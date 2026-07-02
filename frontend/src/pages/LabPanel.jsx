@@ -6,6 +6,7 @@ import {
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
+import { formatLabStatus } from '../components/laboratory/labUiLabels';
 import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
@@ -140,8 +141,11 @@ export default function LabPanel() {
 
   const switchTab = useCallback((tabId) => {
     setActiveTab(tabId);
-    navigate(`/lab?tab=${tabId}`, { replace: true });
-  }, [navigate]);
+    // WF-15 fix: сохраняем patient/instance в URL при переключении таба.
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tabId);
+    navigate(`/lab?${params.toString()}`, { replace: true });
+  }, [navigate, location.search]);
 
   const handleTabKeyDown = useCallback((event, tabId) => {
     const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
@@ -329,11 +333,41 @@ export default function LabPanel() {
     }
   }, [loadReportHistory, notify, switchTab]);
 
+  // WF-15 fix: URL sync для patient/instance — shareable + back-button friendly.
+  // При смене selectedAppointment или activeInstance обновляем URL params.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (selectedAppointment?.patient_id) {
+      params.set('patient', String(selectedAppointment.patient_id));
+    } else {
+      params.delete('patient');
+    }
+    if (activeInstance?.id) {
+      params.set('instance', String(activeInstance.id));
+    } else {
+      params.delete('instance');
+    }
+    // Только если params реально изменились —避免 лишних navigate
+    const current = new URLSearchParams(location.search);
+    if (params.toString() !== current.toString()) {
+      navigate(`/lab?${params.toString()}`, { replace: true });
+    }
+  }, [selectedAppointment, activeInstance, location.search, navigate]);
+
   useEffect(() => {
     loadLabAppointments();
     loadTemplates();
     loadRecentReports();
-  }, [loadLabAppointments, loadRecentReports, loadTemplates]);
+    // WF-15 fix: восстановление контекста из URL при загрузке.
+    // Если URL содержит ?instance=N — открываем этот отчёт.
+    const instanceParam = searchParams.get('instance');
+    if (instanceParam) {
+      const instanceId = parseInt(instanceParam, 10);
+      if (!Number.isNaN(instanceId)) {
+        loadInstance(instanceId);
+      }
+    }
+  }, [loadLabAppointments, loadRecentReports, loadTemplates, searchParams, loadInstance]);
 
   useEffect(() => {
     if (selectedAppointment?.patient_id) {
@@ -528,87 +562,129 @@ export default function LabPanel() {
         )}
       </Card>
 
-      {activeTab === 'queue' && (
-        <section
-          id={getLabPanelTabPanelId('queue')}
-          role="tabpanel"
-          aria-labelledby={getLabPanelTabId('queue')}
-          tabIndex={0}
-        >
-          <LabQueueWorkbench
-            appointments={appointments}
-            loading={appointmentsLoading}
-            onRefresh={loadLabAppointments}
-            onOpenAppointment={(appointment) => {
-              setSelectedAppointment(appointment);
-              setTemplateResolution(null);
-              // WF-03 fix: если у пациента уже есть report_instance_id —
-              // сразу открываем существующий бланк, а не сбрасываем в режим
-              // создания. Раньше setActiveInstance(null) безусловно сбрасывал,
-              // и кнопка «Открыть бланк» misleading'ила: вела в режим создания.
-              if (appointment.report_instance_id) {
-                loadInstance(appointment.report_instance_id);
-              } else {
-                setActiveInstance(null);
-              }
-              switchTab('reports');
-            }}
-            selectedAppointment={selectedAppointment}
-            reportHistory={reportHistory}
-          />
-        </section>
-      )}
+      {/* WF-14 fix: используем hidden вместо conditional render.
+          Раньше activeTab === 'queue' && (...) размонтировало компонент
+          при переключении — searchQuery и statusFilter терялись.
+          Теперь все 3 секции смонтированы, скрытые через hidden —
+          local state сохраняется. aria-hidden для accessibility. */}
+      <section
+        id={getLabPanelTabPanelId('queue')}
+        role="tabpanel"
+        aria-labelledby={getLabPanelTabId('queue')}
+        tabIndex={0}
+        hidden={activeTab !== 'queue'}
+      >
+        <LabQueueWorkbench
+          appointments={appointments}
+          loading={appointmentsLoading}
+          onRefresh={loadLabAppointments}
+          onOpenAppointment={(appointment) => {
+            setSelectedAppointment(appointment);
+            setTemplateResolution(null);
+            // WF-03 fix: если у пациента уже есть report_instance_id —
+            // сразу открываем существующий отчёт, а не сбрасываем в режим
+            // создания.
+            if (appointment.report_instance_id) {
+              loadInstance(appointment.report_instance_id);
+            } else {
+              setActiveInstance(null);
+            }
+            switchTab('reports');
+          }}
+          selectedAppointment={selectedAppointment}
+          reportHistory={reportHistory}
+        />
+      </section>
 
-      {activeTab === 'templates' && (
-        <section
-          id={getLabPanelTabPanelId('templates')}
-          role="tabpanel"
-          aria-labelledby={getLabPanelTabId('templates')}
-          tabIndex={0}
-        >
-          <LabTemplateWorkbench
-            templates={templates}
-            selectedTemplate={selectedTemplate}
-            onSelectTemplate={async (templateId) => {
-              try {
-                const template = await labReportingApi.getTemplate(templateId);
-                setSelectedTemplate(template);
-              } catch (error) {
-                notify('error', getErrorMessage(error, 'Не удалось загрузить шаблон. Проверьте соединение и попробуйте снова.'));
-              }
-            }}
-            onTemplatesChanged={async (preferredTemplateId = null) => {
-              await loadTemplates(preferredTemplateId);
-            }}
-            notify={notify}
-          />
-        </section>
-      )}
+      <section
+        id={getLabPanelTabPanelId('templates')}
+        role="tabpanel"
+        aria-labelledby={getLabPanelTabId('templates')}
+        tabIndex={0}
+        hidden={activeTab !== 'templates'}
+      >
+        <LabTemplateWorkbench
+          templates={templates}
+          selectedTemplate={selectedTemplate}
+          onSelectTemplate={async (templateId) => {
+            try {
+              const template = await labReportingApi.getTemplate(templateId);
+              setSelectedTemplate(template);
+            } catch (error) {
+              notify('error', getErrorMessage(error, 'Не удалось загрузить шаблон. Проверьте соединение и попробуйте снова.'));
+            }
+          }}
+          onTemplatesChanged={async (preferredTemplateId = null) => {
+            await loadTemplates(preferredTemplateId);
+          }}
+          notify={notify}
+        />
+      </section>
 
-      {activeTab === 'reports' && (
-        <section
-          id={getLabPanelTabPanelId('reports')}
-          role="tabpanel"
-          aria-labelledby={getLabPanelTabId('reports')}
-          tabIndex={0}
-        >
-          <LabReportWorkbench
-            selectedAppointment={selectedAppointment}
-            templates={templates}
-            templateResolution={templateResolution}
-            templateResolutionLoading={templateResolutionLoading}
-            reportHistory={reportHistory}
-            recentReports={recentReports}
-            activeInstance={activeInstance}
-            onInstanceChange={setActiveInstance}
-            onOpenInstance={loadInstance}
-            onRefreshHistory={loadReportHistory}
-            onRefreshRecentReports={loadRecentReports}
-            onQueueChanged={loadLabAppointments}
-            notify={notify}
-          />
-        </section>
-      )}
+      <section
+        id={getLabPanelTabPanelId('reports')}
+        role="tabpanel"
+        aria-labelledby={getLabPanelTabId('reports')}
+        tabIndex={0}
+        hidden={activeTab !== 'reports'}
+      >
+        {/* WF-16 fix: breadcrumb навигация для wayfinding.
+            Показывает путь: Очередь → Пациент → Отчёт #N (статус). */}
+        {(selectedAppointment || activeInstance) && (
+          <nav aria-label="Навигация" style={{
+            padding: '8px 0',
+            fontSize: '13px',
+            color: 'var(--mac-text-secondary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexWrap: 'wrap',
+          }}>
+            <button
+              type="button"
+              onClick={() => switchTab('queue')}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--mac-accent)', font: 'inherit', padding: 0,
+              }}
+            >
+              Очередь
+            </button>
+            {selectedAppointment && (
+              <>
+                <span>›</span>
+                <span>{selectedAppointment.patient_fio || `Пациент #${selectedAppointment.patient_id}`}</span>
+              </>
+            )}
+            {activeInstance && (
+              <>
+                <span>›</span>
+                <span>
+                  Отчёт #{activeInstance.id}
+                  <span style={{ marginLeft: '4px', color: 'var(--mac-text-muted)' }}>
+                    ({formatLabStatus(activeInstance.status)})
+                  </span>
+                </span>
+              </>
+            )}
+          </nav>
+        )}
+        <LabReportWorkbench
+          selectedAppointment={selectedAppointment}
+          templates={templates}
+          templateResolution={templateResolution}
+          templateResolutionLoading={templateResolutionLoading}
+          reportHistory={reportHistory}
+          recentReports={recentReports}
+          activeInstance={activeInstance}
+          onInstanceChange={setActiveInstance}
+          onOpenInstance={loadInstance}
+          onRefreshHistory={loadReportHistory}
+          onRefreshRecentReports={loadRecentReports}
+          onQueueChanged={loadLabAppointments}
+          notify={notify}
+        />
+      </section>
 
       <RoleNotificationCenter userRole="lab" />
     </main>
