@@ -127,6 +127,18 @@
   color: white;
 }
 
+/* Larger button variant for empty-state CTAs */
+.registrar-btn-lg {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  color: white;
+}
+
 .registrar-btn-accent {
   background: var(--mac-accent-blue);
 }
