@@ -1371,6 +1371,81 @@ def start_queue_visit(
         )
 
 
+
+# ===================== HELPERS ДЛЯ get_today_queues (R-22 decomposition) =====================
+
+
+def _parse_queue_target_date(target_date: str | None) -> "date":
+    """R-22: Парсинг даты для очереди. Возвращает today если невалидно."""
+    from datetime import datetime
+    if target_date:
+        import re
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', target_date):
+            try:
+                return datetime.strptime(target_date, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                pass
+    return date.today()
+
+
+def _normalize_department_filter(department: str | None) -> set[str] | None:
+    """R-22: Нормализация department фильтра для очереди."""
+    if not department:
+        return None
+    normalized = str(department).strip().lower()
+    aliases = {
+        "lab": {"lab", "laboratory"},
+        "laboratory": {"lab", "laboratory"},
+    }
+    return aliases.get(normalized, {normalized})
+
+
+def _load_queue_data_for_date(db: Session, target_day: "date") -> tuple:
+    """R-22: Загрузка visits, appointments и online entries для даты.
+
+    Returns:
+        tuple of (visits, appointments, online_entries)
+    """
+    from app.models.appointment import Appointment
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.visit import Visit
+
+    visits = (
+        db.query(Visit)
+        .filter(
+            Visit.visit_date == target_day,
+            ~func.lower(func.coalesce(Visit.status, "")).in_(
+                REGISTRAR_HIDDEN_QUEUE_STATUSES
+            ),
+        )
+        .all()
+    )
+
+    appointments = (
+        db.query(Appointment)
+        .filter(
+            Appointment.appointment_date == target_day,
+            ~func.lower(func.coalesce(Appointment.status, "")).in_(
+                REGISTRAR_HIDDEN_QUEUE_STATUSES
+            ),
+        )
+        .all()
+    )
+
+    online_entries = (
+        db.query(OnlineQueueEntry)
+        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+        .filter(
+            DailyQueue.day == target_day,
+            OnlineQueueEntry.status.in_(["waiting", "called", "paid"]),
+        )
+        .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
+        .all()
+    )
+
+    return visits, appointments, online_entries
+
+
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
 
 
@@ -1440,76 +1515,12 @@ def get_today_queues(
                 visit.patient_id,
             )
 
-        # [OK] УПРОЩЕНО: Валидация формата даты перед парсингом (Single Source of Truth)
-        # Если дата не указана, используем сегодня
-        if target_date:
-            # Проверяем формат даты перед парсингом (YYYY-MM-DD)
-            import re
+        # R-22: date parsing + department filter extracted to helpers
+        today = _parse_queue_target_date(target_date)
+        department_filter = _normalize_department_filter(department)
 
-            date_pattern = r'^\d{4}-\d{2}-\d{2}$'
-            if re.match(date_pattern, target_date):
-                try:
-                    today = datetime.strptime(target_date, '%Y-%m-%d').date()
-                except (ValueError, TypeError):
-                    # Если парсинг не удался (некорректная дата), используем сегодня
-                    today = date.today()
-            else:
-                # Неправильный формат - используем сегодня
-                today = date.today()
-        else:
-            today = date.today()
-
-        department_filter: set[str] | None = None
-        if department:
-            normalized_department = str(department).strip().lower()
-            department_aliases = {
-                "lab": {"lab", "laboratory"},
-                "laboratory": {"lab", "laboratory"},
-            }
-            department_filter = department_aliases.get(
-                normalized_department,
-                {normalized_department},
-            )
-
-        # Получаем все визиты на сегодня (новая система)
-        visits = (
-            db.query(Visit)
-            .filter(
-                Visit.visit_date == today,
-                ~func.lower(func.coalesce(Visit.status, "")).in_(
-                    REGISTRAR_HIDDEN_QUEUE_STATUSES
-                ),
-            )
-            .all()
-        )
-
-        # Получаем все appointments на сегодня (старая система)
-        appointments = (
-            db.query(Appointment)
-            .filter(
-                Appointment.appointment_date == today,
-                ~func.lower(func.coalesce(Appointment.status, "")).in_(
-                    REGISTRAR_HIDDEN_QUEUE_STATUSES
-                ),
-            )
-            .all()
-        )
-
-        # [OK] ДОБАВЛЕНО: Получаем записи из онлайн-очереди (OnlineQueueEntry)
-        from app.models.online_queue import DailyQueue, OnlineQueueEntry
-
-        online_entries = (
-            db.query(OnlineQueueEntry)
-            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-            .filter(
-                DailyQueue.day == today,
-                # [OK] ИСПРАВЛЕНО: Добавлен статус "paid" чтобы оплаченные записи
-                # отображались в списке регистратора (UI может фильтровать по статусу)
-                OnlineQueueEntry.status.in_(["waiting", "called", "paid"]),
-            )
-            .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())  # ✅ EXPLICIT SORT: Oldest first
-            .all()
-        )
+        # R-22: data loading extracted to helper
+        visits, appointments, online_entries = _load_queue_data_for_date(db, today)
 
         # Группируем записи по специальности
         queues_by_specialty = {}
