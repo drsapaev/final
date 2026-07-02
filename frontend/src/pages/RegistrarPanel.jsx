@@ -1783,15 +1783,7 @@ const RegistrarPanel = () => {
 
       {/* R-03 fix: breadcrumb навигация для wayfinding.
           Показывает текущую view, выбранное отделение, поисковый запрос. */}
-      <nav aria-label="Навигация" className="registrar-breadcrumb" style={{
-        padding: '4px 0',
-        fontSize: '13px',
-        color: 'var(--mac-text-secondary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        flexWrap: 'wrap',
-      }}>
+      <nav aria-label="Навигация" className="registrar-breadcrumb-nav">
         <button
           type="button"
           onClick={() => {
@@ -2018,27 +2010,9 @@ const RegistrarPanel = () => {
 
                         {/* Календарный виджет */}
                         {showCalendar &&
-                      <div style={{
-                        marginTop: 'var(--mac-spacing-4)',
-                        padding: 'var(--mac-spacing-5)',
-                        background: 'var(--mac-bg-primary)',
-                        borderRadius: 'var(--mac-radius-lg)',
-                        border: '1px solid var(--mac-separator)',
-                        boxShadow: 'var(--mac-shadow-sm)'
-                      }}>
-                            <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 'var(--mac-spacing-3)'
-                        }}>
-                              <label style={{
-                            fontSize: 'var(--mac-font-size-sm)',
-                            fontWeight: 'var(--mac-font-weight-semibold)',
-                            color: 'var(--mac-text-primary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--mac-spacing-2)'
-                          }}>
+                      <div className="registrar-info-card" style={{ padding: 'var(--mac-spacing-5)', boxShadow: 'var(--mac-shadow-sm)' }}>
+                            <div className="registrar-flex-col">
+                              <label className="registrar-picker-label">
                                 <Icon name="magnifyingglass" size="small" className="registrar-text-secondary" />
                                 Выберите дату для просмотра истории:
                               </label>

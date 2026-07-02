@@ -243,7 +243,7 @@ export const useRegistrarData = ({
       return enrichedApt;
     }));
     return enrichedAppointments;
-  };
+  }, [fetchPatientData]);
 
   return {
     loadIntegratedData,
