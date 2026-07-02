@@ -433,7 +433,7 @@ def get_registrar_departments(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения отделений: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -998,7 +998,7 @@ def get_registrar_services(
         # Ошибки валидации или доступа к атрибутам
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка обработки данных услуг: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
     except Exception as e:
         # Остальные ошибки (БД, сеть и т.д.)
@@ -1007,11 +1007,11 @@ def get_registrar_services(
         if isinstance(e, SQLAlchemyError):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка базы данных при получении услуг: {str(e)}",
+                detail="Внутренняя ошибка сервера. Подробности в журнале.",
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения услуг для регистратуры: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -1110,7 +1110,7 @@ def get_registrar_doctors(
         # Ошибки валидации или доступа к атрибутам
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка обработки данных врачей: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
     except Exception as e:
         # Остальные ошибки (БД, сеть и т.д.)
@@ -1119,11 +1119,11 @@ def get_registrar_doctors(
         if isinstance(e, SQLAlchemyError):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка базы данных при получении врачей: {str(e)}",
+                detail="Внутренняя ошибка сервера. Подробности в журнале.",
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения врачей: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -1180,7 +1180,7 @@ def get_registrar_queue_settings(
         # Ошибки валидации или доступа к атрибутам
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка обработки настроек очереди: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
     except Exception as e:
         # Остальные ошибки (БД, сеть и т.д.)
@@ -1189,11 +1189,11 @@ def get_registrar_queue_settings(
         if isinstance(e, SQLAlchemyError):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка базы данных при получении настроек очереди: {str(e)}",
+                detail="Внутренняя ошибка сервера. Подробности в журнале.",
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек очереди: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -1304,7 +1304,7 @@ def create_registrar_appointment(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания записи: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -1352,7 +1352,7 @@ def generate_qr_for_registrar(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации QR: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -1383,7 +1383,7 @@ def open_reception(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка открытия приема: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -1478,7 +1478,7 @@ def start_queue_visit(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка начала приема: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -2839,7 +2839,7 @@ def get_today_queues(
                              # setattr(entry_data, "service_name", service_name)
                              # Лучше не трогать модель, а полагаться на entry_wrapper
                              pass
-                         except:
+                         except Exception:
                              pass
 
                     # ⭐ PHASE 1 FIX: Проверяем service_codes из entry_data (не online_entry!)
@@ -2853,7 +2853,7 @@ def get_today_queues(
                                 parsed = json.loads(entry_data.service_codes)
                                 if isinstance(parsed, list):
                                     service_codes.extend(parsed)
-                            except:
+                            except Exception:
                                 pass
 
                     # ⭐ PHASE 1 FIX: total_cost - приоритет: oqe_total_amount, entry_data.total_amount, VisitService
@@ -2882,7 +2882,7 @@ def get_today_queues(
                             import json
                             try:
                                 parsed_services = json.loads(parsed_services)
-                            except:
+                            except Exception:
                                 parsed_services = []
                         
                         if isinstance(parsed_services, list):
@@ -3221,10 +3221,10 @@ def get_today_queues(
             e,
             exc_info=True,
         )
-        traceback.print_exc()
+        logger.exception("Registrar operation failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения очередей: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -3264,7 +3264,7 @@ def get_registrar_calendar(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения календаря: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -3548,11 +3548,11 @@ def create_queue_entries_batch(
         )
         import traceback
 
-        traceback.print_exc()
+        logger.exception("Registrar operation failed")
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка массового создания записей в очереди: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
 
 
@@ -3612,5 +3612,5 @@ def get_doctor_user_id(
         logger.error(f"Ошибка получения user_id для doctor_id={doctor_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения user_id: {str(e)}",
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )

@@ -70,9 +70,12 @@ def get_or_create_session_id(
         )
         return existing.session_id
 
-    # Generate new session_id (opaque format)
-    day_str = (actual_day or queue_day).isoformat()
-    new_session_id = f"{patient_id}_{target_queue_id}_{day_str}"
+    # Generate new session_id (opaque, unpredictable format).
+    # R-40 fix: previously f"{patient_id}_{target_queue_id}_{day_str}" — predictable.
+    # CWE-340: if session_id is used for access control — IDOR vulnerability.
+    # Now: secrets.token_urlsafe(16) — cryptographically secure, unpredictable.
+    import secrets
+    new_session_id = secrets.token_urlsafe(16)
 
     logger.info(
         "[get_or_create_session_id] Created new session_id=%s for patient=%d, queue=%d",
