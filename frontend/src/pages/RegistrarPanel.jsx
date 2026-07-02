@@ -1583,7 +1583,7 @@ const RegistrarPanel = () => {
     if (dataSource === 'error') {
       return (
         <div className="registrar-ds-indicator registrar-ds-error">
-          <Icon name="exclamationmark.triangle" size="small" style={{ color: 'white' }} />
+          <Icon name="exclamationmark.triangle" size="small" className="registrar-text-white" />
           <span>Не удалось загрузить записи. Проверьте подключение к серверу.</span>
           <button
             onClick={() => loadAppointments({ source: 'error_refresh_button', force: true })}
@@ -1598,7 +1598,7 @@ const RegistrarPanel = () => {
     if (dataSource === 'api') {
       return (
         <div className="registrar-ds-indicator registrar-ds-success">
-          <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
+          <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
           <span>Данные загружены с сервера</span>
           <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
             {count} из {paginationInfo.total} записей
@@ -1610,7 +1610,7 @@ const RegistrarPanel = () => {
     if (dataSource === 'loading') {
       return (
         <div className="registrar-ds-indicator registrar-ds-loading">
-          <Icon name="arrow.up.arrow.down" size="small" style={{ color: 'white' }} />
+          <Icon name="arrow.up.arrow.down" size="small" className="registrar-text-white" />
           <span>Загрузка данных...</span>
         </div>);
 
@@ -1904,14 +1904,9 @@ const RegistrarPanel = () => {
                             setShowWizard(true);
                           }}
                           aria-label="Create new appointment"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--mac-spacing-2)',
-                            fontWeight: 'var(--mac-font-weight-semibold)'
-                          }}>
+                          className="registrar-flex" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
 
-                            <Icon name="plus" size="small" style={{ color: 'white' }} />
+                            <Icon name="plus" size="small" className="registrar-text-white" />
                             {t('new_appointment')}
                           </Button>
 
@@ -1921,11 +1916,7 @@ const RegistrarPanel = () => {
                           size="default"
                           onClick={() => setShowPaymentManager(true)}
                           aria-label="Open payment module"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--mac-spacing-2)'
-                          }}>
+                          className="registrar-flex">
 
                             <Icon name="creditcard" size="small" />
                             Модуль оплаты
@@ -1941,11 +1932,7 @@ const RegistrarPanel = () => {
                             downloadCSV(csvContent, filename);
                             notify.success(`Экспортировано ${appointments.length} записей`);
                           }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--mac-spacing-2)'
-                          }}>
+                          className="registrar-flex">
 
                             <Icon name="square.and.arrow.up" size="small" />
                             {t('export_csv')}
@@ -1987,11 +1974,7 @@ const RegistrarPanel = () => {
                             logger.info('Кнопка "Календарь" нажата');
                             setShowCalendar(!showCalendar);
                           }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--mac-spacing-2)'
-                          }}>
+                          className="registrar-flex">
 
                             <Icon name="magnifyingglass" size="small" style={{ color: showCalendar ? 'white' : 'var(--mac-text-primary)' }} />
                             Календарь
@@ -2003,7 +1986,7 @@ const RegistrarPanel = () => {
                           onClick={() => setSearchParams({ status: 'queued' })}
                           className="registrar-flex">
 
-                            <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
+                            <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
                             Активная очередь
                           </Button>
 
@@ -2013,7 +1996,7 @@ const RegistrarPanel = () => {
                           onClick={() => setSearchParams({ status: 'paid_pending' })}
                           className="registrar-flex">
 
-                            <Icon name="creditcard" size="small" style={{ color: 'white' }} />
+                            <Icon name="creditcard" size="small" className="registrar-text-white" />
                             Ожидают оплаты
                           </Button>
 
@@ -2265,7 +2248,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
                         onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue)'}>
 
-                                <Icon name="key" size="small" style={{ marginRight: '6px' }} />Войти снова
+                                <Icon name="key" size="small" className="registrar-icon-mr" />Войти снова
                               </button>
 
                               <button
@@ -2277,7 +2260,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-green-hover)'}
                         onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-green)'}>
 
-                                <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Обновить данные
+                                <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Обновить данные
                               </button>
 
                               <button
@@ -2289,7 +2272,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = 'var(--mac-text-secondary)'}
                         onMouseOut={(e) => e.target.style.background = 'var(--mac-text-tertiary)'}>
 
-                                <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Перезапустить приложение
+                                <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Перезапустить приложение
                               </button>
                             </div>
                     }
@@ -2316,7 +2299,7 @@ const RegistrarPanel = () => {
                         fontSize: '14px'
                       }}>
 
-                            <Icon name="plus" size="small" style={{ marginRight: '6px' }} />Создать первую запись
+                            <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
                           </Button>
                         </div>
                   }
@@ -2480,7 +2463,7 @@ const RegistrarPanel = () => {
                     gap: 'var(--mac-spacing-2)',
                     flexShrink: 0
                   }}>
-                    <Icon name="plus" size="small" style={{ color: 'white' }} />
+                    <Icon name="plus" size="small" className="registrar-text-white" />
                     {t('new_appointment')}
                   </Button>
                 </div>
@@ -2527,7 +2510,7 @@ const RegistrarPanel = () => {
                   fontSize: '14px'
                 }}>
 
-                    <Icon name="plus" size="small" style={{ marginRight: '6px' }} />Создать первую запись
+                    <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
                   </Button>
                 </div> :
             filteredAppointments.length === 0 ?
@@ -2628,7 +2611,7 @@ const RegistrarPanel = () => {
                       </> :
 
                 <>
-                        <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Загрузить еще
+                        <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Загрузить еще
                       </>
                 }
                   </button>
