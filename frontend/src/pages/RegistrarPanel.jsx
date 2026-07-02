@@ -2529,6 +2529,9 @@ const RegistrarPanel = () => {
               background: 'var(--mac-gradient-subtle)',
               borderBottom: '1px solid var(--mac-separator)'
             }}>
+                {/* QW-08 fix: reduced AnimatedTransition from 10 to 3 (100/200/300ms). */}
+                {/* Previous delays 400/800/900/1000/1100/1350/1400/1500 blocked first */}
+                {/* user intent until 1.5s after page load. */}
                 <AnimatedTransition type="slide" direction="up" delay={200}>
                   <h1 style={{
                   margin: 0,
@@ -2547,7 +2550,7 @@ const RegistrarPanel = () => {
                     <Icon name="person" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
                   </h1>
                 </AnimatedTransition>
-                <AnimatedTransition type="fade" delay={400}>
+                <AnimatedTransition type="fade" delay={300}>
                   <div style={{
                   fontSize: '20px',
                   fontWeight: '600',
@@ -2584,9 +2587,8 @@ const RegistrarPanel = () => {
 
 
                 {/* Панель управления и фильтров */}
-                <AnimatedTransition type="fade" delay={800}>
+                {/* QW-08 fix: unwrapped nested AnimatedTransition (was delays 800-1500). */}
                   <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
-                    <AnimatedTransition type="slide" direction="up" delay={900}>
                       <h2 style={{
                       fontSize: 'var(--mac-font-size-xl)',
                       marginBottom: 'var(--mac-spacing-4)',
@@ -2599,10 +2601,8 @@ const RegistrarPanel = () => {
                         <Icon name="gear" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
                         Панель управления
                       </h2>
-                    </AnimatedTransition>
 
                     {/* Быстрые действия */}
-                    <AnimatedTransition type="fade" delay={1000}>
                       <div style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -2610,7 +2610,6 @@ const RegistrarPanel = () => {
                       alignItems: 'stretch',
                       marginBottom: 'var(--mac-spacing-6)'
                     }}>
-                        <AnimatedTransition type="scale" delay={1100}>
                           <Button
                           variant="primary"
                           size="default"
@@ -2631,10 +2630,8 @@ const RegistrarPanel = () => {
                             <Icon name="plus" size="small" style={{ color: 'white' }} />
                             {t('new_appointment')}
                           </Button>
-                        </AnimatedTransition>
 
                         {/* Кнопка модуля оплаты */}
-                        <AnimatedTransition type="scale" delay={1350}>
                           <Button
                           variant="secondary"
                           size="default"
@@ -2649,9 +2646,7 @@ const RegistrarPanel = () => {
                             <Icon name="creditcard" size="small" />
                             Модуль оплаты
                           </Button>
-                        </AnimatedTransition>
 
-                        <AnimatedTransition type="scale" delay={1400}>
                           <Button
                           variant="outline"
                           size="default"
@@ -2671,12 +2666,9 @@ const RegistrarPanel = () => {
                             <Icon name="square.and.arrow.up" size="small" />
                             {t('export_csv')}
                           </Button>
-                        </AnimatedTransition>
                       </div>
-                    </AnimatedTransition>
 
                     {/* Фильтры и навигация */}
-                    <AnimatedTransition type="fade" delay={1500}>
                       <div style={{
                       background: 'var(--mac-bg-toolbar)',
                       borderRadius: 'var(--mac-radius-lg)',
@@ -2885,9 +2877,7 @@ const RegistrarPanel = () => {
                           </div>
                       }
                       </div>
-                    </AnimatedTransition>
                   </div>
-                </AnimatedTransition>
 
                 {/* История записей */}
                 <div>
