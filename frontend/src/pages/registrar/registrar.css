@@ -87,6 +87,15 @@
   color: var(--mac-accent-blue);
 }
 
+.registrar-text-white {
+  color: white;
+}
+
+/* Icon margin utility for inline icons before text */
+.registrar-icon-mr {
+  margin-right: 6px;
+}
+
 .registrar-text-sm {
   font-size: var(--mac-font-size-sm);
   line-height: 1.5;
