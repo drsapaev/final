@@ -454,7 +454,7 @@ export default function LabQueueWorkbench({
                       </div>
                       <Button variant="primary" onClick={() => onOpenAppointment(appointment)}>
                         <Icon name="doc.text" size={16} />
-                        {appointment.report_instance_id ? 'Открыть бланк' : 'Открыть в редакторе'}
+                        {appointment.report_instance_id ? 'Открыть отчёт' : 'Открыть в редакторе'}
                       </Button>
                     </div>
                   </div>
@@ -476,12 +476,12 @@ export default function LabQueueWorkbench({
           >
             <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Icon name="clock.arrow.circlepath" size={20} />
-              История бланков пациента
+              История отчётов пациента
             </CardTitle>
           </CardHeader>
           <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}>
             {reportHistory.length === 0 ? (
-              <Alert severity="info">Для выбранного пациента ещё нет лабораторных бланков.</Alert>
+              <Alert severity="info">Для выбранного пациента ещё нет лабораторных отчётов.</Alert>
             ) : (
               <div style={{ display: 'grid', gap: '12px' }}>
                 {reportHistory.map((item) => (
@@ -500,7 +500,7 @@ export default function LabQueueWorkbench({
                   >
                     <div style={{ display: 'grid', gap: '4px' }}>
                       <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                        {item.template?.name || `Бланк #${item.id}`}
+                        {item.template?.name || `Отчёт #${item.id}`}
                       </div>
                       <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
                         Создан: {new Date(item.created_at).toLocaleString()} | Статус: {formatLabStatus(item.status)}

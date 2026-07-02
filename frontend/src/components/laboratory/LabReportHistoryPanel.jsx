@@ -52,12 +52,12 @@ export default function LabReportHistoryPanel({
   );
 
   const title = showRecentReportsBrowser
-    ? 'Недавние лабораторные бланки'
-    : 'Доступные бланки пациента';
+    ? 'Недавние лабораторные отчёты'
+    : 'Доступные отчёты пациента';
 
   const emptyText = showRecentReportsBrowser
-    ? 'В лаборатории пока нет сохранённых бланков для повторного открытия.'
-    : 'Для выбранного фильтра нет лабораторных бланков.';
+    ? 'В лаборатории пока нет сохранённых отчётов для повторного открытия.'
+    : 'Для выбранного фильтра нет лабораторных отчётов.';
 
   return (
     <Card variant="filled" padding="none">
@@ -108,7 +108,7 @@ export default function LabReportHistoryPanel({
               >
                 <div style={{ display: 'grid', gap: '4px', textAlign: 'left' }}>
                   <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                    {item.template?.name || `Бланк #${item.id}`}
+                    {item.template?.name || `Отчёт #${item.id}`}
                   </div>
                   <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
                     {showRecentReportsBrowser
