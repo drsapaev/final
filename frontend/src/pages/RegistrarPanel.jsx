@@ -2952,12 +2952,17 @@ const RegistrarPanel = () => {
                     borderRadius: '12px',
                     border: `1px solid ${borderColor}`
                   }}>
-                          <div style={{
+                          {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
+                    {/* Full unification deferred — requires EmptyState.jsx migration */}
+                    {/* from Tailwind/native to macOS design system first. */}
+                    <div style={{
                       fontSize: '48px',
                       marginBottom: '16px',
                       opacity: 0.3
                     }}>
-                            {!tokenManager.hasToken() ? '🔐' : '📋'}
+                            {!tokenManager.hasToken() ?
+                      <Icon name="lock" size="large" /> :
+                      <Icon name="doc.text" size="large" />}
                           </div>
                           <h3 style={{
                       fontSize: '20px',
@@ -3050,7 +3055,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = '#4b5563'}
                         onMouseOut={(e) => e.target.style.background = '#6b7280'}>
 
-                                🔄 Перезапустить приложение
+                                <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Перезапустить приложение
                               </button>
                             </div>
                     }
@@ -3063,7 +3068,9 @@ const RegistrarPanel = () => {
                       `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :
                       'Сегодня пока нет записей'}
                           </p>
-                          <Button
+                          {/* QW-04: empty state 3 of 3 (welcome no-records). */}
+                    {/* See empty state 1 above for unification plan. */}
+                    <Button
                       variant="primary"
                       onClick={() => {
                         setWizardEditMode(false); // ✅ Сброс режима
@@ -3305,7 +3312,8 @@ const RegistrarPanel = () => {
                 marginBottom: '16px',
                 opacity: 0.3
               }}>
-                    📋
+                    {/* QW-04: empty state 2 of 3 (worklist empty). */}
+                    <Icon name="doc.text" size="large" />
                   </div>
                   <h3 style={{
                 fontSize: '20px',
