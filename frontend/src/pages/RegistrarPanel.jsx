@@ -874,38 +874,9 @@ const RegistrarPanel = () => {
     color: textColor
   };
 
-  const buttonStyle = {
-    padding: '0.5rem 1.5rem',
-    background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    marginRight: '0.5rem',
-    fontSize: '14px',
-    fontWeight: '600',
-    lineHeight: '1.25',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    position: 'relative',
-    overflow: 'hidden',
-    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-  };
-
-  const buttonSecondaryStyle = {
-    padding: `${'0.5rem'} ${'1.5rem'}`,
-    background: theme === 'light' ? 'white' : 'var(--color-background-secondary)',
-    color: textColor,
-    border: `1px solid ${borderColor}`,
-    borderRadius: '12px',
-    cursor: 'pointer',
-    marginRight: '0.5rem',
-    fontSize: '14px',
-    fontWeight: '600',
-    lineHeight: '1.25',
-    transition: 'all 0.2s ease',
-    boxShadow: 'none'
-  };
+  // QW-01 cleanup: buttonStyle and buttonSecondaryStyle removed (were unused
+  // dead code — 32 lines of inline styles that bypassed the macOS design
+  // system canonical Button component). See audit §5.5, §5.6.
 
 
   // Загрузка данных из админ панели
