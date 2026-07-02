@@ -604,3 +604,18 @@
   align-items: flex-start;
   gap: 12px;
 }
+
+/* Inline flex with tight gap (for badges with icon) */
+.registrar-inline-flex-tight {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+}
+
+/* Inline flex with flexShrink (for fixed-width containers) */
+.registrar-inline-flex-shrink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
