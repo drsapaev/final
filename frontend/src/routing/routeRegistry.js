@@ -1008,7 +1008,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
     legacyRedirectFrom: ['/registrar-panel'],
-    layout: layout({ hideSidebar: true, sidebarPreset: 'registrar', pageTitle: 'Registrar Panel' }),
+    layout: layout({ hideSidebar: true, pageTitle: 'Registrar Panel' }),
   },
   {
     id: 'doctor-home',
@@ -1044,7 +1044,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.cashier',
     component: 'CashierPanel',
     legacyRedirectFrom: ['/cashier-panel'],
-    layout: layout({ hideSidebar: true, sidebarPreset: 'cashier', pageTitle: 'Cashier Panel' }),
+    layout: layout({ hideSidebar: true, pageTitle: 'Cashier Panel' }),
   },
   {
     id: 'lab-home',
@@ -1085,7 +1085,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.patient',
     component: 'PatientPanel',
     legacyRedirectFrom: ['/patient-panel'],
-    layout: layout({ hideSidebar: true, sidebarPreset: 'patient', pageTitle: 'Patient Panel' }),
+    layout: layout({ hideSidebar: true, pageTitle: 'Patient Panel' }),
   },
   {
     id: 'patient-payment-entry',
@@ -1105,7 +1105,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.patient',
     component: 'PatientPanel',
     legacyRedirectFrom: [],
-    layout: layout({ hideSidebar: true, sidebarPreset: 'patient', activeSidebarItem: 'payments', pageTitle: 'Patient Payments' }),
+    layout: layout({ hideSidebar: true, activeSidebarItem: 'payments', pageTitle: 'Patient Payments' }),
   },
   {
     id: 'patient-booking-entry',
@@ -1123,7 +1123,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.patient',
     component: 'PatientPanel',
     legacyRedirectFrom: [],
-    layout: layout({ hideSidebar: true, sidebarPreset: 'patient', activeSidebarItem: 'appointments', pageTitle: 'Patient Bookings' }),
+    layout: layout({ hideSidebar: true, activeSidebarItem: 'appointments', pageTitle: 'Patient Bookings' }),
   },
   {
     id: 'doctor-cardiology',

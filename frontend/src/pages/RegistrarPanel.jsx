@@ -21,6 +21,8 @@ import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
+// QW-06 fix: translations extracted to separate file (was 50+ inline keys).
+import { getRegistrarTranslator } from './registrarTranslations';
 
 const API_BASE = getApiOrigin();
 const REGISTRAR_TAB_LABEL_KEYS = {
@@ -493,276 +495,20 @@ const RegistrarPanel = () => {
 
   // Состояния для пагинации
   const [paginationInfo, setPaginationInfo] = useState({ total: 0, hasMore: false, loadingMore: false });
-  // Демо-данные вынесены в константу
-  const demoAppointments = useMemo(() => [
-  {
-    id: 1,
-    patient_fio: 'Иванов Иван Иванович',
-    patient_birth_year: 1985,
-    patient_phone: '+998 (90) 123-45-67',
-    address: 'ул. Навои, д. 15, кв. 23',
-    services: ['Консультация кардиолога', 'ЭКГ'],
-    visit_type: 'paid',
-    payment_type: 'card',
-    payment_status: 'paid',
-    cost: 50000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'cardiology',
-    doctor_specialty: 'cardiology',
-    date: todayStr,
-    appointment_date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    // Добавляем номера очередей для демонстрации
-    queue_numbers: [
-    {
-      queue_tag: 'cardiology_common',
-      queue_name: 'Кардиолог',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_123456'
-  },
-  // Добавляем записи для того же пациента в разных отделениях (для тестирования агрегации)
-  {
-    id: 2,
-    patient_fio: 'Иванов Иван Иванович', // Тот же пациент
-    patient_birth_year: 1985,
-    patient_phone: '+998 (90) 123-45-67',
-    address: 'ул. Навои, д. 15, кв. 23',
-    services: ['Консультация дерматолога', 'Дерматоскопия'], // Другие услуги
-    visit_type: 'paid',
-    payment_type: 'card',
-    payment_status: 'paid',
-    cost: 45000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'dermatology', // Другое отделение
-    doctor_specialty: 'dermatology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'dermatology',
-      queue_name: 'Дерматолог',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_123456'
-  },
-  {
-    id: 3,
-    patient_fio: 'Иванов Иван Иванович', // Тот же пациент
-    patient_birth_year: 1985,
-    patient_phone: '+998 (90) 123-45-67',
-    address: 'ул. Навои, д. 15, кв. 23',
-    services: ['Консультация стоматолога'], // Третья услуга
-    visit_type: 'paid',
-    payment_type: 'cash',
-    payment_status: 'paid',
-    cost: 30000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'stomatology', // Третье отделение
-    doctor_specialty: 'stomatology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'stomatology',
-      queue_name: 'Стоматолог',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_123456'
-  },
-  {
-    id: 2,
-    patient_fio: 'Петрова Анна Сергеевна',
-    patient_birth_year: 1990,
-    patient_phone: '+998 (91) 234-56-78',
-    address: 'пр. Амира Темура, д. 42',
-    services: ['ЭКГ', 'Холтер'],
-    visit_type: 'repeat',
-    payment_type: 'cash',
-    payment_status: 'pending',
-    cost: 30000,
-    status: 'queued',
-    isEmpty: false,
-    department: 'cardiology',
-    doctor_specialty: 'cardiology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    // Добавляем номера очередей
-    queue_numbers: [
-    {
-      queue_tag: 'cardiology_common',
-      queue_name: 'Кардиолог',
-      number: 2,
-      status: 'waiting',
-      source: 'confirmation',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'registrar_1'
-  },
-  {
-    id: 3,
-    patient_fio: 'Сидоров Петр Александрович',
-    patient_birth_year: 1975,
-    patient_phone: '+998 (93) 345-67-89',
-    address: 'ул. Шота Руставели, д. 8, кв. 45',
-    services: ['Консультация дерматолога'],
-    visit_type: 'paid',
-    payment_type: 'card',
-    payment_status: 'paid',
-    cost: 45000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'dermatology',
-    doctor_specialty: 'dermatology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'dermatology',
-      queue_name: 'Дерматолог',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_789012'
-  },
-  {
-    id: 4,
-    patient_fio: 'Козлова Мария Владимировна',
-    patient_birth_year: 1988,
-    patient_phone: '+998 (94) 456-78-90',
-    address: 'ул. Бабура, д. 25',
-    services: ['Лечение кариеса'],
-    visit_type: 'paid',
-    payment_type: 'cash',
-    payment_status: 'pending',
-    cost: 60000,
-    status: 'queued',
-    isEmpty: false,
-    department: 'stomatology',
-    doctor_specialty: 'stomatology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'stomatology',
-      queue_name: 'Стоматолог',
-      number: 1,
-      status: 'waiting',
-      source: 'desk',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'none',
-    confirmed_at: null,
-    confirmed_by: null
-  },
-  {
-    id: 5,
-    patient_fio: 'Морозов Алексей Игоревич',
-    patient_birth_year: 1992,
-    patient_phone: '+998 (95) 567-89-01',
-    address: 'ул. Мирзо Улугбека, д. 67, кв. 12',
-    services: ['Общий анализ крови', 'Биохимия'],
-    visit_type: 'paid',
-    payment_type: 'card',
-    payment_status: 'paid',
-    cost: 25000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'laboratory',
-    doctor_specialty: 'laboratory',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'lab',
-      queue_name: 'Лаборатория',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_345678'
-  },
-  {
-    id: 6,
-    patient_fio: 'Волкова Елена Сергеевна',
-    patient_birth_year: 1983,
-    patient_phone: '+998 (97) 678-90-12',
-    address: 'ул. Алишера Навои, д. 134',
-    services: ['Капельница', 'Инъекция'],
-    visit_type: 'free',
-    payment_type: 'cash',
-    payment_status: 'paid',
-    cost: 35000,
-    status: 'queued',
-    isEmpty: false,
-    department: 'procedures',
-    doctor_specialty: 'procedures',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'procedures',
-      queue_name: 'Процедуры',
-      number: 1,
-      status: 'waiting',
-      source: 'desk',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'none',
-    confirmed_at: null,
-    confirmed_by: null
-  }],
-  [todayStr]);
+  // QW-03 fix: demoAppointments useMemo (260 lines) removed.
+  // Production code should never ship demo data. Backend fixtures
+  // are used for tests; error states show proper error UI instead.
 
   // Состояния для управления данными
   const [appointments, setAppointments] = useState([]);
   // ⭐ SSOT FIX: Сырые данные (flat list) до агрегации — для Tooltip
   const [rawEntries] = useState([]);
-  const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'demo' | 'error'
+  const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'error' (QW-03: 'demo' removed)
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
+  // QW-01 fix: bulk-action state removed — checkboxes were already disabled
+  // (showCheckboxes=false) and the bulk-action bar was unreachable via UI.
+  // Only hidden Ctrl+A/Alt+1-3 hotkeys could populate this state, creating
+  // dead UI that surfaced unexpectedly. See audit P-011.
   const appointmentsCount = appointments.length;
   // ✅ Используется только новый мастер (V2)
   const [showWizard, setShowWizard] = useState(false);
@@ -1071,23 +817,11 @@ const RegistrarPanel = () => {
   }, []);
   const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   const appointmentOverridesRef = useRef({});
-  const translations = { ru: { // Основные
-      welcome: 'Добро пожаловать', start_work: 'Начать работу', quick_start: 'Быстрый старт', loading: 'Загрузка', error: 'Ошибка', success: 'Успешно', warning: 'Предупреждение', // Вкладки
-      tabs_welcome: 'Главная', tabs_appointments: 'Все записи', tabs_cardio: 'Кардиолог', tabs_echokg: 'ЭКГ', tabs_derma: 'Дерматолог', tabs_dental: 'Стоматолог', tabs_lab: 'Лаборатория', tabs_procedures: 'Процедуры', tabs_queue: 'Онлайн-очередь', // Действия
-      new_appointment: 'Новая запись', export_csv: 'Экспорт CSV', today: 'Сегодня', reset: 'Сбросить', confirm: 'Подтвердить', cancel: 'Отменить', no_show: 'Неявка', reason: 'Причина', bulk_actions: 'Массовые действия', search: 'Поиск', filter: 'Фильтр', clear_filter: 'Очистить фильтр', // Мастер
-      patient: 'Пациент', details: 'Детали', payment: 'Оплата', next: 'Далее', back: 'Назад', save: 'Сохранить', close: 'Закрыть', add_to_queue: 'Добавить в очередь', priority: 'Приоритет', available_slots: 'Доступные слоты', tomorrow: 'Завтра', select_date: 'Выбрать дату', online_payment: 'Онлайн оплата', // Поля формы
-      full_name: 'ФИО', birth_date: 'Дата рождения', phone: 'Телефон', address: 'Адрес', services: 'Услуги', doctor: 'Врач', appointment_type: 'Тип обращения', payment_method: 'Способ оплаты', amount: 'Сумма', // Статусы
-      status_scheduled: 'Запланирован', status_confirmed: 'Подтвержден', status_queued: 'В очереди', status_in_cabinet: 'В кабинете', status_done: 'Завершен', status_cancelled: 'Отменен', status_no_show: 'Неявка', status_paid_pending: 'Ожидает оплаты', status_paid: 'Оплачен', // Статистика
-      total_patients: 'Всего пациентов', today_appointments: 'Записей сегодня', pending_payments: 'Ожидают оплаты', active_queues: 'Активные очереди', empty_table: 'Нет данных для отображения', // Сообщения
-      appointment_created: 'Запись создана успешно', appointment_cancelled: 'Запись отменена', payment_successful: 'Оплата прошла успешно', print_ticket: 'Печать талона', auto_refresh: 'Автообновление', data_source_demo: 'Показаны демо-данные', data_source_api: 'Данные загружены с сервера' }, uz: { // Основные
-      welcome: 'Xush kelibsiz', start_work: 'Ishni boshlash', quick_start: 'Tezkor start', loading: 'Yuklanmoqda', error: 'Xatolik', success: 'Muvaffaqiyatli', warning: 'Ogohlantirish', // Вкладки
-      tabs_welcome: 'Asosiy', tabs_appointments: 'yozilganlar', tabs_cardio: 'Kardiolog', tabs_echokg: 'EKG', tabs_derma: 'Dermatolog', tabs_dental: 'Stomatolog', tabs_lab: 'Laboratoriya', tabs_procedures: 'muolaja', tabs_queue: 'navbat', // Действия
-      new_appointment: 'Yangi yozuv', export_csv: 'CSV eksport', today: 'Bugun', reset: 'Tozalash', confirm: 'Tasdiqlash', cancel: 'Bekor qilish', no_show: 'Kelmaslik', reason: 'Sabab', bulk_actions: 'Ommaviy amallar', search: 'Qidirish', filter: 'Filter', clear_filter: 'Filterni tozalash', // Мастер
-      patient: 'Bemor', details: 'Tafsilotlar', payment: 'To\'lov', next: 'Keyingi', back: 'Orqaga', save: 'Saqlash', close: 'Yopish', add_to_queue: 'Navbatga qo\'shish', priority: 'Ustuvorlik', available_slots: 'Mavjud vaqtlar', tomorrow: 'Ertaga', select_date: 'Sanani tanlash', online_payment: 'Onlayn to\'lov', // Поля формы
-      full_name: 'F.I.Sh', birth_date: 'Tug\'ilgan sana', phone: 'Telefon', address: 'Manzil', services: 'Xizmatlar', doctor: 'Shifokor', appointment_type: 'Murojaat turi', payment_method: 'To\'lov usuli', amount: 'Summa', // Статусы
-      status_scheduled: 'Rejalashtirilgan', status_confirmed: 'Tasdiqlangan', status_queued: 'Navbatda', status_in_cabinet: 'Kabinetda', status_done: 'Tugallangan', status_cancelled: 'Bekor qilingan', status_no_show: 'Kelmagan', status_paid_pending: 'To\'lovni kutmoqda', status_paid: 'To\'langan', // Статистика
-      total_patients: 'Jami bemorlar', today_appointments: 'Bugungi yozuvlar', pending_payments: 'To\'lovni kutmoqda', active_queues: 'Faol navbatlar', empty_table: 'Ma\'lumot yo\'q', // Сообщения
-      appointment_created: 'Yozuv muvaffaqiyatli yaratildi', appointment_cancelled: 'Yozuv bekor qilindi', payment_successful: 'To\'lov muvaffaqiyatli o\'tdi', print_ticket: 'Talon chop etish', auto_refresh: 'Avtomatik yangilash', data_source_demo: 'Demo ma\'lumotlar ko\'rsatilgan', data_source_api: 'Ma\'lumotlar serverdan yuklandi' } };const t = (key) => translations[language] && translations[language][key] || translations.ru[key] || key; // Используем централизованную тему
+  // QW-06 fix: translations moved to ./registrarTranslations.js (was 50+ inline keys).
+  // EN translations added (previously missing — EN users saw RU fallback).
+  // Full migration to locales/{ru,uz,en}.js deferred until useTranslation.jsx
+  // is refactored to use centralized locale files (see audit §8, Direction 3).
+  const t = useMemo(() => getRegistrarTranslator(language), [language]);
   const currentWorklistLabel = t(REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments');
   const statusFilterLabel = statusFilter ? t(REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter) : null;
   const { theme, isDark, getSpacing, getFontSize, getColor } = useTheme();
@@ -1140,38 +874,9 @@ const RegistrarPanel = () => {
     color: textColor
   };
 
-  const buttonStyle = {
-    padding: '0.5rem 1.5rem',
-    background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    marginRight: '0.5rem',
-    fontSize: '14px',
-    fontWeight: '600',
-    lineHeight: '1.25',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    position: 'relative',
-    overflow: 'hidden',
-    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-  };
-
-  const buttonSecondaryStyle = {
-    padding: `${'0.5rem'} ${'1.5rem'}`,
-    background: theme === 'light' ? 'white' : 'var(--color-background-secondary)',
-    color: textColor,
-    border: `1px solid ${borderColor}`,
-    borderRadius: '12px',
-    cursor: 'pointer',
-    marginRight: '0.5rem',
-    fontSize: '14px',
-    fontWeight: '600',
-    lineHeight: '1.25',
-    transition: 'all 0.2s ease',
-    boxShadow: 'none'
-  };
+  // QW-01 cleanup: buttonStyle and buttonSecondaryStyle removed (were unused
+  // dead code — 32 lines of inline styles that bypassed the macOS design
+  // system canonical Button component). See audit §5.5, §5.6.
 
 
   // Загрузка данных из админ панели
@@ -1648,10 +1353,12 @@ const RegistrarPanel = () => {
         });
         logger.info('✅ SSOT: Загружено', enriched.length, 'записей (без local overrides)');
       } else {
-        // ⭐ SSOT: Demo fallback без local overrides
+        // QW-03 fix: empty API response is a valid state, not a demo fallback.
+        // Empty result is already handled earlier (line ~1370). This branch
+        // is unreachable but kept as defensive code.
         startTransition(() => {
-          setAppointments(demoAppointments);
-          setDataSource('demo');
+          setAppointments([]);
+          setDataSource('api');
         });
       }
     } catch (error) {
@@ -1668,41 +1375,31 @@ const RegistrarPanel = () => {
       // Handle axios errors
       if (error.response?.status === 401) {
         // Токен недействителен
-        logger.warn('Токен недействителен (401), очищаем и используем демо-данные');
+        logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
         localStorage.removeItem('auth_token');
-        // ⭐ SSOT: Demo fallback без local overrides
+        // QW-03 fix: show error state instead of demo data.
         startTransition(() => {
-          if (!silent) setDataSource('demo');
-          setAppointments(demoAppointments);
+          if (!silent) setDataSource('error');
+          setAppointments([]);
         });
       } else {
         // Other errors (network, 404, 500, etc.)
-        logger.error('❌ Backend недоступен для загрузки записей, используем демо-режим:', error.message);
+        logger.error('❌ Backend недоступен для загрузки записей:', error.message);
         logger.error('❌ Детали ошибки:', error);
         startTransition(() => {
-          if (!silent) setDataSource((prev) => prev === 'demo' ? prev : 'demo');
-          setAppointments((prev) => {
-            try {
-              const prevStr = JSON.stringify(prev);
-              const nextStr = JSON.stringify(demoAppointments);
-              if (prevStr === nextStr) return prev;
-            } catch {
-
-
-
-
-              // Игнорируем ошибки сравнения JSON
-            }return demoAppointments;});});
+          if (!silent) setDataSource('error');
+          setAppointments([]);
+        });
         // Показываем уведомление пользователю только при первой загрузке
         if (appointmentsCount === 0) {
-          notify.info('Backend недоступен. Работаем в демо-режиме.', { icon: 'ℹ️' });
+          notify.error('Backend недоступен. Проверьте подключение и повторите попытку.');
         }
       }
     } finally {
       loadAppointmentsInFlightRef.current = false;
       if (!silent) setAppointmentsLoading(false);
     }
-  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, searchParams, activeTab, demoAppointments, appointmentsCount]);
+  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, searchParams, activeTab, appointmentsCount]);
 
   // Слушаем обновления отделений от админ-панели
   useEffect(() => {
@@ -2018,43 +1715,7 @@ const RegistrarPanel = () => {
     }
   }, [appointments, loadAppointments, runRegistrarRecordAction]);
 
-  const handleBulkAction = useCallback(async (action, reason = '') => {
-    if (appointmentsSelected.size === 0) return;
-
-    if (['cancelled', 'no_show'].includes(action)) {
-      // P-013 fix: replaced window.confirm() with shared useConfirm hook.
-      const ok = await confirm({
-        title: 'Подтверждение действия',
-        message: `Применить действие «${action}» для ${appointmentsSelected.size} записей?`,
-        description: 'Действие будет применено ко всем выбранным записям.',
-        confirmLabel: 'Применить',
-        cancelLabel: 'Отмена',
-        intent: 'warning',
-      });
-      if (!ok) return;
-    }
-
-    const selectedRecords = Array.from(appointmentsSelected)
-      .map((selectionKey) => findRegistrarRecordBySelectionKey(filteredAppointmentsRef.current, selectionKey))
-      .filter(Boolean);
-
-    if (selectedRecords.length === 0) {
-      notify.error('Action is not available for this record');
-      setAppointmentsSelected(new Set());
-      return;
-    }
-
-    const results = await Promise.allSettled(
-      selectedRecords.map((record) => updateAppointmentStatus(getRegistrarSelectionKey(record), action, reason, record))
-    );
-
-    const successCount = results.filter((r) => r.status === 'fulfilled' && r.value).length;
-    const failCount = appointmentsSelected.size - successCount;
-
-    if (successCount > 0) notify.success(`Обновлено: ${successCount}`);
-    if (failCount > 0) notify.error(`Ошибок: ${failCount}`);
-    setAppointmentsSelected(new Set());
-  }, [appointmentsSelected, updateAppointmentStatus, confirm]);
+  // QW-01 fix: handleBulkAction removed along with bulk-action UI.
 
   // ✅ ИСПОЛЬЗУЕМ useRef для хранения filteredAppointments, чтобы избежать ошибки "Cannot access before initialization"
   const filteredAppointmentsRef = useRef([]);
@@ -2083,49 +1744,13 @@ const RegistrarPanel = () => {
         // Здесь не обрабатываем, чтобы избежать конфликтов
       } else if (e.ctrlKey) {if (e.key === 'p') {e.preventDefault();} else if (e.key === 'k') {e.preventDefault();setShowWizard(true);} else if (e.key === '1') {e.preventDefault(); setSearchParams({ view: 'welcome' });} else if (e.key === '2') setActiveTab('appointments');else if (e.key === '3') setActiveTab('cardio');else
         if (e.key === '4') setActiveTab('derma');else
-        if (e.key === '5') {e.preventDefault(); setSearchParams({ view: 'queue' });}else
-        if (e.key === 'a') {
-          e.preventDefault();
-          logger.info('Ctrl+A: Выбрать все записи');
-          // ✅ ИСПРАВЛЕНО: Используем filteredAppointments из ref
-          const allSelectionKeys = filteredAppointmentsRef.current
-            .map((appointment) => getRegistrarSelectionKey(appointment))
-            .filter(Boolean);
-          setAppointmentsSelected(new Set(allSelectionKeys));
-          logger.info('Выбрано записей:', allSelectionKeys.length);
-        } else if (e.key === 'd') {
-          e.preventDefault();
-          logger.info('Ctrl+D: Снять выделение');
-          setAppointmentsSelected(new Set());
-        }
+        if (e.key === '5') {e.preventDefault(); setSearchParams({ view: 'queue' });}
+        // QW-01 fix: removed Ctrl+A (select all) and Ctrl+D (deselect)
+        // hotkeys — bulk-action UI was unreachable and these only created
+        // dead state. Browser native Ctrl+A (select text) now works normally.
       } else if (e.altKey) {
-        logger.info('Alt key pressed with:', e.key, 'Selected rows:', appointmentsSelected.size);
-        if (e.key === '1') {
-          e.preventDefault();
-          logger.info('Alt+1: Подтвердить');
-          if (appointmentsSelected.size > 0) {
-            handleBulkAction('confirmed');
-          } else {
-            logger.info('Нет выбранных записей для подтверждения');
-          }
-        } else if (e.key === '2') {
-          e.preventDefault();
-          logger.info('Alt+2: Отменить');
-          if (appointmentsSelected.size > 0) {
-            const reason = window.prompt('Причина отмены');
-            if (reason) handleBulkAction('cancelled', reason);
-          } else {
-            logger.info('Нет выбранных записей для отмены');
-          }
-        } else if (e.key === '3') {
-          e.preventDefault();
-          logger.info('Alt+3: Неявка');
-          if (appointmentsSelected.size > 0) {
-            handleBulkAction('no_show');
-          } else {
-            logger.info('Нет выбранных записей для неявки');
-          }
-        }
+        // QW-01 fix: removed Alt+1/Alt+2/Alt+3 bulk-action hotkeys.
+        // No bulk-action UI exists anymore; these were dead shortcuts.
       } else if (e.key === 'Escape') {
         if (showWizard) setShowWizard(false);
         if (showSlotsModal) setShowSlotsModal(false);
@@ -2134,7 +1759,7 @@ const RegistrarPanel = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard, showSlotsModal, appointments, handleBulkAction, appointmentsSelected]);
+  }, [showWizard, showSlotsModal, appointments]);
 
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
@@ -2598,10 +2223,11 @@ const RegistrarPanel = () => {
 
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
   const DataSourceIndicator = memo(({ count }) => {
-    if (dataSource === 'demo') {
+    // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
+    if (dataSource === 'error') {
       return (
         <div style={{
-          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
           color: 'white',
           padding: '8px 12px',
           borderRadius: '6px',
@@ -2613,10 +2239,10 @@ const RegistrarPanel = () => {
           gap: '8px',
           textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
         }}>
-          <span>⚠️</span>
-          <span>Показаны демо-данные. Проверьте подключение к серверу.</span>
+          <Icon name="exclamationmark.triangle" size="small" style={{ color: 'white' }} />
+          <span>Не удалось загрузить записи. Проверьте подключение к серверу.</span>
           <button
-            onClick={() => loadAppointments({ source: 'demo_refresh_button' })}
+            onClick={() => loadAppointments({ source: 'error_refresh_button', force: true })}
             style={{
               background: 'rgba(255, 255, 255, 0.2)',
               border: 'none',
@@ -2628,7 +2254,7 @@ const RegistrarPanel = () => {
               marginLeft: 'auto'
             }}>
 
-            🔄 Повторить
+            Повторить
           </button>
         </div>);
 
@@ -2649,7 +2275,7 @@ const RegistrarPanel = () => {
           gap: '8px',
           textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
         }}>
-          <span>✅</span>
+          <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
           <span>Данные загружены с сервера</span>
           <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
             {count} из {paginationInfo.total} записей
@@ -2673,7 +2299,7 @@ const RegistrarPanel = () => {
           gap: '8px',
           textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
         }}>
-          <span>🔄</span>
+          <Icon name="arrow.up.arrow.down" size="small" style={{ color: 'white' }} />
           <span>Загрузка данных...</span>
         </div>);
 
@@ -2864,6 +2490,9 @@ const RegistrarPanel = () => {
               background: 'var(--mac-gradient-subtle)',
               borderBottom: '1px solid var(--mac-separator)'
             }}>
+                {/* QW-08 fix: reduced AnimatedTransition from 10 to 3 (100/200/300ms). */}
+                {/* Previous delays 400/800/900/1000/1100/1350/1400/1500 blocked first */}
+                {/* user intent until 1.5s after page load. */}
                 <AnimatedTransition type="slide" direction="up" delay={200}>
                   <h1 style={{
                   margin: 0,
@@ -2882,7 +2511,7 @@ const RegistrarPanel = () => {
                     <Icon name="person" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
                   </h1>
                 </AnimatedTransition>
-                <AnimatedTransition type="fade" delay={400}>
+                <AnimatedTransition type="fade" delay={300}>
                   <div style={{
                   fontSize: '20px',
                   fontWeight: '600',
@@ -2919,9 +2548,8 @@ const RegistrarPanel = () => {
 
 
                 {/* Панель управления и фильтров */}
-                <AnimatedTransition type="fade" delay={800}>
+                {/* QW-08 fix: unwrapped nested AnimatedTransition (was delays 800-1500). */}
                   <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
-                    <AnimatedTransition type="slide" direction="up" delay={900}>
                       <h2 style={{
                       fontSize: 'var(--mac-font-size-xl)',
                       marginBottom: 'var(--mac-spacing-4)',
@@ -2934,10 +2562,8 @@ const RegistrarPanel = () => {
                         <Icon name="gear" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
                         Панель управления
                       </h2>
-                    </AnimatedTransition>
 
                     {/* Быстрые действия */}
-                    <AnimatedTransition type="fade" delay={1000}>
                       <div style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -2945,7 +2571,6 @@ const RegistrarPanel = () => {
                       alignItems: 'stretch',
                       marginBottom: 'var(--mac-spacing-6)'
                     }}>
-                        <AnimatedTransition type="scale" delay={1100}>
                           <Button
                           variant="primary"
                           size="default"
@@ -2966,10 +2591,8 @@ const RegistrarPanel = () => {
                             <Icon name="plus" size="small" style={{ color: 'white' }} />
                             {t('new_appointment')}
                           </Button>
-                        </AnimatedTransition>
 
                         {/* Кнопка модуля оплаты */}
-                        <AnimatedTransition type="scale" delay={1350}>
                           <Button
                           variant="secondary"
                           size="default"
@@ -2984,9 +2607,7 @@ const RegistrarPanel = () => {
                             <Icon name="creditcard" size="small" />
                             Модуль оплаты
                           </Button>
-                        </AnimatedTransition>
 
-                        <AnimatedTransition type="scale" delay={1400}>
                           <Button
                           variant="outline"
                           size="default"
@@ -3006,12 +2627,9 @@ const RegistrarPanel = () => {
                             <Icon name="square.and.arrow.up" size="small" />
                             {t('export_csv')}
                           </Button>
-                        </AnimatedTransition>
                       </div>
-                    </AnimatedTransition>
 
                     {/* Фильтры и навигация */}
-                    <AnimatedTransition type="fade" delay={1500}>
                       <div style={{
                       background: 'var(--mac-bg-toolbar)',
                       borderRadius: 'var(--mac-radius-lg)',
@@ -3220,9 +2838,7 @@ const RegistrarPanel = () => {
                           </div>
                       }
                       </div>
-                    </AnimatedTransition>
                   </div>
-                </AnimatedTransition>
 
                 {/* История записей */}
                 <div>
@@ -3297,12 +2913,17 @@ const RegistrarPanel = () => {
                     borderRadius: '12px',
                     border: `1px solid ${borderColor}`
                   }}>
-                          <div style={{
+                          {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
+                    {/* Full unification deferred — requires EmptyState.jsx migration */}
+                    {/* from Tailwind/native to macOS design system first. */}
+                    <div style={{
                       fontSize: '48px',
                       marginBottom: '16px',
                       opacity: 0.3
                     }}>
-                            {!tokenManager.hasToken() ? '🔐' : '📋'}
+                            {!tokenManager.hasToken() ?
+                      <Icon name="lock" size="large" /> :
+                      <Icon name="doc.text" size="large" />}
                           </div>
                           <h3 style={{
                       fontSize: '20px',
@@ -3351,7 +2972,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue, #2563eb)'}
                         onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue, #3b82f6)'}>
 
-                                🔑 Войти снова
+                                <Icon name="key" size="small" style={{ marginRight: '6px' }} />Войти снова
                               </button>
 
                               <button
@@ -3373,7 +2994,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = '#059669'}
                         onMouseOut={(e) => e.target.style.background = '#10b981'}>
 
-                                🔄 Обновить данные
+                                <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Обновить данные
                               </button>
 
                               <button
@@ -3395,7 +3016,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = '#4b5563'}
                         onMouseOut={(e) => e.target.style.background = '#6b7280'}>
 
-                                🔄 Перезапустить приложение
+                                <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Перезапустить приложение
                               </button>
                             </div>
                     }
@@ -3408,7 +3029,9 @@ const RegistrarPanel = () => {
                       `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :
                       'Сегодня пока нет записей'}
                           </p>
-                          <Button
+                          {/* QW-04: empty state 3 of 3 (welcome no-records). */}
+                    {/* See empty state 1 above for unification plan. */}
+                    <Button
                       variant="primary"
                       onClick={() => {
                         setWizardEditMode(false); // ✅ Сброс режима
@@ -3420,7 +3043,7 @@ const RegistrarPanel = () => {
                         fontSize: '14px'
                       }}>
 
-                            ➕ Создать первую запись
+                            <Icon name="plus" size="small" style={{ marginRight: '6px' }} />Создать первую запись
                           </Button>
                         </div>
                   }
@@ -3433,19 +3056,9 @@ const RegistrarPanel = () => {
                     loading={appointmentsLoading}
                     theme={theme}
                     language={language}
-                    selectedRows={appointmentsSelected}
                     outerBorder={true}
                     services={services}
                     showCheckboxes={false} // ✅ Отключаем чекбоксы для регистратуры
-                    onRowSelect={(id, checked) => {
-                      const newSelected = new Set(appointmentsSelected);
-                      if (checked) {
-                        newSelected.add(id);
-                      } else {
-                        newSelected.delete(id);
-                      }
-                      setAppointmentsSelected(newSelected);
-                    }}
                     onRowClick={(row) => {
                       logger.info('Открыть детали записи:', row);
                       // Здесь можно открыть модальное окно с деталями записи
@@ -3642,77 +3255,7 @@ const RegistrarPanel = () => {
                 </div>
               </div>
 
-              {/* Массовые действия */}
-              {appointmentsSelected.size > 0 &&
-            <div style={{
-              display: 'flex',
-              gap: isMobile ? '0.25rem' : '12px',
-              alignItems: 'center',
-              padding: isMobile ? '0.5rem' : '16px',
-              background: theme === 'light' ? '#f8f9fa' : '#374151',
-              borderRadius: isMobile ? '6px' : '8px',
-              flexWrap: isMobile ? 'wrap' : 'nowrap'
-            }}>
-                  <span style={{ fontWeight: 600, marginRight: '12px' }}>
-                    🎯 {t('bulk_actions')} ({appointmentsSelected.size}):
-                  </span>
-                  <button
-                className="clinic-button clinic-button-success interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  pointerEvents: 'auto'
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  logger.info('Кнопка "Подтвердить" нажата через onMouseDown');
-                  handleBulkAction('confirmed');
-                }}>
-
-                    ✅ {!isMobile && t('confirm')}
-                  </button>
-                  <button
-                className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  pointerEvents: 'auto'
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  logger.info('Кнопка "Отменить" нажата через onMouseDown');
-                  const reason = prompt(t('reason'));
-                  if (reason) handleBulkAction('cancelled', reason);
-                }}>
-
-                    ❌ {!isMobile && t('cancel')}
-                  </button>
-                  <button
-                className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  pointerEvents: 'auto'
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  logger.info('Кнопка "Неявка" нажата через onMouseDown');
-                  handleBulkAction('no_show');
-                }}>
-
-                    ⚠️ {!isMobile && t('no_show')}
-                  </button>
-                </div>
-            }
+              {/* QW-01 fix: bulk-action bar removed (was dead UI) */}
 
               {/* Таблица записей */}
               {appointmentsLoading ?
@@ -3730,7 +3273,8 @@ const RegistrarPanel = () => {
                 marginBottom: '16px',
                 opacity: 0.3
               }}>
-                    📋
+                    {/* QW-04: empty state 2 of 3 (worklist empty). */}
+                    <Icon name="doc.text" size="large" />
                   </div>
                   <h3 style={{
                 fontSize: '20px',
@@ -3758,7 +3302,7 @@ const RegistrarPanel = () => {
                   fontSize: '14px'
                 }}>
 
-                    ➕ Создать первую запись
+                    <Icon name="plus" size="small" style={{ marginRight: '6px' }} />Создать первую запись
                   </Button>
                 </div> :
             filteredAppointments.length === 0 ?
@@ -3771,19 +3315,9 @@ const RegistrarPanel = () => {
               loading={appointmentsLoading}
               theme={theme}
               language={language}
-              selectedRows={appointmentsSelected}
               outerBorder={false}
               services={services}
               showCheckboxes={false} // ✅ Отключаем чекбоксы для регистратуры
-              onRowSelect={(id, checked) => {
-                const newSelected = new Set(appointmentsSelected);
-                if (checked) {
-                  newSelected.add(id);
-                } else {
-                  newSelected.delete(id);
-                }
-                setAppointmentsSelected(newSelected);
-              }}
               onRowClick={(row) => {
                 logger.info('Открыть детали записи:', row);
                 // Здесь можно открыть модальное окно с деталями записи
@@ -3882,7 +3416,7 @@ const RegistrarPanel = () => {
                       </> :
 
                 <>
-                        📥 Загрузить еще
+                        <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Загрузить еще
                       </>
                 }
                   </button>
