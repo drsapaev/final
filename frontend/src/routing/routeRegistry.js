@@ -1010,6 +1010,42 @@ export const ROUTE_REGISTRY = [
     legacyRedirectFrom: ['/registrar-panel'],
     layout: layout({ hideSidebar: true, pageTitle: 'Registrar Panel' }),
   },
+  // Strategic Direction 3: canonical nested routes for registrar views.
+  // These replace the legacy ?view= query param pattern. Backward compat
+  // is maintained: ?view=welcome still works (handled by currentView useMemo).
+  // See frontend/src/pages/registrar/registrarNavigation.js for helpers.
+  {
+    id: 'registrar-welcome',
+    path: '/registrar/welcome',
+    group: 'clinical',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'app-shell',
+    auth: 'role-scoped',
+    roles: ['Admin', 'Registrar'],
+    entry: 'direct',
+    nav: false,
+    title: 'Registrar — Welcome Dashboard',
+    owner: 'clinical.registrar',
+    component: 'RegistrarPanel',
+    layout: layout({ hideSidebar: true, pageTitle: 'Registrar — Welcome' }),
+  },
+  {
+    id: 'registrar-queue',
+    path: '/registrar/queue',
+    group: 'clinical',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'app-shell',
+    auth: 'role-scoped',
+    roles: ['Admin', 'Registrar'],
+    entry: 'direct',
+    nav: false,
+    title: 'Registrar — Online Queue',
+    owner: 'clinical.registrar',
+    component: 'RegistrarPanel',
+    layout: layout({ hideSidebar: true, pageTitle: 'Registrar — Queue' }),
+  },
   {
     id: 'doctor-home',
     path: '/doctor',
