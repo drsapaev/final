@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
 import PropTypes from 'prop-types';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
@@ -14,6 +14,8 @@ import '../components/ui/animations.css';
 import '../styles/responsive.css';
 import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
+// DS-3: utility classes for common inline style patterns
+import './registrar/registrar.css';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 // Note: getApiOrigin moved to ./registrar/registrarHelpers.js (decomp step 1)
@@ -106,6 +108,7 @@ const RegistrarPanel = () => {
   const [activeTab, setActiveTab] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const currentView = useMemo(() => {
     // Strategic Direction 3: prefer canonical path-derived view
     // (/registrar/welcome, /registrar/queue) over legacy ?view= query param.
@@ -1088,11 +1091,12 @@ const RegistrarPanel = () => {
   const filteredAppointmentsRef = useRef([]);
 
   // Горячие клавиши — extracted to useRegistrarHotkeys hook (Decomp 2)
+  // Phase 2: navigate replaces setSearchParams for canonical routes
   useRegistrarHotkeys({
     setShowWizard,
     setShowSlotsModal,
     setActiveTab,
-    setSearchParams,
+    navigate,
     showWizard,
     showSlotsModal,
     appointments,
@@ -1561,35 +1565,15 @@ const RegistrarPanel = () => {
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
   const DataSourceIndicator = memo(({ count }) => {
     // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
+    // DS-3: inline styles replaced with .registrar-ds-* CSS classes
     if (dataSource === 'error') {
       return (
-        <div style={{
-          background: 'var(--mac-error)',
-          color: 'white',
-          padding: '8px 12px',
-          borderRadius: '6px',
-          marginBottom: '12px',
-          fontSize: '14px',
-          fontWeight: '500',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-        }}>
+        <div className="registrar-ds-indicator registrar-ds-error">
           <Icon name="exclamationmark.triangle" size="small" style={{ color: 'white' }} />
           <span>Не удалось загрузить записи. Проверьте подключение к серверу.</span>
           <button
             onClick={() => loadAppointments({ source: 'error_refresh_button', force: true })}
-            style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              marginLeft: 'auto'
-            }}>
+            className="registrar-ds-retry-btn">
 
             Повторить
           </button>
@@ -1599,19 +1583,7 @@ const RegistrarPanel = () => {
 
     if (dataSource === 'api') {
       return (
-        <div style={{
-          background: 'var(--mac-success)',
-          color: 'white',
-          padding: '8px 12px',
-          borderRadius: '6px',
-          marginBottom: '12px',
-          fontSize: '14px',
-          fontWeight: '500',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-        }}>
+        <div className="registrar-ds-indicator registrar-ds-success">
           <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
           <span>Данные загружены с сервера</span>
           <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
@@ -1623,19 +1595,7 @@ const RegistrarPanel = () => {
 
     if (dataSource === 'loading') {
       return (
-        <div style={{
-          background: 'var(--mac-accent-blue)',
-          color: 'white',
-          padding: '8px 12px',
-          borderRadius: '6px',
-          marginBottom: '12px',
-          fontSize: '14px',
-          fontWeight: '500',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-        }}>
+        <div className="registrar-ds-indicator registrar-ds-loading">
           <Icon name="arrow.up.arrow.down" size="small" style={{ color: 'white' }} />
           <span>Загрузка данных...</span>
         </div>);
@@ -1765,17 +1725,7 @@ const RegistrarPanel = () => {
       {/* Skip to content link for screen readers */}
       <a
         href="#main-content"
-        style={{
-          position: 'absolute',
-          left: '-9999px',
-          top: '0',
-          zIndex: 9999,
-          padding: '8px 16px',
-          background: 'var(--mac-accent-blue-hover)',
-          color: 'white',
-          textDecoration: 'none',
-          borderRadius: '0 0 4px 4px'
-        }}
+        className="registrar-hidden-visually"
         onFocus={(e) => {
           e.target.style.left = '0';
         }}
@@ -2044,7 +1994,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="outline"
                           size="default"
-                          onClick={() => setSearchParams({ view: 'queue' })}
+                          onClick={() => navigate('/registrar/queue')}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="bell" size="small" />
@@ -2669,26 +2619,13 @@ const RegistrarPanel = () => {
 
               {/* Кнопка загрузки дополнительных записей */}
               {paginationInfo.hasMore &&
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              padding: '16px',
-              borderTop: `1px solid ${theme === 'light' ? 'var(--mac-border-secondary)' : 'var(--mac-bg-quaternary)'}`
-            }}>
+            <div className="registrar-load-more-bar">
                   <button
                 onClick={loadMoreAppointments}
                 disabled={paginationInfo.loadingMore}
                 aria-label={paginationInfo.loadingMore ? 'Loading more appointments' : 'Load more appointments'}
+                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'}`}
                 style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: paginationInfo.loadingMore ?
-                  'var(--mac-text-tertiary)' :
-                  'var(--mac-accent-blue)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '500',
                   cursor: paginationInfo.loadingMore ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
