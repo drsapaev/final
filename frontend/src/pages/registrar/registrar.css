@@ -543,3 +543,64 @@
   margin: 0;
   marginBottom: 12px;
 }
+
+/* Breadcrumb link button (reset to inline text) */
+.registrar-breadcrumb-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mac-accent);
+  font: inherit;
+  padding: 0;
+}
+
+/* Data source indicator count text */
+.registrar-ds-count {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* History section heading (reuse section-heading but with margin: 0 override) */
+.registrar-history-heading {
+  font-size: var(--mac-font-size-xl);
+  margin: 0;
+  color: var(--mac-text-primary);
+  font-weight: var(--mac-font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* Badge with icon (history date display) */
+.registrar-badge-date {
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* Worklist meta label (uppercase, small) */
+.registrar-worklist-meta {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: var(--mac-spacing-1);
+}
+
+/* Worklist container (flex: 1 1 280px) */
+.registrar-worklist-container {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+/* Flex start (alignItems: flex-start) */
+.registrar-flex-start {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}

@@ -1603,7 +1603,7 @@ const RegistrarPanel = () => {
         <div className="registrar-ds-indicator registrar-ds-success">
           <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
           <span>Данные загружены с сервера</span>
-          <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
+          <span className="registrar-ds-count">
             {count} из {paginationInfo.total} записей
           </span>
         </div>);
@@ -1793,7 +1793,7 @@ const RegistrarPanel = () => {
             p.delete('status');
             setSearchParams(p, { replace: true });
           }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mac-accent)', font: 'inherit', padding: 0 }}
+          className="registrar-breadcrumb-link"
         >
           Регистратура
         </button>
@@ -2093,27 +2093,12 @@ const RegistrarPanel = () => {
                 {/* История записей */}
                 <div>
                   <div className="registrar-flex-between" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-                    <h3 style={{
-                    fontSize: 'var(--mac-font-size-xl)',
-                    margin: 0,
-                    color: 'var(--mac-text-primary)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--mac-spacing-2)'
-                  }}>
+                    <h3 className="registrar-history-heading">
                       <Icon name="eye" size="default" className="registrar-text-accent" />
                       История записей
                     </h3>
                     {showCalendar &&
-                  <Badge variant="secondary" style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--mac-spacing-2)'
-                  }}>
+                  <Badge variant="secondary" className="registrar-badge-date">
                         <Icon name="magnifyingglass" size="small" />
                         {new Date(historyDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </Badge>
@@ -2338,15 +2323,8 @@ const RegistrarPanel = () => {
               <div
                 style={registrarWorkflowHeaderStyle}
                 aria-label="Сводка рабочего списка регистратуры">
-                <div style={{ minWidth: 0, flex: '1 1 280px' }}>
-                  <div style={{
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: 'var(--mac-font-size-xs)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                    marginBottom: 'var(--mac-spacing-1)'
-                  }}>
+                <div className="registrar-worklist-container">
+                  <div className="registrar-worklist-meta">
                     Регистратура
                   </div>
                   <h2 style={registrarWorkflowTitleStyle}>
@@ -2871,11 +2849,7 @@ const RegistrarPanel = () => {
               border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.14)'}`,
               backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.06)'
             }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px'
-            }}>
+            <div className="registrar-flex-start">
               <div className="registrar-reschedule-icon registrar-text-accent"
                 style={{
                   backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.14)'
