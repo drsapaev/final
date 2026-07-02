@@ -41,12 +41,12 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
     const records = getRegistrarRecordRefs(record);
     if (records.length === 0) {
       logger.warn('RegistrarPanel: action requires backend record refs', { action, record });
-      notify.error('Missing backend record data for action');
+      notify.error('Недостаточно данных для выполнения действия');
       return null;
     }
     if (!hasBackendAction(record, action)) {
       logger.warn('RegistrarPanel: backend did not expose requested action', { action, record });
-      notify.error('Action is not available for this record');
+      notify.error('Действие недоступно для этой записи');
       return null;
     }
 
@@ -67,7 +67,7 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
       }
 
       logger.info('RegistrarPanel: start_visit completed through backend command contract', result);
-      notify.success('Patient called successfully');
+      notify.success('Пациент вызван в кабинет');
       await loadAppointments({ source: 'start_visit_success' });
       return result;
     } catch (error) {
@@ -91,18 +91,18 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
 
       if (successCount > 0 || skippedCount > 0) {
         const message = skippedCount > 0
-          ? 'Payment completed: ' + successCount + ', already paid: ' + skippedCount
-          : 'Payment completed: ' + successCount;
+          ? 'Оплата проведена: ' + successCount + ' (уже оплачено: ' + skippedCount
+          : 'Оплата проведена: ' + successCount;
         notify.success(failedCount > 0 ? message + '. Failed: ' + failedCount : message);
         setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
         return result.results || [];
       }
 
-      notify.error(result.results?.find((item) => !item.success)?.error || 'Payment failed');
+      notify.error(result.results?.find((item) => !item.success)?.error || 'Ошибка оплаты');
       return result.results || [];
     } catch (error) {
       logger.error('RegistrarPanel: Payment error:', error);
-      notify.error(getErrorMessage(error, 'Payment failed'));
+      notify.error(getErrorMessage(error, 'Ошибка оплаты'));
       return null;
     }
   }, [loadAppointments, runRegistrarRecordAction]);
@@ -113,12 +113,12 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
       const requiredBackendAction = getRegistrarActionForStatus(status);
       if (!requiredBackendAction) {
         logger.warn('RegistrarPanel: unsupported status command', { recordSelectionKey, status, record });
-        notify.error('Action is not available for this record');
+        notify.error('Действие недоступно для этой записи');
         return null;
       }
       if (!record) {
         logger.warn('RegistrarPanel: selected record is missing for status command', { recordSelectionKey, status });
-        notify.error('Action is not available for this record');
+        notify.error('Действие недоступно для этой записи');
         return null;
       }
 
@@ -129,11 +129,11 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
       }
 
       await loadAppointments({ source: 'status_update' });
-      notify.success('Status updated');
+      notify.success('Статус обновлён');
       return result;
     } catch (error) {
       logger.error('RegistrarPanel: Update status error:', error);
-      notify.error(getErrorMessage(error, 'Could not update status. Check connection and try again.'));
+      notify.error(getErrorMessage(error, 'Не удалось обновить статус. Проверьте соединение и попробуйте снова.'));
       return null;
     }
   }, [appointments, loadAppointments, runRegistrarRecordAction]);

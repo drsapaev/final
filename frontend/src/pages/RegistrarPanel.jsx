@@ -105,10 +105,23 @@ const RegistrarPanel = () => {
   const { isMobile, isTablet } = useBreakpoint();
 
   // Основные состояния
-  const [activeTab, setActiveTab] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  // R-02 fix: activeTab синхронизирован с URL (?dept=...).
+  // Раньше был useState(null) — F5 сбрасывал выбранное отделение.
+  const [activeTab, setActiveTabRaw] = useState(() => searchParams.get('dept') || null);
+  const setActiveTab = useCallback((tab) => {
+    setActiveTabRaw(tab);
+    // R-02: пишем в URL для shareable links + back button
+    const params = new URLSearchParams(window.location.search);
+    if (tab) {
+      params.set('dept', tab);
+    } else {
+      params.delete('dept');
+    }
+    setSearchParams(params, { replace: true });
+  }, [setSearchParams]);
   const currentView = useMemo(() => {
     // Strategic Direction 3: prefer canonical path-derived view
     // (/registrar/welcome, /registrar/queue) over legacy ?view= query param.
@@ -1077,6 +1090,7 @@ const RegistrarPanel = () => {
   // Decomp 5: record action handlers extracted to useRegistrarActions hook.
   // openRecordPreview, openRecordEditor, handleContextMenuAction remain
   // inline because they are simple state setters (1-3 lines each).
+  // R-33 fix: RU messages applied in useRegistrarActions hook.
   const {
     runRegistrarRecordAction,
     handleStartVisit,
@@ -2914,16 +2928,29 @@ const RegistrarPanel = () => {
             onClick: async () => {
               if (!rescheduleData) return;
 
+              // R-43 fix: confirmation dialog для destructive action.
+              // Перенос записи — необратимое действие (запись меняет день).
+              const ok = await confirm({
+                title: 'Перенос на завтра',
+                message: 'Перенести запись пациента на завтра?',
+                description: 'Запись будет перемещена на завтрашний день. ' +
+                  'Текущее время слота может измениться.',
+                confirmLabel: 'Перенести',
+                cancelLabel: 'Отмена',
+                intent: 'primary',
+              });
+              if (!ok) return;
+
               try {
                 setShowSlotsModal(false);
                 const targetVisitId = resolveRescheduleVisitId(rescheduleData);
                 if (!targetVisitId) {
-                  notify.error('Cannot reschedule without a canonical visit id');
+                  notify.error('Не удалось определить визит для переноса');
                   return;
                 }
                 logger.info(`Перенос визита ${targetVisitId} на завтра`);
                 await rescheduleTomorrow(targetVisitId);
-                notify.success('Визит успешно перенесен на завтра');
+                notify.success('Визит успешно перенесён на завтра');
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
                 loadAppointments({ source: 'reschedule_tomorrow' });
@@ -2964,16 +2991,26 @@ const RegistrarPanel = () => {
                 return;
               }
 
+              // R-43 fix: confirmation dialog для destructive action.
+              const ok = await confirm({
+                title: 'Перенос на другую дату',
+                message: `Перенести запись пациента на ${dateStr}?`,
+                confirmLabel: 'Перенести',
+                cancelLabel: 'Отмена',
+                intent: 'primary',
+              });
+              if (!ok) return;
+
               try {
                 setShowSlotsModal(false);
                 const targetVisitId = resolveRescheduleVisitId(rescheduleData);
                 if (!targetVisitId) {
-                  notify.error('Cannot reschedule without a canonical visit id');
+                  notify.error('Не удалось определить визит для переноса');
                   return;
                 }
                 logger.info(`Перенос визита ${targetVisitId} на ${dateStr}`);
                 await rescheduleVisit(targetVisitId, dateStr);
-                notify.success(`Визит перенесен на ${dateStr}`);
+                notify.success(`Визит перенесён на ${dateStr}`);
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
                 setCustomRescheduleDate('');
