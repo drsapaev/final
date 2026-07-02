@@ -4,7 +4,7 @@
  * Decomposition step: extracted from RegistrarPanel.jsx (lines 1414-1453).
  *
  * Supported shortcuts (only when not focused in input/textarea):
- * - Ctrl+P: prevent default browser print (no-op handler; reserved)
+ * - Ctrl+P: native browser print (R-14 fix: removed no-op preventDefault)
  * - Ctrl+K: open new-appointment wizard
  * - Ctrl+1: switch to welcome view (canonical route /registrar/welcome)
  * - Ctrl+2: switch to 'appointments' tab
@@ -38,12 +38,13 @@ export const useRegistrarHotkeys = ({
 }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Debug: log all key presses
-      logger.info('Key pressed:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Target:', e.target.tagName);
+      // R-15 fix: убран лог каждого нажатия клавиши — production log spam
+      // + privacy concern (логировался весь ввод пользователя).
+      // Debug: log only in dev mode if needed.
+      // logger.info('Key pressed:', e.key, 'Ctrl:', e.ctrlKey, ...);
 
       // Ignore shortcuts when user is typing in an input/textarea
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        logger.info('Ignoring key press in input/textarea');
         return;
       }
 
@@ -51,9 +52,10 @@ export const useRegistrarHotkeys = ({
         // Enter в мастере обрабатывается отдельно в полях ввода
         // Здесь не обрабатываем, чтобы избежать конфликтов
       } else if (e.ctrlKey) {
-        if (e.key === 'p') {
-          e.preventDefault();
-        } else if (e.key === 'k') {
+        // R-14 fix: убран preventDefault для Ctrl+P — он блокировал
+        // browser print без замены. Если нужен print талона — будет
+        // реализован отдельно. Пока разрешаем нативный print.
+        if (e.key === 'k') {
           e.preventDefault();
           setShowWizard(true);
         } else if (e.key === '1') {

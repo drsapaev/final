@@ -1631,7 +1631,8 @@ const RegistrarPanel = () => {
     index + 1,
     row.patient_fio || '',
     row.patient_birth_year || '',
-    row.patient_phone || '',
+    // R-05 fix: маскируем телефон в CSV-экспорте
+    maskPhoneForCSV(row.patient_phone || ''),
     Array.isArray(row.services) ? row.services.join('; ') : row.services || '',
     row.visit_type || '',
     row.payment_type || '',
@@ -1639,13 +1640,37 @@ const RegistrarPanel = () => {
     row.status || '']
     );
 
+    // R-23 fix: CSV injection protection (CWE-1236).
+    // Экранируем двойные кавычки (CSV standard: " → "")
+    // и префиксируем опасные символы (=, +, -, @) одинарной кавычкой,
+    // чтобы Excel/LibreOffice не интерпретировали их как формулы.
+    const escapeCSVCell = (value) => {
+      const str = String(value ?? '');
+      let escaped = str.replace(/"/g, '""');
+      if (/^[=+\-@]/.test(escaped)) {
+        escaped = "'" + escaped;
+      }
+      return `"${escaped}"`;
+    };
+
     const csvContent = [
     headers.join(','),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(','))].
+    ...rows.map((row) => row.map(escapeCSVCell).join(','))].
     join('\n');
 
     return csvContent;
   };
+
+  // R-05 fix: маскирование телефона для CSV-экспорта.
+  function maskPhoneForCSV(phone) {
+    if (!phone) return '';
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 4) return '***';
+    const lastTwo = digits.slice(-2);
+    const countryMatch = phone.match(/^\+\d{1,3}/);
+    const country = countryMatch ? countryMatch[0] : '+';
+    return `${country} ***-**-${lastTwo}`;
+  }
 
   // Функция скачивания CSV
   const downloadCSV = (content, filename) => {
@@ -1717,7 +1742,10 @@ const RegistrarPanel = () => {
         break;
       case 'call_patient':
         if (row.patient_phone) {
-          window.open(`tel:${row.patient_phone}`);
+          // R-24 fix: санитизация tel: URL — оставляем только digits и +.
+          // Предотвращает injection через специальные символы в phone field.
+          const sanitizedPhone = String(row.patient_phone).replace(/[^\d+]/g, '');
+          window.open(`tel:${sanitizedPhone}`);
         }
         break;
       case 'force_majeure':
