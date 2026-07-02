@@ -762,7 +762,10 @@ const RegistrarPanel = () => {
   const [rawEntries] = useState([]);
   const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'demo' | 'error'
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
+  // QW-01 fix: bulk-action state removed — checkboxes were already disabled
+  // (showCheckboxes=false) and the bulk-action bar was unreachable via UI.
+  // Only hidden Ctrl+A/Alt+1-3 hotkeys could populate this state, creating
+  // dead UI that surfaced unexpectedly. See audit P-011.
   const appointmentsCount = appointments.length;
   // ✅ Используется только новый мастер (V2)
   const [showWizard, setShowWizard] = useState(false);
@@ -2018,43 +2021,7 @@ const RegistrarPanel = () => {
     }
   }, [appointments, loadAppointments, runRegistrarRecordAction]);
 
-  const handleBulkAction = useCallback(async (action, reason = '') => {
-    if (appointmentsSelected.size === 0) return;
-
-    if (['cancelled', 'no_show'].includes(action)) {
-      // P-013 fix: replaced window.confirm() with shared useConfirm hook.
-      const ok = await confirm({
-        title: 'Подтверждение действия',
-        message: `Применить действие «${action}» для ${appointmentsSelected.size} записей?`,
-        description: 'Действие будет применено ко всем выбранным записям.',
-        confirmLabel: 'Применить',
-        cancelLabel: 'Отмена',
-        intent: 'warning',
-      });
-      if (!ok) return;
-    }
-
-    const selectedRecords = Array.from(appointmentsSelected)
-      .map((selectionKey) => findRegistrarRecordBySelectionKey(filteredAppointmentsRef.current, selectionKey))
-      .filter(Boolean);
-
-    if (selectedRecords.length === 0) {
-      notify.error('Action is not available for this record');
-      setAppointmentsSelected(new Set());
-      return;
-    }
-
-    const results = await Promise.allSettled(
-      selectedRecords.map((record) => updateAppointmentStatus(getRegistrarSelectionKey(record), action, reason, record))
-    );
-
-    const successCount = results.filter((r) => r.status === 'fulfilled' && r.value).length;
-    const failCount = appointmentsSelected.size - successCount;
-
-    if (successCount > 0) notify.success(`Обновлено: ${successCount}`);
-    if (failCount > 0) notify.error(`Ошибок: ${failCount}`);
-    setAppointmentsSelected(new Set());
-  }, [appointmentsSelected, updateAppointmentStatus, confirm]);
+  // QW-01 fix: handleBulkAction removed along with bulk-action UI.
 
   // ✅ ИСПОЛЬЗУЕМ useRef для хранения filteredAppointments, чтобы избежать ошибки "Cannot access before initialization"
   const filteredAppointmentsRef = useRef([]);
@@ -2083,49 +2050,13 @@ const RegistrarPanel = () => {
         // Здесь не обрабатываем, чтобы избежать конфликтов
       } else if (e.ctrlKey) {if (e.key === 'p') {e.preventDefault();} else if (e.key === 'k') {e.preventDefault();setShowWizard(true);} else if (e.key === '1') {e.preventDefault(); setSearchParams({ view: 'welcome' });} else if (e.key === '2') setActiveTab('appointments');else if (e.key === '3') setActiveTab('cardio');else
         if (e.key === '4') setActiveTab('derma');else
-        if (e.key === '5') {e.preventDefault(); setSearchParams({ view: 'queue' });}else
-        if (e.key === 'a') {
-          e.preventDefault();
-          logger.info('Ctrl+A: Выбрать все записи');
-          // ✅ ИСПРАВЛЕНО: Используем filteredAppointments из ref
-          const allSelectionKeys = filteredAppointmentsRef.current
-            .map((appointment) => getRegistrarSelectionKey(appointment))
-            .filter(Boolean);
-          setAppointmentsSelected(new Set(allSelectionKeys));
-          logger.info('Выбрано записей:', allSelectionKeys.length);
-        } else if (e.key === 'd') {
-          e.preventDefault();
-          logger.info('Ctrl+D: Снять выделение');
-          setAppointmentsSelected(new Set());
-        }
+        if (e.key === '5') {e.preventDefault(); setSearchParams({ view: 'queue' });}
+        // QW-01 fix: removed Ctrl+A (select all) and Ctrl+D (deselect)
+        // hotkeys — bulk-action UI was unreachable and these only created
+        // dead state. Browser native Ctrl+A (select text) now works normally.
       } else if (e.altKey) {
-        logger.info('Alt key pressed with:', e.key, 'Selected rows:', appointmentsSelected.size);
-        if (e.key === '1') {
-          e.preventDefault();
-          logger.info('Alt+1: Подтвердить');
-          if (appointmentsSelected.size > 0) {
-            handleBulkAction('confirmed');
-          } else {
-            logger.info('Нет выбранных записей для подтверждения');
-          }
-        } else if (e.key === '2') {
-          e.preventDefault();
-          logger.info('Alt+2: Отменить');
-          if (appointmentsSelected.size > 0) {
-            const reason = window.prompt('Причина отмены');
-            if (reason) handleBulkAction('cancelled', reason);
-          } else {
-            logger.info('Нет выбранных записей для отмены');
-          }
-        } else if (e.key === '3') {
-          e.preventDefault();
-          logger.info('Alt+3: Неявка');
-          if (appointmentsSelected.size > 0) {
-            handleBulkAction('no_show');
-          } else {
-            logger.info('Нет выбранных записей для неявки');
-          }
-        }
+        // QW-01 fix: removed Alt+1/Alt+2/Alt+3 bulk-action hotkeys.
+        // No bulk-action UI exists anymore; these were dead shortcuts.
       } else if (e.key === 'Escape') {
         if (showWizard) setShowWizard(false);
         if (showSlotsModal) setShowSlotsModal(false);
@@ -2134,7 +2065,7 @@ const RegistrarPanel = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard, showSlotsModal, appointments, handleBulkAction, appointmentsSelected]);
+  }, [showWizard, showSlotsModal, appointments]);
 
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
@@ -3433,19 +3364,9 @@ const RegistrarPanel = () => {
                     loading={appointmentsLoading}
                     theme={theme}
                     language={language}
-                    selectedRows={appointmentsSelected}
                     outerBorder={true}
                     services={services}
                     showCheckboxes={false} // ✅ Отключаем чекбоксы для регистратуры
-                    onRowSelect={(id, checked) => {
-                      const newSelected = new Set(appointmentsSelected);
-                      if (checked) {
-                        newSelected.add(id);
-                      } else {
-                        newSelected.delete(id);
-                      }
-                      setAppointmentsSelected(newSelected);
-                    }}
                     onRowClick={(row) => {
                       logger.info('Открыть детали записи:', row);
                       // Здесь можно открыть модальное окно с деталями записи
@@ -3642,77 +3563,7 @@ const RegistrarPanel = () => {
                 </div>
               </div>
 
-              {/* Массовые действия */}
-              {appointmentsSelected.size > 0 &&
-            <div style={{
-              display: 'flex',
-              gap: isMobile ? '0.25rem' : '12px',
-              alignItems: 'center',
-              padding: isMobile ? '0.5rem' : '16px',
-              background: theme === 'light' ? '#f8f9fa' : '#374151',
-              borderRadius: isMobile ? '6px' : '8px',
-              flexWrap: isMobile ? 'wrap' : 'nowrap'
-            }}>
-                  <span style={{ fontWeight: 600, marginRight: '12px' }}>
-                    🎯 {t('bulk_actions')} ({appointmentsSelected.size}):
-                  </span>
-                  <button
-                className="clinic-button clinic-button-success interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  pointerEvents: 'auto'
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  logger.info('Кнопка "Подтвердить" нажата через onMouseDown');
-                  handleBulkAction('confirmed');
-                }}>
-
-                    ✅ {!isMobile && t('confirm')}
-                  </button>
-                  <button
-                className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  pointerEvents: 'auto'
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  logger.info('Кнопка "Отменить" нажата через onMouseDown');
-                  const reason = prompt(t('reason'));
-                  if (reason) handleBulkAction('cancelled', reason);
-                }}>
-
-                    ❌ {!isMobile && t('cancel')}
-                  </button>
-                  <button
-                className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  pointerEvents: 'auto'
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  logger.info('Кнопка "Неявка" нажата через onMouseDown');
-                  handleBulkAction('no_show');
-                }}>
-
-                    ⚠️ {!isMobile && t('no_show')}
-                  </button>
-                </div>
-            }
+              {/* QW-01 fix: bulk-action bar removed (was dead UI) */}
 
               {/* Таблица записей */}
               {appointmentsLoading ?
@@ -3771,19 +3622,9 @@ const RegistrarPanel = () => {
               loading={appointmentsLoading}
               theme={theme}
               language={language}
-              selectedRows={appointmentsSelected}
               outerBorder={false}
               services={services}
               showCheckboxes={false} // ✅ Отключаем чекбоксы для регистратуры
-              onRowSelect={(id, checked) => {
-                const newSelected = new Set(appointmentsSelected);
-                if (checked) {
-                  newSelected.add(id);
-                } else {
-                  newSelected.delete(id);
-                }
-                setAppointmentsSelected(newSelected);
-              }}
               onRowClick={(row) => {
                 logger.info('Открыть детали записи:', row);
                 // Здесь можно открыть модальное окно с деталями записи
