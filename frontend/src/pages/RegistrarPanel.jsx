@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
 import PropTypes from 'prop-types';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
@@ -106,6 +106,7 @@ const RegistrarPanel = () => {
   const [activeTab, setActiveTab] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const currentView = useMemo(() => {
     // Strategic Direction 3: prefer canonical path-derived view
     // (/registrar/welcome, /registrar/queue) over legacy ?view= query param.
@@ -1088,11 +1089,12 @@ const RegistrarPanel = () => {
   const filteredAppointmentsRef = useRef([]);
 
   // Горячие клавиши — extracted to useRegistrarHotkeys hook (Decomp 2)
+  // Phase 2: navigate replaces setSearchParams for canonical routes
   useRegistrarHotkeys({
     setShowWizard,
     setShowSlotsModal,
     setActiveTab,
-    setSearchParams,
+    navigate,
     showWizard,
     showSlotsModal,
     appointments,
@@ -2044,7 +2046,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="outline"
                           size="default"
-                          onClick={() => setSearchParams({ view: 'queue' })}
+                          onClick={() => navigate('/registrar/queue')}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="bell" size="small" />

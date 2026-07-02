@@ -6,11 +6,11 @@
  * Supported shortcuts (only when not focused in input/textarea):
  * - Ctrl+P: prevent default browser print (no-op handler; reserved)
  * - Ctrl+K: open new-appointment wizard
- * - Ctrl+1: switch to welcome view (searchParams ?view=welcome)
+ * - Ctrl+1: switch to welcome view (canonical route /registrar/welcome)
  * - Ctrl+2: switch to 'appointments' tab
  * - Ctrl+3: switch to 'cardio' tab
  * - Ctrl+4: switch to 'derma' tab
- * - Ctrl+5: switch to queue view (searchParams ?view=queue)
+ * - Ctrl+5: switch to queue view (canonical route /registrar/queue)
  * - Escape: close wizard / slots modal if open
  *
  * Removed in QW-01 (audit): Ctrl+A, Ctrl+D, Alt+1, Alt+2, Alt+3
@@ -19,7 +19,7 @@
  * @param {Object} handlers
  * @param {Function} handlers.setShowWizard - opens wizard when called with true
  * @param {Function} handlers.setActiveTab - switches department tab
- * @param {Function} handlers.setSearchParams - updates URL search params
+ * @param {Function} handlers.navigate - react-router navigate function for canonical routes
  * @param {boolean} handlers.showWizard - whether wizard is currently open
  * @param {boolean} handlers.showSlotsModal - whether slots modal is open
  * @param {Array} handlers.appointments - current appointments list (dep only)
@@ -31,7 +31,7 @@ export const useRegistrarHotkeys = ({
   setShowWizard,
   setShowSlotsModal,
   setActiveTab,
-  setSearchParams,
+  navigate,
   showWizard,
   showSlotsModal,
   appointments,
@@ -58,7 +58,7 @@ export const useRegistrarHotkeys = ({
           setShowWizard(true);
         } else if (e.key === '1') {
           e.preventDefault();
-          setSearchParams({ view: 'welcome' });
+          navigate('/registrar/welcome');
         } else if (e.key === '2') {
           setActiveTab('appointments');
         } else if (e.key === '3') {
@@ -67,7 +67,7 @@ export const useRegistrarHotkeys = ({
           setActiveTab('derma');
         } else if (e.key === '5') {
           e.preventDefault();
-          setSearchParams({ view: 'queue' });
+          navigate('/registrar/queue');
         }
         // QW-01 fix: removed Ctrl+A (select all) and Ctrl+D (deselect)
         // hotkeys — bulk-action UI was unreachable and these only created
@@ -83,7 +83,7 @@ export const useRegistrarHotkeys = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard, showSlotsModal, appointments, setShowWizard, setShowSlotsModal, setActiveTab, setSearchParams]);
+  }, [showWizard, showSlotsModal, appointments, setShowWizard, setShowSlotsModal, setActiveTab, navigate]);
 };
 
 export default useRegistrarHotkeys;
