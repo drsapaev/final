@@ -269,6 +269,13 @@ export default function LabReportWorkbench({
     if (!activeInstance) {
       return null;
     }
+    // WF-06 fix: передаём updated_at для optimistic locking.
+    // Если backend обнаружит, что бланк был изменён другим пользователем
+    // после этого timestamp — вернёт 409, persistDraft выбросит exception.
+    const expectedUpdatedAt = activeInstance.updated_at
+      ? new Date(activeInstance.updated_at).toISOString()
+      : null;
+
     const payload = [];
     activeInstance.sections.forEach((section) => {
       section.fields.forEach((field) => {
@@ -289,10 +296,10 @@ export default function LabReportWorkbench({
     if (JSON.stringify(activeInstance.signer_snapshot || {}) !== JSON.stringify(signerSnapshot || {})) {
       latestInstance = await labReportingApi.updateInstance(activeInstance.id, {
         signer_snapshot: signerSnapshot
-      });
+      }, expectedUpdatedAt);
     }
     if (payload.length > 0) {
-      const response = await labReportingApi.bulkSaveValues(activeInstance.id, payload);
+      const response = await labReportingApi.bulkSaveValues(activeInstance.id, payload, expectedUpdatedAt);
       latestInstance = response.instance;
     }
     onInstanceChange(latestInstance);

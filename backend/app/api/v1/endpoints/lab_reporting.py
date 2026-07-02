@@ -599,12 +599,16 @@ def get_lab_report_instance(
 def update_lab_report_instance(
     instance_id: int,
     payload: LabReportInstanceUpdate,
+    # WF-06 fix: optimistic locking — frontend передаёт updated_at последнего чтения
+    expected_updated_at: str | None = Query(default=None, alias="expected_updated_at"),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
     service = LabReportingService(db)
     try:
-        return _instance_out(service, service.update_instance(instance_id, payload.model_dump()))
+        return _instance_out(service, service.update_instance(
+            instance_id, payload.model_dump(), expected_updated_at=expected_updated_at
+        ))
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -613,6 +617,8 @@ def update_lab_report_instance(
 def bulk_save_lab_report_values(
     instance_id: int,
     payload: list[LabReportValueIn],
+    # WF-06 fix: optimistic locking — frontend передаёт updated_at последнего чтения
+    expected_updated_at: str | None = Query(default=None, alias="expected_updated_at"),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
@@ -621,6 +627,7 @@ def bulk_save_lab_report_values(
         instance, updated = service.bulk_upsert_values(
             instance_id,
             [item.model_dump(mode="json") for item in payload],
+            expected_updated_at=expected_updated_at,
         )
         return LabReportBulkSaveResponse(
             instance=_instance_out(service, instance),

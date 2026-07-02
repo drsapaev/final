@@ -529,10 +529,15 @@ class LabReportingService:
         logger.info("[LAB] create_instance created instance_id=%s", instance.id)
         return self.get_instance(instance.id)
 
-    def update_instance(self, instance_id: int, payload: dict[str, Any]) -> LabReportInstance:
+    def update_instance(
+        self, instance_id: int, payload: dict[str, Any], expected_updated_at: str | None = None
+    ) -> LabReportInstance:
         logger.info("[LAB] update_instance instance_id=%s", instance_id)
         instance = self.get_instance(instance_id)
         self._assert_instance_editable(instance)
+        # WF-06 fix: optimistic locking — проверяем что никто не изменил
+        # бланк с момента последнего чтения frontend'ом.
+        self._assert_not_concurrently_modified(instance, expected_updated_at)
         if "signer_snapshot" in payload and payload["signer_snapshot"] is not None:
             instance.signer_snapshot = payload["signer_snapshot"]
         if "branding_snapshot" in payload and payload["branding_snapshot"] is not None:
@@ -541,7 +546,8 @@ class LabReportingService:
         return self.get_instance(instance.id)
 
     def bulk_upsert_values(
-        self, instance_id: int, values_payload: list[dict[str, Any]]
+        self, instance_id: int, values_payload: list[dict[str, Any]],
+        expected_updated_at: str | None = None,
     ) -> tuple[LabReportInstance, list[LabReportValue]]:
         logger.info(
             "[LAB] bulk_upsert_values instance_id=%s items=%s",
@@ -550,6 +556,9 @@ class LabReportingService:
         )
         instance = self.get_instance(instance_id)
         self._assert_instance_editable(instance)
+        # WF-06 fix: optimistic locking — проверяем что никто не изменил
+        # бланк с момента последнего чтения frontend'ом.
+        self._assert_not_concurrently_modified(instance, expected_updated_at)
         field_map = self._field_map(instance.template_version)
         existing_by_key = {value.field_key: value for value in instance.values}
         current_values = {
@@ -2238,6 +2247,43 @@ class LabReportingService:
     def _assert_instance_editable(self, instance: LabReportInstance) -> None:
         if instance.status in FINAL_INSTANCE_STATUSES:
             raise LabReportingDomainError(409, "Finalized reports are immutable; use revise")
+
+    def _assert_not_concurrently_modified(
+        self, instance: LabReportInstance, expected_updated_at: str | None
+    ) -> None:
+        """WF-06 fix: optimistic locking via updated_at.
+
+        Если frontend передал expected_updated_at (ISO string), проверяем
+        что instance.updated_at не изменился с момента последнего чтения.
+        Если изменился — другой пользователь сохранил изменения, 409 Conflict.
+
+        Это предотвращает silent data loss когда два лаборанта редактируют
+        один бланк одновременно (last-write-wins без этой проверки).
+        """
+        if not expected_updated_at:
+            return  # optimistic locking опционален, backward compatible
+        try:
+            from datetime import datetime, timezone
+            # Парсим ISO string (frontend передаёт ISO 8601)
+            expected_dt = datetime.fromisoformat(
+                expected_updated_at.replace("Z", "+00:00")
+            )
+            actual_dt = instance.updated_at
+            if actual_dt and actual_dt.tzinfo is None:
+                actual_dt = actual_dt.replace(tzinfo=timezone.utc)
+            if expected_dt and actual_dt and abs((actual_dt - expected_dt).total_seconds()) > 1:
+                raise LabReportingDomainError(
+                    409,
+                    "Бланк был изменён другим пользователем. "
+                    "Обновите страницу, чтобы получить актуальные данные.",
+                )
+        except (ValueError, TypeError):
+            # Если не удалось распарсить дату — не блокируем (graceful degradation)
+            logger.warning(
+                "[LAB] _assert_not_concurrently_modified: failed to parse "
+                "expected_updated_at=%s, skipping lock check",
+                expected_updated_at,
+            )
 
     def _make_clone_code(self, source_code: str) -> str:
         suffix = 2

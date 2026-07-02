@@ -163,15 +163,24 @@ export const labReportingApi = {
     });
   },
 
-  updateInstance(instanceId, payload) {
-    return request(`/lab/report-instances/${instanceId}`, {
+  // WF-06 fix: expectedUpdatedAt — optimistic locking via updated_at.
+  // Если backend обнаружит, что бланк был изменён после этого timestamp,
+  // вернёт 409 Conflict. Frontend показывает dialog "обновите страницу".
+  updateInstance(instanceId, payload, expectedUpdatedAt = null) {
+    const search = expectedUpdatedAt
+      ? `?expected_updated_at=${encodeURIComponent(expectedUpdatedAt)}`
+      : '';
+    return request(`/lab/report-instances/${instanceId}${search}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
   },
 
-  bulkSaveValues(instanceId, payload) {
-    return request(`/lab/report-instances/${instanceId}/bulk-values`, {
+  bulkSaveValues(instanceId, payload, expectedUpdatedAt = null) {
+    const search = expectedUpdatedAt
+      ? `?expected_updated_at=${encodeURIComponent(expectedUpdatedAt)}`
+      : '';
+    return request(`/lab/report-instances/${instanceId}/bulk-values${search}`, {
       method: 'POST',
       body: JSON.stringify(payload)
     });
