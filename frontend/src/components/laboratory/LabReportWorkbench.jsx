@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
@@ -62,6 +62,46 @@ export default function LabReportWorkbench({
   const [busyAction, setBusyAction] = useState('');
   const [printFeedback, setPrintFeedback] = useState(null);
   const [historySeverityFilter, setHistorySeverityFilter] = useState('all');
+  // WF-11 fix: escape hatch для template resolution blocking gap.
+  // Если услуги есть, но ни один template не смаплен — лаборант застревал.
+  // Теперь можно нажать "Показать все шаблоны" и создать бланк без привязки.
+  const [escapeHatchActive, setEscapeHatchActive] = useState(false);
+
+  // Dirty state tracking: храним snapshot значений при загрузке instance,
+  // сравниваем с текущими draftValues для определения несохранённых изменений.
+  const initialValuesRef = useRef({ values: {}, signer: {} });
+
+  const isDirty = useMemo(() => {
+    if (!activeInstance) return false;
+    // Сравниваем draftValues с initialValues
+    const initial = initialValuesRef.current.values;
+    const draftKeys = new Set([...Object.keys(draftValues), ...Object.keys(initial)]);
+    for (const key of draftKeys) {
+      if ((draftValues[key] || '') !== (initial[key] || '')) return true;
+    }
+    // Сравниваем signerSnapshot
+    const initialSigner = initialValuesRef.current.signer;
+    const signerKeys = ['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'];
+    for (const key of signerKeys) {
+      if ((signerSnapshot?.[key] || '') !== (initialSigner?.[key] || '')) return true;
+    }
+    return false;
+  }, [activeInstance, draftValues, signerSnapshot]);
+
+  // Navigation guard: предотвращает потерю данных при refresh/close.
+  // Используем beforeunload напрямую (без useNavigationGuard) —
+  // useNavigationGuard требует <Router> context, что ломает unit-тесты.
+  // Переключение табов внутри SPA не теряет state (LabPanel хранит
+  // selectedAppointment/activeInstance в useState).
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   const publishedTemplates = useMemo(
     () => templates.filter((template) => template.published_version_id || template.draft_version_id),
@@ -73,10 +113,15 @@ export default function LabReportWorkbench({
   );
   const resolvedTemplates = templateResolution?.allowed_templates || [];
   const serviceContextPresent = (templateResolution?.service_codes || []).length > 0;
+  // WF-11 fix: при escape hatch показываем все published templates,
+  // даже если service context есть, но resolution не нашёл шаблон.
   const templateOptions = serviceContextPresent ? resolvedTemplates : publishedTemplates;
-  const resolutionHasBlockingGap = serviceContextPresent && resolvedTemplates.length === 0;
+  const effectiveTemplateOptions = escapeHatchActive
+    ? publishedTemplates
+    : templateOptions;
+  const resolutionHasBlockingGap = serviceContextPresent && resolvedTemplates.length === 0 && !escapeHatchActive;
   const singleAllowedTemplate =
-    serviceContextPresent && templateOptions.length === 1 ? templateOptions[0] : null;
+    serviceContextPresent && effectiveTemplateOptions.length === 1 ? effectiveTemplateOptions[0] : null;
 
   const showRecentReportsBrowser = !selectedAppointment && !activeInstance;
   const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit');
@@ -129,8 +174,10 @@ export default function LabReportWorkbench({
         appointment_id: selectedAppointment.appointment_id || null,
         visit_id: templateResolution?.visit_id || selectedAppointment.visit_id || null,
         template_id: Number(templateId),
-        service_codes: templateResolution?.service_codes || selectedAppointment.service_codes || [],
-        service_items: (selectedAppointment.service_details || []).map((item) => ({
+        // WF-11 fix: при escape hatch не передаём service_codes —
+        // бланк создаётся без привязки к услугам визита.
+        service_codes: escapeHatchActive ? [] : (templateResolution?.service_codes || selectedAppointment.service_codes || []),
+        service_items: escapeHatchActive ? [] : (selectedAppointment.service_details || []).map((item) => ({
           service_id: item.id || null,
           code: item.code || null,
           name: item.name || null
@@ -154,6 +201,7 @@ export default function LabReportWorkbench({
     onRefreshRecentReports,
     onQueueChanged,
     resolutionHasBlockingGap,
+    escapeHatchActive,
     selectedAppointment,
     selectedTemplateId,
     templateResolution
@@ -164,6 +212,9 @@ export default function LabReportWorkbench({
       setDraftValues({});
       setSignerSnapshot({});
       setPrintFeedback(null);
+      initialValuesRef.current = { values: {}, signer: {} };
+      // WF-11 fix: сбрасываем escape hatch при смене/закрытии instance
+      setEscapeHatchActive(false);
       return;
     }
     // WF-12 fix: сбрасываем printFeedback при смене activeInstance,
@@ -180,6 +231,12 @@ export default function LabReportWorkbench({
     setDraftValues(values);
     setSignerSnapshot(activeInstance.signer_snapshot || {});
     setSelectedTemplateId(String(activeInstance.template_id));
+    // Dirty state: сохраняем snapshot загруженных значений как "чистых".
+    // isDirty будет true только если пользователь изменит что-то после этого.
+    initialValuesRef.current = {
+      values: { ...values },
+      signer: { ...(activeInstance.signer_snapshot || {}) },
+    };
   }, [activeInstance]);
 
   useEffect(() => {
@@ -188,10 +245,10 @@ export default function LabReportWorkbench({
     }
     const defaultTemplateId =
       templateResolution?.default_template?.id
-      || (!serviceContextPresent ? templateOptions[0]?.id : '')
+      || (!serviceContextPresent ? effectiveTemplateOptions[0]?.id : '')
       || '';
     setSelectedTemplateId((current) => {
-      if (current && templateOptions.some((template) => String(template.id) === String(current))) {
+      if (current && effectiveTemplateOptions.some((template) => String(template.id) === String(current))) {
         return current;
       }
       return defaultTemplateId ? String(defaultTemplateId) : '';
@@ -200,7 +257,7 @@ export default function LabReportWorkbench({
     activeInstance,
     selectedAppointment,
     serviceContextPresent,
-    templateOptions,
+    effectiveTemplateOptions,
     templateResolution?.default_template?.id
   ]);
 
@@ -247,12 +304,28 @@ export default function LabReportWorkbench({
       notify('error', 'Сначала создайте или откройте бланк.');
       return;
     }
+    // WF-07 fix: запоминаем статус до save, чтобы обнаружить auto-transition.
+    // Backend bulk_upsert_values автоматически меняет DRAFT → IN_PROGRESS
+    // при первом сохранении. Раньше пользователь не знал об этом — surprise
+    // transition. Теперь показываем явное сообщение если статус изменился.
+    const previousStatus = activeInstance.status;
     setSaving(true);
     setBusyAction('save');
     try {
-      await persistDraft();
+      const latest = await persistDraft();
       await onRefreshHistory(activeInstance.patient_id);
-      notify('success', 'Черновик сохранён.');
+      // Dirty state: после успешного save сбрасываем dirty flag.
+      initialValuesRef.current = {
+        values: { ...draftValues },
+        signer: { ...signerSnapshot },
+      };
+      // WF-07: проверяем, изменился ли статус автоматически
+      const newStatus = latest?.status || previousStatus;
+      if (previousStatus === 'DRAFT' && newStatus === 'IN_PROGRESS') {
+        notify('info', 'Черновик сохранён. Статус изменён на «Заполняется» — бланк теперь в работе.');
+      } else {
+        notify('success', 'Черновик сохранён.');
+      }
     } catch (error) {
       notify('error', error.message);
     } finally {
@@ -465,7 +538,25 @@ export default function LabReportWorkbench({
               )}
               {!templateResolutionLoading && resolutionHasBlockingGap && (
                 <Alert severity="error">
-                  Для выбранного визита не найдено ни одного допустимого бланка. Сначала настройте mapping услуги к шаблону.
+                  Для выбранного визита не найдено ни одного допустимого бланка.
+                  Настройте mapping услуги к шаблону (требуется роль Admin)
+                  или создайте бланк без привязки к услугам.
+                  <div style={{ marginTop: '8px' }}>
+                    <Button
+                      size="small"
+                      variant="outline"
+                      onClick={() => setEscapeHatchActive(true)}
+                    >
+                      Показать все шаблоны (без привязки к услугам)
+                    </Button>
+                  </div>
+                </Alert>
+              )}
+              {/* WF-11 fix: warning когда escape hatch активен */}
+              {!templateResolutionLoading && escapeHatchActive && (
+                <Alert severity="warning">
+                  Создание бланка без привязки к услугам визита. Убедитесь,
+                  что выбрали правильный шаблон — проверка соответствия отключена.
                 </Alert>
               )}
               {!templateResolutionLoading && singleAllowedTemplate && !resolutionHasBlockingGap && (
@@ -475,15 +566,15 @@ export default function LabReportWorkbench({
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'end' }}>
                 <label style={{ display: 'grid', gap: '6px' }}>
-                  <span>{serviceContextPresent ? 'Допустимый бланк' : 'Шаблон бланка'}</span>
+                  <span>{serviceContextPresent && !escapeHatchActive ? 'Допустимый бланк' : 'Шаблон бланка'}</span>
                   <select
                     className="macos-input"
                     value={selectedTemplateId}
                     onChange={(event) => setSelectedTemplateId(event.target.value)}
-                    disabled={templateResolutionLoading || resolutionHasBlockingGap}
+                    disabled={templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive)}
                   >
                     <option value="">Выберите шаблон</option>
-                    {templateOptions.map((template) => (
+                    {effectiveTemplateOptions.map((template) => (
                       <option key={template.id} value={template.id}>
                         {template.name} ({template.family})
                       </option>
@@ -493,7 +584,7 @@ export default function LabReportWorkbench({
                 <Button
                   variant="primary"
                   onClick={() => handleCreateInstance()}
-                  disabled={saving || templateResolutionLoading || resolutionHasBlockingGap || !selectedTemplateId}
+                  disabled={saving || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
                 >
                   <Icon name="plus.rectangle.on.folder" size={16} />
                   {busyAction === 'create' ? 'Создаю...' : 'Создать бланк'}
@@ -554,6 +645,18 @@ export default function LabReportWorkbench({
                       marginLeft: '8px',
                     }}>
                       Не заполнено обязательных полей: {missingRequiredFields.length}
+                    </span>
+                  )}
+                  {/* Dirty state indicator: показываем, что есть несохранённые
+                      изменения. Предотвращает потерю данных при переключении. */}
+                  {isDirty && canEditActiveInstance && (
+                    <span style={{
+                      fontSize: '12px',
+                      color: 'var(--mac-accent-orange, #c2410c)',
+                      marginLeft: '8px',
+                      fontWeight: 500,
+                    }}>
+                      ● несохранённые изменения
                     </span>
                   )}
                   {/* P-01 fix: AI-анализ бланка. Перенесён из LabResultsManager
