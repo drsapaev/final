@@ -1954,12 +1954,7 @@ const RegistrarPanel = () => {
                           Фильтры и навигация
                         </h3>
 
-                        <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                        gap: 'var(--mac-spacing-3)',
-                        alignItems: 'stretch'
-                      }}>
+                        <div className="registrar-grid-auto">
                           <Button
                           variant={showCalendar ? 'warning' : 'outline'}
                           size="default"
@@ -2200,12 +2195,7 @@ const RegistrarPanel = () => {
 
                           {/* Кнопки действий */}
                           {!tokenManager.hasToken() &&
-                    <div style={{
-                      display: 'flex',
-                      gap: '12px',
-                      justifyContent: 'center',
-                      flexWrap: 'wrap'
-                    }}>
+                    <div className="registrar-flex-wrap">
                               <button
                         onClick={() => {
                           // Перенаправляем на страницу входа
@@ -2534,15 +2524,11 @@ const RegistrarPanel = () => {
                 onClick={loadMoreAppointments}
                 disabled={paginationInfo.loadingMore}
                 aria-label={paginationInfo.loadingMore ? 'Loading more appointments' : 'Load more appointments'}
-                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'}`}
-                style={{
-                  cursor: paginationInfo.loadingMore ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-                }}>
+                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'} registrar-flex`}
+                  style={{
+                    cursor: paginationInfo.loadingMore ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                  }}>
 
                     {paginationInfo.loadingMore ?
                 <>
@@ -2612,9 +2598,7 @@ const RegistrarPanel = () => {
                   display: 'grid',
                   gridTemplateColumns: 'minmax(120px, 0.36fr) minmax(0, 1fr)',
                   gap: '12px',
-                  alignItems: 'start',
-                  padding: '10px 12px',
-                  borderRadius: 'var(--mac-radius-md)'
+                  alignItems: 'start'
                 }}>
                 <span className="registrar-text-secondary" style={{ fontSize: '13px' }}>{label}</span>
                 <span style={{ minWidth: 0, overflowWrap: 'anywhere', fontWeight: 500 }}>
@@ -2940,19 +2924,12 @@ const RegistrarPanel = () => {
 
           {/* QW-02 fix: inline date picker replacing window.prompt().
               min=today prevents selecting past dates natively in the picker. */}
-          <div style={{
-            padding: '16px',
-            borderRadius: '14px',
-            border: `1px solid ${theme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'}`,
-            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
-          }}>
-            <label htmlFor="reschedule-custom-date" style={{
-              display: 'block',
-              color: getColor('textPrimary'),
-              fontSize: '13px',
-              fontWeight: 600,
-              marginBottom: '8px'
+          <div className="registrar-reschedule-card"
+            style={{
+              border: `1px solid ${theme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'}`,
+              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
             }}>
+            <label htmlFor="reschedule-custom-date" className="registrar-reschedule-label" style={{ color: getColor('textPrimary') }}>
               Дата переноса
             </label>
             <input
