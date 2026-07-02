@@ -82,9 +82,9 @@ describe('LabReportWorkbench', () => {
     );
 
     expect(
-      screen.getByText('Выберите пациента из очереди или откройте уже существующий лабораторный бланк из списка ниже.')
+      screen.getByText('Выберите пациента из очереди или откройте уже существующий лабораторный отчёт из списка ниже.')
     ).toBeInTheDocument();
-    expect(screen.getByText('Недавние лабораторные бланки')).toBeInTheDocument();
+    expect(screen.getByText('Недавние лабораторные отчёты')).toBeInTheDocument();
     expect(screen.getByText(/Тестовый Пациент Регистратура/i)).toBeInTheDocument();
 
     const reportButton = screen.getByText('ОАК').closest('button');
@@ -177,7 +177,7 @@ describe('LabReportWorkbench', () => {
     );
 
     await screen.findByText((content) =>
-      content.includes('Единственный допустимый бланк найден')
+      content.includes('Единственный допустимый отчёт найден')
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 
