@@ -471,3 +471,75 @@
 @keyframes registrar-spin {
   to { transform: rotate(360deg); }
 }
+
+/* Breadcrumb navigation */
+.registrar-breadcrumb-nav {
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--mac-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Date picker label (with icon) */
+.registrar-picker-label {
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* Vertical flex (flex-direction: column) */
+.registrar-flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3);
+}
+
+/* Info card with shadow (history search panel) */
+.registrar-info-card {
+  margin-top: var(--mac-spacing-4);
+  padding: var(--mac-spacing-4);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-lg);
+  box-shadow: var(--mac-shadow-xs);
+}
+
+/* Badge with icon */
+.registrar-badge-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+  padding: '4px 10px';
+}
+
+/* Worklist header section */
+.registrar-worklist-header {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-semibold);
+  margin: 0;
+  margin-bottom: var(--mac-spacing-3);
+}
+
+/* Worklist counter */
+.registrar-worklist-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mac-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
+  marginBottom: 12px;
+}
