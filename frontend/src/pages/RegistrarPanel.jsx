@@ -27,6 +27,8 @@ import { getRegistrarTranslator } from './registrarTranslations';
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
 import { useRegistrarReschedule } from './registrar/useRegistrarReschedule';
+// Decomp 4: data-loading functions extracted to useRegistrarData hook
+import { useRegistrarData } from './registrar/useRegistrarData';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
@@ -41,9 +43,7 @@ import {
   findRegistrarRecordBySelectionKey,
   hasBackendAction,
   getRegistrarActionForStatus,
-  hasBackendPatientDisplayContract,
   normalizePatientGender,
-  hasBackendPatientGenderContract,
   formatPreviewList,
   buildPostWizardPaymentRow,
   isMultiRecordAggregateRow,
@@ -75,7 +75,7 @@ import ModernStatistics from '../components/statistics/ModernStatistics';
 // Утилиты для работы с датами
 import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
-import { formatNetworkErrorMessage, isNetworkFetchError } from '../utils/networkErrorMessages';
+// Note: formatNetworkErrorMessage + isNetworkFetchError moved to useRegistrarData.js (Decomp 4)
 import { getErrorMessage } from '../utils/errorHandler';
 import {
   aggregatePatientsForAllDepartments as aggregateRegistrarPatients,
@@ -538,232 +538,20 @@ const RegistrarPanel = () => {
   // system canonical Button component). See audit §5.5, §5.6.
 
 
-  // Загрузка данных из админ панели
-  const loadIntegratedData = useCallback(async () => {
-    logger.info('🔧 loadIntegratedData called at:', new Date().toISOString());
-    try {
-      // Сбрасываем устаревшие значения перед загрузкой truth из API.
-      // Если backend недоступен, лучше показать пустое состояние, чем локальные моки.
-      setDoctors([]);
-      setServices({});
-      setDynamicDepartments([]);
+  // Decomp 4: data-loading functions extracted to useRegistrarData hook.
+  // loadAppointments and loadMoreAppointments remain inline due to complex
+  // ref dependencies (loadAppointmentsInFlightRef, autoRefreshCooldownUntilRef,
+  // autoRefreshCooldownLoggedRef, filteredAppointmentsRef).
+  const {
+    loadIntegratedData,
+    enrichAppointmentsWithPatientData,
+  } = useRegistrarData({
+    setDoctors,
+    setServices,
+    setDynamicDepartments,
+    appointmentOverridesRef,
+  });
 
-      // Загружаем врачей, услуги и настройки очередей из админ панели
-      try {
-        const token = tokenManager.getAccessToken();
-        logger.info('🔍 RegistrarPanel: token present:', Boolean(token));
-
-        // ✅ ОПТИМИЗАЦИЯ: Загружаем все данные параллельно с Promise.allSettled
-        logger.info('🚀 Загружаем данные параллельно...');
-        const [doctorsResult, servicesResult, departmentsResult] = await Promise.allSettled([
-        api.get('/registrar/doctors'),
-        api.get('/registrar/services'),
-        api.get('/registrar/departments?active_only=true')]
-        );
-
-        // Обрабатываем результаты
-        const doctorsRes = doctorsResult.status === 'fulfilled' ? doctorsResult.value : { ok: false };
-        const servicesRes = servicesResult.status === 'fulfilled' ? servicesResult.value : { ok: false };
-        const departmentsRes = departmentsResult.status === 'fulfilled' ? departmentsResult.value : { success: false };
-
-        // Логируем результаты
-        if (doctorsResult.status === 'fulfilled') {
-          logger.info('📊 Ответ врачей: OK');
-        } else {
-          logger.error('❌ Ошибка загрузки врачей:', doctorsResult.reason?.message);
-        }
-        if (servicesResult.status === 'fulfilled') {
-          logger.info('📊 Ответ услуг: OK');
-        } else {
-          logger.error('❌ Ошибка загрузки услуг:', servicesResult.reason?.message);
-        }
-        if (departmentsResult.status === 'fulfilled') {
-          logger.info('📊 Ответ отделений: OK', departmentsRes.data);
-        } else {
-          logger.error('❌ Ошибка загрузки отделений:', departmentsResult.reason);
-        }
-
-        logger.info('🔄 Обрабатываем ответы API...');
-
-        // Проверяем, что все ответы успешны
-        const allSuccess = doctorsRes && doctorsRes.data && servicesRes && servicesRes.data;
-        logger.info('📊 Статус ответов:', {
-          doctors: doctorsRes && doctorsRes.data ? 'OK' : 'ERROR',
-          services: servicesRes && servicesRes.data ? 'OK' : 'ERROR',
-          allSuccess
-        });
-
-        if (!allSuccess) {
-          logger.warn('⚠️ Некоторые API недоступны, но продолжаем работу');
-        }
-
-        if (doctorsRes && doctorsRes.data) {
-          try {
-            const doctorsData = doctorsRes.data;
-            const apiDoctors = doctorsData.doctors || [];
-            logger.info('✅ Данные врачей получены:', apiDoctors.length, 'врачей');
-            // Если API вернул данные — используем их
-            if (apiDoctors.length > 0) {
-              setDoctors(apiDoctors);
-              logger.info('✅ Врачи обновлены из API');
-            }
-          } catch (error) {
-            logger.warn('Ошибка обработки данных врачей:', error.message);
-          }
-        } else {
-          logger.warn('❌ API врачей недоступен, оставляем пустое состояние');
-        }
-
-        // Обработка отделений
-        if (departmentsRes && departmentsRes.data) {
-          const depts = departmentsRes.data.data || [];
-          if (Array.isArray(depts) && depts.length > 0) {
-            setDynamicDepartments(depts);
-            logger.info('✅ Отделения обновлены из API:', depts.length);
-          }
-        }
-
-        if (servicesRes && servicesRes.data) {
-          try {
-            const servicesData = servicesRes.data;
-            const apiServices = servicesData.services_by_group || {};
-            logger.info('✅ Данные услуг получены:', Object.keys(apiServices));
-            // Если API вернул данные — используем их
-            if (Object.keys(apiServices).length > 0) {
-              setServices(apiServices);
-              logger.info('✅ Услуги обновлены из API');
-            }
-          } catch (error) {
-            logger.warn('Ошибка обработки данных услуг:', error.message);
-          }
-        } else {
-          logger.warn('❌ API услуг недоступен, оставляем пустое состояние');
-        }
-
-
-        logger.info('🎯 Загрузка интегрированных данных завершена');
-      } catch (fetchError) {
-        // Backend недоступен - оставляем пустое состояние без локальных моков.
-        logger.warn('Backend недоступен для загрузки интегрированных данных, оставляем пустое состояние:', fetchError.message);
-      }
-
-    } catch (error) {
-      logger.error('Ошибка загрузки интегрированных данных:', error);
-      notify.error('Ошибка загрузки данных из админ панели');
-    } finally {
-
-
-
-
-
-
-
-
-      // УБИРАЕМ setAppointmentsLoading(false) - это не должно влиять на загрузку записей
-      // setAppointmentsLoading(false);
-    }}, []); // Функция для получения данных пациента по ID
-  const fetchPatientData = useCallback(async (patientId) => {// Проверяем, является ли это демо-пациентом (ID >= 1000)
-      if (patientId >= 1000) {// Возвращаем null для демо-пациентов, так как их данные уже есть в записи
-        return null;}const token = tokenManager.getAccessToken();
-      if (!token) return null;
-
-      try {
-        const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (response.ok) {
-          return await response.json();
-        }
-      } catch (error) {
-        // Подавляем ошибки для демо-режима
-        const rawMessage = error?.message || '';
-        if (isNetworkFetchError(rawMessage)) {
-          logger.warn('[Registrar] Не удалось загрузить пациента из URL: backend недоступен', {
-            patientId,
-            rawMessage,
-          });
-          return null;
-        }
-
-        logger.error(`Error fetching patient ${patientId}:`, {
-          error: formatNetworkErrorMessage({
-            rawMessage,
-            fallbackMessage: 'Не удалось загрузить пациента из URL',
-          }),
-          rawMessage,
-        });
-      }
-      return null;
-    }, []);
-
-  // Функция для обогащения записей данными пациентов и недостающими полями
-  const enrichAppointmentsWithPatientData = useCallback(async (appointments) => {
-    const enrichedAppointments = await Promise.all(appointments.map(async (apt) => {
-      let enrichedApt = { ...apt };
-
-      // Обогащаем данными пациента
-      if (apt.patient_id && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt))) {
-        const patient = await fetchPatientData(apt.patient_id);
-        if (patient) {
-          // ✅ ИСПРАВЛЕНО: Формируем patient_fio безопасно, используя все доступные поля
-          // Если поля пустые, используем fallback
-          let patient_fio = '';
-          if (patient.last_name && patient.first_name) {
-            patient_fio = `${patient.last_name} ${patient.first_name}`;
-            if (patient.middle_name) {
-              patient_fio += ` ${patient.middle_name}`;
-            }
-          } else if (patient.last_name) {
-            patient_fio = patient.last_name;
-          } else if (patient.first_name) {
-            patient_fio = patient.first_name;
-          } else {
-            // Fallback, если все поля пустые (не должно произойти благодаря валидации)
-            patient_fio = `Пациент ID=${patient.id}`;
-          }
-
-          const patientGender = normalizePatientGender(patient);
-          enrichedApt = {
-            ...enrichedApt,
-            patient_fio: patient_fio.trim() || `Пациент ID=${patient.id}`,
-            patient_phone: patient.phone,
-            patient_birth_year: patient.birth_date ? new Date(patient.birth_date).getFullYear() : null,
-            patient_gender: patientGender,
-            gender: patientGender,
-            sex: patientGender,
-            address: patient.address || 'Не указан' // Добавляем адрес из данных пациента
-          };
-        }
-      }
-
-      // Применяем локальные оверрайды (например, после оплаты), чтобы не было отката
-      const overrideKey = String(enrichedApt.id);
-      const ov = appointmentOverridesRef.current[overrideKey];
-      if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-        // ✅ ИСПРАВЛЕНО: Применяем только определенные поля из оверрайда, сохраняя queue_numbers
-        enrichedApt = {
-          ...enrichedApt,
-          status: ov.status !== undefined ? ov.status : enrichedApt.status,
-          payment_status: ov.payment_status !== undefined ? ov.payment_status : enrichedApt.payment_status
-          // queue_numbers остается из enrichedApt (из API)
-        };
-      } else if (ov) {
-        delete appointmentOverridesRef.current[overrideKey];
-      }
-      enrichedApt = {
-        ...enrichedApt,
-        visit_type: enrichedApt.visit_type ?? null,
-        payment_type: enrichedApt.payment_type ?? null,
-        payment_status: enrichedApt.payment_status ?? null,
-        services: enrichedApt.services || [],
-        cost: Number(enrichedApt.cost ?? 0)
-      };
-
-      return enrichedApt;
-    }));
-    return enrichedAppointments;
-  }, [fetchPatientData]);
 
   // Улучшенная загрузка записей с поддержкой тихого режима
   const loadAppointments = useCallback(async (options = {}) => {

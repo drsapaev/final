@@ -9,12 +9,14 @@ const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.jsx');
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js.
 // Decomp step 2: hotkeys extracted to ./registrar/useRegistrarHotkeys.js.
 // Decomp step 3: reschedule helpers extracted to ./registrar/useRegistrarReschedule.js.
+// Decomp step 4: data-loading functions extracted to ./registrar/useRegistrarData.js.
 // Contract tests must read all files because they verify that certain
 // functions exist in the registrar panel source tree (not necessarily
 // in the orchestrator file itself).
 const registrarHelpersPath = path.resolve(__dirname, '../registrar/registrarHelpers.js');
 const useRegistrarHotkeysPath = path.resolve(__dirname, '../registrar/useRegistrarHotkeys.js');
 const useRegistrarReschedulePath = path.resolve(__dirname, '../registrar/useRegistrarReschedule.js');
+const useRegistrarDataPath = path.resolve(__dirname, '../registrar/useRegistrarData.js');
 
 const readRegistrarPanelSource = () => fs.readFileSync(registrarPanelPath, 'utf8');
 const readRegistrarHelpersSource = () => fs.readFileSync(registrarHelpersPath, 'utf8');
@@ -26,6 +28,8 @@ const readRegistrarSourceTree = () => [
   fs.readFileSync(useRegistrarHotkeysPath, 'utf8'),
   '// ─── useRegistrarReschedule.js ───',
   fs.readFileSync(useRegistrarReschedulePath, 'utf8'),
+  '// ─── useRegistrarData.js ───',
+  fs.readFileSync(useRegistrarDataPath, 'utf8'),
 ].join('\n\n');
 
 const extractSourceBlock = (source, startMarker, endMarker) => {
@@ -51,10 +55,13 @@ describe('RegistrarPanel command contract', () => {
 
   it('passes through registrar queue patient display fields before legacy patient fetch fallback', () => {
     const source = readRegistrarSourceTree();
+    // Decomp 4: enrichAppointmentsWithPatientData moved to useRegistrarData.js.
+    // End marker changed from 'const loadAppointments' (now in different file)
+    // to 'return enrichedAppointments;' (last line of the function in the hook).
     const enrichmentBlock = extractSourceBlock(
       source,
       'const enrichAppointmentsWithPatientData = useCallback(async (appointments) => {',
-      'const loadAppointments = useCallback(async (options = {}) => {',
+      'return enrichedAppointments;',
     );
 
     expect(source).toContain('if (apt.patient_id && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt)))');
