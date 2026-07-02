@@ -1800,7 +1800,7 @@ const RegistrarPanel = () => {
       {/* Старые вкладки удалены - используется ModernTabs компонент */}
 
       {/* Основной контент без отступа сверху */}
-      <div style={{ overflow: 'hidden' }}>
+      <div className="registrar-overflow-hidden">
         {/* Экран приветствия по параметру view=welcome (с историей: календарь + поиск) */}
         {currentView === 'welcome' &&
         <AnimatedTransition type="fade" delay={100}>
@@ -1837,7 +1837,7 @@ const RegistrarPanel = () => {
                   textRendering: 'optimizeLegibility'
                 }}>
                     {t('welcome')} в панель регистратора!
-                    <Icon name="person" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                    <Icon name="person" size="default" className="registrar-text-accent" />
                   </h1>
                 </AnimatedTransition>
                 <AnimatedTransition type="fade" delay={300}>
@@ -1888,7 +1888,7 @@ const RegistrarPanel = () => {
                       alignItems: 'center',
                       gap: 'var(--mac-spacing-2)'
                     }}>
-                        <Icon name="gear" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                        <Icon name="gear" size="default" className="registrar-text-accent" />
                         Панель управления
                       </h2>
 
@@ -1957,7 +1957,7 @@ const RegistrarPanel = () => {
                         alignItems: 'center',
                         gap: 'var(--mac-spacing-2)'
                       }}>
-                          <Icon name="magnifyingglass" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                          <Icon name="magnifyingglass" size="default" className="registrar-text-accent" />
                           Фильтры и навигация
                         </h3>
 
@@ -2054,7 +2054,7 @@ const RegistrarPanel = () => {
                             alignItems: 'center',
                             gap: 'var(--mac-spacing-2)'
                           }}>
-                                <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
+                                <Icon name="magnifyingglass" size="small" className="registrar-text-secondary" />
                                 Выберите дату для просмотра истории:
                               </label>
                               <Input
@@ -2158,7 +2158,7 @@ const RegistrarPanel = () => {
                     alignItems: 'center',
                     gap: 'var(--mac-spacing-2)'
                   }}>
-                      <Icon name="eye" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                      <Icon name="eye" size="default" className="registrar-text-accent" />
                       История записей
                     </h3>
                     {showCalendar &&
@@ -2652,7 +2652,7 @@ const RegistrarPanel = () => {
           }
         ]}>
         {recordPreviewDialog.row && (
-          <div className="registrar-text-primary" style={{ display: 'grid', gap: '12px' }}>
+          <div className="registrar-text-primary registrar-grid-gap-md">
             {[
               ['Пациент', recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
               ['Телефон', recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
@@ -2970,7 +2970,7 @@ const RegistrarPanel = () => {
             }
           }
         ]}>
-        <div style={{ display: 'grid', gap: '16px' }}>
+        <div className="registrar-grid-gap-lg">
           <div style={{
             padding: '16px',
             borderRadius: '14px',
