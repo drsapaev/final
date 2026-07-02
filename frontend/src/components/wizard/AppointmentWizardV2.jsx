@@ -23,7 +23,7 @@ import {
 import { toast } from 'react-toastify';
 import ModernDialog from '../dialogs/ModernDialog';
 import {
-  Input, Button,
+  Input, Button, Tooltip,
 } from '../ui/macos';
 import { useRoleAccess } from '../common/RoleGuard';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
@@ -4074,6 +4074,17 @@ const CartStepV2 = ({
                       {row.doctorName ? `Врач: ${row.doctorName}` : 'Врач не выбран'}
                     </div>
                   </div>
+                  {/* QW-10 fix: wrapped repeat-eligibility badge in Tooltip with explanation. */}
+                  {/* Previously only had native title={reason} — users didn't know WHAT the badge meant. */}
+                  <Tooltip
+                    content={isRepeatEligibilityLoading && !row.eligibility ?
+                      'Проверяем историю визитов пациента, чтобы определить право на повторную скидку.' :
+                      isEligible ?
+                      `Этому пациенту положена повторная консультация со скидкой ${discount}%. Основание: ${reason}` :
+                      `Повторная скидка недоступна. Причина: ${reason}`
+                    }
+                    position="top"
+                    delay={300}>
                   <div style={{
                   flexShrink: 0,
                   padding: '2px 8px',
@@ -4087,13 +4098,14 @@ const CartStepV2 = ({
                   border: isEligible ?
                   '1px solid color-mix(in srgb, var(--mac-success), transparent 75%)' :
                   '1px solid color-mix(in srgb, var(--mac-warning), transparent 70%)'
-                }} title={reason}>
+                }}>
                     {isRepeatEligibilityLoading && !row.eligibility ?
                   'Проверка...' :
                   isEligible ?
                   `Доступна повторная скидка ${discount}%` :
                   `Повторная скидка недоступна (${reason})`}
                   </div>
+                  </Tooltip>
                 </div>);
           })}
           </div>
