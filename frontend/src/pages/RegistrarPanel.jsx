@@ -485,10 +485,11 @@ const RegistrarPanel = () => {
   const statusFilterLabel = statusFilter ? t(REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter) : null;
   const { theme, isDark, getSpacing, getFontSize, getColor } = useTheme();
   // Адаптивные цвета из централизованной системы темизации
-  const cardBg = isDark ? 'var(--color-background-primary)' : 'var(--color-background-secondary)';
-  const textColor = isDark ? 'var(--color-text-primary)' : 'var(--color-text-primary)';
-  const borderColor = isDark ? 'var(--color-border-medium)' : 'var(--color-border-light)';
-  const accentColor = 'var(--color-primary-500)';
+  // DS-2 fix: replaced --color-* variables with --mac-* canonical tokens
+  const cardBg = isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)';
+  const textColor = 'var(--mac-text-primary)';
+  const borderColor = isDark ? 'var(--mac-border)' : 'var(--mac-border-secondary)';
+  const accentColor = 'var(--mac-accent-blue)';
 
   // Используем централизованную типографику и отступы
   // Используем CSS переменные вместо getSpacing и getColor
@@ -1554,7 +1555,7 @@ const RegistrarPanel = () => {
     if (dataSource === 'error') {
       return (
         <div style={{
-          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          background: 'var(--mac-error)',
           color: 'white',
           padding: '8px 12px',
           borderRadius: '6px',
@@ -1590,7 +1591,7 @@ const RegistrarPanel = () => {
     if (dataSource === 'api') {
       return (
         <div style={{
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          background: 'var(--mac-success)',
           color: 'white',
           padding: '8px 12px',
           borderRadius: '6px',
@@ -1614,7 +1615,7 @@ const RegistrarPanel = () => {
     if (dataSource === 'loading') {
       return (
         <div style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+          background: 'var(--mac-accent-blue)',
           color: 'white',
           padding: '8px 12px',
           borderRadius: '6px',
@@ -1761,7 +1762,7 @@ const RegistrarPanel = () => {
           top: '0',
           zIndex: 9999,
           padding: '8px 16px',
-          background: 'var(--color-primary-600)',
+          background: 'var(--mac-accent-blue-hover)',
           color: 'white',
           textDecoration: 'none',
           borderRadius: '0 0 4px 4px'
@@ -2109,7 +2110,7 @@ const RegistrarPanel = () => {
                                 padding: '8px 12px',
                                 borderRadius: '6px',
                                 fontSize: '13px',
-                                background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
                                 color: textColor,
                                 border: 'none',
                                 cursor: 'pointer',
@@ -2129,7 +2130,7 @@ const RegistrarPanel = () => {
                                 padding: '8px 12px',
                                 borderRadius: '6px',
                                 fontSize: '13px',
-                                background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
                                 color: textColor,
                                 border: 'none',
                                 cursor: 'pointer',
@@ -2151,7 +2152,7 @@ const RegistrarPanel = () => {
                                 padding: '8px 12px',
                                 borderRadius: '6px',
                                 fontSize: '13px',
-                                background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
                                 color: textColor,
                                 border: 'none',
                                 cursor: 'pointer',
@@ -2287,7 +2288,7 @@ const RegistrarPanel = () => {
                         }}
                         style={{
                           padding: '12px 24px',
-                          background: 'var(--mac-accent-blue, #3b82f6)',
+                          background: 'var(--mac-accent-blue)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '8px',
@@ -2296,8 +2297,8 @@ const RegistrarPanel = () => {
                           cursor: 'pointer',
                           transition: 'all 0.2s'
                         }}
-                        onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue, #2563eb)'}
-                        onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue, #3b82f6)'}>
+                        onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
+                        onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue)'}>
 
                                 <Icon name="key" size="small" style={{ marginRight: '6px' }} />Войти снова
                               </button>
@@ -2309,7 +2310,7 @@ const RegistrarPanel = () => {
                         }}
                         style={{
                           padding: '12px 24px',
-                          background: '#10b981',
+                          background: 'var(--mac-accent-green)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '8px',
@@ -2318,8 +2319,8 @@ const RegistrarPanel = () => {
                           cursor: 'pointer',
                           transition: 'all 0.2s'
                         }}
-                        onMouseOver={(e) => e.target.style.background = '#059669'}
-                        onMouseOut={(e) => e.target.style.background = '#10b981'}>
+                        onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-green-hover)'}
+                        onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-green)'}>
 
                                 <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Обновить данные
                               </button>
@@ -2331,7 +2332,7 @@ const RegistrarPanel = () => {
                         }}
                         style={{
                           padding: '12px 24px',
-                          background: '#6b7280',
+                          background: 'var(--mac-text-tertiary)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '8px',
@@ -2340,8 +2341,8 @@ const RegistrarPanel = () => {
                           cursor: 'pointer',
                           transition: 'all 0.2s'
                         }}
-                        onMouseOver={(e) => e.target.style.background = '#4b5563'}
-                        onMouseOut={(e) => e.target.style.background = '#6b7280'}>
+                        onMouseOver={(e) => e.target.style.background = 'var(--mac-text-secondary)'}
+                        onMouseOut={(e) => e.target.style.background = 'var(--mac-text-tertiary)'}>
 
                                 <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Перезапустить приложение
                               </button>
@@ -2663,7 +2664,7 @@ const RegistrarPanel = () => {
               display: 'flex',
               justifyContent: 'center',
               padding: '16px',
-              borderTop: `1px solid ${theme === 'light' ? '#e5e7eb' : '#374151'}`
+              borderTop: `1px solid ${theme === 'light' ? 'var(--mac-border-secondary)' : 'var(--mac-bg-quaternary)'}`
             }}>
                   <button
                 onClick={loadMoreAppointments}
@@ -2674,8 +2675,8 @@ const RegistrarPanel = () => {
                   borderRadius: '8px',
                   border: 'none',
                   background: paginationInfo.loadingMore ?
-                  '#9ca3af' :
-                  'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  'var(--mac-text-tertiary)' :
+                  'var(--mac-accent-blue)',
                   color: 'white',
                   fontSize: '14px',
                   fontWeight: '500',
@@ -3058,7 +3059,7 @@ const RegistrarPanel = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.14)',
-                color: 'var(--mac-accent-blue, #3b82f6)',
+                color: 'var(--mac-accent-blue)',
                 flexShrink: 0
               }}>
                 📅
@@ -3112,7 +3113,7 @@ const RegistrarPanel = () => {
                 padding: '10px 12px',
                 borderRadius: '10px',
                 border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#ffffff',
+                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'var(--mac-bg-primary)',
                 color: getColor('textPrimary'),
                 fontSize: '14px',
                 fontFamily: 'inherit',
