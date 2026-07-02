@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, attributes
 
 from app.crud.patient import normalize_patient_name
 from app.models.clinic import Doctor
@@ -261,7 +261,12 @@ class RegistrarEditDeltaService:
                     )
                 )
             entry.services = services
+            # R-41 fix: flag_modified для JSON column — без этого SQLAlchemy
+            # не обнаруживает изменение mutable JSON field, update не persist'ится.
+            # Silent data loss: пользователь меняет услуги, но БД не обновляется.
+            attributes.flag_modified(entry, 'services')
             entry.service_codes = self._merged_service_codes(entry.service_codes, service)
+            attributes.flag_modified(entry, 'service_codes')
             entry.total_amount = int(Decimal(str(entry.total_amount or 0)) + delta_amount)
             entry.updated_at = changed_at
 

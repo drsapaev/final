@@ -1065,12 +1065,18 @@ const RegistrarPanel = () => {
     // meant a registrar with a payment dialog open for 2+ minutes would not
     // see new online-queue patients arrive in the worklist behind the dialog.
     //
-    // Now we only pause for `showWizard` — the wizard form holds unsaved
-    // patient data that silent refresh could overwrite if the table state
-    // gets re-derived. Payment / print / cancel dialogs operate on a single
-    // row snapshot and do not interact with the worklist rendering, so
-    // background refresh is safe and keeps the worklist live.
-    if (showWizard) return;
+    // R-26 fix: pause auto-refresh when ANY dialog is open.
+    // Раньше только showWizard — но payment/cancel/reschedule dialogs
+    // тоже могут пострадать от фонового refresh (row positions change).
+    const anyDialogOpen = showWizard
+      || paymentDialog.open
+      || cancelDialog.open
+      || printDialog.open
+      || recordPreviewDialog.open
+      || contextMenu.open
+      || forceMajeureModal.open
+      || showSlotsModal;
+    if (anyDialogOpen) return;
     if (!autoRefresh) return;
     if (Date.now() < autoRefreshCooldownUntilRef.current) return;
 
@@ -1777,6 +1783,50 @@ const RegistrarPanel = () => {
 
         Перейти к основному содержимому
       </a>
+
+      {/* R-03 fix: breadcrumb навигация для wayfinding.
+          Показывает текущую view, выбранное отделение, поисковый запрос. */}
+      <nav aria-label="Навигация" className="registrar-breadcrumb" style={{
+        padding: '4px 0',
+        fontSize: '13px',
+        color: 'var(--mac-text-secondary)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        flexWrap: 'wrap',
+      }}>
+        <button
+          type="button"
+          onClick={() => {
+            const p = new URLSearchParams(searchParams);
+            p.set('view', 'welcome');
+            p.delete('q');
+            p.delete('status');
+            setSearchParams(p, { replace: true });
+          }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mac-accent)', font: 'inherit', padding: 0 }}
+        >
+          Регистратура
+        </button>
+        {activeTab && (
+          <>
+            <span>›</span>
+            <span>{queueProfiles.find(p => p.key === activeTab)?.title || activeTab}</span>
+          </>
+        )}
+        {searchQuery && (
+          <>
+            <span>›</span>
+            <span>Поиск: «{searchQuery}»</span>
+          </>
+        )}
+        {showWizard && (
+          <>
+            <span>›</span>
+            <span>{wizardEditMode ? 'Редактирование' : 'Новая запись'}</span>
+          </>
+        )}
+      </nav>
 
       {/* Современные вкладки */}
       {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
