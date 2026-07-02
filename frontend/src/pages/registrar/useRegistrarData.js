@@ -228,16 +228,9 @@ export const useRegistrarData = ({
         }
       }
 
-      // Применяем локальные оверрайды (например, после оплаты), чтобы не было отката
-      const overrideKey = String(enrichedApt.id);
-      if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-        enrichedApt = {
-          ...enrichedApt,
-          status: ov.status !== undefined ? ov.status : enrichedApt.status,
-          payment_status: ov.payment_status !== undefined ? ov.payment_status : enrichedApt.payment_status,
-        };
-      } else if (ov) {
-      }
+      // R-29 fix: override block removed — appointmentOverridesRef was dead code
+      // (never populated). Local overrides after payment are handled by
+      // loadAppointments silent refresh instead.
       enrichedApt = {
         ...enrichedApt,
         visit_type: enrichedApt.visit_type ?? null,
