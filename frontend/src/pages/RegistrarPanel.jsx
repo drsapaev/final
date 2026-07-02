@@ -2278,7 +2278,7 @@ const RegistrarPanel = () => {
           gap: '8px',
           textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
         }}>
-          <span>⚠</span>
+          <Icon name="exclamationmark.triangle" size="small" style={{ color: 'white' }} />
           <span>Не удалось загрузить записи. Проверьте подключение к серверу.</span>
           <button
             onClick={() => loadAppointments({ source: 'error_refresh_button', force: true })}
@@ -2314,7 +2314,7 @@ const RegistrarPanel = () => {
           gap: '8px',
           textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
         }}>
-          <span>✅</span>
+          <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
           <span>Данные загружены с сервера</span>
           <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
             {count} из {paginationInfo.total} записей
@@ -2338,7 +2338,7 @@ const RegistrarPanel = () => {
           gap: '8px',
           textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
         }}>
-          <span>🔄</span>
+          <Icon name="arrow.up.arrow.down" size="small" style={{ color: 'white' }} />
           <span>Загрузка данных...</span>
         </div>);
 
@@ -3006,7 +3006,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue, #2563eb)'}
                         onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue, #3b82f6)'}>
 
-                                🔑 Войти снова
+                                <Icon name="key" size="small" style={{ marginRight: '6px' }} />Войти снова
                               </button>
 
                               <button
@@ -3028,7 +3028,7 @@ const RegistrarPanel = () => {
                         onMouseOver={(e) => e.target.style.background = '#059669'}
                         onMouseOut={(e) => e.target.style.background = '#10b981'}>
 
-                                🔄 Обновить данные
+                                <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Обновить данные
                               </button>
 
                               <button
@@ -3075,7 +3075,7 @@ const RegistrarPanel = () => {
                         fontSize: '14px'
                       }}>
 
-                            ➕ Создать первую запись
+                            <Icon name="plus" size="small" style={{ marginRight: '6px' }} />Создать первую запись
                           </Button>
                         </div>
                   }
@@ -3333,7 +3333,7 @@ const RegistrarPanel = () => {
                   fontSize: '14px'
                 }}>
 
-                    ➕ Создать первую запись
+                    <Icon name="plus" size="small" style={{ marginRight: '6px' }} />Создать первую запись
                   </Button>
                 </div> :
             filteredAppointments.length === 0 ?
@@ -3447,7 +3447,7 @@ const RegistrarPanel = () => {
                       </> :
 
                 <>
-                        📥 Загрузить еще
+                        <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: '6px' }} />Загрузить еще
                       </>
                 }
                   </button>
