@@ -493,274 +493,15 @@ const RegistrarPanel = () => {
 
   // Состояния для пагинации
   const [paginationInfo, setPaginationInfo] = useState({ total: 0, hasMore: false, loadingMore: false });
-  // Демо-данные вынесены в константу
-  const demoAppointments = useMemo(() => [
-  {
-    id: 1,
-    patient_fio: 'Иванов Иван Иванович',
-    patient_birth_year: 1985,
-    patient_phone: '+998 (90) 123-45-67',
-    address: 'ул. Навои, д. 15, кв. 23',
-    services: ['Консультация кардиолога', 'ЭКГ'],
-    visit_type: 'paid',
-    payment_type: 'card',
-    payment_status: 'paid',
-    cost: 50000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'cardiology',
-    doctor_specialty: 'cardiology',
-    date: todayStr,
-    appointment_date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    // Добавляем номера очередей для демонстрации
-    queue_numbers: [
-    {
-      queue_tag: 'cardiology_common',
-      queue_name: 'Кардиолог',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_123456'
-  },
-  // Добавляем записи для того же пациента в разных отделениях (для тестирования агрегации)
-  {
-    id: 2,
-    patient_fio: 'Иванов Иван Иванович', // Тот же пациент
-    patient_birth_year: 1985,
-    patient_phone: '+998 (90) 123-45-67',
-    address: 'ул. Навои, д. 15, кв. 23',
-    services: ['Консультация дерматолога', 'Дерматоскопия'], // Другие услуги
-    visit_type: 'paid',
-    payment_type: 'card',
-    payment_status: 'paid',
-    cost: 45000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'dermatology', // Другое отделение
-    doctor_specialty: 'dermatology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'dermatology',
-      queue_name: 'Дерматолог',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_123456'
-  },
-  {
-    id: 3,
-    patient_fio: 'Иванов Иван Иванович', // Тот же пациент
-    patient_birth_year: 1985,
-    patient_phone: '+998 (90) 123-45-67',
-    address: 'ул. Навои, д. 15, кв. 23',
-    services: ['Консультация стоматолога'], // Третья услуга
-    visit_type: 'paid',
-    payment_type: 'cash',
-    payment_status: 'paid',
-    cost: 30000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'stomatology', // Третье отделение
-    doctor_specialty: 'stomatology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'stomatology',
-      queue_name: 'Стоматолог',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_123456'
-  },
-  {
-    id: 2,
-    patient_fio: 'Петрова Анна Сергеевна',
-    patient_birth_year: 1990,
-    patient_phone: '+998 (91) 234-56-78',
-    address: 'пр. Амира Темура, д. 42',
-    services: ['ЭКГ', 'Холтер'],
-    visit_type: 'repeat',
-    payment_type: 'cash',
-    payment_status: 'pending',
-    cost: 30000,
-    status: 'queued',
-    isEmpty: false,
-    department: 'cardiology',
-    doctor_specialty: 'cardiology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    // Добавляем номера очередей
-    queue_numbers: [
-    {
-      queue_tag: 'cardiology_common',
-      queue_name: 'Кардиолог',
-      number: 2,
-      status: 'waiting',
-      source: 'confirmation',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'registrar_1'
-  },
-  {
-    id: 3,
-    patient_fio: 'Сидоров Петр Александрович',
-    patient_birth_year: 1975,
-    patient_phone: '+998 (93) 345-67-89',
-    address: 'ул. Шота Руставели, д. 8, кв. 45',
-    services: ['Консультация дерматолога'],
-    visit_type: 'paid',
-    payment_type: 'card',
-    payment_status: 'paid',
-    cost: 45000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'dermatology',
-    doctor_specialty: 'dermatology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'dermatology',
-      queue_name: 'Дерматолог',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_789012'
-  },
-  {
-    id: 4,
-    patient_fio: 'Козлова Мария Владимировна',
-    patient_birth_year: 1988,
-    patient_phone: '+998 (94) 456-78-90',
-    address: 'ул. Бабура, д. 25',
-    services: ['Лечение кариеса'],
-    visit_type: 'paid',
-    payment_type: 'cash',
-    payment_status: 'pending',
-    cost: 60000,
-    status: 'queued',
-    isEmpty: false,
-    department: 'stomatology',
-    doctor_specialty: 'stomatology',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'stomatology',
-      queue_name: 'Стоматолог',
-      number: 1,
-      status: 'waiting',
-      source: 'desk',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'none',
-    confirmed_at: null,
-    confirmed_by: null
-  },
-  {
-    id: 5,
-    patient_fio: 'Морозов Алексей Игоревич',
-    patient_birth_year: 1992,
-    patient_phone: '+998 (95) 567-89-01',
-    address: 'ул. Мирзо Улугбека, д. 67, кв. 12',
-    services: ['Общий анализ крови', 'Биохимия'],
-    visit_type: 'paid',
-    payment_type: 'card',
-    payment_status: 'paid',
-    cost: 25000,
-    status: 'confirmed',
-    isEmpty: false,
-    department: 'laboratory',
-    doctor_specialty: 'laboratory',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'lab',
-      queue_name: 'Лаборатория',
-      number: 1,
-      status: 'waiting',
-      source: 'online',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: 'telegram_345678'
-  },
-  {
-    id: 6,
-    patient_fio: 'Волкова Елена Сергеевна',
-    patient_birth_year: 1983,
-    patient_phone: '+998 (97) 678-90-12',
-    address: 'ул. Алишера Навои, д. 134',
-    services: ['Капельница', 'Инъекция'],
-    visit_type: 'free',
-    payment_type: 'cash',
-    payment_status: 'paid',
-    cost: 35000,
-    status: 'queued',
-    isEmpty: false,
-    department: 'procedures',
-    doctor_specialty: 'procedures',
-    date: todayStr,
-    record_type: 'appointment', // Добавляем тип записи для демо-данных
-    appointment_date: todayStr,
-    queue_numbers: [
-    {
-      queue_tag: 'procedures',
-      queue_name: 'Процедуры',
-      number: 1,
-      status: 'waiting',
-      source: 'desk',
-      created_at: new Date().toISOString()
-    }],
-
-    confirmation_status: 'none',
-    confirmed_at: null,
-    confirmed_by: null
-  }],
-  [todayStr]);
+  // QW-03 fix: demoAppointments useMemo (260 lines) removed.
+  // Production code should never ship demo data. Backend fixtures
+  // are used for tests; error states show proper error UI instead.
 
   // Состояния для управления данными
   const [appointments, setAppointments] = useState([]);
   // ⭐ SSOT FIX: Сырые данные (flat list) до агрегации — для Tooltip
   const [rawEntries] = useState([]);
-  const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'demo' | 'error'
+  const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'error' (QW-03: 'demo' removed)
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   // QW-01 fix: bulk-action state removed — checkboxes were already disabled
   // (showCheckboxes=false) and the bulk-action bar was unreachable via UI.
@@ -1651,10 +1392,12 @@ const RegistrarPanel = () => {
         });
         logger.info('✅ SSOT: Загружено', enriched.length, 'записей (без local overrides)');
       } else {
-        // ⭐ SSOT: Demo fallback без local overrides
+        // QW-03 fix: empty API response is a valid state, not a demo fallback.
+        // Empty result is already handled earlier (line ~1370). This branch
+        // is unreachable but kept as defensive code.
         startTransition(() => {
-          setAppointments(demoAppointments);
-          setDataSource('demo');
+          setAppointments([]);
+          setDataSource('api');
         });
       }
     } catch (error) {
@@ -1671,41 +1414,31 @@ const RegistrarPanel = () => {
       // Handle axios errors
       if (error.response?.status === 401) {
         // Токен недействителен
-        logger.warn('Токен недействителен (401), очищаем и используем демо-данные');
+        logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
         localStorage.removeItem('auth_token');
-        // ⭐ SSOT: Demo fallback без local overrides
+        // QW-03 fix: show error state instead of demo data.
         startTransition(() => {
-          if (!silent) setDataSource('demo');
-          setAppointments(demoAppointments);
+          if (!silent) setDataSource('error');
+          setAppointments([]);
         });
       } else {
         // Other errors (network, 404, 500, etc.)
-        logger.error('❌ Backend недоступен для загрузки записей, используем демо-режим:', error.message);
+        logger.error('❌ Backend недоступен для загрузки записей:', error.message);
         logger.error('❌ Детали ошибки:', error);
         startTransition(() => {
-          if (!silent) setDataSource((prev) => prev === 'demo' ? prev : 'demo');
-          setAppointments((prev) => {
-            try {
-              const prevStr = JSON.stringify(prev);
-              const nextStr = JSON.stringify(demoAppointments);
-              if (prevStr === nextStr) return prev;
-            } catch {
-
-
-
-
-              // Игнорируем ошибки сравнения JSON
-            }return demoAppointments;});});
+          if (!silent) setDataSource('error');
+          setAppointments([]);
+        });
         // Показываем уведомление пользователю только при первой загрузке
         if (appointmentsCount === 0) {
-          notify.info('Backend недоступен. Работаем в демо-режиме.', { icon: 'ℹ️' });
+          notify.error('Backend недоступен. Проверьте подключение и повторите попытку.');
         }
       }
     } finally {
       loadAppointmentsInFlightRef.current = false;
       if (!silent) setAppointmentsLoading(false);
     }
-  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, searchParams, activeTab, demoAppointments, appointmentsCount]);
+  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, searchParams, activeTab, appointmentsCount]);
 
   // Слушаем обновления отделений от админ-панели
   useEffect(() => {
@@ -2529,10 +2262,11 @@ const RegistrarPanel = () => {
 
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
   const DataSourceIndicator = memo(({ count }) => {
-    if (dataSource === 'demo') {
+    // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
+    if (dataSource === 'error') {
       return (
         <div style={{
-          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
           color: 'white',
           padding: '8px 12px',
           borderRadius: '6px',
@@ -2544,10 +2278,10 @@ const RegistrarPanel = () => {
           gap: '8px',
           textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
         }}>
-          <span>⚠️</span>
-          <span>Показаны демо-данные. Проверьте подключение к серверу.</span>
+          <span>⚠</span>
+          <span>Не удалось загрузить записи. Проверьте подключение к серверу.</span>
           <button
-            onClick={() => loadAppointments({ source: 'demo_refresh_button' })}
+            onClick={() => loadAppointments({ source: 'error_refresh_button', force: true })}
             style={{
               background: 'rgba(255, 255, 255, 0.2)',
               border: 'none',
@@ -2559,7 +2293,7 @@ const RegistrarPanel = () => {
               marginLeft: 'auto'
             }}>
 
-            🔄 Повторить
+            Повторить
           </button>
         </div>);
 
