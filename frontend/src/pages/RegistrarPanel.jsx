@@ -2524,8 +2524,7 @@ const RegistrarPanel = () => {
                 onClick={loadMoreAppointments}
                 disabled={paginationInfo.loadingMore}
                 aria-label={paginationInfo.loadingMore ? 'Loading more appointments' : 'Load more appointments'}
-                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'}`}
-                className="registrar-flex"
+                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'} registrar-flex`}
                   style={{
                     cursor: paginationInfo.loadingMore ? 'not-allowed' : 'pointer',
                     boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
@@ -2600,8 +2599,7 @@ const RegistrarPanel = () => {
                   gridTemplateColumns: 'minmax(120px, 0.36fr) minmax(0, 1fr)',
                   gap: '12px',
                   alignItems: 'start'
-                }}
-                className="registrar-surface">
+                }}>
                 <span className="registrar-text-secondary" style={{ fontSize: '13px' }}>{label}</span>
                 <span style={{ minWidth: 0, overflowWrap: 'anywhere', fontWeight: 500 }}>
                   {String(value)}
