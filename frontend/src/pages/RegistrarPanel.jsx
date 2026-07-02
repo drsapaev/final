@@ -1948,23 +1948,8 @@ const RegistrarPanel = () => {
                       </div>
 
                     {/* Фильтры и навигация */}
-                      <div style={{
-                      background: 'var(--mac-bg-toolbar)',
-                      borderRadius: 'var(--mac-radius-lg)',
-                      padding: 'var(--mac-spacing-5)',
-                      border: '1px solid var(--mac-separator)',
-                      backdropFilter: 'var(--mac-blur-light)',
-                      WebkitBackdropFilter: 'var(--mac-blur-light)'
-                    }}>
-                        <h3 style={{
-                        fontSize: 'var(--mac-font-size-lg)',
-                        marginBottom: 'var(--mac-spacing-4)',
-                        color: 'var(--mac-text-primary)',
-                        fontWeight: 'var(--mac-font-weight-semibold)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--mac-spacing-2)'
-                      }}>
+                      <div className="registrar-surface-toolbar">
+                        <h3 className="registrar-subsection-heading">
                           <Icon name="magnifyingglass" size="default" className="registrar-text-accent" />
                           Фильтры и навигация
                         </h3>
@@ -2561,14 +2546,7 @@ const RegistrarPanel = () => {
 
                     {paginationInfo.loadingMore ?
                 <>
-                        <div style={{
-                    width: '16px',
-                    height: '16px',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderTop: '2px solid white',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
+                        <div className="registrar-spinner" />
                         Загрузка...
                       </> :
 
@@ -2933,44 +2911,27 @@ const RegistrarPanel = () => {
           }
         ]}>
         <div className="registrar-grid-gap-lg">
-          <div style={{
-            padding: '16px',
-            borderRadius: '14px',
-            border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.14)'}`,
-            backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.06)'
-          }}>
+          <div className="registrar-reschedule-card"
+            style={{
+              border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.14)'}`,
+              backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.06)'
+            }}>
             <div style={{
               display: 'flex',
               alignItems: 'flex-start',
               gap: '12px'
             }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.14)',
-                color: 'var(--mac-accent-blue)',
-                flexShrink: 0
-              }}>
+              <div className="registrar-reschedule-icon registrar-text-accent"
+                style={{
+                  backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.14)'
+                }}>
                 📅
               </div>
               <div>
-                <div style={{
-                  color: getColor('textPrimary'),
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  marginBottom: '4px'
-                }}>
+                <div className="registrar-reschedule-title" style={{ color: getColor('textPrimary') }}>
                   Перенос записи
                 </div>
-                <div style={{
-                  color: getColor('textSecondary'),
-                  fontSize: '13px',
-                  lineHeight: 1.5
-                }}>
+                <div className="registrar-reschedule-desc" style={{ color: getColor('textSecondary') }}>
                   Выберите быстрый перенос на завтра или укажите другую дату.
                 </div>
               </div>
@@ -3001,23 +2962,14 @@ const RegistrarPanel = () => {
               min={getLocalDateString()}
               aria-label="Дата переноса записи"
               onChange={(e) => setCustomRescheduleDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '10px',
-                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'var(--mac-bg-primary)',
-                color: getColor('textPrimary'),
-                fontSize: '14px',
-                fontFamily: 'inherit',
-                outline: 'none'
-              }}
+              className="registrar-reschedule-input"
+                style={{
+                  border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'var(--mac-bg-primary)',
+                  color: getColor('textPrimary')
+                }}
             />
-            <div style={{
-              color: getColor('textSecondary'),
-              fontSize: '12px',
-              marginTop: '6px'
-            }}>
+            <div className="registrar-reschedule-hint" style={{ color: getColor('textSecondary') }}>
               Выберите дату и нажмите «{t('select_date')}».
             </div>
           </div>
