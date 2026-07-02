@@ -2193,13 +2193,7 @@ const RegistrarPanel = () => {
 
                     return isEmptyQueue;
                   })() &&
-                  <div style={{
-                    padding: '60px 20px',
-                    textAlign: 'center',
-                    background: cardBg,
-                    borderRadius: '12px',
-                    border: `1px solid ${borderColor}`
-                  }}>
+                  <div className="registrar-empty-state">
                           {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
                     {/* Full unification deferred — requires EmptyState.jsx migration */}
                     {/* from Tailwind/native to macOS design system first. */}
@@ -2245,17 +2239,7 @@ const RegistrarPanel = () => {
                           // Перенаправляем на страницу входа
                           window.location.href = '/login';
                         }}
-                        style={{
-                          padding: '12px 24px',
-                          background: 'var(--mac-accent-blue)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
+                        className="registrar-btn-lg registrar-btn-accent"
                         onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
                         onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue)'}>
 
@@ -2267,17 +2251,7 @@ const RegistrarPanel = () => {
                           // Обновляем данные
                           loadAppointments({ source: 'manual_refresh_button' });
                         }}
-                        style={{
-                          padding: '12px 24px',
-                          background: 'var(--mac-accent-green)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
+                        className="registrar-btn-lg registrar-btn-success"
                         onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-green-hover)'}
                         onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-green)'}>
 
@@ -2289,17 +2263,7 @@ const RegistrarPanel = () => {
                           // Перезапускаем приложение
                           window.location.reload();
                         }}
-                        style={{
-                          padding: '12px 24px',
-                          background: 'var(--mac-text-tertiary)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
+                        className="registrar-btn-lg registrar-btn-neutral"
                         onMouseOver={(e) => e.target.style.background = 'var(--mac-text-secondary)'}
                         onMouseOut={(e) => e.target.style.background = 'var(--mac-text-tertiary)'}>
 
@@ -2506,13 +2470,7 @@ const RegistrarPanel = () => {
               {appointmentsLoading ?
             <AnimatedLoader.TableSkeleton rows={8} columns={10} /> :
             filteredAppointments.length === 0 && dataSource === 'api' ?
-            <div style={{
-              padding: '60px 20px',
-              textAlign: 'center',
-              background: cardBg,
-              borderRadius: '12px',
-              border: `1px solid ${borderColor}`
-            }}>
+            <div className="registrar-empty-state">
                   <div style={{
                 fontSize: '48px',
                 marginBottom: '16px',
@@ -2689,7 +2647,7 @@ const RegistrarPanel = () => {
           }
         ]}>
         {recordPreviewDialog.row && (
-          <div style={{ display: 'grid', gap: '12px', color: 'var(--mac-text-primary)' }}>
+          <div className="registrar-text-primary" style={{ display: 'grid', gap: '12px' }}>
             {[
               ['Пациент', recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
               ['Телефон', recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
@@ -2704,17 +2662,16 @@ const RegistrarPanel = () => {
             ].filter(([, value]) => value !== null && value !== undefined && value !== '').map(([label, value]) => (
               <div
                 key={label}
+                className="registrar-surface"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'minmax(120px, 0.36fr) minmax(0, 1fr)',
                   gap: '12px',
                   alignItems: 'start',
                   padding: '10px 12px',
-                  border: '1px solid var(--mac-separator)',
-                  borderRadius: 'var(--mac-radius-md)',
-                  background: 'var(--mac-bg-secondary)'
+                  borderRadius: 'var(--mac-radius-md)'
                 }}>
-                <span style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>{label}</span>
+                <span className="registrar-text-secondary" style={{ fontSize: '13px' }}>{label}</span>
                 <span style={{ minWidth: 0, overflowWrap: 'anywhere', fontWeight: 500 }}>
                   {String(value)}
                 </span>
