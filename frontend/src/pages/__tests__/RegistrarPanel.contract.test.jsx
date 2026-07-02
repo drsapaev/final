@@ -257,7 +257,7 @@ describe('RegistrarPanel command contract', () => {
     expect(resolverBlock).not.toContain('appointment_id');
     expect(resolverBlock).not.toContain('appointment_ids');
     expect(resolverBlock).not.toContain('appointmentRow?.id');
-    expect(source).toContain('Cannot reschedule without a canonical visit id');
+    expect(source).toContain('Не удалось определить визит для переноса');
   });
 });
 
