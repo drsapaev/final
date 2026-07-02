@@ -29,6 +29,7 @@ import logger from '../../utils/logger';
 
 export const useRegistrarHotkeys = ({
   setShowWizard,
+  setShowSlotsModal,
   setActiveTab,
   setSearchParams,
   showWizard,
@@ -82,7 +83,7 @@ export const useRegistrarHotkeys = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard, showSlotsModal, appointments, setShowWizard, setActiveTab, setSearchParams]);
+  }, [showWizard, showSlotsModal, appointments, setShowWizard, setShowSlotsModal, setActiveTab, setSearchParams]);
 };
 
 export default useRegistrarHotkeys;

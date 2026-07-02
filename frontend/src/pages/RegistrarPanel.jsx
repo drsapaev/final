@@ -37,11 +37,7 @@ import {
   registrarWorkflowTitleStyle,
   registrarWorkflowMetaStyle,
   registrarWorkflowActionsStyle,
-  normalizeRegistrarContractValue,
-  getRegistrarRecordKind,
-  getRegistrarRecordId,
   getRegistrarRecordRefs,
-  getRegistrarSelectionKey,
   findRegistrarRecordBySelectionKey,
   hasBackendAction,
   getRegistrarActionForStatus,
@@ -49,9 +45,6 @@ import {
   normalizePatientGender,
   hasBackendPatientGenderContract,
   formatPreviewList,
-  resolveWizardQueueEntryId,
-  normalizeWizardQueueAssignment,
-  flattenWizardQueueNumbers,
   buildPostWizardPaymentRow,
   isMultiRecordAggregateRow,
 } from './registrar/registrarHelpers';
@@ -1389,6 +1382,7 @@ const RegistrarPanel = () => {
   // Горячие клавиши — extracted to useRegistrarHotkeys hook (Decomp 2)
   useRegistrarHotkeys({
     setShowWizard,
+    setShowSlotsModal,
     setActiveTab,
     setSearchParams,
     showWizard,
