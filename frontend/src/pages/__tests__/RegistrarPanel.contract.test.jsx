@@ -10,6 +10,7 @@ const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.jsx');
 // Decomp step 2: hotkeys extracted to ./registrar/useRegistrarHotkeys.js.
 // Decomp step 3: reschedule helpers extracted to ./registrar/useRegistrarReschedule.js.
 // Decomp step 4: data-loading functions extracted to ./registrar/useRegistrarData.js.
+// Decomp step 5: record action handlers extracted to ./registrar/useRegistrarActions.js.
 // Contract tests must read all files because they verify that certain
 // functions exist in the registrar panel source tree (not necessarily
 // in the orchestrator file itself).
@@ -17,6 +18,7 @@ const registrarHelpersPath = path.resolve(__dirname, '../registrar/registrarHelp
 const useRegistrarHotkeysPath = path.resolve(__dirname, '../registrar/useRegistrarHotkeys.js');
 const useRegistrarReschedulePath = path.resolve(__dirname, '../registrar/useRegistrarReschedule.js');
 const useRegistrarDataPath = path.resolve(__dirname, '../registrar/useRegistrarData.js');
+const useRegistrarActionsPath = path.resolve(__dirname, '../registrar/useRegistrarActions.js');
 
 const readRegistrarPanelSource = () => fs.readFileSync(registrarPanelPath, 'utf8');
 const readRegistrarHelpersSource = () => fs.readFileSync(registrarHelpersPath, 'utf8');
@@ -30,6 +32,8 @@ const readRegistrarSourceTree = () => [
   fs.readFileSync(useRegistrarReschedulePath, 'utf8'),
   '// ─── useRegistrarData.js ───',
   fs.readFileSync(useRegistrarDataPath, 'utf8'),
+  '// ─── useRegistrarActions.js ───',
+  fs.readFileSync(useRegistrarActionsPath, 'utf8'),
 ].join('\n\n');
 
 const extractSourceBlock = (source, startMarker, endMarker) => {

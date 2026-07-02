@@ -29,6 +29,8 @@ import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 import { useRegistrarReschedule } from './registrar/useRegistrarReschedule';
 // Decomp 4: data-loading functions extracted to useRegistrarData hook
 import { useRegistrarData } from './registrar/useRegistrarData';
+// Decomp 5: record action handlers extracted to useRegistrarActions hook
+import { useRegistrarActions } from './registrar/useRegistrarActions';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
@@ -39,10 +41,6 @@ import {
   registrarWorkflowTitleStyle,
   registrarWorkflowMetaStyle,
   registrarWorkflowActionsStyle,
-  getRegistrarRecordRefs,
-  findRegistrarRecordBySelectionKey,
-  hasBackendAction,
-  getRegistrarActionForStatus,
   normalizePatientGender,
   formatPreviewList,
   buildPostWizardPaymentRow,
@@ -1061,106 +1059,16 @@ const RegistrarPanel = () => {
   }, [autoRefresh, showWizard, loadAppointments]);
 
   // Функции для жесткого потока
-  const runRegistrarRecordAction = useCallback(async (record, action, payload = {}) => {
-    const records = getRegistrarRecordRefs(record);
-    if (records.length === 0) {
-      logger.warn('RegistrarPanel: action requires backend record refs', { action, record });
-      notify.error('Missing backend record data for action');
-      return null;
-    }
-    if (!hasBackendAction(record, action)) {
-      logger.warn('RegistrarPanel: backend did not expose requested action', { action, record });
-      notify.error('Action is not available for this record');
-      return null;
-    }
+  // Decomp 5: record action handlers extracted to useRegistrarActions hook.
+  // openRecordPreview, openRecordEditor, handleContextMenuAction remain
+  // inline because they are simple state setters (1-3 lines each).
+  const {
+    runRegistrarRecordAction,
+    handleStartVisit,
+    handlePayment,
+    updateAppointmentStatus,
+  } = useRegistrarActions({ appointments, loadAppointments });
 
-    const response = await api.post('/registrar/records/actions', {
-      ...payload,
-      action,
-      records
-    });
-    return response.data;
-  }, []);
-
-  const handleStartVisit = useCallback(async (appointment) => {
-    try {
-      const result = await runRegistrarRecordAction(appointment, 'start_visit');
-      if (!result) return null;
-      if (!result.success) {
-        throw new Error(result.results?.find((item) => !item.success)?.error || 'start_visit_failed');
-      }
-
-      logger.info('RegistrarPanel: start_visit completed through backend command contract', result);
-      notify.success('Patient called successfully');
-      await loadAppointments({ source: 'start_visit_success' });
-      return result;
-    } catch (error) {
-      logger.error('RegistrarPanel: Start visit API error:', error);
-      notify.error(getErrorMessage(error, 'Could not start visit. Check connection and try again.'));
-      return null;
-    }
-  }, [loadAppointments, runRegistrarRecordAction]);
-
-  const handlePayment = async (appointment, paymentData = null) => {
-    try {
-      const result = await runRegistrarRecordAction(appointment, 'mark_paid', {
-        amount: paymentData?.amount ?? null,
-        method: paymentData?.method ?? null
-      });
-      if (!result) return null;
-
-      const successCount = Number(result.success_count || 0);
-      const skippedCount = Number(result.skipped_count || 0);
-      const failedCount = Number(result.failed_count || 0);
-
-      if (successCount > 0 || skippedCount > 0) {
-        const message = skippedCount > 0
-          ? 'Payment completed: ' + successCount + ', already paid: ' + skippedCount
-          : 'Payment completed: ' + successCount;
-        notify.success(failedCount > 0 ? message + '. Failed: ' + failedCount : message);
-        setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
-        return result.results || [];
-      }
-
-      notify.error(result.results?.find((item) => !item.success)?.error || 'Payment failed');
-      return result.results || [];
-    } catch (error) {
-      logger.error('RegistrarPanel: Payment error:', error);
-      notify.error(getErrorMessage(error, 'Payment failed'));
-      return null;
-    }
-  };
-
-  const updateAppointmentStatus = useCallback(async (recordSelectionKey, status, reason = '', sourceRecord = null) => {
-    try {
-      const record = sourceRecord || findRegistrarRecordBySelectionKey(appointments, recordSelectionKey);
-      const requiredBackendAction = getRegistrarActionForStatus(status);
-      if (!requiredBackendAction) {
-        logger.warn('RegistrarPanel: unsupported status command', { recordSelectionKey, status, record });
-        notify.error('Action is not available for this record');
-        return null;
-      }
-      if (!record) {
-        logger.warn('RegistrarPanel: selected record is missing for status command', { recordSelectionKey, status });
-        notify.error('Action is not available for this record');
-        return null;
-      }
-
-      const result = await runRegistrarRecordAction(record, requiredBackendAction, { reason });
-      if (!result) return null;
-      if (!result.success) {
-        throw new Error(result.results?.find((item) => !item.success)?.error || 'status_update_failed');
-      }
-
-      await loadAppointments({ source: 'status_update' });
-      notify.success('Status updated');
-      return result;
-    } catch (error) {
-      logger.error('RegistrarPanel: Update status error:', error);
-      notify.error(getErrorMessage(error, 'Could not update status. Check connection and try again.'));
-      return null;
-    }
-  }, [appointments, loadAppointments, runRegistrarRecordAction]);
 
   // QW-01 fix: handleBulkAction removed along with bulk-action UI.
 
