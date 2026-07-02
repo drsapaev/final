@@ -1804,53 +1804,19 @@ const RegistrarPanel = () => {
         {/* Экран приветствия по параметру view=welcome (с историей: календарь + поиск) */}
         {currentView === 'welcome' &&
         <AnimatedTransition type="fade" delay={100}>
-            <Card variant="default" style={{
-            margin: `0 ${'1rem'} ${'2rem'} ${'1rem'}`,
-            maxWidth: 'none',
-            width: 'calc(100vw - 32px)',
-            backgroundColor: 'var(--mac-bg-toolbar)',
-            border: '1px solid var(--mac-separator)',
-            borderRadius: 'var(--mac-radius-lg)',
-            backdropFilter: 'var(--mac-blur-medium)',
-            WebkitBackdropFilter: 'var(--mac-blur-medium)'
-          }}>
-              <CardHeader style={{
-              padding: 'var(--mac-spacing-8)',
-              background: 'var(--mac-gradient-subtle)',
-              borderBottom: '1px solid var(--mac-separator)'
-            }}>
+            <Card variant="default" className="registrar-card-surface">
+              <CardHeader className="registrar-card-header">
                 {/* QW-08 fix: reduced AnimatedTransition from 10 to 3 (100/200/300ms). */}
                 {/* Previous delays 400/800/900/1000/1100/1350/1400/1500 blocked first */}
                 {/* user intent until 1.5s after page load. */}
                 <AnimatedTransition type="slide" direction="up" delay={200}>
-                  <h1 style={{
-                  margin: 0,
-                  fontSize: '40px',
-                  fontWeight: '700',
-                  lineHeight: '1.2',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--mac-spacing-3)',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif',
-                  letterSpacing: '-0.01em',
-                  textRendering: 'optimizeLegibility'
-                }}>
+                  <h1 className="registrar-hero-title">
                     {t('welcome')} в панель регистратора!
                     <Icon name="person" size="default" className="registrar-text-accent" />
                   </h1>
                 </AnimatedTransition>
                 <AnimatedTransition type="fade" delay={300}>
-                  <div style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-secondary)',
-                  lineHeight: '1.4',
-                  marginTop: 'var(--mac-spacing-3)',
-                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif',
-                  letterSpacing: '0.01em',
-                  opacity: 0.9
-                }}>
+                  <div className="registrar-date-subtitle">
                     {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', {
                     weekday: 'long',
                     year: 'numeric',
@@ -1879,15 +1845,7 @@ const RegistrarPanel = () => {
                 {/* Панель управления и фильтров */}
                 {/* QW-08 fix: unwrapped nested AnimatedTransition (was delays 800-1500). */}
                   <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
-                      <h2 style={{
-                      fontSize: 'var(--mac-font-size-xl)',
-                      marginBottom: 'var(--mac-spacing-4)',
-                      color: 'var(--mac-text-primary)',
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--mac-spacing-2)'
-                    }}>
+                      <h2 className="registrar-section-heading">
                         <Icon name="gear" size="default" className="registrar-text-accent" />
                         Панель управления
                       </h2>
@@ -2196,12 +2154,7 @@ const RegistrarPanel = () => {
                       <Icon name="lock" size="large" /> :
                       <Icon name="doc.text" size="large" />}
                           </div>
-                          <h3 style={{
-                      fontSize: '20px',
-                      fontWeight: '600',
-                      color: textColor,
-                      marginBottom: '8px'
-                    }}>
+                          <h3 className="registrar-empty-heading" style={{ color: textColor }}>
                             {!tokenManager.hasToken() ? 'Сессия истекла' : 'Очередь пуста'}
                           </h3>
                           <p className="registrar-empty-desc-text" style={{ fontSize: '16px', color: textColor }}>
@@ -2452,20 +2405,11 @@ const RegistrarPanel = () => {
             <AnimatedLoader.TableSkeleton rows={8} columns={10} /> :
             filteredAppointments.length === 0 && dataSource === 'api' ?
             <div className="registrar-empty-state">
-                  <div style={{
-                fontSize: '48px',
-                marginBottom: '16px',
-                opacity: 0.3
-              }}>
+                  <div className="registrar-empty-icon-lg">
                     {/* QW-04: empty state 2 of 3 (worklist empty). */}
                     <Icon name="doc.text" size="large" />
                   </div>
-                  <h3 style={{
-                fontSize: '20px',
-                fontWeight: '600',
-                color: textColor,
-                marginBottom: '8px'
-              }}>
+                  <h3 className="registrar-empty-heading" style={{ color: textColor }}>
                     Очередь пуста
                   </h3>
                   <p className="registrar-empty-desc-text" style={{ fontSize: '14px', color: textColor }}>
@@ -2482,7 +2426,7 @@ const RegistrarPanel = () => {
                   </Button>
                 </div> :
             filteredAppointments.length === 0 ?
-            <div style={{ padding: 24, textAlign: 'center', opacity: 0.7 }}>
+            <div className="registrar-empty-table">
                   {t('empty_table')}
                 </div> :
 

@@ -307,3 +307,92 @@
   line-height: 1.5;
   margin-bottom: 24px;
 }
+
+/* Empty-state heading (h3 with 20px font) */
+.registrar-empty-heading {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* Empty-state icon container (48px icon with opacity) */
+.registrar-empty-icon-lg {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+/* Welcome card surface */
+.registrar-card-surface {
+  margin: 0 1rem 2rem 1rem;
+  max-width: none;
+  width: calc(100vw - 32px);
+  background-color: var(--mac-bg-toolbar);
+  border: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-lg);
+  backdrop-filter: var(--mac-blur-medium);
+  -webkit-backdrop-filter: var(--mac-blur-medium);
+}
+
+/* Welcome card header */
+.registrar-card-header {
+  padding: var(--mac-spacing-8);
+  background: var(--mac-gradient-subtle);
+  border-bottom: 1px solid var(--mac-separator);
+}
+
+/* Welcome hero title (h1) */
+.registrar-hero-title {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3);
+  color: var(--mac-text-primary);
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  text-rendering: optimizeLegibility;
+}
+
+/* Welcome date subtitle */
+.registrar-date-subtitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--mac-text-secondary);
+  line-height: 1.4;
+  margin-top: var(--mac-spacing-3);
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  opacity: 0.9;
+}
+
+/* Section heading (h2 with gear icon) */
+.registrar-section-heading {
+  font-size: var(--mac-font-size-xl);
+  margin-bottom: var(--mac-spacing-4);
+  color: var(--mac-text-primary);
+  font-weight: var(--mac-font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* Subsection heading (h3) */
+.registrar-subsection-heading {
+  font-size: var(--mac-font-size-lg);
+  margin-bottom: var(--mac-spacing-4);
+  color: var(--mac-text-primary);
+  font-weight: var(--mac-font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* Empty table (simple centered text) */
+.registrar-empty-table {
+  padding: 24px;
+  text-align: center;
+  opacity: 0.7;
+}
