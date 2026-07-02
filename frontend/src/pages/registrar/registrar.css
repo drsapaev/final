@@ -396,3 +396,78 @@
   text-align: center;
   opacity: 0.7;
 }
+
+/* Reschedule dialog — info card */
+.registrar-reschedule-card {
+  padding: 16px;
+  border-radius: 14px;
+}
+
+/* Reschedule dialog — icon container (36px circle) */
+.registrar-reschedule-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Reschedule dialog — title text */
+.registrar-reschedule-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Reschedule dialog — description text */
+.registrar-reschedule-desc {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Reschedule dialog — date input */
+.registrar-reschedule-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+/* Reschedule dialog — label */
+.registrar-reschedule-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+/* Reschedule dialog — hint text */
+.registrar-reschedule-hint {
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* Inline flex (for badges and small containers) */
+.registrar-inline-flex {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* Spinner (loading indicator) */
+.registrar-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: registrar-spin 0.6s linear infinite;
+}
+
+@keyframes registrar-spin {
+  to { transform: rotate(360deg); }
+}
