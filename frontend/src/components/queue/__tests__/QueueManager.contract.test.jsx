@@ -35,11 +35,13 @@ describe('Queue manager command contract', () => {
 
   it('keeps registrar online queue doctor selection explicit before doctor-specific commands load', () => {
     const registrarSource = read('pages/RegistrarPanel.jsx');
+    const queueViewSource = read('pages/registrar/views/QueueView.jsx');
     const managerSource = read('components/queue/ModernQueueManager.jsx');
     const tableSource = read('components/queue/QueueTable.jsx');
 
     expect(registrarSource).toContain('Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди');
-    expect(registrarSource).toContain("selectedDoctor={searchParams.get('doctor') || ''}");
+    // Decomp 6a: selectedDoctor prop moved to QueueView.jsx
+    expect(queueViewSource).toContain("selectedDoctor={searchParams.get('doctor') || ''}");
 
     expect(managerSource).toContain("const [internalDoctor, setInternalDoctor] = useState('')");
     expect(managerSource).toContain("const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== '' ? selectedDoctor : internalDoctor");

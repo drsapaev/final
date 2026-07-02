@@ -31,6 +31,8 @@ import { useRegistrarReschedule } from './registrar/useRegistrarReschedule';
 import { useRegistrarData } from './registrar/useRegistrarData';
 // Decomp 5: record action handlers extracted to useRegistrarActions hook
 import { useRegistrarActions } from './registrar/useRegistrarActions';
+// Decomp 6a: QueueView extracted to component
+import QueueView from './registrar/views/QueueView';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
@@ -2444,63 +2446,21 @@ const RegistrarPanel = () => {
           </AnimatedTransition>
         }
 
-        {/* Онлайн-очередь по параметру view=queue */}
+        {/* Онлайн-очередь — extracted to QueueView component (Decomp 6a) */}
         {currentView === 'queue' &&
-        <AnimatedTransition type="fade" delay={100}>
-            <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
-              <CardHeader>
-                <AnimatedTransition type="slide" direction="up" delay={200}>
-                  <h1 style={{
-                  margin: 0,
-                  fontSize: getFontSize('3xl'),
-                  fontWeight: '400',
-                  lineHeight: '1.25',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: getSpacing('sm'),
-                  color: getColor('textPrimary')
-                }}>
-                    📱 Онлайн-очередь
-                  </h1>
-                </AnimatedTransition>
-                <AnimatedTransition type="fade" delay={400}>
-                  <div style={{
-                  fontSize: getFontSize('lg'),
-                  opacity: 0.9,
-                  lineHeight: '1.5',
-                  color: getColor('textSecondary')
-                }}>
-                    Управление онлайн-записью и QR кодами для очереди
-                  </div>
-                </AnimatedTransition>
-              </CardHeader>
-
-              <CardContent>
-                <ModernQueueManager
-                selectedDate={searchParams.get('date') || getLocalDateString()}
-                selectedDoctor={searchParams.get('doctor') || ''}
-                searchQuery={searchParams.get('q') || ''}
-                onQueueUpdate={loadAppointments}
-                onDateChange={(newDate) => {
-                  logger.info('📅 RegistrarPanel received date change:', newDate);
-                  const newParams = new URLSearchParams(searchParams);
-                  newParams.set('date', newDate);
-                  setSearchParams(newParams);
-                }}
-                onDoctorChange={(newDoctorId) => {
-                  logger.info('👨‍⚕️ RegistrarPanel received doctor change:', newDoctorId);
-                  const newParams = new URLSearchParams(searchParams);
-                  newParams.set('doctor', newDoctorId);
-                  setSearchParams(newParams);
-                }}
-                language={language}
-                theme={theme}
-                doctors={doctors} />
-
-              </CardContent>
-            </Card>
-          </AnimatedTransition>
+          <QueueView
+            searchParams={searchParams}
+            setSearchParams={setSearchParams}
+            loadAppointments={loadAppointments}
+            getSpacing={getSpacing}
+            getFontSize={getFontSize}
+            getColor={getColor}
+            language={language}
+            theme={theme}
+            doctors={doctors}
+          />
         }
+
 
         {/* Основная панель с записями */}
         {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
