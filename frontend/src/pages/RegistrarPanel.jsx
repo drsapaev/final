@@ -1865,13 +1865,7 @@ const RegistrarPanel = () => {
                       </h2>
 
                     {/* Быстрые действия */}
-                      <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: 'var(--mac-spacing-3)',
-                      alignItems: 'stretch',
-                      marginBottom: 'var(--mac-spacing-6)'
-                    }}>
+                      <div className="registrar-grid-auto" style={{ marginBottom: 'var(--mac-spacing-6)' }}>
                           <Button
                           variant="primary"
                           size="default"
@@ -1979,7 +1973,7 @@ const RegistrarPanel = () => {
                           variant="success"
                           size="default"
                           onClick={() => setSearchParams({ status: 'queued' })}
-                          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                          className="registrar-flex">
 
                             <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
                             Активная очередь
@@ -1989,7 +1983,7 @@ const RegistrarPanel = () => {
                           variant="primary"
                           size="default"
                           onClick={() => setSearchParams({ status: 'paid_pending' })}
-                          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                          className="registrar-flex">
 
                             <Icon name="creditcard" size="small" style={{ color: 'white' }} />
                             Ожидают оплаты
@@ -1999,7 +1993,7 @@ const RegistrarPanel = () => {
                           variant="outline"
                           size="default"
                           onClick={() => setSearchParams({})}
-                          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                          className="registrar-flex">
 
                             <Icon name="eye" size="small" />
                             Все записи
@@ -2009,7 +2003,7 @@ const RegistrarPanel = () => {
                           variant="outline"
                           size="default"
                           onClick={() => navigate('/registrar/queue')}
-                          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                          className="registrar-flex">
 
                             <Icon name="bell" size="small" />
                             Онлайн-очередь
@@ -2019,7 +2013,7 @@ const RegistrarPanel = () => {
                           variant="outline"
                           size="default"
                           onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
-                          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                          className="registrar-flex">
 
                             <Icon name="gear" size="small" />
                             Обновить данные
@@ -2143,14 +2137,7 @@ const RegistrarPanel = () => {
 
                 {/* История записей */}
                 <div>
-                  <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 'var(--mac-spacing-4)',
-                  flexWrap: 'wrap',
-                  gap: 'var(--mac-spacing-3)'
-                }}>
+                  <div className="registrar-flex-between" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
                     <h3 style={{
                     fontSize: 'var(--mac-font-size-xl)',
                     margin: 0,
@@ -2177,14 +2164,7 @@ const RegistrarPanel = () => {
                       </Badge>
                   }
                   </div>
-                  <div style={{
-                  background: 'var(--mac-bg-toolbar)',
-                  border: '1px solid var(--mac-separator)',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  padding: 'var(--mac-spacing-5)',
-                  backdropFilter: 'var(--mac-blur-light)',
-                  WebkitBackdropFilter: 'var(--mac-blur-light)'
-                }}>
+                  <div className="registrar-surface-toolbar">
                     {/* Индикатор источника данных */}
                     {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
 
