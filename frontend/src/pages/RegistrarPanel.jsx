@@ -23,6 +23,8 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 import { useConfirm } from '../components/common/ConfirmDialog';
 // QW-06 fix: translations extracted to separate file (was 50+ inline keys).
 import { getRegistrarTranslator } from './registrarTranslations';
+// Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
+import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
@@ -1411,46 +1413,15 @@ const RegistrarPanel = () => {
   // ✅ ИСПОЛЬЗУЕМ useRef для хранения filteredAppointments, чтобы избежать ошибки "Cannot access before initialization"
   const filteredAppointmentsRef = useRef([]);
 
-  // Горячие клавиши
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Отладка всех нажатий клавиш
-      logger.info('Key pressed:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Target:', e.target.tagName);
-
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        logger.info('Ignoring key press in input/textarea');
-        return;
-      }
-
-      if (e.key === 'Enter') {
-
-
-
-
-
-
-
-
-        // Enter в мастере обрабатывается отдельно в полях ввода
-        // Здесь не обрабатываем, чтобы избежать конфликтов
-      } else if (e.ctrlKey) {if (e.key === 'p') {e.preventDefault();} else if (e.key === 'k') {e.preventDefault();setShowWizard(true);} else if (e.key === '1') {e.preventDefault(); setSearchParams({ view: 'welcome' });} else if (e.key === '2') setActiveTab('appointments');else if (e.key === '3') setActiveTab('cardio');else
-        if (e.key === '4') setActiveTab('derma');else
-        if (e.key === '5') {e.preventDefault(); setSearchParams({ view: 'queue' });}
-        // QW-01 fix: removed Ctrl+A (select all) and Ctrl+D (deselect)
-        // hotkeys — bulk-action UI was unreachable and these only created
-        // dead state. Browser native Ctrl+A (select text) now works normally.
-      } else if (e.altKey) {
-        // QW-01 fix: removed Alt+1/Alt+2/Alt+3 bulk-action hotkeys.
-        // No bulk-action UI exists anymore; these were dead shortcuts.
-      } else if (e.key === 'Escape') {
-        if (showWizard) setShowWizard(false);
-        if (showSlotsModal) setShowSlotsModal(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard, showSlotsModal, appointments]);
+  // Горячие клавиши — extracted to useRegistrarHotkeys hook (Decomp 2)
+  useRegistrarHotkeys({
+    setShowWizard,
+    setActiveTab,
+    setSearchParams,
+    showWizard,
+    showSlotsModal,
+    appointments,
+  });
 
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
