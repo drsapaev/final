@@ -348,8 +348,7 @@ def _resolve_payment_truth(
                 return status, method
         except Exception:
             logger.debug(
-                "registrar_integration: failed to resolve payment truth for visit %s",
-                visit_id,
+                "registrar_integration: failed to resolve payment truth for visit",
                 exc_info=True,
             )
 
@@ -518,7 +517,7 @@ def get_queue_profiles(
         
     except Exception as e:
         # При любой ошибке (включая отсутствие таблицы) возвращаем fallback
-        logger.error("Error fetching queue profiles: %s", e)
+        logger.error("Error fetching queue profiles", exc_info=True)
         from app.models.queue_profile import INITIAL_QUEUE_PROFILES
         
         return {
@@ -602,7 +601,7 @@ def get_queue_profiles_public(
         }
         
     except Exception as e:
-        logger.error("Error fetching queue profiles for QR page: %s", e)
+        logger.error("Error fetching queue profiles for QR page", exc_info=True)
         # Fallback на базовый список
         return {
             "success": True,
@@ -1845,9 +1844,7 @@ def get_today_queues(
                 is_qr_entry = online_entry.source in ('online', 'confirmation')
                 if is_qr_entry:
                     logger.debug(
-                        "get_today_queues: OnlineQueueEntry %d - QR-запись (source=%s), НЕ пропускаем",
-                        online_entry.id,
-                        online_entry.source,
+                        "get_today_queues: OnlineQueueEntry - QR-запись, НЕ пропускаем",
                     )
                 else:
                     # Проверяем есть ли Visit для этого пациента на сегодня
