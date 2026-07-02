@@ -96,6 +96,27 @@
   margin-right: 6px;
 }
 
+/* Overflow utilities */
+.registrar-overflow-hidden {
+  overflow: hidden;
+}
+
+/* Grid utilities (specific gap variants) */
+.registrar-grid-gap-sm {
+  display: grid;
+  gap: var(--mac-spacing-2);
+}
+
+.registrar-grid-gap-md {
+  display: grid;
+  gap: 12px;
+}
+
+.registrar-grid-gap-lg {
+  display: grid;
+  gap: 16px;
+}
+
 .registrar-text-sm {
   font-size: var(--mac-font-size-sm);
   line-height: 1.5;
