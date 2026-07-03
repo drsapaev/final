@@ -469,16 +469,28 @@ VITE_ENABLE_WS=1
 
 Если хочется продолжить работу облачно, вот задачи, не требующие локального запуска:
 
-- [ ] **Добавить unit-тесты для `utils/doctorPanelShared.js`** — `SPECIALTY_KEYS`, `matchesSpecialty`, `countAppointmentsByStatuses`, `normalizeNumericId`
-- [ ] **Удалить dead code**: `formatHistoryTimestamp` в Cardio (P2-5)
-- [ ] **Заменить debug-логи** в `useQueueManager.js` на `logger.debug` (P3-4)
-- [ ] **Fix pre-existing lint warnings** (P2-4) — `npm run lint -- --fix` + ручной фикс
-- [ ] **Документировать P0-2 (двойные интерсепторы)** в виде ADR (`docs/architecture/ADR-0002-interceptor-consolidation.md`)
-- [ ] **Создать `docs/architecture/ADR-0003-cardio-emr-v2-migration.md`** с планом миграции Cardio на EMRContainerV2
+- [x] ✅ **Добавить unit-тесты для `utils/doctorPanelShared.js`** — 33 теста covering SPECIALTY_KEYS, SPECIALTY_ALIASES, matchesSpecialty, countAppointmentsByStatuses, normalizeNumericId (closed in PR follow-up)
+- [x] ✅ **Удалить dead code**: `formatHistoryTimestamp` в Cardio (P2-5) + unused `Badge` import (closed in PR follow-up)
+- [x] ✅ **Заменить debug-логи** в `useQueueManager.js` на `logger.debug` (P3-4) (closed in PR follow-up)
+- [x] ✅ **Fix pre-existing lint warnings** (P2-4) — 13 → 5 warnings (remaining 5 are `react-hooks/exhaustive-deps` requiring manual hook analysis)
+- [x] ✅ **Документировать P0-2 (двойные интерсепторы)** в виде ADR (`docs/architecture/ADR-0002-interceptor-consolidation.md`) — Proposed status, 3-phase plan
+- [x] ✅ **Создать `docs/architecture/ADR-0003-cardio-emr-v2-migration.md`** с планом миграции Cardio на EMRContainerV2 — Proposed status, 4-phase plan
+- [x] ✅ **Подключить `useVisitLifecycle` в Derma и Dentist** (P1-6) — закрыто, все 3 панели теперь симметричны
+
+### Остались облачные задачи (не сделаны):
+
+- [ ] **Вынести ещё 4-5 shared helpers** из панелей (P1-4) — `getAllPatientServices`, `ensureCanonicalVisitId`, `appointmentSummaryItems`, `loadXxxAppointments`, `handleAppointmentActionClick` switch. Контракт требует `resolveDoctorQueueEntryId` оставить локально, остальные можно вынести.
+- [ ] **Fix оставшихся 5 `react-hooks/exhaustive-deps` warnings** — требует ручного анализа dependency array каждого хука
+- [ ] **Создать ADR-0004** — план включения `VITE_ENABLE_WS=1` + реконнект в `openQueueWS` (P1-1)
+- [ ] **Создать ADR-0005** — план unified WSManager (P1-3)
+- [ ] **Создать ADR-0006** — план IndexedDB persistence layer для cacheService (P1-2)
 
 ---
 
 **Дата создания:** 2026-07-04
 **Автор:** dr-sapaev-bot
-**Статус:** Open — ждать возвращения к локальной разработке
-**Связанный merged PR:** #1779 (`c77aa2b`)
+**Статус:** Partially closed — quick wins выполнены, P0/P1 требуют локальной разработки
+**Связанные merged PR:**
+- #1779 (`c77aa2b`) — основной workflow refactor
+- #1780 (`e2e15a9`) — этот follow-up документ
+- Cloud follow-up PR (this branch) — quick wins

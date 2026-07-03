@@ -71,6 +71,7 @@ import {
   normalizeNumericId,
   SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
+import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 
 const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
 
@@ -232,6 +233,36 @@ const DentistPanelUnified = () => {
   const [showProstheticForm, setShowProstheticForm] = useState(false);
   const [dentalChartData, setDentalChartData] = useState(null);
 
+  // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
+  // is invalidated when the doctor switches between visits or patients.
+  // Mirrors the CardiologistPanelUnified wiring (commit 5ee3de3).
+  //
+  // When currentVisitId / currentPatientId change, the hook:
+  //   1. aborts all in-flight requests via AbortController
+  //   2. calls cacheService.invalidateByVisit(prevVisitId)
+  //   3. calls cacheService.invalidateByPatient(prevPatientId)
+  //   4. invokes our onCleanup callback (resets local visit-protocol state)
+  //
+  // This prevents PHI leaks between patients on rapid visit switches.
+  // Non-breaking: existing persistVisitProtocol, handleCompleteVisit, and
+  // queue handlers are untouched.
+  const lifecycleVisitId = selectedPatient?.visit_id || visitIdFromUrl || null;
+  const lifecyclePatientId =
+    selectedPatient?.patient?.id ||
+    selectedPatient?.patient_id ||
+    selectedPatient?.id ||
+    patientIdFromUrl ||
+    null;
+  useVisitLifecycle(lifecycleVisitId, lifecyclePatientId, {
+    invalidateCacheOnChange: true,
+    onCleanup: () => {
+      // Reset local protocol state so stale data does not bleed into the
+      // next visit's view. persistVisitProtocol will be re-invoked by the
+      // existing useEffect when selectedPatient changes.
+      setShowVisitProtocol(false);
+      setProtocolTemplateDraft(null);
+    },
+  });
   // Состояние для DentalPriceManager
   const [showPriceManager, setShowPriceManager] = useState(false);
   const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null);
@@ -527,7 +558,7 @@ const DentistPanelUnified = () => {
           const data = await response.json();
 
           // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-          let allAppointments = [];
+          const allAppointments = [];
           if (data && data.queues && Array.isArray(data.queues)) {
             data.queues.forEach((queue) => {
               if (queue.entries) {
@@ -580,7 +611,7 @@ const DentistPanelUnified = () => {
           }
 
           // Фильтруем только стоматологические записи для отображения
-          let appointmentsData = allAppointments.filter((apt) =>
+          const appointmentsData = allAppointments.filter((apt) =>
             isDentistrySpecialty(apt.specialty)
           );
 

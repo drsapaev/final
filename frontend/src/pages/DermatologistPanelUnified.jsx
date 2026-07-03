@@ -54,6 +54,7 @@ import {
   normalizeNumericId,
   SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
+import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
@@ -247,6 +248,39 @@ const DermatologistPanelUnified = () => {
   const [canCreatePrescription, setCanCreatePrescription] = useState(false);
   const [doctorPrice, setDoctorPrice] = useState('');
 
+  // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
+  // is invalidated when the doctor switches between visits or patients.
+  // Mirrors the CardiologistPanelUnified wiring (commit 5ee3de3).
+  //
+  // When currentVisitId / currentPatientId change, the hook:
+  //   1. aborts all in-flight requests via AbortController
+  //   2. calls cacheService.invalidateByVisit(prevVisitId)
+  //   3. calls cacheService.invalidateByPatient(prevPatientId)
+  //   4. invokes our onCleanup callback (resets local EMR + prescription state)
+  //
+  // This prevents PHI leaks between patients on rapid visit switches.
+  // Non-breaking: existing handleSaveVisit, loadEMR, and queue handlers are
+  // untouched. The lifecycle hook only adds cache hygiene on top.
+  const lifecycleVisitId =
+    selectedPatient?.visit_id || currentAppointment?.visit_id || visitIdFromUrl || null;
+  const lifecyclePatientId =
+    selectedPatient?.patient?.id ||
+    selectedPatient?.patient_id ||
+    currentAppointment?.patient_id ||
+    patientIdFromUrl ||
+    null;
+  useVisitLifecycle(lifecycleVisitId, lifecyclePatientId, {
+    invalidateCacheOnChange: true,
+    onCleanup: () => {
+      // Reset local EMR + prescription state so stale data does not bleed
+      // into the next visit's view. loadEMR / prescription endpoints will
+      // be re-invoked by the existing useEffect when selectedPatient /
+      // currentAppointment changes.
+      setEmr(null);
+      setPrescription(null);
+    },
+  });
+
   // Состояние для PriceOverrideManager
   const [showPriceOverride, setShowPriceOverride] = useState(false);
   const [selectedServiceForPriceOverride, setSelectedServiceForPriceOverride] = useState(null);
@@ -379,7 +413,7 @@ const DermatologistPanelUnified = () => {
           }
         });
 
-        let allAppointments = [];
+        const allAppointments = [];
         if (queuesResponse.ok) {
           const queuesData = await queuesResponse.json();
 

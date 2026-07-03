@@ -15,8 +15,6 @@ import {
 import {
   MacOSCard,
   Button,
-  Badge,
-  Textarea,
   Checkbox,
 } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
@@ -1141,8 +1139,8 @@ const MacOSCardiologistPanelUnified = () => {
         message:
           `Код МКБ-10 ${criticalWarning.fullCode} соответствует критическому диагнозу: ` +
           `"${criticalWarning.label}". Подтвердите, что диагноз установлен корректно. ` +
-          `Ошибочный диагноз может привести к ненужному агрессивному лечению ` +
-          `(тромболизис, коронарография, интенсивная терапия).`,
+          'Ошибочный диагноз может привести к ненужному агрессивному лечению ' +
+          '(тромболизис, коронарография, интенсивная терапия).',
         description:
           'После завершения приёма EMR будет сохранена с этим диагнозом. ' +
           'Изменение диагноза после подписания возможно только через поправку (amend).',
@@ -1478,19 +1476,6 @@ const MacOSCardiologistPanelUnified = () => {
     background: getColor('background'),
     color: getColor('text'),
     overflow: 'visible'
-  };
-
-  const formatHistoryTimestamp = (value) => {
-    if (!value) {
-      return '—';
-    }
-
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return String(value);
-    }
-
-    return parsed.toLocaleString('ru-RU');
   };
 
   const getHistoryTimestampValue = (value) => {
