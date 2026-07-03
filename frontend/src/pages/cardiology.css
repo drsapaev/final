@@ -149,3 +149,113 @@
   border-top: 1px solid var(--mac-separator);
   margin: 20px 0;
 }
+
+/* ─── Form inputs (dynamic border/bg/color via theme) ─── */
+.cardio-input-themed {
+  padding: var(--mac-spacing-sm) var(--mac-spacing-md);
+  border-radius: 6px;
+  font-size: var(--mac-font-size-base);
+}
+
+/* ─── Input container (bordered box) ─── */
+.cardio-input-container {
+  padding: var(--mac-spacing-md);
+  border-radius: 8px;
+}
+
+/* ─── Section heading without display:flex ─── */
+.cardio-section-heading-simple {
+  font-size: var(--mac-font-size-lg);
+  font-weight: 500;
+  margin-bottom: var(--mac-spacing-lg);
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+}
+
+/* ─── Section heading with flex + fontFamily ─── */
+.cardio-section-heading-flex {
+  display: flex;
+  font-size: var(--mac-font-size-lg);
+  font-weight: 500;
+  margin-bottom: var(--mac-spacing-lg);
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+}
+
+/* ─── Text label (color + fontSize + fontWeight + marginBottom) ─── */
+.cardio-text-label {
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-sm);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* ─── Text value (color + fontSize + fontWeight) ─── */
+.cardio-text-value {
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-sm);
+  font-weight: 500;
+}
+
+/* ─── Text desc (color + fontSize + marginBottom) ─── */
+.cardio-text-desc {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+  margin-bottom: 8px;
+}
+
+/* ─── Text hint (color + fontSize + marginTop) ─── */
+.cardio-text-hint {
+  color: var(--mac-text-tertiary);
+  font-size: var(--mac-font-size-xs);
+  margin-top: 4px;
+}
+
+/* ─── Max width overflow (3-prop pattern) ─── */
+.cardio-maxw-overflow {
+  max-width: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* ─── Flex column scroll (6-prop pattern) ─── */
+.cardio-flex-col-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-md);
+  max-width: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* ─── Grid 2col with gap ─── */
+.cardio-grid-2col-gap {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--mac-spacing-md);
+  margin-bottom: var(--mac-spacing-md);
+}
+
+/* ─── FAB (floating action button) ─── */
+.cardio-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  padding: 16px;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: var(--mac-accent-blue);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+/* ─── Input full width themed ─── */
+.cardio-input-full {
+  width: 100%;
+  padding: var(--mac-spacing-sm) var(--mac-spacing-md);
+  border-radius: var(--mac-radius-md);
+  font-size: var(--mac-font-size-sm);
+  outline: none;
+}
