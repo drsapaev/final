@@ -2308,11 +2308,7 @@ const MacOSCardiologistPanelUnified = () => {
                     border: `1px solid ${getColor('border')}`,
                     backgroundColor: getColor('surface')
                   }}>
-                        <div style={{
-                      fontSize: getFontSize('sm'),
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('xs')
-                    }}>Количество ЭКГ</div>
+                        <div className="cardio-stat-label-sm cardio-text-secondary">Количество ЭКГ</div>
                         <div className="cardio-stat-value" style={{ color: getColor('text') }}>{ecgResults.length}</div>
                       </div>
                       <div className="cardio-input-container"
@@ -2320,11 +2316,7 @@ const MacOSCardiologistPanelUnified = () => {
                     border: `1px solid ${getColor('border')}`,
                     backgroundColor: getColor('surface')
                   }}>
-                        <div style={{
-                      fontSize: getFontSize('sm'),
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('xs')
-                    }}>Количество анализов</div>
+                        <div className="cardio-stat-label-sm cardio-text-secondary">Количество анализов</div>
                         <div className="cardio-stat-value" style={{ color: getColor('text') }}>{bloodTests.length}</div>
                       </div>
                       <div className="cardio-input-container"
@@ -2332,11 +2324,7 @@ const MacOSCardiologistPanelUnified = () => {
                     border: `1px solid ${getColor('border')}`,
                     backgroundColor: getColor('surface')
                   }}>
-                        <div style={{
-                      fontSize: getFontSize('sm'),
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('xs')
-                    }}>Вложения</div>
+                        <div className="cardio-stat-label-sm cardio-text-secondary">Вложения</div>
                         <div className="cardio-stat-value" style={{ color: getColor('text') }}>{patientFiles.length}</div>
                       </div>
                       <div className="cardio-input-container"
@@ -2344,11 +2332,7 @@ const MacOSCardiologistPanelUnified = () => {
                     border: `1px solid ${getColor('border')}`,
                     backgroundColor: getColor('surface')
                   }}>
-                        <div style={{
-                      fontSize: getFontSize('sm'),
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('xs')
-                    }}>Выбранный пациент</div>
+                        <div className="cardio-stat-label-sm cardio-text-secondary">Выбранный пациент</div>
                         <div className="cardio-stat-value" style={{ color: getColor('text') }}>{selectedPatientLabel}</div>
                       </div>
                     </div>

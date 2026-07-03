@@ -286,3 +286,22 @@
   font-size: var(--mac-font-size-xs);
   font-weight: 500;
 }
+
+/* ─── Themed input with dynamic border/bg/color ─── */
+.cardio-input-dynamic {
+  border-radius: 6px;
+  font-size: var(--mac-font-size-base);
+  padding: var(--mac-spacing-sm) var(--mac-spacing-md);
+}
+
+/* ─── Container with dynamic border/bg ─── */
+.cardio-container-dynamic {
+  padding: var(--mac-spacing-md);
+  border-radius: 8px;
+}
+
+/* ─── Stat label small (fontSize + color + marginBottom) ─── */
+.cardio-stat-label-sm {
+  font-size: var(--mac-font-size-sm);
+  margin-bottom: var(--mac-spacing-xs);
+}
