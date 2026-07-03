@@ -389,12 +389,9 @@ class VisitsApiService:
 
 # app/api/v1/endpoints/visits.py
 
-from datetime import date, datetime
-from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 

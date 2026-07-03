@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, date, datetime, time, timedelta, timezone
-from typing import Any, Dict, NoReturn, Optional
+from datetime import UTC, date, datetime, time, timedelta
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, desc, func

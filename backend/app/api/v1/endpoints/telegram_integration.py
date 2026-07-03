@@ -4,7 +4,7 @@ API endpoints для интеграции с Telegram ботом
 """
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session

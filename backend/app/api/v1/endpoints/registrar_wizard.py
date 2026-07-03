@@ -5,9 +5,9 @@ API endpoints для мастера регистрации с поддержко
 
 import asyncio
 import logging
-from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -2958,7 +2958,7 @@ def mark_visit_as_paid(
             result = db.execute(
                 text(
                     """
-                    INSERT INTO payments 
+                    INSERT INTO payments
                     (visit_id, amount, currency, method, status, note, paid_at, created_at)
                     VALUES (:visit_id, :amount, :currency, :method, :status, :note, :paid_at, :created_at)
                 """
@@ -3079,7 +3079,7 @@ def mark_queue_entry_as_paid(
         entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         if not entry:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Запись очереди с ID {entry_id} не найдена"
             )
 
@@ -3159,7 +3159,7 @@ def mark_queue_entry_as_paid(
             result = db.execute(
                 text(
                     """
-                    INSERT INTO payments 
+                    INSERT INTO payments
                     (visit_id, amount, currency, method, status, note, paid_at, created_at)
                     VALUES (:visit_id, :amount, :currency, :method, :status, :note, :paid_at, :created_at)
                 """

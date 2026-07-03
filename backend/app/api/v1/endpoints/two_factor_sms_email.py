@@ -6,7 +6,7 @@ import logging
 import random
 import string
 from datetime import datetime, timedelta
-from typing import NoReturn, Optional
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session

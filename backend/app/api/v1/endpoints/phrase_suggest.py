@@ -5,7 +5,7 @@ Phrase Suggest API - Endpoint для подсказок из истории вр
 НЕ генерация нового текста.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field

@@ -3,7 +3,7 @@ API endpoints для AI функций EMR
 """
 
 import logging
-from typing import Any, Dict, List, NoReturn, Optional
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -254,7 +254,7 @@ class SuggestResponseV2(BaseModel):
 
 
 def generate_v2_suggestions(
-    emr_data: dict[str, Any], 
+    emr_data: dict[str, Any],
     specialty: str,
     doctor_context: DoctorContext | None = None,
 ) -> list[AISuggestionV2]:
@@ -351,7 +351,7 @@ async def suggest_v2(
     Optionally accepts doctor_context for personalized suggestions.
     """
     suggestions = generate_v2_suggestions(
-        request.emr_snapshot, 
+        request.emr_snapshot,
         request.specialty,
         request.doctor_context,
     )

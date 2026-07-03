@@ -3,7 +3,7 @@ API endpoints для управления SMS провайдерами
 """
 
 import logging
-from typing import List, NoReturn, Optional
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel

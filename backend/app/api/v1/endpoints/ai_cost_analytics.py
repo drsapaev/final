@@ -7,7 +7,7 @@ AI Analytics Endpoints - Аналитика и мониторинг AI.
 - Performance stats
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session

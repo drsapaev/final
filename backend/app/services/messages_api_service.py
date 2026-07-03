@@ -638,28 +638,21 @@ class MessagesApiService:
 API endpoints для системы сообщений между пользователями
 """
 
-import os
 
 from fastapi import (
     APIRouter,
     Depends,
     File,
     Form,
-    HTTPException,
     Query,
     Request,
-    UploadFile,
 )
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.models.user import User
 from app.schemas.message import (
     ConversationListResponse,
-    MessageCreate,
     MessageListResponse,
-    MessageOut,
     MessageReactionCreate,
     UnreadCountResponse,
 )

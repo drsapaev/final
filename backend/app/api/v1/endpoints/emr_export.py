@@ -3,7 +3,7 @@ API endpoints для экспорта и импорта EMR данных
 """
 
 import logging
-from typing import List, NoReturn, Optional
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 

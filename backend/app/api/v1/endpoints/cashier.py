@@ -6,7 +6,7 @@ API endpoints для кассира
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -834,7 +834,7 @@ async def get_payments(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
     date_from: date | None = Query(None, description="Дата начала"),
-    date_to: date | None = Query(None, description="Дата окончания"), 
+    date_to: date | None = Query(None, description="Дата окончания"),
     search: str | None = Query(None, description="Поиск по пациенту"),
     status_filter: str | None = Query(None, alias="status", description="Фильтр по статусу (paid/pending/cancelled)"),
     method: str | None = Query(None, description="Фильтр по методу оплаты (cash/card)"),
@@ -1233,7 +1233,7 @@ async def create_payment(
 
         else:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Для создания платежа необходимо указать visit_id"
             )
 

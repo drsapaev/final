@@ -5,7 +5,7 @@
 import json
 import logging
 from json import JSONDecodeError
-from typing import Any, Dict, NoReturn
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session

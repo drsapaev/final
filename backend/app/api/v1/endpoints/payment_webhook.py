@@ -2,7 +2,7 @@
 import json
 import logging
 from json import JSONDecodeError
-from typing import Any, List
+from typing import Any
 from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status

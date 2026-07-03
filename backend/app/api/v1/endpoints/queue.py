@@ -11,7 +11,6 @@ API endpoints для системы очередей
 
 import logging
 from datetime import date, datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel

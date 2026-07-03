@@ -4,7 +4,7 @@ API endpoints для обработки webhook от платежных пров
 
 import json
 from json import JSONDecodeError
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session

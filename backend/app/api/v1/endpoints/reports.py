@@ -5,7 +5,7 @@ API endpoints для системы отчетов
 import logging
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, NoReturn, Optional
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse

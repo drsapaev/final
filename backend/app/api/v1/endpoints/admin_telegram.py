@@ -7,10 +7,10 @@ import hmac
 import logging
 import os
 import secrets
-from datetime import UTC, date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from html import escape
-from typing import Any, Dict, List, NoReturn, Optional
+from typing import Any, NoReturn
 
 import requests
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status

@@ -6,7 +6,6 @@ API endpoints для работы с фото в дерматологии
 import logging
 import os
 import uuid
-from typing import List, Optional
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status

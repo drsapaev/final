@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Callable
+from collections.abc import Callable
 
 from sqlalchemy.orm import Session
 

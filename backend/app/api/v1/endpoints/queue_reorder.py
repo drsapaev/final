@@ -4,7 +4,7 @@ API endpoints для изменения порядка очереди
 
 import logging
 from datetime import date
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, field_validator

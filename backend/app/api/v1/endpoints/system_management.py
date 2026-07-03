@@ -4,7 +4,6 @@ API endpoints для управления системой (бэкапы и мо
 
 import logging
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field

@@ -5,7 +5,6 @@ API endpoints для пациентов - управление своими за
 """
 import logging
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -259,7 +258,7 @@ async def cancel_my_appointment(
 
     if not can_cancel:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"Отмена возможна минимум за 24 часа до приёма. До записи осталось {round(hours_until, 1)} часов."
         )
 

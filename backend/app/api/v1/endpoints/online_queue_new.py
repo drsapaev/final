@@ -3,7 +3,6 @@ API endpoints для онлайн-очереди согласно detail.md ст
 """
 
 from datetime import date, datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session

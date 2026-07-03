@@ -2,7 +2,6 @@
 API endpoints для утренней сборки и управления присвоением номеров
 """
 
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field

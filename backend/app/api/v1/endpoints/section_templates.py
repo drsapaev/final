@@ -11,7 +11,6 @@ Endpoints:
 - DELETE /{section_type}/{template_id} - Delete template
 """
 
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel

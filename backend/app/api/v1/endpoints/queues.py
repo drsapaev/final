@@ -1,6 +1,5 @@
 # --- BEGIN app/api/v1/endpoints/queues.py ---
 from dataclasses import asdict
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session

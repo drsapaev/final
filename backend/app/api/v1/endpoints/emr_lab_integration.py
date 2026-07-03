@@ -3,7 +3,7 @@ API endpoints для интеграции EMR с лабораторными да
 """
 
 from datetime import datetime, timedelta
-from typing import Any, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session

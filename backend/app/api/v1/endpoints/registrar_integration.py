@@ -4,8 +4,8 @@ API endpoints для интеграции регистратуры с админ
 """
 
 import logging
-from datetime import UTC, date, datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, date, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -634,9 +634,7 @@ def _get_emoji_for_key(key: str) -> str:
 # ===================== QUEUE PROFILE CRUD (ADMIN) =====================
 
 
-from typing import List
 
-from pydantic import BaseModel, Field
 
 
 class QueueProfileCreate(BaseModel):

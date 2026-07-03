@@ -8,7 +8,7 @@ import logging
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from app.core.config import settings
