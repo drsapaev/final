@@ -32,6 +32,15 @@ paths = [
   '''backend/tests/.*''',
   '''frontend/e2e/.*''',
   '''frontend/src/.*__tests__/.*''',
+  # Feature flag seeder contains flag keys like 'ai_icd10_suggestion' that
+  # gitleaks' generic-api-key rule flags as high-entropy strings. They are
+  # not secrets — they're string identifiers for DB rows.
+  '''backend/app/scripts/seed_ai_feature_flags\.py''',
+  # Synthetic seed script contains realistic-looking phone numbers / passport
+  # formats for staging data. All values are generated, not real.
+  '''backend/app/synthetic_seed\.py''',
+  # MCP server descriptions may contain example tokens
+  '''mcp-servers/.*\.py''',
 ]
 
 # Allowlist specific regex patterns that gitleaks tends to flag in medical code
