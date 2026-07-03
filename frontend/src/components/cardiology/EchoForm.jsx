@@ -274,9 +274,9 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
           </Typography>
           
           <div style={{ display: 'flex', gap: 8 }}>
-            {/* P-030 (UX audit): removed dead AI button — the onClick handler
-                was empty ({* AI анализ */}), so the button did nothing. Backend
-                has no /ai/echo-interpret endpoint yet. When AI echo analysis is
+            {/* P-030 (UX audit): removed dead AI button. The onClick handler
+                was empty, so the button did nothing. Backend has no
+                /ai/echo-interpret endpoint yet. When AI echo analysis is
                 implemented, re-add the button with a real handler. */}
             <Button
               variant="primary"
