@@ -18,8 +18,10 @@
 | `pr-lifecycle-recommendation.yml` | PR events on main | ❌ No | Adds lifecycle labels + bot comment via `actions/github-script@v9`. Cosmetic. |
 | `format-code.yml` | push on `backend/**/*.py`, `frontend/**/*.{js,jsx,ts,tsx}`, manual | ❌ No (report-only) | `black --check`, `isort --check`, `npm run lint:check`. Warnings only — enforcement happens in pre-commit. |
 | `weekly-maintenance.yml` | Weekly Sunday 22:30 UTC + manual | ❌ No | npm audit + pip-audit + runs `backend/tests/architecture` and `backend/tests/unit`. Writes TSV summary. |
-| `monitoring.yml` | Manual dispatch only (schedule disabled) | ❌ No | Starts uvicorn locally, curls `/health` `/status` `/queue/stats` `/appointments/stats`. Cosmetic — keep disabled until wired to real env. |
-| `load-testing.yml` | Manual dispatch only (schedule disabled) | ❌ No | Hits `/health` and `/status` 100×. Currently always passes (do not trust as signal). |
+
+**Deleted in P0.8:**
+- ~~`monitoring.yml`~~ — schedule was disabled, ran against a CI-started uvicorn on a temp PG, generated fake "✅ Доступна" reports regardless of actual endpoint state. Replaced by Sentry (frontend, P0.7) + Prometheus (backend, P1).
+- ~~`load-testing.yml`~~ — always returned success, threshold was 30% success rate with explicit comment "Не блокируем CI/CD". Replaced by k6 or locust script TBD (P2).
 
 ## Required merge blockers
 
