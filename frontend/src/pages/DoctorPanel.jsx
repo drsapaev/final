@@ -733,24 +733,15 @@ const DoctorPanel = () => {
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
-                      <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--mac-text-on-accent)'
-                    }}>
+                    <div className="doctor-stat-row">
+                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)` }}>
                         <User size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
+                        <div className="doctor-stat-num">
                           {patients.length}
                         </div>
-                        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
+                        <div className="doctor-stat-label">
                           Активных пациентов
                         </div>
                       </div>
@@ -769,24 +760,15 @@ const DoctorPanel = () => {
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
-                      <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${successColor} 0%, ${getColor('success', 600)} 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--mac-text-on-accent)'
-                    }}>
+                    <div className="doctor-stat-row">
+                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${successColor} 0%, ${getColor('success', 600)} 100%)` }}>
                         <Calendar size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
+                        <div className="doctor-stat-num">
                           {appointments.filter((a) => a.status === 'scheduled').length}
                         </div>
-                        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
+                        <div className="doctor-stat-label">
                           Записей на сегодня
                         </div>
                       </div>
@@ -805,24 +787,15 @@ const DoctorPanel = () => {
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
-                      <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${warningColor} 0%, ${getColor('warning', 600)} 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--mac-text-on-accent)'
-                    }}>
+                    <div className="doctor-stat-row">
+                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${warningColor} 0%, ${getColor('warning', 600)} 100%)` }}>
                         <Clock size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
+                        <div className="doctor-stat-num">
                           {appointments.filter((a) => a.status === 'in_progress').length}
                         </div>
-                        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
+                        <div className="doctor-stat-label">
                           В процессе
                         </div>
                       </div>
@@ -841,24 +814,15 @@ const DoctorPanel = () => {
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
-                      <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${accentColor} 0%, ${getColor('info', 600)} 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--mac-text-on-accent)'
-                    }}>
+                    <div className="doctor-stat-row">
+                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${accentColor} 0%, ${getColor('info', 600)} 100%)` }}>
                         <CheckCircle size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
+                        <div className="doctor-stat-num">
                           {appointments.filter((a) => a.status === 'completed').length}
                         </div>
-                        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
+                        <div className="doctor-stat-label">
                           Завершено сегодня
                         </div>
                       </div>
@@ -914,44 +878,27 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
-                  <h2 style={{
-                  fontSize: getFontSize('xl'),
-                  fontWeight: '700',
-                  color: getColor('secondary', 800),
-                  margin: 0
-                }}>
+                <div className="doctor-section-head">
+                  <h2 className="doctor-section-title">
                     Пациенты
                   </h2>
-                  <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ position: 'relative' }}>
-                      <Search size={20} style={{ position: 'absolute', left: getSpacing('sm'), top: '50%', transform: 'translateY(-50%)', color: getColor('secondary', 400) }} />
+                  <div className="doctor-section-actions">
+                    <div className="doctor-search-wrap">
+                      <Search size={20} className="doctor-search-icon" />
                       <input
                       aria-label="Search patients"
                       type="text"
                       placeholder="Поиск пациентов..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
-                        border: `1px solid ${getColor('secondary', 200)}`,
-                        borderRadius: '12px',
-                        fontSize: getFontSize('sm'),
-                        width: isMobile ? '200px' : '250px',
-                        background: 'white'
-                      }} />
+                      className="doctor-search-input"
+                      style={{ width: isMobile ? '200px' : '250px' }} />
 
                     </div>
                     <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    style={{
-                      padding: getSpacing('sm'),
-                      border: `1px solid ${getColor('secondary', 200)}`,
-                      borderRadius: '12px',
-                      fontSize: getFontSize('sm'),
-                      background: 'white'
-                    }}>
+                    className="doctor-filter-select">
 
                       <option value="all">Все статусы</option>
                       <option value="active">Активные</option>
