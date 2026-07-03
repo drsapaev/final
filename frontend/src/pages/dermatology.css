@@ -1,0 +1,81 @@
+/**
+ * Dermatologist Panel — utility CSS classes.
+ * Extracted from DermatologistPanelUnified.jsx inline styles.
+ */
+
+/* ─── Section heading (color + display + fontFamily + fontSize + fontWeight + marginBottom) ─── */
+.derma-heading {
+  display: flex;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  margin-bottom: var(--mac-spacing-4);
+  color: var(--mac-text-primary);
+}
+
+.derma-heading-flex {
+  display: flex;
+  align-items: center;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  margin-bottom: var(--mac-spacing-4);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Text value (color + fontFamily + fontSize + fontWeight) ─── */
+.derma-text-value {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: var(--mac-font-size-base);
+  font-weight: 500;
+  color: var(--mac-text-primary);
+}
+
+/* ─── Text label (color + fontFamily + fontSize + fontWeight + marginBottom) ─── */
+.derma-text-label {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: var(--mac-font-size-sm);
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--mac-text-primary);
+}
+
+/* ─── Flex column ─── */
+.derma-flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-4);
+}
+
+/* ─── Flex between ─── */
+.derma-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--mac-spacing-4);
+}
+
+/* ─── Grid auto ─── */
+.derma-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--mac-spacing-3);
+}
+
+/* ─── Icon margin ─── */
+.derma-icon-mr {
+  margin-right: 8px;
+}
+
+/* ─── Card surface ─── */
+.derma-card {
+  padding: var(--mac-spacing-4);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-lg);
+}
+
+/* ─── Padding utilities ─── */
+.derma-p-4 { padding: var(--mac-spacing-4); }
+.derma-p-6 { padding: var(--mac-spacing-6); }
+.derma-p-8 { padding: var(--mac-spacing-8); }
