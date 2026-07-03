@@ -1521,7 +1521,7 @@ const DentistPanelUnified = () => {
           justifyContent: 'center',
           boxShadow: 'var(--mac-shadow-lg)'
         }}>
-            <Users style={{ height: '28px', width: '28px', color: 'white' }} />
+            <Users className="dental-icon-28 dental-text-white" />
           </div>
         </div>
 
@@ -1565,7 +1565,7 @@ const DentistPanelUnified = () => {
           justifyContent: 'center',
           boxShadow: 'var(--mac-shadow-lg)'
         }}>
-            <Calendar style={{ height: '28px', width: '28px', color: 'white' }} />
+            <Calendar className="dental-icon-28 dental-text-white" />
           </div>
         </div>
 
@@ -1609,7 +1609,7 @@ const DentistPanelUnified = () => {
           justifyContent: 'center',
           boxShadow: 'var(--mac-shadow-lg)'
         }}>
-            <FileText style={{ height: '28px', width: '28px', color: 'white' }} />
+            <FileText className="dental-icon-28 dental-text-white" />
           </div>
         </div>
 
@@ -1653,7 +1653,7 @@ const DentistPanelUnified = () => {
           justifyContent: 'center',
           boxShadow: 'var(--mac-shadow-lg)'
         }}>
-            <Smile style={{ height: '28px', width: '28px', color: 'white' }} />
+            <Smile className="dental-icon-28 dental-text-white" />
           </div>
         </div>
       </div>
@@ -1811,11 +1811,7 @@ const DentistPanelUnified = () => {
               justifyContent: 'center',
               boxShadow: 'var(--mac-shadow-sm)'
             }}>
-                  <span style={{
-                color: 'white',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-bold)'
-              }}>
+                  <span className="dental-text-value dental-fw-700" style={{ color: 'white' }}>
                     {appointment.patientName?.charAt(0)}
                   </span>
                 </div>
@@ -1962,11 +1958,7 @@ const DentistPanelUnified = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-                  <span style={{
-                color: 'white',
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+                  <span className="dental-text-value dental-heading" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
@@ -2186,11 +2178,7 @@ const DentistPanelUnified = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-                  <span style={{
-                color: 'white',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+                  <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
@@ -2268,11 +2256,7 @@ const DentistPanelUnified = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-                  <span style={{
-                color: 'white',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+                  <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
@@ -2391,11 +2375,7 @@ const DentistPanelUnified = () => {
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                    <span style={{
-                    color: 'white',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)'
-                  }}>
+                    <span className="dental-text-value" style={{ color: 'white' }}>
                       {patient.name?.charAt(0)}
                     </span>
                   </div>
@@ -2474,11 +2454,7 @@ const DentistPanelUnified = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-                  <span style={{
-                color: 'white',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+                  <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
@@ -3108,11 +3084,7 @@ const DentistPanelUnified = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-                  <span style={{
-                color: 'white',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+                  <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
@@ -3190,11 +3162,7 @@ const DentistPanelUnified = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-                  <span style={{
-                color: 'white',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+                  <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
