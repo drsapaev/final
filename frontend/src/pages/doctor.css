@@ -31,3 +31,293 @@
 
 /* ─── Badge bg ─── */
 .doctor-badge-bg { padding: var(--mac-spacing-2); text-align: center; }
+
+/* ─── Patient modal (batch 2) ─── */
+.doctor-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: color-mix(in srgb, var(--mac-bg-primary), black 42%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.doctor-modal-card {
+  background-color: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  margin: 16px;
+  box-shadow: var(--mac-shadow-xl);
+}
+.doctor-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.doctor-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--mac-text-primary);
+  margin: 0;
+}
+.doctor-modal-close {
+  color: var(--mac-text-tertiary);
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 4px;
+  border-radius: 4px;
+}
+.doctor-modal-body { margin-bottom: var(--mac-spacing-4); }
+.doctor-modal-avatar {
+  color: var(--mac-text-on-accent);
+}
+.doctor-modal-patient-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--mac-text-primary);
+  margin: 0;
+}
+.doctor-modal-patient-meta {
+  font-size: 14px;
+  color: var(--mac-text-secondary);
+  margin: 0;
+}
+.doctor-modal-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.doctor-modal-info-label {
+  font-size: 12px;
+  color: var(--mac-text-secondary);
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.doctor-modal-info-value {
+  font-size: 16px;
+  color: var(--mac-text-primary);
+  margin: 0;
+  font-weight: 500;
+}
+.doctor-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.doctor-modal-btn-primary { color: var(--mac-text-primary); }
+.doctor-modal-btn-accent { color: var(--mac-text-on-accent); }
+.doctor-flex-gap-12 { display: flex; align-items: center; gap: 12px; }
+
+/* ─── Empty state (batch 2) ─── */
+.doctor-empty {
+  padding: var(--mac-spacing-xl, 32px);
+  text-align: center;
+}
+.doctor-empty-icon { opacity: 0.55; margin-bottom: var(--mac-spacing-md, 12px); }
+.doctor-empty-title { font-size: var(--mac-font-size-md, 16px); font-weight: 600; margin-bottom: var(--mac-spacing-xs, 4px); }
+.doctor-empty-text {
+  font-size: var(--mac-font-size-sm);
+  max-width: 520px;
+  margin: 0 auto;
+}
+.doctor-empty-action { margin-top: var(--mac-spacing-md, 12px); }
+
+/* ─── Stat cards (batch 3) ─── */
+.doctor-stat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-md, 16px);
+}
+.doctor-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mac-text-on-accent);
+}
+.doctor-stat-num {
+  font-size: var(--mac-font-size-2xl, 24px);
+  font-weight: 700;
+  color: var(--mac-text-primary);
+}
+.doctor-stat-label {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Search box (batch 3) ─── */
+.doctor-search-wrap { position: relative; }
+.doctor-search-icon {
+  position: absolute;
+  left: var(--mac-spacing-sm, 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mac-text-tertiary);
+  pointer-events: none;
+}
+.doctor-search-input {
+  padding: var(--mac-spacing-sm, 8px) var(--mac-spacing-sm, 8px) var(--mac-spacing-sm, 8px) 40px;
+  border: 1px solid var(--mac-border, #e5e7eb);
+  border-radius: 12px;
+  font-size: var(--mac-font-size-sm);
+  background: var(--mac-card-bg, #ffffff);
+  color: var(--mac-text-primary);
+}
+.doctor-filter-select {
+  padding: var(--mac-spacing-sm, 8px);
+  border: 1px solid var(--mac-border, #e5e7eb);
+  border-radius: 12px;
+  font-size: var(--mac-font-size-sm);
+  background: var(--mac-card-bg, #ffffff);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Action buttons (batch 3) ─── */
+.doctor-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--mac-spacing-xs, 4px);
+  border-radius: 8px;
+  border: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: var(--mac-spacing-xs, 4px);
+}
+.doctor-action-btn-primary { background: rgba(0, 122, 255, 0.12); color: var(--mac-accent); }
+.doctor-action-btn-success { background: rgba(52, 199, 89, 0.12); color: var(--mac-success); }
+.doctor-action-btn-danger { background: rgba(255, 59, 48, 0.12); color: var(--mac-danger); }
+.doctor-action-btn-info { background: rgba(88, 86, 214, 0.12); color: var(--mac-accent-purple); }
+.doctor-action-btn-warning { background: rgba(255, 149, 0, 0.12); color: var(--mac-accent-orange); }
+
+/* ─── Section header (batch 3) ─── */
+.doctor-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-md, 16px);
+}
+.doctor-section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mac-text-primary);
+  margin: 0;
+}
+.doctor-section-actions {
+  display: flex;
+  gap: var(--mac-spacing-md, 16px);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.doctor-section-actions-sm {
+  display: flex;
+  gap: var(--mac-spacing-sm, 8px);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--mac-spacing-sm, 8px);
+}
+
+/* ─── Patient table cells (batch 4) ─── */
+.doctor-table-row-hover {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.doctor-table-row-hover:hover {
+  background-color: var(--mac-fill-quaternary, rgba(0, 122, 255, 0.04));
+}
+.doctor-patient-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-sm, 8px);
+}
+.doctor-avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mac-text-on-accent);
+  font-size: var(--mac-font-size-sm);
+  font-weight: 700;
+}
+.doctor-patient-name {
+  font-weight: 500;
+  color: var(--mac-text-primary);
+}
+.doctor-patient-meta {
+  font-size: var(--mac-font-size-xs, 12px);
+  color: var(--mac-text-secondary);
+}
+.doctor-card-pad-0 { padding: 0; }
+.doctor-card-mb-xl { margin-bottom: var(--mac-spacing-xl, 32px); }
+.doctor-badge-ml { margin-left: 4px; font-size: 10px; }
+.doctor-ml-4 { margin-left: 4px; }
+
+/* ─── Quick actions grid (batch 5) ─── */
+.doctor-actions-grid {
+  display: grid;
+  gap: var(--mac-spacing-md, 16px);
+}
+.doctor-actions-grid-1 { grid-template-columns: 1fr; }
+.doctor-actions-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.doctor-actions-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* ─── Queue entries (batch 5) ─── */
+.doctor-queue-entry-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-xs, 4px);
+}
+.doctor-queue-entry-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-xs, 4px);
+  flex-wrap: wrap;
+}
+.doctor-queue-waiting { font-size: 10px; color: var(--mac-accent-orange); }
+.doctor-queue-text-sm { font-size: 12px; color: var(--mac-text-secondary); }
+.doctor-queue-badge-mr { margin-right: 4px; font-size: 10px; }
+.doctor-queue-timer {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--mac-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.doctor-queue-status-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ─── Search width helper (batch 5) ─── */
+.doctor-search-w-mobile { width: 200px; }
+.doctor-search-w-desktop { width: 250px; }
+
+/* ─── Reports grid (batch 6) ─── */
+.doctor-reports-grid {
+  display: grid;
+  gap: var(--mac-spacing-lg, 24px);
+}
+.doctor-reports-grid-1 { grid-template-columns: 1fr; }
+.doctor-reports-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.doctor-reports-grid-3 { grid-template-columns: repeat(3, 1fr); }

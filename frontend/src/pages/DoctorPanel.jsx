@@ -484,19 +484,6 @@ const DoctorPanel = () => {
     color: 'var(--mac-text-secondary)'
   };
 
-  const actionButtonStyle = {
-    padding: getSpacing('xs'),
-    borderRadius: '8px',
-    border: 'none',
-    outline: '2px solid transparent',
-    outlineOffset: '2px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: getSpacing('xs')
-  };
 
   // Функции
   const getStatusVariant = (status) => {
@@ -586,18 +573,18 @@ const DoctorPanel = () => {
   const renderEmptyState = ({ icon: Icon, title, description, tone = 'default', action = null }) => {
     const color = tone === 'error' ? dangerColor : getColor('secondary', 500);
     return (
-      <div style={{ padding: getSpacing('xl'), textAlign: 'center', color }}>
-        <Icon size={48} style={{ opacity: 0.55, marginBottom: getSpacing('md') }} />
-        <div style={{ fontSize: getFontSize('md'), fontWeight: 600, marginBottom: getSpacing('xs') }}>
+      <div className="doctor-empty" style={{ color }}>
+        <Icon size={48} className="doctor-empty-icon" />
+        <div className="doctor-empty-title">
           {title}
         </div>
         {description &&
-        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 500), maxWidth: 520, margin: '0 auto' }}>
+        <div className="doctor-empty-text">
             {description}
           </div>
         }
         {action &&
-        <div style={{ marginTop: getSpacing('md') }}>
+        <div className="doctor-empty-action">
             {action}
           </div>
         }
@@ -687,7 +674,7 @@ const DoctorPanel = () => {
             <Users size={isMobile ? 16 : 20} />
             {!isMobile && <span>Очередь</span>}
             {queueStats.waiting > 0 &&
-            <Badge variant="warning" style={{ marginLeft: '4px', fontSize: '10px' }}>
+            <Badge variant="warning" className="doctor-badge-ml">
                 {queueStats.waiting}
               </Badge>
             }
@@ -733,24 +720,15 @@ const DoctorPanel = () => {
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
-                      <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--mac-text-on-accent)'
-                    }}>
+                    <div className="doctor-stat-row">
+                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)` }}>
                         <User size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
+                        <div className="doctor-stat-num">
                           {patients.length}
                         </div>
-                        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
+                        <div className="doctor-stat-label">
                           Активных пациентов
                         </div>
                       </div>
@@ -769,24 +747,15 @@ const DoctorPanel = () => {
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
-                      <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${successColor} 0%, ${getColor('success', 600)} 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--mac-text-on-accent)'
-                    }}>
+                    <div className="doctor-stat-row">
+                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${successColor} 0%, ${getColor('success', 600)} 100%)` }}>
                         <Calendar size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
+                        <div className="doctor-stat-num">
                           {appointments.filter((a) => a.status === 'scheduled').length}
                         </div>
-                        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
+                        <div className="doctor-stat-label">
                           Записей на сегодня
                         </div>
                       </div>
@@ -805,24 +774,15 @@ const DoctorPanel = () => {
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
-                      <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${warningColor} 0%, ${getColor('warning', 600)} 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--mac-text-on-accent)'
-                    }}>
+                    <div className="doctor-stat-row">
+                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${warningColor} 0%, ${getColor('warning', 600)} 100%)` }}>
                         <Clock size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
+                        <div className="doctor-stat-num">
                           {appointments.filter((a) => a.status === 'in_progress').length}
                         </div>
-                        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
+                        <div className="doctor-stat-label">
                           В процессе
                         </div>
                       </div>
@@ -841,24 +801,15 @@ const DoctorPanel = () => {
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
-                      <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${accentColor} 0%, ${getColor('info', 600)} 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--mac-text-on-accent)'
-                    }}>
+                    <div className="doctor-stat-row">
+                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${accentColor} 0%, ${getColor('info', 600)} 100%)` }}>
                         <CheckCircle size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
+                        <div className="doctor-stat-num">
                           {appointments.filter((a) => a.status === 'completed').length}
                         </div>
-                        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
+                        <div className="doctor-stat-label">
                           Завершено сегодня
                         </div>
                       </div>
@@ -869,23 +820,14 @@ const DoctorPanel = () => {
 
               {/* Быстрые действия */}
               <AnimatedTransition type="fade" delay={600}>
-                <Card style={{ marginBottom: getSpacing('xl') }}>
+                <Card className="doctor-card-mb-xl">
                   <CardHeader>
-                    <h2 style={{
-                    fontSize: getFontSize('xl'),
-                    fontWeight: '700',
-                    color: getColor('secondary', 800),
-                    margin: 0
-                  }}>
+                    <h2 className="doctor-section-title">
                       Быстрые действия
                     </h2>
                   </CardHeader>
                   <CardContent>
-                    <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-                    gap: getSpacing('md')
-                  }}>
+                    <div className={`doctor-actions-grid doctor-actions-grid-${isMobile ? '1' : isTablet ? '2' : '4'}`}>
                       <Button variant="primary" fullWidth>
                         <Plus size={20} />
                         Новый пациент
@@ -914,44 +856,26 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
-                  <h2 style={{
-                  fontSize: getFontSize('xl'),
-                  fontWeight: '700',
-                  color: getColor('secondary', 800),
-                  margin: 0
-                }}>
+                <div className="doctor-section-head">
+                  <h2 className="doctor-section-title">
                     Пациенты
                   </h2>
-                  <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ position: 'relative' }}>
-                      <Search size={20} style={{ position: 'absolute', left: getSpacing('sm'), top: '50%', transform: 'translateY(-50%)', color: getColor('secondary', 400) }} />
+                  <div className="doctor-section-actions">
+                    <div className="doctor-search-wrap">
+                      <Search size={20} className="doctor-search-icon" />
                       <input
                       aria-label="Search patients"
                       type="text"
                       placeholder="Поиск пациентов..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
-                        border: `1px solid ${getColor('secondary', 200)}`,
-                        borderRadius: '12px',
-                        fontSize: getFontSize('sm'),
-                        width: isMobile ? '200px' : '250px',
-                        background: 'white'
-                      }} />
+                      className={`doctor-search-input ${isMobile ? 'doctor-search-w-mobile' : 'doctor-search-w-desktop'}`} />
 
                     </div>
                     <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    style={{
-                      padding: getSpacing('sm'),
-                      border: `1px solid ${getColor('secondary', 200)}`,
-                      borderRadius: '12px',
-                      fontSize: getFontSize('sm'),
-                      background: 'white'
-                    }}>
+                    className="doctor-filter-select">
 
                       <option value="all">Все статусы</option>
                       <option value="active">Активные</option>
@@ -969,7 +893,7 @@ const DoctorPanel = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent style={{ padding: 0 }}>
+              <CardContent className="doctor-card-pad-0">
                 {loading ?
               <Skeleton.Table rows={5} columns={6} /> :
               loadError ?
@@ -1004,40 +928,20 @@ const DoctorPanel = () => {
                       {filteredPatients.map((patient) =>
                   <tr
                     key={patient.id}
-                    style={{
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = getColor('primary', 50);
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
+                    className="doctor-table-row-hover"
                     aria-label={`Open ${getPatientA11yContext(patient)}`}
                     onClick={() => handlePatientClick(patient)}>
 
                           <td style={tdStyle} aria-label={getPatientA11yContext(patient)}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
-                              <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--mac-text-on-accent)',
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '700'
-                        }}>
+                            <div className="doctor-patient-cell">
+                              <div className="doctor-avatar-sm" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)` }}>
                                 {String(patient.name || 'Пациент').split(' ').map((n) => n[0]).join('')}
                               </div>
                               <div>
-                                <div style={{ fontWeight: '500', color: getColor('secondary', 800) }}>
+                                <div className="doctor-patient-name">
                                   {patient.name || 'Пациент'}
                                 </div>
-                                <div style={{ fontSize: getFontSize('xs'), color: getColor('secondary', 500) }}>
+                                <div className="doctor-patient-meta">
                                   {patient.gender}
                                 </div>
                               </div>
@@ -1054,7 +958,7 @@ const DoctorPanel = () => {
                           <td style={tdStyle} aria-label={`${getPatientA11yContext(patient)} actions`}>
                             <button
                         aria-label={`Edit ${getPatientA11yContext(patient)}`}
-                        style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                        className="doctor-action-btn doctor-action-btn-primary"
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePatientClick(patient);
@@ -1064,7 +968,7 @@ const DoctorPanel = () => {
                             </button>
                             <button
                         aria-label={`View ${getPatientA11yContext(patient)}`}
-                        style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                        className="doctor-action-btn doctor-action-btn-success"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('View patient', patient.id);
@@ -1074,7 +978,7 @@ const DoctorPanel = () => {
                             </button>
                             <button
                         aria-label={`Delete ${getPatientA11yContext(patient)}`}
-                        style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                        className="doctor-action-btn doctor-action-btn-danger"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('Delete patient', patient.id);
@@ -1097,44 +1001,26 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
-                  <h2 style={{
-                  fontSize: getFontSize('xl'),
-                  fontWeight: '700',
-                  color: getColor('secondary', 800),
-                  margin: 0
-                }}>
+                <div className="doctor-section-head">
+                  <h2 className="doctor-section-title">
                     Записи на прием
                   </h2>
-                  <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ position: 'relative' }}>
-                      <Search size={20} style={{ position: 'absolute', left: getSpacing('sm'), top: '50%', transform: 'translateY(-50%)', color: getColor('secondary', 400) }} />
+                  <div className="doctor-section-actions">
+                    <div className="doctor-search-wrap">
+                      <Search size={20} className="doctor-search-icon" />
                       <input
                       aria-label="Search appointments"
                       type="text"
                       placeholder="Поиск записей..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
-                        border: `1px solid ${getColor('secondary', 200)}`,
-                        borderRadius: '12px',
-                        fontSize: getFontSize('sm'),
-                        width: isMobile ? '200px' : '250px',
-                        background: 'white'
-                      }} />
+                      className={`doctor-search-input ${isMobile ? 'doctor-search-w-mobile' : 'doctor-search-w-desktop'}`} />
 
                     </div>
                     <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    style={{
-                      padding: getSpacing('sm'),
-                      border: `1px solid ${getColor('secondary', 200)}`,
-                      borderRadius: '12px',
-                      fontSize: getFontSize('sm'),
-                      background: 'white'
-                    }}>
+                    className="doctor-filter-select">
 
                       <option value="all">Все статусы</option>
                       <option value="scheduled">Запланированы</option>
@@ -1155,7 +1041,7 @@ const DoctorPanel = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent style={{ padding: 0 }}>
+              <CardContent className="doctor-card-pad-0">
                 {loading ?
               <Skeleton.Table rows={5} columns={6} /> :
               loadError ?
@@ -1190,20 +1076,11 @@ const DoctorPanel = () => {
                       {filteredAppointments.map((appointment) =>
                   <tr
                     key={appointment.id}
-                    style={{
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = getColor('primary', 50);
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}>
+                    className="doctor-table-row-hover">
 
                           <td style={tdStyle}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
-                              <Clock size={16} style={{ color: getColor('secondary', 400) }} />
+                            <div className="doctor-patient-cell">
+                              <Clock size={16} className="doctor-patient-meta" />
                               {appointment.time}
                             </div>
                           </td>
@@ -1218,7 +1095,7 @@ const DoctorPanel = () => {
                           <td style={tdStyle}>
                             <button
                         aria-label={`Edit ${getAppointmentA11yContext(appointment)}`}
-                        style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                        className="doctor-action-btn doctor-action-btn-primary"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('Edit appointment', appointment.id);
@@ -1228,7 +1105,7 @@ const DoctorPanel = () => {
                             </button>
                             <button
                         aria-label={`Complete ${getAppointmentA11yContext(appointment)}`}
-                        style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                        className="doctor-action-btn doctor-action-btn-success"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('Complete appointment', appointment.id);
@@ -1238,7 +1115,7 @@ const DoctorPanel = () => {
                             </button>
                             <button
                         aria-label={`Cancel ${getAppointmentA11yContext(appointment)}`}
-                        style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                        className="doctor-action-btn doctor-action-btn-danger"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('Cancel appointment', appointment.id);
@@ -1262,23 +1139,18 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
+                <div className="doctor-section-head">
                   <div>
-                    <h2 style={{
-                    fontSize: getFontSize('xl'),
-                    fontWeight: '700',
-                    color: getColor('secondary', 800),
-                    margin: 0
-                  }}>
+                    <h2 className="doctor-section-title">
                       Очередь пациентов
                     </h2>
-                    <div style={{ display: 'flex', gap: getSpacing('md'), marginTop: getSpacing('sm') }}>
+                    <div className="doctor-section-actions doctor-section-actions-sm">
                       <Badge variant="warning">Ожидают: {queueStats.waiting}</Badge>
                       <Badge variant="primary">Вызваны: {queueStats.called}</Badge>
                       <Badge variant="success">Обслужены: {queueStats.served}</Badge>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: getSpacing('sm') }}>
+                  <div className="doctor-section-actions-sm">
                     <Button
                     variant="primary"
                     aria-label="Call next queue patient"
@@ -1293,7 +1165,7 @@ const DoctorPanel = () => {
                     disabled={!canCallNext}>
 
                       <Phone size={16} />
-                      {!isMobile && <span style={{ marginLeft: '4px' }}>Вызвать следующего</span>}
+                      {!isMobile && <span className="doctor-ml-4">Вызвать следующего</span>}
                     </Button>
                     <Button
                     variant="ghost"
@@ -1305,20 +1177,20 @@ const DoctorPanel = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent style={{ padding: 0 }}>
+              <CardContent className="doctor-card-pad-0">
                 {queueLoading ?
-              <div style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
+              <div className="doctor-empty">
                     <Skeleton height={40} count={5} />
                   </div> :
               queueError ?
-              <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: dangerColor }}>
-                    <AlertCircle size={32} style={{ marginBottom: getSpacing('sm') }} />
+              <div className="doctor-empty" style={{ color: dangerColor }}>
+                    <AlertCircle size={32} className="doctor-empty-icon" />
                     <p>{queueError}</p>
                     <Button variant="ghost" onClick={loadQueue}>Повторить</Button>
                   </div> :
               queueEntries.length === 0 ?
-              <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: getColor('secondary', 500) }}>
-                    <Users size={48} style={{ opacity: 0.5, marginBottom: getSpacing('md') }} />
+              <div className="doctor-empty">
+                    <Users size={48} className="doctor-empty-icon" />
                     <p>Очередь пуста</p>
                   </div> :
 
@@ -1340,6 +1212,7 @@ const DoctorPanel = () => {
                     return (
                   <tr
                     key={entry.id}
+                    className={`doctor-queue-row ${currentVisitMeta ? 'doctor-queue-row-current' : entry.priority > 0 ? 'doctor-queue-row-priority' : ''}`}
                     style={{
                       background: currentVisitMeta ? 'color-mix(in srgb, var(--mac-accent), transparent 92%)' : entry.priority > 0 ? `${warningColor}10` : 'transparent',
                       borderLeft: currentVisitMeta ? `3px solid ${primaryColor}` : entry.priority > 0 ? `3px solid ${warningColor}` : 'none'
@@ -1352,9 +1225,9 @@ const DoctorPanel = () => {
                             </Badge>
                           </td>
                           <td style={tdStyle} aria-label={getQueuePatientContext(entry)}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('xs') }}>
+                            <div className="doctor-queue-entry-info">
                               <strong>{entry.patient_name}</strong>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs'), flexWrap: 'wrap' }}>
+                              <div className="doctor-queue-entry-row">
                                 {currentVisitMeta &&
                                 <Badge
                                   variant={currentVisitMeta.variant}
@@ -1364,7 +1237,7 @@ const DoctorPanel = () => {
                                 </Badge>
                                 }
                                 {entry.priority > 0 &&
-                                <span style={{ fontSize: '10px', color: warningColor }}>
+                                <span className="doctor-queue-waiting">
                                   ⚡ Следующий
                                 </span>
                                 }
@@ -1375,12 +1248,12 @@ const DoctorPanel = () => {
                           <td style={tdStyle}>
                             {entry.service_details?.length > 0 ?
                       entry.service_details.slice(0, 2).map((svc, i) =>
-                      <Badge key={i} variant="default" style={{ marginRight: '4px', fontSize: '10px' }}>
+                      <Badge key={i} variant="default" className="doctor-queue-badge-mr">
                                   {svc.name || svc.code}
                                 </Badge>
                       ) :
                       entry.services?.length > 0 ?
-                      <span style={{ fontSize: '12px', color: getColor('secondary', 500) }}>
+                      <span className="doctor-queue-text-sm">
                                 {entry.services.slice(0, 2).join(', ')}
                               </span> :
                       '—'}
@@ -1391,14 +1264,7 @@ const DoctorPanel = () => {
                             </Badge>
                             {/* ✅ Таймер для активных статусов */}
                             {(entry.status === 'called' || entry.status === 'diagnostics') && entry.called_at &&
-                      <span style={{
-                        marginLeft: '8px',
-                        fontSize: '11px',
-                        color: getColor('secondary', 500),
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '2px'
-                      }}>
+                      <span className="doctor-queue-timer">
                                 <Clock size={12} />
                                 {formatElapsedTime(entry.called_at)}
                               </span>
@@ -1412,7 +1278,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Mark no-show', entry)}
                           aria-label={`Mark no-show for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                          className="doctor-action-btn doctor-action-btn-danger"
                           onClick={() => markNoShow(entry.id)}
                           title="Отметить неявку">
 
@@ -1425,7 +1291,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Send to diagnostics', entry)}
                           aria-label={`Send to diagnostics for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('info', 100), color: accentColor }}
+                          className="doctor-action-btn doctor-action-btn-info"
                           onClick={() => sendToDiagnostics(entry.id)}
                           title="На обследование">
 
@@ -1434,7 +1300,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Complete visit', entry)}
                           aria-label={`Complete visit for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                          className="doctor-action-btn doctor-action-btn-success"
                           onClick={() => completeVisit(entry.id)}
                           title="Завершить приём">
 
@@ -1443,7 +1309,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Mark no-show', entry)}
                           aria-label={`Mark no-show for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                          className="doctor-action-btn doctor-action-btn-danger"
                           onClick={() => markNoShow(entry.id)}
                           title="Не явился">
 
@@ -1456,7 +1322,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Call back from diagnostics', entry)}
                           aria-label={`Call back from diagnostics for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                          className="doctor-action-btn doctor-action-btn-primary"
                           onClick={() => callFromDiagnostics(entry.id)}
                           title="Вернуть с диагностики (Push)">
 
@@ -1465,7 +1331,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Complete visit', entry)}
                           aria-label={`Complete visit for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                          className="doctor-action-btn doctor-action-btn-success"
                           onClick={() => completeVisit(entry.id)}
                           title="Завершить приём">
 
@@ -1474,7 +1340,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Mark visit incomplete', entry)}
                           aria-label={`Mark visit incomplete for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+                          className="doctor-action-btn doctor-action-btn-warning"
                           onClick={() => markIncomplete(entry.id, 'Не вернулся с обследования')}
                           title="Не вернулся">
 
@@ -1486,7 +1352,7 @@ const DoctorPanel = () => {
                       <button
                         {...getQueueActionA11yProps('Restore as next patient', entry)}
                         aria-label={`Restore as next patient for ${getQueuePatientContext(entry)}`}
-                        style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+                        className="doctor-action-btn doctor-action-btn-warning"
                         onClick={() => restoreToNext(entry.id)}
                         title="Восстановить следующим">
 
@@ -1509,12 +1375,7 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
-                <h2 style={{
-                fontSize: getFontSize('xl'),
-                fontWeight: '700',
-                color: getColor('secondary', 800),
-                margin: 0
-              }}>
+                <h2 className="doctor-section-title">
                   AI Помощник врача
                 </h2>
               </CardHeader>
@@ -1534,21 +1395,12 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
-                <h2 style={{
-                fontSize: getFontSize('xl'),
-                fontWeight: '700',
-                color: getColor('secondary', 800),
-                margin: 0
-              }}>
+                <h2 className="doctor-section-title">
                   Отчеты и аналитика
                 </h2>
               </CardHeader>
               <CardContent>
-                <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-                gap: getSpacing('lg')
-              }}>
+                <div className={`doctor-reports-grid doctor-reports-grid-${isMobile ? '1' : isTablet ? '2' : '3'}`}>
                   <Button variant="primary" fullWidth>
                     <FileText size={20} />
                     Отчет по пациентам
@@ -1582,77 +1434,50 @@ const DoctorPanel = () => {
 
       {/* ✅ УЛУЧШЕНИЕ: Модальное окно пациента с универсальным хуком */}
       {patientModal.isOpen && patientModal.selectedItem &&
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'color-mix(in srgb, var(--mac-bg-primary), black 42%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
-      }}>
-          <div style={{
-          backgroundColor: 'var(--mac-card-bg)',
-          border: '1px solid var(--mac-card-border)',
-          borderRadius: '12px',
-          padding: '24px',
-          width: '100%',
-          maxWidth: '500px',
-          margin: '16px',
-          boxShadow: 'var(--mac-shadow-xl)'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--mac-text-primary)', margin: 0 }}>
+      <div className="doctor-modal-overlay">
+          <div className="doctor-modal-card">
+            <div className="doctor-modal-header">
+              <h3 className="doctor-modal-title">
                 Информация о пациенте
               </h3>
               <button
               aria-label="Close patient information dialog"
               onClick={patientModal.closeModal}
-              style={{
-                color: 'var(--mac-text-tertiary)',
-                cursor: 'pointer',
-                border: 'none',
-                background: 'none',
-                padding: '4px',
-                borderRadius: '4px'
-              }}>
+              className="doctor-modal-close">
 
                 <XCircle size={24} />
               </button>
             </div>
 
-            <div className="doctor-mb-4">
-              <div className="doctor-flex" style={{ gap: '12px' }}>
-                <div className="doctor-text-sm" style={{ color: 'var(--mac-text-on-accent)' }}>
+            <div className="doctor-modal-body">
+              <div className="doctor-flex-gap-12">
+                <div className="doctor-text-sm doctor-modal-avatar">
                   {patientModal.selectedItem.name?.charAt(0) || 'П'}
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)', margin: 0 }}>
+                  <h4 className="doctor-modal-patient-name">
                     {patientModal.selectedItem.name || 'Неизвестно'}
                   </h4>
-                  <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', margin: 0 }}>
+                  <p className="doctor-modal-patient-meta">
                     {patientModal.selectedItem.phone || 'Телефон не указан'}
                   </p>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="doctor-modal-info-grid">
                 <div>
-                  <p style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <p className="doctor-modal-info-label">
                     Возраст
                   </p>
-                  <p style={{ fontSize: '16px', color: 'var(--mac-text-primary)', margin: 0, fontWeight: '500' }}>
+                  <p className="doctor-modal-info-value">
                     {patientModal.selectedItem.age || 'Не указан'}
                   </p>
                 </div>
                 <div>
-                  <p style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <p className="doctor-modal-info-label">
                     Статус
                   </p>
-                  <p style={{ fontSize: '16px', color: 'var(--mac-text-primary)', margin: 0, fontWeight: '500' }}>
+                  <p className="doctor-modal-info-value">
                     {patientModal.selectedItem.status === 'active' ? 'Активный' :
                   patientModal.selectedItem.status === 'waiting' ? 'Ожидает' :
                   patientModal.selectedItem.status || 'Неизвестно'}
@@ -1661,15 +1486,15 @@ const DoctorPanel = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+            <div className="doctor-modal-footer">
               <button
               onClick={patientModal.closeModal}
-              className="doctor-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+              className="doctor-text-sm doctor-modal-btn-primary">
 
                 Закрыть
               </button>
               <button
-              className="doctor-text-sm" style={{ color: 'var(--mac-text-on-accent)' }}>
+              className="doctor-text-sm doctor-modal-btn-accent">
 
                 Редактировать
               </button>
