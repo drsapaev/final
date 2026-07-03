@@ -1432,16 +1432,8 @@ const DermatologistPanelUnified = () => {
           {activeTab === 'patients' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard className="derma-p-8">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: '20px'
-                }}>
+                <div className="derma-flex" style={{ alignItems: 'center' }}>
+                  <h3 className="derma-flex" style={{ alignItems: 'center' }}>
                     <User size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Дерматологические пациенты
                   </h3>
@@ -1465,7 +1457,7 @@ const DermatologistPanelUnified = () => {
                 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                            <div className="derma-flex" style={{ alignItems: 'center' }}>
                               <h4 style={{
                           fontSize: '16px',
                           fontWeight: '600',
@@ -1485,15 +1477,15 @@ const DermatologistPanelUnified = () => {
                         flexDirection: 'column',
                         gap: '12px'
                       }}>
-                              <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <div className="derma-flex" style={{ alignItems: 'center' }}>
                                 <Phone size={18} className="derma-icon-mr" style={{ color: 'var(--mac-accent)' }} />
                                 {patient.phone}
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <div className="derma-flex" style={{ alignItems: 'center' }}>
                                 <Calendar size={14} className="derma-icon-mr" />
                                 {patient.birth_date}
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <div className="derma-flex" style={{ alignItems: 'center' }}>
                                 <User size={14} className="derma-icon-mr" />
                                 ID: {patient.id}
                               </div>
@@ -1511,7 +1503,7 @@ const DermatologistPanelUnified = () => {
                           }));
                           setShowSkinForm(true);
                         }}
-                        style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        className="derma-flex" style={{ alignItems: 'center' }}>
 
                               <Activity size={16} />
                               Осмотр
@@ -1527,7 +1519,7 @@ const DermatologistPanelUnified = () => {
                           }));
                           setShowCosmeticForm(true);
                         }}
-                        style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        className="derma-flex" style={{ alignItems: 'center' }}>
 
                               <Sparkles size={16} />
                               Процедура
@@ -1535,7 +1527,7 @@ const DermatologistPanelUnified = () => {
                             <Button
                         variant="outline"
                         onClick={() => setSelectedPatient(patient)}
-                        style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        className="derma-flex" style={{ alignItems: 'center' }}>
 
                               <User size={16} />
                               Просмотр
@@ -1558,16 +1550,8 @@ const DermatologistPanelUnified = () => {
           {activeTab === 'visit' && currentAppointment &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard className="derma-p-8">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                  display: 'flex',
-                  alignItems: 'center',
-                  margin: 0
-                }}>
+                <div className="derma-flex" style={{ alignItems: 'center' }}>
+                  <h3 className="derma-flex" style={{ alignItems: 'center' }}>
                     <Stethoscope size={20} style={{ marginRight: '8px', color: 'var(--mac-orange-500)' }} />
                     Прием пациента: {currentAppointment.patient_name || 'Не указано'}
                   </h3>
@@ -1585,15 +1569,7 @@ const DermatologistPanelUnified = () => {
 
                 {/* EMR система */}
                 <div style={{ marginTop: '24px' }}>
-                  <h4 style={{
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  marginBottom: '16px',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}>
+                  <h4 className="derma-flex" style={{ alignItems: 'center' }}>
                     <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                     Электронная медицинская карта
                   </h4>
@@ -1607,15 +1583,7 @@ const DermatologistPanelUnified = () => {
                 {/* Система рецептов */}
                 {emr && !emr.is_draft &&
               <div style={{ marginTop: '24px' }}>
-                    <h4 style={{
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  marginBottom: '16px',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}>
+                    <h4 className="derma-flex" style={{ alignItems: 'center' }}>
                       <TestTube size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                       Рецепт
                     </h4>
@@ -1636,16 +1604,7 @@ const DermatologistPanelUnified = () => {
                     <Button
                   onClick={handleSaveVisit}
                   disabled={loading}
-                  style={{
-                    backgroundColor: 'var(--mac-green-500)',
-                    color: 'white',
-                    fontSize: '16px',
-                    padding: '12px 32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    margin: '0 auto'
-                  }}>
+                  className="derma-flex" style={{ alignItems: 'center' }}>
 
                       {loading ?
                   <RefreshCw size={20} className="animate-spin" /> :
@@ -1665,15 +1624,7 @@ const DermatologistPanelUnified = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Информация о пациенте */}
               <MacOSCard className="derma-p-8">
-                <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                marginBottom: '20px',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
+                <h3 className="derma-flex" style={{ alignItems: 'center' }}>
                   <User size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                   Пациент #{selectedPatient.number}
                 </h3>
@@ -1710,7 +1661,7 @@ const DermatologistPanelUnified = () => {
                   }}>
                         Телефон
                       </label>
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <div className="derma-flex" style={{ alignItems: 'center' }}>
                         <Phone size={16} style={{ marginRight: '8px', color: 'var(--mac-text-secondary)' }} />
                         <span style={{
                       fontSize: '16px',
@@ -1826,15 +1777,7 @@ const DermatologistPanelUnified = () => {
               {/* EMR система */}
               {currentAppointment &&
             <MacOSCard className="derma-p-8">
-                  <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                marginBottom: '20px',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
+                  <h3 className="derma-flex" style={{ alignItems: 'center' }}>
                     <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                     Электронная медицинская карта
                   </h3>
@@ -1899,7 +1842,7 @@ const DermatologistPanelUnified = () => {
               title="Выберите визит"
               description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
               action={
-              <Button variant="outline" onClick={() => handleTabChange('appointments')} style={{ marginTop: '16px' }}>
+              <Button variant="outline" onClick={() => handleTabChange('appointments')} className="derma-p-4" style={{ marginTop: '16px' }}>
                     Перейти к записям
                   </Button>
               } />
@@ -1980,7 +1923,7 @@ const DermatologistPanelUnified = () => {
               title="Выберите пациента"
               description="Перейдите на вкладку 'Очередь' и выберите пациента для просмотра фото"
               action={
-              <Button variant="outline" onClick={() => handleTabChange('queue')} style={{ marginTop: '16px' }}>
+              <Button variant="outline" onClick={() => handleTabChange('queue')} className="derma-p-4" style={{ marginTop: '16px' }}>
                     Перейти к очереди
                   </Button>
               } />
@@ -1992,15 +1935,8 @@ const DermatologistPanelUnified = () => {
           {activeTab === 'skin' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard className="derma-p-8">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>
+                <div className="derma-flex" style={{ alignItems: 'center' }}>
+                  <h3 className="derma-flex" style={{ alignItems: 'center' }}>
                     <Activity size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Осмотры кожи
                   </h3>
@@ -2219,15 +2155,8 @@ const DermatologistPanelUnified = () => {
           {activeTab === 'cosmetic' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard className="derma-p-8">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>
+                <div className="derma-flex" style={{ alignItems: 'center' }}>
+                  <h3 className="derma-flex" style={{ alignItems: 'center' }}>
                     <Sparkles size={20} style={{ marginRight: '8px', color: 'var(--mac-pink-500)' }} />
                     Косметические процедуры
                   </h3>
@@ -2454,15 +2383,7 @@ const DermatologistPanelUnified = () => {
           {activeTab === 'services' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard className="derma-p-8">
-                <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-              }}>
+                <h3 className="derma-flex" style={{ alignItems: 'center' }}>
                   <Scissors size={20} style={{ marginRight: '8px', color: 'var(--mac-orange-600)' }} />
                   Услуги дерматологии и косметологии
                 </h3>
@@ -2495,7 +2416,7 @@ const DermatologistPanelUnified = () => {
                     }} />
 
 
-                    <div style={{ marginTop: '16px' }}>
+                    <div className="derma-p-4" style={{ marginTop: '16px' }}>
                       <ServiceChecklist
                       value={selectedServices}
                       onChange={setSelectedServices}
@@ -2567,15 +2488,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                         Итого к оплате
                       </label>
-                      <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      height: '40px',
-                      padding: '0 12px',
-                      border: '2px dashed var(--mac-border)',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--mac-bg-secondary)'
-                    }}>
+                      <div className="derma-flex" style={{ alignItems: 'center' }}>
                         <span style={{
                         fontSize: '18px',
                         fontWeight: '600',
@@ -2637,15 +2550,7 @@ const DermatologistPanelUnified = () => {
           {activeTab === 'history' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard className="derma-p-8">
-                <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-              }}>
+                <h3 className="derma-flex" style={{ alignItems: 'center' }}>
                   <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-text-secondary)' }} />
                   История приемов и процедур
                 </h3>
@@ -2653,15 +2558,7 @@ const DermatologistPanelUnified = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
                   {/* История осмотров кожи */}
                   <div>
-                    <h4 style={{
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    marginBottom: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>
+                    <h4 className="derma-flex" style={{ alignItems: 'center' }}>
                       <Activity size={16} style={{ marginRight: '8px', color: 'var(--mac-green-600)' }} />
                       Осмотры кожи ({skinExaminations.length})
                     </h4>
@@ -2702,15 +2599,7 @@ const DermatologistPanelUnified = () => {
 
                   {/* История косметических процедур */}
                   <div>
-                    <h4 style={{
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    marginBottom: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>
+                    <h4 className="derma-flex" style={{ alignItems: 'center' }}>
                       <Sparkles size={16} style={{ marginRight: '8px', color: 'var(--mac-pink-600)' }} />
                       Косметические процедуры ({cosmeticProcedures.length})
                     </h4>
