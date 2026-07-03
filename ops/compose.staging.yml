@@ -99,6 +99,47 @@ services:
       retries: 10
       start_period: 15s
 
+  # Redis (for WebSocket pubsub + arq broker) — staging
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - staging_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  # arq worker — staging
+  worker:
+    build:
+      context: ..
+      dockerfile: ops/backend.Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ARQ_REDIS_URL: redis://redis:6379/0
+      ENV: staging
+      SECRET_KEY: ${SECRET_KEY}
+      TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENV: staging
+      LOG_STRUCTURED: 1
+    volumes:
+      - ../backend:/app:rw
+      - staging_backend_data:/data
+    working_dir: /app
+    command: ["arq", "app.tasks.worker.WorkerSettings"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   staging_backend_data:
   staging_postgres_data:
+  staging_redis_data:

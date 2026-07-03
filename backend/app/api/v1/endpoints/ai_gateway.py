@@ -26,6 +26,7 @@ from app.services.ai import (
     AITaskType,
     get_ai_gateway,
 )
+from app.services.ai_feature_gating import RequireAiFeature
 
 router = APIRouter()
 
@@ -34,7 +35,7 @@ router = APIRouter()
 # DIAGNOSTIC ENDPOINTS (Requires DIAGNOSE permission)
 # =============================================================================
 
-@router.post("/analyze-complaints", response_model=AIResponse)
+@router.post("/analyze-complaints", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def analyze_complaints(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
@@ -65,7 +66,7 @@ async def analyze_complaints(
     return response
 
 
-@router.post("/suggest-icd10", response_model=AIResponse)
+@router.post("/suggest-icd10", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_icd10_suggestion"))])
 async def suggest_icd10(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.SUGGEST_ICD10)),
@@ -93,7 +94,7 @@ async def suggest_icd10(
     return response
 
 
-@router.post("/differential-diagnosis", response_model=AIResponse)
+@router.post("/differential-diagnosis", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def differential_diagnosis(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
@@ -126,7 +127,7 @@ async def differential_diagnosis(
 # LAB INTERPRETATION (Requires ANALYZE_LAB permission)
 # =============================================================================
 
-@router.post("/interpret-lab", response_model=AIResponse)
+@router.post("/interpret-lab", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def interpret_lab_results(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_LAB)),
@@ -162,7 +163,7 @@ async def interpret_lab_results(
 # IMAGE ANALYSIS (Requires ANALYZE_IMAGE permission)
 # =============================================================================
 
-@router.post("/analyze-skin", response_model=AIResponse)
+@router.post("/analyze-skin", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def analyze_skin(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_IMAGE)),
@@ -195,7 +196,7 @@ async def analyze_skin(
     return response
 
 
-@router.post("/analyze-ecg", response_model=AIResponse)
+@router.post("/analyze-ecg", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def analyze_ecg(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_IMAGE)),
@@ -233,7 +234,7 @@ async def analyze_ecg(
 # TRIAGE (Requires SYMPTOM_CHECK permission)
 # =============================================================================
 
-@router.post("/symptom-check", response_model=AIResponse)
+@router.post("/symptom-check", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def symptom_check(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.SYMPTOM_CHECK)),
@@ -275,7 +276,7 @@ async def symptom_check(
 # DOCUMENT ANALYSIS (Requires ANALYZE_DOCUMENT permission)
 # =============================================================================
 
-@router.post("/analyze-document", response_model=AIResponse)
+@router.post("/analyze-document", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def analyze_document(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_DOCUMENT)),
@@ -307,7 +308,7 @@ async def analyze_document(
 # DRUG INTERACTIONS (Requires DIAGNOSE permission)
 # =============================================================================
 
-@router.post("/drug-interaction", response_model=AIResponse)
+@router.post("/drug-interaction", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def check_drug_interaction(
     request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),

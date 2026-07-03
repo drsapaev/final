@@ -1,0 +1,136 @@
+name: 🔄 DR Drill (Backup Restore Test)
+
+on:
+  schedule:
+    # Weekly Sunday 04:00 UTC — between security-scan (03:00) and gitleaks (03:30)
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+    inputs:
+      backup_file:
+        description: 'Optional: explicit backup file path (default: latest in backups/)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dr-drill
+  cancel-in-progress: false
+
+jobs:
+  dr-drill:
+    name: 🔄 Verify backup restores
+    runs-on: ubuntu-latest
+    # Only run on the main repo, not forks — forks don't have staging DB access.
+    if: github.repository == 'drsapaev/final'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic_ci_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
+      DRILL_DB_NAME: clinic_dr_drill
+      PYTHONPATH: ${{ github.workspace }}/backend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11.10'
+
+      - name: Install backend deps
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-monitoring.txt
+
+      - name: Run Alembic migrations (populate clinicdb with schema)
+        run: |
+          cd backend
+          alembic upgrade head
+
+      - name: Seed synthetic data (so we have something to back up)
+        run: |
+          cd backend
+          # Override DB name to 'clinicdb' (synthetic_seed refuses prod-looking names; clinicdb is in PROTECTED list).
+          # Use dev_seed instead — it's designed for this.
+          python -c "
+          import os
+          os.environ['ALLOW_SQLITE_DATABASE_URL'] = '0'
+          from sqlalchemy import create_engine, text
+          e = create_engine(os.environ['DATABASE_URL'])
+          with e.connect() as c:
+            print('Tables:', c.execute(text(\"SELECT count(*) FROM information_schema.tables WHERE table_schema='public'\")).scalar())
+          "
+
+      - name: Create a backup (pg_dump)
+        run: |
+          mkdir -p backend/backups
+          cd backend
+          PGPASSWORD=clinic_ci_only_password pg_dump \
+            -h localhost -p 5432 -U clinic -d clinicdb \
+            -F c -f backups/backup_ci_test.dump
+          ls -lh backups/
+
+      - name: Run DR drill
+        env:
+          BACKUP_FILE: ${{ github.event.inputs.backup_file || '' }}
+        run: |
+          cd backend
+          # The drill will:
+          # 1. Find latest backup in backups/
+          # 2. Create clinic_dr_drill DB
+          # 3. pg_restore into it
+          # 4. Smoke test users/appointments/services/audit_log tables
+          # 5. Drop clinic_dr_drill
+          if [ -n "$BACKUP_FILE" ]; then
+            BACKUP_FILE="$BACKUP_FILE" python -m app.scripts.dr_drill
+          else
+            python -m app.scripts.dr_drill
+          fi
+
+      - name: Notify on failure (issue creation)
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔴 DR Drill failed — backup does NOT restore cleanly`,
+              body: [
+                `**Disaster Recovery Drill failed in run ${context.runId}**`,
+                ``,
+                `This means the latest backup file cannot be restored to a working state.`,
+                `For a medical system this is a P0 incident — if prod burns tonight, you cannot recover.`,
+                ``,
+                `**Action required:**`,
+                `1. Open the failed run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                `2. Identify whether the failure is in pg_dump, pg_restore, or smoke test`,
+                `3. If pg_restore fails: backup format is wrong. Check pg_dump version compatibility.`,
+                `4. If smoke test fails: schema drift between backup and current code. Run alembic upgrade head on the backup.`,
+                `5. Do NOT delete this issue until DR drill passes again.`,
+                ``,
+                `**Run details:**`,
+                `- Workflow: ${context.workflow}`,
+                `- Branch: ${context.ref}`,
+                `- Commit: ${context.sha}`,
+                `- Triggered by: ${context.eventName}`,
+              ].join('\n'),
+              labels: ['dr-drill', 'p0-incident', 'auto-generated'],
+            });

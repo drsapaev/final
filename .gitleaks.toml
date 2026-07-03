@@ -1,0 +1,85 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks#configuration
+
+title = "Clinic repo gitleaks config"
+
+[extend]
+# Inherit default rules
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Global allowlist — files we know contain test/example data, not real secrets.
+# Add ONLY paths that genuinely cannot contain production secrets.
+# ---------------------------------------------------------------------------
+[allowlist]
+description = "Allowed paths (test fixtures, examples, docs)"
+paths = [
+  '''frontend/.env\.example''',
+  '''backend/.env\.example''',
+  '''ops/.env\.example''',
+  '''env_example\.txt''',
+  '''backend/staging\.env\.sample''',
+  '''frontend/staging\.env\.sample''',
+  # OpenAPI spec may contain example tokens
+  '''backend/openapi\.json''',
+  # Example patient JSON fixtures
+  '''backend/test_patient\.json''',
+  # CI workflow uses a literal placeholder password for PG service
+  '''.github/workflows/.*\.yml''',
+  # Migration files may reference placeholder tokens
+  '''backend/alembic/versions/.*\.py''',
+  # Test fixtures with mock tokens
+  '''backend/tests/.*''',
+  '''frontend/e2e/.*''',
+  '''frontend/src/.*__tests__/.*''',
+  # Feature flag seeder contains flag keys like 'ai_icd10_suggestion' that
+  # gitleaks' generic-api-key rule flags as high-entropy strings. They are
+  # not secrets — they're string identifiers for DB rows.
+  '''backend/app/scripts/seed_ai_feature_flags\.py''',
+  # Synthetic seed script contains realistic-looking phone numbers / passport
+  # formats for staging data. All values are generated, not real.
+  '''backend/app/synthetic_seed\.py''',
+  # MCP server descriptions may contain example tokens
+  '''mcp-servers/.*\.py''',
+]
+
+# Allowlist specific regex patterns that gitleaks tends to flag in medical code
+regexes = [
+  # clinic_ci_only_password — placeholder for CI PG service (not a real secret)
+  '''clinic_ci_only_password''',
+  # Example JWT tokens used in docs/tests
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c''',
+]
+
+# ---------------------------------------------------------------------------
+# Custom rules — patterns specific to this repo that gitleaks default misses.
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "telegram-bot-token"
+description = "Telegram Bot API token"
+regex = '''\b\d{8,10}:[A-Za-z0-9_-]{35}\b'''
+tags = ["key", "telegram"]
+
+[[rules]]
+id = "click-uz-merchant"
+description = "Click.uz merchant/user ID + secret combo"
+regex = '''click\.uz|CLICK_SECRET|CLICK_MERCHANT_USER_ID'''
+tags = ["key", "payment"]
+
+[[rules]]
+id = "payme-merchant"
+description = "Payme merchant credentials"
+regex = '''PAYME_KEY|PAYME_MERCHANT_ID|PAYME_END_POINT'''
+tags = ["key", "payment"]
+
+[[rules]]
+id = "deepseek-api-key"
+description = "DeepSeek API key"
+regex = '''sk-[a-f0-9]{32}'''
+tags = ["key", "ai"]
+
+[[rules]]
+id = "grok-api-key"
+description = "Grok/xAI API key"
+regex = '''xai-[A-Za-z0-9]{40,}'''
+tags = ["key", "ai"]

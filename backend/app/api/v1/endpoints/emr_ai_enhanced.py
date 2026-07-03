@@ -11,6 +11,7 @@ from app.api import deps
 from app.crud import emr
 from app.models.user import User
 from app.services.emr_ai_enhanced import emr_ai_enhanced
+from app.services.ai_feature_gating import RequireAiFeature
 
 router = APIRouter()
 
@@ -26,7 +27,7 @@ def ai_safety_meta() -> dict[str, Any]:
     }
 
 
-@router.post("/generate-smart-template")
+@router.post("/generate-smart-template", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
 async def generate_smart_template(
     specialty: str = Query(..., description="Специализация врача"),
     patient_data: dict[str, Any] = None,
@@ -58,7 +59,7 @@ async def generate_smart_template(
         )
 
 
-@router.post("/smart-suggestions")
+@router.post("/smart-suggestions", dependencies=[Depends(RequireAiFeature("ai_smart_suggestions"))])
 async def get_smart_suggestions(
     field_name: str = Query(..., description="Название поля"),
     current_data: dict[str, Any] = None,
@@ -88,7 +89,7 @@ async def get_smart_suggestions(
         )
 
 
-@router.post("/auto-fill")
+@router.post("/auto-fill", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
 async def auto_fill_emr_fields(
     template_structure: dict[str, Any],
     patient_data: dict[str, Any],
@@ -115,7 +116,7 @@ async def auto_fill_emr_fields(
         raise HTTPException(status_code=500, detail=f"Ошибка автозаполнения: {str(e)}")
 
 
-@router.post("/validate")
+@router.post("/validate", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
 async def validate_emr_data(
     emr_data: dict[str, Any],
     specialty: str = Query("general", description="Специализация врача"),
@@ -136,7 +137,7 @@ async def validate_emr_data(
         raise HTTPException(status_code=500, detail=f"Ошибка валидации: {str(e)}")
 
 
-@router.post("/icd10-suggestions")
+@router.post("/icd10-suggestions", dependencies=[Depends(RequireAiFeature("ai_icd10_suggestion"))])
 async def get_icd10_suggestions(
     diagnosis_text: str = Query(..., description="Текст диагноза"),
     specialty: str = Query("general", description="Специализация врача"),
@@ -162,7 +163,7 @@ async def get_icd10_suggestions(
         )
 
 
-@router.post("/analyze-patient")
+@router.post("/analyze-patient", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
 async def analyze_patient_data(
     patient_data: dict[str, Any],
     db: Session = Depends(deps.get_db),
@@ -213,7 +214,7 @@ async def get_specialty_templates(
         )
 
 
-@router.post("/emr/{emr_id}/ai-enhance")
+@router.post("/emr/{emr_id}/ai-enhance", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
 async def enhance_emr_with_ai(
     emr_id: int,
     enhancement_type: str = Query(

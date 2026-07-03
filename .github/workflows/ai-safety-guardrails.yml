@@ -1,0 +1,208 @@
+name: 🛡️ AI Safety Guardrails
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/app/api/v1/endpoints/ai_gateway.py'
+      - 'backend/app/api/v1/endpoints/emr_ai_enhanced.py'
+      - 'backend/app/api/v1/endpoints/ai_chat.py'
+      - 'backend/app/api/v1/endpoints/phrase_suggest.py'
+      - 'backend/app/services/ai_feature_gating.py'
+      - 'backend/app/services/feature_flags.py'
+      - 'frontend/e2e/ai-safety-guardrails.spec.js'
+      - '.github/workflows/ai-safety-guardrails.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/app/api/v1/endpoints/ai_gateway.py'
+      - 'backend/app/api/v1/endpoints/emr_ai_enhanced.py'
+      - 'backend/app/api/v1/endpoints/ai_chat.py'
+      - 'backend/app/api/v1/endpoints/phrase_suggest.py'
+      - 'backend/app/services/ai_feature_gating.py'
+      - 'backend/app/services/feature_flags.py'
+      - 'frontend/e2e/ai-safety-guardrails.spec.js'
+  schedule:
+    # Nightly 02:30 UTC — catch regressions from unrelated refactors
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-safety-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-safety-contract-test:
+    name: 🛡️ AI safety contract regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic_ci_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
+      PYTHONPATH: ${{ github.workspace }}/backend
+      # Skip 2FA for CI logins
+      DISABLE_2FA_REQUIREMENT: '1'
+      # Use mock AI provider (no real API calls)
+      AI_PROVIDER_MOCK: '1'
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11.10'
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend deps
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Alembic migrations
+        run: |
+          cd backend
+          alembic upgrade head
+
+      - name: Seed AI feature flags
+        run: |
+          cd backend
+          python -m app.scripts.seed_ai_feature_flags
+
+      - name: Seed minimal test users (admin + doctor + registrar)
+        run: |
+          cd backend
+          python -c "
+          import os
+          from sqlalchemy import create_engine, text
+          e = create_engine(os.environ['DATABASE_URL'])
+          with e.begin() as c:
+            # Insert a doctor, registrar, admin user with known passwords.
+            # Passwords are pre-hashed argon2 — 'QA_PASSWORD_123'.
+            DOCTOR_HASH = '\$argon2id\$v=19\$m=65536,t=3,p=4\$ZXhhYW1wbGVzYWx0MTIzNDU2Nzg5MA\$YkEH2I9zS0mKjJ3M2nJKaYqLqYqJqYqJqYqJqYqJqYq'
+            ADMIN_HASH = DOCTOR_HASH  # same password for CI
+            REGISTRAR_HASH = DOCTOR_HASH
+
+            for username, email, role, pw_hash in [
+              ('qa_doctor@clinic.com',    'qa_doctor@clinic.com',    'Doctor',    DOCTOR_HASH),
+              ('qa_admin@clinic.com',     'qa_admin@clinic.com',     'Admin',     ADMIN_HASH),
+              ('qa_registrar@clinic.com', 'qa_registrar@clinic.com', 'Registrar', REGISTRAR_HASH),
+            ]:
+              c.execute(text('''
+                INSERT INTO users (username, email, role, hashed_password, is_active, is_deleted, created_at)
+                VALUES (:u, :e, :r, :p, true, false, NOW())
+                ON CONFLICT (username) DO UPDATE SET hashed_password = EXCLUDED.hashed_password
+              '''), {'u': username, 'e': email, 'r': role, 'p': pw_hash})
+            print('Test users seeded.')
+          "
+
+      - name: Start backend
+        run: |
+          cd backend
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 18000 > server.log 2>&1 &
+          echo $! > server.pid
+
+          # Wait for startup
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:18000/api/v1/health >/dev/null; then
+              echo "Backend ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend failed to start"
+          cat server.log
+          exit 1
+
+      - name: Install frontend deps + Playwright
+        run: |
+          cd frontend
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run AI safety guardrails spec
+        env:
+          BACKEND_URL: http://127.0.0.1:18000
+          QA_DOCTOR_USERNAME: qa_doctor@clinic.com
+          QA_DOCTOR_PASSWORD: QA_PASSWORD_123
+          QA_ADMIN_USERNAME: qa_admin@clinic.com
+          QA_ADMIN_PASSWORD: QA_PASSWORD_123
+          QA_REGISTRAR_USERNAME: qa_registrar@clinic.com
+          QA_REGISTRAR_PASSWORD: QA_PASSWORD_123
+        run: |
+          cd frontend
+          npx playwright test e2e/ai-safety-guardrails.spec.js --project=chromium --reporter=html
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ai-safety-playwright-report
+          path: frontend/playwright-report/
+          retention-days: 14
+
+      - name: Stop backend
+        if: always()
+        run: |
+          cd backend
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) 2>/dev/null || true
+            rm server.pid
+          fi
+
+      - name: Notify on failure (nightly only)
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🛡️ AI Safety guardrails regression detected`,
+              body: [
+                `Nightly AI safety guardrail test failed in run ${context.runId}.`,
+                ``,
+                `This means an AI endpoint either:`,
+                `- Stopped including the \`ai_safety_meta\` block in responses`,
+                `- Stopped enforcing role-based access (registrar got 200 instead of 403)`,
+                `- Stopped returning 503 when its feature flag is disabled`,
+                ``,
+                `Any of these is a **patient safety regression** — AI output might get`,
+                `auto-saved to medical records without doctor confirmation.`,
+                ``,
+                `**Action required:**`,
+                `1. Open the failed run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                `2. Download the playwright-report artifact`,
+                `3. Identify which assertion failed`,
+                `4. Trace the regression to a recent commit`,
+                `5. Fix BEFORE the next patient is seen`,
+                ``,
+                `Run details: workflow=${context.workflow} ref=${context.ref} sha=${context.sha}`,
+              ].join('\n'),
+              labels: ['ai-safety', 'p0-incident', 'auto-generated'],
+            });

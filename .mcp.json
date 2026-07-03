@@ -25,5 +25,15 @@
       "-y",
       "@playwright/mcp@latest"
     ]
+  },
+  "synthetic-data": {
+    "command": "python",
+    "args": [
+      "mcp-servers/synthetic_data_server.py"
+    ],
+    "env": {
+      "DATABASE_URL": "${DATABASE_URL}",
+      "BACKEND_DIR": "${workspaceFolder}/backend"
+    }
   }
 }

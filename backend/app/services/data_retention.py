@@ -239,7 +239,7 @@ class DataRetentionService:
 def run_scheduled_cleanup(db: Session) -> dict:
     """
     Запустить плановую очистку данных.
-    Эту функцию можно вызывать из cron job или Celery task.
+    Эту функцию можно вызывать из cron job или arq task (см. app/tasks/worker.py).
     """
     service = DataRetentionService(db)
 

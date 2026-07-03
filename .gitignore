@@ -153,3 +153,9 @@ artifacts/load/
 artifacts/*_preview*.pdf
 artifacts/*_preview*.png
 artifacts/non_shim_endpoints.txt
+
+# Stray dev artifacts at repo root — keep them OUT of git
+/tmp/
+/scratch/
+*.draft.md
+*.scratch.py
