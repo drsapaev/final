@@ -541,7 +541,10 @@ export default function HeaderNew() {
         {/* P-027 (UX audit): surface the Cmd+K shortcut so power-users
             discover the CommandPalette without reading docs. */}
         <kbd
+          role="button"
+          tabIndex={0}
           title="Открыть командную палитру (Cmd+K / Ctrl+K)"
+          aria-label="Открыть командную палитру (Cmd+K или Ctrl+K)"
           onClick={() => {
             // Dispatch a keyboard event to trigger the CommandPalette's
             // global listener. This is simpler than importing the component.
@@ -553,6 +556,19 @@ export default function HeaderNew() {
               bubbles: true,
             });
             document.dispatchEvent(event);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              const isMac = navigator.platform.toUpperCase().includes('MAC');
+              const event = new KeyboardEvent('keydown', {
+                key: 'k',
+                metaKey: isMac,
+                ctrlKey: !isMac,
+                bubbles: true,
+              });
+              document.dispatchEvent(event);
+            }
           }}
           style={{
             display: 'inline-flex',
