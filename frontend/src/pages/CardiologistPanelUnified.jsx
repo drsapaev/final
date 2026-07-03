@@ -111,7 +111,9 @@ const MacOSCardiologistPanelUnified = () => {
     notes: ''
   });
   const [loading, setLoading] = useState(false);
-  const [, setMessage] = useState({ type: '', text: '' });
+  // QW-01 (UX audit): removed swallowed setMessage — all calls now route through `notify`
+  // (react-toastify) so users actually see error/success/warning feedback.
+  // `message` destructure was dropped, which silently discarded every notification.
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -180,7 +182,7 @@ const MacOSCardiologistPanelUnified = () => {
   const openBloodTestForm = () => {
     const { patientId } = getSelectedPatientContext();
     if (!patientId) {
-      setMessage({ type: 'error', text: 'Сначала выберите пациента или визит кардиолога' });
+      notify.error('Сначала выберите пациента или визит кардиолога');
       return;
     }
 
@@ -260,12 +262,9 @@ const MacOSCardiologistPanelUnified = () => {
 
       setPatientFiles(Array.from(mergedFiles.values()));
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось обновить данные пациента. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось обновить данные пациента. Проверьте соединение и попробуйте снова.'));
     }
-  }, [getSelectedPatientContext, setMessage]);
+  }, [getSelectedPatientContext]);
 
   // ✅ Очистка EMR и visitData при смене пациента
   useEffect(() => {
@@ -337,10 +336,7 @@ const MacOSCardiologistPanelUnified = () => {
           setServices(servicesData);
         }
       } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось загрузить список услуг. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось загрузить список услуг. Проверьте соединение и попробуйте снова.'));
       }
     };
 
@@ -387,12 +383,9 @@ const MacOSCardiologistPanelUnified = () => {
         specialty: prev?.specialty || 'cardiology'
       }));
       setActiveTab('appointments');
-      setMessage({ type: 'info', text: `Загружен пациент: ${patientName}. Выберите визит с каноническим visit_id.` });
+      notify.info(`Загружен пациент: ${patientName}. Выберите визит с каноническим visit_id.`);
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось загрузить пациента. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось загрузить пациента. Проверьте соединение и попробуйте снова.'));
     }
   }, [patientIdFromUrl, visitIdFromUrl, selectedPatient]);
 
@@ -629,14 +622,11 @@ const MacOSCardiologistPanelUnified = () => {
         setAppointments(enrichedAppointmentsData);
       }
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось загрузить записи кардиолога. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось загрузить записи кардиолога. Проверьте соединение и попробуйте снова.'));
     } finally {
       setAppointmentsLoading(false);
     }
-  }, [getAllPatientServices, setMessage]);
+  }, [getAllPatientServices]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
@@ -689,13 +679,10 @@ const MacOSCardiologistPanelUnified = () => {
         return await response.json();
       }
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось загрузить данные пациента. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось загрузить данные пациента. Проверьте соединение и попробуйте снова.'));
     }
     return null;
-  }, [setMessage]);
+  }, []);
 
   // Функция для преобразования данных пациента из формата API в формат PatientModal
   const transformPatientData = useCallback((apiPatient) => {
@@ -758,7 +745,7 @@ const MacOSCardiologistPanelUnified = () => {
         // Если не удалось загрузить, используем данные из row (частичные)
         const partialPatient = createPartialPatientFromRow(row);
         setEditPatientModal({ open: true, patient: partialPatient, loading: false });
-        setMessage({ type: 'warning', text: 'Не удалось загрузить карточку пациента, показаны данные из очереди' });
+        notify.warning('Не удалось загрузить карточку пациента, показаны данные из очереди');
         return;
       }
 
@@ -769,10 +756,7 @@ const MacOSCardiologistPanelUnified = () => {
     } catch (error) {
       const partialPatient = createPartialPatientFromRow(row);
       setEditPatientModal({ open: true, patient: partialPatient, loading: false });
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось загрузить карточку пациента. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось загрузить карточку пациента. Проверьте соединение и попробуйте снова.'));
     }
   }, [fetchPatientData, transformPatientData, createPartialPatientFromRow]);
 
@@ -783,7 +767,7 @@ const MacOSCardiologistPanelUnified = () => {
       const appointmentId = row.appointment_id || null;
       const visitId = await ensureCanonicalVisitId(row);
       if (!visitId) {
-        setMessage({ type: 'error', text: 'Не удалось определить канонический visit_id для пациента' });
+        notify.error('Не удалось определить канонический visit_id для пациента');
         return;
       }
 
@@ -829,7 +813,7 @@ const MacOSCardiologistPanelUnified = () => {
           const appointmentId = row.appointment_id || null;
           const visitId = await ensureCanonicalVisitId(row);
           if (!visitId) {
-            setMessage({ type: 'error', text: 'Не удалось открыть EMR без канонического visit_id' });
+            notify.error('Не удалось открыть EMR без канонического visit_id');
             break;
           }
 
@@ -865,7 +849,7 @@ const MacOSCardiologistPanelUnified = () => {
           const queueEntryId = resolveDoctorQueueEntryId(row);
           if (queueEntryId === null) {
             logger.warn('[Cardiology] Cannot start visit without OnlineQueueEntry id', row);
-            setMessage({ type: 'error', text: 'Cannot start visit without a queue entry id' });
+            notify.error('Cannot start visit without a queue entry id');
             break;
           }
           const token = tokenManager.getAccessToken();
@@ -879,13 +863,10 @@ const MacOSCardiologistPanelUnified = () => {
 
           if (response.ok) {
             await loadMacOSCardiologyAppointments();
-            setMessage({ type: 'success', text: `Пациент ${row.patient_fio} вызван` });
+            notify.success(`Пациент ${row.patient_fio} вызван`);
           }
         } catch (error) {
-          setMessage({
-            type: 'error',
-            text: getErrorMessage(error, 'Не удалось вызвать пациента. Проверьте соединение и попробуйте снова.')
-          });
+          notify.error(getErrorMessage(error, 'Не удалось вызвать пациента. Проверьте соединение и попробуйте снова.'));
         }
         break;
       case 'payment':
@@ -908,7 +889,7 @@ const MacOSCardiologistPanelUnified = () => {
           try {
             const visitId = await ensureCanonicalVisitId(row);
             if (!visitId) {
-              setMessage({ type: 'error', text: 'Не удалось завершить приём без канонического visit_id' });
+              notify.error('Не удалось завершить приём без канонического visit_id');
               break;
             }
             // Переходим на вкладку визита для завершения
@@ -936,10 +917,7 @@ const MacOSCardiologistPanelUnified = () => {
             // Переходим на вкладку visit для завершения
             goToTab('visit');
           } catch (error) {
-            setMessage({
-              type: 'error',
-              text: getErrorMessage(error, 'Не удалось завершить приём. Проверьте соединение и попробуйте снова.')
-            });
+            notify.error(getErrorMessage(error, 'Не удалось завершить приём. Проверьте соединение и попробуйте снова.'));
           }
           break;
         }
@@ -971,10 +949,10 @@ const MacOSCardiologistPanelUnified = () => {
   const handleAISuggestion = (type, suggestion) => {
     if (type === 'icd10') {
       setVisitData({ ...visitData, icd10: suggestion });
-      setMessage({ type: 'success', text: 'Код МКБ-10 добавлен из AI предложения' });
+      notify.success('Код МКБ-10 добавлен из AI предложения');
     } else if (type === 'diagnosis') {
       setVisitData({ ...visitData, diagnosis: suggestion });
-      setMessage({ type: 'success', text: 'Диагноз добавлен из AI предложения' });
+      notify.success('Диагноз добавлен из AI предложения');
     }
   };
 
@@ -986,7 +964,7 @@ const MacOSCardiologistPanelUnified = () => {
       setLoading(true);
       const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
       if (queueEntryId === null) {
-        setMessage({ type: 'error', text: 'Cannot complete visit without a queue entry id' });
+        notify.error('Cannot complete visit without a queue entry id');
         return;
       }
 
@@ -999,7 +977,7 @@ const MacOSCardiologistPanelUnified = () => {
         notes: visitData.notes
       };
       await queueService.completeVisit(queueEntryId, visitPayload);
-      setMessage({ type: 'success', text: 'Прием завершен успешно' });
+      notify.success('Прием завершен успешно');
 
       // Очищаем форму и возвращаемся в очередь
       setSelectedPatient(null);
@@ -1011,20 +989,17 @@ const MacOSCardiologistPanelUnified = () => {
       try {
         const next = await queueService.callNextWaiting('cardiology');
         if (next?.success) {
-          setMessage({ type: 'success', text: `Вызван следующий пациент №${next.entry.number}` });
+          notify.success(`Вызван следующий пациент №${next.entry.number}`);
         }
       } catch (err) {
-        setMessage({
-          type: 'warning',
-          text: getErrorMessage(
-            err,
-            'Следующий пациент не вызван автоматически. Проверьте соединение и попробуйте снова.'
-          )
-        });
+        notify.warning(getErrorMessage(
+          err,
+          'Следующий пациент не вызван автоматически. Проверьте соединение и попробуйте снова.'
+        ));
       }
 
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, 'Не удалось завершить действие. Проверьте соединение и попробуйте снова.') });
+      notify.error(getErrorMessage(error, 'Не удалось завершить действие. Проверьте соединение и попробуйте снова.'));
     } finally {
       setLoading(false);
     }
@@ -1035,7 +1010,7 @@ const MacOSCardiologistPanelUnified = () => {
     try {
       const token = tokenManager.getAccessToken();
       if (!visitId) {
-        setMessage({ type: 'error', text: 'Не указан visit_id для EMR v2' });
+        notify.error('Не указан visit_id для EMR v2');
         return null;
       }
 
@@ -1057,14 +1032,11 @@ const MacOSCardiologistPanelUnified = () => {
         return null;
       } else {
         const error = await response.json().catch(() => ({ detail: 'Ошибка при загрузке EMR' }));
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
         return null;
       }
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.') });
+      notify.error(getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
       return null;
     }
   };
@@ -1172,10 +1144,7 @@ const MacOSCardiologistPanelUnified = () => {
     try {
       await handleSaveVisit();
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось завершить приём через EMR. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось завершить приём через EMR. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -1185,7 +1154,7 @@ const MacOSCardiologistPanelUnified = () => {
     const { patientId, visitId } = getSelectedPatientContext();
 
     if (!patientId) {
-      setMessage({ type: 'error', text: 'Нельзя сохранить анализ без выбранного пациента' });
+      notify.error('Нельзя сохранить анализ без выбранного пациента');
       return;
     }
 
@@ -1217,20 +1186,14 @@ const MacOSCardiologistPanelUnified = () => {
         setShowForm({ open: false, type: 'blood' });
         setBloodTestForm(getEmptyBloodTestForm());
         await loadPatientData();
-        setMessage({ type: 'success', text: 'Анализ крови сохранен успешно' });
+        notify.success('Анализ крови сохранен успешно');
         return;
       }
 
       const errorData = await response.json().catch(() => ({}));
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(errorData?.detail || errorData?.message || '', 'Не удалось сохранить анализ. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(errorData?.detail || errorData?.message || '', 'Не удалось сохранить анализ. Проверьте соединение и попробуйте снова.'));
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось сохранить анализ. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось сохранить анализ. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -1312,10 +1275,7 @@ const MacOSCardiologistPanelUnified = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось скачать файл. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось скачать файл. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -1342,10 +1302,7 @@ const MacOSCardiologistPanelUnified = () => {
         throw new Error('Браузер заблокировал окно предпросмотра');
       }
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getErrorMessage(error, 'Не удалось открыть файл. Проверьте соединение и попробуйте снова.')
-      });
+      notify.error(getErrorMessage(error, 'Не удалось открыть файл. Проверьте соединение и попробуйте снова.'));
     }
   };
 
