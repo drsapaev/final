@@ -12,7 +12,7 @@ import {
   RefreshCw,
   AlertCircle } from
 'lucide-react';
-import { Card } from '../ui/native';
+import { Card } from '../ui/macos';
 import { getApiOrigin } from '../../api/runtime';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';

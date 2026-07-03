@@ -1,13 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Input,
-  Label
-} from '../ui/native';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Label } from '../ui/macos';
 import {
   Phone,
   Shield,

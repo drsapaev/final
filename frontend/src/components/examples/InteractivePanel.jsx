@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button, Badge } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
 import { AnimatedTransition } from '../../hooks/useAnimation';

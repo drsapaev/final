@@ -1,8 +1,7 @@
 // Error Boundary для обработки ошибок React
 import React from 'react';
 
-import { Button } from '../ui/native';
-
+import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 /**

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Button } from '../ui/native';
+import { Card, Button } from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
 import {
   MessageSquare,

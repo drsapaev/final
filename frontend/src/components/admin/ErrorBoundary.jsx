@@ -1,7 +1,6 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { Card, Button } from '../ui/native';
-
+import { Card, Button } from '../ui/macos';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 

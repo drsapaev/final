@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Menu, X, Search, Plus } from 'lucide-react';
-import { Button } from '../ui/native';
-
+import { Button } from '../ui/macos';
 /**
  * Компонент для оптимизации админ панели на мобильных устройствах
  */

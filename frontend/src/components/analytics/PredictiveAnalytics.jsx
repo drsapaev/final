@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Card, Button } from '../ui/native';
+import { Card, Button } from '../ui/macos';
 import {
   TrendingUp,
   TrendingDown,

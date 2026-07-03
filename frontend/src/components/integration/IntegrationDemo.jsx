@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button, Badge } from '../ui/macos';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { useAppData } from '../../contexts/AppDataContext';
