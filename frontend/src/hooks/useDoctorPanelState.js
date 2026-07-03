@@ -72,7 +72,10 @@ export function useDoctorPanelState({
     setActiveTab(tabId);
     const params = new URLSearchParams(location.search);
     params.set('tab', tabId);
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+    // P-029 (UX audit): use push instead of replace so the browser Back
+    // button navigates between tabs intuitively. Previously used replace:
+    // true, which meant Back always exited the panel entirely.
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: false });
   }, [location.pathname, location.search, navigate]);
 
   const [selectedPatient, setSelectedPatient] = useState(null);

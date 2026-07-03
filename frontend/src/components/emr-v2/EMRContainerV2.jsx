@@ -55,6 +55,7 @@ import './EMRContainerV2.css';
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
 import notify from '../../services/notify';
+import Button from '../ui/macos/Button';
 import logger from '../../utils/logger';
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
 // (consistent with the rest of the app + screen-reader friendly via aria-label).
@@ -500,17 +501,19 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             autosaveConfig={autosaveConfig}
                         />
 
-                        <button
-                            className="emr-v2-btn emr-v2-btn--icon"
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowHelp(true)}
                             title="Справка и безопасность"
                             aria-label="Справка и безопасность"
                         >
                             <HelpCircle size={16} aria-hidden="true" />
-                        </button>
+                        </Button>
 
-                        <button
-                            className={`emr-v2-btn ${experimentalGhostMode ? 'emr-v2-btn--active' : ''}`}
+                        <Button
+                            variant={experimentalGhostMode ? 'primary' : 'ghost'}
+                            size="sm"
                             onClick={toggleGhostMode}
                             disabled={isSigned || isAmended}
                             title={isSigned ? 'Недоступно в подписанной карте' : 'Расширенный режим ввода (экспериментальный)'}
@@ -518,30 +521,31 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             aria-pressed={experimentalGhostMode}
                         >
                             <Ghost size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                            className="emr-v2-btn emr-v2-btn--icon"
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowHistory(!showHistory)}
                             title="История изменений"
                             aria-label="История изменений"
                             aria-expanded={showHistory}
                         >
                             <History size={16} aria-hidden="true" />
-                        </button>
+                        </Button>
                     </div>
                 </header>
 
                 {/* Toolbar */}
                 <div className="emr-v2-toolbar">
-                    <button onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)" aria-label="Отменить (Ctrl+Z)">
+                    <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)" aria-label="Отменить (Ctrl+Z)">
                         <Undo2 size={14} aria-hidden="true" /> Отменить
-                    </button>
-                    <button onClick={redo} disabled={!canRedo} title="Повторить (Ctrl+Y)" aria-label="Повторить (Ctrl+Y)">
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} title="Повторить (Ctrl+Y)" aria-label="Повторить (Ctrl+Y)">
                         <Redo2 size={14} aria-hidden="true" /> Повторить
-                    </button>
-                    <button onClick={loadEMR} title="Обновить" aria-label="Обновить EMR">
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={loadEMR} title="Обновить" aria-label="Обновить EMR">
                         <RefreshCw size={14} aria-hidden="true" /> Обновить
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Sections */}
