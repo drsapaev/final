@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -1641,7 +1641,6 @@ def _process_legacy_appointments(
     """R-22 Phase 3: Process legacy Appointment records into specialty queues."""
     from app.models.service import Service
     from app.models.visit import Visit
-    from sqlalchemy import and_, text
 
     for appointment in appointments:
         if appointment.id in seen_appointment_ids:
@@ -2097,6 +2096,8 @@ def get_today_queues(
                 visit_department = (
                     None  # ✅ ДОБАВЛЕНО: для хранения department из Visit
                 )
+                appointment_date = None  # R-22 fix: для queue_entry lookup
+                doctor_id = None  # R-22 fix: для queue_entry lookup
 
                 if entry_type == "visit":
                     if entry_data is None:
@@ -2262,6 +2263,8 @@ def get_today_queues(
                     appointment = entry_data
                     record_id = appointment.id
                     patient_id = appointment.patient_id
+                    appointment_date = getattr(appointment, 'appointment_date', today)
+                    doctor_id = getattr(appointment, 'doctor_id', None)
                     visit_time = (
                         str(appointment.appointment_time)
                         if hasattr(appointment, 'appointment_time')
@@ -2574,7 +2577,7 @@ def get_today_queues(
                 if record_id:
                     try:
                         # Используем прямой SQL запрос через Table reflection (без импорта модели)
-                        from sqlalchemy import select, text
+                        # text/select уже импортированы на уровне модуля (R-22 cleanup)
 
                         # Используем прямой SQL для избежания конфликта с моделями
                         if entry_type == "online_queue":
