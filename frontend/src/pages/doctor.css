@@ -31,3 +31,103 @@
 
 /* ─── Badge bg ─── */
 .doctor-badge-bg { padding: var(--mac-spacing-2); text-align: center; }
+
+/* ─── Patient modal (batch 2) ─── */
+.doctor-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: color-mix(in srgb, var(--mac-bg-primary), black 42%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.doctor-modal-card {
+  background-color: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  margin: 16px;
+  box-shadow: var(--mac-shadow-xl);
+}
+.doctor-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.doctor-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--mac-text-primary);
+  margin: 0;
+}
+.doctor-modal-close {
+  color: var(--mac-text-tertiary);
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 4px;
+  border-radius: 4px;
+}
+.doctor-modal-body { margin-bottom: var(--mac-spacing-4); }
+.doctor-modal-avatar {
+  color: var(--mac-text-on-accent);
+}
+.doctor-modal-patient-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--mac-text-primary);
+  margin: 0;
+}
+.doctor-modal-patient-meta {
+  font-size: 14px;
+  color: var(--mac-text-secondary);
+  margin: 0;
+}
+.doctor-modal-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.doctor-modal-info-label {
+  font-size: 12px;
+  color: var(--mac-text-secondary);
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.doctor-modal-info-value {
+  font-size: 16px;
+  color: var(--mac-text-primary);
+  margin: 0;
+  font-weight: 500;
+}
+.doctor-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.doctor-modal-btn-primary { color: var(--mac-text-primary); }
+.doctor-modal-btn-accent { color: var(--mac-text-on-accent); }
+.doctor-flex-gap-12 { display: flex; align-items: center; gap: 12px; }
+
+/* ─── Empty state (batch 2) ─── */
+.doctor-empty {
+  padding: var(--mac-spacing-xl, 32px);
+  text-align: center;
+}
+.doctor-empty-icon { opacity: 0.55; margin-bottom: var(--mac-spacing-md, 12px); }
+.doctor-empty-title { font-size: var(--mac-font-size-md, 16px); font-weight: 600; margin-bottom: var(--mac-spacing-xs, 4px); }
+.doctor-empty-text {
+  font-size: var(--mac-font-size-sm);
+  max-width: 520px;
+  margin: 0 auto;
+}
+.doctor-empty-action { margin-top: var(--mac-spacing-md, 12px); }
