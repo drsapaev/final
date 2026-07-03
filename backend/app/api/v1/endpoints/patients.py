@@ -206,16 +206,16 @@ def soft_delete_patient(
 ):
     """
     Мягкое удаление пациента (пометка как удалённый).
-    
+
     Пациент остаётся в базе, но не отображается в списках.
     Можно восстановить через POST /{patient_id}/restore
     """
     from app.crud.patient import soft_delete_patient as do_soft_delete
-    
+
     patient = do_soft_delete(db, patient_id=patient_id, deleted_by=current_user.id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
-    
+
     # Audit log
     log_critical_change(
         db=db,
@@ -228,7 +228,7 @@ def soft_delete_patient(
         request=request,
         description=f"Мягкое удаление пациента: {patient.short_name()}",
     )
-    
+
     return {"message": "Пациент помечен как удалённый", "patient_id": patient_id}
 
 
@@ -242,15 +242,15 @@ def restore_patient(
 ):
     """
     Восстановить удалённого пациента.
-    
+
     Только администраторы могут восстанавливать пациентов.
     """
     from app.crud.patient import restore_patient as do_restore
-    
+
     patient = do_restore(db, patient_id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
-    
+
     # Audit log
     log_critical_change(
         db=db,
@@ -263,7 +263,7 @@ def restore_patient(
         request=request,
         description=f"Восстановлен пациент: {patient.short_name()}",
     )
-    
+
     return {"message": "Пациент восстановлен", "patient_id": patient_id}
 
 
@@ -279,22 +279,22 @@ def get_patient_family(
 ):
     """
     Получить семью/родственников пациента.
-    
+
     Возвращает список связей с данными родственников.
     """
     from app.crud.family_relation import get_patient_as_relative
     from app.crud.family_relation import get_patient_family as do_get_family
-    
+
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
-    
+
     # Получаем родственников пациента
     family = do_get_family(db, patient_id=patient_id)
-    
+
     # Получаем пациентов, для которых данный пациент является родственником
     as_relative_of = get_patient_as_relative(db, patient_id=patient_id)
-    
+
     return {
         "patient_id": patient_id,
         "patient_name": patient.short_name(),
@@ -317,7 +317,7 @@ def add_family_relation(
 ):
     """
     Добавить связь с родственником.
-    
+
     Типы связей:
     - parent: родитель
     - child: ребёнок
@@ -327,7 +327,7 @@ def add_family_relation(
     - other: другое
     """
     from app.crud.family_relation import create_family_relation
-    
+
     try:
         relation = create_family_relation(
             db,
@@ -338,7 +338,7 @@ def add_family_relation(
             is_primary_contact=is_primary_contact,
             created_by=current_user.id,
         )
-        
+
         return {
             "message": "Связь добавлена",
             "relation_id": relation.id,
@@ -346,7 +346,7 @@ def add_family_relation(
             "related_patient_id": related_patient_id,
             "relation_type": relation_type,
         }
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -363,11 +363,11 @@ def remove_family_relation(
     Удалить связь с родственником.
     """
     from app.crud.family_relation import delete_family_relation
-    
+
     success = delete_family_relation(db, relation_id=relation_id)
     if not success:
         raise HTTPException(status_code=404, detail="Связь не найдена")
-    
+
     return {"message": "Связь удалена", "relation_id": relation_id}
 
 
@@ -380,17 +380,17 @@ def get_primary_contact(
 ):
     """
     Получить основное контактное лицо для пациента.
-    
+
     Используется для пациентов без телефона (дети, пожилые).
     """
     from app.crud.family_relation import get_primary_contact as do_get_primary
-    
+
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
-    
+
     primary = do_get_primary(db, patient_id=patient_id)
-    
+
     if primary:
         return {
             "has_primary_contact": True,
@@ -400,6 +400,6 @@ def get_primary_contact(
                 "phone": primary.phone,
             },
         }
-    
+
     return {"has_primary_contact": False, "contact": None}
 

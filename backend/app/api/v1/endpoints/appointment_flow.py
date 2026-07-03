@@ -246,7 +246,7 @@ def create_or_update_emr(
     """
     Создать или обновить EMR
     Может работать как с Appointment ID, так и с Visit ID (создает Appointment из Visit если нужно)
-    
+
     ✅ SECURITY: Validates medical data including ICD-10 codes, date ranges, and medical values
     """
     _maybe_raise_legacy_write_freeze()
@@ -391,7 +391,7 @@ def save_emr(
 ) -> Any:
     """
     Сохранить EMR (перевести из черновика)
-    
+
     Также индексирует фразы для Doctor History Autocomplete.
     """
     _maybe_raise_legacy_write_freeze()

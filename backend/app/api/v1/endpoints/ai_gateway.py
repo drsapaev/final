@@ -42,9 +42,9 @@ async def analyze_complaints(
 ):
     """
     Анализ жалоб пациента → план обследования.
-    
+
     Requires: DIAGNOSE permission (Doctor, Cardiologist, Dermatologist, Dentist)
-    
+
     Request body:
     {
         "complaint": "Головная боль, тошнота, температура 38.5",
@@ -54,14 +54,14 @@ async def analyze_complaints(
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.COMPLAINT_ANALYSIS,
         payload=request,
         user_id=current_user.id,
         specialty=request.get("specialty")
     )
-    
+
     return response
 
 
@@ -73,9 +73,9 @@ async def suggest_icd10(
 ):
     """
     Подбор кодов МКБ-10 по симптомам/диагнозу.
-    
+
     Requires: SUGGEST_ICD10 permission
-    
+
     Request body:
     {
         "symptoms": ["головная боль", "повышенное давление"],
@@ -83,13 +83,13 @@ async def suggest_icd10(
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.ICD10_SUGGESTION,
         payload=request,
         user_id=current_user.id
     )
-    
+
     return response
 
 
@@ -101,9 +101,9 @@ async def differential_diagnosis(
 ):
     """
     Дифференциальная диагностика.
-    
+
     Requires: DIAGNOSE permission
-    
+
     Request body:
     {
         "symptoms": ["боль в груди", "одышка", "потливость"],
@@ -112,13 +112,13 @@ async def differential_diagnosis(
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.DIFFERENTIAL_DIAGNOSIS,
         payload=request,
         user_id=current_user.id
     )
-    
+
     return response
 
 
@@ -134,9 +134,9 @@ async def interpret_lab_results(
 ):
     """
     Интерпретация лабораторных результатов.
-    
+
     Requires: ANALYZE_LAB permission (Doctor, Lab)
-    
+
     Request body:
     {
         "results": [
@@ -148,13 +148,13 @@ async def interpret_lab_results(
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.LAB_INTERPRETATION,
         payload=request,
         user_id=current_user.id
     )
-    
+
     return response
 
 
@@ -170,9 +170,9 @@ async def analyze_skin(
 ):
     """
     Анализ кожного образования.
-    
+
     Requires: ANALYZE_IMAGE permission (Doctor, Dermatologist)
-    
+
     Request body:
     {
         "image_data": "<base64 encoded image>",
@@ -184,14 +184,14 @@ async def analyze_skin(
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.SKIN_ANALYSIS,
         payload=request,
         user_id=current_user.id,
         specialty="dermatology"
     )
-    
+
     return response
 
 
@@ -203,9 +203,9 @@ async def analyze_ecg(
 ):
     """
     Интерпретация ЭКГ.
-    
+
     Requires: ANALYZE_IMAGE permission
-    
+
     Request body:
     {
         "ecg_data": {
@@ -218,14 +218,14 @@ async def analyze_ecg(
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.ECG_INTERPRETATION,
         payload=request,
         user_id=current_user.id,
         specialty="cardiology"
     )
-    
+
     return response
 
 
@@ -241,12 +241,12 @@ async def symptom_check(
 ):
     """
     Проверка симптомов для триажа.
-    
+
     Requires: SYMPTOM_CHECK permission (Registrar, Nurse)
-    
+
     This is a LIMITED analysis for triage purposes only.
     Does NOT provide diagnosis or treatment.
-    
+
     Request body:
     {
         "symptoms": ["боль в груди", "одышка"],
@@ -255,19 +255,19 @@ async def symptom_check(
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.SYMPTOM_CHECK,
         payload=request,
         user_id=current_user.id
     )
-    
+
     # Add explicit disclaimer for triage
     response.warnings.append(
         "Это предварительная оценка для триажа. "
         "Не является диагнозом. Требуется осмотр врача."
     )
-    
+
     return response
 
 
@@ -283,9 +283,9 @@ async def analyze_document(
 ):
     """
     Анализ медицинского документа.
-    
+
     Requires: ANALYZE_DOCUMENT permission (Doctor)
-    
+
     Request body:
     {
         "document_text": "Заключение УЗИ органов брюшной полости...",
@@ -293,13 +293,13 @@ async def analyze_document(
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.DOCUMENT_ANALYSIS,
         payload=request,
         user_id=current_user.id
     )
-    
+
     return response
 
 
@@ -315,22 +315,22 @@ async def check_drug_interaction(
 ):
     """
     Проверка лекарственных взаимодействий.
-    
+
     Requires: DIAGNOSE permission
-    
+
     Request body:
     {
         "medications": ["Аспирин", "Варфарин", "Омепразол"]
     }
     """
     gateway = get_ai_gateway()
-    
+
     response = await gateway.execute(
         task_type=AITaskType.DRUG_INTERACTION,
         payload=request,
         user_id=current_user.id
     )
-    
+
     return response
 
 
@@ -346,7 +346,7 @@ async def ai_health_check(
 ):
     """
     Проверка здоровья AI подсистемы.
-    
+
     Requires: ADMIN_AI or VIEW_STATS permission
     """
     gateway = get_ai_gateway()
@@ -362,7 +362,7 @@ async def get_rate_limit_status(
     Статус rate limit для текущего пользователя.
     """
     from app.services.ai import get_rate_limiter
-    
+
     limiter = get_rate_limiter()
     return limiter.get_user_usage(current_user.id)
 
@@ -375,14 +375,14 @@ async def reset_circuit_breaker(
 ):
     """
     Сброс circuit breaker для провайдера.
-    
+
     Requires: ADMIN_AI permission
-    
+
     Use when provider is recovered after outage.
     """
     gateway = get_ai_gateway()
     gateway.reset_circuit_breaker(provider)
-    
+
     return {
         "message": f"Circuit breaker reset for {provider}",
         "status": "success"
@@ -396,12 +396,12 @@ async def clear_ai_cache(
 ):
     """
     Очистка кэша AI ответов.
-    
+
     Requires: ADMIN_AI permission
     """
     gateway = get_ai_gateway()
     gateway.clear_cache()
-    
+
     return {
         "message": "AI cache cleared",
         "status": "success"

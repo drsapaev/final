@@ -35,7 +35,7 @@ async def get_api_docs():
     </head>
     <body>
         <h1>🏥 Clinic Management System - API Documentation</h1>
-        
+
         <h2>📋 Аутентификация</h2>
         <div class="endpoint">
             <div class="method">POST</div>

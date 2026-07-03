@@ -292,7 +292,7 @@ def set_status(
         visit.started_at = datetime.utcnow()
     if status_new in {"closed", "canceled"} and hasattr(visit, "finished_at"):
         visit.finished_at = datetime.utcnow()
-    
+
     # [FIX] Также обновляем статус в очереди, если есть связанная запись
     if status_new == "canceled":
         try:
@@ -308,7 +308,7 @@ def set_status(
 
     db.commit()
     db.refresh(visit)
-    
+
     # Convert ORM object to Pydantic model
     return VisitOut(
         id=visit.id,
@@ -386,7 +386,7 @@ def reschedule_visit(
     row = db.execute(upd).mappings().first()
     if not row:
         raise HTTPException(404, "Visit not found")
-    
+
     # [FIX] Обновляем статус в очереди для старой даты
     try:
         from sqlalchemy import text
@@ -447,7 +447,7 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
     row = db.execute(upd).mappings().first()
     if not row:
         raise HTTPException(404, "Visit not found")
-    
+
     # [FIX] Обновляем статус в очереди для старой даты
     try:
         from sqlalchemy import text

@@ -37,10 +37,10 @@ async def get_treatment_templates(
 ):
     """
     Получить персональные шаблоны лечения врача по коду МКБ-10.
-    
+
     Возвращает шаблоны, основанные на прошлых подписанных EMR врача,
     отсортированные по частоте использования (usage_count DESC).
-    
+
     Пример ответа:
     ```json
     {
@@ -77,7 +77,7 @@ async def delete_treatment_template(
 ):
     """
     Удалить свой шаблон лечения.
-    
+
     Врач может удалить только свои шаблоны.
     """
     service = DoctorTemplatesService(db)
@@ -85,10 +85,10 @@ async def delete_treatment_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )
-    
+
     if not deleted:
         raise HTTPException(status_code=404, detail="Template not found")
-    
+
     return {"status": "deleted", "id": template_id}
 
 
@@ -125,7 +125,7 @@ async def pin_template(
 ):
     """
     Закрепить шаблон (📌 Часто использую).
-    
+
     Max 3 закреплённых на диагноз.
     При превышении лимита - автоматически открепляет самый старый.
     """
@@ -134,10 +134,10 @@ async def pin_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )
-    
+
     if not pinned:
         raise HTTPException(status_code=404, detail="Template not found")
-    
+
     return {"status": "pinned", "id": template_id}
 
 
@@ -158,10 +158,10 @@ async def unpin_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )
-    
+
     if not unpinned:
         raise HTTPException(status_code=404, detail="Template not found")
-    
+
     return {"status": "unpinned", "id": template_id}
 
 
@@ -187,14 +187,14 @@ async def update_template(
 ):
     """
     Редактировать шаблон лечения.
-    
+
     Modes:
     - "replace": Обновить текст существующего шаблона
     - "save_as_new": Создать новый шаблон с новым текстом
     """
     if request.mode not in ("replace", "save_as_new"):
         raise HTTPException(status_code=400, detail="Invalid mode. Use 'replace' or 'save_as_new'")
-    
+
     service = DoctorTemplatesService(db)
     result = await service.update_template(
         doctor_id=current_user.id,
@@ -202,10 +202,10 @@ async def update_template(
         new_text=request.treatment_text,
         mode=request.mode,
     )
-    
+
     if not result:
         raise HTTPException(status_code=404, detail="Template not found or update failed")
-    
+
     return {
         "status": "updated" if request.mode == "replace" else "created",
         "id": result.id,

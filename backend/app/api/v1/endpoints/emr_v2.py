@@ -178,7 +178,7 @@ async def get_doctor_history(
 ):
     """
     Get doctor's previous EMR entries for a specific field.
-    
+
     Used to provide context to AI for better suggestions.
     Doctor can only access their own history.
     """
@@ -186,7 +186,7 @@ async def get_doctor_history(
     is_admin = current_user.role == "Admin" or current_user.is_superuser
     if current_user.id != doctor_id and not is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     history_service = EMRDoctorHistoryService(db)
     try:
         entries = history_service.get_history_entries(
@@ -217,7 +217,7 @@ async def get_emr(
 ):
     """
     Get current EMR for visit.
-    
+
     Returns the latest version of the EMR for the specified visit.
     Creates an audit log entry for the view action.
     """
@@ -248,7 +248,7 @@ async def get_emr_history(
 ):
     """
     Get revision history for EMR.
-    
+
     Returns list of all revisions in descending order (newest first).
     """
     ensure_emr_visit_access(db, visit_id, current_user)
@@ -285,7 +285,7 @@ async def get_emr_version(
 ):
     """
     Get specific version of EMR.
-    
+
     Returns the complete data snapshot for the specified version.
     """
     ensure_emr_visit_access(db, visit_id, current_user)
@@ -311,7 +311,7 @@ async def compare_versions(
 ):
     """
     Compare two EMR versions.
-    
+
     Returns list of field changes between the two versions.
     """
     ensure_emr_visit_access(db, visit_id, current_user)
@@ -334,7 +334,7 @@ async def get_patient_emrs(
 ):
     """
     Get all EMRs for a patient.
-    
+
     Returns list of EMR summaries in descending order by creation date.
     """
     emrs = emr_v2_service.get_by_patient(db, patient_id, limit=limit)
@@ -356,10 +356,10 @@ async def save_emr(
 ):
     """
     Save EMR with versioning.
-    
+
     Creates new EMR if none exists, otherwise updates with new version.
     Uses optimistic locking via row_version to detect concurrent edits.
-    
+
     **Conflict Resolution:**
     - If row_version mismatch and different user: returns 409 Conflict
     - If row_version mismatch but same user/session: allows (autosave)
@@ -421,7 +421,7 @@ async def sign_emr(
 ):
     """
     Sign and finalize EMR.
-    
+
     Changes status to 'signed' and records signing timestamp.
     After signing, EMR can only be modified via the amend endpoint.
     """
@@ -436,12 +436,12 @@ async def sign_emr(
             row_version=payload.row_version,
             client_session_id=payload.client_session_id,
         )
-        
+
         # 🧠 Learn from signed EMR - create section templates
         try:
             template_service = DoctorSectionTemplatesService(db)
             icd10_code = payload.data.get('icd10_code') or payload.data.get('icd_10_code')
-            
+
             # Learn from each section with content
             sections_to_learn = [
                 ('anamnesis', payload.data.get('anamnesis_morbi')),
@@ -449,7 +449,7 @@ async def sign_emr(
                 ('treatment', payload.data.get('treatment') or payload.data.get('medications', {}).get('text')),
                 ('recommendations', payload.data.get('recommendations')),
             ]
-            
+
             for section_type, text in sections_to_learn:
                 if text and text.strip():
                     await template_service.learn_from_signed_emr(
@@ -458,12 +458,12 @@ async def sign_emr(
                         text=text,
                         icd10_code=icd10_code,
                     )
-            
+
             logger.info(f"Learned templates from EMR sign: visit_id={visit_id}, doctor_id={current_user.id}")
         except Exception as learn_error:
             # Don't fail signing if learning fails
             logger.warning(f"Failed to learn templates from EMR: {learn_error}")
-        
+
         return emr
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
@@ -491,7 +491,7 @@ async def amend_emr(
 ):
     """
     Amend a signed EMR.
-    
+
     Creates a new version with amendment, requires a reason (min 10 chars).
     Only available for EMRs with status 'signed'.
     """
@@ -533,7 +533,7 @@ async def restore_emr(
 ):
     """
     Restore EMR to a specific version.
-    
+
     Creates a new version with data from the target version.
     The restore is recorded in the revision history.
     """
