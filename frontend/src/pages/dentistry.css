@@ -138,3 +138,14 @@
 /* ─── Font weight utilities ─── */
 .dental-fw-600 { font-weight: 600; }
 .dental-fw-700 { font-weight: 700; }
+
+/* ─── Icon size 28px (lucide-react icons in stat cards) ─── */
+.dental-icon-28 {
+  height: 28px;
+  width: 28px;
+}
+
+/* ─── White text ─── */
+.dental-text-white {
+  color: white;
+}
