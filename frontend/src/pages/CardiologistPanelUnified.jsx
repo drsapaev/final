@@ -9,22 +9,13 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 // so they can save their work instead of losing it to a silent 401.
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import {
-  FileText,
-  User,
-  Settings,
   Save,
-  RefreshCw,
-  Calendar,
-  Phone,
-  Plus,
-  TestTube } from
-'lucide-react';
+  Settings,
+} from 'lucide-react';
 import {
   MacOSCard,
   Button,
   Badge,
-  Skeleton,
-  MacOSEmptyState,
   Textarea,
   Checkbox,
 } from '../components/ui/macos';
@@ -36,13 +27,13 @@ import HistoryTab from '../components/cardiology/HistoryTab';
 import ServicesTab from '../components/cardiology/ServicesTab';
 import AiTab from '../components/cardiology/AiTab';
 import AppointmentsTab from '../components/cardiology/AppointmentsTab';
+import VisitTab from '../components/cardiology/VisitTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
 import QueueIntegration from '../components/QueueIntegration';
 import { getApiBaseUrl } from '../api/runtime';
-import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -1621,162 +1612,26 @@ const MacOSCardiologistPanelUnified = () => {
           }
 
           {/* Прием пациента */}
+          {/* Очередь — trivial 1-liner, no extraction needed */}
           {activeTab === 'queue' &&
           <QueueIntegration specialty="cardiology" />
           }
 
-          {activeTab === 'visit' && selectedPatient &&
-          <div className="cardio-flex-col-visible" style={{ gap: '24px' }}>
-              {/* Информация о пациенте */}
-              <MacOSCard className="cardio-card-padded">
-                <h3 className="cardio-section-heading">
-                  <User size={20} className="cardio-icon-mr cardio-icon-blue" />
-                  Пациент #{selectedPatient.number}
-                </h3>
-
-                <div className="cardio-grid-auto">
-                  <div>
-                    <label className="cardio-form-label-block">
-                      ФИО пациента
-                    </label>
-                    <div className="cardio-patient-name cardio-patient-name-primary">{selectedPatient.patient_name}</div>
-                  </div>
-
-                  {selectedPatient.phone &&
-                <div>
-                      <label className="cardio-form-label-block">
-                        Телефон
-                      </label>
-                      <div style={{
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                        <Phone size={16} style={{
-                      marginRight: '6px',
-                      color: 'var(--mac-text-secondary)'
-                    }} />
-                        <span className="cardio-patient-name cardio-patient-name-primary">{selectedPatient.phone}</span>
-                      </div>
-                    </div>
-                }
-                </div>
-
-                {/* P-019 (UX audit): EMR audit badge — show status, version,
-                    last-modified date, and who signed/amended the record.
-                    Previously this info was hidden inside the EMR container's
-                    toggle-only history panel; now the cardiologist sees it at
-                    a glance on the visit tab. */}
-                {emr && (
-                  <div className="cardio-emr-audit-badge" style={{
-                    marginTop: '12px',
-                    padding: '8px 12px',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: '12px',
-                    fontSize: getFontSize('sm'),
-                    color: getColor('textSecondary'),
-                    background: emr.status === 'signed' ? 'var(--mac-success-bg)' : 'var(--mac-bg-secondary)',
-                    border: `1px solid ${emr.status === 'signed' ? 'var(--mac-success-border)' : getColor('border')}`,
-                    borderRadius: '8px',
-                  }}>
-                    <span style={{ fontWeight: '600', color: getColor('text') }}>
-                      EMR #{emr.id ?? '—'}
-                    </span>
-                    <span style={{
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontWeight: '600',
-                      fontSize: '11px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      background: emr.status === 'signed' ? 'var(--mac-success)' : emr.status === 'amended' ? 'var(--mac-warning)' : 'var(--mac-text-tertiary)',
-                      color: 'var(--mac-text-on-accent)',
-                    }}>
-                      {emr.status || 'draft'}
-                    </span>
-                    {emr.version != null && (
-                      <span title="Версия EMR">v{emr.version}</span>
-                    )}
-                    {emr.updated_at && (
-                      <span title="Последнее изменение">
-                        изм. {new Date(emr.updated_at).toLocaleDateString('ru-RU', {
-                          day: '2-digit', month: '2-digit', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit',
-                        })}
-                      </span>
-                    )}
-                    {emr.signed_at && (
-                      <span title="Подписана">
-                        подписана {new Date(emr.signed_at).toLocaleDateString('ru-RU', {
-                          day: '2-digit', month: '2-digit', year: 'numeric',
-                        })}
-                      </span>
-                    )}
-                    {emr.signed_by != null && emr.signed_by > 0 && (
-                      <span title="Кем подписана">
-                        врач #{emr.signed_by}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </MacOSCard>
-
-
-              {/* Электронная медицинская карта */}
-              <MacOSCard className="cardio-card-padded">
-                <h3 className="cardio-section-heading">
-                  <FileText size={20} className="cardio-icon-mr cardio-icon-blue" />
-                  Электронная медицинская карта
-                </h3>
-                <EMRContainerV2
-                visitId={selectedPatient?.visit_id}
-                patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
-                specialty="cardiology" />
-
-              </MacOSCard>
-
-              {/* Действия */}
-              <MacOSCard className="cardio-card-padded">
-                <div className="flex justify-end" style={{ gap: '12px' }}>
-                  <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedPatient(null);
-                    setActiveTab('queue');
-                  }}>
-
-                    Отменить
-                  </Button>
-                  <Button
-                  onClick={handleCompleteVisitFromEMR}
-                  disabled={loading}>
-
-                    {loading ?
-                  <RefreshCw size={16} className="cardio-icon-mr" /> :
-
-                  <Save size={16} className="cardio-icon-mr" />
-                  }
-                    Завершить прием
-                  </Button>
-                </div>
-              </MacOSCard>
-            </div>
-          }
-
-          {/* ЭКГ */}
-          {activeTab === 'visit' && !selectedPatient &&
-          <MacOSCard className="cardio-empty-state" style={{ padding: "48px" }}>
-              <MacOSEmptyState
-              icon={Calendar}
-              title="Выберите визит"
-              description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
-              action={
-              <Button variant="outline" onClick={() => goToTab('appointments')} style={{ marginTop: '16px' }}>
-                    Перейти к записям
-                  </Button>
-              } />
-            </MacOSCard>
+          {/* Приём пациента — R-15: extracted to VisitTab component */}
+          {activeTab === 'visit' &&
+            <VisitTab
+              selectedPatient={selectedPatient}
+              emr={emr}
+              loading={loading}
+              onCancel={() => {
+                setSelectedPatient(null);
+                setActiveTab('queue');
+              }}
+              onComplete={handleCompleteVisitFromEMR}
+              onGoToAppointments={() => goToTab('appointments')}
+              getColor={getColor}
+              getFontSize={getFontSize}
+            />
           }
 
           {/* ЭКГ — R-15: extracted to EcgTab component */}
