@@ -65,6 +65,12 @@ import {
 import { isDentistrySpecialty } from '../utils/dentistrySpecialty';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { queueService } from '../services/queue';
+import {
+  countAppointmentsByStatuses,
+  normalizeNumericId,
+  SPECIALTY_KEYS,
+} from '../utils/doctorPanelShared';
 
 const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
 
@@ -103,14 +109,8 @@ const dentistVisitProtocolsCache = new Map();
 const dentistVisitProtocolsLoadPromises = new Map();
 const dentistFallbackLoggedKeys = new Set();
 
-function countAppointmentsByStatuses(appointments, statuses) {
-  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
-}
-
-function normalizeNumericId(value) {
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+// countAppointmentsByStatuses and normalizeNumericId are imported from
+// utils/doctorPanelShared (unified across Cardiology / Dermatology / Dentistry).
 
 function resolveDoctorQueueEntryId(row) {
   const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
@@ -1057,9 +1057,86 @@ const DentistPanelUnified = () => {
 
 
   // Завершение визита
+  //
+  // Унифицированная функция завершения приёма для стоматолога.
+  // Следует тому же контракту, что и Cardiologist/Dermatologist:
+  //   1. resolveDoctorQueueEntryId(selectedPatient) — canonical entry id
+  //   2. queueService.completeVisit(entryId, payload) — POST /doctor/queue/{id}/complete
+  //   3. Сброс состояния и возврат на вкладку очереди
+  //   4. callNextWaiting('dentistry') — автовызов следующего пациента
+  //
+  // Контракт SSOT (DoctorPanels.contract.test.jsx) требует:
+  //   - НЕ использовать row.id / selectedPatient.id напрямую
+  //   - НЕ использовать /registrar/queue/${...}/start-visit
+  //   - использовать resolveDoctorQueueEntryId + /doctor/queue/${queueEntryId}/complete
+  const handleCompleteVisit = async () => {
+    if (!selectedPatient) {
+      notify.error('Не выбран пациент для завершения приёма');
+      return;
+    }
 
+    const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
+    if (queueEntryId === null) {
+      logger.error('[Dentistry] handleCompleteVisit: нет queueEntryId', { selectedPatient });
+      notify.error('Cannot complete visit without a queue entry id');
+      return;
+    }
 
+    try {
+      setLoading(true);
+      logger.info('[Dentistry] handleCompleteVisit: start', { queueEntryId, selectedPatient });
 
+      const patientId =
+        selectedPatient?.patient?.id ||
+        selectedPatient?.patient_id ||
+        selectedPatient?.id ||
+        null;
+
+      // Минимальный payload: стоматолог использует EMR v2 для протокола визита,
+      // а в queue completeVisit передаём только ключевые поля для закрытия очереди.
+      const visitProtocol = selectedPatient?.visitData || null;
+      const visitPayload = {
+        patient_id: patientId,
+        complaint: visitProtocol?.chiefComplaint || visitProtocol?.complaint || '',
+        diagnosis: visitProtocol?.diagnosis || '',
+        icd10: visitProtocol?.icd10 || visitProtocol?.icdCode || '',
+        services: [],
+        notes: visitProtocol?.recommendations || visitProtocol?.notes || '',
+      };
+
+      logger.info('[Dentistry] handleCompleteVisit: payload', visitPayload);
+      await queueService.completeVisit(queueEntryId, visitPayload);
+      logger.info('[Dentistry] handleCompleteVisit: completeVisit OK');
+      notify.success('Приём завершён успешно');
+
+      // Сброс состояния
+      setSelectedPatient(null);
+      setShowVisitProtocol(false);
+      setProtocolTemplateDraft(null);
+      handleTabChange('queue');
+
+      // Автовызов следующего пациента по стоматологии
+      try {
+        logger.info('[Dentistry] callNextWaiting(dentistry): start');
+        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DENTISTRY);
+        logger.info('[Dentistry] callNextWaiting(dentistry): result', next);
+        if (next?.success && next?.entry?.number) {
+          notify.success(`Вызван следующий пациент №${next.entry.number}`);
+        }
+      } catch (err) {
+        logger.warn('[Dentistry] callNextWaiting(dentistry): failed', err);
+        // Не блокируем UI: визит уже завершён, просто информируем
+      }
+    } catch (error) {
+      logger.error('[Dentistry] handleCompleteVisit: error', error);
+      notify.error(
+        error?.message || 'Не удалось завершить приём. Проверьте соединение и попробуйте снова.'
+      );
+    } finally {
+      logger.info('[Dentistry] handleCompleteVisit: finish');
+      setLoading(false);
+    }
+  };
 
 
 
@@ -2861,6 +2938,7 @@ const DentistPanelUnified = () => {
           setShowVisitProtocol(false);
           setProtocolTemplateDraft(null);
         }}
+        onComplete={handleCompleteVisit}
         onClose={() => {
           setShowVisitProtocol(false);
           setProtocolTemplateDraft(null);

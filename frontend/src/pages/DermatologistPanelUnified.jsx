@@ -49,6 +49,11 @@ import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
+import {
+  countAppointmentsByStatuses,
+  normalizeNumericId,
+  SPECIALTY_KEYS,
+} from '../utils/doctorPanelShared';
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
@@ -80,9 +85,8 @@ const dermatologyRequestCache = {
   cosmeticProcedures: { promise: null, data: null, lastAttemptAt: 0 }
 };
 
-function countAppointmentsByStatuses(appointments, statuses) {
-  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
-}
+// countAppointmentsByStatuses is imported from utils/doctorPanelShared
+// (unified implementation shared with Cardiology and Dentistry panels).
 
 function resolveDoctorQueueEntryId(row) {
   const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
@@ -100,10 +104,8 @@ function getRecentDermatologyCache(cacheEntry, fallbackValue) {
   return null;
 }
 
-function normalizeNumericId(value) {
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+// normalizeNumericId is imported from utils/doctorPanelShared
+// (unified implementation shared with Cardiology and Dentistry panels).
 
 function splitFullName(fullName) {
   const nameParts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
@@ -1203,14 +1205,14 @@ const DermatologistPanelUnified = () => {
 
       // Автоматически вызвать следующего пациента по дерматологии
       try {
-        logger.info('[Dermatology] callNextWaiting(derma): start');
-        const next = await queueService.callNextWaiting('derma');
-        logger.info('[Dermatology] callNextWaiting(derma): result', next);
+        logger.info('[Dermatology] callNextWaiting(dermatology): start');
+        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DERMATOLOGY);
+        logger.info('[Dermatology] callNextWaiting(dermatology): result', next);
         if (next?.success) {
             notify.success(`Вызван следующий пациент №${next.entry.number}`);
         }
       } catch (err) {
-        logger.warn('[Dermatology] callNextWaiting(derma): failed', err);
+        logger.warn('[Dermatology] callNextWaiting(dermatology): failed', err);
       }
 
     } catch (error) {

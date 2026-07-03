@@ -43,14 +43,15 @@ import notify from '../services/notify';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import tokenManager from '../utils/tokenManager';
+import { countAppointmentsByStatuses, SPECIALTY_KEYS } from '../utils/doctorPanelShared';
+import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 
 const API_V1_BASE = getApiBaseUrl();
 const CARDIOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
 const CARDIOLOGY_CALLED_STATUSES = ['called', 'in_progress'];
 const CARDIOLOGY_COMPLETED_STATUSES = ['completed', 'done'];
-function countAppointmentsByStatuses(appointments, statuses) {
-  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
-}
+// countAppointmentsByStatuses is imported from utils/doctorPanelShared
+// (unified implementation shared with Dermatology and Dentistry panels).
 
 function resolveDoctorQueueEntryId(row) {
   const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
@@ -162,6 +163,37 @@ const MacOSCardiologistPanelUnified = () => {
     const visitId = selectedPatient?.visit_id || null;
     return { patientId, visitId };
   }, [selectedPatient]);
+
+  // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
+  // is invalidated when the doctor switches between visits or patients.
+  // Previously, cache entries tagged with `visit:${prevVisitId}` could
+  // linger and leak data between patients on rapid visit switches.
+  //
+  // We pass the lifecycle hook only the canonical patientId / visitId
+  // derived from selectedPatient — when those change, the hook:
+  //   1. aborts all in-flight requests via AbortController
+  //   2. calls cacheService.invalidateByVisit(prevVisitId)
+  //   3. calls cacheService.invalidateByPatient(prevPatientId)
+  //   4. invokes our onCleanup callback (resets the local EMR state)
+  //
+  // This is a non-breaking change: existing loadEMR / loadPatientData
+  // functions are untouched. The lifecycle hook only adds cache hygiene
+  // on top of the existing data flow.
+  const currentVisitId = selectedPatient?.visit_id || visitIdFromUrl || null;
+  const currentPatientId =
+    selectedPatient?.patient?.id ||
+    selectedPatient?.patient_id ||
+    patientIdFromUrl ||
+    null;
+  useVisitLifecycle(currentVisitId, currentPatientId, {
+    invalidateCacheOnChange: true,
+    onCleanup: () => {
+      // Reset local EMR state so stale data does not bleed into the
+      // next visit's view. loadEMR will be re-invoked by the existing
+      // useEffect when selectedPatient changes.
+      setEmr(null);
+    },
+  });
 
   const getEmptyBloodTestForm = useCallback((overrides = {}) => ({
     patient_id: '',
@@ -1178,7 +1210,7 @@ const MacOSCardiologistPanelUnified = () => {
 
       // Автоматически вызвать следующего пациента для кардиолога
       try {
-        const next = await queueService.callNextWaiting('cardiology');
+        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
         if (next?.success) {
           notify.success(`Вызван следующий пациент №${next.entry.number}`);
         }
@@ -1197,14 +1229,36 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   // Загрузка EMR для просмотра
+  //
+  // P-021 (workflow audit): previously this function had three issues:
+  //   1. 401/403 surfaced as a generic 'EMR load failed' toast — the
+  //      doctor had no way to tell their session had expired vs the
+  //      backend being unreachable.
+  //   2. Network errors were caught but the user-visible message did
+  //      not distinguish 'no connection' from 'server error'.
+  //   3. The local \`error\` variable was assigned but only its
+  //      \`detail\` field reached getErrorMessage, losing HTTP status.
+  //
+  // Now:
+  //   - 401/403 → 'Сессия истекла, войдите снова' toast + log auth event
+  //   - 404 → silent (EMR not yet created is a normal state)
+  //   - 5xx → 'Сервер недоступен, попробуйте позже'
+  //   - Network/AbortError → silent (component unmounted or visit changed)
+  //   - Other → generic fallback via getErrorMessage
   const loadEMR = async (visitId) => {
-    try {
-      const token = tokenManager.getAccessToken();
-      if (!visitId) {
-        notify.error('Не указан visit_id для EMR v2');
-        return null;
-      }
+    if (!visitId) {
+      notify.error('Не указан visit_id для EMR v2');
+      return null;
+    }
 
+    const token = tokenManager.getAccessToken();
+    if (!token) {
+      logger.warn('[Cardiology] loadEMR: no auth token, skipping EMR load', { visitId });
+      notify.error('Сессия истекла. Войдите в систему снова.');
+      return null;
+    }
+
+    try {
       const response = await fetch(`${API_V1_BASE}/v2/emr/${visitId}`, {
         method: 'GET',
         headers: {
@@ -1217,16 +1271,42 @@ const MacOSCardiologistPanelUnified = () => {
         const emrData = await response.json();
         setEmr(emrData);
         return emrData;
-      } else if (response.status === 404) {
+      }
+
+      if (response.status === 404) {
         // EMR ещё не создана - это нормально
         setEmr(null);
         return null;
-      } else {
-        const error = await response.json().catch(() => ({ detail: 'Ошибка при загрузке EMR' }));
-      notify.error(getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        logger.warn('[Cardiology] loadEMR: auth denied', { visitId, status: response.status });
+        notify.error('Сессия истекла или нет прав на просмотр EMR. Войдите в систему снова.');
+        setEmr(null);
         return null;
       }
+
+      if (response.status >= 500) {
+        logger.error('[Cardiology] loadEMR: server error', { visitId, status: response.status });
+        notify.error('Сервер недоступен. Попробуйте позже.');
+        setEmr(null);
+        return null;
+      }
+
+      // Other 4xx — surface the backend detail if available
+      const errorPayload = await response.json().catch(() => ({ detail: 'Ошибка при загрузке EMR' }));
+      logger.warn('[Cardiology] loadEMR: client error', { visitId, status: response.status, errorPayload });
+      notify.error(getErrorMessage(errorPayload, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
+      setEmr(null);
+      return null;
     } catch (error) {
+      // AbortError happens when the parent component aborted the fetch
+      // (e.g. visitId changed) — not a user-facing error.
+      if (error?.name === 'AbortError') {
+        logger.info('[Cardiology] loadEMR: aborted', { visitId });
+        return null;
+      }
+      logger.error('[Cardiology] loadEMR: network error', { visitId, error: error?.message || error });
       notify.error(getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
       return null;
     }
