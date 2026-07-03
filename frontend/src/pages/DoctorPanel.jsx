@@ -1582,77 +1582,50 @@ const DoctorPanel = () => {
 
       {/* ✅ УЛУЧШЕНИЕ: Модальное окно пациента с универсальным хуком */}
       {patientModal.isOpen && patientModal.selectedItem &&
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'color-mix(in srgb, var(--mac-bg-primary), black 42%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
-      }}>
-          <div style={{
-          backgroundColor: 'var(--mac-card-bg)',
-          border: '1px solid var(--mac-card-border)',
-          borderRadius: '12px',
-          padding: '24px',
-          width: '100%',
-          maxWidth: '500px',
-          margin: '16px',
-          boxShadow: 'var(--mac-shadow-xl)'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--mac-text-primary)', margin: 0 }}>
+      <div className="doctor-modal-overlay">
+          <div className="doctor-modal-card">
+            <div className="doctor-modal-header">
+              <h3 className="doctor-modal-title">
                 Информация о пациенте
               </h3>
               <button
               aria-label="Close patient information dialog"
               onClick={patientModal.closeModal}
-              style={{
-                color: 'var(--mac-text-tertiary)',
-                cursor: 'pointer',
-                border: 'none',
-                background: 'none',
-                padding: '4px',
-                borderRadius: '4px'
-              }}>
+              className="doctor-modal-close">
 
                 <XCircle size={24} />
               </button>
             </div>
 
-            <div className="doctor-mb-4">
-              <div className="doctor-flex" style={{ gap: '12px' }}>
-                <div className="doctor-text-sm" style={{ color: 'var(--mac-text-on-accent)' }}>
+            <div className="doctor-modal-body">
+              <div className="doctor-flex-gap-12">
+                <div className="doctor-text-sm doctor-modal-avatar">
                   {patientModal.selectedItem.name?.charAt(0) || 'П'}
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)', margin: 0 }}>
+                  <h4 className="doctor-modal-patient-name">
                     {patientModal.selectedItem.name || 'Неизвестно'}
                   </h4>
-                  <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', margin: 0 }}>
+                  <p className="doctor-modal-patient-meta">
                     {patientModal.selectedItem.phone || 'Телефон не указан'}
                   </p>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="doctor-modal-info-grid">
                 <div>
-                  <p style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <p className="doctor-modal-info-label">
                     Возраст
                   </p>
-                  <p style={{ fontSize: '16px', color: 'var(--mac-text-primary)', margin: 0, fontWeight: '500' }}>
+                  <p className="doctor-modal-info-value">
                     {patientModal.selectedItem.age || 'Не указан'}
                   </p>
                 </div>
                 <div>
-                  <p style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <p className="doctor-modal-info-label">
                     Статус
                   </p>
-                  <p style={{ fontSize: '16px', color: 'var(--mac-text-primary)', margin: 0, fontWeight: '500' }}>
+                  <p className="doctor-modal-info-value">
                     {patientModal.selectedItem.status === 'active' ? 'Активный' :
                   patientModal.selectedItem.status === 'waiting' ? 'Ожидает' :
                   patientModal.selectedItem.status || 'Неизвестно'}
@@ -1661,15 +1634,15 @@ const DoctorPanel = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+            <div className="doctor-modal-footer">
               <button
               onClick={patientModal.closeModal}
-              className="doctor-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+              className="doctor-text-sm doctor-modal-btn-primary">
 
                 Закрыть
               </button>
               <button
-              className="doctor-text-sm" style={{ color: 'var(--mac-text-on-accent)' }}>
+              className="doctor-text-sm doctor-modal-btn-accent">
 
                 Редактировать
               </button>
