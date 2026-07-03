@@ -573,18 +573,18 @@ const DoctorPanel = () => {
   const renderEmptyState = ({ icon: Icon, title, description, tone = 'default', action = null }) => {
     const color = tone === 'error' ? dangerColor : getColor('secondary', 500);
     return (
-      <div style={{ padding: getSpacing('xl'), textAlign: 'center', color }}>
-        <Icon size={48} style={{ opacity: 0.55, marginBottom: getSpacing('md') }} />
-        <div style={{ fontSize: getFontSize('md'), fontWeight: 600, marginBottom: getSpacing('xs') }}>
+      <div className="doctor-empty" style={{ color }}>
+        <Icon size={48} className="doctor-empty-icon" />
+        <div className="doctor-empty-title">
           {title}
         </div>
         {description &&
-        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 500), maxWidth: 520, margin: '0 auto' }}>
+        <div className="doctor-empty-text">
             {description}
           </div>
         }
         {action &&
-        <div style={{ marginTop: getSpacing('md') }}>
+        <div className="doctor-empty-action">
             {action}
           </div>
         }
@@ -674,7 +674,7 @@ const DoctorPanel = () => {
             <Users size={isMobile ? 16 : 20} />
             {!isMobile && <span>Очередь</span>}
             {queueStats.waiting > 0 &&
-            <Badge variant="warning" style={{ marginLeft: '4px', fontSize: '10px' }}>
+            <Badge variant="warning" className="doctor-badge-ml">
                 {queueStats.waiting}
               </Badge>
             }
@@ -903,7 +903,7 @@ const DoctorPanel = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent style={{ padding: 0 }}>
+              <CardContent className="doctor-card-pad-0">
                 {loading ?
               <Skeleton.Table rows={5} columns={6} /> :
               loadError ?
@@ -938,40 +938,20 @@ const DoctorPanel = () => {
                       {filteredPatients.map((patient) =>
                   <tr
                     key={patient.id}
-                    style={{
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = getColor('primary', 50);
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
+                    className="doctor-table-row-hover"
                     aria-label={`Open ${getPatientA11yContext(patient)}`}
                     onClick={() => handlePatientClick(patient)}>
 
                           <td style={tdStyle} aria-label={getPatientA11yContext(patient)}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
-                              <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--mac-text-on-accent)',
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '700'
-                        }}>
+                            <div className="doctor-patient-cell">
+                              <div className="doctor-avatar-sm" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)` }}>
                                 {String(patient.name || 'Пациент').split(' ').map((n) => n[0]).join('')}
                               </div>
                               <div>
-                                <div style={{ fontWeight: '500', color: getColor('secondary', 800) }}>
+                                <div className="doctor-patient-name">
                                   {patient.name || 'Пациент'}
                                 </div>
-                                <div style={{ fontSize: getFontSize('xs'), color: getColor('secondary', 500) }}>
+                                <div className="doctor-patient-meta">
                                   {patient.gender}
                                 </div>
                               </div>
@@ -1031,44 +1011,27 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
-                  <h2 style={{
-                  fontSize: getFontSize('xl'),
-                  fontWeight: '700',
-                  color: getColor('secondary', 800),
-                  margin: 0
-                }}>
+                <div className="doctor-section-head">
+                  <h2 className="doctor-section-title">
                     Записи на прием
                   </h2>
-                  <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ position: 'relative' }}>
-                      <Search size={20} style={{ position: 'absolute', left: getSpacing('sm'), top: '50%', transform: 'translateY(-50%)', color: getColor('secondary', 400) }} />
+                  <div className="doctor-section-actions">
+                    <div className="doctor-search-wrap">
+                      <Search size={20} className="doctor-search-icon" />
                       <input
                       aria-label="Search appointments"
                       type="text"
                       placeholder="Поиск записей..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
-                        border: `1px solid ${getColor('secondary', 200)}`,
-                        borderRadius: '12px',
-                        fontSize: getFontSize('sm'),
-                        width: isMobile ? '200px' : '250px',
-                        background: 'white'
-                      }} />
+                      className="doctor-search-input"
+                      style={{ width: isMobile ? '200px' : '250px' }} />
 
                     </div>
                     <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    style={{
-                      padding: getSpacing('sm'),
-                      border: `1px solid ${getColor('secondary', 200)}`,
-                      borderRadius: '12px',
-                      fontSize: getFontSize('sm'),
-                      background: 'white'
-                    }}>
+                    className="doctor-filter-select">
 
                       <option value="all">Все статусы</option>
                       <option value="scheduled">Запланированы</option>
@@ -1089,7 +1052,7 @@ const DoctorPanel = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent style={{ padding: 0 }}>
+              <CardContent className="doctor-card-pad-0">
                 {loading ?
               <Skeleton.Table rows={5} columns={6} /> :
               loadError ?
@@ -1124,20 +1087,11 @@ const DoctorPanel = () => {
                       {filteredAppointments.map((appointment) =>
                   <tr
                     key={appointment.id}
-                    style={{
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = getColor('primary', 50);
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}>
+                    className="doctor-table-row-hover">
 
                           <td style={tdStyle}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
-                              <Clock size={16} style={{ color: getColor('secondary', 400) }} />
+                            <div className="doctor-patient-cell">
+                              <Clock size={16} className="doctor-patient-meta" />
                               {appointment.time}
                             </div>
                           </td>
@@ -1196,23 +1150,18 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
+                <div className="doctor-section-head">
                   <div>
-                    <h2 style={{
-                    fontSize: getFontSize('xl'),
-                    fontWeight: '700',
-                    color: getColor('secondary', 800),
-                    margin: 0
-                  }}>
+                    <h2 className="doctor-section-title">
                       Очередь пациентов
                     </h2>
-                    <div style={{ display: 'flex', gap: getSpacing('md'), marginTop: getSpacing('sm') }}>
+                    <div className="doctor-section-actions doctor-section-actions-sm">
                       <Badge variant="warning">Ожидают: {queueStats.waiting}</Badge>
                       <Badge variant="primary">Вызваны: {queueStats.called}</Badge>
                       <Badge variant="success">Обслужены: {queueStats.served}</Badge>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: getSpacing('sm') }}>
+                  <div className="doctor-section-actions-sm">
                     <Button
                     variant="primary"
                     aria-label="Call next queue patient"
@@ -1227,7 +1176,7 @@ const DoctorPanel = () => {
                     disabled={!canCallNext}>
 
                       <Phone size={16} />
-                      {!isMobile && <span style={{ marginLeft: '4px' }}>Вызвать следующего</span>}
+                      {!isMobile && <span className="doctor-ml-4">Вызвать следующего</span>}
                     </Button>
                     <Button
                     variant="ghost"
@@ -1239,20 +1188,20 @@ const DoctorPanel = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent style={{ padding: 0 }}>
+              <CardContent className="doctor-card-pad-0">
                 {queueLoading ?
-              <div style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
+              <div className="doctor-empty">
                     <Skeleton height={40} count={5} />
                   </div> :
               queueError ?
-              <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: dangerColor }}>
-                    <AlertCircle size={32} style={{ marginBottom: getSpacing('sm') }} />
+              <div className="doctor-empty" style={{ color: dangerColor }}>
+                    <AlertCircle size={32} className="doctor-empty-icon" />
                     <p>{queueError}</p>
                     <Button variant="ghost" onClick={loadQueue}>Повторить</Button>
                   </div> :
               queueEntries.length === 0 ?
-              <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: getColor('secondary', 500) }}>
-                    <Users size={48} style={{ opacity: 0.5, marginBottom: getSpacing('md') }} />
+              <div className="doctor-empty">
+                    <Users size={48} className="doctor-empty-icon" />
                     <p>Очередь пуста</p>
                   </div> :
 

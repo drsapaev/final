@@ -225,3 +225,47 @@
   align-items: center;
   flex-wrap: wrap;
 }
+.doctor-section-actions-sm {
+  display: flex;
+  gap: var(--mac-spacing-sm, 8px);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--mac-spacing-sm, 8px);
+}
+
+/* ─── Patient table cells (batch 4) ─── */
+.doctor-table-row-hover {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.doctor-table-row-hover:hover {
+  background-color: var(--mac-fill-quaternary, rgba(0, 122, 255, 0.04));
+}
+.doctor-patient-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-sm, 8px);
+}
+.doctor-avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mac-text-on-accent);
+  font-size: var(--mac-font-size-sm);
+  font-weight: 700;
+}
+.doctor-patient-name {
+  font-weight: 500;
+  color: var(--mac-text-primary);
+}
+.doctor-patient-meta {
+  font-size: var(--mac-font-size-xs, 12px);
+  color: var(--mac-text-secondary);
+}
+.doctor-card-pad-0 { padding: 0; }
+.doctor-card-mb-xl { margin-bottom: var(--mac-spacing-xl, 32px); }
+.doctor-badge-ml { margin-left: 4px; font-size: 10px; }
+.doctor-ml-4 { margin-left: 4px; }
