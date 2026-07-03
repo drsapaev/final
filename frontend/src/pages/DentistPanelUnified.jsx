@@ -1507,16 +1507,7 @@ const DentistPanelUnified = () => {
             marginTop: '4px'
           }}>+12% за месяц</p>
           </div>
-          <div style={{
-          width: '56px',
-          height: '56px',
-          background: 'var(--mac-accent-blue)',
-          borderRadius: 'var(--mac-radius-xl)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--mac-shadow-lg)'
-        }}>
+          <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue)', borderRadius: 'var(--mac-radius-xl)', boxShadow: 'var(--mac-shadow-lg)' }}>
             <Users className="dental-icon-28 dental-text-white" />
           </div>
         </div>
@@ -1547,16 +1538,7 @@ const DentistPanelUnified = () => {
             marginTop: '4px'
           }}>8 из 12 слотов</p>
           </div>
-          <div style={{
-          width: '56px',
-          height: '56px',
-          background: 'var(--mac-success)',
-          borderRadius: 'var(--mac-radius-xl)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--mac-shadow-lg)'
-        }}>
+          <div className="dental-icon-bg" style={{ background: 'var(--mac-success)', borderRadius: 'var(--mac-radius-xl)', boxShadow: 'var(--mac-shadow-lg)' }}>
             <Calendar className="dental-icon-28 dental-text-white" />
           </div>
         </div>
@@ -1587,16 +1569,7 @@ const DentistPanelUnified = () => {
             marginTop: '4px'
           }}>+8% к прошлому месяцу</p>
           </div>
-          <div style={{
-          width: '56px',
-          height: '56px',
-          background: 'var(--mac-accent-purple)',
-          borderRadius: 'var(--mac-radius-xl)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--mac-shadow-lg)'
-        }}>
+          <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-purple)', borderRadius: 'var(--mac-radius-xl)', boxShadow: 'var(--mac-shadow-lg)' }}>
             <FileText className="dental-icon-28 dental-text-white" />
           </div>
         </div>
@@ -1627,16 +1600,7 @@ const DentistPanelUnified = () => {
             marginTop: '4px'
           }}>+15% к прошлому месяцу</p>
           </div>
-          <div style={{
-          width: '56px',
-          height: '56px',
-          background: 'var(--mac-warning)',
-          borderRadius: 'var(--mac-radius-xl)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--mac-shadow-lg)'
-        }}>
+          <div className="dental-icon-bg" style={{ background: 'var(--mac-warning)', borderRadius: 'var(--mac-radius-xl)', boxShadow: 'var(--mac-shadow-lg)' }}>
             <Smile className="dental-icon-28 dental-text-white" />
           </div>
         </div>
@@ -1777,16 +1741,7 @@ const DentistPanelUnified = () => {
           }}>
 
               <div className="dental-flex" style={{ gap: '16px' }}>
-                <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-accent-blue)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: 'var(--mac-shadow-sm)'
-            }}>
+                <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue)', borderRadius: 'var(--mac-radius-lg)', boxShadow: 'var(--mac-shadow-sm)' }}>
                   <span className="dental-text-value dental-fw-700" style={{ color: 'white' }}>
                     {appointment.patientName?.charAt(0)}
                   </span>
@@ -2131,15 +2086,7 @@ const DentistPanelUnified = () => {
           }}>
 
               <div className="dental-flex" style={{ gap: '12px' }}>
-                <div style={{
-              width: '32px',
-              height: '32px',
-              background: 'var(--mac-success)',
-              borderRadius: 'var(--mac-radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+                <div className="dental-icon-bg" style={{ background: 'var(--mac-success)', borderRadius: 'var(--mac-radius-full)' }}>
                   <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
@@ -2203,15 +2150,7 @@ const DentistPanelUnified = () => {
           }}>
 
               <div className="dental-flex" style={{ gap: '12px' }}>
-                <div style={{
-              width: '32px',
-              height: '32px',
-              background: 'var(--mac-accent-blue)',
-              borderRadius: 'var(--mac-radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+                <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue)', borderRadius: 'var(--mac-radius-full)' }}>
                   <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
@@ -2316,15 +2255,7 @@ const DentistPanelUnified = () => {
               }}>
 
                 <div className="dental-flex" style={{ gap: '12px' }}>
-                  <div style={{
-                  width: '32px',
-                  height: '32px',
-                  background: 'var(--mac-accent-purple)',
-                  borderRadius: 'var(--mac-radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+                  <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-purple)', borderRadius: 'var(--mac-radius-full)' }}>
                     <span className="dental-text-value" style={{ color: 'white' }}>
                       {patient.name?.charAt(0)}
                     </span>
@@ -2389,15 +2320,7 @@ const DentistPanelUnified = () => {
           }}>
 
               <div className="dental-flex" style={{ gap: '12px' }}>
-                <div style={{
-              width: '32px',
-              height: '32px',
-              background: 'var(--mac-warning)',
-              borderRadius: 'var(--mac-radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+                <div className="dental-icon-bg" style={{ background: 'var(--mac-warning)', borderRadius: 'var(--mac-radius-full)' }}>
                   <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
@@ -2471,15 +2394,7 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-accent-blue-bg)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+              <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
                 <Scissors className="dental-icon-20" style={{ color: 'var(--mac-accent-blue)' }} />
               </div>
               <div>
@@ -2531,15 +2446,7 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-danger-bg)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+              <div className="dental-icon-bg" style={{ background: 'var(--mac-danger-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
                 <Scissors className="dental-icon-20" style={{ color: 'var(--mac-danger)' }} />
               </div>
               <div>
@@ -2591,15 +2498,7 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-success-bg)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+              <div className="dental-icon-bg" style={{ background: 'var(--mac-success-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
                 <Scissors className="dental-icon-20" style={{ color: 'var(--mac-success)'  }} />
               </div>
               <div>
@@ -2764,15 +2663,7 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-accent-blue-bg)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+              <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
                 <BarChart3 className="dental-icon-20" style={{ color: 'var(--mac-accent-blue)'  }} />
               </div>
               <div>
@@ -2814,15 +2705,7 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-success-bg)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+              <div className="dental-icon-bg" style={{ background: 'var(--mac-success-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
                 <Users className="dental-icon-20" style={{ color: 'var(--mac-success)'  }} />
               </div>
               <div>
@@ -2864,15 +2747,7 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-accent-purple-bg)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+              <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-purple-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
                 <Stethoscope className="dental-icon-20" style={{ color: 'var(--mac-accent-purple)'  }} />
               </div>
               <div>
@@ -2914,15 +2789,7 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-warning-bg)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+              <div className="dental-icon-bg" style={{ background: 'var(--mac-warning-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
                 <Building className="dental-icon-20" style={{ color: 'var(--mac-warning)'  }} />
               </div>
               <div>
@@ -2989,15 +2856,7 @@ const DentistPanelUnified = () => {
           }}>
 
               <div className="dental-flex" style={{ gap: '12px' }}>
-                <div style={{
-              width: '32px',
-              height: '32px',
-              background: 'var(--mac-accent-blue)',
-              borderRadius: 'var(--mac-radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+                <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue)', borderRadius: 'var(--mac-radius-full)' }}>
                   <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
@@ -3061,15 +2920,7 @@ const DentistPanelUnified = () => {
           }}>
 
               <div className="dental-flex" style={{ gap: '12px' }}>
-                <div style={{
-              width: '32px',
-              height: '32px',
-              background: 'var(--mac-success)',
-              borderRadius: 'var(--mac-radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+                <div className="dental-icon-bg" style={{ background: 'var(--mac-success)', borderRadius: 'var(--mac-radius-full)' }}>
                   <span className="dental-text-value" style={{ color: 'white' }}>
                     {patient.name?.charAt(0)}
                   </span>
