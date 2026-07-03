@@ -1865,6 +1865,139 @@ def _build_queue_payload(
     }
 
 
+
+# ===================== R-22 Phase 5: Queue entry lookup =====================
+
+
+def _same_patient_queue_entry_for_visit_id(
+    db: Session,
+    visit_id: int | None,
+    patient_id: int | None,
+):
+    """R-22 Phase 5: Find the OnlineQueueEntry linked to a visit by visit_id + patient_id.
+
+    Returns None if either id is None or no entry is found.
+    """
+    from app.models.online_queue import OnlineQueueEntry
+    if visit_id is None or patient_id is None:
+        return None
+    return (
+        db.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.visit_id == visit_id,
+            OnlineQueueEntry.patient_id == patient_id,
+        )
+        .order_by(OnlineQueueEntry.id.asc())
+        .first()
+    )
+
+
+def _same_patient_queue_entry_for_visit(db: Session, visit):
+    """R-22 Phase 5: Convenience wrapper around _same_patient_queue_entry_for_visit_id."""
+    return _same_patient_queue_entry_for_visit_id(
+        db,
+        visit.id,
+        visit.patient_id,
+    )
+
+
+def _resolve_queue_entry_metadata(
+    *,
+    db: Session,
+    entry_type: str,
+    entry_data: Any,
+    entry_wrapper: dict,
+    record_id: int | None,
+    patient_id: int | None,
+    appointment_date: Any,
+    doctor_id: int | None,
+    idx: int,
+) -> tuple[int, Any, Any]:
+    """R-22 Phase 5: Resolve (queue_entry_number, queue_entry_time, queue_entry_updated_at).
+
+    Lookup priority depends on entry_type:
+    - online_queue: read directly from OnlineQueueEntry (or entry_wrapper for QR-visits)
+    - visit: lookup via _same_patient_queue_entry_for_visit_id
+    - appointment: SQL query against queue_entries table (same patient + day + doctor)
+    Falls back to (idx, None, None) on any error.
+    """
+    queue_entry_number = idx
+    queue_entry_time = None
+    queue_entry_updated_at = None
+
+    if not record_id:
+        return queue_entry_number, queue_entry_time, queue_entry_updated_at
+
+    try:
+        if entry_type == "online_queue":
+            # entry_data may be Visit (for QR-visits) or OnlineQueueEntry
+            is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
+
+            if is_visit_object:
+                queue_entry_number = entry_wrapper.get("oqe_number") or idx
+                queue_entry_time = entry_wrapper.get("oqe_queue_time")
+                queue_entry_updated_at = entry_wrapper.get("oqe_updated_at")
+            else:
+                queue_entry_number = (
+                    entry_data.number
+                    if hasattr(entry_data, 'number') and entry_data.number is not None
+                    else idx
+                )
+                queue_entry_time = (
+                    entry_data.queue_time
+                    if hasattr(entry_data, 'queue_time') and entry_data.queue_time
+                    else None
+                )
+                queue_entry_updated_at = getattr(entry_data, 'updated_at', None)
+        elif entry_type == "visit":
+            queue_entry_row = _same_patient_queue_entry_for_visit_id(
+                db,
+                record_id,
+                patient_id,
+            )
+            if queue_entry_row:
+                queue_entry_number = queue_entry_row.number
+                queue_entry_time = queue_entry_row.queue_time
+                queue_entry_updated_at = queue_entry_row.updated_at
+        elif (
+            entry_type == "appointment"
+            and patient_id
+            and appointment_date
+            and doctor_id is not None
+        ):
+            queue_entry_row = db.execute(
+                text(
+                    """
+                    SELECT qe.number, qe.queue_time, qe.updated_at
+                    FROM queue_entries qe
+                    JOIN daily_queues dq ON qe.queue_id = dq.id
+                    WHERE qe.patient_id = :patient_id
+                      AND qe.visit_id IS NULL
+                      AND dq.day = :appointment_date
+                      AND dq.specialist_id = :doctor_id
+                    ORDER BY qe.created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {
+                    "patient_id": patient_id,
+                    "appointment_date": appointment_date,
+                    "doctor_id": doctor_id,
+                },
+            ).first()
+            if queue_entry_row:
+                queue_entry_number = queue_entry_row.number
+                queue_entry_time = queue_entry_row.queue_time
+                queue_entry_updated_at = queue_entry_row.updated_at
+    except Exception as e:
+        logger.debug(
+            "get_today_queues: Ошибка получения queue_time: %s", str(e)
+        )
+
+    return queue_entry_number, queue_entry_time, queue_entry_updated_at
+
+
+
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
 
 
@@ -1910,29 +2043,8 @@ def get_today_queues(
         from app.models.patient import Patient
         from app.models.visit import Visit
 
-        def _same_patient_queue_entry_for_visit_id(
-            visit_id: int | None,
-            patient_id: int | None,
-        ) -> OnlineQueueEntry | None:
-            if visit_id is None or patient_id is None:
-                return None
-            return (
-                db.query(OnlineQueueEntry)
-                .filter(
-                    OnlineQueueEntry.visit_id == visit_id,
-                    OnlineQueueEntry.patient_id == patient_id,
-                )
-                .order_by(OnlineQueueEntry.id.asc())
-                .first()
-            )
-
-        def _same_patient_queue_entry_for_visit(
-            visit: Visit,
-        ) -> OnlineQueueEntry | None:
-            return _same_patient_queue_entry_for_visit_id(
-                visit.id,
-                visit.patient_id,
-            )
+        # R-22 Phase 5: _same_patient_queue_entry_for_visit_id and _same_patient_queue_entry_for_visit
+        # promoted to module-level helpers (take db as first parameter).
 
         # R-22: date parsing + department filter extracted to helpers
         today = _parse_queue_target_date(target_date)
@@ -1954,7 +2066,7 @@ def get_today_queues(
 
             # ⭐ PHASE 1.1: Пропускаем Visit если есть связанный OnlineQueueEntry
             # Очередь должна читаться ТОЛЬКО из OnlineQueueEntry (SSOT)
-            has_queue_entry = _same_patient_queue_entry_for_visit(visit)
+            has_queue_entry = _same_patient_queue_entry_for_visit(db, visit)
             if has_queue_entry:
                 # ⚠️ НЕ добавляем в seen_visit_ids - пусть OQE обрабатывается
                 logger.debug(
@@ -2102,7 +2214,7 @@ def get_today_queues(
             # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
             visit_queue_time = None
             try:
-                queue_entry_row = _same_patient_queue_entry_for_visit(visit)
+                queue_entry_row = _same_patient_queue_entry_for_visit(db, visit)
                 if queue_entry_row and queue_entry_row.queue_time:
                     visit_queue_time = queue_entry_row.queue_time
             except Exception:
@@ -2507,7 +2619,7 @@ def get_today_queues(
                         visit = entry_data
                         # ✅ SSOT FIX: Для QR-визитов нужно получить данные из OnlineQueueEntry
                         # Frontend использует этот ID для вызова full-update endpoint
-                        queue_entry_for_visit = _same_patient_queue_entry_for_visit(visit)
+                        queue_entry_for_visit = _same_patient_queue_entry_for_visit(db, visit)
                         if queue_entry_for_visit:
                             record_id = queue_entry_for_visit.id
                             # ⭐ PHASE 1 FIX: Сохраняем данные из OQE для использования позже
@@ -2699,106 +2811,18 @@ def get_today_queues(
                 # patient/date/doctor match can expose an unrelated appointment.
                 appointment_id_value = record_id if entry_type == "appointment" else None
 
-                # ✅ ИСПРАВЛЕНО: Получаем РЕАЛЬНЫЙ номер и queue_time из queue_entries
-                # Используем Table reflection вместо ORM модели для избежания конфликта DailyQueue
-                queue_entry_number = idx  # По умолчанию используем idx
-                queue_entry_time = None  # По умолчанию нет queue_time
-
-                # Пробуем получить номер и queue_time из таблицы queue_entries через Table reflection
-                queue_entry_updated_at = None
-
-                if record_id:
-                    try:
-                        # Используем прямой SQL запрос через Table reflection (без импорта модели)
-                        # text/select уже импортированы на уровне модуля (R-22 cleanup)
-
-                        # Используем прямой SQL для избежания конфликта с моделями
-                        if entry_type == "online_queue":
-                            # ✅ SSOT FIX: entry_data может быть Visit (для QR-записей) или OnlineQueueEntry
-                            # Проверяем тип объекта
-                            is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
-                            
-                            if is_visit_object:
-                                # ⭐ PHASE 1 FIX: Используем уже полученные данные из entry_wrapper
-                                queue_entry_number = entry_wrapper.get("oqe_number") or idx
-                                queue_entry_time = entry_wrapper.get("oqe_queue_time")
-                                queue_entry_updated_at = entry_wrapper.get("oqe_updated_at")
-                            else:
-                                # ⭐ PHASE 1 FIX: Для OnlineQueueEntry номер и queue_time из entry_data
-                                queue_entry_number = (
-                                    entry_data.number
-                                    if hasattr(entry_data, 'number') and entry_data.number is not None
-                                    else idx
-                                )
-                                logger.debug(
-                                    "PHASE1 DEBUG: entry_data.id=%s, entry_data.number=%s, queue_entry_number=%s, idx=%s",
-                                    getattr(entry_data, 'id', 'N/A'),
-                                    getattr(entry_data, 'number', 'N/A'),
-                                    queue_entry_number,
-                                    idx
-                                )
-                                queue_entry_time = (
-                                    entry_data.queue_time
-                                    if hasattr(entry_data, 'queue_time')
-                                    and entry_data.queue_time
-                                    else None
-                                )
-                                queue_entry_updated_at = getattr(entry_data, 'updated_at', None)
-                            logger.debug(
-                                "get_today_queues: OnlineQueue номер: ID=%d, number=%d, queue_time=%s, patient=%s",
-                                record_id,
-                                queue_entry_number,
-                                queue_entry_time,
-                                patient_name,
-                            )
-                        elif entry_type == "visit":
-                            # Ищем запись по visit_id
-                            queue_entry_row = _same_patient_queue_entry_for_visit_id(
-                                record_id,
-                                patient_id,
-                            )
-                            if queue_entry_row:
-                                queue_entry_number = queue_entry_row.number
-                                queue_entry_time = queue_entry_row.queue_time
-                                queue_entry_updated_at = queue_entry_row.updated_at
-                        elif (
-                            entry_type == "appointment"
-                            and patient_id
-                            and appointment_date
-                            and doctor_id is not None
-                        ):
-                            # Для Appointment используем только queue entry того же пациента, дня и врача.
-                            queue_entry_row = db.execute(
-                                text(
-                                    """
-                                    SELECT qe.number, qe.queue_time, qe.updated_at
-                                    FROM queue_entries qe
-                                    JOIN daily_queues dq ON qe.queue_id = dq.id
-                                    WHERE qe.patient_id = :patient_id
-                                      AND qe.visit_id IS NULL
-                                      AND dq.day = :appointment_date
-                                      AND dq.specialist_id = :doctor_id
-                                    ORDER BY qe.created_at DESC
-                                    LIMIT 1
-                                    """
-                                ),
-                                {
-                                    "patient_id": patient_id,
-                                    "appointment_date": appointment_date,
-                                    "doctor_id": doctor_id,
-                                },
-                            ).first()
-                            if queue_entry_row:
-                                queue_entry_number = queue_entry_row.number
-                                queue_entry_time = queue_entry_row.queue_time
-                                queue_entry_updated_at = queue_entry_row.updated_at
-                    except Exception as e:
-                        # Логируем ошибку, но продолжаем работу с дефолтным номером
-                        # Это не критично - порядковые номера работают как fallback
-                        logger.debug(
-                            "get_today_queues: Ошибка получения queue_time: %s", str(e)
-                        )
-                        pass  # Тихая ошибка - порядковые номера достаточно
+                # R-22 Phase 5: queue entry metadata lookup extracted to helper
+                queue_entry_number, queue_entry_time, queue_entry_updated_at = _resolve_queue_entry_metadata(
+                    db=db,
+                    entry_type=entry_type,
+                    entry_data=entry_data,
+                    entry_wrapper=entry_wrapper,
+                    record_id=record_id,
+                    patient_id=patient_id,
+                    appointment_date=appointment_date,
+                    doctor_id=doctor_id,
+                    idx=idx,
+                )
 
                 # [OK] ДОБАВЛЯЕМ department_key и department для фронтенда
                 entry_department_key = None
