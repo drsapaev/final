@@ -24,7 +24,7 @@ See also:
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
@@ -185,7 +185,7 @@ class OnlineQueueEntry(Base):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=True, default=lambda: datetime.now(UTC)
     )
     called_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

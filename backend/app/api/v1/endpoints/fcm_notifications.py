@@ -23,7 +23,7 @@ class FCMTokenRequest(BaseModel):
 
     device_token: str
     device_type: str = "web"  # web, android, ios
-    device_info: Optional[Dict[str, str]] = None
+    device_info: Optional[dict[str, str]] = None
 
 
 class FCMNotificationRequest(BaseModel):
@@ -31,9 +31,9 @@ class FCMNotificationRequest(BaseModel):
 
     title: str
     body: str
-    user_ids: Optional[List[int]] = None
-    device_tokens: Optional[List[str]] = None
-    data: Optional[Dict[str, Any]] = None
+    user_ids: Optional[list[int]] = None
+    device_tokens: Optional[list[str]] = None
+    data: Optional[dict[str, Any]] = None
     image: Optional[str] = None
     click_action: Optional[str] = None
     sound: str = "default"
@@ -44,7 +44,7 @@ class FCMTopicRequest(BaseModel):
     """Запрос для работы с топиками FCM"""
 
     topic: str
-    device_tokens: List[str]
+    device_tokens: list[str]
 
 
 class FCMTopicNotificationRequest(BaseModel):
@@ -53,7 +53,7 @@ class FCMTopicNotificationRequest(BaseModel):
     topic: str
     title: str
     body: str
-    data: Optional[Dict[str, Any]] = None
+    data: Optional[dict[str, Any]] = None
     image: Optional[str] = None
     condition: Optional[str] = None
 

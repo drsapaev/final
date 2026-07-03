@@ -188,7 +188,7 @@ async def get_patient_lab_results(
 @router.post("/emr/{emr_id}/integrate-lab-results")
 async def integrate_lab_results_with_emr(
     emr_id: int,
-    lab_result_ids: List[int],
+    lab_result_ids: list[int],
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:

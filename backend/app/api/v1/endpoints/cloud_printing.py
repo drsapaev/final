@@ -15,8 +15,8 @@ from app.core.roles import Roles
 from app.models.user import User
 from app.services.cloud_printing_service import (
     DocumentFormat,
-    get_cloud_printing_service,
     PrinterStatus,
+    get_cloud_printing_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class PrinterResponse(BaseModel):
     description: str
     status: str
     location: str
-    capabilities: Dict[str, Any]
+    capabilities: dict[str, Any]
     provider: str
 
 
@@ -71,8 +71,8 @@ class MedicalDocumentRequest(BaseModel):
     provider_name: str = Field(..., description="Имя провайдера печати")
     printer_id: str = Field(..., description="ID принтера")
     document_type: str = Field(..., pattern="^(prescription|receipt|ticket|report)$")
-    patient_data: Dict[str, Any] = Field(..., description="Данные пациента")
-    template_data: Optional[Dict[str, Any]] = Field(None, description="Данные шаблона")
+    patient_data: dict[str, Any] = Field(..., description="Данные пациента")
+    template_data: Optional[dict[str, Any]] = Field(None, description="Данные шаблона")
 
 
 class PrintJobResponse(BaseModel):

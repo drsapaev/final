@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.api.deps import require_roles
 from app.models.user import User
-from app.services.sms_providers import get_sms_manager, SMSProviderType
+from app.services.sms_providers import SMSProviderType, get_sms_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ def _sanitize_sms_response_error(success: bool, error: Optional[str]) -> Optiona
     return error
 
 
-@router.get("/providers", response_model=List[SMSProviderInfo])
+@router.get("/providers", response_model=list[SMSProviderInfo])
 async def get_sms_providers(current_user: User = Depends(require_roles(["Admin"]))):
     """Получить список доступных SMS провайдеров"""
     try:

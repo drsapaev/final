@@ -25,7 +25,7 @@ INTERNAL_ERROR_DETAIL = "Internal server error"
 MAX_TELEGRAM_WEBHOOK_BODY_BYTES = 256 * 1024
 
 
-async def _read_telegram_webhook_json(request: Request) -> Dict[str, Any]:
+async def _read_telegram_webhook_json(request: Request) -> dict[str, Any]:
     chunks: list[bytes] = []
     total_size = 0
 
@@ -111,7 +111,7 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/set-webhook")
 async def set_telegram_webhook(
-    webhook_data: Dict[str, str],
+    webhook_data: dict[str, str],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -242,7 +242,7 @@ async def get_bot_info(current_user: User = Depends(require_roles("Admin"))):
 
 @router.post("/send-notification")
 async def send_telegram_notification(
-    notification_data: Dict[str, Any],
+    notification_data: dict[str, Any],
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Отправка уведомления через Telegram бота"""
@@ -277,7 +277,7 @@ async def send_telegram_notification(
 
 @router.post("/send-appointment-reminder")
 async def send_appointment_reminder(
-    reminder_data: Dict[str, Any],
+    reminder_data: dict[str, Any],
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
     """Отправка напоминания о визите"""
@@ -309,7 +309,7 @@ async def send_appointment_reminder(
 
 @router.post("/send-lab-notification")
 async def send_lab_results_notification(
-    lab_data: Dict[str, Any],
+    lab_data: dict[str, Any],
     current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
 ):
     """Уведомление о готовности результатов анализов"""

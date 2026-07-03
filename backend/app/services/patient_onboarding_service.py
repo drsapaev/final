@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import csv
-import io
-from datetime import datetime, timedelta, timezone
-from difflib import SequenceMatcher
 import hashlib
 import hmac
+import io
 import os
 import re
+from datetime import UTC, datetime, timedelta, timezone
+from difflib import SequenceMatcher
 from typing import Any
 
 from fastapi import HTTPException, Request, status
@@ -32,7 +32,6 @@ from app.schemas.patient_onboarding import (
     RegistrarPatientLinkDecisionRequest,
 )
 from app.services.patient_service import PatientService
-
 
 ONBOARDING_ACTIVE_STATUSES = {"pending_review", "needs_more_info"}
 ONBOARDING_REQUEST_TTL_DAYS = 14
@@ -147,15 +146,15 @@ def _decode_candidate_id(request_id: int, candidate_id: str) -> int | None:
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _as_aware_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _clean_text(value: str | None, *, max_length: int) -> str | None:
@@ -200,7 +199,7 @@ def _safe_note_hash(value: str | None) -> str | None:
 def _patient_ref(patient_id: int | None) -> str | None:
     if not patient_id:
         return None
-    return hashlib.sha256(f"patient:{int(patient_id)}".encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha256(f"patient:{int(patient_id)}".encode()).hexdigest()[:12]
 
 
 def _request_payload(row: PatientOnboardingRequest) -> dict[str, Any]:
@@ -256,7 +255,7 @@ class PatientOnboardingService:
     @staticmethod
     def _request_signature(row: PatientOnboardingRequest) -> str:
         return hashlib.sha256(
-            f"req:{int(row.id)}:{int(row.telegram_chat_id)}".encode("utf-8")
+            f"req:{int(row.id)}:{int(row.telegram_chat_id)}".encode()
         ).hexdigest()[:16]
 
     def _validate_audit_actor(self, actor: User) -> None:
@@ -806,7 +805,7 @@ class PatientOnboardingService:
 
     def analytics_summary(self) -> dict[str, Any]:
         now = _utc_now()
-        start_of_day = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
+        start_of_day = datetime.combine(now.date(), datetime.min.time(), tzinfo=UTC)
 
         rows = self.db.query(PatientOnboardingRequest).all()
         refreshed_rows = [self._refresh_expired(row) for row in rows]

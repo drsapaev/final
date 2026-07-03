@@ -11,6 +11,7 @@ from app.models.payment_invoice import PaymentInvoice
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
 
+
 class PaymentsApiRepository:
     """Shared DB session adapter for payments service."""
 

@@ -19,15 +19,15 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
-    status,
     UploadFile,
+    status,
 )
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.models.user import User
 from app.core.audit import extract_model_changes
+from app.models.user import User
 from app.schemas.file_system import (
     FileExportRequest,
     FileExportResponse,
@@ -553,7 +553,7 @@ async def create_file_share(
         raise_file_system_internal_error("create_file_share", e)
 
 
-@router.get("/{file_id}/shares", response_model=List[FileShareOut])
+@router.get("/{file_id}/shares", response_model=list[FileShareOut])
 async def get_file_shares(
     file_id: int,
     db: Session = Depends(get_db),

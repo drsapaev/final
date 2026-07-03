@@ -24,10 +24,10 @@ from app.models.clinic import Doctor
 from app.models.user import User
 from app.services.queue_api_service import QueueApiService
 from app.services.queue_service import (
-    get_queue_service,
     QueueConflictError,
     QueueNotFoundError,
     QueueValidationError,
+    get_queue_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ class QueueStatusResponse(BaseModel):
     opened_at: Optional[datetime]
     total_entries: int
     waiting_entries: int
-    entries: List[QueueEntryResponse]
+    entries: list[QueueEntryResponse]
 
 
 @router.post("/qrcode", response_model=QueueTokenResponse)

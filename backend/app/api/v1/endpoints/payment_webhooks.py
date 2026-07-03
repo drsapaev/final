@@ -22,7 +22,7 @@ router = APIRouter()
 MAX_PAYMENT_WEBHOOK_BODY_BYTES = 256 * 1024
 
 
-async def _read_payment_webhook_json(request: Request) -> Dict[str, Any]:
+async def _read_payment_webhook_json(request: Request) -> dict[str, Any]:
     chunks: list[bytes] = []
     total_size = 0
 
@@ -55,7 +55,7 @@ async def _read_payment_webhook_json(request: Request) -> Dict[str, Any]:
 async def _emit_payment_notification_from_webhook_result(
     *,
     db: Session,
-    result: Dict[str, Any],
+    result: dict[str, Any],
     webhook_kind: str,
 ) -> None:
     payment_id = result.get("payment_id")
@@ -128,7 +128,7 @@ async def _emit_payment_notification_from_webhook_result(
     )
 
 
-def _strip_internal_payment_fields(result: Dict[str, Any]) -> Dict[str, Any]:
+def _strip_internal_payment_fields(result: dict[str, Any]) -> dict[str, Any]:
     sanitized = dict(result or {})
     sanitized.pop("payment_id", None)
     sanitized.pop("payment_status", None)
@@ -139,7 +139,7 @@ def _strip_internal_payment_fields(result: Dict[str, Any]) -> Dict[str, Any]:
 @router.post("/click")
 async def click_webhook(
     request: Request, db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Webhook для Click платежной системы"""
     webhook_data = await _read_payment_webhook_json(request)
     result = ProviderWebhookService(db).process_click_webhook(webhook_data)
@@ -154,7 +154,7 @@ async def click_webhook(
 @router.post("/payme")
 async def payme_webhook(
     request: Request, db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Webhook для Payme платежной системы (JSON-RPC)"""
     webhook_data = await _read_payment_webhook_json(request)
     auth_header = request.headers.get("Authorization")
@@ -170,7 +170,7 @@ async def payme_webhook(
 @router.post("/kaspi")
 async def kaspi_webhook(
     request: Request, db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Webhook для Kaspi Pay платежной системы"""
     webhook_data = await _read_payment_webhook_json(request)
     result = ProviderWebhookService(db).process_kaspi_webhook(webhook_data)

@@ -14,8 +14,14 @@ from app.api.v1.endpoints.admin_telegram import PATIENT_PAYMENT_ENTRY_ROUTE
 from app.core.config import settings
 from app.crud import (
     appointment as crud_appointment,
+)
+from app.crud import (
     lab_result as crud_lab,
+)
+from app.crud import (
     patient as crud_patient,
+)
+from app.crud import (
     telegram_config as crud_telegram,
 )
 from app.models.clinic import Doctor
@@ -40,7 +46,7 @@ def _telegram_notification_allowed(telegram_user: Any, *preference_fields: str) 
     return all(bool(getattr(telegram_user, field, True)) for field in preference_fields)
 
 
-def _telegram_notifications_disabled_response() -> Dict[str, Any]:
+def _telegram_notifications_disabled_response() -> dict[str, Any]:
     return {
         "success": False,
         "message": "Telegram notifications disabled by patient preference",
@@ -62,10 +68,10 @@ def _protected_payment_history_url() -> str:
 
 def _safe_lab_template_data(
     patient: Any,
-    lab_results: List[Any],
+    lab_results: list[Any],
     templates_service: Any,
     language: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     test_types = [result.test_code for result in lab_results]
     has_abnormalities = any(
         result.is_abnormal for result in lab_results if hasattr(result, "is_abnormal")
@@ -85,7 +91,7 @@ def _safe_lab_template_data(
     }
 
 
-def _safe_payment_template_data(payment_data: Dict[str, Any]) -> Dict[str, Any]:
+def _safe_payment_template_data(payment_data: dict[str, Any]) -> dict[str, Any]:
     return {
         "amount": payment_data.get("amount", 0),
         "currency": payment_data.get("currency", "UZS"),
@@ -184,7 +190,7 @@ def _ensure_lab_results_belong_to_patient(
     db: Session,
     *,
     patient_id: int,
-    lab_results: List[Any],
+    lab_results: list[Any],
 ) -> None:
     for result in lab_results:
         result_patient_id = _lab_result_patient_id(db, result)
@@ -195,7 +201,7 @@ def _ensure_lab_results_belong_to_patient(
             )
 
 
-def _payment_id_from_payload(payment_data: Dict[str, Any]) -> int | None:
+def _payment_id_from_payload(payment_data: dict[str, Any]) -> int | None:
     for key in ("payment_id", "id"):
         value = payment_data.get(key)
         if value is None:
@@ -214,7 +220,7 @@ def _ensure_payment_confirmation_belongs_to_patient(
     db: Session,
     *,
     patient_id: int,
-    payment_data: Dict[str, Any],
+    payment_data: dict[str, Any],
 ) -> None:
     payment_id = _payment_id_from_payload(payment_data)
     if payment_id is None:
@@ -330,7 +336,7 @@ async def send_appointment_reminder(
 @router.post("/send-lab-results")
 async def send_lab_results(
     patient_id: int,
-    lab_result_ids: List[int],
+    lab_result_ids: list[int],
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
@@ -428,7 +434,7 @@ async def send_lab_results(
 @router.post("/send-payment-confirmation")
 async def send_payment_confirmation(
     patient_id: int,
-    payment_data: Dict[str, Any],
+    payment_data: dict[str, Any],
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
@@ -504,7 +510,7 @@ async def send_payment_confirmation(
 @router.post("/broadcast-message")
 async def send_broadcast_message(
     message: str,
-    target_groups: List[str] = Query(
+    target_groups: list[str] = Query(
         ..., description="Группы получателей: patients, doctors, admins"
     ),
     language: str = Query("ru", description="Язык сообщения"),
@@ -566,7 +572,7 @@ async def send_broadcast_message(
 
         return {
             "success": True,
-            "message": f"Широковещательное сообщение отправлено",
+            "message": "Широковещательное сообщение отправлено",
             "total_recipients": len(recipients),
             "sent_count": sent_count,
             "failed_count": failed_count,

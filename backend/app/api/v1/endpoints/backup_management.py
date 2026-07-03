@@ -21,7 +21,7 @@ async def create_backup(
     backup_type: str = "manual",
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Admin")),
-) -> Dict:
+) -> dict:
     """
     Create a database backup
     
@@ -43,7 +43,7 @@ async def create_backup(
 async def list_backups(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Admin")),
-) -> Dict:
+) -> dict:
     """
     List all available backups
     
@@ -69,7 +69,7 @@ async def restore_backup(
     backup_filename: str,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Admin")),
-) -> Dict:
+) -> dict:
     """
     Restore database from backup
     
@@ -94,7 +94,7 @@ async def verify_backup(
     backup_filename: str,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Admin")),
-) -> Dict:
+) -> dict:
     """
     Verify backup integrity
     

@@ -5,7 +5,6 @@ import logging
 
 from fastapi import APIRouter
 
-from app.core.config import settings
 from app.api.v1.endpoints import (
     activation as activation_ep,
 )
@@ -13,10 +12,10 @@ from app.api.v1.endpoints import (
     admin_ai,
     admin_appointments,
     admin_clinic,
-    admin_finance,
     admin_departments,
     admin_display,
     admin_doctors,
+    admin_finance,
     admin_providers,
     admin_stats,
     admin_telegram,
@@ -36,9 +35,9 @@ from app.api.v1.endpoints import (
     api_documentation,
     appointment_flow,
     appointments,
+    audit,
     auth,
     authentication,
-    audit,
     billing,
     cardio,
     cashier,
@@ -107,7 +106,6 @@ from app.api.v1.endpoints import (
     schedule,
     services,
     setup,
-    settings as settings_ep,
     simple_auth,
     sms_providers,
     specialized_panels,
@@ -136,6 +134,9 @@ from app.api.v1.endpoints import (
 from app.api.v1.endpoints import (
     health as health_ep,
 )
+from app.api.v1.endpoints import (
+    settings as settings_ep,
+)
 from app.api.v1.endpoints.migration_management import (
     router as migration_management_router,
 )
@@ -147,6 +148,7 @@ from app.api.v1.endpoints.security_management import (
     router as security_management_router,
 )
 from app.api.v1.endpoints.visit_confirmation import router as visit_confirmation_router
+from app.core.config import settings
 from app.ws import cashier_ws
 
 try:

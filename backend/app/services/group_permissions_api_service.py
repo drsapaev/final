@@ -7,7 +7,9 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.repositories.group_permissions_api_repository import GroupPermissionsApiRepository
+from app.repositories.group_permissions_api_repository import (
+    GroupPermissionsApiRepository,
+)
 from app.services.group_permissions_service import get_group_permissions_service
 
 

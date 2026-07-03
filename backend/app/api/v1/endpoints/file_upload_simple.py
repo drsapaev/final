@@ -10,7 +10,7 @@ import hashlib
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -100,7 +100,7 @@ async def _read_limited_upload(file: UploadFile) -> bytes:
 
 
 def _build_target_path(safe_filename: str, file_hash: str) -> tuple[Path, str]:
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     storage_name = f"{timestamp}_{file_hash[:16]}_{safe_filename}"
     root = SIMPLE_UPLOAD_ROOT.resolve()
     target_path = (root / storage_name).resolve()

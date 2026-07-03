@@ -15,7 +15,6 @@ from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.global_search_api_service import GlobalSearchApiService
 
-
 router = APIRouter(tags=["search"])
 
 GLOBAL_SEARCH_ROLES = (
@@ -72,9 +71,9 @@ class LabResultSearchResult(BaseModel):
 
 
 class GlobalSearchResponse(BaseModel):
-    patients: List[PatientSearchResult] = []
-    visits: List[VisitSearchResult] = []
-    labResults: List[LabResultSearchResult] = []
+    patients: list[PatientSearchResult] = []
+    visits: list[VisitSearchResult] = []
+    labResults: list[LabResultSearchResult] = []
     query: str
     total: int = 0
 

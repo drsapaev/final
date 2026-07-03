@@ -19,16 +19,16 @@ from app.schemas.online_queue import (
     QueueOpenResponse,
     QueueStatusCheck,
 )
-from app.services.queue_domain_service import QueueDomainService
-from app.services.queue_service import (
-    queue_service,
-    QueueConflictError,
-    QueueNotFoundError,
-    QueueValidationError,
-)
 from app.services.online_queue_new_service import (
     OnlineQueueNewDomainError,
     OnlineQueueNewService,
+)
+from app.services.queue_domain_service import QueueDomainService
+from app.services.queue_service import (
+    QueueConflictError,
+    QueueNotFoundError,
+    QueueValidationError,
+    queue_service,
 )
 
 router = APIRouter()

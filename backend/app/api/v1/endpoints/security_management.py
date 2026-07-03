@@ -58,7 +58,7 @@ class CleanupResponse(BaseModel):
 class SecurityConfigResponse(BaseModel):
     """Конфигурация безопасности"""
 
-    rate_limits: Dict[str, Dict[str, int]]
+    rate_limits: dict[str, dict[str, int]]
     token_expiry_hours: int
     max_confirmation_attempts: int
     cleanup_interval_hours: int

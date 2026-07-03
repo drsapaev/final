@@ -9,7 +9,7 @@ import uuid
 from typing import List, Optional
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, Form, HTTPException, status, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from PIL import Image
 from sqlalchemy.orm import Session
 
@@ -35,7 +35,7 @@ os.makedirs(f"{UPLOAD_DIR}/thumbnails", exist_ok=True)
 
 @router.post("/upload")
 async def upload_photos(
-    files: List[UploadFile] = File(...),
+    files: list[UploadFile] = File(...),
     patient_id: int = Form(...),
     category: str = Form(...),  # before, after, progress
     patient_name: str = Form(""),

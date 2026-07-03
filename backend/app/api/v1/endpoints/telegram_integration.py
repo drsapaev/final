@@ -23,7 +23,7 @@ from app.services.telegram_service import (
 router = APIRouter()
 
 
-def _appointment_id_from_payload(appointment_data: Dict[str, Any]) -> int | None:
+def _appointment_id_from_payload(appointment_data: dict[str, Any]) -> int | None:
     for key in ("appointment_id", "id"):
         value = appointment_data.get(key)
         if value is None:
@@ -42,7 +42,7 @@ def _ensure_appointment_reminder_belongs_to_phone(
     db: Session,
     *,
     patient_phone: str,
-    appointment_data: Dict[str, Any],
+    appointment_data: dict[str, Any],
 ) -> None:
     appointment_id = _appointment_id_from_payload(appointment_data)
     if appointment_id is None:
@@ -62,7 +62,7 @@ def _ensure_appointment_reminder_belongs_to_phone(
             detail="Access denied",
         )
 
-def _lab_result_id_from_payload(lab_data: Dict[str, Any]) -> int | None:
+def _lab_result_id_from_payload(lab_data: dict[str, Any]) -> int | None:
     for key in ("lab_results_id", "lab_result_id", "id"):
         value = lab_data.get(key)
         if value is None:
@@ -81,7 +81,7 @@ def _ensure_lab_notification_belongs_to_phone(
     db: Session,
     *,
     patient_phone: str,
-    lab_data: Dict[str, Any],
+    lab_data: dict[str, Any],
 ) -> None:
     lab_result_id = _lab_result_id_from_payload(lab_data)
     if lab_result_id is None:
@@ -108,7 +108,7 @@ def _ensure_lab_notification_belongs_to_phone(
 
 @router.post("/send-notification")
 async def send_notification(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
@@ -151,7 +151,7 @@ async def send_notification(
 
 @router.post("/appointment-reminder")
 async def send_appointment_reminder(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -224,7 +224,7 @@ async def send_appointment_reminder(
 
 @router.post("/lab-results-notification")
 async def send_lab_results_notification(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
@@ -297,7 +297,7 @@ async def send_lab_results_notification(
 
 @router.post("/send-qr-code")
 async def send_qr_code(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),

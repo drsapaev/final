@@ -12,7 +12,6 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 
-
 REGISTRAR_BATCH_ACTIVE_DUPLICATE_STATUSES = (
     "waiting",
     "called",

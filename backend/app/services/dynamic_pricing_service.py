@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
+from app.models.appointment import Appointment
 from app.models.dynamic_pricing import (
     DiscountType,
     DynamicPrice,
@@ -19,7 +20,6 @@ from app.models.dynamic_pricing import (
     PricingRuleType,
     ServicePackage,
 )
-from app.models.appointment import Appointment
 from app.models.service import Service
 from app.models.visit import Visit
 

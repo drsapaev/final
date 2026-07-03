@@ -11,6 +11,7 @@ from app.api.deps import get_current_user, get_db, require_roles
 from app.crud import online_queue as crud_queue
 from app.models.online_queue import OnlineQueueEntry  # Added import
 from app.models.user import User
+from app.repositories.online_queue_new_api_repository import OnlineQueueNewApiRepository
 from app.schemas.online_queue import (
     QRTokenResponse,
     QueueJoinError,
@@ -25,7 +26,6 @@ from app.services.queue_service import (
     QueueValidationError,
     queue_service,
 )
-from app.repositories.online_queue_new_api_repository import OnlineQueueNewApiRepository
 
 router = APIRouter()
 

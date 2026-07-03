@@ -14,9 +14,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.clinic import ClinicSettings
 from app.models.user import User
+from app.repositories.payment_settings_api_repository import (
+    PaymentSettingsApiRepository,
+)
 from app.services.payment_providers.click import ClickProvider
 from app.services.payment_providers.payme import PayMeProvider
-from app.repositories.payment_settings_api_repository import PaymentSettingsApiRepository
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, select, Table, text
+from sqlalchemy import MetaData, Table, select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -62,7 +62,7 @@ class VisitServiceIn(BaseModel):
 
 class VisitWithServices(BaseModel):
     visit: VisitOut
-    services: List[VisitServiceIn]
+    services: list[VisitServiceIn]
 
 
 def _visits(db: Session) -> Table:
@@ -183,7 +183,7 @@ def _ensure_doctor_can_create_visit_for_payload(
         raise HTTPException(status_code=403, detail="Access denied")
 
 
-@router.get("/visits", response_model=List[VisitOut], summary="Список визитов")
+@router.get("/visits", response_model=list[VisitOut], summary="Список визитов")
 def list_visits(
     patient_id: Optional[int] = Query(default=None),
     doctor_id: Optional[int] = Query(default=None),

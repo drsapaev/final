@@ -105,7 +105,7 @@ def _serialize_doctor(db: Session, doctor) -> DoctorOut:
     return DoctorOut(**doctor_dict)
 
 
-@router.get("/doctors", response_model=List[DoctorOut])
+@router.get("/doctors", response_model=list[DoctorOut])
 def get_doctors(
     skip: int = 0,
     limit: int = 100,
@@ -126,7 +126,7 @@ def get_doctors(
         raise _admin_doctors_http_error(exc, "get_doctors") from exc
 
 
-@router.get("/doctors/available-users", response_model=List[DoctorUserOption])
+@router.get("/doctors/available-users", response_model=list[DoctorUserOption])
 def get_available_doctor_users(
     doctor_id: Optional[int] = Query(
         None,
@@ -282,7 +282,7 @@ def delete_doctor(
         raise _admin_doctors_http_error(exc, "delete_doctor") from exc
 
 
-@router.get("/doctors/{doctor_id}/schedule", response_model=List[ScheduleOut])
+@router.get("/doctors/{doctor_id}/schedule", response_model=list[ScheduleOut])
 def get_doctor_schedule(
     doctor_id: int,
     db: Session = Depends(get_db),
@@ -298,7 +298,7 @@ def get_doctor_schedule(
     return crud_clinic.get_doctor_schedules(db, doctor_id)
 
 
-@router.put("/doctors/{doctor_id}/schedule", response_model=List[ScheduleOut])
+@router.put("/doctors/{doctor_id}/schedule", response_model=list[ScheduleOut])
 def update_doctor_schedule(
     doctor_id: int,
     schedule_data: WeeklyScheduleUpdate,

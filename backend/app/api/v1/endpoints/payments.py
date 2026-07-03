@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.db.session import get_db
+from app.models.clinic import Doctor
+from app.models.payment import Payment
+from app.models.visit import Visit
 from app.services.payment_cancel_service import (
     PaymentCancelDomainError,
     PaymentCancelService,
@@ -19,20 +22,17 @@ from app.services.payment_create_service import (
     PaymentCreateDomainError,
     PaymentCreateService,
 )
+from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
 from app.services.payment_invoice_service import (
     PaymentInvoiceDomainError,
     PaymentInvoiceService,
 )
-from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
+from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.payment_read_service import PaymentReadDomainError, PaymentReadService
 from app.services.payment_test_init_service import (
     PaymentTestInitDomainError,
     PaymentTestInitService,
 )
-from app.services.payment_provider_manager_factory import get_payment_manager
-from app.models.clinic import Doctor
-from app.models.payment import Payment
-from app.models.visit import Visit
 
 router = APIRouter()
 
@@ -118,7 +118,7 @@ class PaymentInvoiceCreateRequest(BaseModel):
         ..., pattern="^(click|payme)$", description="Платежный провайдер"
     )
     description: Optional[str] = Field(None, description="Описание платежа")
-    patient_info: Optional[Dict[str, Any]] = Field(
+    patient_info: Optional[dict[str, Any]] = Field(
         None, description="Информация о пациенте"
     )
 
@@ -134,7 +134,7 @@ class PaymentInvoiceResponse(BaseModel):
 
 
 class PendingInvoicesResponse(BaseModel):
-    invoices: List[PaymentInvoiceResponse]
+    invoices: list[PaymentInvoiceResponse]
 
 
 # Pydantic модели
@@ -172,13 +172,13 @@ class PaymentStatusResponse(BaseModel):
     provider_payment_id: Optional[str] = None
     created_at: datetime
     paid_at: Optional[datetime] = None
-    provider_data: Optional[Dict[str, Any]] = None
+    provider_data: Optional[dict[str, Any]] = None
 
 
 class PaymentListResponse(BaseModel):
     """Список платежей"""
 
-    payments: List[Dict[str, Any]]  # Используем Dict для гибкости формата данных
+    payments: list[dict[str, Any]]  # Используем Dict для гибкости формата данных
     total: int
 
 
@@ -187,15 +187,15 @@ class ProviderInfo(BaseModel):
 
     name: str
     code: str
-    supported_currencies: List[str]
+    supported_currencies: list[str]
     is_active: bool
-    features: Dict[str, bool]
+    features: dict[str, bool]
 
 
 class ProvidersResponse(BaseModel):
     """Список доступных провайдеров"""
 
-    providers: List[ProviderInfo]
+    providers: list[ProviderInfo]
 
 
 # API Endpoints
@@ -250,13 +250,13 @@ class PaymentCreateRequest(BaseModel):
     note: Optional[str] = Field(None, description="Примечание")
 
 
-@router.post("/", response_model=Dict[str, Any])
+@router.post("/", response_model=dict[str, Any])
 def create_payment(
     request: Request,
     payment_request: PaymentCreateRequest,
     db: Session = Depends(get_db),
     current_user=Depends(deps.require_roles("Admin", "Cashier")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Создание платежа (для кассы)"""
     try:
         service = PaymentCreateService(db)
@@ -336,7 +336,7 @@ def cancel_payment(
     payment_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(deps.require_roles("Admin", "Cashier")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Отмена платежа"""
     service = PaymentCancelService(db, get_payment_manager())
     try:
@@ -449,7 +449,7 @@ async def create_payment_invoice(
         )
 
 
-@router.get("/invoices/pending", response_model=List[PaymentInvoiceResponse])
+@router.get("/invoices/pending", response_model=list[PaymentInvoiceResponse])
 async def get_pending_invoices(
     db: Session = Depends(get_db),
     current_user: Any = Depends(deps.require_roles("Admin", "Registrar", "Cashier")),

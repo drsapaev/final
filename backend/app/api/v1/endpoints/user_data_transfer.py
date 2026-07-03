@@ -28,14 +28,14 @@ class UserDataSummaryResponse(BaseModel):
     email: Optional[str]
     phone: Optional[str]
     patient_id: Optional[int]
-    data_counts: Dict[str, int]
-    transferable_data: List[Dict[str, Any]]
+    data_counts: dict[str, int]
+    transferable_data: list[dict[str, Any]]
 
 
 class DataTransferRequest(BaseModel):
     source_user_id: int = Field(..., description="ID пользователя-источника")
     target_user_id: int = Field(..., description="ID пользователя-получателя")
-    data_types: List[str] = Field(
+    data_types: list[str] = Field(
         default=["appointments", "visits", "queue_entries"],
         description="Типы данных для передачи",
     )
@@ -46,9 +46,9 @@ class DataTransferRequest(BaseModel):
 
 class DataTransferResponse(BaseModel):
     success: bool
-    transferred: Dict[str, Dict[str, Any]]
-    errors: List[str]
-    summary: Dict[str, Any]
+    transferred: dict[str, dict[str, Any]]
+    errors: list[str]
+    summary: dict[str, Any]
 
 
 class TransferConfirmationRequest(BaseModel):

@@ -7,7 +7,9 @@ from typing import Callable
 
 from sqlalchemy.orm import Session
 
-from app.repositories.migration_management_repository import MigrationManagementRepository
+from app.repositories.migration_management_repository import (
+    MigrationManagementRepository,
+)
 from app.services.emr_cutover_service import EMRCutoverService
 from app.services.migration_service import MigrationService
 

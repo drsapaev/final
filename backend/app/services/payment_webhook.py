@@ -19,7 +19,6 @@ from app.schemas.payment_webhook import (
 )
 from app.services.visit_payment_integration import VisitPaymentIntegrationService
 
-
 logger = logging.getLogger(__name__)
 
 

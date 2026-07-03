@@ -27,7 +27,7 @@ def _to_out(r) -> ScheduleRowOut:
     )
 
 
-@router.get("", response_model=List[ScheduleRowOut], summary="Список расписаний")
+@router.get("", response_model=list[ScheduleRowOut], summary="Список расписаний")
 async def list_templates(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),

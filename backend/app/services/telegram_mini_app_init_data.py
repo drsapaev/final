@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime, timezone
 from typing import Any, Literal
 from urllib.parse import parse_qsl
 
@@ -16,7 +16,6 @@ from app.crud import telegram_config as crud_telegram
 from app.models.patient import Patient
 from app.models.telegram_config import TelegramPatientFormSubmission, TelegramUser
 from app.models.user import User
-
 
 DEFAULT_MAX_AUTH_AGE_SECONDS = 24 * 60 * 60
 DEFAULT_MAX_FUTURE_SKEW_SECONDS = 60
@@ -320,7 +319,7 @@ def _patient_form_submission_payload(
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _parse_init_data(init_data: str) -> dict[str, str]:
@@ -358,7 +357,7 @@ def _parse_auth_date(value: str) -> datetime:
         timestamp = int(value)
     except (TypeError, ValueError) as exc:
         raise TelegramMiniAppInitDataError("invalid_auth_date") from exc
-    return datetime.fromtimestamp(timestamp, timezone.utc)
+    return datetime.fromtimestamp(timestamp, UTC)
 
 
 def _parse_user(value: str | None) -> dict[str, Any] | None:
@@ -582,9 +581,9 @@ def validate_telegram_mini_app_init_data(
 
     checked_at = now or _utc_now()
     if checked_at.tzinfo is None:
-        checked_at = checked_at.replace(tzinfo=timezone.utc)
+        checked_at = checked_at.replace(tzinfo=UTC)
     else:
-        checked_at = checked_at.astimezone(timezone.utc)
+        checked_at = checked_at.astimezone(UTC)
 
     auth_date = _parse_auth_date(fields[_AUTH_DATE_FIELD])
     age_seconds = int((checked_at - auth_date).total_seconds())

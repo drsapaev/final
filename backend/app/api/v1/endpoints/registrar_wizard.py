@@ -5,7 +5,7 @@ API endpoints для мастера регистрации с поддержко
 
 import asyncio
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -15,7 +15,9 @@ from sqlalchemy import String, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.crud import clinic as crud_clinic, online_queue as crud_queue
+from app.crud import clinic as crud_clinic
+from app.crud import online_queue as crud_queue
+from app.crud.appointment import appointment as crud_appointment
 from app.models.clinic import ClinicSettings, Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.patient import Patient
@@ -23,14 +25,6 @@ from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
-from app.crud.appointment import appointment as crud_appointment
-from app.services.registrar_wizard_queue_assignment_service import (
-    RegistrarWizardQueueAssignmentService,
-)
-from app.services.registrar_edit_delta_service import (
-    RegistrarEditDeltaItem,
-    RegistrarEditDeltaService,
-)
 from app.services.notifications import notification_sender_service
 from app.services.online_queue_new_service import (
     OnlineQueueNewDomainError,
@@ -38,6 +32,13 @@ from app.services.online_queue_new_service import (
 )
 from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.queue_service import queue_service
+from app.services.registrar_edit_delta_service import (
+    RegistrarEditDeltaItem,
+    RegistrarEditDeltaService,
+)
+from app.services.registrar_wizard_queue_assignment_service import (
+    RegistrarWizardQueueAssignmentService,
+)
 from app.services.service_mapping import get_service_code, normalize_service_code
 from app.services.visits_api_service import VisitsApiService
 
@@ -83,7 +84,7 @@ class ServiceItemRequest(BaseModel):
 
 class VisitRequest(BaseModel):
     doctor_id: Optional[int] = None  # Может быть None для лабораторных услуг
-    services: List[ServiceItemRequest]
+    services: list[ServiceItemRequest]
     visit_date: date
     visit_time: Optional[str] = None  # HH:MM
     department: Optional[str] = None
@@ -92,7 +93,7 @@ class VisitRequest(BaseModel):
 
 class CartRequest(BaseModel):
     patient_id: int
-    visits: List[VisitRequest]
+    visits: list[VisitRequest]
     discount_mode: str = Field(default="none")  # none|repeat|benefit|all_free
     payment_method: str = Field(default="cash")  # cash|card|online|click|payme
     all_free: bool = Field(default=False)  # Чекбокс "All Free"
@@ -103,13 +104,13 @@ class CartResponse(BaseModel):
     success: bool
     message: str
     invoice_id: int
-    visit_ids: List[int]
+    visit_ids: list[int]
     total_amount: Decimal
-    queue_numbers: Dict[
-        int, List[Dict]
+    queue_numbers: dict[
+        int, list[dict]
     ]  # visit_id -> [{"queue_tag": str, "number": int, "queue_id": int}]
-    print_tickets: List[Dict[str, Any]]
-    created_visits: Optional[List[Dict[str, Any]]] = (
+    print_tickets: list[dict[str, Any]]
+    created_visits: Optional[list[dict[str, Any]]] = (
         None  # Информация о созданных визитах
     )
 
@@ -135,24 +136,24 @@ class EditDeltaRequest(BaseModel):
     discount_mode: str = Field(default="none")
     all_free: bool = Field(default=False)
     patient_data: Optional[EditDeltaPatientData] = None
-    services: List[EditDeltaServiceItem] = Field(default_factory=list)
-    existing_queue_entry_ids: List[int] = Field(default_factory=list)
+    services: list[EditDeltaServiceItem] = Field(default_factory=list)
+    existing_queue_entry_ids: list[int] = Field(default_factory=list)
     # R-08 fix: optimistic locking — map of entry_id → ISO updated_at string.
     # Frontend передаёт updated_at каждой existing entry при последнем чтении.
     # Если какая-либо entry была изменена другим пользователем — 409 Conflict.
-    expected_entry_updated_at: Dict[int, str] = Field(default_factory=dict)
+    expected_entry_updated_at: dict[int, str] = Field(default_factory=dict)
 
 
 class EditDeltaResponse(BaseModel):
     success: bool
     message: str
     invoice_id: Optional[int] = None
-    visit_ids: List[int] = Field(default_factory=list)
+    visit_ids: list[int] = Field(default_factory=list)
     total_amount: Decimal = Decimal("0")
-    queue_numbers: Dict[int, List[Dict[str, Any]]] = Field(default_factory=dict)
-    print_tickets: List[Dict[str, Any]] = Field(default_factory=list)
-    created_visits: List[Dict[str, Any]] = Field(default_factory=list)
-    updated_queue_entries: List[Dict[str, Any]] = Field(default_factory=list)
+    queue_numbers: dict[int, list[dict[str, Any]]] = Field(default_factory=dict)
+    print_tickets: list[dict[str, Any]] = Field(default_factory=list)
+    created_visits: list[dict[str, Any]] = Field(default_factory=list)
+    updated_queue_entries: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class MarkPaidRequest(BaseModel):
@@ -169,7 +170,7 @@ class RegistrarRecordActionRequest(BaseModel):
     action: str
     record_kind: Optional[str] = None
     record_id: Optional[int] = None
-    records: Optional[List[RegistrarRecordRef]] = None
+    records: Optional[list[RegistrarRecordRef]] = None
     reason: Optional[str] = None
     amount: Optional[Decimal] = None
     method: Optional[str] = Field(default="cash")
@@ -183,7 +184,7 @@ class RegistrarRecordActionItemResponse(BaseModel):
     status: Optional[str] = None
     payment_status: Optional[str] = None
     error: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
+    result: Optional[dict[str, Any]] = None
 
 
 class RegistrarRecordActionResponse(BaseModel):
@@ -192,7 +193,7 @@ class RegistrarRecordActionResponse(BaseModel):
     success_count: int
     skipped_count: int
     failed_count: int
-    results: List[RegistrarRecordActionItemResponse]
+    results: list[RegistrarRecordActionItemResponse]
 
 
 class RepeatEligibilityCandidate(BaseModel):
@@ -204,7 +205,7 @@ class RepeatEligibilityCandidate(BaseModel):
 
 class RepeatEligibilityPreviewRequest(BaseModel):
     patient_id: int
-    candidates: List[RepeatEligibilityCandidate] = Field(default_factory=list)
+    candidates: list[RepeatEligibilityCandidate] = Field(default_factory=list)
 
 
 class RepeatEligibilityPreviewItem(BaseModel):
@@ -220,7 +221,7 @@ class RepeatEligibilityPreviewItem(BaseModel):
 
 class RepeatEligibilityPreviewResponse(BaseModel):
     patient_id: int
-    items: List[RepeatEligibilityPreviewItem]
+    items: list[RepeatEligibilityPreviewItem]
 
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
@@ -230,7 +231,7 @@ def _check_repeat_visit_eligibility(
     db: Session,
     patient_id: int,
     doctor_id: int,
-    service_ids: List[int],
+    service_ids: list[int],
     days_window: int = 21,
 ) -> bool:
     """
@@ -270,7 +271,7 @@ def _resolve_effective_discount_mode(cart_data: CartRequest) -> str:
     return cart_data.discount_mode or "none"
 
 
-def _load_registration_discount_settings(db: Session) -> Dict[str, Any]:
+def _load_registration_discount_settings(db: Session) -> dict[str, Any]:
     """Load repeat/benefit settings with safe defaults."""
     defaults = {
         "repeat_visit_days": 21,
@@ -310,7 +311,7 @@ def _load_registration_discount_settings(db: Session) -> Dict[str, Any]:
 def _apply_service_discount(
     base_price: Decimal,
     discount_mode: str,
-    settings: Dict[str, Any],
+    settings: dict[str, Any],
     is_consultation: bool,
 ) -> Decimal:
     """Apply deterministic service pricing rules for the registrar cart."""
@@ -472,8 +473,8 @@ def _build_repeat_eligibility_preview_item(
 
 
 def _create_queue_entries(
-    db: Session, visits: List[Visit], queue_settings: Dict[str, Any]
-) -> Dict[int, int]:
+    db: Session, visits: list[Visit], queue_settings: dict[str, Any]
+) -> dict[int, int]:
     """
     Создание записей в очереди для визитов на сегодня
     """
@@ -870,7 +871,7 @@ def create_cart_appointments(
         registration_settings = _load_registration_discount_settings(db)
 
         created_visits = []
-        created_visit_amounts: Dict[int, Decimal] = {}
+        created_visit_amounts: dict[int, Decimal] = {}
         total_invoice_amount = Decimal('0')
 
         # Создаём визиты
@@ -1232,13 +1233,13 @@ class PriceOverrideListResponse(BaseModel):
     reason: str
     details: Optional[str]
     status: str
-    available_actions: List[str]
+    available_actions: list[str]
     can_approve: bool
     can_reject: bool
     created_at: datetime
 
 
-def _price_override_available_actions(override_status: str) -> List[str]:
+def _price_override_available_actions(override_status: str) -> list[str]:
     if override_status == "pending":
         return ["approve", "reject"]
     return []
@@ -1254,7 +1255,7 @@ def get_pending_price_overrides(
         default="pending", pattern="^(pending|approved|rejected|all)$"
     ),
     limit: int = Query(default=50, ge=1, le=100),
-) -> List[PriceOverrideListResponse]:
+) -> list[PriceOverrideListResponse]:
     """
     Получить список изменений цен для одобрения регистратурой
     """
@@ -1316,7 +1317,7 @@ def approve_price_override(
     approval_data: PriceOverrideApprovalRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Одобрить или отклонить изменение цены врачом
     """
@@ -1404,7 +1405,7 @@ class AllFreeVisitResponse(BaseModel):
     patient_id: int
     patient_name: Optional[str]
     patient_phone: Optional[str]
-    services: List[str]
+    services: list[str]
     total_original_amount: Decimal
     doctor_name: Optional[str]
     doctor_specialty: Optional[str]
@@ -1413,12 +1414,12 @@ class AllFreeVisitResponse(BaseModel):
     notes: Optional[str]
     created_at: datetime
     approval_status: str
-    available_actions: List[str]
+    available_actions: list[str]
     can_approve: bool
     can_reject: bool
 
 
-def _all_free_available_actions(approval_status: str) -> List[str]:
+def _all_free_available_actions(approval_status: str) -> list[str]:
     if approval_status == "pending":
         return ["approve", "reject"]
     return []
@@ -1434,7 +1435,7 @@ def get_all_free_requests(
         default="pending", pattern="^(pending|approved|rejected|all)$"
     ),
     limit: int = Query(default=50, ge=1, le=100),
-) -> List[AllFreeVisitResponse]:
+) -> list[AllFreeVisitResponse]:
     """
     Получить список заявок All Free для одобрения администратором
     """
@@ -1559,7 +1560,7 @@ def approve_all_free_request(
     approval_data: AllFreeApprovalRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Одобрить или отклонить заявку All Free администратором
     """
@@ -1752,7 +1753,7 @@ def update_benefit_settings(
     settings_data: BenefitSettingsRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Обновить настройки льгот и повторных визитов
     """
@@ -1946,12 +1947,12 @@ class VisitResponse(BaseModel):
     status: str
     discount_mode: str
     approval_status: str
-    services: Optional[List[str]] = None
+    services: Optional[list[str]] = None
     notes: Optional[str] = None
     created_at: datetime
 
 
-@router.get("/registrar/visits", response_model=List[VisitResponse])
+@router.get("/registrar/visits", response_model=list[VisitResponse])
 def get_visits(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist", "Cashier", "Lab")),
@@ -2951,7 +2952,7 @@ def mark_visit_as_paid(
 
             currency = total_info.get("currency", "UZS")
             note = f"Оплата визита {visit_id} через панель кассира"
-            paid_at = datetime.now(timezone.utc)
+            paid_at = datetime.now(UTC)
 
             # Создаем платеж через прямой SQL
             result = db.execute(
@@ -2998,7 +2999,7 @@ def mark_visit_as_paid(
             )
 
         # [FIX:PAYMENT_STATUS] Payment must not overwrite the operational visit/queue status.
-        changed_at = datetime.now(timezone.utc)
+        changed_at = datetime.now(UTC)
         visit.status = _preserve_operational_status_on_payment(visit.status)
         visit.updated_at = changed_at
         _sync_payment_invoices_for_paid_visit(
@@ -3115,7 +3116,7 @@ def mark_queue_entry_as_paid(
             )
             entry.status = _preserve_operational_status_on_payment(entry.status)
             entry.discount_mode = "paid"
-            entry.updated_at = datetime.now(timezone.utc)
+            entry.updated_at = datetime.now(UTC)
             logger.info(
                 "[FIX:PAYMENT_STATUS] Queue entry marked paid without Visit: entry_id=%d, status=%s",
                 entry.id,
@@ -3153,7 +3154,7 @@ def mark_queue_entry_as_paid(
 
             currency = total_info.get("currency", "UZS")
             note = f"Оплата визита {visit.id} через запись очереди {entry_id}"
-            paid_at = datetime.now(timezone.utc)
+            paid_at = datetime.now(UTC)
 
             result = db.execute(
                 text(
@@ -3199,7 +3200,7 @@ def mark_queue_entry_as_paid(
             )
 
         # [FIX:PAYMENT_STATUS] Payment is stored separately; queue operational status stays intact.
-        changed_at = datetime.now(timezone.utc)
+        changed_at = datetime.now(UTC)
         visit.status = _preserve_operational_status_on_payment(visit.status)
         visit.updated_at = changed_at
         
@@ -3275,7 +3276,7 @@ def complete_visit(
         _ensure_visit_doctor_access(db, visit, current_user)
 
         visit.status = "completed"
-        visit.updated_at = datetime.now(timezone.utc)
+        visit.updated_at = datetime.now(UTC)
         db.commit()
         db.refresh(visit)
 
@@ -3307,7 +3308,7 @@ def start_visit(
             )
 
         visit.status = "in_progress"
-        visit.updated_at = datetime.now(timezone.utc)
+        visit.updated_at = datetime.now(UTC)
         db.commit()
         db.refresh(visit)
 
@@ -3430,8 +3431,8 @@ class ConfirmVisitResponse(BaseModel):
     message: str
     visit_id: int
     status: str
-    queue_numbers: Optional[Dict[str, Any]] = None
-    print_tickets: Optional[List[Dict[str, Any]]] = None
+    queue_numbers: Optional[dict[str, Any]] = None
+    print_tickets: Optional[list[dict[str, Any]]] = None
 
 
 @router.post(
@@ -3518,7 +3519,7 @@ def confirm_visit_by_registrar(
 
 def _assign_queue_numbers_on_confirmation(
     db: Session, visit: Visit
-) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Assign or reuse queue numbers through VisitConfirmationService."""
     from app.services.visit_confirmation_service import VisitConfirmationService
 

@@ -24,7 +24,7 @@ class MigrationResult(BaseModel):
     success: bool
     migrated_records: int
     errors: list[str]
-    integrity_check: Dict[str, Any]
+    integrity_check: dict[str, Any]
 
 
 class BackupResult(BaseModel):
@@ -60,7 +60,7 @@ class IntegrityCheckResult(BaseModel):
     """Результат проверки целостности"""
 
     passed: bool
-    checks: Dict[str, Any]
+    checks: dict[str, Any]
     checked_at: str
     error: Optional[str] = None
 
@@ -76,16 +76,16 @@ class EMRCutoverBackfillResult(BaseModel):
     failed: int
     rebound_prescriptions: int
     rebound_files: int
-    errors: list[Dict[str, Any]]
+    errors: list[dict[str, Any]]
     generated_at: str
-    verification: Optional[Dict[str, Any]] = None
+    verification: Optional[dict[str, Any]] = None
 
 
 class EMRCutoverVerificationResult(BaseModel):
     """Verification summary for EMR v2 hard cutover."""
 
     passed: bool
-    checks: Dict[str, Any]
+    checks: dict[str, Any]
     generated_at: str
 
 

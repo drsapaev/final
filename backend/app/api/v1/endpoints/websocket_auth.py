@@ -8,8 +8,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, status, WebSocket, WebSocketDisconnect
-from jose import jwt, JWTError
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings

@@ -36,7 +36,7 @@ router = APIRouter()
 
 @router.post("/analyze-complaints", response_model=AIResponse)
 async def analyze_complaints(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
     db: Session = Depends(get_db)
 ):
@@ -67,7 +67,7 @@ async def analyze_complaints(
 
 @router.post("/suggest-icd10", response_model=AIResponse)
 async def suggest_icd10(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.SUGGEST_ICD10)),
     db: Session = Depends(get_db)
 ):
@@ -95,7 +95,7 @@ async def suggest_icd10(
 
 @router.post("/differential-diagnosis", response_model=AIResponse)
 async def differential_diagnosis(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
     db: Session = Depends(get_db)
 ):
@@ -128,7 +128,7 @@ async def differential_diagnosis(
 
 @router.post("/interpret-lab", response_model=AIResponse)
 async def interpret_lab_results(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_LAB)),
     db: Session = Depends(get_db)
 ):
@@ -164,7 +164,7 @@ async def interpret_lab_results(
 
 @router.post("/analyze-skin", response_model=AIResponse)
 async def analyze_skin(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_IMAGE)),
     db: Session = Depends(get_db)
 ):
@@ -197,7 +197,7 @@ async def analyze_skin(
 
 @router.post("/analyze-ecg", response_model=AIResponse)
 async def analyze_ecg(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_IMAGE)),
     db: Session = Depends(get_db)
 ):
@@ -235,7 +235,7 @@ async def analyze_ecg(
 
 @router.post("/symptom-check", response_model=AIResponse)
 async def symptom_check(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.SYMPTOM_CHECK)),
     db: Session = Depends(get_db)
 ):
@@ -277,7 +277,7 @@ async def symptom_check(
 
 @router.post("/analyze-document", response_model=AIResponse)
 async def analyze_document(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_DOCUMENT)),
     db: Session = Depends(get_db)
 ):
@@ -309,7 +309,7 @@ async def analyze_document(
 
 @router.post("/drug-interaction", response_model=AIResponse)
 async def check_drug_interaction(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
     db: Session = Depends(get_db)
 ):

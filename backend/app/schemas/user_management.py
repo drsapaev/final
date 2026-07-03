@@ -8,7 +8,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from email_validator import EmailNotValidError, validate_email as validate_email_address
+from email_validator import EmailNotValidError
+from email_validator import validate_email as validate_email_address
 from pydantic import BaseModel, Field, field_validator
 from pydantic.config import ConfigDict
 

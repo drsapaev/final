@@ -12,12 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
+from app.services.registrar_notification_service import (
+    get_registrar_notification_service,
+)
 from app.services.registrar_notifications_api_service import (
     RegistrarNotificationsApiDomainError,
     RegistrarNotificationsApiService,
-)
-from app.services.registrar_notification_service import (
-    get_registrar_notification_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,13 +76,13 @@ class NotificationResponse(BaseModel):
     success: bool
     message: str
     sent_count: Optional[int] = None
-    results: Optional[List[Dict[str, Any]]] = None
+    results: Optional[list[dict[str, Any]]] = None
 
 
 class RegistrarListResponse(BaseModel):
     """Схема списка регистраторов"""
 
-    registrars: List[Dict[str, Any]]
+    registrars: list[dict[str, Any]]
     total_count: int
 
 
@@ -92,8 +92,8 @@ class NotificationStatsResponse(BaseModel):
     total_sent: int
     successful_deliveries: int
     failed_deliveries: int
-    channels_stats: Dict[str, int]
-    recent_notifications: List[Dict[str, Any]]
+    channels_stats: dict[str, int]
+    recent_notifications: list[dict[str, Any]]
 
 
 # ===================== ENDPOINTS =====================

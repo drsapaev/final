@@ -51,7 +51,7 @@ async def get_dental_examinations(
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Получить список стоматологических осмотров
     """
@@ -65,10 +65,10 @@ async def get_dental_examinations(
 
 @router.post("/examinations", summary="Создать стоматологический осмотр")
 async def create_dental_examination(
-    examination_data: Dict[str, Any],
+    examination_data: dict[str, Any],
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Создать новый стоматологический осмотр
     """
@@ -84,7 +84,7 @@ async def get_treatment_plans(
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Получить список планов лечения
     """
@@ -98,10 +98,10 @@ async def get_treatment_plans(
 
 @router.post("/treatments", summary="Создать план лечения")
 async def create_treatment_plan(
-    treatment_data: Dict[str, Any],
+    treatment_data: dict[str, Any],
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Создать новый план лечения
     """
@@ -117,7 +117,7 @@ async def get_prosthetics(
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Получить список протезов
     """
@@ -131,10 +131,10 @@ async def get_prosthetics(
 
 @router.post("/prosthetics", summary="Создать протез")
 async def create_prosthetic(
-    prosthetic_data: Dict[str, Any],
+    prosthetic_data: dict[str, Any],
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Создать новый протез
     """
@@ -149,7 +149,7 @@ async def get_xray_images(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     patient_id: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Получить рентгеновские снимки пациента
     """
@@ -212,7 +212,7 @@ async def get_dental_price_overrides(
         None, description="Статус (pending, approved, rejected)"
     ),
     limit: int = Query(50, ge=1, le=100),
-) -> List[DentalPriceOverrideResponse]:
+) -> list[DentalPriceOverrideResponse]:
     """
     Получить список изменений цен стоматолога
     """

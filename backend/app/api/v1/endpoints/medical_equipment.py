@@ -69,7 +69,7 @@ class MeasurementResponse(BaseModel):
     device_type: str
     timestamp: datetime
     patient_id: Optional[str] = None
-    measurements: Dict[str, Any]
+    measurements: dict[str, Any]
     raw_data: Optional[str] = None
     quality_score: Optional[float] = None
     notes: Optional[str] = None
@@ -80,7 +80,7 @@ class DeviceConfigRequest(BaseModel):
 
     name: Optional[str] = None
     location: Optional[str] = None
-    connection_params: Optional[Dict[str, Any]] = None
+    connection_params: Optional[dict[str, Any]] = None
     maintenance_date: Optional[datetime] = None
 
 
@@ -90,7 +90,7 @@ class DiagnosticsResponse(BaseModel):
     device_id: str
     timestamp: datetime
     success: bool
-    tests: Dict[str, Any]
+    tests: dict[str, Any]
     error: Optional[str] = None
 
 

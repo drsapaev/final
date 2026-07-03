@@ -5,8 +5,7 @@ EMR v2 Schemas - Pydantic models for API
 from datetime import datetime
 from typing import Any
 
-from pydantic import Field
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from app.schemas.base import ORMModel
 

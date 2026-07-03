@@ -9,7 +9,12 @@ from functools import lru_cache
 from pathlib import Path
 
 from pydantic import AliasChoices, Field, field_validator
-from pydantic_settings import BaseSettings, DotEnvSettingsSource, EnvSettingsSource, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    DotEnvSettingsSource,
+    EnvSettingsSource,
+    SettingsConfigDict,
+)
 
 logger = logging.getLogger(__name__)
 

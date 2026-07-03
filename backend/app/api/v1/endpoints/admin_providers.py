@@ -42,7 +42,7 @@ def _admin_providers_http_error(exc: Exception) -> HTTPException:
 
 @router.get(
     "/admin/providers",
-    response_model=List[PaymentProviderOut],
+    response_model=list[PaymentProviderOut],
     summary="Список всех провайдеров",
 )
 def list_providers(
@@ -264,7 +264,7 @@ def get_provider_stats(
 
 @router.post("/admin/providers/bulk-update", summary="Массовое обновление провайдеров")
 def bulk_update_providers(
-    updates: List[dict],  # Список обновлений: [{"id": 1, "updates": {...}}, ...]
+    updates: list[dict],  # Список обновлений: [{"id": 1, "updates": {...}}, ...]
     db: Session = Depends(get_db),
     _: dict = Depends(require_roles("Admin")),
 ):

@@ -239,7 +239,10 @@ class ServicesApiService:
         return rows
 
     def get_queue_groups_payload(self) -> dict[str, Any]:
-        from app.services.service_mapping import QUEUE_GROUPS, get_queue_group_for_service
+        from app.services.service_mapping import (
+            QUEUE_GROUPS,
+            get_queue_group_for_service,
+        )
 
         groups = {}
         for key, data in QUEUE_GROUPS.items():

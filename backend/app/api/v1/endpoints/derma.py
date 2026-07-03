@@ -415,7 +415,7 @@ async def get_price_overrides(
         None, description="Статус (pending, approved, rejected)"
     ),
     limit: int = Query(50, ge=1, le=100),
-) -> List[PriceOverrideResponse]:
+) -> list[PriceOverrideResponse]:
     """
     Получить список изменений цен дерматолога
     """
@@ -457,7 +457,7 @@ async def get_photo_gallery(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     patient_id: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Получить фотогалерею пациента
     """

@@ -105,7 +105,7 @@ class DepartmentResponseWithSettings(DepartmentResponse):
     queue_prefix: Optional[str] = None
 
 
-def _default_stats() -> Dict[str, int]:
+def _default_stats() -> dict[str, int]:
     return {
         "appointments_today": 0,
         "visits_today": 0,
@@ -138,10 +138,10 @@ def _ensure_department_integrations(
     db: Session,
     department: Department,
     options: Optional[DepartmentIntegrationOptions] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Гарантирует, что отделение подключено к очередям, услугам и мастеру регистрации."""
     opts = options.dict(exclude_unset=True) if options else {}
-    integration_result: Dict[str, Any] = {
+    integration_result: dict[str, Any] = {
         "queue_settings_created": False,
         "registration_settings_created": False,
         "clinic_settings_updated": [],
@@ -294,11 +294,11 @@ def _ensure_department_integrations(
     return integration_result
 
 
-def _collect_department_overview(db: Session) -> Dict[str, Any]:
+def _collect_department_overview(db: Session) -> dict[str, Any]:
     """Формирует реальные показатели по отделениям."""
     today = date.today()
     departments = db.query(Department).order_by(Department.display_order).all()
-    overview_items: List[Dict[str, Any]] = []
+    overview_items: list[dict[str, Any]] = []
 
     totals = {
         "departments": len(departments),
@@ -955,7 +955,7 @@ def _legacy_departments_overview_payload(
 @router.post("/{department_id}/initialize", response_model=dict)
 def initialize_department(
     department_id: int,
-    payload: Optional[Dict[str, Any]] = None,
+    payload: Optional[dict[str, Any]] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

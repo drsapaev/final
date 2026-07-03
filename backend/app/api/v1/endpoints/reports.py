@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db, require_roles
 from app.core.roles import Roles
 from app.models.user import User
-from app.services.reporting_service import get_reporting_service, ReportingService
+from app.services.reporting_service import ReportingService, get_reporting_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class ReportRequest(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     format: str = Field(default="json", pattern="^(json|csv|excel|pdf)$")
-    filters: Optional[Dict[str, Any]] = None
+    filters: Optional[dict[str, Any]] = None
 
 
 class PatientReportRequest(ReportRequest):
@@ -88,9 +88,9 @@ class ScheduleReportRequest(BaseModel):
         pattern="^(patient_report|appointments_report|financial_report|queue_report|doctor_performance_report)$",
     )
     schedule: str = Field(..., pattern="^(daily|weekly|monthly)$")
-    recipients: List[str] = Field(..., min_length=1)
+    recipients: list[str] = Field(..., min_length=1)
     format: str = Field(default="excel", pattern="^(json|csv|excel|pdf)$")
-    filters: Optional[Dict[str, Any]] = None
+    filters: Optional[dict[str, Any]] = None
 
 
 class ReportResponse(BaseModel):
@@ -100,7 +100,7 @@ class ReportResponse(BaseModel):
     report_type: str
     generated_at: str
     format: str
-    data: Optional[Dict[str, Any]] = None
+    data: Optional[dict[str, Any]] = None
     filename: Optional[str] = None
     filepath: Optional[str] = None
     size: Optional[int] = None

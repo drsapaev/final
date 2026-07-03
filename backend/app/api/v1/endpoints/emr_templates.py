@@ -22,7 +22,7 @@ from app.services.emr_templates import EMRTemplateService
 router = APIRouter()
 
 
-@router.get("/templates", response_model=List[EMRTemplateOut])
+@router.get("/templates", response_model=list[EMRTemplateOut])
 async def get_emr_templates(
     specialty: Optional[str] = Query(None, description="Фильтр по специализации"),
     is_public: Optional[bool] = Query(None, description="Только публичные шаблоны"),
@@ -45,7 +45,7 @@ async def get_emr_templates(
         )
 
 
-@router.get("/templates/user", response_model=List[EMRTemplateOut])
+@router.get("/templates/user", response_model=list[EMRTemplateOut])
 async def get_user_templates(
     specialty: Optional[str] = Query(None, description="Фильтр по специализации"),
     db: Session = Depends(get_db),
@@ -231,7 +231,7 @@ async def load_default_templates(
         )
 
 
-@router.get("/emr/{emr_id}/versions", response_model=List[EMRVersionOut])
+@router.get("/emr/{emr_id}/versions", response_model=list[EMRVersionOut])
 async def get_emr_versions(
     emr_id: int,
     limit: int = Query(50, ge=1, le=100),

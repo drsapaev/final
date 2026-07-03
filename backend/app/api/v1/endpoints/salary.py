@@ -3,6 +3,7 @@ Salary History API Endpoints
 Эндпоинты для управления историей зарплат
 """
 
+import logging
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, NoReturn, Optional
@@ -14,8 +15,6 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.user import User
 from app.services.salary_api_service import SalaryApiDomainError, SalaryApiService
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,7 @@ async def get_salary_history(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin", "HR")),
     limit: int = Query(50, ge=1, le=200),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Получить историю изменений зарплаты сотрудника
     """
@@ -87,7 +86,7 @@ async def create_salary_change(
     data: SalaryChangeCreate,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin", "HR")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Создать запись об изменении зарплаты
     """
@@ -107,7 +106,7 @@ async def confirm_salary_change(
     record_id: int,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Подтвердить изменение зарплаты
     """
@@ -131,7 +130,7 @@ async def get_salary_payments(
     user: User = Depends(deps.require_roles("Admin", "HR")),
     year: Optional[int] = None,
     limit: int = Query(24, ge=1, le=100),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Получить историю выплат зарплаты сотрудника
     """
@@ -150,7 +149,7 @@ async def create_salary_payment(
     data: SalaryPaymentCreate,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin", "HR")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Создать запись о выплате зарплаты
     """
@@ -170,7 +169,7 @@ async def update_payment_status(
     payment_method: Optional[str] = None,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Обновить статус выплаты зарплаты
     """
@@ -195,7 +194,7 @@ async def get_salary_summary(
     year: int,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin", "HR")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Получить годовую сводку по зарплате сотрудника
     """

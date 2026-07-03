@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 from app.core.audit import extract_model_changes, log_critical_change
 from app.crud.patient import (
     normalize_patient_name,
-    patient as patient_crud,
     validate_birthdate,
+)
+from app.crud.patient import (
+    patient as patient_crud,
 )
 from app.models.patient import Patient
 from app.models.user import User
