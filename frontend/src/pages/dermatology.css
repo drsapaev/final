@@ -79,3 +79,8 @@
 .derma-p-4 { padding: var(--mac-spacing-4); }
 .derma-p-6 { padding: var(--mac-spacing-6); }
 .derma-p-8 { padding: var(--mac-spacing-8); }
+
+/* ─── Flex center ─── */
+.derma-flex {
+  display: flex;
+}
