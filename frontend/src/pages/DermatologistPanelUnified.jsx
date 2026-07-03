@@ -52,6 +52,7 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 import {
   countAppointmentsByStatuses,
   normalizeNumericId,
+  SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
 
 const API_V1_BASE = getApiBaseUrl();
@@ -1204,14 +1205,14 @@ const DermatologistPanelUnified = () => {
 
       // Автоматически вызвать следующего пациента по дерматологии
       try {
-        logger.info('[Dermatology] callNextWaiting(derma): start');
-        const next = await queueService.callNextWaiting('derma');
-        logger.info('[Dermatology] callNextWaiting(derma): result', next);
+        logger.info('[Dermatology] callNextWaiting(dermatology): start');
+        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DERMATOLOGY);
+        logger.info('[Dermatology] callNextWaiting(dermatology): result', next);
         if (next?.success) {
             notify.success(`Вызван следующий пациент №${next.entry.number}`);
         }
       } catch (err) {
-        logger.warn('[Dermatology] callNextWaiting(derma): failed', err);
+        logger.warn('[Dermatology] callNextWaiting(dermatology): failed', err);
       }
 
     } catch (error) {

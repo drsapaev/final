@@ -69,6 +69,7 @@ import { queueService } from '../services/queue';
 import {
   countAppointmentsByStatuses,
   normalizeNumericId,
+  SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
 
 const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
@@ -1117,7 +1118,7 @@ const DentistPanelUnified = () => {
       // Автовызов следующего пациента по стоматологии
       try {
         logger.info('[Dentistry] callNextWaiting(dentistry): start');
-        const next = await queueService.callNextWaiting('dentistry');
+        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DENTISTRY);
         logger.info('[Dentistry] callNextWaiting(dentistry): result', next);
         if (next?.success && next?.entry?.number) {
           notify.success(`Вызван следующий пациент №${next.entry.number}`);

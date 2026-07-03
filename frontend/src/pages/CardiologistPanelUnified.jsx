@@ -43,7 +43,7 @@ import notify from '../services/notify';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import tokenManager from '../utils/tokenManager';
-import { countAppointmentsByStatuses } from '../utils/doctorPanelShared';
+import { countAppointmentsByStatuses, SPECIALTY_KEYS } from '../utils/doctorPanelShared';
 
 const API_V1_BASE = getApiBaseUrl();
 const CARDIOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
@@ -1178,7 +1178,7 @@ const MacOSCardiologistPanelUnified = () => {
 
       // Автоматически вызвать следующего пациента для кардиолога
       try {
-        const next = await queueService.callNextWaiting('cardiology');
+        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
         if (next?.success) {
           notify.success(`Вызван следующий пациент №${next.entry.number}`);
         }
