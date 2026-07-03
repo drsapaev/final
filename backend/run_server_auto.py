@@ -41,7 +41,7 @@ def run_server():
     # Импортируем приложение
     from app.main import app
 
-    host = os.environ.get("BACKEND_HOST", "0.0.0.0")
+    host = os.environ.get("BACKEND_HOST", "0.0.0.0")  # nosec B104 — intentional bind to all interfaces for dev server
     port = int(os.environ.get("BACKEND_PORT", str(DEFAULT_BACKEND_PORT)))
 
     # Запускаем сервер
@@ -65,7 +65,7 @@ def main():
     os.environ.setdefault("WS_DEV_ALLOW", "1")
     os.environ.setdefault("CORS_DISABLE", "0")
     os.environ.setdefault("REQUIRE_LICENSE", "0")
-    os.environ.setdefault("BACKEND_HOST", "0.0.0.0")
+    os.environ.setdefault("BACKEND_HOST", "0.0.0.0")  # nosec B104 — intentional bind to all interfaces for dev server
     os.environ.setdefault("BACKEND_PORT", str(DEFAULT_BACKEND_PORT))
 
     # Запускаем сервер в отдельном потоке

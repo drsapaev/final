@@ -13,4 +13,4 @@ if __name__ == "__main__":
     print("🌐 CORS: включен для localhost:5173")
     print("=" * 50)
 
-    uvicorn.run(app, host="0.0.0.0", port=18000, reload=False, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=18000, reload=False, log_level="info")  # nosec B104 — intentional bind to all interfaces for dev server

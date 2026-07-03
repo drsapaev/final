@@ -44,7 +44,7 @@ async def get_auth_token():
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req) as response:  # nosec B310 — dev script, controlled URL
             if response.status == 200:
                 data = json.loads(response.read().decode())
                 return data.get("access_token")
@@ -114,7 +114,7 @@ async def test_broadcast_trigger():
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req) as response:  # nosec B310 — dev script, controlled URL
                 print(f"📅 Результат открытия: {response.status}")
         except urllib.error.HTTPError as e:
             print(f"📅 Ошибка открытия: {e.code}")
@@ -133,7 +133,7 @@ async def test_broadcast_trigger():
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req) as response:  # nosec B310 — dev script, controlled URL
                 print(f"🎫 Результат выдачи: {response.status}")
         except urllib.error.HTTPError as e:
             print(f"🎫 Ошибка выдачи: {e.code}")

@@ -192,7 +192,7 @@ def check_orphaned_records(engine, result):
                     FROM {table} c
                     LEFT JOIN {referred_table} p ON c.{constrained_col} = p.{referred_col}
                     WHERE c.{constrained_col} IS NOT NULL AND p.{referred_col} IS NULL
-                """)
+                """)  # nosec B608 — production readiness check, hardcoded table names
 
                 try:
                     count_result = session.execute(query).fetchone()

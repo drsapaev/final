@@ -154,7 +154,8 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
         }
 
         try:
-            response = requests.post(url, data=data)
+            response = requests.post(url, data=data,
+                timeout=30,)
             response.raise_for_status()
             token_data = response.json()
 
@@ -174,7 +175,8 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             headers = {"Authorization": f"Bearer {token}"}
 
             url = "https://graph.microsoft.com/v1.0/print/printers"
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers,
+                timeout=30,)
             response.raise_for_status()
 
             data = response.json()
@@ -205,7 +207,8 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             headers = {"Authorization": f"Bearer {token}"}
 
             url = f"https://graph.microsoft.com/v1.0/print/printers/{printer_id}"
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers,
+                timeout=30,)
             response.raise_for_status()
 
             data = response.json()
@@ -263,7 +266,8 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             url = (
                 f"https://graph.microsoft.com/v1.0/print/printers/{job.printer_id}/jobs"
             )
-            response = requests.post(url, headers=headers, json=job_data)
+            response = requests.post(url, headers=headers, json=job_data,
+                timeout=30,)
             response.raise_for_status()
 
             result = response.json()
@@ -279,7 +283,8 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             headers = {"Authorization": f"Bearer {token}"}
 
             url = f"https://graph.microsoft.com/v1.0/print/jobs/{job_id}"
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers,
+                timeout=30,)
             response.raise_for_status()
 
             data = response.json()
@@ -296,7 +301,8 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             headers = {"Authorization": f"Bearer {token}"}
 
             url = f"https://graph.microsoft.com/v1.0/print/jobs/{job_id}/cancel"
-            response = requests.post(url, headers=headers)
+            response = requests.post(url, headers=headers,
+                timeout=30,)
             response.raise_for_status()
 
             return True

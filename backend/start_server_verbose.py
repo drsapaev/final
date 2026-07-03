@@ -63,7 +63,7 @@ if __name__ == "__main__":
     # Конфигурация uvicorn с МАКСИМАЛЬНЫМ логированием
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104 — intentional bind to all interfaces for dev server
         port=PORT,
         reload=False,  # Отключаем reload для стабильности
         log_level="info",

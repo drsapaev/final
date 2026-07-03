@@ -28,7 +28,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 def start_server():
-    config = uvicorn.Config(app, host="0.0.0.0", port=PORT, log_level="info")
+    config = uvicorn.Config(app, host="0.0.0.0", port=PORT, log_level="info")  # nosec B104 — intentional bind to all interfaces for dev server
     server = uvicorn.Server(config)
     server.run()
 

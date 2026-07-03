@@ -64,6 +64,7 @@ def count_orphans(conn, child_t, child_c, parent_t, parent_c="id"):
     if not table_has(insp, child_t, child_c) or not table_has(insp, parent_t, parent_c):
         return None
     q = sa.text(
+    q = sa.text(  # nosec B608 — audit script with hardcoded table names, no user input
         f"""
         SELECT COUNT(*) AS cnt
         FROM "{child_t}" c

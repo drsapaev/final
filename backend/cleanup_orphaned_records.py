@@ -120,7 +120,7 @@ def cleanup_orphaned_records(engine):
                     FROM {table_name} c
                     LEFT JOIN {referred_table} p ON c.{column_name} = p.{referred_column}
                     WHERE c.{column_name} IS NOT NULL AND p.{referred_column} IS NULL
-                """)
+                """)  # nosec B608 — admin dev script, table names hardcoded in script
                 
                 result = session.execute(count_query).fetchone()
                 orphaned_count = result[0] if result else 0
@@ -147,7 +147,7 @@ def cleanup_orphaned_records(engine):
                                 SELECT 1 FROM {referred_table} p
                                 WHERE p.{referred_column} = {table_name}.{column_name}
                             )
-                        """)
+                        """)  # nosec B608 — admin dev script, table names hardcoded in script
                         result = session.execute(delete_query)
                         affected = result.rowcount
                         session.commit()
@@ -163,7 +163,7 @@ def cleanup_orphaned_records(engine):
                                 SELECT 1 FROM {referred_table} p
                                 WHERE p.{referred_column} = {table_name}.{column_name}
                             )
-                        """)
+                        """)  # nosec B608 — admin dev script, table names hardcoded in script
                         result = session.execute(update_query)
                         affected = result.rowcount
                         session.commit()
@@ -179,7 +179,7 @@ def cleanup_orphaned_records(engine):
                             SELECT 1 FROM {referred_table} p
                             WHERE p.{referred_column} = {table_name}.{column_name}
                         )
-                    """)
+                    """)  # nosec B608 — admin dev script, table names hardcoded in script
                     result = session.execute(delete_query)
                     affected = result.rowcount
                     session.commit()
@@ -235,7 +235,7 @@ def verify_cleanup(engine):
                     FROM {table_name} c
                     LEFT JOIN {referred_table} p ON c.{column_name} = p.{referred_column}
                     WHERE c.{column_name} IS NOT NULL AND p.{referred_column} IS NULL
-                """)
+                """)  # nosec B608 — admin dev script, table names hardcoded in script
                 
                 result = session.execute(count_query).fetchone()
                 count = result[0] if result else 0
