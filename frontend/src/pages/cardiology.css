@@ -1,0 +1,151 @@
+/**
+ * Cardiologist Panel — utility CSS classes.
+ *
+ * CSS migration: extracted from CardiologistPanelUnified.jsx inline styles.
+ * All classes use macOS design system tokens (var(--mac-*)).
+ */
+
+/* ─── Card padding ─── */
+.cardio-card-padded {
+  padding: 24px;
+}
+
+/* ─── Section headings (h3) ─── */
+.cardio-section-heading {
+  display: flex;
+  align-items: center;
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  margin-bottom: 20px;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+}
+
+/* ─── Form labels ─── */
+.cardio-form-label {
+  display: block;
+  font-size: var(--mac-font-size-sm);
+  font-weight: 500;
+  color: var(--mac-text-secondary);
+  margin-bottom: var(--mac-spacing-sm);
+}
+
+/* ─── Icon margins ─── */
+.cardio-icon-mr {
+  margin-right: 8px;
+}
+
+.cardio-icon-mr-sm {
+  margin-right: 6px;
+}
+
+/* ─── Icon colors ─── */
+.cardio-icon-blue {
+  color: var(--mac-blue-500);
+}
+
+/* ─── Grid layouts ─── */
+.cardio-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.cardio-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+/* ─── Flex layouts ─── */
+.cardio-flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-md);
+}
+
+.cardio-flex-col-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-md);
+  max-width: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+
+.cardio-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+/* ─── Text styles ─── */
+.cardio-text-secondary {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+  font-weight: 500;
+}
+
+.cardio-text-sm-mt {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+  margin-top: 4px;
+}
+
+.cardio-text-muted {
+  color: var(--mac-text-tertiary);
+  font-size: var(--mac-font-size-xs);
+}
+
+/* ─── Empty state ─── */
+.cardio-empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Form inputs ─── */
+.cardio-input {
+  padding: var(--mac-spacing-sm) var(--mac-spacing-md);
+  border-radius: var(--mac-radius-md);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-sm);
+  outline: none;
+  width: 100%;
+}
+
+.cardio-input:focus {
+  box-shadow: 0 0 0 2px var(--mac-accent-blue);
+}
+
+/* ─── Status badges ─── */
+.cardio-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: var(--mac-font-size-xs);
+  font-weight: 600;
+}
+
+.cardio-badge-success {
+  background: var(--mac-success-bg);
+  color: var(--mac-success);
+}
+
+.cardio-badge-warning {
+  background: var(--mac-warning-bg);
+  color: var(--mac-warning);
+}
+
+.cardio-badge-info {
+  background: var(--mac-accent-blue-bg);
+  color: var(--mac-accent-blue);
+}
+
+/* ─── Divider ─── */
+.cardio-divider {
+  border-top: 1px solid var(--mac-separator);
+  margin: 20px 0;
+}
