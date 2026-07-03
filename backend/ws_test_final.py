@@ -38,7 +38,7 @@ async def get_auth_token():
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req) as response:  # nosec B310 — dev script, controlled URL
             if response.status == 200:
                 data = json.loads(response.read().decode())
                 return data.get("access_token")
@@ -87,7 +87,7 @@ async def test_ws_with_broadcast(token):
                         headers={"Authorization": f"Bearer {token}"},
                         method="POST",
                     )
-                    with urllib.request.urlopen(req) as response:
+                    with urllib.request.urlopen(req) as response:  # nosec B310 — dev script, controlled URL
                         print(f"📅 Результат открытия: {response.status} OK")
                         response_data = response.read().decode()
                         print(f"📅 Ответ: {response_data}")

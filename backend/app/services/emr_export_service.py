@@ -194,7 +194,7 @@ class EMRExportService:
     async def import_emr_from_xml(self, xml_data: str) -> dict[str, Any]:
         """Импорт EMR из XML формата"""
         try:
-            import xml.etree.ElementTree as ET
+            from defusedxml import ElementTree as ET  # noqa — defusedxml protects against XXE
 
             root = ET.fromstring(xml_data)
 
@@ -278,7 +278,7 @@ class EMRExportService:
                             validation_result["is_valid"] = False
 
             elif format_type == 'xml':
-                import xml.etree.ElementTree as ET
+                from defusedxml import ElementTree as ET  # noqa — defusedxml protects against XXE
 
                 try:
                     root = ET.fromstring(data)

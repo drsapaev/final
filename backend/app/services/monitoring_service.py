@@ -218,7 +218,7 @@ class MonitoringService:
                         continue
                     try:
                         # Безопасно: используем предопределенное имя таблицы из whitelist
-                        result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
+                        result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))  # nosec B608 — table from main_tables whitelist + isalnum validated
                         count = result.scalar()
                         records_count[table] = count
                         total_records += count

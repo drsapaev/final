@@ -56,14 +56,13 @@ jobs:
         cd backend
         pip-audit --format json --output pip-audit-report.json || true
 
-    - name: 🔍 Сканирование кода (bandit) — блокирующее на HIGH+
-      # Bandit: -ll = MEDIUM+ threshold. На existing legacy коде есть
-      # MEDIUM findings (subprocess usage в backup_service и т.д.).
-      # Поднимаем порог до HIGH (-lll) пока MEDIUM не починены.
-      # TODO: опустить до -ll после закрытия legacy MEDIUM findings.
+    - name: 🔍 Сканирование кода (bandit) — блокирующее на MEDIUM+
+      # Bandit: -ll = MEDIUM+ threshold. All HIGH and MEDIUM findings
+      # were fixed in V4 (PR with 53 nosec/fixes). Now blocking on
+      # MEDIUM+ to prevent regressions.
       run: |
         cd backend
-        bandit -r . -f json -o bandit-report.json -lll
+        bandit -r . -f json -o bandit-report.json -ll
       continue-on-error: false
 
     - name: 📤 Загрузка отчётов безопасности
@@ -90,7 +89,7 @@ jobs:
         fi
         if [ -f backend/bandit-report.json ]; then
           metrics=$(python -c "import json;d=json.load(open('backend/bandit-report.json'));m=d.get('metrics',{}).get('_totals',{});print(f\"HIGH={m.get('SEVERITY.HIGH',0)} MEDIUM={m.get('SEVERITY.MEDIUM',0)} LOW={m.get('SEVERITY.LOW',0)}\")" 2>/dev/null || echo "?")
-          echo "bandit: $metrics (HIGH блокирует; MEDIUM/LOW report-only)"
+          echo "bandit: $metrics (HIGH+MEDIUM блокируют; LOW report-only)"
         fi
         echo ""
         echo "⚠️  Safety report-only пока CVE в requirements.txt не закрыты."

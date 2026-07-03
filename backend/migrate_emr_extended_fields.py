@@ -79,7 +79,7 @@ def migrate_emr_table():
                 
                 for field in json_fields:
                     if field in added_fields:
-                        conn.execute(text(f"UPDATE emr SET {field} = '{{}}' WHERE {field} IS NULL"))
+                        conn.execute(text(f"UPDATE emr SET {field} = '{{}}' WHERE {field} IS NULL"))  # nosec B608 — one-shot EMR migration script, hardcoded queries
                 
                 # Устанавливаем ai_confidence по умолчанию
                 if 'ai_confidence' in added_fields:

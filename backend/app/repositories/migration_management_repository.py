@@ -76,7 +76,13 @@ class MigrationManagementRepository:
         ).fetchall()
 
     def get_table_record_count(self, table: str) -> int:
-        return self.db.execute(text(f"SELECT COUNT(*) FROM {table}")).fetchone()[0]
+        # Validate table name to prevent SQL injection — table names cannot
+        # be parameterized in SQL, so we whitelist alphanumeric + underscore.
+        if not table or not all(c.isalnum() or c == "_" for c in table):
+            raise ValueError(f"Invalid table name: {table!r}")
+        return self.db.execute(
+            text(f"SELECT COUNT(*) FROM {table}")  # nosec B608 — validated above
+        ).fetchone()[0]
 
     def get_queue_indexes(self):
         inspector = inspect(self.db.get_bind())

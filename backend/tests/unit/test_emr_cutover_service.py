@@ -59,7 +59,7 @@ class TestEMRCutoverService:
         file_obj = File(
             filename="legacy-note.txt",
             original_filename="legacy-note.txt",
-            file_path="/tmp/legacy-note.txt",
+            file_path="/tmp/legacy-note.txt",  # nosec B108 — test fixture, not production
             file_size=128,
             file_type=FileType.DOCUMENT,
             mime_type="text/plain",

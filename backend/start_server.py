@@ -53,7 +53,7 @@ def port_available(host: str, port: int) -> tuple[bool, str | None]:
 def existing_backend_status(port: int) -> str | None:
     url = f"http://127.0.0.1:{port}/api/v1/health"
     try:
-        with urlopen(url, timeout=2) as response:
+        with urlopen(url, timeout=2) as response:  # nosec B310 — dev script, controlled URL
             return response.read().decode("utf-8")
     except (OSError, URLError):
         return None
@@ -61,7 +61,7 @@ def existing_backend_status(port: int) -> str | None:
 
 def main() -> int:
     env_file = current_dir / ".env"
-    host = os.environ.get("BACKEND_HOST", "0.0.0.0")
+    host = os.environ.get("BACKEND_HOST", "0.0.0.0")  # nosec B104 — intentional bind to all interfaces for dev server
     port = int(os.environ.get("BACKEND_PORT", "18000"))
     under_debugger = debugger_attached()
     reload_enabled = env_flag("BACKEND_RELOAD", default=not under_debugger)

@@ -419,7 +419,7 @@ def migrate_sqlite_to_postgres(
         with target_engine.begin() as target_connection:
             for plan in plans:
                 cursor = sqlite_connection.execute(
-                    f'SELECT * FROM "{plan.table_name}" ORDER BY {", ".join(plan.primary_keys)}'
+                    f'SELECT * FROM "{plan.table_name}" ORDER BY {", ".join(plan.primary_keys)}'  # nosec B608 — one-shot SQLite→PG migration script, hardcoded queries
                 )
                 rows = cursor.fetchall()
                 source_count = len(rows)
@@ -452,7 +452,7 @@ def migrate_sqlite_to_postgres(
                     tuple(row)
                     for row in target_connection.execute(
                         text(
-                            f'SELECT {", ".join(plan.primary_keys)} FROM "{plan.table_name}"'
+                            f'SELECT {", ".join(plan.primary_keys)} FROM "{plan.table_name}"'  # nosec B608 — one-shot SQLite→PG migration script, hardcoded queries
                         )
                     ).fetchall()
                 }
@@ -530,7 +530,7 @@ def migrate_sqlite_to_postgres(
                                     source_primary_key_cache[referred_table] = {
                                         row[0]
                                         for row in sqlite_connection.execute(
-                                            f'SELECT "{referred_column}" FROM "{referred_table}"'
+                                            f'SELECT "{referred_column}" FROM "{referred_table}"'  # nosec B608 — one-shot SQLite→PG migration script, hardcoded queries
                                         ).fetchall()
                                     }
                                 exists = value in source_primary_key_cache[referred_table]
@@ -539,7 +539,7 @@ def migrate_sqlite_to_postgres(
                                 exists = (
                                     target_connection.execute(
                                         text(
-                                            f'SELECT 1 FROM "{referred_table}" '
+                                            f'SELECT 1 FROM "{referred_table}" '  # nosec B608 — one-shot SQLite→PG migration script, hardcoded queries
                                             f'WHERE "{referred_column}" = :value LIMIT 1'
                                         ),
                                         {"value": value},
@@ -612,6 +612,7 @@ def migrate_sqlite_to_postgres(
                 if not dry_run and plan.primary_keys == ("id",):
                     target_connection.execute(
                         text(
+                        text(  # nosec B608 — one-shot SQLite→PG migration script, hardcoded queries
                             f"""
                             SELECT setval(
                                 pg_get_serial_sequence('{plan.table_name}', 'id'),
