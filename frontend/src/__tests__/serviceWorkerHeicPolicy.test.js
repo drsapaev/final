@@ -9,7 +9,7 @@ const serviceWorkerSource = fs
 describe('service worker HEIC policy', () => {
   it('does not execute a remote HEIC converter from a CDN', () => {
     expect(serviceWorkerSource).not.toContain('https://cdn.skypack.dev/heic2any');
-    expect(serviceWorkerSource).not.toMatch(/import\(['"`]https?:\/\/[^'"`]+heic2any/);
+    expect(serviceWorkerSource).not.toMatch(/import\([''`]https?:\/\/[^\''`]+heic2any/);
   });
 
   it('routes HEIC conversion messages to the app fallback path', () => {

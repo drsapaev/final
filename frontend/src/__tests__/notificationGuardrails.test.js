@@ -28,7 +28,7 @@ describe('notification guardrails', () => {
   it('keeps notification surfaces on the shared adapter path', () => {
     for (const filePath of NOTIFICATION_FILES) {
       const content = read(filePath);
-      expect(content).not.toMatch(/from ['"]react-toastify['"]/);
+      expect(content).not.toMatch(/from ['']react-toastify[\'']/);
       expect(content).not.toContain('alert(');
     }
 
