@@ -2960,11 +2960,11 @@ def get_today_queues(
                 "entries": entries,
                 "stats": {
                     "total": len(entries),
-                    "waiting": len([e for e in entries if e["status"] == "waiting"]),
-                    "called": len([e for e in entries if e["status"] == "called"]),
-                    "served": len([e for e in entries if e["status"] == "served"]),
+                    "waiting": len([e for e in entries if e.get("status") == "waiting"]),
+                    "called": len([e for e in entries if e.get("status") == "called"]),
+                    "served": len([e for e in entries if e.get("status") == "served"]),
                     "online_entries": len(
-                        [e for e in entries if e["source"] == "online"]
+                        [e for e in entries if e.get("source") == "online"]
                     ),
                 },
             }
