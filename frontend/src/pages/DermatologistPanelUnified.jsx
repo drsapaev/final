@@ -22,6 +22,7 @@ import {
   Button, MacOSCard, Badge, Input, Textarea, Select, MacOSEmptyState,
 } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import './dermatology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -1430,7 +1431,7 @@ const DermatologistPanelUnified = () => {
           {/* Список пациентов */}
           {activeTab === 'patients' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{
                   fontSize: '18px',
@@ -1485,15 +1486,15 @@ const DermatologistPanelUnified = () => {
                         gap: '12px'
                       }}>
                               <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <Phone size={18} style={{ marginRight: '8px', color: 'var(--mac-accent)' }} />
+                                <Phone size={18} className="derma-icon-mr" style={{ color: 'var(--mac-accent)' }} />
                                 {patient.phone}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <Calendar size={14} style={{ marginRight: '8px' }} />
+                                <Calendar size={14} className="derma-icon-mr" />
                                 {patient.birth_date}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <User size={14} style={{ marginRight: '8px' }} />
+                                <User size={14} className="derma-icon-mr" />
                                 ID: {patient.id}
                               </div>
                             </div>
@@ -1556,7 +1557,7 @@ const DermatologistPanelUnified = () => {
 
           {activeTab === 'visit' && currentAppointment &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{
                   fontSize: '18px',
@@ -1663,7 +1664,7 @@ const DermatologistPanelUnified = () => {
           {activeTab === 'visit' && selectedPatient && !currentAppointment &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Информация о пациенте */}
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -1724,7 +1725,7 @@ const DermatologistPanelUnified = () => {
               </MacOSCard>
 
               {/* Жалобы и диагноз */}
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -1824,7 +1825,7 @@ const DermatologistPanelUnified = () => {
 
               {/* EMR система */}
               {currentAppointment &&
-            <MacOSCard style={{ padding: '24px' }}>
+            <MacOSCard className="derma-p-8">
                   <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -1847,7 +1848,7 @@ const DermatologistPanelUnified = () => {
 
               {/* Система рецептов */}
               {currentAppointment && emr && !emr.is_draft &&
-            <MacOSCard style={{ padding: '24px' }}>
+            <MacOSCard className="derma-p-8">
                   <h3 className="text-lg font-medium mb-4 flex items-center">
                     <TestTube size={20} className="mr-2 text-green-600" />
                     Рецепт
@@ -1863,7 +1864,7 @@ const DermatologistPanelUnified = () => {
             }
 
               {/* Действия */}
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <div className="flex justify-end space-x-3">
                   <Button
                   variant="outline"
@@ -1907,7 +1908,7 @@ const DermatologistPanelUnified = () => {
 
           {activeTab === 'photos' && (currentAppointment || selectedPatient) &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -1928,7 +1929,7 @@ const DermatologistPanelUnified = () => {
 
               </MacOSCard>
 
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -1949,7 +1950,7 @@ const DermatologistPanelUnified = () => {
 
               </MacOSCard>
 
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -1990,7 +1991,7 @@ const DermatologistPanelUnified = () => {
           {/* Осмотр кожи */}
           {activeTab === 'skin' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{
                   fontSize: '18px',
@@ -2064,7 +2065,7 @@ const DermatologistPanelUnified = () => {
 
               {/* Форма осмотра кожи */}
               {showSkinForm &&
-            <MacOSCard style={{ padding: '24px' }}>
+            <MacOSCard className="derma-p-8">
                   <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -2217,7 +2218,7 @@ const DermatologistPanelUnified = () => {
           {/* Косметология */}
           {activeTab === 'cosmetic' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{
                   fontSize: '18px',
@@ -2290,7 +2291,7 @@ const DermatologistPanelUnified = () => {
 
               {/* Форма косметической процедуры */}
               {showCosmeticForm &&
-            <MacOSCard style={{ padding: '24px' }}>
+            <MacOSCard className="derma-p-8">
                   <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -2452,7 +2453,7 @@ const DermatologistPanelUnified = () => {
           {/* Управление услугами */}
           {activeTab === 'services' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
@@ -2635,7 +2636,7 @@ const DermatologistPanelUnified = () => {
           {/* История */}
           {activeTab === 'history' &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="derma-p-8">
                 <h3 style={{
                 fontSize: '18px',
                 fontWeight: '600',
