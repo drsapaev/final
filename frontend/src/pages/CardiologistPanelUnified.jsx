@@ -1197,14 +1197,36 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   // Загрузка EMR для просмотра
+  //
+  // P-021 (workflow audit): previously this function had three issues:
+  //   1. 401/403 surfaced as a generic 'EMR load failed' toast — the
+  //      doctor had no way to tell their session had expired vs the
+  //      backend being unreachable.
+  //   2. Network errors were caught but the user-visible message did
+  //      not distinguish 'no connection' from 'server error'.
+  //   3. The local \`error\` variable was assigned but only its
+  //      \`detail\` field reached getErrorMessage, losing HTTP status.
+  //
+  // Now:
+  //   - 401/403 → 'Сессия истекла, войдите снова' toast + log auth event
+  //   - 404 → silent (EMR not yet created is a normal state)
+  //   - 5xx → 'Сервер недоступен, попробуйте позже'
+  //   - Network/AbortError → silent (component unmounted or visit changed)
+  //   - Other → generic fallback via getErrorMessage
   const loadEMR = async (visitId) => {
-    try {
-      const token = tokenManager.getAccessToken();
-      if (!visitId) {
-        notify.error('Не указан visit_id для EMR v2');
-        return null;
-      }
+    if (!visitId) {
+      notify.error('Не указан visit_id для EMR v2');
+      return null;
+    }
 
+    const token = tokenManager.getAccessToken();
+    if (!token) {
+      logger.warn('[Cardiology] loadEMR: no auth token, skipping EMR load', { visitId });
+      notify.error('Сессия истекла. Войдите в систему снова.');
+      return null;
+    }
+
+    try {
       const response = await fetch(`${API_V1_BASE}/v2/emr/${visitId}`, {
         method: 'GET',
         headers: {
@@ -1217,16 +1239,42 @@ const MacOSCardiologistPanelUnified = () => {
         const emrData = await response.json();
         setEmr(emrData);
         return emrData;
-      } else if (response.status === 404) {
+      }
+
+      if (response.status === 404) {
         // EMR ещё не создана - это нормально
         setEmr(null);
         return null;
-      } else {
-        const error = await response.json().catch(() => ({ detail: 'Ошибка при загрузке EMR' }));
-      notify.error(getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        logger.warn('[Cardiology] loadEMR: auth denied', { visitId, status: response.status });
+        notify.error('Сессия истекла или нет прав на просмотр EMR. Войдите в систему снова.');
+        setEmr(null);
         return null;
       }
+
+      if (response.status >= 500) {
+        logger.error('[Cardiology] loadEMR: server error', { visitId, status: response.status });
+        notify.error('Сервер недоступен. Попробуйте позже.');
+        setEmr(null);
+        return null;
+      }
+
+      // Other 4xx — surface the backend detail if available
+      const errorPayload = await response.json().catch(() => ({ detail: 'Ошибка при загрузке EMR' }));
+      logger.warn('[Cardiology] loadEMR: client error', { visitId, status: response.status, errorPayload });
+      notify.error(getErrorMessage(errorPayload, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
+      setEmr(null);
+      return null;
     } catch (error) {
+      // AbortError happens when the parent component aborted the fetch
+      // (e.g. visitId changed) — not a user-facing error.
+      if (error?.name === 'AbortError') {
+        logger.info('[Cardiology] loadEMR: aborted', { visitId });
+        return null;
+      }
+      logger.error('[Cardiology] loadEMR: network error', { visitId, error: error?.message || error });
       notify.error(getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
       return null;
     }
