@@ -33,9 +33,8 @@ import './cardiology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
-import ECGViewer from '../components/cardiology/ECGViewer';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
-import EchoForm from '../components/cardiology/EchoForm';
+import EcgTab from '../components/cardiology/EcgTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
@@ -1816,37 +1815,14 @@ const MacOSCardiologistPanelUnified = () => {
             </MacOSCard>
           }
 
+          {/* ЭКГ — R-15: extracted to EcgTab component */}
           {activeTab === 'ecg' &&
-          <div style={{
-            width: '100%',
-            maxWidth: 'none',
-            overflow: 'visible',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: getSpacing('xl')
-          }}>
-              <div className="flex justify-end">
-                <Button onClick={() => setShowForm({ open: true, type: 'ecg' })}>
-                  <Plus size={16} className="cardio-icon-mr" /> Добавить ЭКГ
-                </Button>
-              </div>
-              {/* Используем новые компоненты ЭКГ и ЭхоКГ */}
-              <ECGViewer
-              visitId={selectedPatient?.visit_id}
-              patientId={selectedPatient?.patient_id || selectedPatient?.patient?.id}
-              onDataUpdate={() => {
-                loadPatientData();
-              }} />
-
-
-              <EchoForm
-              visitId={selectedPatient?.visit_id}
-              patientId={selectedPatient?.patient_id || selectedPatient?.patient?.id}
-              onDataUpdate={() => {
-                loadPatientData();
-              }} />
-
-            </div>
+            <EcgTab
+              selectedPatient={selectedPatient}
+              onAddEcg={() => setShowForm({ open: true, type: 'ecg' })}
+              onDataUpdate={loadPatientData}
+              getSpacing={getSpacing}
+            />
           }
 
           {/* Анализы крови — R-15: extracted to BloodTestsTab component */}
