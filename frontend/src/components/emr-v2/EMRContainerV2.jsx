@@ -55,6 +55,20 @@ import './EMRContainerV2.css';
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
 import notify from '../../services/notify';
+// QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
+// (consistent with the rest of the app + screen-reader friendly via aria-label).
+import {
+    HelpCircle,
+    Ghost,
+    History,
+    Undo2,
+    Redo2,
+    RefreshCw,
+    Save,
+    CheckCircle2,
+    FilePenLine,
+    Ban,
+} from 'lucide-react';
 
 /**
  * EMRContainerV2 Component
@@ -337,7 +351,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             ...prev,
                             [fieldName]: [{
                                 id: 'info-no-complaints',
-                                content: '💡 Для AI-подсказок сначала заполните поле «Жалобы»',
+                                content: 'Для AI-подсказок сначала заполните поле «Жалобы»',
                                 source: 'info',
                                 confidence: 0,
                                 isInfo: true  // Marking as info, not a real suggestion
@@ -500,8 +514,9 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             className="emr-v2-btn emr-v2-btn--icon"
                             onClick={() => setShowHelp(true)}
                             title="Справка и безопасность"
+                            aria-label="Справка и безопасность"
                         >
-                            ❓
+                            <HelpCircle size={16} aria-hidden="true" />
                         </button>
 
                         <button
@@ -509,29 +524,33 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             onClick={toggleGhostMode}
                             disabled={isSigned || isAmended}
                             title={isSigned ? 'Недоступно в подписанной карте' : 'Расширенный режим ввода (экспериментальный)'}
+                            aria-label={isSigned ? 'Ghost Mode недоступен в подписанной карте' : 'Переключить расширенный режим ввода (Ghost Mode)'}
+                            aria-pressed={experimentalGhostMode}
                         >
-                            👻
+                            <Ghost size={16} aria-hidden="true" />
                         </button>
                         <button
                             className="emr-v2-btn emr-v2-btn--icon"
                             onClick={() => setShowHistory(!showHistory)}
                             title="История изменений"
+                            aria-label="История изменений"
+                            aria-expanded={showHistory}
                         >
-                            📜
+                            <History size={16} aria-hidden="true" />
                         </button>
                     </div>
                 </header>
 
                 {/* Toolbar */}
                 <div className="emr-v2-toolbar">
-                    <button onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)">
-                        ↩️ Отменить
+                    <button onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)" aria-label="Отменить (Ctrl+Z)">
+                        <Undo2 size={14} aria-hidden="true" /> Отменить
                     </button>
-                    <button onClick={redo} disabled={!canRedo} title="Повторить (Ctrl+Y)">
-                        ↪️ Повторить
+                    <button onClick={redo} disabled={!canRedo} title="Повторить (Ctrl+Y)" aria-label="Повторить (Ctrl+Y)">
+                        <Redo2 size={14} aria-hidden="true" /> Повторить
                     </button>
-                    <button onClick={loadEMR} title="Обновить">
-                        🔄 Обновить
+                    <button onClick={loadEMR} title="Обновить" aria-label="Обновить EMR">
+                        <RefreshCw size={14} aria-hidden="true" /> Обновить
                     </button>
                 </div>
 
@@ -696,8 +715,8 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                 {/* Actions */}
                 <div className="emr-v2-actions">
                     {accessDenied && (
-                        <div className="emr-v2-signed-badge" style={{ marginBottom: 8 }}>
-                            ⛔ Нет прав на сохранение этой EMR
+                        <div className="emr-v2-signed-badge" style={{ marginBottom: 8 }} role="alert">
+                            <Ban size={14} aria-hidden="true" /> Нет прав на сохранение этой EMR
                         </div>
                     )}
                     {!isSigned ? (
@@ -706,30 +725,37 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                                 className="emr-v2-btn emr-v2-btn--primary"
                                 onClick={() => saveEMR({ isDraft: false })}
                             disabled={isSaving || !isDirty || accessDenied}
+                            aria-label={isSaving ? 'Сохранение EMR' : 'Сохранить EMR'}
                         >
-                            {isSaving ? '💾 Сохранение...' : '💾 Сохранить'}
+                            {isSaving ? (
+                                <><Save size={14} aria-hidden="true" /> Сохранение...</>
+                            ) : (
+                                <><Save size={14} aria-hidden="true" /> Сохранить</>
+                            )}
                         </button>
                             <button
                                 className="emr-v2-btn emr-v2-btn--success"
                                 onClick={handleSign}
                                 disabled={isSaving || isDirty || accessDenied}
                                 title={accessDenied ? 'Нет прав на изменение EMR' : (isDirty ? 'Сначала сохраните' : 'Подписать')}
+                                aria-label="Подписать EMR"
                             >
-                                ✅ Подписать
+                                <CheckCircle2 size={14} aria-hidden="true" /> Подписать
                             </button>
                         </>
                     ) : (
                         <>
                             <div className="emr-v2-signed-badge">
-                                ✅ Подписана {isAmended && '(с поправками)'}
+                                <CheckCircle2 size={14} aria-hidden="true" /> Подписана {isAmended && '(с поправками)'}
                             </div>
 
                             {!showAmendForm ? (
                                 <button
                                     className="emr-v2-btn emr-v2-btn--warning"
                                     onClick={() => setShowAmendForm(true)}
+                                    aria-label="Внести поправку в подписанную EMR"
                                 >
-                                    📝 Внести поправку
+                                    <FilePenLine size={14} aria-hidden="true" /> Внести поправку
                                 </button>
                             ) : (
                                 <div className="emr-v2-amend-form">
