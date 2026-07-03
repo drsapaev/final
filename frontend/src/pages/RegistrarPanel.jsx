@@ -234,259 +234,8 @@ const RegistrarPanel = () => {
 
   // Отладка состояния загрузки
   useEffect(() => {
-
-
-
-
     // logger.info('⏳ appointmentsLoading changed:', appointmentsLoading);
   }, [appointmentsLoading]); // Отладка изменений appointments
-  useEffect(() => {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      // logger.info('📋 appointments changed, count:', appointments.length);
-      // if (appointments.length > 0) {
-      //   logger.info('📋 Первая запись в состоянии:', appointments[0]);
-      // }
-      // Тестируем агрегацию пациентов при изменении данных (debug отключен)
-      /*if (appointments.length > 0) {
-        setTimeout(() => {
-          logger.info('🧪 Тестирование агрегации пациентов:');
-          logger.info('Исходные записи:', appointments.length);
-           // Простая функция агрегации для тестирования
-          const patientGroups = {};
-          appointments.forEach(appointment => {
-            const patientKey = appointment.patient_fio;
-            if (!patientGroups[patientKey]) {
-              patientGroups[patientKey] = {
-                patient_fio: appointment.patient_fio,
-                services: [],
-                departments: new Set(),
-                cost: 0 // Общая стоимость
-              };
-            }
-             // Суммируем стоимость
-            if (appointment.cost) {
-              patientGroups[patientKey].cost += appointment.cost;
-            }
-             if (appointment.services && Array.isArray(appointment.services)) {
-              appointment.services.forEach(service => {
-                if (!patientGroups[patientKey].services.includes(service)) {
-                  patientGroups[patientKey].services.push(service);
-                }
-              });
-            }
-            if (appointment.department) {
-              patientGroups[patientKey].departments.add(appointment.department);
-            }
-          });
-           const aggregated = Object.values(patientGroups);
-          logger.info('После агрегации:', aggregated.length);
-           // Находим первого пациента для тестирования
-          const firstPatient = aggregated[0];
-          if (firstPatient) {
-            logger.info('Первый пациент после агрегации:', firstPatient.patient_fio);
-            logger.info('Количество услуг:', firstPatient.services.length);
-            logger.info('Услуги:', firstPatient.services);
-            logger.info('Отделения:', Array.from(firstPatient.departments));
-            logger.info('Общая стоимость:', firstPatient.cost);
-          }
-        }, 100);
-      }*/}, [appointments]); // Убираем дублирование - filteredAppointments уже определена ниже в коде
   const [showSlotsModal, setShowSlotsModal] = useState(false);
   // QW-02 fix: hold the date the user picks in the inline date input inside the
   // reschedule slots dialog. Replaces the previous window.prompt() call that was
@@ -580,7 +329,6 @@ const RegistrarPanel = () => {
 
   // Улучшенная загрузка записей с поддержкой тихого режима
   const loadAppointments = useCallback(async (options = {}) => {
-    // console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
     const { silent = false } = options || {};
     const callSource = String(options?.source || 'unknown');
     const isAutoRefreshCall = callSource === 'auto_refresh';
@@ -611,7 +359,6 @@ const RegistrarPanel = () => {
 
       // Проверяем наличие токена
       const token = tokenManager.getAccessToken();
-      // console.log('🔍 loadAppointments: token exists:', !!token);
       if (!token) {
         logger.warn('Токен аутентификации отсутствует, показываем пустое состояние');
         startTransition(() => {
@@ -622,27 +369,14 @@ const RegistrarPanel = () => {
       }
 
 
-      // console.log('🔍 loadAppointments: making request');
-
-
       // Используем новый эндпоинт для получения очередей на указанную дату
       // Если календарь открыт, используем historyDate, иначе сегодня
       const urlDate = searchParams.get('date');
       const dateParam = showCalendar && historyDate ? historyDate : urlDate || getLocalDateString();
-      /* console.log('📅 Параметры для loadAppointments:', {
-        source: callSource,
-        showCalendar,
-        historyDate,
-        dateParam,
-        activeTab
-      }); */
 
       const params = new URLSearchParams();
       params.append('target_date', dateParam);
 
-
-
-      // console.log('🔍 loadAppointments: requesting with params:', { target_date: dateParam });
 
 
       const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } });
@@ -654,26 +388,8 @@ const RegistrarPanel = () => {
       let appointmentsData = [];
 
       if (data && typeof data === 'object') {
-        // Временно отключено логирование больших объектов для диагностики
-        // logger.info('📊 Получены данные от сервера:', data);
-        // console.log('📊 Получены данные от сервера (count):', data.queues?.length || 0);
-
-
         // Обрабатываем формат от эндпоинта registrar_integration.py
         if (data.queues && Array.isArray(data.queues)) {
-          // console.log('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
-          // ✅ ОТЛАДКА: Логируем структуру данных от сервера
-          /*data.queues.forEach((q, idx) => {
-            logger.info(`  Очередь ${idx + 1}: specialty=${q.specialty}, entries=${q.entries?.length || 0}`);
-            if (q.entries && q.entries.length > 0) {
-              q.entries.slice(0, 2).forEach((e, eIdx) => {
-                const entryData = e.data || e;
-                logger.info(`    Запись ${eIdx + 1}: type=${e.type}, id=${entryData?.id}, patient_id=${entryData?.patient_id}, patient_name=${entryData?.patient_name}`);
-              });
-            }
-          });*/
-
-
           // ⭐ SSOT: Simple flatMap - no deduplication, no aggregation
           // Each backend entry = one frontend row
           // Removed: appointmentsMap, mergedByPatientKey, getAppointmentKey, calcPriority, mergeAppointments
