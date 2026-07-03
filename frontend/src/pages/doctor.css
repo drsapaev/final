@@ -131,3 +131,95 @@
   margin: 0 auto;
 }
 .doctor-empty-action { margin-top: var(--mac-spacing-md, 12px); }
+
+/* ─── Stat cards (batch 3) ─── */
+.doctor-stat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-md, 16px);
+}
+.doctor-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mac-text-on-accent);
+}
+.doctor-stat-num {
+  font-size: var(--mac-font-size-2xl, 24px);
+  font-weight: 700;
+  color: var(--mac-text-primary);
+}
+.doctor-stat-label {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Search box (batch 3) ─── */
+.doctor-search-wrap { position: relative; }
+.doctor-search-icon {
+  position: absolute;
+  left: var(--mac-spacing-sm, 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mac-text-tertiary);
+  pointer-events: none;
+}
+.doctor-search-input {
+  padding: var(--mac-spacing-sm, 8px) var(--mac-spacing-sm, 8px) var(--mac-spacing-sm, 8px) 40px;
+  border: 1px solid var(--mac-border, #e5e7eb);
+  border-radius: 12px;
+  font-size: var(--mac-font-size-sm);
+  background: var(--mac-card-bg, #ffffff);
+  color: var(--mac-text-primary);
+}
+.doctor-filter-select {
+  padding: var(--mac-spacing-sm, 8px);
+  border: 1px solid var(--mac-border, #e5e7eb);
+  border-radius: 12px;
+  font-size: var(--mac-font-size-sm);
+  background: var(--mac-card-bg, #ffffff);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Action buttons (batch 3) ─── */
+.doctor-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.doctor-action-btn-primary { background: var(--mac-accent-light, rgba(0,122,255,0.1)); color: var(--mac-accent); }
+.doctor-action-btn-success { background: rgba(52, 199, 89, 0.12); color: var(--mac-success); }
+.doctor-action-btn-danger { background: rgba(255, 59, 48, 0.12); color: var(--mac-danger); }
+.doctor-action-btn-info { background: rgba(88, 86, 214, 0.12); color: var(--mac-accent-purple); }
+.doctor-action-btn-warning { background: rgba(255, 149, 0, 0.12); color: var(--mac-accent-orange); }
+
+/* ─── Section header (batch 3) ─── */
+.doctor-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-md, 16px);
+}
+.doctor-section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mac-text-primary);
+  margin: 0;
+}
+.doctor-section-actions {
+  display: flex;
+  gap: var(--mac-spacing-md, 16px);
+  align-items: center;
+  flex-wrap: wrap;
+}
