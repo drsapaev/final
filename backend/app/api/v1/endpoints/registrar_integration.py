@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -1532,6 +1532,206 @@ def _get_visit_created_at(visit: Any) -> Any:
     return visit.created_at
 
 
+
+# ===================== R-22 Phase 3: Online entries + Appointment processing =====================
+
+
+_SPECIALTY_MAPPING = {
+    "cardio": "cardiology",
+    "cardiology": "cardiology",
+    "derma": "dermatology",
+    "dermatology": "dermatology",
+    "dentist": "stomatology",
+    "stomatology": "stomatology",
+    "lab": "laboratory",
+    "laboratory": "laboratory",
+    "ecg": "echokg",
+    "echokg": "echokg",
+}
+
+
+def _process_online_queue_entries(
+    db: Session,
+    online_entries: list,
+    visits: list,
+    queues_by_specialty: dict,
+    seen_visit_ids: set,
+) -> None:
+    """R-22 Phase 3: Process OnlineQueueEntry records into specialty queues."""
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue
+
+    for online_entry in online_entries:
+        if online_entry.visit_id and online_entry.visit_id in seen_visit_ids:
+            continue
+
+        if not online_entry.visit_id and online_entry.patient_id:
+            is_qr_entry = online_entry.source in ('online', 'confirmation')
+            if not is_qr_entry:
+                patient_has_visit = any(
+                    v.patient_id == online_entry.patient_id for v in visits
+                )
+                if patient_has_visit:
+                    continue
+
+        daily_queue = (
+            db.query(DailyQueue)
+            .filter(DailyQueue.id == online_entry.queue_id)
+            .first()
+        )
+        if not daily_queue:
+            continue
+
+        doctor = db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
+        integrity_warnings: list[str] = []
+        if not doctor:
+            integrity_warnings.append("linked_doctor_missing")
+
+        specialty = None
+        if daily_queue.queue_tag:
+            specialty = daily_queue.queue_tag.lower()
+        elif doctor and doctor.department:
+            specialty = doctor.department.lower()
+        else:
+            specialty = "general"
+
+        specialty = _SPECIALTY_MAPPING.get(specialty, specialty)
+
+        if doctor and not doctor.user_id:
+            integrity_warnings.append("doctor_without_user")
+        if doctor and doctor.user and not doctor.user.is_active:
+            integrity_warnings.append("doctor_user_inactive")
+        if doctor and not doctor.active:
+            integrity_warnings.append("doctor_inactive")
+        if doctor and not doctor.cabinet:
+            integrity_warnings.append("doctor_cabinet_missing")
+
+        _ensure_specialty_queue(queues_by_specialty, specialty, doctor.id if doctor else daily_queue.specialist_id)
+        bucket = queues_by_specialty[specialty]
+        bucket.setdefault("integrity_warnings", [])
+        for warning in integrity_warnings:
+            if warning not in bucket["integrity_warnings"]:
+                bucket["integrity_warnings"].append(warning)
+
+        if doctor and doctor.id:
+            bucket["doctor"] = doctor
+            bucket["doctor_id"] = doctor.id
+
+        entry_time = (
+            online_entry.queue_time
+            if online_entry.queue_time
+            else (online_entry.created_at if online_entry.created_at else datetime.now())
+        )
+
+        bucket["entries"].append({
+            "type": "online_queue",
+            "data": online_entry,
+            "created_at": online_entry.created_at if online_entry.created_at else datetime.now(),
+            "queue_time": entry_time,
+        })
+
+
+def _process_legacy_appointments(
+    db: Session,
+    appointments: list,
+    queues_by_specialty: dict,
+    seen_appointment_ids: set,
+    today: "date",
+) -> None:
+    """R-22 Phase 3: Process legacy Appointment records into specialty queues."""
+    from app.models.service import Service
+    from app.models.visit import Visit
+
+    for appointment in appointments:
+        if appointment.id in seen_appointment_ids:
+            continue
+        seen_appointment_ids.add(appointment.id)
+
+        specialty = None
+        appointment_date = getattr(appointment, 'appointment_date', today)
+        patient_id = getattr(appointment, 'patient_id', None)
+
+        if hasattr(appointment, 'services') and appointment.services:
+            for service_item in appointment.services:
+                service = None
+                if isinstance(service_item, dict):
+                    service_id = service_item.get('id')
+                    if service_id:
+                        service = db.query(Service).filter(Service.id == service_id).first()
+                elif isinstance(service_item, int):
+                    service = db.query(Service).filter(Service.id == service_item).first()
+                elif isinstance(service_item, str):
+                    service = db.query(Service).filter(Service.name == service_item).first()
+                if service and service.department_key:
+                    specialty = service.department_key
+                    break
+
+        if not specialty:
+            specialty = getattr(appointment, 'department', None) or "general"
+
+        visit_exists = False
+        doctor_id = getattr(appointment, 'doctor_id', None)
+        if patient_id and appointment_date:
+            try:
+                visit_filters = [
+                    Visit.patient_id == patient_id,
+                    Visit.visit_date == appointment_date,
+                ]
+                if doctor_id is not None:
+                    visit_filters.append(Visit.doctor_id == doctor_id)
+                else:
+                    visit_filters.append(Visit.doctor_id.is_(None))
+                existing_visit = db.query(Visit).filter(and_(*visit_filters)).first()
+                if existing_visit:
+                    visit_exists = True
+            except Exception:
+                pass
+
+        if visit_exists:
+            continue
+
+        _ensure_specialty_queue(queues_by_specialty, specialty, doctor_id)
+
+        appointment_queue_time = None
+        try:
+            if patient_id and appointment_date and doctor_id is not None:
+                queue_entry_row = db.execute(
+                    text("""
+                        SELECT qe.queue_time
+                        FROM queue_entries qe
+                        JOIN daily_queues dq ON qe.queue_id = dq.id
+                        WHERE qe.patient_id = :patient_id
+                          AND qe.visit_id IS NULL
+                          AND dq.day = :appointment_date
+                          AND dq.specialist_id = :doctor_id
+                        ORDER BY qe.created_at DESC
+                        LIMIT 1
+                    """),
+                    {
+                        "patient_id": patient_id,
+                        "appointment_date": appointment_date,
+                        "doctor_id": doctor_id,
+                    },
+                ).first()
+                if queue_entry_row and queue_entry_row.queue_time:
+                    appointment_queue_time = queue_entry_row.queue_time
+        except Exception:
+            pass
+
+        queues_by_specialty[specialty]["entries"].append({
+            "type": "appointment",
+            "data": appointment,
+            "created_at": appointment.created_at,
+            "queue_time": appointment_queue_time,
+        })
+
+        if not queues_by_specialty[specialty]["doctor"]:
+            appointment_doctor = getattr(appointment, 'doctor', None)
+            if appointment_doctor:
+                queues_by_specialty[specialty]["doctor"] = appointment_doctor
+
+
+
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
 
 
@@ -1799,308 +1999,16 @@ def get_today_queues(
             # ✅ ИСПРАВЛЕНО: Убрана логика обновления doctor_id для visit записей, если specialty уже существует
             # Это предотвращает перезапись doctor_id, установленного online_queue записями (которые обрабатываются позже)
 
-        # [OK] ДОБАВЛЕНО: Обрабатываем записи из онлайн-очереди (OnlineQueueEntry)
-        from app.models.clinic import Doctor
-        from app.models.online_queue import DailyQueue, OnlineQueueEntry
+        # R-22 Phase 3: online entries processing extracted to helper
+        _process_online_queue_entries(db, online_entries, visits, queues_by_specialty, seen_visit_ids)
 
-        for online_entry in online_entries:
-            # ⭐ PHASE 1.1: OnlineQueueEntry теперь ЕДИНСТВЕННЫЙ источник очереди
-            # Проверка seen_visit_ids нужна только для Visit БЕЗ OQE (редкий edge case)
-            if online_entry.visit_id and online_entry.visit_id in seen_visit_ids:
-                logger.debug(
-                    "get_today_queues: PHASE 1.1 - OQE %d пропущен, Visit %d был обработан (без OQE - edge case)",
-                    online_entry.id,
-                    online_entry.visit_id,
-                )
-                continue
-            
-            # ⭐ ДОПОЛНИТЕЛЬНО: Пропускаем "сиротские" OnlineQueueEntry (без visit_id) 
-            # если для этого пациента уже есть Visit на сегодня
-            # ✅ FIX 11: НО НЕ пропускаем QR-записи! Они должны показывать source='online'
-            if not online_entry.visit_id and online_entry.patient_id:
-                # ✅ FIX 11: QR-записи (source='online' или 'confirmation') НЕ пропускаем
-                is_qr_entry = online_entry.source in ('online', 'confirmation')
-                if is_qr_entry:
-                    logger.debug(
-                        "get_today_queues: OnlineQueueEntry - QR-запись, НЕ пропускаем",
-                    )
-                else:
-                    # Проверяем есть ли Visit для этого пациента на сегодня
-                    patient_has_visit = any(
-                        v.patient_id == online_entry.patient_id 
-                        for v in visits
-                    )
-                    if patient_has_visit:
-                        logger.debug(
-                            "get_today_queues: Пропуск OnlineQueueEntry %d - пациент %d уже имеет Visit на сегодня",
-                            online_entry.id,
-                            online_entry.patient_id,
-                        )
-                        continue
-            
-            daily_queue = (
-                db.query(DailyQueue)
-                .filter(DailyQueue.id == online_entry.queue_id)
-                .first()
-            )
-            if not daily_queue:
-                continue
-
-            # ✅ CANONICAL: DailyQueue.specialist_id должен указывать на Doctor.id.
-            # Старые записи с user_id больше не auto-link'им: вместо этого оставляем
-            # запись видимой и помечаем её как требующую deterministic repair.
-            doctor = db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
-            integrity_warnings: list[str] = []
-            if not doctor:
-                integrity_warnings.append("linked_doctor_missing")
-                logger.warning(
-                    "get_today_queues: DailyQueue %d specialist_id=%s does not resolve to Doctor.id",
-                    daily_queue.id,
-                    daily_queue.specialist_id,
-                )
-
-            # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.department
-            # queue_tag - это точное указание очереди, созданное при регистрации
-            specialty = None
-            if daily_queue.queue_tag:
-                specialty = daily_queue.queue_tag.lower()
-            elif doctor.department:
-                specialty = doctor.department.lower()
-            else:
-                specialty = "general"
-
-            # Маппинг specialty для соответствия с другими записями
-            specialty_mapping = {
-                "cardio": "cardiology",
-                "cardiology": "cardiology",
-                "derma": "dermatology",
-                "dermatology": "dermatology",
-                "dentist": "stomatology",
-                "stomatology": "stomatology",
-                "lab": "laboratory",
-                "laboratory": "laboratory",
-                "ecg": "echokg",  # [OK] ДОБАВЛЕНО: маппинг для ЭКГ
-                "echokg": "echokg",
-            }
-            specialty = specialty_mapping.get(specialty, specialty)
-
-            if doctor and not doctor.user_id:
-                integrity_warnings.append("doctor_without_user")
-            if doctor and doctor.user and not doctor.user.is_active:
-                integrity_warnings.append("doctor_user_inactive")
-            if doctor and not doctor.active:
-                integrity_warnings.append("doctor_inactive")
-            if doctor and not doctor.cabinet:
-                integrity_warnings.append("doctor_cabinet_missing")
-
-            if specialty not in queues_by_specialty:
-                queues_by_specialty[specialty] = {
-                    "entries": [],
-                    "doctor": doctor,
-                    "doctor_id": doctor.id if doctor else daily_queue.specialist_id,
-                    "integrity_warnings": list(dict.fromkeys(integrity_warnings)),
-                }
-            else:
-                # ✅ ИСПРАВЛЕНО: Обновляем doctor_id и doctor, если specialty уже существует
-                # Приоритет у online_queue записей (они обрабатываются после visit и отражают актуальное состояние)
-                # Это важно, когда для одной специальности есть записи от разных врачей
-                bucket = queues_by_specialty[specialty]
-                bucket.setdefault("integrity_warnings", [])
-                for warning in integrity_warnings:
-                    if warning not in bucket["integrity_warnings"]:
-                        bucket["integrity_warnings"].append(warning)
-
-                if doctor and doctor.id:
-                    # ✅ ИСПРАВЛЕНО: Всегда обновляем doctor_id для online_queue записей
-                    # Это гарантирует, что если есть QR-записи от врача 4, doctor_id будет 4
-                    queues_by_specialty[specialty]["doctor"] = doctor
-                    queues_by_specialty[specialty]["doctor_id"] = doctor.id
-
-            # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
-            # Приоритет: queue_time > created_at
-            entry_time = (
-                online_entry.queue_time
-                if online_entry.queue_time
-                else (
-                    online_entry.created_at
-                    if online_entry.created_at
-                    else datetime.now()
-                )
-            )
-
-            # Добавляем запись из онлайн-очереди
-            queues_by_specialty[specialty]["entries"].append(
-                {
-                    "type": "online_queue",
-                    "data": online_entry,
-                    "created_at": (
-                        online_entry.created_at
-                        if online_entry.created_at
-                        else datetime.now()
-                    ),
-                    "queue_time": entry_time,  # ⭐ ВАЖНО: queue_time для правильной сортировки
-                }
-            )
-
-            logger.debug(
-                "get_today_queues: QR-запись добавлена: ID=%d, specialty=%s, queue_tag=%s, number=%d, patient=%s",
-                online_entry.id,
-                specialty,
-                daily_queue.queue_tag,
-                online_entry.number,
-                online_entry.patient_name,
-            )
-
-        # Обрабатываем Appointment (старая система)
-        # Подгружаем актуальный статус оплаты из payments при наличии
-        from app.models.payment import Payment
-
-        for appointment in appointments:
-            # Пропускаем если уже обработан
-            if appointment.id in seen_appointment_ids:
-                continue
-            seen_appointment_ids.add(appointment.id)
-
-            # [OK] ОБНОВЛЕНО: Определяем специальность из appointment
-            # Приоритет: services.department_key > appointment.department > "general"
-            specialty = None
-            appointment_date = getattr(appointment, 'appointment_date', today)
-            patient_id = getattr(appointment, 'patient_id', None)
-
-            # Проверяем department_key из услуг appointment
-            if hasattr(appointment, 'services') and appointment.services:
-                from app.models.service import Service
-
-                for service_item in appointment.services:
-                    service = None
-                    if isinstance(service_item, dict):
-                        service_id = service_item.get('id')
-                        if service_id:
-                            service = (
-                                db.query(Service)
-                                .filter(Service.id == service_id)
-                                .first()
-                            )
-                    elif isinstance(service_item, int):
-                        service = (
-                            db.query(Service).filter(Service.id == service_item).first()
-                        )
-                    elif isinstance(service_item, str):
-                        # [OK] ДОБАВЛЕНО: Поиск услуги по названию (Appointment.services - это JSON строк)
-                        service = (
-                            db.query(Service)
-                            .filter(Service.name == service_item)
-                            .first()
-                        )
-
-                    if service and service.department_key:
-                        specialty = service.department_key
-                        break
-
-            # Fallback на appointment.department
-            if not specialty:
-                specialty = getattr(appointment, 'department', None) or "general"
-
-            # [OK] УПРОЩЕНО: Проверяем, нет ли уже Visit для этого Appointment (чтобы избежать дубликатов)
-            # Используем проверки вместо try/except (Single Source of Truth)
-            visit_exists = False
-            doctor_id = getattr(appointment, 'doctor_id', None)
-
-            # Проверяем наличие обязательных данных перед запросом
-            if patient_id and appointment_date:
-                try:
-                    # Строим фильтр для поиска соответствующего Visit
-                    visit_filters = [
-                        Visit.patient_id == patient_id,
-                        Visit.visit_date == appointment_date,
-                    ]
-
-                    # doctor_id может быть None, поэтому добавляем его в фильтр только если он не None
-                    if doctor_id is not None:
-                        visit_filters.append(Visit.doctor_id == doctor_id)
-                    else:
-                        # Если doctor_id None, ищем Visit с doctor_id None
-                        visit_filters.append(Visit.doctor_id.is_(None))
-
-                    existing_visit = (
-                        db.query(Visit).filter(and_(*visit_filters)).first()
-                    )
-                    if existing_visit:
-                        visit_exists = True
-                        logger.debug(
-                            "get_today_queues: Пропущен Appointment %d - есть соответствующий Visit %d",
-                            appointment.id,
-                            existing_visit.id,
-                        )
-                except Exception as check_error:
-                    # Если проверка не удалась, логируем и продолжаем - лучше показать дубликат, чем упасть с ошибкой
-                    logger.warning(
-                        "get_today_queues: Ошибка при проверке дубликатов для Appointment %s: %s",
-                        getattr(appointment, 'id', 'unknown'),
-                        check_error,
-                        exc_info=True,
-                    )
-                    # Не прерываем выполнение - продолжаем обработку Appointment
-
-            if visit_exists:
-                continue
-
-            if specialty not in queues_by_specialty:
-                queues_by_specialty[specialty] = {
-                    "entries": [],
-                    "doctor": None,
-                    "doctor_id": getattr(appointment, 'doctor_id', None),
-                }
-
-            # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
-            appointment_queue_time = None
-            try:
-                from sqlalchemy import text
-
-                if patient_id and appointment_date and doctor_id is not None:
-                    queue_entry_row = db.execute(
-                        text(
-                            """
-                            SELECT qe.queue_time
-                            FROM queue_entries qe
-                            JOIN daily_queues dq ON qe.queue_id = dq.id
-                            WHERE qe.patient_id = :patient_id
-                              AND qe.visit_id IS NULL
-                              AND dq.day = :appointment_date
-                              AND dq.specialist_id = :doctor_id
-                            ORDER BY qe.created_at DESC
-                            LIMIT 1
-                            """
-                        ),
-                        {
-                            "patient_id": patient_id,
-                            "appointment_date": appointment_date,
-                            "doctor_id": doctor_id,
-                        },
-                    ).first()
-                    if queue_entry_row and queue_entry_row.queue_time:
-                        appointment_queue_time = queue_entry_row.queue_time
-            except Exception:
-                pass  # Тихая ошибка - используем created_at как fallback
-
-            queues_by_specialty[specialty]["entries"].append(
-                {
-                    "type": "appointment",
-                    "data": appointment,
-                    "created_at": appointment.created_at,
-                    "queue_time": appointment_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
-                }
-            )
-
-            # [OK] УПРОЩЕНО: Используем getattr вместо try/except (Single Source of Truth)
-            if not queues_by_specialty[specialty]["doctor"]:
-                appointment_doctor = getattr(appointment, 'doctor', None)
-                if appointment_doctor:
-                    queues_by_specialty[specialty]["doctor"] = appointment_doctor
+        # R-22 Phase 3: appointment processing extracted to helper
+        _process_legacy_appointments(db, appointments, queues_by_specialty, seen_appointment_ids, today)
 
         # Формируем результат
         result = []
         queue_number = 1
+        seen_entry_keys = set()
         include_lab_report_summary = bool(
             department_filter and department_filter.intersection({"lab", "laboratory"})
         )
@@ -2133,171 +2041,32 @@ def get_today_queues(
             visible_visit_ids,
         )
 
-        for specialty, data in queues_by_specialty.items():
+        for specialty, queue_data in queues_by_specialty.items():
             specialty_key = str(specialty or "").strip().lower()
             if department_filter and specialty_key not in department_filter:
                 continue
 
-            doctor = data["doctor"]
-            entries_list = data["entries"]
+            entries_list = queue_data.get("entries", [])
+            if not entries_list:
+                continue
 
-            # ✅ ИСПРАВЛЕНО: Сортируем записи по queue_time (приоритет), иначе по created_at
-            # Это формирует правильную очередь: кто раньше зарегистрировался, тот раньше в очереди
-            # queue_time - это бизнес-время регистрации, которое не меняется при редактировании
-            try:
-
-                def get_sort_key(e):
-                    # Безопасно получаем значения
-                    queue_time = e.get("queue_time")
-                    created_at = e.get("created_at")
-
-                    # Приоритет: queue_time, затем created_at, затем текущий момент
-                    sort_time = None
-
-                    # Обрабатываем queue_time
-                    if queue_time:
-                        if isinstance(queue_time, datetime):
-                            sort_time = queue_time
-                            # ✅ ИСПРАВЛЕНО Bug 3: Нормализуем naive datetime к timezone-aware UTC
-                            if sort_time.tzinfo is None:
-                                from datetime import timezone
-
-                                sort_time = sort_time.replace(tzinfo=timezone.utc)
-                        elif isinstance(queue_time, str):
-                            try:
-                                # Пробуем разные форматы дат
-                                if 'T' in queue_time:
-                                    sort_time = datetime.fromisoformat(
-                                        queue_time.replace('Z', '+00:00')
-                                    )
-                                else:
-                                    # ✅ ИСПРАВЛЕНО Bug 3: strptime возвращает naive datetime, нормализуем к UTC
-                                    from datetime import timezone
-
-                                    sort_time = datetime.strptime(
-                                        queue_time, '%Y-%m-%d %H:%M:%S'
-                                    ).replace(tzinfo=timezone.utc)
-                            except (ValueError, TypeError):
-                                pass
-
-                    # Если queue_time не сработал, пробуем created_at
-                    if not sort_time and created_at:
-                        if isinstance(created_at, datetime):
-                            sort_time = created_at
-                            # ✅ ИСПРАВЛЕНО Bug 3: Нормализуем naive datetime к timezone-aware UTC
-                            if sort_time.tzinfo is None:
-                                from datetime import timezone
-
-                                sort_time = sort_time.replace(tzinfo=timezone.utc)
-                        elif isinstance(created_at, str):
-                            try:
-                                if 'T' in created_at:
-                                    sort_time = datetime.fromisoformat(
-                                        created_at.replace('Z', '+00:00')
-                                    )
-                                else:
-                                    # ✅ ИСПРАВЛЕНО Bug 3: strptime возвращает naive datetime, нормализуем к UTC
-                                    from datetime import timezone
-
-                                    sort_time = datetime.strptime(
-                                        created_at, '%Y-%m-%d %H:%M:%S'
-                                    ).replace(tzinfo=timezone.utc)
-                            except (ValueError, TypeError):
-                                pass
-
-                    # ✅ ИСПРАВЛЕНО Bug 3: Если ничего не сработало, используем timezone-aware UTC datetime
-                    # Это предотвращает TypeError при сравнении timezone-aware и naive datetime
-                    if not sort_time:
-                        from datetime import timezone
-
-                        sort_time = datetime.now(timezone.utc)
-
-                    return sort_time
-
-                entries_list.sort(key=get_sort_key)
-            except Exception as sort_error:
-                logger.warning(
-                    f"Ошибка сортировки записей для {specialty}: {sort_error}"
+            # Сортируем записи по queue_time, затем по created_at
+            entries_list.sort(
+                key=lambda e: (
+                    e.get("queue_time") or e.get("created_at") or datetime.max,
+                    e.get("data").id if hasattr(e.get("data"), "id") else 0,
                 )
-                # В случае ошибки сортировки оставляем записи как есть
-                pass
+            )
 
+            # R-22 fix: separate output list to avoid in-place mutation during iteration
             entries = []
-            seen_entry_keys = set()  # Для дедупликации записей в одной специальности
-            
-            # ⭐ FIX: Улучшенная дедупликация для поддержки множественных записей одной сессии
-            # Каждая новая услуга (добавленная через edit) создаёт отдельную OnlineQueueEntry.
-            # Мы не должны их скрывать/объединять здесь, они должны быть видны как отдельные элементы
-            # или сгруппированы корректно на frontend.
-            # Поэтому в ключ добавляем ID записи, чтобы уникальные ID не склеивались.
-            
-            for idx, entry_wrapper in enumerate(entries_list, 1):
-                # ⭐ FIX ROOT CAUSE: Strict SSOT - 1 Row = 1 OnlineQueueEntry
-                # No aggregation here. We only deduplicate IDENTICAL record instances
-                # that might appear due to SQL joins.
-                
-                entry_id = entry_wrapper.get('id')
-                if entry_id:
-                     unique_key = f"id_{entry_id}"
-                else:
-                     # Fallback only for legacy visit-based records without OQE
-                     unique_key = f"visit_{entry_wrapper.get('visit_id')}_idx_{idx}"
-
-                if unique_key in seen_entry_keys:
-                    continue
-                seen_entry_keys.add(unique_key)
-
-                entry_type = entry_wrapper["type"]
-                entry_data = entry_wrapper["data"]
-
-                # Получаем базовые идентификаторы для дедупликации
-                if entry_type == "visit":
-                    entry_record_id = entry_data.id
-                    entry_patient_id = entry_data.patient_id
-                    entry_date = getattr(entry_data, 'visit_date', today)
-                elif entry_type == "online_queue":
-                    entry_record_id = entry_data.id
-                    # ⚠️ ВАЖНО: для онлайн-очереди patient_id часто NULL (анонимный пациент).
-                    # Если дедуплицировать только по patient_id, все такие записи сольются в одну
-                    # в рамках specialty+date. Поэтому используем устойчивый идентификатор:
-                    # patient_id → phone (нормализованный) → patient_name (нормализованный) → id.
-                    # ✅ ИСПРАВЛЕНО: Синхронизировано с frontend логикой дедупликации
-                    entry_patient_id = None
-                    if entry_data.patient_id:
-                        entry_patient_id = entry_data.patient_id
-                    elif entry_data.phone:
-                        # Нормализуем телефон (только цифры) для совместимости с frontend
-                        # ✅ ИСПРАВЛЕНО: import re перемещен на уровень модуля
-                        normalized_phone = re.sub(r'\D', '', str(entry_data.phone))
-                        if normalized_phone:
-                            entry_patient_id = normalized_phone
-                    elif entry_data.patient_name:
-                        # Нормализуем ФИО (trim + lowercase) для совместимости с frontend
-                        normalized_name = str(entry_data.patient_name).strip().lower()
-                        if normalized_name:
-                            entry_patient_id = normalized_name
-                    # ✅ ИСПРАВЛЕНО: Используем entry_data.id только если все остальные поля пустые
-                    # Это гарантирует, что backend и frontend используют одинаковые ключи дедупликации
-                    if not entry_patient_id:
-                        entry_patient_id = entry_data.id
-                    entry_date = today  # OnlineQueueEntry всегда на сегодня
-                else:  # appointment
-                    entry_record_id = entry_data.id
-                    entry_patient_id = entry_data.patient_id
-                    entry_date = getattr(entry_data, 'appointment_date', today)
-
-                # ✅ ИСПРАВЛЕНО: Создаем уникальный ключ дедупликации
-                # Для online_queue записей НЕ включаем specialty (как на frontend),
-                # чтобы записи одного пациента к разным специалистам объединялись
-                # Для других типов записей включаем specialty для разделения по отделениям
-                if entry_type == "online_queue":
-                    # ⭐ FIX: Включаем ID записи, чтобы разрешить несколько услуг (разные тикеты для одного пациента)
-                    entry_key = f"{entry_patient_id}_{entry_date}_{entry_record_id}"
-                else:
-                    # Для visit/appointment: дедуплицируем только идентичные записи,
-                    # а не все записи одного пациента в одной specialty на один день.
-                    entry_key = f"{entry_type}_{entry_record_id}"
-
+            for idx, entry in enumerate(entries_list):
+                entry_type = entry.get("type")
+                entry_data = entry.get("data")
+                entry_id_val = getattr(entry_data, "id", "")
+                entry_key = f"{entry_type}_{entry_id_val}"
+                # R-22 fix: entry_wrapper is alias for entry (used in result serialization)
+                entry_wrapper = entry
                 # Пропускаем дубликаты
                 if entry_key in seen_entry_keys:
                     logger.debug(
@@ -2327,8 +2096,13 @@ def get_today_queues(
                 visit_department = (
                     None  # ✅ ДОБАВЛЕНО: для хранения department из Visit
                 )
+                appointment_date = None  # R-22 fix: для queue_entry lookup
+                doctor_id = None  # R-22 fix: для queue_entry lookup
 
                 if entry_type == "visit":
+                    if entry_data is None:
+                        logger.warning("get_today_queues: visit entry with None data, skipping")
+                        continue
                     # Обработка Visit
                     visit = entry_data
                     record_id = visit.id
@@ -2482,10 +2256,15 @@ def get_today_queues(
                     visit_department = getattr(visit, 'department', None)
 
                 elif entry_type == "appointment":
+                    if entry_data is None:
+                        logger.warning("get_today_queues: appointment entry with None data, skipping")
+                        continue
                     # Обработка Appointment
                     appointment = entry_data
                     record_id = appointment.id
                     patient_id = appointment.patient_id
+                    appointment_date = getattr(appointment, 'appointment_date', today)
+                    doctor_id = getattr(appointment, 'doctor_id', None)
                     visit_time = (
                         str(appointment.appointment_time)
                         if hasattr(appointment, 'appointment_time')
@@ -2583,6 +2362,10 @@ def get_today_queues(
                         entry_wrapper["visit_id"] = None
 
                 elif entry_type == "online_queue":
+                    # R-22 fix: guard against None entry_data
+                    if entry_data is None:
+                        logger.warning("get_today_queues: online_queue entry with None data, skipping")
+                        continue
                     # ✅ SSOT FIX: entry_data может быть OnlineQueueEntry или Visit (для QR-визитов)
                     is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
                     
@@ -2794,7 +2577,7 @@ def get_today_queues(
                 if record_id:
                     try:
                         # Используем прямой SQL запрос через Table reflection (без импорта модели)
-                        from sqlalchemy import select, text
+                        # text/select уже импортированы на уровне модуля (R-22 cleanup)
 
                         # Используем прямой SQL для избежания конфликта с моделями
                         if entry_type == "online_queue":
@@ -2910,6 +2693,9 @@ def get_today_queues(
                                 entry_department_key = svc.department_key
                                 break
                 elif entry_type == "appointment":
+                    if entry_data is None:
+                        logger.warning("get_today_queues: appointment entry with None data, skipping")
+                        continue
                     # Для Appointment получаем из услуг или напрямую
                     appointment_obj = entry_data
                     if (
@@ -3055,26 +2841,26 @@ def get_today_queues(
                 # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
                 # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
                 # Если doctor не найден, оставляем raw specialist_id видимым для repair.
-                "specialist_id": data["doctor_id"],
+                "specialist_id": queue_data["doctor_id"],
                 "specialist_name": (
-                    doctor.user.full_name
-                    if doctor and doctor.user
-                    else f"Специалист #{data['doctor_id']}"
+                    queue_data["doctor"].user.full_name
+                    if queue_data.get("doctor") and queue_data["doctor"].user
+                    else f"Специалист #{queue_data['doctor_id']}"
                 ),
                 "specialty": specialty,
                 "timezone": "Asia/Tashkent",
-                "cabinet": doctor.cabinet if doctor else "N/A",
-                "integrity_warnings": list(dict.fromkeys(data.get("integrity_warnings", []))),
-                "has_integrity_warnings": bool(data.get("integrity_warnings")),
+                "cabinet": queue_data["doctor"].cabinet if queue_data.get("doctor") else "N/A",
+                "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
+                "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
                         "opened_at": datetime.now(timezone.utc).isoformat(),
                 "entries": entries,
                 "stats": {
                     "total": len(entries),
-                    "waiting": len([e for e in entries if e["status"] == "waiting"]),
-                    "called": len([e for e in entries if e["status"] == "called"]),
-                    "served": len([e for e in entries if e["status"] == "served"]),
+                    "waiting": len([e for e in entries if e.get("status") == "waiting"]),
+                    "called": len([e for e in entries if e.get("status") == "called"]),
+                    "served": len([e for e in entries if e.get("status") == "served"]),
                     "online_entries": len(
-                        [e for e in entries if e["source"] == "online"]
+                        [e for e in entries if e.get("source") == "online"]
                     ),
                 },
             }
