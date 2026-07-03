@@ -1234,12 +1234,22 @@ const MacOSCardiologistPanelUnified = () => {
   // specific action (call/complete/view_emr), not on initial patient
   // selection — so the doctor had no visibility into who last touched
   // the record.
+  // MUST be above the isDemoMode early return to satisfy the
+  // rules-of-hooks lint rule.
   useEffect(() => {
     const { visitId } = getSelectedPatientContext();
     if (visitId && selectedPatient) {
       loadEMR(visitId);
     }
   }, [selectedPatient, authRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Проверяем демо-режим после всех хуков
+  const isDemoMode = window.location.pathname.includes('/medilab-demo');
+
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    return null;
+  }
 
 
 
