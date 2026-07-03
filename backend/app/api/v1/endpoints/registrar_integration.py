@@ -2339,6 +2339,188 @@ def _process_online_queue_entry(
 
 
 
+_VISIT_STATUS_MAPPING = {
+    "confirmed": "waiting",
+    "pending_confirmation": "waiting",
+    "in_progress": "called",
+    "completed": "served",
+    "cancelled": "no_show",
+    "canceled": "no_show",
+    "no_show": "no_show",
+}
+
+
+def _process_visit_entry(
+    *,
+    db: Session,
+    entry_data: Any,
+    entry_wrapper: dict,
+    specialty: str,
+) -> dict | None:
+    """R-22 Phase 8: Process a Visit row into entry fields.
+
+    Returns a dict with the populated fields, or None to signal "skip this entry"
+    (caller should `continue` to the next iteration). Skipping happens when:
+    - entry_data is None
+    - ecg_only flag set but no ECG services found
+    - non-ECG filter and visit has only ECG services
+    """
+    if entry_data is None:
+        logger.warning("get_today_queues: visit entry with None data, skipping")
+        return None
+
+    from app.models.patient import Patient
+    from app.models.service import Service
+    from app.models.visit import VisitService
+    from app.services.service_mapping import get_service_code
+
+    visit = entry_data
+    record_id = visit.id
+    patient_id = visit.patient_id
+    visit_time = visit.visit_time
+    discount_mode = visit.discount_mode
+
+    patient_name = "Неизвестный пациент"
+    phone = "Не указан"
+    patient_birth_year = None
+    address = None
+
+    patient = (
+        db.query(Patient).filter(Patient.id == visit.patient_id).first()
+    )
+    if patient:
+        patient_name = patient.short_name()
+        phone = patient.phone or "Не указан"
+        if patient.birth_date:
+            patient_birth_year = patient.birth_date.year
+        address = patient.address
+    else:
+        logger.warning(
+            "get_today_queues: Пациент не найден для Visit ID=%d, patient_id=%s",
+            visit.id,
+            visit.patient_id,
+        )
+        patient_name = (
+            f"Пациент ID={visit.patient_id}"
+            if visit.patient_id
+            else "Неизвестный пациент"
+        )
+
+    all_visit_services = (
+        db.query(VisitService)
+        .filter(VisitService.visit_id == visit.id)
+        .all()
+    )
+
+    ecg_only_flag = entry_wrapper.get("ecg_only", False)
+    filter_services_flag = entry_wrapper.get("filter_services", False)
+
+    visit_services = []
+    if filter_services_flag or ecg_only_flag:
+        # Показываем только ЭКГ услуги (для очереди echokg)
+        for vs in all_visit_services:
+            if hasattr(vs, 'service_id') and vs.service_id:
+                service = (
+                    db.query(Service)
+                    .filter(Service.id == vs.service_id)
+                    .first()
+                )
+                if service and service.queue_tag == 'ecg':
+                    visit_services.append(vs)
+        if not visit_services:
+            logger.warning(
+                "get_today_queues: Флаг ecg_only=True, но ЭКГ услуг не найдено для Visit %d",
+                visit.id,
+            )
+            return None
+    else:
+        # Исключаем ЭКГ услуги (для очереди cardiology)
+        for vs in all_visit_services:
+            if hasattr(vs, 'service_id') and vs.service_id:
+                service = (
+                    db.query(Service)
+                    .filter(Service.id == vs.service_id)
+                    .first()
+                )
+                if service and service.queue_tag != 'ecg':
+                    visit_services.append(vs)
+        if not visit_services:
+            logger.debug(
+                "get_today_queues: Пропущен Visit %d для specialty=%s: содержит только ЭКГ услуги",
+                visit.id,
+                specialty,
+            )
+            return None
+
+    # Fallback на все услуги если фильтр пустой
+    if not visit_services:
+        visit_services = all_visit_services
+
+    services: list = []
+    service_codes: list = []
+    service_details: list = []
+    total_cost = 0.0
+
+    for vs in visit_services:
+        service_code_to_use = None
+        svc = None
+        if hasattr(vs, 'service_id') and vs.service_id:
+            svc = (
+                db.query(Service)
+                .filter(Service.id == vs.service_id)
+                .first()
+            )
+            if svc:
+                service_code_to_use = get_service_code(
+                    {
+                        'service_code': getattr(svc, 'service_code', None),
+                    }
+                )
+
+        if service_code_to_use:
+            services.append(service_code_to_use)
+            service_codes.append(service_code_to_use)
+        elif vs.name:
+            services.append(vs.name)
+
+        if svc:
+            service_details.append({
+                "id": svc.id,
+                "code": service_code_to_use or svc.code,
+                "name": svc.name,
+                "price": float(svc.price) if svc.price else 0,
+            })
+
+        if vs.price:
+            total_cost += float(vs.price) * (vs.qty or 1)
+
+    source = getattr(visit, 'source', None) or 'desk'
+    entry_status = _VISIT_STATUS_MAPPING.get(visit.status, "waiting")
+    discount_mode = _normalize_registration_discount_mode(
+        getattr(visit, "discount_mode", None)
+    )
+    visit_department = getattr(visit, 'department', None)
+
+    return {
+        "record_id": record_id,
+        "patient_id": patient_id,
+        "visit_time": visit_time,
+        "patient_name": patient_name,
+        "phone": phone,
+        "patient_birth_year": patient_birth_year,
+        "address": address,
+        "services": services,
+        "service_codes": service_codes,
+        "service_details": service_details,
+        "total_cost": total_cost,
+        "entry_status": entry_status,
+        "discount_mode": discount_mode,
+        "source": source,
+        "visit_department": visit_department,
+    }
+
+
+
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
 
 
@@ -2686,160 +2868,30 @@ def get_today_queues(
                 doctor_id = None  # R-22 fix: для queue_entry lookup
 
                 if entry_type == "visit":
-                    if entry_data is None:
-                        logger.warning("get_today_queues: visit entry with None data, skipping")
+                    # R-22 Phase 8: visit processing extracted to helper
+                    _vis = _process_visit_entry(
+                        db=db,
+                        entry_data=entry_data,
+                        entry_wrapper=entry_wrapper,
+                        specialty=specialty,
+                    )
+                    if _vis is None:
                         continue
-                    # Обработка Visit
-                    visit = entry_data
-                    record_id = visit.id
-                    patient_id = visit.patient_id
-                    visit_time = visit.visit_time
-                    discount_mode = visit.discount_mode
-
-                    # Загружаем пациента
-                    patient = (
-                        db.query(Patient).filter(Patient.id == visit.patient_id).first()
-                    )
-                    if patient:
-                        # [OK] ИСПОЛЬЗУЕМ short_name() - теперь он всегда возвращает корректное значение
-                        # Метод short_name() гарантирует, что всегда возвращается непустая строка
-                        patient_name = patient.short_name()
-                        phone = patient.phone or "Не указан"
-                        if patient.birth_date:
-                            patient_birth_year = patient.birth_date.year
-                        address = patient.address
-                    else:
-                        # [OK] ЛОГИРОВАНИЕ: Пациент не найден
-                        logger.warning(
-                            "get_today_queues: Пациент не найден для Visit ID=%d, patient_id=%s",
-                            visit.id,
-                            visit.patient_id,
-                        )
-                        patient_name = (
-                            f"Пациент ID={visit.patient_id}"
-                            if visit.patient_id
-                            else "Неизвестный пациент"
-                        )
-
-                    # Загружаем услуги визита
-                    from app.models.visit import VisitService
-
-                    all_visit_services = (
-                        db.query(VisitService)
-                        .filter(VisitService.visit_id == visit.id)
-                        .all()
-                    )
-
-                    # [OK] Фильтруем услуги если есть флаг ecg_only или filter_services
-                    ecg_only_flag = entry_wrapper.get("ecg_only", False)
-                    filter_services_flag = entry_wrapper.get("filter_services", False)
-
-                    visit_services = []
-                    if filter_services_flag or ecg_only_flag:
-                        # Фильтруем: показываем только ЭКГ услуги (для очереди echokg)
-                        for vs in all_visit_services:
-                            if hasattr(vs, 'service_id') and vs.service_id:
-                                service = (
-                                    db.query(Service)
-                                    .filter(Service.id == vs.service_id)
-                                    .first()
-                                )
-                                if service and service.queue_tag == 'ecg':
-                                    visit_services.append(vs)
-                        # Если нет ЭКГ услуг, не добавляем запись (это не должно произойти, но на всякий случай)
-                        if not visit_services:
-                            logger.warning(
-                                "get_today_queues: Флаг ecg_only=True, но ЭКГ услуг не найдено для Visit %d",
-                                visit.id,
-                            )
-                            continue  # Пропускаем эту запись, если нет ЭКГ услуг
-                    else:
-                        # Фильтруем: исключаем ЭКГ услуги (для очереди cardiology)
-                        for vs in all_visit_services:
-                            if hasattr(vs, 'service_id') and vs.service_id:
-                                service = (
-                                    db.query(Service)
-                                    .filter(Service.id == vs.service_id)
-                                    .first()
-                                )
-                                if service and service.queue_tag != 'ecg':
-                                    visit_services.append(vs)
-                        # Если не нашли не-ЭКГ услуг, значит это только ЭКГ визит - пропускаем для cardiology
-                        if not visit_services:
-                            logger.debug(
-                                "get_today_queues: Пропущен Visit %d для specialty=%s: содержит только ЭКГ услуги",
-                                visit.id,
-                                specialty,
-                            )
-                            continue  # Пропускаем эту запись для кардиолога, если нет не-ЭКГ услуг
-
-                    # Если нет отфильтрованных услуг, используем все (fallback)
-                    if not visit_services:
-                        visit_services = all_visit_services
-
-                    for vs in visit_services:
-                        # [OK] Используем service_code из справочника услуг для правильного формата (K01, D02, C03 и т.д.)
-                        # [OK] SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                        service_code_to_use = None
-                        if hasattr(vs, 'service_id') and vs.service_id:
-                            # Получаем полные данные услуги из БД
-                            svc = (
-                                db.query(Service)
-                                .filter(Service.id == vs.service_id)
-                                .first()
-                            )
-                            if svc:
-                                service_code_to_use = get_service_code(
-                                    {
-                                        'service_code': getattr(
-                                            svc, 'service_code', None
-                                        ),
-                                    }
-                                )
-
-                        # Если всё ещё нет кода, используем название (нежелательно)
-                        if service_code_to_use:
-                            services.append(service_code_to_use)
-                            service_codes.append(service_code_to_use)
-                        elif vs.name:
-                            services.append(vs.name)
-
-                        # ✅ НОВОЕ: Собираем полные данные услуг для service_details
-                        if svc:
-                            service_details.append({
-                                "id": svc.id,
-                                "code": service_code_to_use or svc.code,
-                                "name": svc.name,
-                                "price": float(svc.price) if svc.price else 0
-                            })
-
-                        if vs.price:
-                            total_cost += float(vs.price) * (vs.qty or 1)
-
-                    # ✅ SSOT: Используем visit.source напрямую
-                    # Больше никаких эвристик через confirmed_by!
-                    source = getattr(visit, 'source', None) or 'desk'
-
-                    # Определяем статус визита в терминах очереди
-                    status_mapping = {
-                        "confirmed": "waiting",
-                        "pending_confirmation": "waiting",
-                        "in_progress": "called",
-                        "completed": "served",
-                        "cancelled": "no_show",
-                        "canceled": "no_show",
-                        "no_show": "no_show",
-                    }
-                    entry_status = status_mapping.get(visit.status, "waiting")
-
-                    # [OK] Используем единый сервис для определения оплаты (Single Source of Truth)
-                    discount_mode = _normalize_registration_discount_mode(
-                        getattr(visit, "discount_mode", None)
-                    )
-
-                    # ✅ ДОБАВЛЕНО: Сохраняем department из модели Visit для использования ниже
-                    # Это нужно для новых записей из сценария 5
-                    visit_department = getattr(visit, 'department', None)
+                    record_id = _vis["record_id"]
+                    patient_id = _vis["patient_id"]
+                    visit_time = _vis["visit_time"]
+                    patient_name = _vis["patient_name"]
+                    phone = _vis["phone"]
+                    patient_birth_year = _vis["patient_birth_year"]
+                    address = _vis["address"]
+                    services = _vis["services"]
+                    service_codes = _vis["service_codes"]
+                    service_details = _vis["service_details"]
+                    total_cost = _vis["total_cost"]
+                    entry_status = _vis["entry_status"]
+                    discount_mode = _vis["discount_mode"]
+                    source = _vis["source"]
+                    visit_department = _vis["visit_department"]
 
                 elif entry_type == "appointment":
                     # R-22 Phase 6: appointment processing extracted to helper
