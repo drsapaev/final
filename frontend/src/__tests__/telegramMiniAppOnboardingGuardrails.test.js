@@ -55,7 +55,7 @@ describe('Telegram Mini App onboarding guardrails', () => {
 
     expect(onboardingBlockedPanel).toContain("t('onboardingBlockedText')");
     expect(onboardingBlockedPanel).toContain("handleMiniAppCapabilitySelect('appointments')");
-    expect(onboardingBlockedPanel).toContain('handleMiniAppSupportClick');
+    expect(onboardingBlockedPanel).toContain("handleMiniAppSupportClick");
     expect(onboardingBlockedPanel).not.toContain('api.post(');
     expect(onboardingBlockedPanel).not.toMatch(/403|Request failed|entryToken|patientId/);
   });
@@ -67,8 +67,8 @@ describe('Telegram Mini App onboarding guardrails', () => {
       "{state.status === 'ready' && ("
     );
 
-    expect(statusAlerts).toContain('handleMiniAppRetry');
-    expect(statusAlerts).toContain('handleMiniAppSupportClick');
+    expect(statusAlerts).toContain("handleMiniAppRetry");
+    expect(statusAlerts).toContain("handleMiniAppSupportClick");
     expect(statusAlerts).toContain("t('onboardingRetry')");
     expect(statusAlerts).not.toMatch(/AxiosError|Traceback|entryToken=pma_|entryToken=pmo_/);
   });

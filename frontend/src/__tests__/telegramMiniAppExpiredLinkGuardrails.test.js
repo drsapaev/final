@@ -52,7 +52,7 @@ describe('Telegram Mini App expired link guardrails', () => {
       "api.post('/telegram/mini-app/forms/preview', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
       "api.post('/telegram/mini-app/appointments/preview', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
       "api.post('/telegram/mini-app/appointments', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
-      'MINI_APP_HANDLED_ERROR_REQUEST_CONFIG',
+      "MINI_APP_HANDLED_ERROR_REQUEST_CONFIG",
     ].forEach((expectedSnippet) => {
       expect(miniAppShell).toContain(expectedSnippet);
     });
@@ -74,7 +74,7 @@ describe('Telegram Mini App expired link guardrails', () => {
     expect(statusBadge).toContain("variant: 'danger'");
     expect(statusBadge).toContain("'sessionUnavailableBadge'");
     expect(heroMarkup).toContain("aria-live={state.status === 'error' ? 'assertive' : 'polite'}");
-    expect(heroMarkup).toContain('<Alert severity='error' style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>');
+    expect(heroMarkup).toContain('<Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>');
     expect(appSource).toContain("role: 'alert'");
     expect(appSource).toContain("'aria-live': 'assertive'");
   });
