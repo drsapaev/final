@@ -1,25 +1,6 @@
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
-import {
-
-
-
-  Camera,
-  FileText,
-  Pill,
-  Syringe,
-  Scissors,
-  Save,
-  X,
-  Plus,
-  Edit,
-  Trash2,
-
-
-  Upload } from
-
-
-'lucide-react';
+import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
 import PropTypes from 'prop-types';
 
 /**
@@ -30,7 +11,8 @@ const VisitProtocol = ({
   patientName,
   initialData = null,
   onSave,
-  onClose
+  onClose,
+  onComplete
 }) => {
   const [formData, setFormData] = useState({
     // Основные данные визита
@@ -948,6 +930,17 @@ const VisitProtocol = ({
                   <Save className="h-4 w-4" />
                   {loading ? 'Сохранение...' : 'Сохранить'}
                 </button>
+                {onComplete && (
+                  <button
+                    onClick={onComplete}
+                    disabled={loading}
+                    aria-label="Завершить приём и вызвать следующего пациента"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-800 disabled:opacity-50">
+
+                    <Check className="h-4 w-4" />
+                    Завершить приём
+                  </button>
+                )}
               </>
             }
             <button
@@ -994,6 +987,7 @@ VisitProtocol.propTypes = {
   ...(VisitProtocol.propTypes || {}),
   initialData: PropTypes.any,
   onClose: PropTypes.any,
+  onComplete: PropTypes.func,
   onSave: PropTypes.any,
   patientName: PropTypes.any,
 };
