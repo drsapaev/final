@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import './dentistry.css';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
@@ -1473,7 +1474,7 @@ const DentistPanelUnified = () => {
   // Вкладки
   // Рендер дашборда
   const renderDashboard = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+  <div className="dental-flex-col" style={{ gap: '32px' }}>
       {/* Статистические карточки */}
       <div style={{
       display: 'grid',
@@ -1784,7 +1785,7 @@ const DentistPanelUnified = () => {
           color: 'var(--mac-text-primary)'
         }}>Последние записи</h3>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="dental-flex-col" style={{ gap: '16px' }}>
           {appointmentsTableData.slice(0, 5).map((appointment) =>
         <div
           key={appointment.id}
@@ -1799,7 +1800,7 @@ const DentistPanelUnified = () => {
             cursor: 'default'
           }}>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div className="dental-flex" style={{ gap: '16px' }}>
                 <div style={{
               width: '40px',
               height: '40px',
@@ -1849,7 +1850,7 @@ const DentistPanelUnified = () => {
 
   // Рендер пациентов
   const renderPatients = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       {/* Поиск и фильтры */}
       <Card padding="lg">
         <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', flexWrap: 'wrap' }}>
@@ -1951,7 +1952,7 @@ const DentistPanelUnified = () => {
         }}>
 
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="dental-flex" style={{ gap: '12px' }}>
                 <div style={{
               width: '48px',
               height: '48px',
@@ -1976,10 +1977,7 @@ const DentistPanelUnified = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '4px'
               }}>{patient.name}</h3>
-                  <p style={{
-                color: 'var(--mac-text-secondary)',
-                fontSize: 'var(--mac-font-size-sm)'
-              }}>{patient.phone}</p>
+                  <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>{patient.phone}</p>
                 </div>
               </div>
               <Badge variant={patient.status === 'active' ? 'success' : 'warning'}>
@@ -2135,7 +2133,7 @@ const DentistPanelUnified = () => {
 
   // Рендер осмотров
   const renderExaminations = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
         fontSize: 'var(--mac-font-size-lg)',
@@ -2178,7 +2176,7 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="dental-flex" style={{ gap: '12px' }}>
                 <div style={{
               width: '32px',
               height: '32px',
@@ -2217,7 +2215,7 @@ const DentistPanelUnified = () => {
 
   // Рендер диагнозов
   const renderDiagnoses = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
         fontSize: 'var(--mac-font-size-lg)',
@@ -2260,7 +2258,7 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="dental-flex" style={{ gap: '12px' }}>
                 <div style={{
               width: '32px',
               height: '32px',
@@ -2302,7 +2300,7 @@ const DentistPanelUnified = () => {
     // Если выбран пациент из очереди - показываем EMR
     if (selectedPatient) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="dental-flex-col" style={{ gap: '24px' }}>
           <Card padding="lg">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{
@@ -2340,7 +2338,7 @@ const DentistPanelUnified = () => {
 
     // Иначе показываем список пациентов для выбора протокола
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div className="dental-flex-col" style={{ gap: '24px' }}>
         <Card padding="lg">
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
@@ -2383,7 +2381,7 @@ const DentistPanelUnified = () => {
                 e.currentTarget.style.background = 'transparent';
               }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="dental-flex" style={{ gap: '12px' }}>
                   <div style={{
                   width: '32px',
                   height: '32px',
@@ -2423,7 +2421,7 @@ const DentistPanelUnified = () => {
 
   // Рендер фото архива
   const renderPhotos = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
         fontSize: 'var(--mac-font-size-lg)',
@@ -2466,7 +2464,7 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="dental-flex" style={{ gap: '12px' }}>
                 <div style={{
               width: '32px',
               height: '32px',
@@ -2505,7 +2503,7 @@ const DentistPanelUnified = () => {
 
   // Рендер шаблонов
   const renderTemplates = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       <Card padding="lg">
         <div style={{
         display: 'flex',
@@ -2520,20 +2518,13 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '4px'
           }}>Шаблоны протоколов</h3>
-            <p style={{
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+            <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
               Стандартные протоколы для быстрого создания протоколов визитов
             </p>
           </div>
           <Button
           onClick={handleProtocolTemplates}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          className="dental-flex" style={{ gap: '8px' }}>
 
             <FileText style={{ height: '16px', width: '16px' }} />
             Управление шаблонами
@@ -2731,7 +2722,7 @@ const DentistPanelUnified = () => {
 
   // Рендер отчетов
   const renderReports = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       {savedVisitProtocols.length > 0 &&
       <Card padding="lg">
           <div style={{
@@ -2747,10 +2738,7 @@ const DentistPanelUnified = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '4px'
             }}>Сохранённые протоколы визитов</h3>
-              <p style={{
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+              <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
                 Последние протоколы доступны для повторного открытия без ручной пересборки
               </p>
             </div>
@@ -2819,20 +2807,13 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '4px'
           }}>Отчеты и аналитика</h3>
-            <p style={{
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+            <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
               Статистика по пациентам, врачам, процедурам и клинике
             </p>
           </div>
           <Button
           onClick={handleReports}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          className="dental-flex" style={{ gap: '8px' }}>
 
             <BarChart3 style={{ height: '16px', width: '16px' }} />
             Открыть отчеты
@@ -3074,7 +3055,7 @@ const DentistPanelUnified = () => {
 
   // Рендер схем зубов
   const renderDentalChart = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
         fontSize: 'var(--mac-font-size-lg)',
@@ -3117,7 +3098,7 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="dental-flex" style={{ gap: '12px' }}>
                 <div style={{
               width: '32px',
               height: '32px',
@@ -3156,7 +3137,7 @@ const DentistPanelUnified = () => {
 
   // Рендер планов лечения
   const renderTreatmentPlans = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
         fontSize: 'var(--mac-font-size-lg)',
@@ -3199,7 +3180,7 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="dental-flex" style={{ gap: '12px' }}>
                 <div style={{
               width: '32px',
               height: '32px',
@@ -3238,7 +3219,7 @@ const DentistPanelUnified = () => {
 
   // Рендер протезирования
   const renderProsthetics = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
         fontSize: 'var(--mac-font-size-lg)',
@@ -3246,7 +3227,7 @@ const DentistPanelUnified = () => {
         marginBottom: '16px',
         color: 'var(--mac-text-primary)'
       }}>Протезирование</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="dental-flex-col" style={{ gap: '12px' }}>
           {prosthetics.map((prosthetic) =>
         <div
           key={prosthetic.id}
@@ -3260,7 +3241,7 @@ const DentistPanelUnified = () => {
             transition: 'all var(--mac-duration-normal) var(--mac-ease)'
           }}>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div className="dental-flex" style={{ gap: '16px' }}>
                 <div style={{
               width: '40px',
               height: '40px',
@@ -3296,7 +3277,7 @@ const DentistPanelUnified = () => {
 
   // Рендер AI помощника
   const renderAIAssistant = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="dental-flex-col" style={{ gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
         fontSize: 'var(--mac-font-size-lg)',
@@ -3368,7 +3349,7 @@ const DentistPanelUnified = () => {
   if (loading) {
     return (
       <div style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="dental-flex-col" style={{ gap: '24px' }}>
           <div style={{
             height: '32px',
             background: 'var(--mac-bg-secondary)',
