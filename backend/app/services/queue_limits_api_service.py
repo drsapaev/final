@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from collections.abc import Callable
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
