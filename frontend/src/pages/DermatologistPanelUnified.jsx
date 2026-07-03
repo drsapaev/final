@@ -49,6 +49,10 @@ import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
+import {
+  countAppointmentsByStatuses,
+  normalizeNumericId,
+} from '../utils/doctorPanelShared';
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
@@ -80,9 +84,8 @@ const dermatologyRequestCache = {
   cosmeticProcedures: { promise: null, data: null, lastAttemptAt: 0 }
 };
 
-function countAppointmentsByStatuses(appointments, statuses) {
-  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
-}
+// countAppointmentsByStatuses is imported from utils/doctorPanelShared
+// (unified implementation shared with Cardiology and Dentistry panels).
 
 function resolveDoctorQueueEntryId(row) {
   const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
@@ -100,10 +103,8 @@ function getRecentDermatologyCache(cacheEntry, fallbackValue) {
   return null;
 }
 
-function normalizeNumericId(value) {
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+// normalizeNumericId is imported from utils/doctorPanelShared
+// (unified implementation shared with Cardiology and Dentistry panels).
 
 function splitFullName(fullName) {
   const nameParts = String(fullName || '').trim().split(/\s+/).filter(Boolean);

@@ -66,6 +66,10 @@ import { isDentistrySpecialty } from '../utils/dentistrySpecialty';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { queueService } from '../services/queue';
+import {
+  countAppointmentsByStatuses,
+  normalizeNumericId,
+} from '../utils/doctorPanelShared';
 
 const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
 
@@ -104,14 +108,8 @@ const dentistVisitProtocolsCache = new Map();
 const dentistVisitProtocolsLoadPromises = new Map();
 const dentistFallbackLoggedKeys = new Set();
 
-function countAppointmentsByStatuses(appointments, statuses) {
-  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
-}
-
-function normalizeNumericId(value) {
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+// countAppointmentsByStatuses and normalizeNumericId are imported from
+// utils/doctorPanelShared (unified across Cardiology / Dermatology / Dentistry).
 
 function resolveDoctorQueueEntryId(row) {
   const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;

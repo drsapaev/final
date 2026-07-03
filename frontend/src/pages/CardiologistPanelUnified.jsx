@@ -43,14 +43,14 @@ import notify from '../services/notify';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import tokenManager from '../utils/tokenManager';
+import { countAppointmentsByStatuses } from '../utils/doctorPanelShared';
 
 const API_V1_BASE = getApiBaseUrl();
 const CARDIOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
 const CARDIOLOGY_CALLED_STATUSES = ['called', 'in_progress'];
 const CARDIOLOGY_COMPLETED_STATUSES = ['completed', 'done'];
-function countAppointmentsByStatuses(appointments, statuses) {
-  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
-}
+// countAppointmentsByStatuses is imported from utils/doctorPanelShared
+// (unified implementation shared with Dermatology and Dentistry panels).
 
 function resolveDoctorQueueEntryId(row) {
   const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
