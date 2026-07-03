@@ -4,20 +4,17 @@ API endpoints для управления шаблонами печати
 """
 
 import os
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
-from jinja2 import Environment, FileSystemLoader, TemplateError
+from jinja2 import Environment, TemplateError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.crud import print_config as crud_print
-from app.models.print_config import PrinterConfig, PrintJob, PrintTemplate
 from app.models.user import User
 from app.schemas.print_config import (
-    PrintJobCreate,
     PrintJobOut,
     PrintTemplateCreate,
     PrintTemplateOut,

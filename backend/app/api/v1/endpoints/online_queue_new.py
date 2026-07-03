@@ -2,7 +2,7 @@
 API endpoints для онлайн-очереди согласно detail.md стр. 224-257
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,12 +12,10 @@ from app.api.deps import get_current_user, get_db, require_roles
 from app.crud import online_queue as crud_queue
 from app.models.user import User
 from app.schemas.online_queue import (
-    QRTokenRequest,
     QRTokenResponse,
     QueueJoinError,
     QueueJoinRequest,
     QueueJoinResponse,
-    QueueOpenRequest,
     QueueOpenResponse,
     QueueStatusCheck,
 )

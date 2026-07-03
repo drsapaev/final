@@ -7,12 +7,10 @@ from typing import List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
-from app.db.session import get_db
+from app.api.deps import require_roles
 from app.models.user import User
-from app.services.sms_providers import get_sms_manager, SMSMessage, SMSProviderType
+from app.services.sms_providers import get_sms_manager, SMSProviderType
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -23,18 +23,14 @@ from app.schemas.clinic import (
     EquipmentCreate,
     EquipmentMaintenanceCreate,
     EquipmentMaintenanceOut,
-    EquipmentMaintenanceUpdate,
     EquipmentOut,
     EquipmentUpdate,
     LicenseActivationCreate,
     LicenseActivationOut,
-    LicenseActivationUpdate,
     LicenseCreate,
     LicenseOut,
     LicenseUpdate,
-    SystemInfoCreate,
     SystemInfoOut,
-    SystemInfoUpdate,
 )
 from app.services.clinic_management_service import (
     backup_management,

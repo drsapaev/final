@@ -4,7 +4,7 @@ API endpoints для управления системой (бэкапы и мо
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ from app.api.deps import get_current_user, get_db, require_roles
 from app.core.roles import Roles
 from app.models.user import User
 from app.services.backup_service import BackupService, get_backup_service
-from app.services.monitoring_service import get_monitoring_service, MonitoringService
+from app.services.monitoring_service import get_monitoring_service
 
 logger = logging.getLogger(__name__)
 

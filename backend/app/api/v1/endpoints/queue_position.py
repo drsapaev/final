@@ -9,7 +9,6 @@ API endpoints для Push-уведомлений о позиции в очере
 """
 
 import logging
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks

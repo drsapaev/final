@@ -3,11 +3,10 @@ API endpoints для управления миграциями и совмест
 Доступны только администраторам
 """
 
-from datetime import date, datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles

@@ -1,10 +1,9 @@
 # app/api/v1/endpoints/appointments.py
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, List as TypingList, Optional
+from typing import Any, List, List as TypingList, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 

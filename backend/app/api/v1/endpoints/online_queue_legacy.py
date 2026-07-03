@@ -3,7 +3,7 @@ Legacy API endpoints для совместимости с документаци
 Алиасы для /api/online-queue/* путей
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query

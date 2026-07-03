@@ -7,11 +7,10 @@ AI Chat Endpoints - REST и WebSocket API для AI чата.
 """
 
 import asyncio
-import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 

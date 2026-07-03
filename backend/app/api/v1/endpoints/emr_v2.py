@@ -27,7 +27,6 @@ from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.emr_v2 import (
     EMRAmendRequest,
-    EMRConflictError,
     EMRDiffOut,
     EMRHistoryOut,
     EMRRecordOut,

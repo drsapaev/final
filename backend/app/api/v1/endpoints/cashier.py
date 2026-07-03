@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, func, desc
+from sqlalchemy import or_
 
 from app.api import deps
 from app.models.payment import Payment

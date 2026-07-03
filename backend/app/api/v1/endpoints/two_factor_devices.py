@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.services.two_factor_service import get_two_factor_service, TwoFactorService
+from app.services.two_factor_service import get_two_factor_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

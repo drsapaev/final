@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.models.service import Service
 from app.models.service_audit import ServiceAuditLog
-from app.models.user import User
 
 
 class ServiceAuditService:

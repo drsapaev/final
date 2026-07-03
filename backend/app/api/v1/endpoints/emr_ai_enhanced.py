@@ -2,7 +2,7 @@
 Расширенные API endpoints для EMR с AI интеграцией
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud import emr
 from app.models.user import User
-from app.schemas.emr import EMRCreate, EMRUpdate
 from app.services.emr_ai_enhanced import emr_ai_enhanced
 
 router = APIRouter()

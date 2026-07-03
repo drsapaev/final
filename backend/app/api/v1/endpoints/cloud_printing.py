@@ -4,9 +4,9 @@ API endpoints для облачной печати
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, NoReturn, Optional
+from typing import Any, Dict, NoReturn, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -14,11 +14,9 @@ from app.api.deps import get_current_user, get_db, require_roles
 from app.core.roles import Roles
 from app.models.user import User
 from app.services.cloud_printing_service import (
-    CloudPrintingService,
     DocumentFormat,
     get_cloud_printing_service,
     PrinterStatus,
-    PrintJobStatus,
 )
 
 logger = logging.getLogger(__name__)

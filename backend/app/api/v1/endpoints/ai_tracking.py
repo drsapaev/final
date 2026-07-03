@@ -13,7 +13,6 @@ from app.db.session import get_db
 from app.schemas.ai_tracking import (
     AIModelStats,
     AIProviderStats,
-    AIResponseWithTracking,
 )
 from app.services.ai_tracking_api_service import AITrackingApiService
 from app.services.ai_tracking_service import get_ai_tracking_service

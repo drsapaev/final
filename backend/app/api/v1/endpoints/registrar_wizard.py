@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import String, func, literal
+from sqlalchemy import String, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -24,7 +24,6 @@ from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.crud.appointment import appointment as crud_appointment
-from app.services.feature_flags import is_feature_enabled
 from app.services.registrar_wizard_queue_assignment_service import (
     RegistrarWizardQueueAssignmentService,
 )
@@ -39,7 +38,6 @@ from app.services.online_queue_new_service import (
 )
 from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.queue_service import queue_service
-from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import get_service_code, normalize_service_code
 from app.services.visits_api_service import VisitsApiService
 

@@ -6,11 +6,11 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.registrar_notifications_api_service import (
     RegistrarNotificationsApiDomainError,

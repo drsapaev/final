@@ -27,7 +27,6 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -110,7 +109,6 @@ def _ensure_doctor_can_mutate_queue_entry(
 from app.services.qr_queue_service import QRQueueService
 from app.services.queue_service import (
     queue_service,
-    QueueConflictError,
     QueueNotFoundError,
     QueueValidationError,
 )
@@ -514,7 +512,6 @@ def get_available_specialists(db: Session = Depends(get_db)):
         }
         
     except Exception as e:
-        import traceback
 
         logger.error(
             "[get_available_specialists] ОШИБКА: %s: %s",
@@ -548,7 +545,6 @@ def get_qr_token_info(token: str, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
 
         logger.error(
             "[get_qr_token_info] ОШИБКА: %s: %s",
@@ -571,7 +567,6 @@ def start_join_session(
     """
     Начинает сессию присоединения к очереди (публичный эндпоинт)
     """
-    import traceback
     
     service = QRQueueService(db)
     
@@ -1290,7 +1285,6 @@ def update_online_entry(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
 
         logger.error(
             "[update_online_entry] Ошибка: %s: %s",
@@ -1849,7 +1843,6 @@ def full_update_online_entry(
             # ⭐ FIX 13: Создаём Independent Queue Entries для дополнительных услуг
             # Эти услуги получают ТЕКУЩЕЕ время, а не QR время
             if new_service_ids:
-                from datetime import timezone as tz
                 from sqlalchemy import text
                 from zoneinfo import ZoneInfo
                 
@@ -3104,7 +3097,6 @@ def full_update_online_entry(
             }
         except Exception as commit_error:
             db.rollback()
-            import traceback
 
             logger.error(
                 "[full_update_online_entry] ❌ Ошибка при коммите: %s: %s",
@@ -3120,7 +3112,6 @@ def full_update_online_entry(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
 
         logger.error(
             "[full_update_online_entry] Ошибка: %s: %s",
@@ -3157,7 +3148,7 @@ def cancel_service_in_entry(
     """
     import json
 
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.online_queue import OnlineQueueEntry
 
     logger.info(
         "[cancel_service] Отмена услуги service_id=%d в entry_id=%d, Причина: %s, Была оплачена: %s, Отменяет: %s (ID: %d)",
@@ -3334,7 +3325,6 @@ def cancel_service_in_entry(
         raise
     except Exception as e:
         db.rollback()
-        import traceback
 
         logger.error(
             "[cancel_service] Ошибка: %s: %s",

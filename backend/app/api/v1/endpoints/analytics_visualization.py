@@ -2,7 +2,7 @@
 API endpoints для визуализации аналитических данных
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,12 +11,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.services.advanced_analytics import (
-    AdvancedAnalyticsService,
     get_advanced_analytics_service,
 )
 from app.services.analytics import AnalyticsService
 from app.services.analytics_visualization_service import (
-    AnalyticsVisualizationService,
     get_analytics_visualization_service,
 )
 
