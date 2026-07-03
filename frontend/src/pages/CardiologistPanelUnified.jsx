@@ -429,7 +429,7 @@ const MacOSCardiologistPanelUnified = () => {
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
-  }, [location.search, activeTab]);
+  }, [location.search, activeTab, setActiveTab]);
 
   useEffect(() => {
     const handleAuthLikeRefresh = () => {
@@ -513,7 +513,7 @@ const MacOSCardiologistPanelUnified = () => {
     } catch (error) {
       notify.error(getErrorMessage(error, 'Не удалось загрузить пациента. Проверьте соединение и попробуйте снова.'));
     }
-  }, [patientIdFromUrl, visitIdFromUrl, selectedPatient]);
+  }, [patientIdFromUrl, visitIdFromUrl, selectedPatient, setSelectedPatient, setActiveTab]);
 
   useEffect(() => {
     hydratePatientFromUrl();
@@ -525,8 +525,8 @@ const MacOSCardiologistPanelUnified = () => {
   // P-009: goToTab is now handleTabChange from useDoctorPanelState
 
   const ensureCanonicalVisitId = useCallback(
-    makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId),
-    [resolveCanonicalVisitId]
+    (row) => makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId)(row),
+    []
   );
 
   useEffect(() => {
@@ -584,7 +584,7 @@ const MacOSCardiologistPanelUnified = () => {
 
       return didChange ? nextPatient : prev;
     });
-  }, [appointments, patientIdFromUrl, visitIdFromUrl]);
+  }, [appointments, patientIdFromUrl, visitIdFromUrl, setSelectedPatient]);
 
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServicesCb = useCallback((patientId, allAppointments) => {

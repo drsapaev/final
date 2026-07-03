@@ -519,8 +519,8 @@ const DermatologistPanelUnified = () => {
   }, [activeTab, loadDermatologyAppointments]);
 
   const ensureCanonicalVisitId = useCallback(
-    makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId),
-    [resolveCanonicalVisitId]
+    (row) => makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId)(row),
+    []
   );
 
   // Функция для создания частичного объекта пациента из данных row (для QR-пациентов)
@@ -1000,7 +1000,7 @@ const DermatologistPanelUnified = () => {
     };
 
     loadPatientFromUrl();
-  }, [location.search, patientIdFromUrl, visitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments]);
+  }, [location.search, patientIdFromUrl, visitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments, setActiveTab, setSelectedPatient]);
 
   useEffect(() => {
     const appointmentId = currentAppointment?.appointment_id || null;

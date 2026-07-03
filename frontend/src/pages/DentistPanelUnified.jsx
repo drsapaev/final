@@ -666,8 +666,8 @@ const DentistPanelUnified = () => {
   }, [activeTab, loadDentistryAppointments]);
 
   const ensureCanonicalVisitId = useCallback(
-    makeEnsureCanonicalVisitId(setAppointmentsTableData, resolveCanonicalVisitId),
-    [resolveCanonicalVisitId]
+    (row) => makeEnsureCanonicalVisitId(setAppointmentsTableData, resolveCanonicalVisitId)(row),
+    []
   );
 
   const resolvePatientId = useCallback((patient) => (
@@ -1395,7 +1395,7 @@ const DentistPanelUnified = () => {
       source: selectedProtocol.source || protocolRecord?.source || 'reports',
     });
     setShowVisitProtocol(true);
-  }, [loadDentistVisitProtocolByVisitId]);
+  }, [loadDentistVisitProtocolByVisitId, setSelectedPatient]);
 
   const handleDentalChart = (patient) => {
     setSelectedPatient({
