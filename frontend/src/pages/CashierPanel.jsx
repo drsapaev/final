@@ -862,7 +862,7 @@ const CashierPanel = () => {void
   const renderServiceBadges = (serviceCodes, serviceNames) => {
     // Если нет кодов, возвращаем пустой элемент
     if (!serviceCodes || !Array.isArray(serviceCodes) || serviceCodes.length === 0) {
-      return <span style={{ color: 'var(--mac-text-tertiary)' }}>—</span>;
+      return <span className="cashier-empty">—</span>;
     }
 
     // ✅ ИСПРАВЛЕНИЕ: Обрабатываем случай когда services - это массив объектов {id, name, price, quantity}
@@ -884,23 +884,15 @@ const CashierPanel = () => {void
 
     // Создаем tooltip с полными названиями услуг
     const tooltipContent =
-    <div style={{ padding: '4px 0', maxWidth: '300px' }}>
+    <div className="cashier-tooltip">
         {names && Array.isArray(names) && names.length === codes.length ?
       names.map((name, idx) =>
-      <div key={idx} style={{
-        marginBottom: idx < names.length - 1 ? '6px' : '0',
-        lineHeight: '1.4',
-        fontSize: '12px'
-      }}>
+      <div key={idx} className="cashier-tooltip-row">
               {name}
             </div>
       ) :
       codes.map((code, idx) =>
-      <div key={idx} style={{
-        marginBottom: idx < codes.length - 1 ? '6px' : '0',
-        lineHeight: '1.4',
-        fontSize: '12px'
-      }}>
+      <div key={idx} className="cashier-tooltip-row">
               {code}
             </div>
       )
@@ -915,31 +907,9 @@ const CashierPanel = () => {void
         delay={200}
         followCursor>
 
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '4px',
-          cursor: 'help',
-          maxWidth: '280px'
-        }}>
+        <div className="cashier-badge-wrap">
           {codes.map((code, idx) =>
-          <span
-            key={idx}
-            style={{
-              padding: '3px 8px',
-              borderRadius: '4px',
-              fontSize: '11px',
-              fontWeight: '600',
-              backgroundColor: 'rgba(0, 122, 255, 0.12)',
-              color: 'var(--mac-accent-blue)',
-              border: '1px solid rgba(0, 122, 255, 0.25)',
-              whiteSpace: 'nowrap',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-              maxWidth: '150px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-
+          <span key={idx} className="cashier-badge">
               {typeof code === 'string' ? code : String(code)}
             </span>
           )}
@@ -1008,16 +978,9 @@ const CashierPanel = () => {void
 
 
   return (
-    <div style={{
-      padding: '0',
-      minHeight: '100vh',
-      background: 'var(--mac-gradient-window)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-      color: 'var(--mac-text-primary)',
-      transition: 'background var(--mac-duration-normal) var(--mac-ease)'
-    }}>
+    <div className="cashier-root">
 
-      <div style={{ padding: '0px' }}>
+      <div className="cashier-root-inner">
         <div className="max-w-7xl mx-auto space-y-6">
 
           {/* Filters */}
@@ -1026,23 +989,15 @@ const CashierPanel = () => {void
             padding="default"
             className="cashier-mb-4">
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
+            <div className="cashier-filter-row">
               {/* Поиск */}
-              <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-                <Search style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '16px',
-                  height: '16px',
-                  color: 'var(--mac-text-tertiary)'
-                }} />
+              <div className="cashier-search-wrap">
+                <Search className="cashier-search-icon" />
                 <input
                   aria-label="Search cashier payments"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}
+                  className="cashier-text-sm cashier-text-primary"
                   placeholder="Поиск по пациенту (Server Search)" />
 
               </div>
@@ -1051,7 +1006,7 @@ const CashierPanel = () => {void
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+                className="cashier-text-sm cashier-text-primary">
 
                 <option value="all">Все статусы</option>
                 <option value="paid">Оплачено</option>
@@ -1059,8 +1014,8 @@ const CashierPanel = () => {void
               </select>
 
               {/* Переключатель режима даты */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar style={{ width: '16px', height: '16px', color: 'var(--mac-text-secondary)' }} />
+              <div className="cashier-date-mode">
+                <Calendar className="cashier-date-icon" />
                 <SegmentedControl
                   options={[
                   { label: 'Одна дата', value: 'single' },
@@ -1079,7 +1034,7 @@ const CashierPanel = () => {void
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  style={{ minWidth: '160px' }} />
+                  className="cashier-min-w-160" />
 
                   <Button
                   size="sm"
@@ -1098,14 +1053,14 @@ const CashierPanel = () => {void
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  style={{ minWidth: '140px' }} />
+                  className="cashier-min-w-140" />
 
-                  <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>—</span>
+                  <span className="cashier-date-sep">—</span>
                   <Input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  style={{ minWidth: '140px' }} />
+                  className="cashier-min-w-140" />
 
                   <Button
                   size="sm"
@@ -1124,54 +1079,49 @@ const CashierPanel = () => {void
           </Card>
 
           {/* ✅ УЛУЧШЕНИЕ: Статистика платежей из API */}
-          <Card variant="outline" style={{ marginBottom: '16px', padding: '16px' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-              gap: '16px',
-              alignItems: 'center'
-            }}>
+          <Card variant="outline" className="cashier-stats-card">
+            <div className="cashier-stats-grid">
               {/* Conditional Stats based on Active Tab */}
               {activeTab === 'history' ?
               <>
                   <div className="cashier-text-center">
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent)' }}>
+                    <div className="cashier-stat-num cashier-stat-accent">
                       {format(stats.total_amount)}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                    <div className="cashier-stat-cap">
                       Всего за период
                     </div>
                   </div>
                   <div className="cashier-text-center">
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-green)' }}>
+                    <div className="cashier-stat-num cashier-stat-green">
                       {format(stats.cash_amount)}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                    <div className="cashier-stat-cap">
                       Наличные
                     </div>
                   </div>
                   <div className="cashier-text-center">
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-blue)' }}>
+                    <div className="cashier-stat-num cashier-stat-blue">
                       {format(stats.card_amount)}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                    <div className="cashier-stat-cap">
                       Карта
                     </div>
                   </div>
                   <div className="cashier-text-center">
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-purple)' }}>
+                    <div className="cashier-stat-num cashier-stat-purple">
                       {stats.paid_count}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                    <div className="cashier-stat-cap">
                       Оплачено
                     </div>
                   </div>
                   {stats.cancelled_count > 0 &&
                 <div className="cashier-text-center">
-                      <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-danger)' }}>
+                      <div className="cashier-stat-num cashier-stat-danger">
                         {stats.cancelled_count}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                      <div className="cashier-stat-cap">
                         Отменено
                       </div>
                     </div>
@@ -1179,15 +1129,15 @@ const CashierPanel = () => {void
                 </> :
 
               <div className="cashier-text-center">
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--mac-accent-orange)' }}>
+                  <div className="cashier-stat-num-lg cashier-stat-orange">
                     {format(stats.pending_amount || 0)}
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                  <div className="cashier-stat-cap-base">
                     Ожидает оплаты ({stats.pending_count} заявок)
                   </div>
                 </div>
               }
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <div className="cashier-refresh-row">
                 <Button
                   size="sm"
                   variant="outline"
@@ -1247,47 +1197,39 @@ const CashierPanel = () => {void
 
 
             {activeTab === 'pending' &&
-            <div style={{ marginTop: '24px' }}>
+            <div className="cashier-section-gap">
                 {pendingLoading ?
-              <Skeleton style={{ height: '192px' }} /> :
+              <Skeleton className="cashier-skeleton-h" /> :
               appointments.length > 0 ?
-              <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%' }}>
+              <div className="cashier-table-scroll">
+                    <table className="cashier-table">
                       <thead>
-                        <tr style={{
-                      backgroundColor: 'var(--mac-bg-tertiary)',
-                      borderBottom: '1px solid var(--mac-border)'
-                    }}>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Дата/Время</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Пациент</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Услуги</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Сумма</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Статус</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Действия</th>
+                        <tr className="cashier-table-row">
+                          <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
+                          <th className="cashier-text-sm cashier-text-primary">Пациент</th>
+                          <th className="cashier-text-sm cashier-text-primary">Услуги</th>
+                          <th className="cashier-text-sm cashier-text-primary">Сумма</th>
+                          <th className="cashier-text-sm cashier-text-primary">Статус</th>
+                          <th className="cashier-text-sm cashier-text-primary">Действия</th>
                         </tr>
                       </thead>
                       <tbody>
                         {appointments.map((appointment, index) =>
                     <tr
                       key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${appointment.visit_ids?.join('-') || ''}`}
-                      style={{
-                        borderBottom: '1px solid var(--mac-border)',
-                        transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                      className="cashier-table-row">
 
                             <td
                               aria-label="Pending appointment date and time"
-                              className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontWeight: '500' }}>
+                              className="cashier-text-sm cashier-text-primary">
+                              <div className="cashier-date-stack">
+                                <span className="cashier-date-main">
                                   {appointment.created_at ?
                             formatRegistrarDate(appointment.created_at) :
                             appointment.appointment_date || '—'
                             }
                                 </span>
-                                <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+                                <span className="cashier-date-sub">
                                   {appointment.created_at ?
                             formatRegistrarTime(appointment.created_at) :
                             appointment.appointment_time || '—'
@@ -1295,19 +1237,19 @@ const CashierPanel = () => {void
                                 </span>
                               </div>
                             </td>
-                            <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+                            <td className="cashier-text-sm cashier-text-primary">
                               {appointment.patient_last_name && appointment.patient_first_name ?
                         `${appointment.patient_last_name} ${appointment.patient_first_name}` :
                         appointment.patient_name || `Пациент #${appointment.patient_id}`
                         }
                             </td>
-                            <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+                            <td className="cashier-text-sm cashier-text-primary">
                               {renderServiceBadges(appointment.services, appointment.services_names)}
                             </td>
-                            <td className="cashier-text-sm" style={{ color: 'var(--mac-accent)' }}>
+                            <td className="cashier-text-sm cashier-text-accent">
                               {format(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0)}
                             </td>
-                            <td style={{ padding: '12px 16px' }}>
+                            <td className="cashier-cell-padded">
                               <Badge
                                 variant="warning"
                                 role="status"
@@ -1315,8 +1257,8 @@ const CashierPanel = () => {void
                                 Ожидает оплаты
                               </Badge>
                             </td>
-                            <td style={{ padding: '12px 16px' }}>
-                              <div style={{ display: 'flex', gap: '8px' }}>
+                            <td className="cashier-cell-padded">
+                              <div className="cashier-refresh-row">
                                 <Button
                             size="sm"
                             variant="outline"
@@ -1345,14 +1287,7 @@ const CashierPanel = () => {void
 
                     {/* ✅ v2.0: Пагинация для ожидающих оплаты */}
                     {pendingTotalPages > 1 &&
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginTop: '16px',
-                  padding: '12px'
-                }}>
+                <div className="cashier-pagination">
                         <Button
                     size="sm"
                     variant="outline"
@@ -1361,7 +1296,7 @@ const CashierPanel = () => {void
 
                           ← Назад
                         </Button>
-                        <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                        <span className="cashier-pagination-info">
                           Страница {pendingPage} из {pendingTotalPages} (Всего: {pendingTotalItems})
                         </span>
                         <Button
@@ -1376,7 +1311,7 @@ const CashierPanel = () => {void
                 }
                   </div> :
 
-              <div className="cashier-text-sm" style={{ color: 'var(--mac-text-secondary)' }}>
+              <div className="cashier-text-sm cashier-text-secondary">
                     Нет записей, ожидающих оплаты
                   </div>
               }
@@ -1384,58 +1319,50 @@ const CashierPanel = () => {void
             }
 
             {activeTab === 'history' &&
-            <div style={{ marginTop: '24px' }}>
+            <div className="cashier-section-gap">
                 {historyLoading ?
-              <Skeleton style={{ height: '192px' }} /> :
+              <Skeleton className="cashier-skeleton-h" /> :
 
-              <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%' }}>
+              <div className="cashier-table-scroll">
+                    <table className="cashier-table">
                       <thead>
-                        <tr style={{
-                      backgroundColor: 'var(--mac-bg-tertiary)',
-                      borderBottom: '1px solid var(--mac-border)'
-                    }}>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Дата/Время</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Пациент</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Услуга</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Способ</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Сумма</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Статус</th>
-                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Действия</th>
+                        <tr className="cashier-table-row">
+                          <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
+                          <th className="cashier-text-sm cashier-text-primary">Пациент</th>
+                          <th className="cashier-text-sm cashier-text-primary">Услуга</th>
+                          <th className="cashier-text-sm cashier-text-primary">Способ</th>
+                          <th className="cashier-text-sm cashier-text-primary">Сумма</th>
+                          <th className="cashier-text-sm cashier-text-primary">Статус</th>
+                          <th className="cashier-text-sm cashier-text-primary">Действия</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredPayments.length > 0 ?
                     filteredPayments.map((row, index) =>
-                    <tr key={`payment-${row.id || row.payment_id || index}`} style={{
-                      borderBottom: '1px solid var(--mac-border)',
-                      transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                    <tr key={`payment-${row.id || row.payment_id || index}`} className="cashier-table-row">
 
                               <td
                                 aria-label="Payment history date and time"
-                                className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                  <span style={{ fontWeight: '500' }}>{row.date || '—'}</span>
-                                  <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{row.time || '—'}</span>
+                                className="cashier-text-sm cashier-text-primary">
+                                <div className="cashier-date-stack">
+                                  <span className="cashier-date-main">{row.date || '—'}</span>
+                                  <span className="cashier-date-sub">{row.time || '—'}</span>
                                 </div>
                               </td>
-                              <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+                              <td className="cashier-text-sm cashier-text-primary">
                                 {row.patient}
                               </td>
-                              <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+                              <td className="cashier-text-sm cashier-text-primary">
                                 {/* TODO: Render services info properly if available in history item */}
                                  {row.service || '—'}
                               </td>
-                              <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+                              <td className="cashier-text-sm cashier-text-primary">
                                 {row.method}
                               </td>
-                              <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
+                              <td className="cashier-text-sm cashier-text-primary">
                                 {format(row.total_amount || row.amount || 0)}
                               </td>
-                              <td style={{ padding: '12px 16px' }}>
+                              <td className="cashier-cell-padded">
                                 <Badge
                                   variant={getPaymentStatusMeta(row.status).variant}
                                   role="status"
@@ -1443,7 +1370,7 @@ const CashierPanel = () => {void
                                   {getPaymentStatusLabel(row.status)}
                                 </Badge>
                               </td>
-                              <td style={{ padding: '12px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              <td className="cashier-cell-actions">
                                 {/* QW-07 fix: differentiated variants by intent.
                                     Previously all 4 buttons used variant="outline" with emoji icons,
                                     making destructive (Cancel, Refund) visually identical to constructive
@@ -1490,8 +1417,8 @@ const CashierPanel = () => {void
                             </tr>
                     ) :
 
-                    <tr>
-                            <td colSpan="7" className="cashier-text-sm" style={{ color: 'var(--mac-text-secondary)' }}>
+                    <tr className="cashier-empty-row">
+                            <td colSpan="7" className="cashier-text-sm cashier-text-secondary">
                               Нет данных для отображения
                             </td>
                           </tr>
@@ -1501,14 +1428,7 @@ const CashierPanel = () => {void
 
                     {/* ✅ УЛУЧШЕНИЕ: Пагинация c Server-Side логикой */}
                     {totalPages > 1 &&
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginTop: '16px',
-                  padding: '12px'
-                }}>
+                <div className="cashier-pagination">
                         <Button
                     size="sm"
                     variant="outline"
@@ -1517,7 +1437,7 @@ const CashierPanel = () => {void
 
                           ← Назад
                         </Button>
-                        <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                        <span className="cashier-pagination-info">
                           Страница {currentPage} из {totalPages} (Всего: {totalItems})
                         </span>
                         <Button
@@ -1537,7 +1457,7 @@ const CashierPanel = () => {void
 
             {/* Вкладка Возвраты */}
             {activeTab === 'refunds' &&
-            <div style={{ marginTop: '24px' }}>
+            <div className="cashier-section-gap">
                 <RefundRequestsTable onRefresh={handleRefresh} />
               </div>
             }
@@ -1561,7 +1481,7 @@ const CashierPanel = () => {void
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Причина отмены (необязательно)"
-                className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }} />
+                className="cashier-text-sm cashier-text-primary" />
 
             </DialogContent>
             <DialogActions>
@@ -1603,7 +1523,7 @@ const CashierPanel = () => {void
 
             <DialogContent>
               {paymentError &&
-              <Alert severity="error" style={{ marginBottom: 8 }}>
+              <Alert severity="error" className="cashier-alert-error">
                   {paymentError}
                 </Alert>
               }
@@ -1637,7 +1557,7 @@ const CashierPanel = () => {void
 
             <DialogTitle>
               <Box display="flex" alignItems="center">
-                <CheckCircle style={{ color: 'var(--mac-success)', marginRight: 8 }} />
+                <CheckCircle className="cashier-check-icon" />
                 Оплата успешна!
               </Box>
             </DialogTitle>
@@ -1684,13 +1604,7 @@ const CashierPanel = () => {void
                     aria-label="Refund amount"
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--mac-border)',
-                      fontSize: '14px'
-                    }}
+                    className="cashier-refund-input"
                     max={refundPaymentAmount}
                     min={1} />
 
@@ -1703,14 +1617,7 @@ const CashierPanel = () => {void
                     onChange={(e) => setRefundReason(e.target.value)}
                     placeholder="Укажите причину возврата (минимум 3 символа)"
                     rows={3}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--mac-border)',
-                      fontSize: '14px',
-                      resize: 'vertical'
-                    }} />
+                    className="cashier-refund-textarea" />
 
                 </Box>
               </Box>
