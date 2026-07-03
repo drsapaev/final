@@ -2135,6 +2135,210 @@ def _process_appointment_entry(
 
 
 
+def _process_online_queue_entry(
+    *,
+    db: Session,
+    entry_data: Any,
+    entry_wrapper: dict,
+    specialty: str,
+) -> dict | None:
+    """R-22 Phase 7: Process an OnlineQueueEntry (or QR-Visit) into entry fields.
+
+    Returns a dict with the populated fields, or None to signal "skip this entry"
+    (caller should `continue` to the next iteration).
+    Mutates `entry_wrapper` in place: sets queue_entry_id, visit_id, oqe_*, service_name, service_id, service_code.
+    """
+    if entry_data is None:
+        logger.warning("get_today_queues: online_queue entry with None data, skipping")
+        return None
+
+    from app.models.patient import Patient
+    from app.models.service import Service
+    from app.models.visit import VisitService
+    from app.services.service_mapping import get_default_service_by_specialty
+
+    # entry_data может быть OnlineQueueEntry или Visit (для QR-визитов)
+    is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
+
+    services: list = []
+    service_codes: list = []
+    service_details: list = []
+
+    if is_visit_object:
+        # entry_data это Visit с source='online'
+        visit = entry_data
+        queue_entry_for_visit = _same_patient_queue_entry_for_visit(db, visit)
+        if queue_entry_for_visit:
+            record_id = queue_entry_for_visit.id
+            entry_wrapper["oqe_number"] = queue_entry_for_visit.number
+            entry_wrapper["oqe_total_amount"] = queue_entry_for_visit.total_amount or 0
+            entry_wrapper["oqe_queue_time"] = queue_entry_for_visit.queue_time
+            entry_wrapper["oqe_updated_at"] = queue_entry_for_visit.updated_at
+        else:
+            record_id = visit.id
+        entry_wrapper["visit_id"] = visit.id
+        entry_wrapper["queue_entry_id"] = queue_entry_for_visit.id if queue_entry_for_visit else None
+        patient_id = visit.patient_id
+        entry_status = visit.status or "waiting"
+        source = visit.source or "online"
+        discount_mode = visit.discount_mode or "none"
+        visit_time = str(visit.visit_time) if hasattr(visit, 'visit_time') and visit.visit_time else None
+
+        patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+        if patient:
+            patient_name = patient.short_name()
+            phone = patient.phone or "Не указан"
+            patient_birth_year = patient.birth_date.year if patient.birth_date else None
+            address = patient.address
+        else:
+            patient_name = "Неизвестный пациент"
+            phone = "Не указан"
+            patient_birth_year = None
+            address = None
+
+        # Услуги из VisitService
+        visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+        for vs in visit_services:
+            svc = db.query(Service).filter(Service.id == vs.service_id).first()
+            if svc:
+                service_codes.append(svc.service_code or svc.code or "")
+                services.append({
+                    "service_id": svc.id,
+                    "name": svc.name,
+                    "code": svc.service_code or svc.code,
+                    "price": float(vs.price) if vs.price else 0,
+                    "quantity": vs.qty or 1,
+                })
+    else:
+        # entry_data это OnlineQueueEntry (обычный случай)
+        online_entry = entry_data
+        record_id = online_entry.id
+        entry_wrapper["queue_entry_id"] = online_entry.id
+        patient_id = online_entry.patient_id
+        patient_name = online_entry.patient_name or "Неизвестный пациент"
+        phone = online_entry.phone or "Не указан"
+        patient_birth_year = online_entry.birth_year
+        address = online_entry.address
+        entry_status = online_entry.status
+        source = online_entry.source or "online"
+        discount_mode = online_entry.discount_mode or "none"
+        visit_time = None
+
+        # Услуги из online_entry.services (list или JSON string)
+        if hasattr(online_entry, 'services') and online_entry.services:
+            if isinstance(online_entry.services, list):
+                services = online_entry.services
+                for service in services:
+                    if isinstance(service, dict):
+                        if service.get("code"):
+                            service_codes.append(service["code"])
+                        elif service.get("service_code"):
+                            service_codes.append(service["service_code"])
+                    elif isinstance(service, str):
+                        service_codes.append(service)
+            elif isinstance(online_entry.services, str):
+                import json
+                try:
+                    services = json.loads(online_entry.services)
+                    if isinstance(services, list):
+                        for service in services:
+                            if isinstance(service, dict) and service.get("code"):
+                                service_codes.append(service["code"])
+                except Exception:
+                    pass
+
+    # service_name: приоритет — имя из первой услуги, затем SSOT lookup по specialty
+    service_name = None
+    if services and len(services) > 0:
+        first = services[0]
+        if isinstance(first, dict):
+            service_name = first.get("name") or first.get("service_name")
+        elif isinstance(first, str):
+            service_name = first
+
+    if not service_name:
+        default_service = get_default_service_by_specialty(db, specialty)
+        if default_service:
+            service_name = default_service["name"]
+            entry_wrapper["service_id"] = default_service["id"]
+            entry_wrapper["service_code"] = default_service["service_code"]
+
+    entry_wrapper["service_name"] = service_name
+
+    # service_codes из entry_data.service_codes (дополнительно)
+    if hasattr(entry_data, 'service_codes') and entry_data.service_codes:
+        if isinstance(entry_data.service_codes, list):
+            service_codes.extend(entry_data.service_codes)
+        elif isinstance(entry_data.service_codes, str):
+            import json
+            try:
+                parsed = json.loads(entry_data.service_codes)
+                if isinstance(parsed, list):
+                    service_codes.extend(parsed)
+            except Exception:
+                pass
+
+    # total_cost: приоритет oqe_total_amount > entry_data.total_amount > VisitService SUM
+    total_cost = entry_wrapper.get("oqe_total_amount") or getattr(entry_data, 'total_amount', 0) or 0
+    if total_cost == 0:
+        linked_visit_id = getattr(entry_data, 'visit_id', None) or entry_wrapper.get("visit_id")
+        if linked_visit_id:
+            try:
+                cost_row = db.execute(
+                    text("SELECT SUM(price * qty) as total FROM visit_services WHERE visit_id = :vid"),
+                    {"vid": linked_visit_id}
+                ).first()
+                if cost_row and cost_row.total:
+                    total_cost = float(cost_row.total)
+            except Exception:
+                pass  # Fallback на 0
+
+    # service_details из entry_data.services
+    if hasattr(entry_data, 'services') and entry_data.services:
+        parsed_services = entry_data.services
+        if isinstance(parsed_services, str):
+            import json
+            try:
+                parsed_services = json.loads(parsed_services)
+            except Exception:
+                parsed_services = []
+
+        if isinstance(parsed_services, list):
+            for svc in parsed_services:
+                if isinstance(svc, dict):
+                    service_details.append({
+                        "id": svc.get("id") or svc.get("service_id"),
+                        "code": svc.get("code") or svc.get("service_code"),
+                        "name": svc.get("name") or svc.get("service_name"),
+                        "price": float(svc.get("price", 0)) if svc.get("price") else 0,
+                    })
+                elif isinstance(svc, str):
+                    service_details.append({
+                        "id": None,
+                        "code": None,
+                        "name": svc,
+                        "price": 0,
+                    })
+
+    return {
+        "record_id": record_id,
+        "patient_id": patient_id,
+        "patient_name": patient_name,
+        "phone": phone,
+        "patient_birth_year": patient_birth_year,
+        "address": address,
+        "entry_status": entry_status,
+        "source": source,
+        "discount_mode": discount_mode,
+        "visit_time": visit_time,
+        "services": services,
+        "service_codes": service_codes,
+        "service_details": service_details,
+        "total_cost": total_cost,
+    }
+
+
+
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
 
 
@@ -2664,204 +2868,29 @@ def get_today_queues(
                     source = _appt["source"]
 
                 elif entry_type == "online_queue":
-                    # R-22 fix: guard against None entry_data
-                    if entry_data is None:
-                        logger.warning("get_today_queues: online_queue entry with None data, skipping")
+                    # R-22 Phase 7: online_queue processing extracted to helper
+                    _oqe = _process_online_queue_entry(
+                        db=db,
+                        entry_data=entry_data,
+                        entry_wrapper=entry_wrapper,
+                        specialty=specialty,
+                    )
+                    if _oqe is None:
                         continue
-                    # ✅ SSOT FIX: entry_data может быть OnlineQueueEntry или Visit (для QR-визитов)
-                    is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
-                    
-                    if is_visit_object:
-                        # entry_data это Visit с source='online'
-                        visit = entry_data
-                        # ✅ SSOT FIX: Для QR-визитов нужно получить данные из OnlineQueueEntry
-                        # Frontend использует этот ID для вызова full-update endpoint
-                        queue_entry_for_visit = _same_patient_queue_entry_for_visit(db, visit)
-                        if queue_entry_for_visit:
-                            record_id = queue_entry_for_visit.id
-                            # ⭐ PHASE 1 FIX: Сохраняем данные из OQE для использования позже
-                            entry_wrapper["oqe_number"] = queue_entry_for_visit.number
-                            entry_wrapper["oqe_total_amount"] = queue_entry_for_visit.total_amount or 0
-                            entry_wrapper["oqe_queue_time"] = queue_entry_for_visit.queue_time
-                            entry_wrapper["oqe_updated_at"] = queue_entry_for_visit.updated_at
-                        else:
-                            record_id = visit.id
-                        # Также сохраняем visit_id для обратной совместимости
-                        entry_wrapper["visit_id"] = visit.id
-                        entry_wrapper["queue_entry_id"] = queue_entry_for_visit.id if queue_entry_for_visit else None
-                        patient_id = visit.patient_id
-                        entry_status = visit.status or "waiting"
-                        source = visit.source or "online"  # SSOT: Visit.source
-                        discount_mode = visit.discount_mode or "none"
-                        visit_time = str(visit.visit_time) if hasattr(visit, 'visit_time') and visit.visit_time else None
-                        
-                        # Загружаем пациента для получения данных
-                        patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
-                        if patient:
-                            patient_name = patient.short_name()
-                            phone = patient.phone or "Не указан"
-                            patient_birth_year = patient.birth_date.year if patient.birth_date else None
-                            address = patient.address
-                        else:
-                            patient_name = "Неизвестный пациент"
-                            phone = "Не указан"
-                            patient_birth_year = None
-                            address = None
-                    else:
-                        # entry_data это OnlineQueueEntry (обычный случай)
-                        online_entry = entry_data
-                        record_id = online_entry.id
-                        entry_wrapper["queue_entry_id"] = online_entry.id
-                        patient_id = online_entry.patient_id
-                        patient_name = online_entry.patient_name or "Неизвестный пациент"
-                        phone = online_entry.phone or "Не указан"
-                        patient_birth_year = online_entry.birth_year
-                        address = online_entry.address
-                        entry_status = online_entry.status  # waiting, called, served, no_show
-                        source = online_entry.source or "online"
-                        discount_mode = online_entry.discount_mode or "none"
-                        visit_time = None
-
-                    # Получаем услуги - зависит от типа entry_data
-                    if is_visit_object:
-                        # Для Visit загружаем услуги из VisitService
-                        from app.models.visit import VisitService
-                        visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
-                        for vs in visit_services:
-                            svc = db.query(Service).filter(Service.id == vs.service_id).first()
-                            if svc:
-                                service_codes.append(svc.service_code or svc.code or "")
-                                services.append({
-                                    "service_id": svc.id,
-                                    "name": svc.name,
-                                    "code": svc.service_code or svc.code,
-                                    "price": float(vs.price) if vs.price else 0,
-                                    "quantity": vs.qty or 1
-                                })
-                    elif hasattr(entry_data, 'services') and entry_data.services:
-                        online_entry = entry_data
-                        if isinstance(online_entry.services, list):
-                            services = online_entry.services
-                            # Извлекаем коды услуг
-                            for service in services:
-                                if isinstance(service, dict):
-                                    if service.get("code"):
-                                        service_codes.append(service["code"])
-                                    elif service.get("service_code"):
-                                        service_codes.append(service["service_code"])
-                                elif isinstance(service, str):
-                                    service_codes.append(service)
-                        elif isinstance(online_entry.services, str):
-                            # Если это JSON строка, парсим
-                            import json
-
-                            try:
-                                services = json.loads(online_entry.services)
-                                if isinstance(services, list):
-                                    for service in services:
-                                        if isinstance(service, dict) and service.get(
-                                            "code"
-                                        ):
-                                            service_codes.append(service["code"])
-                            except Exception:
-                                pass
-
-                    # ✅ ИСПРАВЛЕНО: Определяем service_name только из явной service truth
-                    # Приоритет: 1. Имя из первой услуги 2. SSOT lookup по specialty
-                    service_name = None
-                    if services and len(services) > 0:
-                        first = services[0]
-                        if isinstance(first, dict):
-                            service_name = first.get("name") or first.get(
-                                "service_name"
-                            )
-                        elif isinstance(first, str):
-                            service_name = first
-
-                    if not service_name:
-                        # ✅ SSOT: Используем единственный источник истины для маппинга
-                        from app.services.service_mapping import get_default_service_by_specialty
-                        
-                        default_service = get_default_service_by_specialty(db, specialty)
-                        if default_service:
-                            service_name = default_service["name"]
-                            # ✅ ВАЖНО: Добавляем service_id для правильной работы визарда
-                            entry_wrapper["service_id"] = default_service["id"]
-                            entry_wrapper["service_code"] = default_service["service_code"]
-
-                    entry_wrapper["service_name"] = service_name
-                    # Добавляем также в data для надежности (frontend может читать из data)
-                    if isinstance(entry_data, dict):
-                         entry_data["service_name"] = service_name
-                    elif hasattr(entry_data, "__dict__"):
-                         try:
-                             # Не можем менять объект модели SQLAlchemy, но можем попробовать
-                             # setattr(entry_data, "service_name", service_name)
-                             # Лучше не трогать модель, а полагаться на entry_wrapper
-                             pass
-                         except Exception:
-                             pass
-
-                    # ⭐ PHASE 1 FIX: Проверяем service_codes из entry_data (не online_entry!)
-                    if hasattr(entry_data, 'service_codes') and entry_data.service_codes:
-                        if isinstance(entry_data.service_codes, list):
-                            service_codes.extend(entry_data.service_codes)
-                        elif isinstance(entry_data.service_codes, str):
-                            import json
-
-                            try:
-                                parsed = json.loads(entry_data.service_codes)
-                                if isinstance(parsed, list):
-                                    service_codes.extend(parsed)
-                            except Exception:
-                                pass
-
-                    # ⭐ PHASE 1 FIX: total_cost - приоритет: oqe_total_amount, entry_data.total_amount, VisitService
-                    total_cost = entry_wrapper.get("oqe_total_amount") or getattr(entry_data, 'total_amount', 0) or 0
-                    
-                    # ⭐ PHASE 1 FIX: Для desk записей total_amount=0 — вычисляем из VisitService
-                    if total_cost == 0:
-                        linked_visit_id = getattr(entry_data, 'visit_id', None) or entry_wrapper.get("visit_id")
-                        if linked_visit_id:
-                            try:
-                                cost_row = db.execute(
-                                    text("SELECT SUM(price * qty) as total FROM visit_services WHERE visit_id = :vid"),
-                                    {"vid": linked_visit_id}
-                                ).first()
-                                if cost_row and cost_row.total:
-                                    total_cost = float(cost_row.total)
-                            except Exception:
-                                pass  # Fallback на 0
-                    
-                    appointment_id_value = record_id
-
-                    # ⭐ PHASE 1 FIX: Формируем service_details из entry_data.services (не online_entry!)
-                    if hasattr(entry_data, 'services') and entry_data.services:
-                        parsed_services = entry_data.services
-                        if isinstance(parsed_services, str):
-                            import json
-                            try:
-                                parsed_services = json.loads(parsed_services)
-                            except Exception:
-                                parsed_services = []
-                        
-                        if isinstance(parsed_services, list):
-                            for svc in parsed_services:
-                                if isinstance(svc, dict):
-                                    service_details.append({
-                                        "id": svc.get("id") or svc.get("service_id"),
-                                        "code": svc.get("code") or svc.get("service_code"),
-                                        "name": svc.get("name") or svc.get("service_name"),
-                                        "price": float(svc.get("price", 0)) if svc.get("price") else 0
-                                    })
-                                elif isinstance(svc, str):
-                                    # Если только название - добавляем как есть
-                                    service_details.append({
-                                        "id": None,
-                                        "code": None,
-                                        "name": svc,
-                                        "price": 0
-                                    })
+                    record_id = _oqe["record_id"]
+                    patient_id = _oqe["patient_id"]
+                    patient_name = _oqe["patient_name"]
+                    phone = _oqe["phone"]
+                    patient_birth_year = _oqe["patient_birth_year"]
+                    address = _oqe["address"]
+                    entry_status = _oqe["entry_status"]
+                    source = _oqe["source"]
+                    discount_mode = _oqe["discount_mode"]
+                    visit_time = _oqe["visit_time"]
+                    services = _oqe["services"]
+                    service_codes = _oqe["service_codes"]
+                    service_details = _oqe["service_details"]
+                    total_cost = _oqe["total_cost"]
 
                 # appointment_id must mean a real Appointment.id for this row.
                 # Visit rows do not have an explicit Appointment FK, so a fuzzy
