@@ -5,6 +5,9 @@ import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 // P-016 (UX audit): persist cardiologist settings (ldlThreshold,
 // showEcgEchoTogether) in localStorage so they survive page reloads.
 import { useLocalStorage } from '../hooks/useLocalStorage';
+// P-021 (UX audit): warn the doctor 5 minutes before session expiry
+// so they can save their work instead of losing it to a silent 401.
+import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import {
   FileText,
   User,
@@ -124,6 +127,22 @@ const MacOSCardiologistPanelUnified = () => {
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [services, setServices] = useState({}); // ✅ Добавлено: состояние для услуг
+
+  // P-021 (UX audit): session timeout warning state. When the JWT is
+  // about to expire, we show a dialog so the doctor can save their work.
+  const [sessionWarning, setSessionWarning] = useState(null); // { expiresAt } | null
+
+  useSessionTimeoutWarning({
+    onWarning: (expiresAt) => setSessionWarning({ expiresAt }),
+    onExpired: () => {
+      setSessionWarning(null);
+      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      // Force a reload so the auth guard redirects to /login.
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    },
+  });
 
   // Специализированные данные кардиолога
   const [bloodTestForm, setBloodTestForm] = useState({
@@ -2369,6 +2388,70 @@ const MacOSCardiologistPanelUnified = () => {
 
         {/* QW-10 (UX audit): portal-mounted ConfirmDialog used before completing a visit */}
         {confirmDialog}
+
+        {/* P-021 (UX audit): session timeout warning dialog */}
+        {sessionWarning && (
+          <div
+            role="alertdialog"
+            aria-label="Предупреждение об истечении сессии"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10000,
+            }}
+          >
+            <div
+              style={{
+                background: getColor('surface'),
+                border: `1px solid ${getColor('border')}`,
+                borderRadius: '12px',
+                padding: '24px',
+                maxWidth: '420px',
+                width: '90%',
+                boxShadow: getShadow('xl'),
+              }}
+            >
+              <h3 style={{ margin: '0 0 12px 0', fontSize: getFontSize('lg'), color: getColor('text') }}>
+                Сессия скоро истечёт
+              </h3>
+              <p style={{ margin: '0 0 16px 0', fontSize: getFontSize('base'), color: getColor('textSecondary'), lineHeight: 1.5 }}>
+                Ваша сессия истекает. Несохранённые данные (жалобы, диагноз, лечение)
+                могут быть потеряны. Сохраните текущий приём или продлите сессию.
+              </p>
+              <div style={{ display: 'flex', gap: getSpacing('sm'), justifyContent: 'flex-end' }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSessionWarning(null);
+                    // Reset the warning flag so it can fire again if the
+                    // session is still expiring after dismissal.
+                  }}
+                >
+                  Позже
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSessionWarning(null);
+                    // Trigger a token refresh by making any API call —
+                    // the api/client.js interceptor will refresh if needed.
+                    // A simple page reload also works but is more disruptive.
+                    notify.info('Продлеваем сессию...');
+                    loadMacOSCardiologyAppointments?.();
+                  }}
+                >
+                  Продлить сессию
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Настройки кардиолога: плавающая кнопка и панель */}
         <button
