@@ -63,6 +63,8 @@ services:
       RELOAD: ${RELOAD:-1}
       WORKERS: ${WORKERS:-1}
       RUN_ALEMBIC_ON_START: ${RUN_ALEMBIC_ON_START:-1}
+      # Redis (for WebSocket pubsub + arq task queue)
+      ARQ_REDIS_URL: ${ARQ_REDIS_URL:-redis://redis:6379/0}
       # Licensing / Activation
       REQUIRE_LICENSE: ${REQUIRE_LICENSE:-0}
       LICENSE_MODE: ${LICENSE_MODE:-activation}
@@ -106,7 +108,59 @@ services:
       backend:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # Redis — pub/sub for WebSocket fanout + arq task queue broker
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: clinic-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  # ---------------------------------------------------------------------------
+  # arq worker — background jobs (visit reminders, data retention, reports)
+  # ---------------------------------------------------------------------------
+  worker:
+    build:
+      context: ..
+      dockerfile: ops/backend.Dockerfile
+      target: runtime
+    container_name: clinic-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clinic}:${POSTGRES_PASSWORD:-clinic_dev_password}@postgres:5432/${POSTGRES_DB:-clinicdb}
+      ARQ_REDIS_URL: redis://redis:6379/0
+      APP_NAME: ${APP_NAME:-Clinic Queue Manager}
+      APP_VERSION: ${APP_VERSION:-0.9.0-local}
+      ENV: ${ENV:-dev}
+      SECRET_KEY: ${SECRET_KEY:-local-dev-secret-key-for-visual-testing-only-2026}
+      TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
+      # Sentry (optional — no-op if unset)
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENV: ${SENTRY_ENV:-${ENV:-dev}}
+    volumes:
+      - ../backend:/app:rw
+      - backend_data:/data
+    working_dir: /app
+    # arq WorkerSettings is defined in backend/app/tasks/worker.py
+    command: ["arq", "app.tasks.worker.WorkerSettings"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   backend_data:
   frontend_node_modules:
   postgres_data:
+  redis_data:
