@@ -55,6 +55,7 @@ import './EMRContainerV2.css';
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
 import notify from '../../services/notify';
+import logger from '../../utils/logger';
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
 // (consistent with the rest of the app + screen-reader friendly via aria-label).
 import {
@@ -148,8 +149,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
             // Очищаем AI-состояние при смене визита
             setAiSuggestions({});
             setAiLoading({});
-            // eslint-disable-next-line no-console
-            console.log('[EMR] Visit changed', { prevVisitId, newVisitId });
+            logger.info('[EMR] Visit changed', { prevVisitId, newVisitId });
         },
         onCleanup: () => {
             // Дополнительная очистка при размонтировании
@@ -206,8 +206,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
         // ghost.enabled, ghost.accepted, ghost.dismissed, history.accepted
         if (event && event.type) {
             if (process.env.NODE_ENV === 'development') {
-                // eslint-disable-next-line no-console
-                console.log('[EMR Telemetry]', event);
+                logger.info('[EMR Telemetry]', event);
             }
             // In production: send to analytics backend
         }
@@ -215,8 +214,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
 
     // Handle AI Request - calls MCP API for suggestions
     const handleRequestAI = useCallback(async (fieldName) => {
-        // eslint-disable-next-line no-console
-        console.log('[EMR AI Request]', {
+        logger.info('[EMR AI Request]', {
             fieldName,
             specialty: data.specialty || 'general',
             complaintsLength: data.complaints?.length || 0,
@@ -250,13 +248,11 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                         specialty,
                         maxSuggestions: 5
                     }, requestOptions);
-                    // eslint-disable-next-line no-console
-                    console.log('[EMR AI] ICD10 result:', result);
+                    logger.info('[EMR AI] ICD10 result:', result);
 
                     // Log debug_meta in dev mode for transparency
                     if (process.env.NODE_ENV === 'development' && result?.debug_meta) {
-                        // eslint-disable-next-line no-console
-                        console.log('[AI Debug]', result.debug_meta);
+                        logger.info('[AI Debug]', result.debug_meta);
                     }
 
                     // Handle wrapped response: {status, data: {suggestions: [...]}}
@@ -282,8 +278,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             tags: buildAiTags(),
                         });
                     } else {
-                        // eslint-disable-next-line no-console
-                        console.log('[EMR AI] No ICD-10 suggestions returned');
+                        logger.info('[EMR AI] No ICD-10 suggestions returned');
                     }
                     break;
                 }
@@ -297,13 +292,11 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             patientAge: data.patient_age,
                             patientGender: data.patient_gender
                         }, requestOptions);
-                        // eslint-disable-next-line no-console
-                        console.log('[EMR AI] Complaint analysis result:', result);
+                        logger.info('[EMR AI] Complaint analysis result:', result);
 
                         // Log debug_meta in dev mode for transparency
                         if (process.env.NODE_ENV === 'development' && result?.debug_meta) {
-                            // eslint-disable-next-line no-console
-                            console.log('[AI Debug]', result.debug_meta);
+                            logger.info('[AI Debug]', result.debug_meta);
                         }
 
                         const analysisData = result?.data || result;
@@ -357,21 +350,18 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                                 isInfo: true  // Marking as info, not a real suggestion
                             }]
                         }));
-                        // eslint-disable-next-line no-console
-                        console.log('[EMR AI] No complaints to analyze - showing info message');
+                        logger.info('[EMR AI] No complaints to analyze - showing info message');
                     }
                     break;
 
                 default:
-                    // eslint-disable-next-line no-console
-                    console.log('[EMR AI] No AI handler for field:', fieldName);
+                    logger.info('[EMR AI] No AI handler for field:', fieldName);
             }
         } catch (err) {
             if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
                 return;
             }
-            // eslint-disable-next-line no-console
-            console.error('[EMR AI Error]', err);
+            logger.error('[EMR AI Error]', err);
             handleTelemetry({ type: 'ai.error', payload: { fieldName, error: err.message } });
         } finally {
             setAiLoading(prev => ({ ...prev, [fieldName]: false }));
