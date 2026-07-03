@@ -309,7 +309,6 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
   // Отправка голосового сообщения
   const handleSendVoice = async (audioBlob) => {
-    // console.log('📤 handleSendVoice called. activeConversation:', activeConversation);
 
 
     if (!activeConversation || isSending) {
@@ -340,7 +339,6 @@ const ChatWindow = ({ isOpen, onClose }) => {
       }void (
 
       await response.json());
-      // console.log('✅ Voice message sent successfully, response:', messageData);
 
 
       // Обновляем только список бесед - сообщение придет через WebSocket

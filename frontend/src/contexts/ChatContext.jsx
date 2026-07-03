@@ -354,7 +354,6 @@ export const ChatProvider = ({ children }) => {
 
       const wsUrl = `${wsBase}/ws/chat?token=${latestToken}`;
 
-      // console.log('🔌 [Context] Connecting WS...', wsUrl);
       const ws = new WebSocket(wsUrl);
       activeSocket = ws;
 
@@ -370,7 +369,6 @@ export const ChatProvider = ({ children }) => {
         if (activeConversationRef.current) {
           requestOnlineStatus([activeConversationRef.current]);
         }
-        // console.log('✅ [Context] WS Connected');
       };
 
       ws.onmessage = (event) => {
@@ -447,11 +445,9 @@ export const ChatProvider = ({ children }) => {
             code: e.code,
             delay,
           });
-          // console.log(`❌ [Context] WS Disconnected (abnormal), retrying in ${delay}ms...`, e.code);
           reconnectTimeoutRef.current = setTimeout(connect, delay);
         } else {
           retryCountRef.current = 0;
-          // console.log('🔒 [Context] WS Closed normally');
         }
       };
 
