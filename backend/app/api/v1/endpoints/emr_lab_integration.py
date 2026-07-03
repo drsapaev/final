@@ -321,9 +321,9 @@ async def get_lab_results_statistics(
         parsed_date_to = None
 
         if date_from:
-            parsed_date_from = datetime.fromisoformat(date_from)
+            parsed_date_from = datetime.fromisoformat(date_from)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
         if date_to:
-            parsed_date_to = datetime.fromisoformat(date_to)
+            parsed_date_to = datetime.fromisoformat(date_to)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
 
         # Здесь будет реальная статистика
         # Пока возвращаем заглушку

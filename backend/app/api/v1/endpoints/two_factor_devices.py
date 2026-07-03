@@ -207,7 +207,7 @@ async def revoke_all_devices(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный пароль"
             )
 
-        success = service.revoke_all_devices(db=db, user_id=current_user.id)
+        success = service.revoke_all_devices(db=db, user_id=current_user.id)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
 
         return {"success": True, "message": "Доступ всех устройств отозван"}
 

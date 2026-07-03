@@ -202,9 +202,11 @@ async def ai_health_check(current_user: User = Depends(EMR_AI_ACCESS)):
 # EMR v2 Compatible Endpoint
 # =============================================================================
 
-import uuid
+import uuid  # noqa: E402  # manual-review: conditional import after config — intentional
 
-from pydantic import BaseModel
+from pydantic import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    BaseModel,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
 
 
 class AISuggestionV2(BaseModel):

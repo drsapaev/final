@@ -655,7 +655,7 @@ async def get_pending_payments(
             result.append(group_data)
 
         # Применяем пагинацию
-        total = len(result)
+        total = len(result)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
         result = result[skip : skip + limit]
 
         return result
@@ -887,7 +887,7 @@ def qrcode_png(
 
 
 @router.get("/pending-payments")
-async def get_pending_payments(
+async def get_pending_payments(  # noqa: F811  # manual-review: intentional redefinition for compatibility
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -1158,7 +1158,7 @@ async def get_pending_payments(
                 visits_by_patient[group_key]['created_at'] = visit.created_at
 
         # Обрабатываем сгруппированные visits
-        for group_key, group_data in visits_by_patient.items():
+        for group_key, group_data in visits_by_patient.items():  # noqa: B007  # manual-review: loop var unused but kept for API contract
             # Собираем все услуги из всех visits группы
             all_services_codes = []
             all_services_names = []

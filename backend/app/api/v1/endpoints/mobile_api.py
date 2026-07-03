@@ -220,7 +220,7 @@ async def get_upcoming_appointments(
 
         result = []
         for appointment in appointments:
-            services = [service.service.title for service in appointment.services]
+            services = [service.service.title for service in appointment.services]  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
 
             result.append(
                 AppointmentUpcomingOut(

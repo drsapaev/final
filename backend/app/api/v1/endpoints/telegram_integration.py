@@ -380,7 +380,7 @@ def get_bot_status(
                 "message": "Telegram бот не настроен",
             }
 
-        telegram_service = get_telegram_service()
+        telegram_service = get_telegram_service()  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
 
         return {
             "configured": bool(config.bot_token),

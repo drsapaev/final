@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from app.models.visit import Visit
 
 
-class RefundRequestStatus(str, Enum):
+class RefundRequestStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы заявок на возврат"""
     PENDING = "pending"          # Ожидает рассмотрения
     APPROVED = "approved"        # Одобрен
@@ -33,14 +33,14 @@ class RefundRequestStatus(str, Enum):
     CANCELLED = "cancelled"      # Отменён пациентом
 
 
-class RefundType(str, Enum):
+class RefundType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Тип возврата"""
     BANK_TRANSFER = "bank_transfer"  # Возврат на карту/счёт
     DEPOSIT = "deposit"              # На баланс депозита в клинике
     CASH = "cash"                    # Наличными в кассе
 
 
-class DepositTransactionType(str, Enum):
+class DepositTransactionType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Тип транзакции депозита"""
     CREDIT = "credit"    # Пополнение (начисление)
     DEBIT = "debit"      # Списание

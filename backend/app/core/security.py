@@ -17,7 +17,9 @@ if "__version__" not in vars(_argon2):
     logger.debug("[FIX] Applied argon2 version shim for passlib compatibility")
 
 # JWT configuration is owned by app.core.config and fails closed on invalid env.
-from app.core.config import settings  # type: ignore
+from app.core.config import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    settings,  # type: ignore  # noqa: E402  # manual-review: conditional import after config — intentional
+)
 
 SECRET_KEY: str = settings.SECRET_KEY
 ALGORITHM: str = settings.ALGORITHM

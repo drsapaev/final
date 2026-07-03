@@ -21,7 +21,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-class PrinterStatus(str, Enum):
+class PrinterStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы принтера"""
 
     ONLINE = "online"
@@ -32,7 +32,7 @@ class PrinterStatus(str, Enum):
     OUT_OF_INK = "out_of_ink"
 
 
-class PrintJobStatus(str, Enum):
+class PrintJobStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы задания печати"""
 
     PENDING = "pending"
@@ -42,7 +42,7 @@ class PrintJobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class DocumentFormat(str, Enum):
+class DocumentFormat(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Форматы документов"""
 
     PDF = "pdf"

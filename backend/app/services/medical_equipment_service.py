@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
-class DeviceType(str, Enum):
+class DeviceType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы медицинских устройств"""
 
     ECG = "ecg"  # ЭКГ аппарат
@@ -36,7 +36,7 @@ class DeviceType(str, Enum):
     HEIGHT_METER = "height_meter"  # Ростомер
 
 
-class DeviceStatus(str, Enum):
+class DeviceStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы устройств"""
 
     ONLINE = "online"
@@ -47,7 +47,7 @@ class DeviceStatus(str, Enum):
     CALIBRATING = "calibrating"
 
 
-class ConnectionType(str, Enum):
+class ConnectionType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы подключения"""
 
     SERIAL = "serial"  # COM порт

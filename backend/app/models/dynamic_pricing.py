@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from app.models.visit import Visit
 
 
-class PricingRuleType(str, enum.Enum):
+class PricingRuleType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы правил ценообразования"""
 
     TIME_BASED = "time_based"  # По времени (утро/день/вечер)
@@ -33,7 +33,7 @@ class PricingRuleType(str, enum.Enum):
     DYNAMIC = "dynamic"  # Динамические (на основе загруженности)
 
 
-class DiscountType(str, enum.Enum):
+class DiscountType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы скидок"""
 
     PERCENTAGE = "percentage"  # Процентная скидка

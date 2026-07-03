@@ -88,7 +88,7 @@ def _build_context(
         current_appointments.get("summary", {}).get("total_appointments", 0) or 0
     )
     total_revenue = float(current_revenue.get("total_revenue", 0) or 0)
-    new_patients = float(current_patients.get("new_patients", 0) or 0)
+    new_patients = float(current_patients.get("new_patients", 0) or 0)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
     active_patients = float(current_patients.get("active_patients", 0) or 0)
     completion_rate = float(current_visits.get("completion_rate", 0) or 0)
     retention_rate = float(current_patients.get("retention_rate", 0) or 0)

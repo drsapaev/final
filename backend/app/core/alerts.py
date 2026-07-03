@@ -26,7 +26,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-class AlertSeverity(str, Enum):
+class AlertSeverity(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Alert severity levels"""
     INFO = "info"
     WARNING = "warning"
@@ -34,7 +34,7 @@ class AlertSeverity(str, Enum):
     CRITICAL = "critical"
 
 
-class AlertType(str, Enum):
+class AlertType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Types of alerts"""
     PAYMENT_FAILURE = "payment_failure"
     DATABASE_ERROR = "database_error"

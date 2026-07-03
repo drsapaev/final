@@ -5,7 +5,7 @@ Enums для различных статусов в системе
 from enum import Enum
 
 
-class AppointmentStatus(str, Enum):
+class AppointmentStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """
     Статусы записей - жесткий поток: запись → платеж → прием → медкарта → рецепт
 
@@ -29,7 +29,7 @@ class AppointmentStatus(str, Enum):
     CONFIRMED = "confirmed"  # Старый статус -> маппится на paid
 
 
-class PaymentStatus(str, Enum):
+class PaymentStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы платежей (SSOT)"""
 
     PENDING = "pending"
@@ -41,7 +41,7 @@ class PaymentStatus(str, Enum):
     VOID = "void"
 
 
-class VisitStatus(str, Enum):
+class VisitStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы визитов (SSOT)"""
 
     OPEN = "open"
@@ -57,7 +57,7 @@ class VisitStatus(str, Enum):
     CONFIRMED = "confirmed"
 
 
-class ServiceCategory(str, Enum):
+class ServiceCategory(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """
     Категории услуг (SSOT) - только базовые категории.
 
@@ -73,7 +73,7 @@ class ServiceCategory(str, Enum):
     PROCEDURE = "P"  # Процедуры/Физиотерапия
 
 
-class PaymentMethod(str, Enum):
+class PaymentMethod(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Методы оплаты"""
 
     CASH = "cash"
@@ -82,7 +82,7 @@ class PaymentMethod(str, Enum):
     BANK_TRANSFER = "bank_transfer"
 
 
-class EMRStatus(str, Enum):
+class EMRStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы ЭМК"""
 
     DRAFT = "draft"
@@ -90,7 +90,7 @@ class EMRStatus(str, Enum):
     COMPLETED = "completed"
 
 
-class PrescriptionStatus(str, Enum):
+class PrescriptionStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы рецептов"""
 
     DRAFT = "draft"
@@ -98,7 +98,7 @@ class PrescriptionStatus(str, Enum):
     PRINTED = "printed"
 
 
-class QueueStatus(str, Enum):
+class QueueStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы очереди"""
 
     WAITING = "waiting"

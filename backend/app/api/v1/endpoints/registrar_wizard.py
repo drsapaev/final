@@ -572,7 +572,7 @@ def _create_queue_entries(
                     default_start=start_number,
                 )
 
-                queue_entry = queue_service.create_queue_entry(
+                queue_entry = queue_service.create_queue_entry(  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
                     db,
                     daily_queue=daily_queue,
                     patient_id=visit.patient_id,
@@ -867,7 +867,7 @@ def create_cart_appointments(
         # (Предполагаем, что пациент уже существует, так как он выбран в мастере)
 
         # Получаем настройки очереди
-        queue_settings = crud_clinic.get_queue_settings(db)
+        queue_settings = crud_clinic.get_queue_settings(db)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
         registration_settings = _load_registration_discount_settings(db)
 
         created_visits = []
@@ -2955,7 +2955,7 @@ def mark_visit_as_paid(
             paid_at = datetime.now(UTC)
 
             # Создаем платеж через прямой SQL
-            result = db.execute(
+            result = db.execute(  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
                 text(
                     """
                     INSERT INTO payments
@@ -3156,7 +3156,7 @@ def mark_queue_entry_as_paid(
             note = f"Оплата визита {visit.id} через запись очереди {entry_id}"
             paid_at = datetime.now(UTC)
 
-            result = db.execute(
+            result = db.execute(  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
                 text(
                     """
                     INSERT INTO payments

@@ -21,7 +21,7 @@ from fastapi import HTTPException, UploadFile, status
 logger = logging.getLogger(__name__)
 
 
-class FileCategory(str, Enum):
+class FileCategory(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """File categories"""
     IMAGE = "image"
     DOCUMENT = "document"

@@ -16,7 +16,7 @@ from pydantic.config import ConfigDict
 logger = logging.getLogger(__name__)
 
 
-class UserStatus(str, Enum):
+class UserStatus(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы пользователя"""
 
     ACTIVE = "active"
@@ -26,7 +26,7 @@ class UserStatus(str, Enum):
     LOCKED = "locked"
 
 
-class Gender(str, Enum):
+class Gender(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Пол пользователя"""
 
     MALE = "male"
@@ -34,7 +34,7 @@ class Gender(str, Enum):
     OTHER = "other"
 
 
-class Theme(str, Enum):
+class Theme(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Темы интерфейса"""
 
     LIGHT = "light"
@@ -46,7 +46,7 @@ class Theme(str, Enum):
     GRADIENT = "gradient"
 
 
-class TimeFormat(str, Enum):
+class TimeFormat(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Форматы времени"""
 
     HOUR_12 = "12"

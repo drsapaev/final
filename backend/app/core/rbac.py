@@ -12,7 +12,7 @@ from enum import Enum
 from fastapi import Depends, HTTPException, status
 
 
-class UserRole(str, Enum):
+class UserRole(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """
     SSOT для ролей пользователей.
 
@@ -120,7 +120,7 @@ class UserRole(str, Enum):
         }
 
 
-class AIPermission(str, Enum):
+class AIPermission(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """
     Разрешения для AI операций.
 

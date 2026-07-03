@@ -72,10 +72,10 @@ from .derma_procedure import DermaProcedure
 # from .webhook import Webhook, WebhookCall, WebhookEvent
 # from .ai_config import AIProvider, AIProviderSettings
 from .display_config import (
-    DisplayAnnouncement,
-    DisplayBanner,
-    DisplayBoard,
-    DisplayTheme,
+    DisplayAnnouncement,  # noqa: F401  # manual-review: re-export — add to __all__ or keep for external import
+    DisplayBanner,  # noqa: F401  # manual-review: re-export — add to __all__ or keep for external import
+    DisplayBoard,  # noqa: F401  # manual-review: re-export — add to __all__ or keep for external import
+    DisplayTheme,  # noqa: F401  # manual-review: re-export — add to __all__ or keep for external import
 )
 from .doctor_phrase_history import DoctorPhraseHistory
 from .doctor_price_override import DoctorPriceOverride

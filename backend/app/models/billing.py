@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from app.models.visit import Visit
 
 
-class InvoiceStatus(str, enum.Enum):
+class InvoiceStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы счетов"""
 
     DRAFT = "draft"  # Черновик
@@ -38,7 +38,7 @@ class InvoiceStatus(str, enum.Enum):
     REFUNDED = "refunded"  # Возвращен
 
 
-class InvoiceType(str, enum.Enum):
+class InvoiceType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы счетов"""
 
     STANDARD = "standard"  # Обычный счет
@@ -47,7 +47,7 @@ class InvoiceType(str, enum.Enum):
     CORRECTION = "correction"  # Корректировочный счет
 
 
-class PaymentMethod(str, enum.Enum):
+class PaymentMethod(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Способы оплаты"""
 
     CASH = "cash"  # Наличные
@@ -58,7 +58,7 @@ class PaymentMethod(str, enum.Enum):
     INSTALLMENT = "installment"  # Рассрочка
 
 
-class RecurrenceType(str, enum.Enum):
+class RecurrenceType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы периодичности"""
 
     DAILY = "daily"  # Ежедневно

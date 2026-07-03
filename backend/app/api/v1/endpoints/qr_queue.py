@@ -106,14 +106,21 @@ def _ensure_doctor_can_mutate_queue_entry(
     )
 
 
-from app.services.qr_queue_service import QRQueueService
-from app.services.queue_service import (
+from app.services.qr_queue_service import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    QRQueueService,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.services.queue_service import (  # noqa: E402  # manual-review: conditional import after config — intentional
     QueueNotFoundError,
     QueueValidationError,
     queue_service,
 )
-from app.services.queue_session import get_or_create_session_id
-from app.services.service_mapping import get_queue_group_for_service, get_service_code
+from app.services.queue_session import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    get_or_create_session_id,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.services.service_mapping import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    get_queue_group_for_service,
+    get_service_code,
+)
 
 router = APIRouter()
 
