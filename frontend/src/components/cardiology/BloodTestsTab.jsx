@@ -193,6 +193,7 @@ export function BloodTestsTab({
                 <input
                   type="date"
                   required
+                  aria-label="Дата анализа"
                   value={bloodTestForm.test_date}
                   onChange={(e) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
                   className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
