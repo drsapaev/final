@@ -538,6 +538,47 @@ export default function HeaderNew() {
       </div>
       <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: '16px' }}>
         <GlobalSearchBar />
+        {/* P-027 (UX audit): surface the Cmd+K shortcut so power-users
+            discover the CommandPalette without reading docs. */}
+        <kbd
+          title="Открыть командную палитру (Cmd+K / Ctrl+K)"
+          onClick={() => {
+            // Dispatch a keyboard event to trigger the CommandPalette's
+            // global listener. This is simpler than importing the component.
+            const isMac = navigator.platform.toUpperCase().includes('MAC');
+            const event = new KeyboardEvent('keydown', {
+              key: 'k',
+              metaKey: isMac,
+              ctrlKey: !isMac,
+              bubbles: true,
+            });
+            document.dispatchEvent(event);
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '2px 8px',
+            fontSize: '11px',
+            fontWeight: '500',
+            color: 'var(--mac-text-secondary, #6b7280)',
+            background: 'var(--mac-surface-secondary, #f3f4f6)',
+            border: '1px solid var(--mac-border, #d1d5db)',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+            lineHeight: '1.4',
+            userSelect: 'none',
+            transition: 'background 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-surface-hover, #e5e7eb)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--mac-surface-secondary, #f3f4f6)';
+          }}
+        >
+          ⌘K
+        </kbd>
         {roleNav}
       </div>
       <div className="hdr-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{controls}</div>
