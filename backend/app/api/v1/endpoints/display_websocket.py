@@ -39,8 +39,8 @@ router = APIRouter()
 
 
 async def authenticate_websocket_token(
-    token: Optional[str], db: Session
-) -> Optional[User]:
+    token: str | None, db: Session
+) -> User | None:
     """
     Аутентификация WebSocket соединения по JWT токену
     """
@@ -62,7 +62,7 @@ async def authenticate_websocket_token(
 
 @router.websocket("/ws/board/{board_id}")
 async def websocket_display_board(
-    websocket: WebSocket, board_id: str, token: Optional[str] = None
+    websocket: WebSocket, board_id: str, token: str | None = None
 ):
     """
     WebSocket подключение для табло очереди с аутентификацией
@@ -152,7 +152,7 @@ async def call_patient_to_board(
 
 @router.websocket("/ws/queue/{department}")
 async def websocket_queue_department(
-    websocket: WebSocket, department: str, token: Optional[str] = None
+    websocket: WebSocket, department: str, token: str | None = None
 ):
     """
     WebSocket подключение для очереди по отделению
@@ -344,7 +344,7 @@ def get_boards_status(
 @router.post("/quick/call-next")
 async def quick_call_next_patient(
     specialty: str,
-    board_id: Optional[str] = None,
+    board_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):

@@ -20,15 +20,15 @@ router = APIRouter()
 
 class TelegramConfirmRequest(BaseModel):
     token: str = Field(..., min_length=10)
-    telegram_user_id: Optional[str] = None
-    telegram_username: Optional[str] = None
+    telegram_user_id: str | None = None
+    telegram_username: str | None = None
 
 
 class PWAConfirmRequest(BaseModel):
     token: str = Field(..., min_length=10)
-    patient_phone: Optional[str] = None
-    user_agent: Optional[str] = None
-    ip_address: Optional[str] = None
+    patient_phone: str | None = None
+    user_agent: str | None = None
+    ip_address: str | None = None
 
 
 class ConfirmationResponse(BaseModel):
@@ -38,9 +38,9 @@ class ConfirmationResponse(BaseModel):
     status: str
     patient_name: str
     visit_date: str
-    visit_time: Optional[str]
-    queue_numbers: Optional[list[dict[str, Any]]] = None
-    print_tickets: Optional[list[dict[str, Any]]] = None
+    visit_time: str | None
+    queue_numbers: list[dict[str, Any]] | None = None
+    print_tickets: list[dict[str, Any]] | None = None
 
 
 def _raise_http_error(exc: VisitConfirmationDomainError) -> None:

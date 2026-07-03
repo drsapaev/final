@@ -43,7 +43,7 @@ class BackupRequest(BaseModel):
 
     backup_type: str = Field(..., pattern="^(full|database|configuration)$")
     include_files: bool = True
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class RestoreRequest(BaseModel):
@@ -58,22 +58,22 @@ class BackupResponse(BaseModel):
     """Ответ с информацией о бэкапе"""
 
     success: bool
-    backup_name: Optional[str] = None
-    status: Optional[str] = None
-    size: Optional[int] = None
-    created_at: Optional[str] = None
-    error: Optional[str] = None
+    backup_name: str | None = None
+    status: str | None = None
+    size: int | None = None
+    created_at: str | None = None
+    error: str | None = None
 
 
 class MonitoringThresholds(BaseModel):
     """Пороговые значения для мониторинга"""
 
-    cpu_usage: Optional[float] = Field(None, ge=0, le=100)
-    memory_usage: Optional[float] = Field(None, ge=0, le=100)
-    disk_usage: Optional[float] = Field(None, ge=0, le=100)
-    response_time: Optional[float] = Field(None, ge=0)
-    error_rate: Optional[float] = Field(None, ge=0, le=100)
-    database_connections: Optional[int] = Field(None, ge=0)
+    cpu_usage: float | None = Field(None, ge=0, le=100)
+    memory_usage: float | None = Field(None, ge=0, le=100)
+    disk_usage: float | None = Field(None, ge=0, le=100)
+    response_time: float | None = Field(None, ge=0)
+    error_rate: float | None = Field(None, ge=0, le=100)
+    database_connections: int | None = Field(None, ge=0)
 
 
 # ===================== БЭКАПЫ =====================
@@ -316,7 +316,7 @@ async def get_metrics_summary(
 
 @router.get("/monitoring/alerts")
 async def get_alerts(
-    severity: Optional[str] = Query(None, pattern="^(critical|warning|info)$"),
+    severity: str | None = Query(None, pattern="^(critical|warning|info)$"),
     limit: int = Query(100, ge=1, le=1000),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),

@@ -66,9 +66,9 @@ class ComplaintAnalysisRequest(BaseModel):
     """Запрос на анализ жалоб"""
 
     complaint: str
-    patient_age: Optional[int] = None
-    patient_gender: Optional[str] = None
-    provider: Optional[AIProviderType] = None
+    patient_age: int | None = None
+    patient_gender: str | None = None
+    provider: AIProviderType | None = None
     use_mcp: bool = True  # Использовать MCP по умолчанию
 
 
@@ -76,27 +76,27 @@ class ICD10SuggestRequest(BaseModel):
     """Запрос на подсказки МКБ-10"""
 
     symptoms: list[str]
-    diagnosis: Optional[str] = None
-    provider: Optional[AIProviderType] = None
+    diagnosis: str | None = None
+    provider: AIProviderType | None = None
 
 
 class LabInterpretRequest(BaseModel):
     """Запрос на интерпретацию анализов"""
 
     results: list[dict[str, Any]]
-    patient_age: Optional[int] = None
-    patient_gender: Optional[str] = None
-    provider: Optional[AIProviderType] = None
+    patient_age: int | None = None
+    patient_gender: str | None = None
+    provider: AIProviderType | None = None
 
 
 class ECGInterpretRequest(BaseModel):
     """Запрос на интерпретацию ЭКГ"""
 
     parameters: dict[str, Any]
-    auto_interpretation: Optional[str] = None
-    patient_age: Optional[int] = None
-    patient_gender: Optional[str] = None
-    provider: Optional[AIProviderType] = None
+    auto_interpretation: str | None = None
+    patient_age: int | None = None
+    patient_gender: str | None = None
+    provider: AIProviderType | None = None
 
 
 @router.get("/providers")
@@ -227,8 +227,8 @@ async def interpret_lab_results(
 @router.post("/skin-analyze")
 async def analyze_skin(
     image: UploadFile = File(...),
-    metadata: Optional[str] = Form(None),
-    provider: Optional[AIProviderType] = Form(None),
+    metadata: str | None = Form(None),
+    provider: AIProviderType | None = Form(None),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """Анализ состояния кожи по фото"""
@@ -301,23 +301,23 @@ class DifferentialDiagnosisRequest(BaseModel):
     """Запрос на дифференциальную диагностику"""
 
     symptoms: list[str]
-    patient_info: Optional[dict[str, Any]] = None
-    provider: Optional[AIProviderType] = None
+    patient_info: dict[str, Any] | None = None
+    provider: AIProviderType | None = None
 
 
 class SymptomAnalysisRequest(BaseModel):
     """Запрос на анализ симптомов"""
 
     symptoms: list[str]
-    severity: Optional[list[int]] = None
-    provider: Optional[AIProviderType] = None
+    severity: list[int] | None = None
+    provider: AIProviderType | None = None
 
 
 class ClinicalDecisionRequest(BaseModel):
     """Запрос на поддержку клинических решений"""
 
     case_data: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/differential-diagnosis")
@@ -374,15 +374,15 @@ class MedicalImageAnalysisRequest(BaseModel):
     """Запрос на анализ медицинского изображения"""
 
     image_type: str  # xray, ultrasound, dermatoscopy, generic
-    metadata: Optional[dict[str, Any]] = None
-    provider: Optional[AIProviderType] = None
+    metadata: dict[str, Any] | None = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/analyze-xray")
 async def analyze_xray_image(
     image: UploadFile = File(...),
-    metadata: Optional[str] = Form(None),
-    provider: Optional[AIProviderType] = Form(None),
+    metadata: str | None = Form(None),
+    provider: AIProviderType | None = Form(None),
     current_user: User = Depends(get_current_user),
 ):
     """Анализ рентгеновского снимка"""
@@ -415,8 +415,8 @@ async def analyze_xray_image(
 @router.post("/analyze-ultrasound")
 async def analyze_ultrasound_image(
     image: UploadFile = File(...),
-    metadata: Optional[str] = Form(None),
-    provider: Optional[AIProviderType] = Form(None),
+    metadata: str | None = Form(None),
+    provider: AIProviderType | None = Form(None),
     current_user: User = Depends(get_current_user),
 ):
     """Анализ УЗИ изображения"""
@@ -449,8 +449,8 @@ async def analyze_ultrasound_image(
 @router.post("/analyze-dermatoscopy")
 async def analyze_dermatoscopy_image(
     image: UploadFile = File(...),
-    metadata: Optional[str] = Form(None),
-    provider: Optional[AIProviderType] = Form(None),
+    metadata: str | None = Form(None),
+    provider: AIProviderType | None = Form(None),
     current_user: User = Depends(get_current_user),
 ):
     """Анализ дерматоскопического изображения"""
@@ -484,8 +484,8 @@ async def analyze_dermatoscopy_image(
 async def analyze_medical_image_generic(
     image: UploadFile = File(...),
     image_type: str = Form(...),
-    metadata: Optional[str] = Form(None),
-    provider: Optional[AIProviderType] = Form(None),
+    metadata: str | None = Form(None),
+    provider: AIProviderType | None = Form(None),
     current_user: User = Depends(get_current_user),
 ):
     """Универсальный анализ медицинского изображения"""
@@ -523,8 +523,8 @@ class TreatmentPlanRequest(BaseModel):
 
     patient_data: dict[str, Any]
     diagnosis: str
-    medical_history: Optional[list[dict[str, Any]]] = None
-    provider: Optional[AIProviderType] = None
+    medical_history: list[dict[str, Any]] | None = None
+    provider: AIProviderType | None = None
 
 
 class MedicationOptimizationRequest(BaseModel):
@@ -533,7 +533,7 @@ class MedicationOptimizationRequest(BaseModel):
     current_medications: list[dict[str, Any]]
     patient_profile: dict[str, Any]
     condition: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class TreatmentEffectivenessRequest(BaseModel):
@@ -541,7 +541,7 @@ class TreatmentEffectivenessRequest(BaseModel):
 
     treatment_history: list[dict[str, Any]]
     patient_response: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class LifestyleModificationsRequest(BaseModel):
@@ -549,7 +549,7 @@ class LifestyleModificationsRequest(BaseModel):
 
     patient_profile: dict[str, Any]
     conditions: list[str]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/generate-treatment-plan")
@@ -629,8 +629,8 @@ class DrugInteractionRequest(BaseModel):
     """Запрос на проверку лекарственных взаимодействий"""
 
     medications: list[dict[str, Any]]
-    patient_profile: Optional[dict[str, Any]] = None
-    provider: Optional[AIProviderType] = None
+    patient_profile: dict[str, Any] | None = None
+    provider: AIProviderType | None = None
 
 
 class DrugSafetyRequest(BaseModel):
@@ -639,7 +639,7 @@ class DrugSafetyRequest(BaseModel):
     medication: dict[str, Any]
     patient_profile: dict[str, Any]
     conditions: list[str]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class DrugAlternativesRequest(BaseModel):
@@ -648,7 +648,7 @@ class DrugAlternativesRequest(BaseModel):
     medication: str
     reason: str
     patient_profile: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class DrugDosageRequest(BaseModel):
@@ -657,7 +657,7 @@ class DrugDosageRequest(BaseModel):
     medication: str
     patient_profile: dict[str, Any]
     indication: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/check-drug-interactions")
@@ -737,7 +737,7 @@ class RiskAssessmentRequest(BaseModel):
     patient_data: dict[str, Any]
     risk_factors: list[str]
     condition: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class ComplicationPredictionRequest(BaseModel):
@@ -746,7 +746,7 @@ class ComplicationPredictionRequest(BaseModel):
     patient_profile: dict[str, Any]
     procedure_or_condition: str
     timeline: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class MortalityRiskRequest(BaseModel):
@@ -754,8 +754,8 @@ class MortalityRiskRequest(BaseModel):
 
     patient_data: dict[str, Any]
     condition: str
-    scoring_system: Optional[str] = None
-    provider: Optional[AIProviderType] = None
+    scoring_system: str | None = None
+    provider: AIProviderType | None = None
 
 
 class SurgicalRiskRequest(BaseModel):
@@ -764,7 +764,7 @@ class SurgicalRiskRequest(BaseModel):
     patient_profile: dict[str, Any]
     surgery_type: str
     anesthesia_type: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class ReadmissionRiskRequest(BaseModel):
@@ -773,7 +773,7 @@ class ReadmissionRiskRequest(BaseModel):
     patient_data: dict[str, Any]
     discharge_condition: str
     social_factors: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/assess-patient-risk")
@@ -872,7 +872,7 @@ class AudioTranscriptionRequest(BaseModel):
 
     language: str = "ru"
     medical_context: bool = True
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class TextStructuringRequest(BaseModel):
@@ -880,29 +880,29 @@ class TextStructuringRequest(BaseModel):
 
     text: str
     document_type: str  # consultation, prescription, discharge, examination
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class EntityExtractionRequest(BaseModel):
     """Запрос на извлечение медицинских сущностей"""
 
     text: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class MedicalSummaryRequest(BaseModel):
     """Запрос на генерацию медицинского резюме"""
 
     consultation_text: str
-    patient_history: Optional[str] = None
-    provider: Optional[AIProviderType] = None
+    patient_history: str | None = None
+    provider: AIProviderType | None = None
 
 
 class RecordValidationRequest(BaseModel):
     """Запрос на валидацию медицинской записи"""
 
     record_data: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/transcribe-audio")
@@ -1007,7 +1007,7 @@ class ScheduleOptimizationRequest(BaseModel):
 
     schedule_data: dict[str, Any]
     constraints: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class AppointmentDurationRequest(BaseModel):
@@ -1015,7 +1015,7 @@ class AppointmentDurationRequest(BaseModel):
 
     appointment_data: dict[str, Any]
     historical_data: list[dict[str, Any]]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class OptimalSlotsRequest(BaseModel):
@@ -1024,7 +1024,7 @@ class OptimalSlotsRequest(BaseModel):
     doctor_profile: dict[str, Any]
     patient_requirements: dict[str, Any]
     available_slots: list[dict[str, Any]]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class WorkloadAnalysisRequest(BaseModel):
@@ -1032,7 +1032,7 @@ class WorkloadAnalysisRequest(BaseModel):
 
     doctors_data: list[dict[str, Any]]
     time_period: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class ShiftRecommendationsRequest(BaseModel):
@@ -1040,7 +1040,7 @@ class ShiftRecommendationsRequest(BaseModel):
 
     department_data: dict[str, Any]
     staffing_requirements: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/optimize-doctor-schedule")
@@ -1134,7 +1134,7 @@ class DocumentationQualityRequest(BaseModel):
 
     medical_records: list[dict[str, Any]]
     quality_standards: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class DocumentationGapsRequest(BaseModel):
@@ -1142,7 +1142,7 @@ class DocumentationGapsRequest(BaseModel):
 
     patient_record: dict[str, Any]
     required_fields: list[str]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class DocumentationImprovementsRequest(BaseModel):
@@ -1150,7 +1150,7 @@ class DocumentationImprovementsRequest(BaseModel):
 
     record_analysis: dict[str, Any]
     best_practices: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class ClinicalConsistencyRequest(BaseModel):
@@ -1159,7 +1159,7 @@ class ClinicalConsistencyRequest(BaseModel):
     diagnosis: str
     symptoms: list[str]
     treatment: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class PrescriptionSafetyRequest(BaseModel):
@@ -1167,7 +1167,7 @@ class PrescriptionSafetyRequest(BaseModel):
 
     prescriptions: list[dict[str, Any]]
     patient_profile: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/analyze-documentation-quality")
@@ -1263,7 +1263,7 @@ class MedicalTrendsRequest(BaseModel):
     medical_data: list[dict[str, Any]]
     time_period: str
     analysis_type: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class AnomalyDetectionRequest(BaseModel):
@@ -1271,7 +1271,7 @@ class AnomalyDetectionRequest(BaseModel):
 
     dataset: list[dict[str, Any]]
     baseline_data: dict[str, Any]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class OutcomePredictionRequest(BaseModel):
@@ -1279,7 +1279,7 @@ class OutcomePredictionRequest(BaseModel):
 
     patient_data: dict[str, Any]
     historical_outcomes: list[dict[str, Any]]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class InsightsReportRequest(BaseModel):
@@ -1287,7 +1287,7 @@ class InsightsReportRequest(BaseModel):
 
     analytics_data: dict[str, Any]
     report_type: str
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 class RiskPatternsRequest(BaseModel):
@@ -1295,7 +1295,7 @@ class RiskPatternsRequest(BaseModel):
 
     population_data: list[dict[str, Any]]
     risk_factors: list[str]
-    provider: Optional[AIProviderType] = None
+    provider: AIProviderType | None = None
 
 
 @router.post("/analyze-medical-trends")

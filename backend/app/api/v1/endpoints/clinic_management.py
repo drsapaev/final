@@ -75,8 +75,8 @@ def get_branches(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    status: Optional[str] = Query(None, description="Фильтр по статусу"),
-    search: Optional[str] = Query(
+    status: str | None = Query(None, description="Фильтр по статусу"),
+    search: str | None = Query(
         None, description="Поиск по названию, адресу или коду"
     ),
     current_user: User = Depends(require_admin),
@@ -183,10 +183,10 @@ def get_equipment(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    branch_id: Optional[int] = Query(None, description="Фильтр по филиалу"),
-    equipment_type: Optional[str] = Query(None, description="Фильтр по типу"),
-    status: Optional[str] = Query(None, description="Фильтр по статусу"),
-    search: Optional[str] = Query(
+    branch_id: int | None = Query(None, description="Фильтр по филиалу"),
+    equipment_type: str | None = Query(None, description="Фильтр по типу"),
+    status: str | None = Query(None, description="Фильтр по статусу"),
+    search: str | None = Query(
         None, description="Поиск по названию, модели или серийному номеру"
     ),
     current_user: User = Depends(require_admin),
@@ -337,9 +337,9 @@ def get_licenses(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    license_type: Optional[str] = Query(None, description="Фильтр по типу лицензии"),
-    status: Optional[str] = Query(None, description="Фильтр по статусу"),
-    search: Optional[str] = Query(
+    license_type: str | None = Query(None, description="Фильтр по типу лицензии"),
+    status: str | None = Query(None, description="Фильтр по статусу"),
+    search: str | None = Query(
         None, description="Поиск по названию, ключу или издателю"
     ),
     current_user: User = Depends(require_admin),
@@ -494,8 +494,8 @@ def get_backups(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    status: Optional[str] = Query(None, description="Фильтр по статусу"),
-    backup_type: Optional[str] = Query(None, description="Фильтр по типу"),
+    status: str | None = Query(None, description="Фильтр по статусу"),
+    backup_type: str | None = Query(None, description="Фильтр по типу"),
     current_user: User = Depends(require_admin),
 ):
     """Получить список резервных копий"""
@@ -617,7 +617,7 @@ def set_system_info(
     db: Session = Depends(get_db),
     key: str,
     value: dict[str, Any],
-    description: Optional[str] = None,
+    description: str | None = None,
     current_user: User = Depends(require_admin),
 ):
     """Установить системную информацию"""

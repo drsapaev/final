@@ -23,7 +23,7 @@ FINANCIAL_ADVANCED_ANALYTICS_ROLES = ["admin", "manager"]
 async def get_kpi_metrics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ADVANCED_ANALYTICS_ROLES)),
 ):
@@ -48,7 +48,7 @@ async def get_kpi_metrics(
 async def get_doctor_performance(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ADVANCED_ANALYTICS_ROLES)),
 ):
@@ -95,7 +95,7 @@ async def get_advanced_patient_analytics(
 async def get_advanced_revenue_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ADVANCED_ANALYTICS_ROLES)),
 ):
@@ -132,7 +132,7 @@ async def get_predictive_analytics(
 async def get_advanced_comprehensive_report(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     include_predictive: bool = Query(
         True, description="Включить предиктивную аналитику"
     ),

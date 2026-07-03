@@ -29,8 +29,8 @@ class PermissionResponse(BaseModel):
     id: int
     name: str
     codename: str
-    description: Optional[str]
-    category: Optional[str]
+    description: str | None
+    category: str | None
     is_active: bool
 
 
@@ -38,7 +38,7 @@ class RoleResponse(BaseModel):
     id: int
     name: str
     display_name: str
-    description: Optional[str]
+    description: str | None
     level: int
     is_active: bool
     is_system: bool
@@ -49,7 +49,7 @@ class GroupResponse(BaseModel):
     id: int
     name: str
     display_name: str
-    description: Optional[str]
+    description: str | None
     group_type: str
     is_active: bool
     users_count: int
@@ -89,8 +89,8 @@ class PermissionOverrideRequest(BaseModel):
     user_id: int
     permission_id: int
     override_type: str = Field(..., pattern="^(grant|deny)$")
-    reason: Optional[str] = None
-    expires_hours: Optional[int] = None
+    reason: str | None = None
+    expires_hours: int | None = None
 
 
 # ===================== ПОЛУЧЕНИЕ РАЗРЕШЕНИЙ =====================
@@ -163,7 +163,7 @@ def check_user_permission(
 @router.get("/groups", response_model=list[GroupResponse])
 def get_groups(
     active_only: bool = Query(True, description="Только активные группы"),
-    group_type: Optional[str] = Query(None, description="Тип группы"),
+    group_type: str | None = Query(None, description="Тип группы"),
     limit: int = Query(50, ge=1, le=100, description="Количество групп"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "SuperAdmin")),
@@ -382,7 +382,7 @@ def get_roles(
 @router.get("/permissions", response_model=list[PermissionResponse])
 def get_permissions(
     active_only: bool = Query(True, description="Только активные разрешения"),
-    category: Optional[str] = Query(None, description="Категория разрешений"),
+    category: str | None = Query(None, description="Категория разрешений"),
     limit: int = Query(100, ge=1, le=200, description="Количество разрешений"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "SuperAdmin")),

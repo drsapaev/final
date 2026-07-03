@@ -39,56 +39,56 @@ def _billing_http_error(exc: Exception, operation: str) -> HTTPException:
 
 
 class InvoiceItemCreate(BaseModel):
-    service_id: Optional[int] = None
+    service_id: int | None = None
     description: str = Field(..., min_length=1, max_length=500)
     quantity: float = Field(..., gt=0)
     unit_price: float = Field(..., ge=0)
     discount_rate: float = Field(0, ge=0, le=100)
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class InvoiceCreate(BaseModel):
     patient_id: int
-    visit_id: Optional[int] = None
-    appointment_id: Optional[int] = None
+    visit_id: int | None = None
+    appointment_id: int | None = None
     invoice_type: InvoiceType = InvoiceType.STANDARD
     items: list[InvoiceItemCreate] = Field(..., min_length=1)
-    description: Optional[str] = None
-    notes: Optional[str] = None
-    payment_terms: Optional[str] = None
+    description: str | None = None
+    notes: str | None = None
+    payment_terms: str | None = None
     due_days: int = Field(30, ge=1, le=365)
     auto_send: bool = False
     send_reminders: bool = True
     # Периодические счета
     is_recurring: bool = False
-    recurrence_type: Optional[RecurrenceType] = None
+    recurrence_type: RecurrenceType | None = None
     recurrence_interval: int = Field(1, ge=1)
 
 
 class InvoiceUpdate(BaseModel):
-    description: Optional[str] = None
-    notes: Optional[str] = None
-    payment_terms: Optional[str] = None
-    due_date: Optional[datetime] = None
-    auto_send: Optional[bool] = None
-    send_reminders: Optional[bool] = None
-    status: Optional[InvoiceStatus] = None
+    description: str | None = None
+    notes: str | None = None
+    payment_terms: str | None = None
+    due_date: datetime | None = None
+    auto_send: bool | None = None
+    send_reminders: bool | None = None
+    status: InvoiceStatus | None = None
 
 
 class PaymentCreate(BaseModel):
     invoice_id: int
     amount: float = Field(..., gt=0)
     payment_method: PaymentMethod
-    reference_number: Optional[str] = Field(None, max_length=100)
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    reference_number: str | None = Field(None, max_length=100)
+    description: str | None = None
+    notes: str | None = None
 
 
 class InvoiceTemplateCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str | None = None
     template_content: str = Field(..., min_length=1)
-    css_styles: Optional[str] = None
+    css_styles: str | None = None
     is_default: bool = False
     auto_generate_for_visits: bool = False
     auto_generate_for_appointments: bool = False
@@ -98,48 +98,48 @@ class InvoiceTemplateCreate(BaseModel):
 
 class BillingRuleCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str | None = None
     trigger_event: str = Field(
         ..., pattern=r'^(visit_completed|appointment_created|service_added)$'
     )
-    service_types: Optional[str] = None  # JSON строка
-    patient_categories: Optional[str] = None  # JSON строка
-    amount_threshold_min: Optional[float] = Field(None, ge=0)
-    amount_threshold_max: Optional[float] = Field(None, ge=0)
+    service_types: str | None = None  # JSON строка
+    patient_categories: str | None = None  # JSON строка
+    amount_threshold_min: float | None = Field(None, ge=0)
+    amount_threshold_max: float | None = Field(None, ge=0)
     invoice_type: InvoiceType = InvoiceType.STANDARD
     payment_terms_days: int = Field(30, ge=1, le=365)
     auto_send: bool = False
     send_reminders: bool = True
-    template_id: Optional[int] = None
+    template_id: int | None = None
     priority: int = Field(0, ge=0)
 
 
 class BillingSettingsUpdate(BaseModel):
-    invoice_number_prefix: Optional[str] = Field(None, max_length=10)
-    default_tax_rate: Optional[float] = Field(None, ge=0, le=100)
-    tax_included_in_price: Optional[bool] = None
-    default_payment_terms_days: Optional[int] = Field(None, ge=1, le=365)
-    overdue_threshold_days: Optional[int] = Field(None, ge=1, le=365)
-    auto_generate_invoices: Optional[bool] = None
-    auto_send_invoices: Optional[bool] = None
-    auto_send_reminders: Optional[bool] = None
-    reminder_days_before: Optional[str] = None
-    reminder_days_after: Optional[str] = None
-    currency_code: Optional[str] = Field(None, max_length=3)
-    currency_symbol: Optional[str] = Field(None, max_length=5)
-    company_name: Optional[str] = Field(None, max_length=255)
-    company_address: Optional[str] = None
-    company_phone: Optional[str] = Field(None, max_length=50)
-    company_email: Optional[str] = Field(None, max_length=100)
-    company_website: Optional[str] = Field(None, max_length=100)
+    invoice_number_prefix: str | None = Field(None, max_length=10)
+    default_tax_rate: float | None = Field(None, ge=0, le=100)
+    tax_included_in_price: bool | None = None
+    default_payment_terms_days: int | None = Field(None, ge=1, le=365)
+    overdue_threshold_days: int | None = Field(None, ge=1, le=365)
+    auto_generate_invoices: bool | None = None
+    auto_send_invoices: bool | None = None
+    auto_send_reminders: bool | None = None
+    reminder_days_before: str | None = None
+    reminder_days_after: str | None = None
+    currency_code: str | None = Field(None, max_length=3)
+    currency_symbol: str | None = Field(None, max_length=5)
+    company_name: str | None = Field(None, max_length=255)
+    company_address: str | None = None
+    company_phone: str | None = Field(None, max_length=50)
+    company_email: str | None = Field(None, max_length=100)
+    company_website: str | None = Field(None, max_length=100)
 
 
 class InvoiceResponse(BaseModel):
     id: int
     invoice_number: str
     patient_id: int
-    visit_id: Optional[int]
-    appointment_id: Optional[int]
+    visit_id: int | None
+    appointment_id: int | None
     invoice_type: str
     status: str
     subtotal: float
@@ -150,10 +150,10 @@ class InvoiceResponse(BaseModel):
     paid_amount: float
     balance: float
     issue_date: datetime
-    due_date: Optional[datetime]
-    paid_date: Optional[datetime]
-    description: Optional[str]
-    notes: Optional[str]
+    due_date: datetime | None
+    paid_date: datetime | None
+    description: str | None
+    notes: str | None
     is_auto_generated: bool
     is_recurring: bool
     created_at: datetime
@@ -169,10 +169,10 @@ class PaymentResponse(BaseModel):
     amount: float
     payment_method: str
     payment_date: datetime
-    reference_number: Optional[str]
-    description: Optional[str]
+    reference_number: str | None
+    description: str | None
     is_confirmed: bool
-    confirmed_at: Optional[datetime]
+    confirmed_at: datetime | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -239,11 +239,11 @@ def create_invoice(
 def get_invoices(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = None,
-    status: Optional[InvoiceStatus] = None,
-    invoice_type: Optional[InvoiceType] = None,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
+    patient_id: int | None = None,
+    status: InvoiceStatus | None = None,
+    invoice_type: InvoiceType | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):
@@ -306,7 +306,7 @@ def delete_invoice(
 @router.get("/invoices/{invoice_id}/html")
 def get_invoice_html(
     invoice_id: int,
-    template_id: Optional[int] = None,
+    template_id: int | None = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):
@@ -367,8 +367,8 @@ def record_payment(
 def get_payments(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):
@@ -503,8 +503,8 @@ def update_billing_settings(
 
 @router.get("/analytics")
 def get_billing_analytics(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):

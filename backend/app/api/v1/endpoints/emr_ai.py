@@ -214,25 +214,25 @@ class AISuggestionV2(BaseModel):
     content: str
     confidence: float
     source: str = "AI"
-    explanation: Optional[str] = None
+    explanation: str | None = None
     model: str = "mock"
     requiresDoctorConfirmation: bool = True
 
 
 class DoctorContextEntry(BaseModel):
     """Single entry from doctor history"""
-    content: Optional[str] = None
-    diagnosis: Optional[str] = None
-    created_at: Optional[str] = None
+    content: str | None = None
+    diagnosis: str | None = None
+    created_at: str | None = None
 
 
 class DoctorContext(BaseModel):
     """Doctor history context for better suggestions"""
-    doctor_id: Optional[int] = None
-    specialty: Optional[str] = None
-    field_name: Optional[str] = None
-    previous_entries: Optional[list[DoctorContextEntry]] = None
-    unique_phrases: Optional[list[str]] = None
+    doctor_id: int | None = None
+    specialty: str | None = None
+    field_name: str | None = None
+    previous_entries: list[DoctorContextEntry] | None = None
+    unique_phrases: list[str] | None = None
 
 
 class SuggestRequestV2(BaseModel):
@@ -240,7 +240,7 @@ class SuggestRequestV2(BaseModel):
     emr_snapshot: dict[str, Any]
     specialty: str = "general"
     language: str = "ru"
-    doctor_context: Optional[DoctorContext] = None
+    doctor_context: DoctorContext | None = None
 
 
 class SuggestResponseV2(BaseModel):
@@ -256,7 +256,7 @@ class SuggestResponseV2(BaseModel):
 def generate_v2_suggestions(
     emr_data: dict[str, Any], 
     specialty: str,
-    doctor_context: Optional[DoctorContext] = None,
+    doctor_context: DoctorContext | None = None,
 ) -> list[AISuggestionV2]:
     """Generate mock suggestions in EMR v2 format"""
     suggestions = []

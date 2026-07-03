@@ -32,7 +32,7 @@ class PhraseSuggestRequest(BaseModel):
     currentText: str = Field("", description="Текущий текст в поле")
     cursorPosition: int = Field(0, ge=0, description="Позиция курсора")
     doctorId: int = Field(..., description="ID врача")
-    specialty: Optional[str] = Field(None, description="Специальность врача")
+    specialty: str | None = Field(None, description="Специальность врача")
     maxSuggestions: int = Field(5, ge=1, le=10, description="Максимум подсказок")
 
 
@@ -41,7 +41,7 @@ class PhraseSuggestion(BaseModel):
     text: str = Field(..., description="Текст продолжения (хвост)")
     source: str = Field("history", description="Источник: history")
     usageCount: int = Field(0, description="Частота использования")
-    lastUsed: Optional[str] = Field(None, description="Дата последнего использования")
+    lastUsed: str | None = Field(None, description="Дата последнего использования")
 
 
 class PhraseSuggestResponse(BaseModel):
@@ -54,7 +54,7 @@ class PhraseSuggestResponse(BaseModel):
 class IndexPhraseRequest(BaseModel):
     """Запрос на индексацию фраз из EMR"""
     doctorId: int
-    specialty: Optional[str] = None
+    specialty: str | None = None
     emrData: dict[str, Any]
 
 
@@ -199,8 +199,8 @@ class TelemetryRequest(BaseModel):
     doctorId: int
     field: str
     event: str = Field(..., pattern="^(shown|accepted|dismissed)$")
-    phraseId: Optional[int] = None
-    timeMs: Optional[int] = None
+    phraseId: int | None = None
+    timeMs: int | None = None
 
 
 class TelemetryResponse(BaseModel):
@@ -243,7 +243,7 @@ class TelemetryStatsResponse(BaseModel):
     totalShown: int
     totalAccepted: int
     acceptanceRate: float
-    avgTimeToAcceptMs: Optional[int]
+    avgTimeToAcceptMs: int | None
     topAcceptedPhrases: list[dict[str, Any]]
 
 
@@ -340,7 +340,7 @@ async def update_field_preferences(
 
 class BatchIndexRequest(BaseModel):
     """Запрос на batch-индексацию"""
-    limit: Optional[int] = Field(None, description="Максимум врачей")
+    limit: int | None = Field(None, description="Максимум врачей")
     offset: int = Field(0, ge=0, description="Смещение")
 
 
@@ -396,7 +396,7 @@ async def batch_index_emrs(
 class DoctorIndexRequest(BaseModel):
     """Запрос на индексацию одного врача"""
     doctorId: int
-    specialty: Optional[str] = None
+    specialty: str | None = None
 
 
 class DoctorIndexResponse(BaseModel):

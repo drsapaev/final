@@ -51,17 +51,17 @@ def _build_ai_ws_payload(event_type: str, session_id: int | None = None, **data:
 
 class ChatSessionCreate(BaseModel):
     """Создание новой сессии"""
-    context_type: Optional[str] = Field(None, description="emr, lab, general, triage")
-    context_id: Optional[int] = Field(None, description="ID связанной сущности")
-    specialty: Optional[str] = Field(None, description="Специализация для персонализации")
+    context_type: str | None = Field(None, description="emr, lab, general, triage")
+    context_id: int | None = Field(None, description="ID связанной сущности")
+    specialty: str | None = Field(None, description="Специализация для персонализации")
 
 
 class ChatSessionResponse(BaseModel):
     """Ответ с информацией о сессии"""
     id: int
-    title: Optional[str]
-    context_type: Optional[str]
-    specialty: Optional[str]
+    title: str | None
+    context_type: str | None
+    specialty: str | None
     is_active: bool
     message_count: int
     created_at: str
@@ -81,10 +81,10 @@ class ChatMessageResponse(BaseModel):
     id: int
     role: str
     content: str
-    provider: Optional[str]
-    model: Optional[str]
-    tokens_used: Optional[int]
-    latency_ms: Optional[int]
+    provider: str | None
+    model: str | None
+    tokens_used: int | None
+    latency_ms: int | None
     is_error: bool
     was_cached: bool
     created_at: str
@@ -95,8 +95,8 @@ class ChatMessageResponse(BaseModel):
 class ChatFeedbackCreate(BaseModel):
     """Feedback на сообщение AI"""
     feedback_type: str = Field(..., description="helpful, not_helpful, incorrect, inappropriate")
-    comment: Optional[str] = Field(None, max_length=1000)
-    correction: Optional[str] = Field(None, max_length=5000)
+    comment: str | None = Field(None, max_length=1000)
+    correction: str | None = Field(None, max_length=5000)
 
 
 # =============================================================================
@@ -210,7 +210,7 @@ async def delete_session(
 async def get_messages(
     session_id: int,
     limit: int = Query(50, ge=1, le=200),
-    before_id: Optional[int] = Query(None, description="Pagination: get messages before this ID"),
+    before_id: int | None = Query(None, description="Pagination: get messages before this ID"),
     current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
     db: Session = Depends(get_db)
 ):
@@ -297,7 +297,7 @@ async def add_feedback(
 # WebSocket Endpoint for Streaming
 # =============================================================================
 
-async def authenticate_websocket(token: str, db: Session) -> Optional[User]:
+async def authenticate_websocket(token: str, db: Session) -> User | None:
     """
     Аутентификация WebSocket по JWT token.
     """
@@ -360,7 +360,7 @@ async def chat_websocket(
     logger.info(f"WebSocket chat connected: user={user.id}")
 
     service = get_chat_service(db)
-    current_session_id: Optional[int] = None
+    current_session_id: int | None = None
 
     try:
         async for message in websocket.iter_json():

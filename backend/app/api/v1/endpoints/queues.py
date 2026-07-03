@@ -14,8 +14,8 @@ router = APIRouter(tags=["queues"])
 @router.get("/stats")
 def stats(
     department: str,
-    d: Optional[str] = Query(None),
-    date: Optional[str] = Query(None),
+    d: str | None = Query(None),
+    date: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     date_str = d or date
@@ -30,8 +30,8 @@ def stats(
 @router.post("/next-ticket")
 def next_ticket(
     department: str,
-    d: Optional[str] = Query(None),
-    date: Optional[str] = Query(None),
+    d: str | None = Query(None),
+    date: str | None = Query(None),
     db: Session = Depends(get_db),
     _current_user=Depends(require_roles("Admin", "Registrar")),
 ):

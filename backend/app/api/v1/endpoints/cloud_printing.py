@@ -72,16 +72,16 @@ class MedicalDocumentRequest(BaseModel):
     printer_id: str = Field(..., description="ID принтера")
     document_type: str = Field(..., pattern="^(prescription|receipt|ticket|report)$")
     patient_data: dict[str, Any] = Field(..., description="Данные пациента")
-    template_data: Optional[dict[str, Any]] = Field(None, description="Данные шаблона")
+    template_data: dict[str, Any] | None = Field(None, description="Данные шаблона")
 
 
 class PrintJobResponse(BaseModel):
     """Ответ с информацией о задании печати"""
 
     success: bool
-    job_id: Optional[str] = None
+    job_id: str | None = None
     message: str
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class JobStatusResponse(BaseModel):

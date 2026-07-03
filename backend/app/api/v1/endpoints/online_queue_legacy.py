@@ -21,7 +21,7 @@ router = APIRouter()
 async def generate_qr_code_legacy(
     day: str = Query(..., description="Дата в формате YYYY-MM-DD"),
     specialist_id: int = Query(..., description="ID специалиста"),
-    department: Optional[str] = Query("general", description="Отделение"),
+    department: str | None = Query("general", description="Отделение"),
     expires_hours: int = Query(24, description="Срок действия в часах"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -112,8 +112,8 @@ async def get_queue_status_legacy(
 @router.post("/join")
 async def join_queue_legacy(
     token: str,
-    phone: Optional[str] = None,
-    telegram_id: Optional[str] = None,
+    phone: str | None = None,
+    telegram_id: str | None = None,
     db: Session = Depends(get_db),
 ):
     """

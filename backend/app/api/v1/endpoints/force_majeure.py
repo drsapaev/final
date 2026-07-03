@@ -34,9 +34,9 @@ class ForceMajeureTransferRequest(BaseModel):
     """Запрос на массовый перенос очереди"""
 
     specialist_id: int = Field(..., description="ID специалиста")
-    target_date: Optional[date] = Field(None, description="Дата очереди (по умолчанию сегодня)")
+    target_date: date | None = Field(None, description="Дата очереди (по умолчанию сегодня)")
     reason: str = Field(..., min_length=5, description="Причина переноса")
-    entry_ids: Optional[list[int]] = Field(None, description="ID конкретных записей (все если не указано)")
+    entry_ids: list[int] | None = Field(None, description="ID конкретных записей (все если не указано)")
     send_notifications: bool = Field(True, description="Отправить уведомления пациентам")
 
 
@@ -44,10 +44,10 @@ class ForceMajeureCancelRequest(BaseModel):
     """Запрос на массовую отмену с возвратом"""
 
     specialist_id: int = Field(..., description="ID специалиста")
-    target_date: Optional[date] = Field(None, description="Дата очереди (по умолчанию сегодня)")
+    target_date: date | None = Field(None, description="Дата очереди (по умолчанию сегодня)")
     reason: str = Field(..., min_length=5, description="Причина отмены")
     refund_type: str = Field("deposit", description="Тип возврата: deposit или bank_transfer")
-    entry_ids: Optional[list[int]] = Field(None, description="ID конкретных записей (все если не указано)")
+    entry_ids: list[int] | None = Field(None, description="ID конкретных записей (все если не указано)")
     send_notifications: bool = Field(True, description="Отправить уведомления пациентам")
 
 
@@ -56,19 +56,19 @@ class RefundRequestResponse(BaseModel):
 
     id: int
     patient_id: int
-    patient_name: Optional[str] = None
+    patient_name: str | None = None
     payment_id: int
     original_amount: float
     refund_amount: float
     commission_amount: float
     refund_type: str
     status: str
-    reason: Optional[str] = None
+    reason: str | None = None
     is_automatic: bool
-    bank_card_number: Optional[str] = None
+    bank_card_number: str | None = None
     created_at: datetime
-    processed_at: Optional[datetime] = None
-    processed_by_name: Optional[str] = None
+    processed_at: datetime | None = None
+    processed_by_name: str | None = None
     available_actions: list[str] = Field(default_factory=list)
     can_approve: bool = False
     can_reject: bool = False
@@ -81,9 +81,9 @@ class ProcessRefundRequest(BaseModel):
     """Запрос на обработку заявки на возврат"""
 
     action: str = Field(..., description="Действие: approve, reject, complete")
-    rejection_reason: Optional[str] = Field(None, description="Причина отклонения")
-    bank_card_number: Optional[str] = Field(None, description="Номер карты для возврата")
-    manager_notes: Optional[str] = Field(None, description="Примечания менеджера")
+    rejection_reason: str | None = Field(None, description="Причина отклонения")
+    bank_card_number: str | None = Field(None, description="Номер карты для возврата")
+    manager_notes: str | None = Field(None, description="Примечания менеджера")
 
 
 class DepositResponse(BaseModel):
@@ -91,7 +91,7 @@ class DepositResponse(BaseModel):
 
     id: int
     patient_id: int
-    patient_name: Optional[str] = None
+    patient_name: str | None = None
     balance: float
     currency: str
     is_active: bool
@@ -108,7 +108,7 @@ class DepositTransactionResponse(BaseModel):
     transaction_type: str
     amount: float
     balance_after: float
-    description: Optional[str] = None
+    description: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -119,7 +119,7 @@ class AddDepositRequest(BaseModel):
 
     patient_id: int
     amount: float = Field(..., gt=0)
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class UseDepositRequest(BaseModel):
@@ -127,8 +127,8 @@ class UseDepositRequest(BaseModel):
 
     patient_id: int
     amount: float = Field(..., gt=0)
-    visit_id: Optional[int] = None
-    description: Optional[str] = None
+    visit_id: int | None = None
+    description: str | None = None
 
 
 # ========================= ФОРС-МАЖОР =========================
@@ -183,7 +183,7 @@ async def cancel_queue_with_refund(
 @router.get("/pending-entries", response_model=list[dict[str, Any]])
 async def get_pending_entries_for_force_majeure(
     specialist_id: int = Query(..., description="ID специалиста"),
-    target_date: Optional[date] = Query(None, description="Дата очереди"),
+    target_date: date | None = Query(None, description="Дата очереди"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
@@ -205,8 +205,8 @@ async def get_pending_entries_for_force_majeure(
 
 @router.get("/refund-requests", response_model=list[RefundRequestResponse])
 async def get_refund_requests(
-    status_filter: Optional[str] = Query(None, description="Фильтр по статусу"),
-    patient_id: Optional[int] = Query(None, description="Фильтр по пациенту"),
+    status_filter: str | None = Query(None, description="Фильтр по статусу"),
+    patient_id: int | None = Query(None, description="Фильтр по пациенту"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -282,7 +282,7 @@ async def process_refund_request(
 @router.get("/deposits", response_model=list[DepositResponse])
 async def get_deposits(
     active_only: bool = Query(True, description="Только активные"),
-    min_balance: Optional[float] = Query(None, description="Минимальный баланс"),
+    min_balance: float | None = Query(None, description="Минимальный баланс"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),

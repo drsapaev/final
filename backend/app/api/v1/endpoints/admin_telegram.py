@@ -2293,7 +2293,7 @@ def _sanitize_telegram_webhook_info(webhook_info: dict[str, Any]) -> dict[str, A
 
 
 class TelegramWebhookRequest(BaseModel):
-    webhook_url: Optional[str] = None
+    webhook_url: str | None = None
 
 
 def _has_secret_value(value: Any) -> bool:
@@ -2745,8 +2745,8 @@ async def register_staff_bot_commands(
 
 @router.post("/telegram/set-webhook")
 def set_telegram_webhook(
-    payload: Optional[TelegramWebhookRequest] = Body(default=None),
-    webhook_url: Optional[str] = Query(default=None),
+    payload: TelegramWebhookRequest | None = Body(default=None),
+    webhook_url: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -3089,7 +3089,7 @@ def get_telegram_integration_status(
 @router.get("/telegram/templates")
 def get_telegram_templates(
     language: str = "ru",
-    template_type: Optional[str] = None,
+    template_type: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

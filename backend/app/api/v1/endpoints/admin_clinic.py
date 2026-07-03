@@ -352,7 +352,7 @@ def get_system_info(current_user: User = Depends(require_roles("Admin"))):
 
 @router.get("/service-categories", response_model=list[ServiceCategoryOut])
 def get_service_categories(
-    specialty: Optional[str] = None,
+    specialty: str | None = None,
     active_only: bool = True,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),

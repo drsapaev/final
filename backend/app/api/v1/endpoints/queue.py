@@ -90,27 +90,27 @@ class QueueTokenResponse(BaseModel):
 
 class QueueJoinRequest(BaseModel):
     token: str
-    phone: Optional[str] = None
-    telegram_id: Optional[str] = None
-    patient_name: Optional[str] = None
+    phone: str | None = None
+    telegram_id: str | None = None
+    patient_name: str | None = None
 
 
 class QueueJoinResponse(BaseModel):
     success: bool
-    number: Optional[int] = None
+    number: int | None = None
     message: str
     duplicate: bool = False
-    queue_info: Optional[dict] = None
+    queue_info: dict | None = None
 
 
 class QueueEntryResponse(BaseModel):
     id: int
     number: int
-    patient_name: Optional[str]
-    phone: Optional[str]
+    patient_name: str | None
+    phone: str | None
     status: str
     created_at: datetime
-    called_at: Optional[datetime]
+    called_at: datetime | None
 
 
 class QueueStatusResponse(BaseModel):
@@ -118,7 +118,7 @@ class QueueStatusResponse(BaseModel):
     day: date
     specialist_name: str
     is_open: bool
-    opened_at: Optional[datetime]
+    opened_at: datetime | None
     total_entries: int
     waiting_entries: int
     entries: list[QueueEntryResponse]

@@ -40,7 +40,7 @@ def _percentage_change(current: float, previous: float) -> float:
 
 
 def _build_kpi_snapshot(
-    db: Session, start: datetime, end: datetime, department: Optional[str]
+    db: Session, start: datetime, end: datetime, department: str | None
 ) -> dict:
     analytics_service = get_advanced_analytics_service()
     comprehensive = AnalyticsService.calculate_statistics(db, start, end, department)
@@ -133,7 +133,7 @@ def _build_kpi_snapshot(
 
 
 def _build_kpi_trend_rows(
-    current: dict, previous: dict, metric: Optional[str] = None
+    current: dict, previous: dict, metric: str | None = None
 ) -> list[dict]:
     keys = [
         "revenue",
@@ -171,7 +171,7 @@ def _build_kpi_trend_rows(
 async def get_kpi_metrics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
@@ -245,8 +245,8 @@ async def get_kpi_metrics(
 async def get_kpi_trends(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
-    metric: Optional[str] = Query(None, description="Конкретная метрика"),
+    department: str | None = Query(None, description="Отделение"),
+    metric: str | None = Query(None, description="Конкретная метрика"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
@@ -274,7 +274,7 @@ async def get_kpi_trends(
 async def get_kpi_comparison(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     comparison_period: str = Query("previous", description="Период сравнения"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),

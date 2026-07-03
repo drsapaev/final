@@ -230,7 +230,7 @@ def check_queue_status(
 
 @router.get("/online-queue/today")
 def get_today_queue(
-    specialist_id: Optional[int] = Query(None, description="ID специалиста"),
+    specialist_id: int | None = Query(None, description="ID специалиста"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

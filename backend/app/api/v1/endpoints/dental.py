@@ -28,7 +28,7 @@ class DentalPriceOverrideRequest(BaseModel):
     service_id: int
     new_price: Decimal
     reason: str
-    details: Optional[str] = None
+    details: str | None = None
     treatment_completed: bool = True
 
 
@@ -39,7 +39,7 @@ class DentalPriceOverrideResponse(BaseModel):
     original_price: Decimal
     new_price: Decimal
     reason: str
-    details: Optional[str]
+    details: str | None
     status: str
     treatment_completed: bool
     created_at: datetime
@@ -50,7 +50,7 @@ async def get_dental_examinations(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """
     Получить список стоматологических осмотров
@@ -83,7 +83,7 @@ async def get_treatment_plans(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """
     Получить список планов лечения
@@ -116,7 +116,7 @@ async def get_prosthetics(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """
     Получить список протезов
@@ -148,7 +148,7 @@ async def create_prosthetic(
 async def get_xray_images(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> dict[str, Any]:
     """
     Получить рентгеновские снимки пациента
@@ -207,8 +207,8 @@ async def create_dental_price_override(
 async def get_dental_price_overrides(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
-    visit_id: Optional[int] = Query(None, description="ID визита"),
-    status: Optional[str] = Query(
+    visit_id: int | None = Query(None, description="ID визита"),
+    status: str | None = Query(
         None, description="Статус (pending, approved, rejected)"
     ),
     limit: int = Query(50, ge=1, le=100),
@@ -248,7 +248,7 @@ async def get_dental_price_overrides(
 
 class PriceOverrideApprovalRequest(BaseModel):
     action: str
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
 
 @router.put(

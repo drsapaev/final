@@ -138,9 +138,9 @@ def _ensure_lab_result_notification_scope(
 @router.get("/patients/{patient_id}/lab-results")
 async def get_patient_lab_results(
     patient_id: int,
-    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    test_types: Optional[str] = Query(None, description="Типы тестов через запятую"),
+    date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="Дата окончания (YYYY-MM-DD)"),
+    test_types: str | None = Query(None, description="Типы тестов через запятую"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
@@ -308,9 +308,9 @@ async def notify_doctor_about_lab_result(
 
 @router.get("/lab-results/statistics")
 async def get_lab_results_statistics(
-    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    test_type: Optional[str] = Query(None, description="Тип теста"),
+    date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="Дата окончания (YYYY-MM-DD)"),
+    test_type: str | None = Query(None, description="Тип теста"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:

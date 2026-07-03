@@ -76,8 +76,8 @@ async def get_webhooks(
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
-    status_filter: Optional[WebhookStatus] = None,
-    event_type: Optional[str] = None,
+    status_filter: WebhookStatus | None = None,
+    event_type: str | None = None,
     current_user: User = Depends(
         require_roles([Roles.ADMIN, Roles.MANAGER, Roles.REGISTRAR])
     ),
@@ -390,7 +390,7 @@ async def get_webhook_calls(
     webhook_id: int,
     skip: int = 0,
     limit: int = 100,
-    status_filter: Optional[WebhookCallStatus] = None,
+    status_filter: WebhookCallStatus | None = None,
     current_user: User = Depends(
         require_roles([Roles.ADMIN, Roles.MANAGER, Roles.REGISTRAR])
     ),

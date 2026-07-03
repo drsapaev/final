@@ -27,13 +27,13 @@ class DoctorInfoResponse(BaseModel):
     full_name: str
     specialization: str
     department: str
-    department_id: Optional[int] = None
-    cabinet: Optional[dict[str, Any]] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
+    department_id: int | None = None
+    cabinet: dict[str, Any] | None = None
+    phone: str | None = None
+    email: str | None = None
     is_active: bool
-    schedule: Optional[str] = None
-    experience_years: Optional[int] = None
+    schedule: str | None = None
+    experience_years: int | None = None
 
 
 class DepartmentInfoResponse(BaseModel):
@@ -41,10 +41,10 @@ class DepartmentInfoResponse(BaseModel):
 
     id: int
     name: str
-    description: Optional[str] = None
-    head_doctor: Optional[str] = None
-    phone: Optional[str] = None
-    location: Optional[str] = None
+    description: str | None = None
+    head_doctor: str | None = None
+    phone: str | None = None
+    location: str | None = None
     is_active: bool
 
 
@@ -95,8 +95,8 @@ async def get_doctor_info(
 
 @router.get("/doctors", response_model=DoctorListResponse)
 async def get_doctors_list(
-    specialization: Optional[str] = Query(None, description="Фильтр по специализации"),
-    department_name: Optional[str] = Query(None, description="Фильтр по отделению"),
+    specialization: str | None = Query(None, description="Фильтр по специализации"),
+    department_name: str | None = Query(None, description="Фильтр по отделению"),
     active_only: bool = Query(True, description="Только активные врачи"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),

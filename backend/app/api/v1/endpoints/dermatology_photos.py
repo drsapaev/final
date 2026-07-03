@@ -142,7 +142,7 @@ async def upload_photos(
 @router.get("/")
 def get_patient_photos(
     patient_id: int,
-    category: Optional[str] = None,
+    category: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "derma")),
 ):

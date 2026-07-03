@@ -35,7 +35,7 @@ class PriceOverrideRequest(BaseModel):
     service_id: int
     new_price: Decimal
     reason: str
-    details: Optional[str] = None
+    details: str | None = None
 
 
 class PriceOverrideResponse(BaseModel):
@@ -45,7 +45,7 @@ class PriceOverrideResponse(BaseModel):
     original_price: Decimal
     new_price: Decimal
     reason: str
-    details: Optional[str]
+    details: str | None
     status: str
     created_at: datetime
 
@@ -134,7 +134,7 @@ async def get_skin_examinations(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> list[DermaExaminationOut]:
     """
     Получить список осмотров кожи
@@ -254,7 +254,7 @@ async def get_cosmetic_procedures(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> list[DermaProcedureOut]:
     """
     Получить список косметических процедур
@@ -410,8 +410,8 @@ async def create_price_override(
 async def get_price_overrides(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
-    visit_id: Optional[int] = Query(None, description="ID визита"),
-    status: Optional[str] = Query(
+    visit_id: int | None = Query(None, description="ID визита"),
+    status: str | None = Query(
         None, description="Статус (pending, approved, rejected)"
     ),
     limit: int = Query(50, ge=1, le=100),
@@ -456,7 +456,7 @@ async def get_price_overrides(
 async def get_photo_gallery(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> dict[str, Any]:
     """
     Получить фотогалерею пациента

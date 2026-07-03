@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 class ServiceCategoryOut(BaseModel):
     id: int
     code: str
-    name_ru: Optional[str] = None
-    name_uz: Optional[str] = None
-    name_en: Optional[str] = None
-    specialty: Optional[str] = None
+    name_ru: str | None = None
+    name_uz: str | None = None
+    name_en: str | None = None
+    specialty: str | None = None
     active: bool = True
 
     model_config = ConfigDict(from_attributes=True)
@@ -41,88 +41,88 @@ class ServiceCategoryOut(BaseModel):
 
 class ServiceCategoryCreate(BaseModel):
     code: str = Field(..., max_length=50)
-    name_ru: Optional[str] = Field(None, max_length=100)
-    name_uz: Optional[str] = Field(None, max_length=100)
-    name_en: Optional[str] = Field(None, max_length=100)
-    specialty: Optional[str] = Field(None, max_length=100)
+    name_ru: str | None = Field(None, max_length=100)
+    name_uz: str | None = Field(None, max_length=100)
+    name_en: str | None = Field(None, max_length=100)
+    specialty: str | None = Field(None, max_length=100)
     active: bool = True
 
 
 class ServiceCategoryUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=50)
-    name_ru: Optional[str] = Field(None, max_length=100)
-    name_uz: Optional[str] = Field(None, max_length=100)
-    name_en: Optional[str] = Field(None, max_length=100)
-    specialty: Optional[str] = Field(None, max_length=100)
-    active: Optional[bool] = None
+    code: str | None = Field(None, max_length=50)
+    name_ru: str | None = Field(None, max_length=100)
+    name_uz: str | None = Field(None, max_length=100)
+    name_en: str | None = Field(None, max_length=100)
+    specialty: str | None = Field(None, max_length=100)
+    active: bool | None = None
 
 
 class ServiceOut(BaseModel):
     id: int
-    code: Optional[str] = None
+    code: str | None = None
     name: str
-    department: Optional[str] = None
-    unit: Optional[str] = None
-    price: Optional[float] = None
-    currency: Optional[str] = None
+    department: str | None = None
+    unit: str | None = None
+    price: float | None = None
+    currency: str | None = None
     active: bool = True
-    category_id: Optional[int] = None
-    duration_minutes: Optional[int] = None
-    doctor_id: Optional[int] = None
+    category_id: int | None = None
+    duration_minutes: int | None = None
+    doctor_id: int | None = None
     # ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
-    category_code: Optional[str] = None  # K, D, C, L, S, O
-    service_code: Optional[str] = None  # K01, D02, C03, etc.
-    requires_doctor: Optional[bool] = None
-    queue_tag: Optional[str] = None
-    is_consultation: Optional[bool] = None
-    allow_doctor_price_override: Optional[bool] = None
-    department_key: Optional[str] = None  # ✅ ДОБАВЛЕНО: связь с отделением
+    category_code: str | None = None  # K, D, C, L, S, O
+    service_code: str | None = None  # K01, D02, C03, etc.
+    requires_doctor: bool | None = None
+    queue_tag: str | None = None
+    is_consultation: bool | None = None
+    allow_doctor_price_override: bool | None = None
+    department_key: str | None = None  # ✅ ДОБАВЛЕНО: связь с отделением
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ServiceCreate(BaseModel):
-    code: Optional[str] = Field(None, max_length=32)
+    code: str | None = Field(None, max_length=32)
     name: str = Field(..., max_length=256)
-    department: Optional[str] = Field(None, max_length=64)
-    unit: Optional[str] = Field(None, max_length=32)
-    price: Optional[Decimal] = None
-    currency: Optional[str] = Field("UZS", max_length=8)
+    department: str | None = Field(None, max_length=64)
+    unit: str | None = Field(None, max_length=32)
+    price: Decimal | None = None
+    currency: str | None = Field("UZS", max_length=8)
     active: bool = True
-    category_id: Optional[int] = None
-    duration_minutes: Optional[int] = Field(30, ge=1, le=480)
-    doctor_id: Optional[int] = None
+    category_id: int | None = None
+    duration_minutes: int | None = Field(30, ge=1, le=480)
+    doctor_id: int | None = None
     # ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
-    category_code: Optional[str] = Field(None, max_length=2, pattern="^[KDCLSOP]$")
-    service_code: Optional[str] = Field(None, max_length=16)
+    category_code: str | None = Field(None, max_length=2, pattern="^[KDCLSOP]$")
+    service_code: str | None = Field(None, max_length=16)
     requires_doctor: bool = False
-    queue_tag: Optional[str] = Field(None, max_length=32)
+    queue_tag: str | None = Field(None, max_length=32)
     is_consultation: bool = False
     allow_doctor_price_override: bool = False
-    department_key: Optional[str] = Field(
+    department_key: str | None = Field(
         None, max_length=50
     )  # ✅ ДОБАВЛЕНО: связь с отделением
 
 
 class ServiceUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=32)
-    name: Optional[str] = Field(None, max_length=256)
-    department: Optional[str] = Field(None, max_length=64)
-    unit: Optional[str] = Field(None, max_length=32)
-    price: Optional[Decimal] = None
-    currency: Optional[str] = Field(None, max_length=8)
-    active: Optional[bool] = None
-    category_id: Optional[int] = None
-    duration_minutes: Optional[int] = Field(None, ge=1, le=480)
-    doctor_id: Optional[int] = None
+    code: str | None = Field(None, max_length=32)
+    name: str | None = Field(None, max_length=256)
+    department: str | None = Field(None, max_length=64)
+    unit: str | None = Field(None, max_length=32)
+    price: Decimal | None = None
+    currency: str | None = Field(None, max_length=8)
+    active: bool | None = None
+    category_id: int | None = None
+    duration_minutes: int | None = Field(None, ge=1, le=480)
+    doctor_id: int | None = None
     # ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
-    category_code: Optional[str] = Field(None, max_length=2, pattern="^[KDCLSOP]$")
-    service_code: Optional[str] = Field(None, max_length=16)
-    requires_doctor: Optional[bool] = None
-    queue_tag: Optional[str] = Field(None, max_length=32)
-    is_consultation: Optional[bool] = None
-    allow_doctor_price_override: Optional[bool] = None
-    department_key: Optional[str] = Field(
+    category_code: str | None = Field(None, max_length=2, pattern="^[KDCLSOP]$")
+    service_code: str | None = Field(None, max_length=16)
+    requires_doctor: bool | None = None
+    queue_tag: str | None = Field(None, max_length=32)
+    is_consultation: bool | None = None
+    allow_doctor_price_override: bool | None = None
+    department_key: str | None = Field(
         None, max_length=50
     )  # ✅ ДОБАВЛЕНО: связь с отделением
 
@@ -321,7 +321,7 @@ def _row_to_out(r) -> ServiceOut:
 async def list_service_categories(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
-    active: Optional[bool] = Query(default=None),
+    active: bool | None = Query(default=None),
 ):
     """Delegate category listing to the service layer."""
     return ServicesApiService(db).list_service_categories(active=active)
@@ -393,10 +393,10 @@ async def list_services(
     # user=Depends(
     #     require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "User")
     # ),
-    q: Optional[str] = Query(default=None, max_length=120),
-    active: Optional[bool] = Query(default=None),
-    category_id: Optional[int] = Query(default=None),
-    department: Optional[str] = Query(default=None),
+    q: str | None = Query(default=None, max_length=120),
+    active: bool | None = Query(default=None),
+    category_id: int | None = Query(default=None),
+    department: str | None = Query(default=None),
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ):
@@ -424,7 +424,7 @@ async def list_services(
 class QueueGroupInfo(BaseModel):
     """Schema for a single queue group"""
     display_name: str
-    display_name_uz: Optional[str] = None
+    display_name_uz: str | None = None
     service_codes: list[str] = []
     service_prefixes: list[str] = []
     exclude_codes: list[str] = []
@@ -476,10 +476,10 @@ async def get_queue_groups(
 
 class ServiceCodeRepairItem(BaseModel):
     id: int
-    before_code: Optional[str] = None
-    before_service_code: Optional[str] = None
-    after_code: Optional[str] = None
-    after_service_code: Optional[str] = None
+    before_code: str | None = None
+    before_service_code: str | None = None
+    after_code: str | None = None
+    after_service_code: str | None = None
     changed: bool = False
 
 
@@ -668,7 +668,7 @@ async def delete_service(
 class DoctorOut(BaseModel):
     id: int
     specialty: str
-    cabinet: Optional[str] = None
+    cabinet: str | None = None
     active: bool = True
 
     model_config = ConfigDict(from_attributes=True)
@@ -694,17 +694,17 @@ class ServiceAuditLogOut(BaseModel):
 
     id: int
     service_id: int
-    user_id: Optional[int] = None
+    user_id: int | None = None
     action: str
-    changes: Optional[dict] = None
-    old_values: Optional[dict] = None
-    new_values: Optional[dict] = None
-    comment: Optional[str] = None
+    changes: dict | None = None
+    old_values: dict | None = None
+    new_values: dict | None = None
+    comment: str | None = None
     created_at: datetime
 
     # Enriched fields
-    user_name: Optional[str] = None
-    service_name: Optional[str] = None
+    user_name: str | None = None
+    service_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -807,13 +807,13 @@ async def get_recent_service_changes(
 class ServiceResolveResponse(BaseModel):
     """Response schema для resolve_service endpoint"""
 
-    service_id: Optional[int] = None
-    service_code: Optional[str] = None
-    normalized_code: Optional[str] = None
-    category: Optional[str] = None
-    subcategory: Optional[str] = None
+    service_id: int | None = None
+    service_code: str | None = None
+    normalized_code: str | None = None
+    category: str | None = None
+    subcategory: str | None = None
     departments: list[str] = []
-    ui_type: Optional[str] = None
+    ui_type: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -822,8 +822,8 @@ class ServiceResolveResponse(BaseModel):
     "/resolve", response_model=ServiceResolveResponse, summary="Разрешить услугу (SSOT)"
 )
 async def resolve_service_endpoint(
-    service_id: Optional[int] = Query(None, description="ID услуги"),
-    code: Optional[str] = Query(None, description="Код услуги"),
+    service_id: int | None = Query(None, description="ID услуги"),
+    code: str | None = Query(None, description="Код услуги"),
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
 ):
@@ -858,7 +858,7 @@ class ServiceBatchUpdateRequest(BaseModel):
 
     service_ids: list[int] = Field(..., min_items=1, max_items=100)
     updates: dict[str, Any] = Field(..., min_items=1)
-    comment: Optional[str] = None
+    comment: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

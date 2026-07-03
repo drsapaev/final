@@ -63,7 +63,7 @@ async def compare_versions(
 async def restore_version_with_backup(
     emr_id: int,
     version_id: int,
-    reason: Optional[str] = Query(None, description="Причина восстановления"),
+    reason: str | None = Query(None, description="Причина восстановления"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
@@ -112,7 +112,7 @@ async def create_version_with_analysis(
     emr_id: int,
     version_data: dict[str, Any],
     change_type: str = Query(..., description="Тип изменения"),
-    change_description: Optional[str] = Query(None, description="Описание изменения"),
+    change_description: str | None = Query(None, description="Описание изменения"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:

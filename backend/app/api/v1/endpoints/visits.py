@@ -22,39 +22,39 @@ VISIT_READ_ROLES = ("Admin", "Registrar", "Doctor", "Cashier", "Lab", "Nurse")
 
 # Pydantic fallbacks (если полноценные схемы уже есть в app.schemas, в следующих шагах заменим)
 class VisitCreate(BaseModel):
-    patient_id: Optional[int] = None
-    doctor_id: Optional[int] = None
-    notes: Optional[str] = None
-    planned_date: Optional[date] = None  # <-- новая поддержка
-    department: Optional[str] = None
-    source: Optional[str] = Field(default="desk", max_length=20)
+    patient_id: int | None = None
+    doctor_id: int | None = None
+    notes: str | None = None
+    planned_date: date | None = None  # <-- новая поддержка
+    department: str | None = None
+    source: str | None = Field(default="desk", max_length=20)
 
 
 class VisitOut(BaseModel):
     id: int
-    patient_id: Optional[int] = None
-    doctor_id: Optional[int] = None
+    patient_id: int | None = None
+    doctor_id: int | None = None
     status: str
-    created_at: Optional[datetime] = None
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    notes: Optional[str] = None
-    planned_date: Optional[date] = None  # <-- новая поддержка
-    source: Optional[str] = None
-    patient_name: Optional[str] = None
-    patient_fio: Optional[str] = None
-    patient_phone: Optional[str] = None
-    patient_birth_year: Optional[int] = None
-    birth_year: Optional[int] = None
-    address: Optional[str] = None
-    patient: Optional[dict[str, Any]] = None
-    doctor_name: Optional[str] = None
-    room: Optional[str] = None
-    doctor: Optional[dict[str, Any]] = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    notes: str | None = None
+    planned_date: date | None = None  # <-- новая поддержка
+    source: str | None = None
+    patient_name: str | None = None
+    patient_fio: str | None = None
+    patient_phone: str | None = None
+    patient_birth_year: int | None = None
+    birth_year: int | None = None
+    address: str | None = None
+    patient: dict[str, Any] | None = None
+    doctor_name: str | None = None
+    room: str | None = None
+    doctor: dict[str, Any] | None = None
 
 
 class VisitServiceIn(BaseModel):
-    code: Optional[str] = Field(default=None, max_length=32)
+    code: str | None = Field(default=None, max_length=32)
     name: str = Field(max_length=255)
     price: float = 0.0
     qty: int = 1
@@ -185,10 +185,10 @@ def _ensure_doctor_can_create_visit_for_payload(
 
 @router.get("/visits", response_model=list[VisitOut], summary="Список визитов")
 def list_visits(
-    patient_id: Optional[int] = Query(default=None),
-    doctor_id: Optional[int] = Query(default=None),
-    status_q: Optional[str] = Query(default=None),
-    planned: Optional[date] = Query(default=None, alias="planned_date"),
+    patient_id: int | None = Query(default=None),
+    doctor_id: int | None = Query(default=None),
+    status_q: str | None = Query(default=None),
+    planned: date | None = Query(default=None, alias="planned_date"),
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -339,7 +339,7 @@ def set_status(
 def reschedule_visit(
     visit_id: int,
     new_date: date = Query(..., alias="new_date"),
-    new_time: Optional[str] = Query(None, alias="new_time", description="Опциональное новое время в формате HH:MM"),
+    new_time: str | None = Query(None, alias="new_time", description="Опциональное новое время в формате HH:MM"),
     db: Session = Depends(get_db),
 ):
     """

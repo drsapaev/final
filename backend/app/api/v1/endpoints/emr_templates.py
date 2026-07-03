@@ -24,8 +24,8 @@ router = APIRouter()
 
 @router.get("/templates", response_model=list[EMRTemplateOut])
 async def get_emr_templates(
-    specialty: Optional[str] = Query(None, description="Фильтр по специализации"),
-    is_public: Optional[bool] = Query(None, description="Только публичные шаблоны"),
+    specialty: str | None = Query(None, description="Фильтр по специализации"),
+    is_public: bool | None = Query(None, description="Только публичные шаблоны"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -47,7 +47,7 @@ async def get_emr_templates(
 
 @router.get("/templates/user", response_model=list[EMRTemplateOut])
 async def get_user_templates(
-    specialty: Optional[str] = Query(None, description="Фильтр по специализации"),
+    specialty: str | None = Query(None, description="Фильтр по специализации"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):

@@ -117,8 +117,8 @@ def _template_path(filename: str) -> Path:
 
 @router.get("/templates", response_model=list[PrintTemplateOut])
 def get_print_templates(
-    template_type: Optional[str] = None,
-    language: Optional[str] = None,
+    template_type: str | None = None,
+    language: str | None = None,
     active_only: bool = True,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
@@ -496,8 +496,8 @@ def _print_template_types_payload():
 
 @router.get("/jobs", response_model=list[PrintJobOut])
 def get_print_jobs(
-    status_filter: Optional[str] = None,
-    document_type: Optional[str] = None,
+    status_filter: str | None = None,
+    document_type: str | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),

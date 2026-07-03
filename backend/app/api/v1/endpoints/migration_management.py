@@ -31,29 +31,29 @@ class BackupResult(BaseModel):
     """Результат создания резервной копии"""
 
     success: bool
-    backup_file: Optional[str] = None
-    queues_count: Optional[int] = None
-    total_entries: Optional[int] = None
-    error: Optional[str] = None
+    backup_file: str | None = None
+    queues_count: int | None = None
+    total_entries: int | None = None
+    error: str | None = None
 
 
 class RestoreResult(BaseModel):
     """Результат восстановления"""
 
     success: bool
-    restored_queues: Optional[int] = None
-    restored_entries: Optional[int] = None
-    error: Optional[str] = None
+    restored_queues: int | None = None
+    restored_entries: int | None = None
+    error: str | None = None
 
 
 class CleanupResult(BaseModel):
     """Результат очистки"""
 
     success: bool
-    deleted_queues: Optional[int] = None
-    deleted_entries: Optional[int] = None
-    cutoff_date: Optional[str] = None
-    error: Optional[str] = None
+    deleted_queues: int | None = None
+    deleted_entries: int | None = None
+    cutoff_date: str | None = None
+    error: str | None = None
 
 
 class IntegrityCheckResult(BaseModel):
@@ -62,7 +62,7 @@ class IntegrityCheckResult(BaseModel):
     passed: bool
     checks: dict[str, Any]
     checked_at: str
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class EMRCutoverBackfillResult(BaseModel):
@@ -78,7 +78,7 @@ class EMRCutoverBackfillResult(BaseModel):
     rebound_files: int
     errors: list[dict[str, Any]]
     generated_at: str
-    verification: Optional[dict[str, Any]] = None
+    verification: dict[str, Any] | None = None
 
 
 class EMRCutoverVerificationResult(BaseModel):
@@ -123,7 +123,7 @@ def migrate_legacy_queue_data(
 )
 def migrate_legacy_emr_cutover(
     dry_run: bool = Query(False, description="Только проверить, без записи изменений"),
-    limit: Optional[int] = Query(None, ge=1, le=10000, description="Лимит legacy EMR для одного прогона"),
+    limit: int | None = Query(None, ge=1, le=10000, description="Лимит legacy EMR для одного прогона"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -198,7 +198,7 @@ def check_data_integrity(
 
 @router.post("/admin/migration/backup-queue-data", response_model=BackupResult)
 def backup_queue_data(
-    target_date: Optional[str] = Query(None, description="Дата в формате YYYY-MM-DD"),
+    target_date: str | None = Query(None, description="Дата в формате YYYY-MM-DD"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

@@ -38,11 +38,11 @@ GLOBAL_SEARCH_ROLES = (
 
 class PatientSearchResult(BaseModel):
     id: int
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    middle_name: Optional[str] = None
-    phone: Optional[str] = None
-    birth_date: Optional[date] = None
+    first_name: str | None = None
+    last_name: str | None = None
+    middle_name: str | None = None
+    phone: str | None = None
+    birth_date: date | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,22 +50,22 @@ class PatientSearchResult(BaseModel):
 class VisitSearchResult(BaseModel):
     id: int
     patient_id: int
-    patient_name: Optional[str] = None
-    status: Optional[str] = None
-    visit_date: Optional[date] = None
-    visit_time: Optional[str] = None
-    specialist_name: Optional[str] = None
+    patient_name: str | None = None
+    status: str | None = None
+    visit_date: date | None = None
+    visit_time: str | None = None
+    specialist_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class LabResultSearchResult(BaseModel):
     id: int
-    patient_id: Optional[int] = None
-    patient_name: Optional[str] = None
+    patient_id: int | None = None
+    patient_name: str | None = None
     status: str
-    test_type: Optional[str] = None
-    created_at: Optional[datetime] = None
+    test_type: str | None = None
+    created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

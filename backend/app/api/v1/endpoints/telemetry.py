@@ -97,9 +97,9 @@ class TelemetryEvent(BaseModel):
     """Single telemetry event"""
     event: str = Field(..., max_length=50)
     entity: str = Field(default="emr", max_length=20)
-    timestamp: Optional[int] = None
-    session_id: Optional[str] = Field(None, max_length=50)
-    meta: Optional[dict[str, Any]] = None
+    timestamp: int | None = None
+    session_id: str | None = Field(None, max_length=50)
+    meta: dict[str, Any] | None = None
 
 
 class TelemetryBatch(BaseModel):

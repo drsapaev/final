@@ -84,8 +84,8 @@ class ServiceWaitAnalyticsResponse(BaseModel):
 async def get_wait_time_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Фильтр по отделению"),
-    doctor_id: Optional[int] = Query(None, description="Фильтр по врачу"),
+    department: str | None = Query(None, description="Фильтр по отделению"),
+    doctor_id: int | None = Query(None, description="Фильтр по врачу"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
 ):
@@ -129,7 +129,7 @@ async def get_wait_time_analytics(
 
 @router.get("/real-time-wait-estimates", response_model=RealTimeWaitEstimateResponse)
 async def get_real_time_wait_estimates(
-    department: Optional[str] = Query(None, description="Фильтр по отделению"),
+    department: str | None = Query(None, description="Фильтр по отделению"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
 ):
@@ -148,7 +148,7 @@ async def get_real_time_wait_estimates(
 async def get_service_wait_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    service_codes: Optional[str] = Query(None, description="Коды услуг через запятую"),
+    service_codes: str | None = Query(None, description="Коды услуг через запятую"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
 ):
@@ -191,7 +191,7 @@ async def get_service_wait_analytics(
 @router.get("/wait-time-summary")
 async def get_wait_time_summary(
     days: int = Query(7, ge=1, le=30, description="Количество дней для анализа"),
-    department: Optional[str] = Query(None, description="Фильтр по отделению"),
+    department: str | None = Query(None, description="Фильтр по отделению"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
 ):
@@ -238,7 +238,7 @@ async def get_wait_time_comparison(
     compare_with_previous: bool = Query(
         True, description="Сравнить с предыдущим периодом"
     ),
-    department: Optional[str] = Query(None, description="Фильтр по отделению"),
+    department: str | None = Query(None, description="Фильтр по отделению"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
 ):
@@ -323,7 +323,7 @@ async def get_wait_time_comparison(
 async def get_wait_time_heatmap(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Фильтр по отделению"),
+    department: str | None = Query(None, description="Фильтр по отделению"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
 ):

@@ -117,8 +117,8 @@ class PaymentInvoiceCreateRequest(BaseModel):
     provider: str = Field(
         ..., pattern="^(click|payme)$", description="Платежный провайдер"
     )
-    description: Optional[str] = Field(None, description="Описание платежа")
-    patient_info: Optional[dict[str, Any]] = Field(
+    description: str | None = Field(None, description="Описание платежа")
+    patient_info: dict[str, Any] | None = Field(
         None, description="Информация о пациенте"
     )
 
@@ -129,7 +129,7 @@ class PaymentInvoiceResponse(BaseModel):
     currency: str
     provider: str
     status: str
-    description: Optional[str]
+    description: str | None
     created_at: datetime
 
 
@@ -145,20 +145,20 @@ class PaymentInitRequest(BaseModel):
     provider: str = Field(..., description="Провайдер платежа (click, payme, kaspi)")
     amount: float = Field(..., gt=0, description="Сумма платежа")
     currency: str = Field(default="UZS", description="Валюта платежа")
-    description: Optional[str] = Field(None, description="Описание платежа")
-    return_url: Optional[str] = Field(None, description="URL возврата при успехе")
-    cancel_url: Optional[str] = Field(None, description="URL возврата при отмене")
+    description: str | None = Field(None, description="Описание платежа")
+    return_url: str | None = Field(None, description="URL возврата при успехе")
+    cancel_url: str | None = Field(None, description="URL возврата при отмене")
 
 
 class PaymentInitResponse(BaseModel):
     """Ответ на инициализацию платежа"""
 
     success: bool
-    payment_id: Optional[int] = None
-    provider_payment_id: Optional[str] = None
-    payment_url: Optional[str] = None
-    status: Optional[str] = None
-    error_message: Optional[str] = None
+    payment_id: int | None = None
+    provider_payment_id: str | None = None
+    payment_url: str | None = None
+    status: str | None = None
+    error_message: str | None = None
 
 
 class PaymentStatusResponse(BaseModel):
@@ -168,11 +168,11 @@ class PaymentStatusResponse(BaseModel):
     status: str
     amount: float
     currency: str
-    provider: Optional[str] = None
-    provider_payment_id: Optional[str] = None
+    provider: str | None = None
+    provider_payment_id: str | None = None
     created_at: datetime
-    paid_at: Optional[datetime] = None
-    provider_data: Optional[dict[str, Any]] = None
+    paid_at: datetime | None = None
+    provider_data: dict[str, Any] | None = None
 
 
 class PaymentListResponse(BaseModel):
@@ -242,12 +242,12 @@ def init_payment(
 class PaymentCreateRequest(BaseModel):
     """Запрос на создание платежа"""
 
-    visit_id: Optional[int] = Field(None, description="ID визита")
-    appointment_id: Optional[int] = Field(None, description="ID записи (appointment)")
+    visit_id: int | None = Field(None, description="ID визита")
+    appointment_id: int | None = Field(None, description="ID записи (appointment)")
     amount: float = Field(..., gt=0, description="Сумма платежа")
     currency: str = Field(default="UZS", description="Валюта платежа")
     method: str = Field(default="cash", description="Метод оплаты (cash, card)")
-    note: Optional[str] = Field(None, description="Примечание")
+    note: str | None = Field(None, description="Примечание")
 
 
 @router.post("/", response_model=dict[str, Any])
@@ -280,9 +280,9 @@ def create_payment(
 @router.get("/", response_model=PaymentListResponse)
 def list_payments(
     db: Session = Depends(get_db),
-    visit_id: Optional[int] = Query(None, description="Фильтр по ID визита"),
-    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
+    visit_id: int | None = Query(None, description="Фильтр по ID визита"),
+    date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="Дата окончания (YYYY-MM-DD)"),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),

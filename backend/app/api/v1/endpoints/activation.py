@@ -87,11 +87,11 @@ async def activation_status(
     "/list", response_model=ActivationListOut, summary="Список выданных ключей (Admin)"
 )
 async def activation_list(
-    status: Optional[str] = Query(
+    status: str | None = Query(
         None, description="issued|trial|active|expired|revoked"
     ),
-    key_like: Optional[str] = Query(None, description="подстрока ключа"),
-    machine_hash: Optional[str] = Query(None),
+    key_like: str | None = Query(None, description="подстрока ключа"),
+    machine_hash: str | None = Query(None),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),

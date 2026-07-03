@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/documentation/endpoints")
 async def get_detailed_endpoints_documentation(
-    category: Optional[str] = Query(None, description="Категория эндпоинтов"),
+    category: str | None = Query(None, description="Категория эндпоинтов"),
     current_user: User = Depends(get_current_user),
 ):
     """Получить детальную документацию по эндпоинтам"""
@@ -561,7 +561,7 @@ async def get_detailed_endpoints_documentation(
 
 @router.get("/documentation/examples")
 async def get_api_examples(
-    endpoint: Optional[str] = Query(None, description="Конкретный эндпоинт"),
+    endpoint: str | None = Query(None, description="Конкретный эндпоинт"),
     current_user: User = Depends(get_current_user),
 ):
     """Получить примеры использования API"""

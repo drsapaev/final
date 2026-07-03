@@ -94,17 +94,17 @@ async def _read_limited_import_archive(file: UploadFile, max_bytes: int) -> byte
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),
-    title: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
+    title: str | None = Form(None),
+    description: str | None = Form(None),
     file_type: str = Form(...),
     permission: str = Form("private"),
-    patient_id: Optional[int] = Form(None),
-    appointment_id: Optional[int] = Form(None),
-    visit_id: Optional[int] = Form(None),
-    emr_id: Optional[int] = Form(None),
-    folder_id: Optional[int] = Form(None),
-    tags: Optional[str] = Form(None),
-    expires_at: Optional[datetime] = Form(None),
+    patient_id: int | None = Form(None),
+    appointment_id: int | None = Form(None),
+    visit_id: int | None = Form(None),
+    emr_id: int | None = Form(None),
+    folder_id: int | None = Form(None),
+    tags: str | None = Form(None),
+    expires_at: datetime | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Doctor", "Nurse", "Receptionist")
@@ -306,12 +306,12 @@ async def search_files(
 
 @router.get("/", response_model=FileList)
 async def get_files(
-    file_type: Optional[str] = Query(None, description="Тип файла"),
-    patient_id: Optional[int] = Query(None, description="ID пациента"),
-    appointment_id: Optional[int] = Query(None, description="ID записи"),
-    visit_id: Optional[int] = Query(None, description="ID визита"),
-    emr_id: Optional[int] = Query(None, description="ID медкарты"),
-    folder_id: Optional[int] = Query(None, description="ID папки"),
+    file_type: str | None = Query(None, description="Тип файла"),
+    patient_id: int | None = Query(None, description="ID пациента"),
+    appointment_id: int | None = Query(None, description="ID записи"),
+    visit_id: int | None = Query(None, description="ID визита"),
+    emr_id: int | None = Query(None, description="ID медкарты"),
+    folder_id: int | None = Query(None, description="ID папки"),
     page: int = Query(1, ge=1, description="Номер страницы"),
     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
     db: Session = Depends(get_db),
@@ -370,11 +370,11 @@ async def get_files(
 async def update_file(
     request: Request,
     file_id: int,
-    title: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    permission: Optional[str] = Form(None),
-    tags: Optional[str] = Form(None),
-    expires_at: Optional[datetime] = Form(None),
+    title: str | None = Form(None),
+    description: str | None = Form(None),
+    permission: str | None = Form(None),
+    tags: str | None = Form(None),
+    expires_at: datetime | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Doctor", "Nurse", "Receptionist")
@@ -442,7 +442,7 @@ async def replace_file_content(
     request: Request,
     file_id: int,
     file: UploadFile = File(...),
-    change_description: Optional[str] = Form(None),
+    change_description: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Doctor", "Nurse", "Receptionist")
@@ -622,7 +622,7 @@ async def export_files(
 @router.post("/import", response_model=FileImportResponse)
 async def import_files(
     file: UploadFile = File(...),
-    target_folder_id: Optional[int] = Form(None),
+    target_folder_id: int | None = Form(None),
     overwrite_existing: bool = Form(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(

@@ -35,11 +35,11 @@ def raise_two_factor_device_internal_error(
 
 class DeviceInfo(BaseModel):
     id: str
-    name: Optional[str] = None
+    name: str | None = None
     device_type: str
-    browser: Optional[str] = None
-    os: Optional[str] = None
-    location: Optional[str] = None
+    browser: str | None = None
+    os: str | None = None
+    location: str | None = None
     ip_address: str
     user_agent: str
     created_at: datetime
@@ -48,7 +48,7 @@ class DeviceInfo(BaseModel):
 
 
 class DeviceCreateRequest(BaseModel):
-    name: Optional[str] = None
+    name: str | None = None
     device_fingerprint: str
     user_agent: str
     ip_address: str

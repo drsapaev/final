@@ -24,8 +24,8 @@ class SendVerificationCodeRequest(BaseModel):
 
     phone: str
     purpose: str = "verification"
-    provider: Optional[str] = None
-    custom_message: Optional[str] = None
+    provider: str | None = None
+    custom_message: str | None = None
 
     @field_validator('phone')
     @classmethod
@@ -337,8 +337,8 @@ async def get_verification_statistics(
 async def admin_send_verification_code(
     phone: str = Query(..., description="Номер телефона в формате +998XXXXXXXXX"),
     purpose: str = Query("verification", description="Цель верификации"),
-    provider: Optional[str] = Query(None, description="SMS провайдер"),
-    message: Optional[str] = Query(None, description="Кастомное сообщение с {code}"),
+    provider: str | None = Query(None, description="SMS провайдер"),
+    message: str | None = Query(None, description="Кастомное сообщение с {code}"),
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
 ):
     """Отправка кода верификации администратором"""

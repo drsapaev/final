@@ -42,16 +42,16 @@ ADMIN_DEPARTMENTS_PUBLIC_ERROR = "Internal server error"
 class DepartmentIntegrationOptions(BaseModel):
     """Настройки автоматической интеграции отделения в очередь/услуги."""
 
-    queue_prefix: Optional[str] = Field(None, max_length=10)
-    queue_type: Optional[str] = Field(None, pattern="^(live|online|mixed)$")
-    auto_close_time: Optional[str] = Field(None, max_length=5)
-    start_number: Optional[int] = Field(None, ge=1, le=999)
-    max_daily_queue: Optional[int] = Field(None, ge=1, le=9999)
-    service_name: Optional[str] = Field(None, max_length=256)
-    service_code: Optional[str] = Field(None, max_length=32)
-    service_price: Optional[Decimal] = None
-    service_currency: Optional[str] = Field("UZS", max_length=8)
-    service_category_code: Optional[str] = Field(None, max_length=2)
+    queue_prefix: str | None = Field(None, max_length=10)
+    queue_type: str | None = Field(None, pattern="^(live|online|mixed)$")
+    auto_close_time: str | None = Field(None, max_length=5)
+    start_number: int | None = Field(None, ge=1, le=999)
+    max_daily_queue: int | None = Field(None, ge=1, le=9999)
+    service_name: str | None = Field(None, max_length=256)
+    service_code: str | None = Field(None, max_length=32)
+    service_price: Decimal | None = None
+    service_currency: str | None = Field("UZS", max_length=8)
+    service_category_code: str | None = Field(None, max_length=2)
 
 
 class DepartmentCreate(BaseModel):
@@ -59,27 +59,27 @@ class DepartmentCreate(BaseModel):
 
     key: str
     name_ru: str
-    name_uz: Optional[str] = None
-    icon: Optional[str] = "folder"
-    color: Optional[str] = None
-    gradient: Optional[str] = None
-    display_order: Optional[int] = 999
-    active: Optional[bool] = True
-    description: Optional[str] = None
-    integration: Optional[DepartmentIntegrationOptions] = None
+    name_uz: str | None = None
+    icon: str | None = "folder"
+    color: str | None = None
+    gradient: str | None = None
+    display_order: int | None = 999
+    active: bool | None = True
+    description: str | None = None
+    integration: DepartmentIntegrationOptions | None = None
 
 
 class DepartmentUpdate(BaseModel):
     """Схема для обновления отделения"""
 
-    name_ru: Optional[str] = None
-    name_uz: Optional[str] = None
-    icon: Optional[str] = None
-    color: Optional[str] = None
-    gradient: Optional[str] = None
-    display_order: Optional[int] = None
-    active: Optional[bool] = None
-    description: Optional[str] = None
+    name_ru: str | None = None
+    name_uz: str | None = None
+    icon: str | None = None
+    color: str | None = None
+    gradient: str | None = None
+    display_order: int | None = None
+    active: bool | None = None
+    description: str | None = None
 
 
 class DepartmentResponse(BaseModel):
@@ -88,13 +88,13 @@ class DepartmentResponse(BaseModel):
     id: int
     key: str
     name_ru: str
-    name_uz: Optional[str]
+    name_uz: str | None
     icon: str
-    color: Optional[str]
-    gradient: Optional[str]
+    color: str | None
+    gradient: str | None
     display_order: int
     active: bool
-    description: Optional[str]
+    description: str | None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -102,7 +102,7 @@ class DepartmentResponse(BaseModel):
 class DepartmentResponseWithSettings(DepartmentResponse):
     """Схема ответа отделения с настройками"""
 
-    queue_prefix: Optional[str] = None
+    queue_prefix: str | None = None
 
 
 def _default_stats() -> dict[str, int]:
@@ -137,7 +137,7 @@ def _ensure_clinic_setting(
 def _ensure_department_integrations(
     db: Session,
     department: Department,
-    options: Optional[DepartmentIntegrationOptions] = None,
+    options: DepartmentIntegrationOptions | None = None,
 ) -> dict[str, Any]:
     """Гарантирует, что отделение подключено к очередям, услугам и мастеру регистрации."""
     opts = options.dict(exclude_unset=True) if options else {}
@@ -573,7 +573,7 @@ def update_department(
 @router.post("/{department_id}/initialize", response_model=dict, include_in_schema=False)
 def initialize_department(
     department_id: int,
-    integration: Optional[DepartmentIntegrationOptions] = None,
+    integration: DepartmentIntegrationOptions | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -955,7 +955,7 @@ def _legacy_departments_overview_payload(
 @router.post("/{department_id}/initialize", response_model=dict)
 def initialize_department(
     department_id: int,
-    payload: Optional[dict[str, Any]] = None,
+    payload: dict[str, Any] | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

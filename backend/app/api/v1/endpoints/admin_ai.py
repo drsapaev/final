@@ -288,8 +288,8 @@ def update_ai_settings(
 @router.get("/ai/stats", response_model=AIStatsResponse)
 def get_ai_stats(
     days_back: int = 30,
-    provider_id: Optional[int] = None,
-    specialty: Optional[str] = None,
+    provider_id: int | None = None,
+    specialty: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -307,9 +307,9 @@ def get_ai_stats(
 def get_ai_usage_logs(
     skip: int = 0,
     limit: int = 100,
-    provider_id: Optional[int] = None,
-    task_type: Optional[str] = None,
-    success_only: Optional[bool] = None,
+    provider_id: int | None = None,
+    task_type: str | None = None,
+    success_only: bool | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

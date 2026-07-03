@@ -46,7 +46,7 @@ class MessageResponse(BaseModel):
 )
 async def get_section_templates(
     section_type: str,
-    icd10_code: Optional[str] = Query(None, description="ICD-10 code for filtering"),
+    icd10_code: str | None = Query(None, description="ICD-10 code for filtering"),
     limit: int = Query(10, ge=1, le=50),
     current_user: User = Depends(deps.get_current_user),
     db: AsyncSession = Depends(deps.get_db),

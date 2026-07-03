@@ -98,7 +98,7 @@ async def get_ecg_results(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*CARDIO_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> list[CardioECGRecordOut]:
     """
     Получить список ЭКГ исследований для пациента.
@@ -236,7 +236,7 @@ async def get_blood_tests(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*CARDIO_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> list[CardioBloodTestOut]:
     """
     Получить список анализов крови
@@ -345,7 +345,7 @@ async def create_blood_test(
 async def get_risk_assessment(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*CARDIO_ROLES)),
-    patient_id: Optional[int] = None,
+    patient_id: int | None = None,
 ) -> dict[str, Any]:
     """
     Получить оценку кардиологических рисков
