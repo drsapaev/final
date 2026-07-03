@@ -65,9 +65,9 @@ async def get_link_preview(url: str = Query(..., description="The URL to preview
             response = await _fetch_public_preview(client, url)
             if response.status_code != 200:
                 raise HTTPException(status_code=400, detail="Could not fetch URL")
-            
+
             soup = BeautifulSoup(response.text, 'html.parser')
-            
+
             title = None
             if soup.find("meta", property="og:title"):
                 title = soup.find("meta", property="og:title")["content"]

@@ -53,11 +53,11 @@ async def get_section_templates(
 ):
     """
     Получить персональные шаблоны врача для секции EMR.
-    
+
     Если указан icd10_code, возвращает:
     1. Шаблоны для конкретного диагноза
     2. Общие шаблоны (icd10_code IS NULL)
-    
+
     Сортировка:
     - Закреплённые (📌) вверху
     - По частоте использования
@@ -94,7 +94,7 @@ async def pin_template(
 ):
     """
     Закрепить шаблон (📌 Часто использую).
-    
+
     Лимит: максимум 3 закреплённых на секцию.
     При превышении — автоматически открепляется самый старый.
     """
@@ -103,10 +103,10 @@ async def pin_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )
-    
+
     if not success:
         raise HTTPException(status_code=400, detail=message)
-    
+
     return MessageResponse(success=True, message=message)
 
 
@@ -127,10 +127,10 @@ async def unpin_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )
-    
+
     if not success:
         raise HTTPException(status_code=400, detail=message)
-    
+
     return MessageResponse(success=True, message=message)
 
 
@@ -148,7 +148,7 @@ async def update_template(
 ):
     """
     Обновить шаблон.
-    
+
     Режимы:
     - `replace`: обновить текст существующего шаблона
     - `save_as_new`: создать новый шаблон с изменённым текстом
@@ -160,10 +160,10 @@ async def update_template(
         new_text=body.new_text,
         mode=body.mode,
     )
-    
+
     if not template:
         raise HTTPException(status_code=400, detail=message)
-    
+
     return DoctorSectionTemplateResponse(
         id=template.id,
         section_type=template.section_type,
@@ -193,8 +193,8 @@ async def delete_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )
-    
+
     if not success:
         raise HTTPException(status_code=404, detail=message)
-    
+
     return MessageResponse(success=True, message=message)

@@ -129,7 +129,7 @@ async def ws_queue_authenticated(
         CONNECTION_TIMEOUT = 120  # seconds
         # ✅ BUGFIX: Use list to allow mutation from nested scopes (nonlocal doesn't work in nested try blocks)
         last_pong = [asyncio.get_event_loop().time()]
-        
+
         async def send_heartbeat():
             """Send periodic ping to detect dead connections"""
             while True:
@@ -155,7 +155,7 @@ async def ws_queue_authenticated(
                         timeout=CONNECTION_TIMEOUT
                     )
                     message = json.loads(data)
-                    
+
                     # Handle pong response
                     if message.get("type") == "pong":
                         # ✅ BUGFIX: Update list element to modify outer scope variable
@@ -220,7 +220,7 @@ async def ws_queue_optional_auth(
 ):
     """
     ⚠️ DEPRECATED: WebSocket соединение с опциональной аутентификацией
-    
+
     ✅ SECURITY: This endpoint is deprecated. Use /ws/queue/auth instead.
     Authentication is now REQUIRED for all WebSocket connections.
     """
@@ -231,7 +231,7 @@ async def ws_queue_optional_auth(
             reason="Authentication required. Use /ws/queue/auth endpoint."
         )
         return
-    
+
     db = SessionLocal()
     authenticated_user = None
 

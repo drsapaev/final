@@ -43,7 +43,7 @@ class PatientSearchResult(BaseModel):
     middle_name: Optional[str] = None
     phone: Optional[str] = None
     birth_date: Optional[date] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -55,7 +55,7 @@ class VisitSearchResult(BaseModel):
     visit_date: Optional[date] = None
     visit_time: Optional[str] = None
     specialist_name: Optional[str] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -66,7 +66,7 @@ class LabResultSearchResult(BaseModel):
     status: str
     test_type: Optional[str] = None
     created_at: Optional[datetime] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -89,10 +89,10 @@ async def global_search(
 ):
     """
     Global search across patients, visits, and lab results.
-    
+
     - **q**: Search query (min 2 characters)
     - **limit**: Max results per domain (default 5)
-    
+
     Returns grouped results from all domains.
     """
     query = q.strip()

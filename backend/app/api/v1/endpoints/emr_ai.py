@@ -260,18 +260,18 @@ def generate_v2_suggestions(
 ) -> list[AISuggestionV2]:
     """Generate mock suggestions in EMR v2 format"""
     suggestions = []
-    
+
     complaints = emr_data.get("complaints", "")
     diagnosis = emr_data.get("diagnosis", "")
     icd10 = emr_data.get("icd10_code", "")
     treatment = emr_data.get("treatment", "")
     recommendations = emr_data.get("recommendations", "")
-    
+
     # Use doctor context for better suggestions
     context_phrases = []
     if doctor_context and doctor_context.unique_phrases:
         context_phrases = doctor_context.unique_phrases[:10]
-    
+
     # Diagnosis suggestions (enhanced with doctor context)
     if complaints and not diagnosis:
         # Standard suggestions
@@ -291,7 +291,7 @@ def generate_v2_suggestions(
                 confidence=0.72,
                 explanation="На основе жалоб на повышенное давление",
             ))
-        
+
         # Add suggestions from doctor context
         for phrase in context_phrases:
             if "диагноз" in phrase.lower() or len(phrase) > 20:
@@ -303,7 +303,7 @@ def generate_v2_suggestions(
                     explanation="На основе вашей истории",
                 ))
                 break  # Only one context-based suggestion
-    
+
     # ICD-10 suggestions
     if diagnosis and not icd10:
         if "гипертензия" in diagnosis.lower() or "гипертоническая" in diagnosis.lower():
@@ -322,7 +322,7 @@ def generate_v2_suggestions(
                 confidence=0.78,
                 explanation="Головная боль напряжённого типа",
             ))
-    
+
     # Recommendations suggestions
     if treatment and not recommendations:
         suggestions.append(AISuggestionV2(
@@ -332,7 +332,7 @@ def generate_v2_suggestions(
             confidence=0.60,
             explanation="Стандартные рекомендации",
         ))
-    
+
     return suggestions
 
 
@@ -344,10 +344,10 @@ async def suggest_v2(
 ):
     """
     EMR v2 compatible AI suggestions endpoint.
-    
+
     Returns suggestions in format expected by useEMRAI hook.
     AI only suggests - doctor must explicitly apply.
-    
+
     Optionally accepts doctor_context for personalized suggestions.
     """
     suggestions = generate_v2_suggestions(
@@ -355,7 +355,7 @@ async def suggest_v2(
         request.specialty,
         request.doctor_context,
     )
-    
+
     return SuggestResponseV2(
         suggestions=suggestions,
         model="mock",

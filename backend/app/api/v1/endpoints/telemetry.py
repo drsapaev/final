@@ -47,13 +47,13 @@ ALLOWED_EVENTS = {
     'emr.sign',
     'emr.amend',
     'emr.conflict',
-    
+
     # Section interactions
     'section.open',
     'section.close',
     'section.focus',
     'section.blur',
-    
+
     # AI interactions
     'ai.suggestion.shown',
     'ai.suggestion.applied',
@@ -61,11 +61,11 @@ ALLOWED_EVENTS = {
     'ai.panel.open',
     'ai.panel.close',
     'ai.completeness.check',
-    
+
     # Template usage
     'template.panel.open',
     'template.applied',
-    
+
     # UX metrics
     'undo',
     'redo',
@@ -120,12 +120,12 @@ class TelemetryResponse(BaseModel):
 
 def validate_event(event: TelemetryEvent) -> bool:
     """Validate event - block any PHI"""
-    
+
     # Must be in whitelist
     if event.event not in ALLOWED_EVENTS:
         logger.debug(f"[Telemetry] Rejected unknown event: {event.event}")
         return False
-    
+
     # Check meta for PHI (paranoid)
     if event.meta:
         for key, value in event.meta.items():
@@ -154,7 +154,7 @@ def validate_event(event: TelemetryEvent) -> bool:
             ):
                 logger.debug(f"[Telemetry] Rejected: suspicious key {key}")
                 return False
-    
+
     return True
 
 
@@ -166,7 +166,7 @@ def validate_event(event: TelemetryEvent) -> bool:
 async def store_events(events: list[TelemetryEvent]):
     """
     Store telemetry events.
-    
+
     For now, just log. In production, send to:
     - Analytics DB
     - BigQuery
@@ -193,31 +193,31 @@ async def submit_telemetry(
 ):
     """
     Submit telemetry events.
-    
+
     This endpoint:
     - Validates events against whitelist
     - Blocks any potential PHI
     - Stores events asynchronously
     - Never fails (best-effort)
-    
+
     User authentication is not required (anonymous ok).
     """
     if not TELEMETRY_ENABLED:
         return TelemetryResponse(accepted=0, rejected=len(batch.events))
-    
+
     accepted = []
     rejected = 0
-    
+
     for event in batch.events:
         if validate_event(event):
             accepted.append(event)
         else:
             rejected += 1
-    
+
     # Store in background (don't block response)
     if accepted:
         background_tasks.add_task(store_events, accepted)
-    
+
     return TelemetryResponse(
         accepted=len(accepted),
         rejected=rejected,

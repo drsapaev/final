@@ -40,7 +40,7 @@ class PatientAppointmentResponse(BaseModel):
     can_cancel: bool = False
     can_reschedule: bool = False
     hours_until_appointment: Optional[float] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -51,7 +51,7 @@ class PatientResultResponse(BaseModel):
     date: str
     status: str
     file_url: Optional[str] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -81,20 +81,20 @@ def can_modify_appointment(appointment: Appointment, min_hours: int = 24) -> tup
     """
     if appointment.status in ['cancelled', 'completed']:
         return False, 0
-    
+
     # Собираем datetime записи
     try:
         apt_date = appointment.appointment_date
         apt_time = appointment.appointment_time or "09:00"
-        
+
         if isinstance(apt_date, str):
             apt_date = datetime.strptime(apt_date, "%Y-%m-%d").date()
-        
+
         apt_datetime = datetime.combine(apt_date, datetime.strptime(apt_time, "%H:%M").time())
-        
+
         now = datetime.now()
         hours_until = (apt_datetime - now).total_seconds() / 3600
-        
+
         return hours_until >= min_hours, hours_until
     except Exception as e:
         logger.error(f"Error calculating appointment time: {e}")
@@ -140,26 +140,26 @@ async def get_my_appointments(
     """
     service = PatientAppointmentsApiService(db)
     patient = service.get_patient_for_user(current_user)
-    
+
     if not patient:
         # Если пациент не найден, вернём пустой список (не ошибку)
         logger.warning(f"No patient found for user {current_user.id}")
         return []
-    
+
     appointments = service.list_appointments(
         patient_id=patient.id,
         status_filter=status_filter,
         include_past=include_past,
     )
-    
+
     result = []
     for apt in appointments:
         can_mod, hours_until = can_modify_appointment(apt)
-        
+
         # Получаем имя врача
         doctor_name = service.get_doctor_name(apt.doctor_id)
         department = extract_department_value(apt)
-        
+
         result.append(PatientAppointmentResponse(
             id=apt.id,
             appointment_date=str(apt.appointment_date),
@@ -175,7 +175,7 @@ async def get_my_appointments(
             can_reschedule=can_mod,
             hours_until_appointment=round(hours_until, 1) if hours_until > 0 else None,
         ))
-    
+
     return result
 
 
@@ -190,24 +190,24 @@ async def get_my_appointment(
     """
     service = PatientAppointmentsApiService(db)
     patient = service.get_patient_for_user(current_user)
-    
+
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
-    
+
     appointment = service.get_appointment_for_patient(
         appointment_id=appointment_id,
         patient_id=patient.id,
     )
-    
+
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
-    
+
     can_mod, hours_until = can_modify_appointment(appointment)
-    
+
     # Получаем имя врача
     doctor_name = service.get_doctor_name(appointment.doctor_id)
     department = extract_department_value(appointment)
-    
+
     return PatientAppointmentResponse(
         id=appointment.id,
         appointment_date=str(appointment.appointment_date),
@@ -237,39 +237,39 @@ async def cancel_my_appointment(
     """
     service = PatientAppointmentsApiService(db)
     patient = service.get_patient_for_user(current_user)
-    
+
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
-    
+
     appointment = service.get_appointment_for_patient(
         appointment_id=appointment_id,
         patient_id=patient.id,
     )
-    
+
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
-    
+
     if appointment.status == 'cancelled':
         raise HTTPException(status_code=400, detail="Запись уже отменена")
-    
+
     if appointment.status == 'completed':
         raise HTTPException(status_code=400, detail="Нельзя отменить завершённую запись")
-    
+
     can_cancel, hours_until = can_modify_appointment(appointment)
-    
+
     if not can_cancel:
         raise HTTPException(
             status_code=400, 
             detail=f"Отмена возможна минимум за 24 часа до приёма. До записи осталось {round(hours_until, 1)} часов."
         )
-    
+
     # Отменяем запись
     service.cancel_appointment(appointment)
-    
+
     logger.info(f"Patient {patient.id} cancelled appointment {appointment_id}")
-    
+
     # TODO: Отправить уведомление клинике
-    
+
     return {
         "success": True,
         "message": "Запись успешно отменена",
@@ -290,64 +290,64 @@ async def reschedule_my_appointment(
     """
     service = PatientAppointmentsApiService(db)
     patient = service.get_patient_for_user(current_user)
-    
+
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
-    
+
     appointment = service.get_appointment_for_patient(
         appointment_id=appointment_id,
         patient_id=patient.id,
     )
-    
+
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
-    
+
     if appointment.status in ['cancelled', 'completed']:
         raise HTTPException(status_code=400, detail=f"Нельзя перенести запись со статусом '{appointment.status}'")
-    
+
     can_reschedule, hours_until = can_modify_appointment(appointment)
-    
+
     if not can_reschedule:
         raise HTTPException(
             status_code=400,
             detail=f"Перенос возможен минимум за 24 часа до приёма. До записи осталось {round(hours_until, 1)} часов."
         )
-    
+
     # Валидация новой даты
     try:
         new_date = datetime.strptime(request.new_date, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
-    
+
     # Проверяем что новая дата в будущем
     if new_date < datetime.now().date():
         raise HTTPException(status_code=400, detail="Нельзя перенести на прошедшую дату")
-    
+
     # Валидация времени
     try:
         datetime.strptime(request.new_time, "%H:%M")
     except ValueError:
         raise HTTPException(status_code=400, detail="Неверный формат времени. Используйте HH:MM")
-    
+
     # TODO: Проверить доступность слота
-    
+
     # Обновляем запись
     old_date = appointment.appointment_date
     old_time = appointment.appointment_time
-    
+
     service.reschedule_appointment(
         appointment=appointment,
         new_date=new_date,
         new_time=request.new_time,
     )
-    
+
     logger.info(
         f"Patient {patient.id} rescheduled appointment {appointment_id} "
         f"from {old_date} {old_time} to {new_date} {request.new_time}"
     )
-    
+
     # TODO: Отправить уведомление клинике
-    
+
     return {
         "success": True,
         "message": "Запись успешно перенесена",
@@ -370,24 +370,24 @@ async def get_available_slots(
     """
     service = PatientAppointmentsApiService(db)
     patient = service.get_patient_for_user(current_user)
-    
+
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
-    
+
     appointment = service.get_appointment_for_patient(
         appointment_id=appointment_id,
         patient_id=patient.id,
     )
-    
+
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
-    
+
     # Парсим даты
     try:
         start_date = datetime.strptime(date_from, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Неверный формат даты date_from")
-    
+
     end_date = service.default_end_date(start_date=start_date)
     if date_to:
         try:
@@ -414,16 +414,16 @@ async def get_my_results(
     """
     service = PatientAppointmentsApiService(db)
     patient = service.get_patient_for_user(current_user)
-    
+
     if not patient:
         return []
-    
+
     # Получаем лабораторные результаты
     lab_results = service.list_done_lab_results(
         patient_id=patient.id,
         limit=limit,
     )
-    
+
     results = []
     for lab in lab_results:
         results.append(PatientResultResponse(
@@ -433,5 +433,5 @@ async def get_my_results(
             status=lab.status,
             file_url=None
         ))
-    
+
     return results

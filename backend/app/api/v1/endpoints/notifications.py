@@ -802,7 +802,7 @@ async def get_user_notification_settings(
 ):
     """Получение настроек уведомлений пользователя"""
     _assert_notification_policy_access(current_user=current_user, user_id=user_id)
-    
+
     # Используем UserNotificationSettings
     return get_or_create_notification_settings(db, user_id)
 

@@ -149,7 +149,7 @@ async def get_current_user_preferences(
     """
     try:
         preferences = user_preferences.get_by_user_id(db, current_user.id)
-        
+
         if not preferences:
             # Возвращаем дефолтные настройки если нет записи
             return {
@@ -165,7 +165,7 @@ async def get_current_user_preferences(
                 "emr_custom_templates": [],
                 "security_settings": {},
             }
-        
+
         # Возвращаем все поля из preferences + EMR-специфичные
         result = {
             "id": preferences.id,
@@ -176,7 +176,7 @@ async def get_current_user_preferences(
             "compact_mode": preferences.compact_mode or False,
             "sidebar_collapsed": preferences.sidebar_collapsed or False,
         }
-        
+
         # Добавляем EMR-специфичные поля из JSON или дефолты
         emr_data = _coerce_json_mapping(getattr(preferences, 'emr_settings', None))
         security_settings = _coerce_json_mapping(
@@ -193,9 +193,9 @@ async def get_current_user_preferences(
             "emr_custom_templates": emr_data.get("emr_custom_templates", []),
             "security_settings": security_settings,
         })
-        
+
         return result
-        
+
     except Exception as e:
         # Логируем, но возвращаем дефолты вместо 500
         import logging
@@ -229,7 +229,7 @@ async def update_current_user_preferences(
             current_user_id=current_user.id,
             preferences_data=preferences_data,
         )
-        
+
     except Exception as e:
         import logging
         logging.error(f"Failed to update preferences for user {current_user.id}: {e}")

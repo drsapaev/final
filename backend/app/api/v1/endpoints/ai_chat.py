@@ -66,7 +66,7 @@ class ChatSessionResponse(BaseModel):
     message_count: int
     created_at: str
     updated_at: str
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -88,7 +88,7 @@ class ChatMessageResponse(BaseModel):
     is_error: bool
     was_cached: bool
     created_at: str
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -111,18 +111,18 @@ async def create_session(
 ):
     """
     Создать новую чат-сессию.
-    
+
     Requires: CHAT permission
     """
     service = get_chat_service(db)
-    
+
     session = await service.get_or_create_session(
         user_id=current_user.id,
         context_type=request.context_type,
         context_id=request.context_id,
         specialty=request.specialty
     )
-    
+
     return ChatSessionResponse(
         id=session.id,
         title=session.title,
@@ -146,13 +146,13 @@ async def list_sessions(
     Получить список чат-сессий пользователя.
     """
     service = get_chat_service(db)
-    
+
     sessions = await service.get_user_sessions(
         user_id=current_user.id,
         limit=limit,
         include_inactive=include_inactive
     )
-    
+
     return [
         ChatSessionResponse(
             id=s.id,
@@ -197,12 +197,12 @@ async def delete_session(
     Удалить сессию и все сообщения.
     """
     service = get_chat_service(db)
-    
+
     deleted = await service.delete_session(session_id, current_user.id)
-    
+
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     return {"message": "Session deleted", "session_id": session_id}
 
 
@@ -238,12 +238,12 @@ async def send_message(
 ):
     """
     Отправить сообщение и получить ответ AI.
-    
+
     Синхронный endpoint (ждет полного ответа).
     Для streaming используйте WebSocket.
     """
     service = get_chat_service(db)
-    
+
     try:
         response = await service.send_message(
             session_id=session_id,
@@ -251,7 +251,7 @@ async def send_message(
             content=request.content,
             include_history=request.include_history
         )
-        
+
         return ChatMessageResponse(
             id=response.id,
             role=response.role,
@@ -264,7 +264,7 @@ async def send_message(
             was_cached=response.was_cached,
             created_at=response.created_at.isoformat()
         )
-        
+
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -278,7 +278,7 @@ async def add_feedback(
 ):
     """
     Добавить feedback на сообщение AI.
-    
+
     Используется для улучшения качества AI.
     """
     try:
@@ -316,9 +316,9 @@ async def chat_websocket(
 ):
     """
     WebSocket для real-time AI чата с streaming.
-    
+
     Protocol:
-    
+
     Client -> Server:
     ```json
     {
@@ -329,7 +329,7 @@ async def chat_websocket(
         "specialty": "cardio"  // Optional
     }
     ```
-    
+
     Server -> Client (streaming):
     ```json
     {"type": "session", "session_id": 123}
@@ -337,51 +337,51 @@ async def chat_websocket(
     {"type": "chunk", "content": "вуйте!"}
     {"type": "done", "message_id": 456, "provider": "deepseek", "tokens": 42}
     ```
-    
+
     Server -> Client (error):
     ```json
     {"type": "error", "message": "Rate limit exceeded"}
     ```
     """
     await websocket.accept()
-    
+
     # Аутентификация
     user = await authenticate_websocket(token, db)
-    
+
     if not user:
         await websocket.close(code=4001, reason="Invalid token")
         return
-    
+
     # Проверка permission
     if not has_permission(user.role, AIPermission.CHAT):
         await websocket.close(code=4003, reason="Permission denied")
         return
-    
+
     logger.info(f"WebSocket chat connected: user={user.id}")
-    
+
     service = get_chat_service(db)
     current_session_id: Optional[int] = None
-    
+
     try:
         async for message in websocket.iter_json():
             msg_type = message.get("type", "message")
-            
+
             if msg_type == "ping":
                 await websocket.send_json(_build_ai_ws_payload("pong", current_session_id))
                 continue
-            
+
             if msg_type == "message":
                 content = message.get("content", "").strip()
-                
+
                 if not content:
                     await websocket.send_json({
                         **_build_ai_ws_payload("error", current_session_id, message="Empty message")
                     })
                     continue
-                
+
                 # Получаем или создаем сессию
                 session_id = message.get("session_id") or current_session_id
-                
+
                 if not session_id:
                     session = await service.get_or_create_session(
                         user_id=user.id,
@@ -390,11 +390,11 @@ async def chat_websocket(
                     )
                     session_id = session.id
                     current_session_id = session_id
-                    
+
                     await websocket.send_json({
                         **_build_ai_ws_payload("session", session_id)
                     })
-                
+
                 # Отправляем сообщение
                 try:
                     response = await service.send_message(
@@ -403,19 +403,19 @@ async def chat_websocket(
                         content=content,
                         include_history=True
                     )
-                    
+
                     # Симулируем streaming (отправляем по частям)
                     # TODO: Реализовать настоящий streaming когда провайдеры поддержат
                     chunk_size = 20
                     full_content = response.content
-                    
+
                     for i in range(0, len(full_content), chunk_size):
                         chunk = full_content[i:i + chunk_size]
                         await websocket.send_json({
                             **_build_ai_ws_payload("chunk", session_id, content=chunk)
                         })
                         await asyncio.sleep(0.03)  # Небольшая задержка для эффекта typing
-                    
+
                     await websocket.send_json({
                         **_build_ai_ws_payload(
                             "done",
@@ -428,7 +428,7 @@ async def chat_websocket(
                             cached=response.was_cached,
                         )
                     })
-                    
+
                 except ValueError as e:
                     await websocket.send_json({
                         **_build_ai_ws_payload("error", session_id, message=str(e))
@@ -438,7 +438,7 @@ async def chat_websocket(
                     await websocket.send_json({
                         **_build_ai_ws_payload("error", session_id, message="Internal error occurred")
                     })
-            
+
             elif msg_type == "close_session":
                 if current_session_id:
                     await service.close_session(current_session_id, user.id)
@@ -446,7 +446,7 @@ async def chat_websocket(
                         **_build_ai_ws_payload("session_closed", current_session_id)
                     })
                     current_session_id = None
-    
+
     except WebSocketDisconnect:
         logger.info(f"WebSocket chat disconnected: user={user.id}")
     except Exception as e:

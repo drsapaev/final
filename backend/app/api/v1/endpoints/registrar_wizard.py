@@ -1977,7 +1977,7 @@ def get_visits(
         # 1. ПОЛУЧАЕМ ЗАПИСИ ИЗ СТАРОЙ ТАБЛИЦЫ APPOINTMENTS
         try:
             appointments_query = db.query(Appointment)
-            
+
             # Фильтры для appointments
             if patient_id:
                 appointments_query = appointments_query.filter(Appointment.patient_id == patient_id)
@@ -1997,7 +1997,7 @@ def get_visits(
                     appointments_query = appointments_query.filter(Appointment.appointment_date <= to_date)
                 except ValueError:
                     pass
-            
+
             appointments = (
                 appointments_query
                 .order_by(Appointment.created_at.desc())
@@ -3059,7 +3059,7 @@ def mark_queue_entry_as_paid(
 ):
     """
     Отметить запись OnlineQueueEntry как оплаченную.
-    
+
     Находит связанный Visit через visit_id и оплачивает его.
     Если visit_id отсутствует, пытается найти Visit по patient_id и дате.
     """
@@ -3085,12 +3085,12 @@ def mark_queue_entry_as_paid(
 
         # Пытаемся найти связанный Visit
         visit = None
-        
+
         # 1. Через visit_id
         if entry.visit_id:
             visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
             logger.info(f"mark_queue_entry_as_paid: Найден Visit {entry.visit_id} через entry.visit_id")
-        
+
         if visit and visit.patient_id != entry.patient_id:
             logger.warning(
                 "mark_queue_entry_as_paid: entry visit owner mismatch entry_id=%d visit_id=%d",
@@ -3124,7 +3124,7 @@ def mark_queue_entry_as_paid(
             )
             db.commit()
             db.refresh(entry)
-            
+
             return {
                 "id": entry.id,
                 "status": entry.status,
@@ -3203,7 +3203,7 @@ def mark_queue_entry_as_paid(
         changed_at = datetime.now(UTC)
         visit.status = _preserve_operational_status_on_payment(visit.status)
         visit.updated_at = changed_at
-        
+
         entry.status = _preserve_operational_status_on_payment(entry.status)
         entry.updated_at = changed_at
         _sync_payment_invoices_for_paid_visit(
@@ -3222,7 +3222,7 @@ def mark_queue_entry_as_paid(
             entry.status,
             visit.status,
         )
-        
+
         db.commit()
         db.refresh(visit)
         db.refresh(entry)

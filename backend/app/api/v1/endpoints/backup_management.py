@@ -24,7 +24,7 @@ async def create_backup(
 ) -> dict:
     """
     Create a database backup
-    
+
     ✅ SECURITY: Requires Admin role
     """
     try:
@@ -46,7 +46,7 @@ async def list_backups(
 ) -> dict:
     """
     List all available backups
-    
+
     ✅ SECURITY: Requires Admin role
     """
     try:
@@ -72,9 +72,9 @@ async def restore_backup(
 ) -> dict:
     """
     Restore database from backup
-    
+
     ⚠️ WARNING: This will overwrite the current database!
-    
+
     ✅ SECURITY: Requires Admin role
     """
     try:
@@ -97,7 +97,7 @@ async def verify_backup(
 ) -> dict:
     """
     Verify backup integrity
-    
+
     ✅ SECURITY: Requires Admin role
     """
     try:

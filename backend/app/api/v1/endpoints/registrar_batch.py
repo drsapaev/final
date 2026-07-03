@@ -58,12 +58,12 @@ async def get_patient_entries(
 ):
     """
     Получить все записи пациента на указанную дату.
-    
+
     Возвращает:
     - online_queue_entries: записи OnlineQueueEntry
     - visits: записи Visit
     - aggregated: агрегированные данные (как показывается в UI)
-    
+
     Доступно: Admin, Registrar, Doctor
     """
     try:
@@ -73,10 +73,10 @@ async def get_patient_entries(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid date format. Use YYYY-MM-DD"
         )
-    
+
     service = get_batch_patient_service(db)
     result = service.get_patient_entries_for_date(patient_id, target_date)
-    
+
     # Конвертируем ORM объекты в dict
     response = {
         "patient_id": result["patient_id"],
@@ -107,7 +107,7 @@ async def get_patient_entries(
         ],
         "aggregated": result["aggregated"]
     }
-    
+
     return PatientEntriesResponse(**response)
 
 
@@ -125,22 +125,22 @@ async def batch_update_patient_entries(
 ):
     """
     ⭐ Атомарное batch-обновление всех записей пациента за день.
-    
+
     Поддерживаемые действия для каждой записи:
     - update: обновить поля записи
     - cancel: отменить запись
     - create: создать новую запись
-    
+
     Также можно применить common_updates ко всем записям:
     - payment_type
     - discount_mode
     - notes
-    
+
     Атомарность: если хотя бы одна операция не удалась,
     все изменения откатываются.
-    
+
     Доступно: Admin, Registrar
-    
+
     Example Request:
     ```json
     {
@@ -163,16 +163,16 @@ async def batch_update_patient_entries(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid date format. Use YYYY-MM-DD"
         )
-    
+
     service = get_batch_patient_service(db)
     result = service.batch_update(patient_id, target_date, request)
-    
+
     if not result.success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=result.error or "Batch update failed"
         )
-    
+
     return result
 
 
@@ -189,10 +189,10 @@ async def cancel_all_patient_entries(
 ):
     """
     Отменить ВСЕ записи пациента на указанную дату.
-    
+
     Это эквивалент вызова batch_update с action="cancel" для всех записей.
     Используется для полной отмены визита пациента.
-    
+
     Доступно: Admin, Registrar
     """
     try:
@@ -202,15 +202,15 @@ async def cancel_all_patient_entries(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid date format. Use YYYY-MM-DD"
         )
-    
+
     service = get_batch_patient_service(db)
-    
+
     # Получаем все записи
     entries_data = service.get_patient_entries_for_date(patient_id, target_date)
-    
+
     # Формируем запрос на отмену всех
     cancel_actions = []
-    
+
     for entry in entries_data["online_queue_entries"]:
         cancel_actions.append({
             "id": entry.id,
@@ -218,7 +218,7 @@ async def cancel_all_patient_entries(
             "action": "cancel",
             "reason": reason
         })
-    
+
     for visit in entries_data["visits"]:
         cancel_actions.append({
             "id": visit.id,
@@ -226,22 +226,22 @@ async def cancel_all_patient_entries(
             "action": "cancel",
             "reason": reason
         })
-    
+
     if not cancel_actions:
         return {
             "success": True,
             "message": "No entries to cancel",
             "cancelled_count": 0
         }
-    
+
     # Выполняем batch-отмену
     from app.services.batch_patient_service import EntryAction
     request = BatchUpdateRequest(
         entries=[EntryAction(**a) for a in cancel_actions]
     )
-    
+
     result = service.batch_update(patient_id, target_date, request)
-    
+
     return {
         "success": result.success,
         "message": f"Cancelled {len(cancel_actions)} entries",

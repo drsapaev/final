@@ -115,7 +115,7 @@ async def get_queue_position(
 ):
     """
     Получить информацию о позиции в очереди
-    
+
     Публичный эндпоинт для отображения позиции на дисплее
     или в мобильном приложении.
     """
@@ -126,7 +126,7 @@ async def get_queue_position(
 
     service = get_queue_position_service(db)
     position_info = service.get_queue_position_info(entry)
-    
+
     return QueuePositionResponse(**position_info)
 
 
@@ -138,7 +138,7 @@ async def get_queue_position_by_number(
 ):
     """
     Получить информацию о позиции по номеру в очереди
-    
+
     Используется для поиска позиции по талону.
     """
     try:
@@ -151,7 +151,7 @@ async def get_queue_position_by_number(
 
     service = get_queue_position_service(db)
     position_info = service.get_queue_position_info(entry)
-    
+
     return QueuePositionResponse(**position_info)
 
 
@@ -164,9 +164,9 @@ async def send_position_notification(
 ):
     """
     Отправить уведомление о позиции в очереди
-    
+
     Используется для ручной отправки уведомления пациенту.
-    
+
     Доступно: Admin, Registrar, Doctor
     """
     try:
@@ -177,12 +177,12 @@ async def send_position_notification(
 
     service = get_queue_position_service(db)
     people_ahead = service._count_people_ahead(entry)
-    
+
     result = await service.notify_position_update(
         entry=entry,
         people_ahead=people_ahead
     )
-    
+
     return NotificationResult(**result)
 
 
@@ -195,9 +195,9 @@ async def send_call_notification(
 ):
     """
     Отправить уведомление о вызове пациента
-    
+
     Отправляется когда врач вызывает пациента.
-    
+
     Доступно: Admin, Registrar, Doctor
     """
     try:
@@ -210,7 +210,7 @@ async def send_call_notification(
         entry=entry,
         cabinet_number=request.cabinet_number
     )
-    
+
     return NotificationResult(**result)
 
 
@@ -223,10 +223,10 @@ async def send_queue_update_notifications(
 ):
     """
     Массовое уведомление об изменении очереди
-    
+
     Отправляет уведомления всем пациентам после указанного номера.
     Используется после обслуживания пациента или его удаления из очереди.
-    
+
     Доступно: Admin, Registrar
     """
     try:
@@ -239,7 +239,7 @@ async def send_queue_update_notifications(
         queue_id=queue_id,
         changed_after_number=changed_after_number
     )
-    
+
     return BatchNotificationResult(**result)
 
 
@@ -251,9 +251,9 @@ async def send_diagnostics_return_notification(
 ):
     """
     Отправить уведомление о возврате после диагностики
-    
+
     Отправляется когда врач ожидает возвращения пациента с обследования.
-    
+
     Доступно: Admin, Doctor
     """
     try:
@@ -297,7 +297,7 @@ async def send_diagnostics_return_notification(
         entry=entry,
         specialist_name=specialist_name
     )
-    
+
     return NotificationResult(**result)
 
 
@@ -309,9 +309,9 @@ async def send_waiting_reminder(
 ):
     """
     Отправить напоминание о нахождении в очереди
-    
+
     Периодическое напоминание для пациентов, долго ожидающих в очереди.
-    
+
     Доступно: Admin, Registrar
     """
     try:
@@ -320,7 +320,7 @@ async def send_waiting_reminder(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     result = await get_queue_position_service(db).send_waiting_reminder(entry=entry)
-    
+
     return NotificationResult(**result)
 
 
@@ -334,7 +334,7 @@ async def get_queue_positions_stats(
 ):
     """
     Получить статистику позиций в очереди
-    
+
     Возвращает список всех записей с их позициями.
     """
     try:
@@ -343,13 +343,13 @@ async def get_queue_positions_stats(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     service = get_queue_position_service(db)
-    
+
     result = []
     for i, entry in enumerate(entries):
         position_info = service.get_queue_position_info(entry)
         position_info["position_in_list"] = i + 1
         result.append(position_info)
-    
+
     return {
         "queue_id": queue_id,
         "queue_day": str(queue.day),

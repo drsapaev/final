@@ -399,7 +399,7 @@ async def get_pending_payments(
 ):
     """
     Получить список ожидающих оплаты записей/визитов.
-    
+
     ВАЖНО: Группировка по пациенту!
     - Один пациент = одна строка (карточка) со ВСЕМИ его неоплаченными услугами
     - Полностью оплаченные пациенты НЕ показываются (они в истории платежей)
@@ -408,11 +408,11 @@ async def get_pending_payments(
     try:
         import math
         from collections import defaultdict
-        
+
         # Базовый запрос - получаем все визиты (не отменённые и не оплаченные)
         # Исключаем визиты со статусами: canceled, paid, completed, done, closed
         excluded_statuses = CASHIER_PENDING_EXCLUDED_VISIT_STATUSES
-        
+
         # ✅ ОПТИМИЗАЦИЯ: Используем joinedload для eager loading services
         # Примечание: Visit.patient relationship не существует, поэтому используем batch loading
         query = db.query(Visit).options(
@@ -420,13 +420,13 @@ async def get_pending_payments(
         ).filter(
             ~Visit.status.in_(excluded_statuses)
         )
-        
+
         # Фильтр по датам
         if date_from:
             query = query.filter(Visit.created_at >= datetime.combine(date_from, datetime.min.time()))
         if date_to:
             query = query.filter(Visit.created_at <= datetime.combine(date_to, datetime.max.time()))
-            
+
         # Поиск по пациенту (Join с Patient)
         if search:
             search_param = f"%{search}%"
@@ -437,10 +437,10 @@ async def get_pending_payments(
                     Patient.middle_name.ilike(search_param),
                 )
             )
-        
+
         # ✅ ОПТИМИЗАЦИЯ: Загружаем все визиты с eager loading для services
         all_visits = query.order_by(Visit.created_at.desc()).all()
-        
+
         if not all_visits:
             return {
                 "items": [],
@@ -449,14 +449,14 @@ async def get_pending_payments(
                 "size": size,
                 "pages": 0
             }
-        
+
         # Batch Loading: Пациенты (Visit.patient relationship не существует)
         patient_ids = list(set([v.patient_id for v in all_visits if v.patient_id]))
         patients_map = {}
         if patient_ids:
             patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
             patients_map = {p.id: p for p in patients}
-        
+
         # Batch Loading: Платежи для всех визитов (этот запрос всё ещё нужен)
         visit_ids = [v.id for v in all_visits]
         payments_map = defaultdict(list)  # visit_id -> list[Payment]
@@ -467,7 +467,7 @@ async def get_pending_payments(
             ).all()
             for p in payments_batch:
                 payments_map[p.visit_id].append(p)
-        
+
         # =====================================================
         # ГРУППИРОВКА ПО ПАЦИЕНТУ
         # =====================================================
@@ -486,14 +486,14 @@ async def get_pending_payments(
             "department": None,
             "queue_number": None,
         })
-        
+
         for visit in all_visits:
             if not visit.patient_id:
                 continue
-                
+
             patient_id = visit.patient_id
             group = patient_groups[patient_id]
-            
+
             # Устанавливаем данные пациента (один раз)
             if group["patient_id"] is None:
                 patient = patients_map.get(patient_id)
@@ -501,25 +501,25 @@ async def get_pending_payments(
                 group["patient"] = patient
                 group["patient_name"] = get_patient_name(patient, patient_id)
                 group["patient_iin"] = getattr(patient, 'doc_number', None) if patient else None
-            
+
             # Добавляем visit_id
             group["visit_ids"].append(visit.id)
-            
+
             # Самая ранняя дата создания
             if group["created_at"] is None or (visit.created_at and visit.created_at < group["created_at"]):
                 group["created_at"] = visit.created_at
-            
+
             # Департамент (берём первый непустой)
             if not group["department"] and hasattr(visit, 'department') and visit.department:
                 group["department"] = visit.department
-            
+
             # Обработка услуг визита
             if hasattr(visit, 'services') and visit.services:
                 for vs in visit.services:
                     service_name = vs.name if hasattr(vs, 'name') and vs.name else "Услуга"
                     service_price = float(vs.price) if hasattr(vs, 'price') and vs.price else 0
                     service_qty = vs.qty if hasattr(vs, 'qty') and vs.qty else 1
-                    
+
                     group["services"].append({
                         "id": vs.service_id if hasattr(vs, 'service_id') else vs.id,
                         "visit_id": visit.id,
@@ -528,55 +528,55 @@ async def get_pending_payments(
                         "quantity": service_qty,
                     })
                     group["total_amount"] += Decimal(str(service_price)) * service_qty
-            
+
             # Оплаченная сумма для этого визита
             visit_payments = payments_map.get(visit.id, [])
             for payment in visit_payments:
                 group["paid_amount"] += payment.amount
-        
+
         # Считаем remaining и фильтруем оплаченных
         pending_groups = []
         for patient_id, group in patient_groups.items():
             group["remaining_amount"] = group["total_amount"] - group["paid_amount"]
-            
+
             # =====================================================
             # ФИЛЬТРАЦИЯ: Исключаем полностью оплаченных
             # =====================================================
-            
+
             # 1. Если нет услуг - пропускаем
             if not group["services"]:
                 continue
-            
+
             # 2. Если total_amount = 0 (нет цены у услуг) - считаем бесплатным, пропускаем
             if group["total_amount"] <= 0:
                 continue
-            
+
             # 3. Если remaining_amount <= 0 - полностью оплачено, пропускаем
             if group["remaining_amount"] <= 0:
                 continue
-            
+
             # 4. Если paid >= total - полностью оплачено, пропускаем
             if group["paid_amount"] >= group["total_amount"]:
                 continue
-            
+
             # Определяем статус для неоплаченных
             if group["paid_amount"] > 0:
                 group["status"] = "partial"  # Частично оплачено
             else:
                 group["status"] = "pending"  # Ожидает оплаты
-            
+
             pending_groups.append(group)
-        
+
         # Сортируем группы по дате создания (новые сверху)
         pending_groups.sort(key=lambda x: x["created_at"] or datetime.min, reverse=True)
-        
+
         # Подсчёт общего количества (до пагинации)
         total_count = len(pending_groups)
-        
+
         # Пагинация
         offset = (page - 1) * size
         paginated_groups = pending_groups[offset:offset + size]
-        
+
         # Формируем результат
         result = []
         for group in paginated_groups:
@@ -604,7 +604,7 @@ async def get_pending_payments(
                 can_create_direct_payment=direct_payment_allowed,
                 can_create_grouped_payment=not direct_payment_allowed,
             ))
-        
+
         return {
             "items": result,
             "total": total_count,
@@ -612,7 +612,7 @@ async def get_pending_payments(
             "size": size,
             "pages": math.ceil(total_count / size) if size > 0 else 0
         }
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -646,14 +646,14 @@ async def get_cashier_stats(
     """
     try:
         query = db.query(Payment)
-        
+
         if date_from:
             query = query.filter(Payment.created_at >= datetime.combine(date_from, datetime.min.time()))
         if date_to:
             query = query.filter(Payment.created_at <= datetime.combine(date_to, datetime.max.time()))
-        
+
         payments = query.all()
-        
+
         total_amount = Decimal("0")
         cash_amount = Decimal("0")
         card_amount = Decimal("0")
@@ -661,7 +661,7 @@ async def get_cashier_stats(
         paid_count = 0
         cancelled_count = 0
 
-        
+
         for p in payments:
             if p.status in ["paid", "completed"]:
                 total_amount += p.amount
@@ -673,7 +673,7 @@ async def get_cashier_stats(
             elif p.status in ["cancelled", "refunded"]:
                 cancelled_count += 1
 
-        
+
         # Считаем pending из Visit
         pending_query = db.query(Visit).options(joinedload(Visit.services)).filter(
             ~Visit.status.in_(CASHIER_PENDING_EXCLUDED_VISIT_STATUSES)
@@ -682,12 +682,12 @@ async def get_cashier_stats(
             pending_query = pending_query.filter(Visit.created_at >= datetime.combine(date_from, datetime.min.time()))
         if date_to:
             pending_query = pending_query.filter(Visit.created_at <= datetime.combine(date_to, datetime.max.time()))
-        
+
         # Считаем только визиты без полной оплаты
         pending_count = 0
         visits = pending_query.all()
         visit_ids = [v.id for v in visits]
-        
+
         if visit_ids:
             # Получаем суммы платежей для каждого визита
             from collections import defaultdict
@@ -698,7 +698,7 @@ async def get_cashier_stats(
             ).all()
             for ep in existing:
                 paid_by_visit[ep.visit_id] += ep.amount
-            
+
             for v in visits:
                 # Считаем стоимость визита
                 visit_total = Decimal("0")
@@ -707,15 +707,15 @@ async def get_cashier_stats(
                         price = Decimal(str(vs.price)) if hasattr(vs, 'price') and vs.price else Decimal("0")
                         qty = vs.qty if hasattr(vs, 'qty') and vs.qty else 1
                         visit_total += price * qty
-                
+
                 if visit_total == Decimal("0") and hasattr(v, 'total_price') and v.total_price:
                     visit_total = Decimal(str(v.total_price))
-                
+
                 paid_for_visit = paid_by_visit.get(v.id, Decimal("0"))
                 if paid_for_visit < visit_total:
                     pending_count += 1
                     pending_amount += (visit_total - paid_for_visit)
-        
+
         return CashierStatsResponse(
             total_amount=total_amount,
             cash_amount=cash_amount,
@@ -726,7 +726,7 @@ async def get_cashier_stats(
             cancelled_count=cancelled_count,
 
         )
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -750,51 +750,51 @@ async def export_payments(
     import io
 
     from fastapi.responses import StreamingResponse
-    
+
     try:
         query = db.query(Payment)
-        
+
         if date_from:
             query = query.filter(Payment.created_at >= datetime.combine(date_from, datetime.min.time()))
         if date_to:
             query = query.filter(Payment.created_at <= datetime.combine(date_to, datetime.max.time()))
-        
+
         query = query.order_by(Payment.created_at.desc()).limit(10000)
         payments = query.all()
-        
+
         # Batch load visits and patients
         visit_ids = [p.visit_id for p in payments if p.visit_id]
         visits_map = {}
         patients_map = {}
-        
+
         if visit_ids:
             visits = db.query(Visit).filter(Visit.id.in_(visit_ids)).all()
             visits_map = {v.id: v for v in visits}
-            
+
             patient_ids = [v.patient_id for v in visits if v.patient_id]
             if patient_ids:
                 patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
                 patients_map = {p.id: p for p in patients}
-        
+
         # Create CSV
         output = io.StringIO()
         writer = csv.writer(output, delimiter=';')
-        
+
         # Header
         writer.writerow(['Дата', 'Время', 'Пациент', 'Способ оплаты', 'Сумма', 'Статус', 'Примечание'])
-        
+
         for p in payments:
             patient_name = "Неизвестно"
             if p.visit_id and p.visit_id in visits_map:
                 visit = visits_map[p.visit_id]
                 patient = patients_map.get(visit.patient_id)
                 patient_name = get_patient_name(patient, visit.patient_id)
-            
+
             date_str = p.created_at.strftime('%d.%m.%Y') if p.created_at else ''
             time_str = p.created_at.strftime('%H:%M') if p.created_at else ''
             method_str = 'Наличные' if p.method == 'cash' else 'Карта' if p.method == 'card' else p.method
             status_str = 'Оплачено' if p.status in ['paid', 'completed'] else 'Отменён' if p.status == 'cancelled' else 'Ожидает'
-            
+
             writer.writerow([
                 date_str,
                 time_str,
@@ -804,22 +804,22 @@ async def export_payments(
                 status_str,
                 p.note or ''
             ])
-        
+
         output.seek(0)
-        
+
         # Return as streaming response with proper encoding for Cyrillic
         def generate():
             yield '\ufeff'  # BOM for Excel
             yield output.getvalue()
-        
+
         filename = f"payments_{date_from or 'all'}_{date_to or 'all'}.csv"
-        
+
         return StreamingResponse(
             generate(),
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -846,21 +846,21 @@ async def get_payments(
     """
     try:
         query = db.query(Payment)
-        
+
         # Фильтр по статусу
         if status_filter:
             query = query.filter(Payment.status == status_filter)
-        
+
         # Фильтр по методу оплаты
         if method:
             query = query.filter(Payment.method == method)
-        
+
         # Join необходимы для поиска по имени пациента
         if search:
             # Payment -> Visit -> Patient
             query = query.join(Visit, Payment.visit_id == Visit.id)\
                          .join(Patient, Visit.patient_id == Patient.id)
-            
+
             search_param = f"%{search}%"
             query = query.filter(
                 or_(
@@ -876,42 +876,42 @@ async def get_payments(
             query = query.filter(Payment.created_at >= datetime.combine(date_from, datetime.min.time()))
         if date_to:
             query = query.filter(Payment.created_at <= datetime.combine(date_to, datetime.max.time()))
-        
+
         # Получаем общее количество ДО пагинации
         total_count = query.count()
-        
+
         # Пагинация и Сортировка
         offset = (page - 1) * size
         query = query.order_by(Payment.created_at.desc()).offset(offset).limit(size)
-        
+
         payments = query.all()
-        
+
         # === Batch Loading Optimization ===
         visit_ids = [p.visit_id for p in payments if p.visit_id]
         visits_map = {}
         patients_map = {}
-        
+
         if visit_ids:
             visits = db.query(Visit).filter(Visit.id.in_(visit_ids)).all()
             visits_map = {v.id: v for v in visits}
-            
+
             patient_ids = [v.patient_id for v in visits if v.patient_id]
             if patient_ids:
                 patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
                 patients_map = {p.id: p for p in patients}
-        
+
         items = []
         for payment in payments:
             patient_id = 0
             patient_name = "Неизвестно"
-            
+
             if payment.visit_id:
                 visit = visits_map.get(payment.visit_id)
                 if visit:
                     patient_id = visit.patient_id
                     patient = patients_map.get(visit.patient_id)
                     patient_name = get_patient_name(patient, visit.patient_id)
-            
+
             items.append(PaymentHistoryItem(
                 id=payment.id,
                 patient_id=patient_id,
@@ -926,7 +926,7 @@ async def get_payments(
                 cashier_name=None,
                 **_cashier_payment_action_contract(payment),
             ))
-            
+
         import math
         return PaginatedResponse(
             items=items,
@@ -935,7 +935,7 @@ async def get_payments(
             size=size,
             pages=math.ceil(total_count / size) if size > 0 else 0
         )
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -1157,7 +1157,7 @@ async def create_payment(
         # Определяем patient_id
         patient_id = payment_data.patient_id
         visit = None
-        
+
         if payment_data.visit_id:
             def _ensure_appointment_matches_visit() -> None:
                 if not payment_data.appointment_id:
@@ -1197,7 +1197,7 @@ async def create_payment(
                     detail="Cashier payment patient_id does not match visit ownership",
                 )
             patient_id = visit.patient_id
-            
+
             # === ВАЛИДАЦИЯ ПЕРЕПЛАТЫ ===
             # 1. Считаем общую стоимость услуг
             total_cost = Decimal("0")
@@ -1206,14 +1206,14 @@ async def create_payment(
                     price = Decimal(str(vs.price)) if hasattr(vs, 'price') and vs.price else Decimal("0")
                     qty = vs.qty if hasattr(vs, 'qty') and vs.qty else 1
                     total_cost += price * qty
-            
+
             # Fallback: если услуги не загружены, используем visit.total_price (если есть)
             if total_cost == Decimal("0"):
                 if hasattr(visit, 'total_price') and visit.total_price:
                     total_cost = Decimal(str(visit.total_price))
                 elif hasattr(visit, 'total_amount') and visit.total_amount:
                     total_cost = Decimal(str(visit.total_amount))
-            
+
             # 2. Считаем уже оплаченное
             paid_amount = Decimal("0")
             existing_payments = db.query(Payment).filter(
@@ -1222,21 +1222,21 @@ async def create_payment(
             ).all()
             for p in existing_payments:
                 paid_amount += p.amount
-                
+
             # 3. Проверяем остаток
             remaining_debt = total_cost - paid_amount
-            
+
             # ⚠️ RELAXED VALIDATION: Разрешаем оплату даже если долг 0 (депозит/аванс)
             # или если total_cost посчитан неверно (0), но кассир хочет принять деньги.
             # if payment_data.amount > remaining_debt:
             #    raise HTTPException(...)
-            
+
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
                 detail="Для создания платежа необходимо указать visit_id"
             )
-        
+
         # Создаем платеж
         new_payment = Payment(
             visit_id=payment_data.visit_id,
@@ -1247,7 +1247,7 @@ async def create_payment(
             created_at=datetime.utcnow(),
             paid_at=datetime.utcnow(),
         )
-        
+
         db.add(new_payment)
         db.commit()
         db.refresh(new_payment)
@@ -1260,7 +1260,7 @@ async def create_payment(
             patient_id=patient_id,
             visit=visit,
         )
-        
+
         # 🔔 WebSocket: Broadcast payment_created event
         try:
             import asyncio
@@ -1276,7 +1276,7 @@ async def create_payment(
             }))
         except Exception as ws_error:
             logger.warning(f"WebSocket broadcast failed: {ws_error}")
-        
+
         return PaymentResponse(
             id=new_payment.id,
             visit_id=new_payment.visit_id,
@@ -1288,7 +1288,7 @@ async def create_payment(
             paid_at=new_payment.paid_at,
             note=new_payment.note,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1311,20 +1311,20 @@ async def get_payment_by_id(
     Получить платеж по ID.
     """
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    
+
     if not payment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Платеж не найден"
         )
-    
+
     # Определяем patient_id через visit
     patient_id = None
     if payment.visit_id:
         visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
         if visit:
             patient_id = visit.patient_id
-    
+
     return PaymentResponse(
         id=payment.id,
         visit_id=payment.visit_id,
@@ -1349,19 +1349,19 @@ async def cancel_payment(
     Отменить платеж.
     """
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    
+
     if not payment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Платеж не найден"
         )
-    
+
     if _cashier_payment_status(payment) in {"cancelled", "refunded", "void"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Платеж уже отменен"
         )
-    
+
     try:
         # Отменяем платеж
         payment.status = "cancelled"
@@ -1375,7 +1375,7 @@ async def cancel_payment(
             if visit and visit.status == 'paid':
                 visit.status = _preserve_cashier_visit_status(visit.status)
                 db.add(visit)
-        
+
         db.commit()
 
         await _emit_payment_notification(
@@ -1387,13 +1387,13 @@ async def cancel_payment(
             visit=visit,
             reason=cancel_data.reason,
         )
-        
+
         return {
             "success": True,
             "message": "Платеж успешно отменен",
             "payment_id": payment_id
         }
-        
+
     except Exception as e:
         db.rollback()
         import traceback
@@ -1415,13 +1415,13 @@ async def mark_visit_as_paid(
     Создаёт платёж на полную сумму услуг визита.
     """
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
-    
+
     if not visit:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Визит не найден"
         )
-    
+
     try:
         # Вычисляем общую сумму услуг
         total_amount = Decimal("0")
@@ -1430,7 +1430,7 @@ async def mark_visit_as_paid(
                 price = Decimal(str(vs.price)) if hasattr(vs, 'price') and vs.price else Decimal("0")
                 qty = vs.qty if hasattr(vs, 'qty') and vs.qty else 1
                 total_amount += price * qty
-        
+
         # Создаём платёж на полную сумму
         if total_amount > 0:
             new_payment = Payment(
@@ -1443,7 +1443,7 @@ async def mark_visit_as_paid(
                 paid_at=datetime.utcnow(),
             )
             db.add(new_payment)
-        
+
         # [FIX:PAYMENT_STATUS] Оплата не должна перезаписывать operational статус визита
         # и не должна менять registration type.
         visit.status = _preserve_cashier_visit_status(visit.status)
@@ -1468,7 +1468,7 @@ async def mark_visit_as_paid(
             "payment_status": "paid",
             "amount": float(total_amount)
         }
-        
+
     except Exception as e:
         db.rollback()
         import traceback
@@ -1493,7 +1493,7 @@ async def confirm_payment(
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
          raise HTTPException(status_code=404, detail="Платеж не найден")
-    
+
     payment_status = _cashier_payment_status(payment)
 
     if payment_status in {'paid', 'completed'}:
@@ -1507,7 +1507,7 @@ async def confirm_payment(
     if not payment.provider_transaction_id:
         from datetime import datetime
         payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.utcnow().timestamp())}"
-    
+
     # Обновляем только operational статус визита; registration type не меняем.
     visit = None
     if payment.visit_id:
@@ -1515,7 +1515,7 @@ async def confirm_payment(
          if visit:
               visit.status = _preserve_cashier_visit_status(visit.status)
               db.add(visit)
-    
+
     db.commit()
     await _emit_payment_notification(
         db=db,
@@ -1541,40 +1541,40 @@ async def refund_payment(
     """
     try:
         payment = db.query(Payment).filter(Payment.id == payment_id).first()
-        
+
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Платеж не найден"
             )
-        
+
         if payment.status not in ["paid", "completed"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Невозможно выполнить возврат для платежа со статусом '{payment.status}'"
             )
-        
+
         # Проверяем, что сумма возврата не превышает доступную
         already_refunded = payment.refunded_amount or Decimal("0")
         available_for_refund = payment.amount - already_refunded
-        
+
         if refund_data.amount > available_for_refund:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Сумма возврата ({refund_data.amount}) превышает доступную ({available_for_refund})"
             )
-        
+
         # Обновляем платеж
         new_refunded_amount = already_refunded + refund_data.amount
         payment.refunded_amount = new_refunded_amount
         payment.refund_reason = refund_data.reason
         payment.refunded_at = datetime.utcnow()
         payment.refunded_by = current_user.id if hasattr(current_user, 'id') else None
-        
+
         # Если возвращена вся сумма — статус "refunded"
         if new_refunded_amount >= payment.amount:
             payment.status = "refunded"
-            
+
             # Возвращаем только operational статус при полном возврате.
             if payment.visit_id:
                 visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
@@ -1584,7 +1584,7 @@ async def refund_payment(
         else:
             # Частичный возврат — оставляем "paid" но с пометкой
             pass
-        
+
         db.commit()
         db.refresh(payment)
 
@@ -1603,7 +1603,7 @@ async def refund_payment(
                 "remaining_amount": _decimal_to_float(payment.amount - new_refunded_amount),
             },
         )
-        
+
         return RefundResponse(
             id=payment.id,
             original_amount=payment.amount,
@@ -1613,7 +1613,7 @@ async def refund_payment(
             refunded_at=payment.refunded_at,
             status=payment.status
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1676,29 +1676,29 @@ async def get_hourly_stats(
     try:
         if not target_date:
             target_date = date.today()
-        
+
         # Получаем все платежи за день
         start_of_day = datetime.combine(target_date, datetime.min.time())
         end_of_day = datetime.combine(target_date, datetime.max.time())
-        
+
         payments = db.query(Payment).filter(
             Payment.created_at >= start_of_day,
             Payment.created_at <= end_of_day,
             Payment.status.in_(["paid", "completed"])
         ).all()
-        
+
         # Группируем по часам
         hourly_data = {}
         for h in range(24):
             hourly_data[h] = {"hour": h, "count": 0, "amount": Decimal("0")}
-        
+
         for p in payments:
             hour = p.created_at.hour
             hourly_data[hour]["count"] += 1
             hourly_data[hour]["amount"] += p.amount
-        
+
         return [HourlyStatItem(**data) for data in hourly_data.values()]
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()

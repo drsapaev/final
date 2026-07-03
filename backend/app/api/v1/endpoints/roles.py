@@ -46,7 +46,7 @@ async def get_roles(
 ):
     """
     Get all roles.
-    
+
     Returns a list of all roles, optionally filtered by active/system status.
     """
     try:
@@ -54,7 +54,7 @@ async def get_roles(
             is_active=is_active,
             is_system=is_system,
         )
-        
+
         return RoleListResponse(
             roles=[RoleResponse.model_validate(role) for role in roles],
             total=len(roles)
@@ -71,26 +71,26 @@ async def get_role_options(
 ):
     """
     Get roles as options for dropdowns.
-    
+
     Returns simplified role list with value/label pairs.
     Used for role selection in forms and filters.
     """
     try:
         roles = RolesApiService(db).list_active_roles()
-        
+
         options = []
-        
+
         # Add "All roles" option for filters if requested
         if include_all:
             options.append(RoleOptionResponse(value="", label="Все роли"))
-        
+
         # Add each role
         for role in roles:
             options.append(RoleOptionResponse(
                 value=role.name,
                 label=role.display_name
             ))
-        
+
         return RoleOptionsListResponse(options=options)
     except Exception as e:
         _raise_roles_internal_error("get_role_options", e)
@@ -118,7 +118,7 @@ async def create_role(
 ):
     """
     Create a new role.
-    
+
     Only Admin users can create roles.
     """
     # Check admin permission
@@ -146,7 +146,7 @@ async def update_role(
 ):
     """
     Update a role.
-    
+
     Only Admin users can update roles.
     System roles have limited editability.
     """
@@ -177,7 +177,7 @@ async def delete_role(
 ):
     """
     Delete a role.
-    
+
     Only Admin users can delete roles.
     System roles cannot be deleted.
     """

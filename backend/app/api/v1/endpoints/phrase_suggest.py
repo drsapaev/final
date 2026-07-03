@@ -77,14 +77,14 @@ async def suggest_phrases(
 ) -> PhraseSuggestResponse:
     """
     Получить подсказки фраз из истории врача.
-    
+
     Это НЕ генерация текста, а поиск и ранжирование
     ранее введённых врачом фраз.
-    
+
     Возвращает только "хвост" (continuation), не полный текст.
     """
     service = get_doctor_phrase_service(db)
-    
+
     suggestions = service.suggest_phrases(
         doctor_id=request.doctorId,
         field=request.field,
@@ -93,7 +93,7 @@ async def suggest_phrases(
         specialty=request.specialty,
         max_suggestions=request.maxSuggestions
     )
-    
+
     return PhraseSuggestResponse(
         suggestions=[
             PhraseSuggestion(
@@ -117,19 +117,19 @@ async def index_phrases(
 ) -> IndexPhraseResponse:
     """
     Проиндексировать фразы из EMR записи.
-    
+
     Вызывается после сохранения EMR для обновления
     истории фраз врача.
     """
     service = get_doctor_phrase_service(db)
-    
+
     try:
         indexed_count = service.index_doctor_phrases(
             doctor_id=request.doctorId,
             emr_data=request.emrData,
             specialty=request.specialty
         )
-        
+
         return IndexPhraseResponse(
             success=True,
             indexedCount=indexed_count,
@@ -174,19 +174,19 @@ async def check_readiness(
 ) -> ReadinessResponse:
     """
     Проверить готовность врача к автоподсказкам.
-    
+
     Автоподсказки активируются АВТОМАТИЧЕСКИ только когда:
     - ≥10 завершённых EMR
     - ≥30 уникальных фраз
     - ≥5 повторяющихся фраз
-    
+
     До этого — полностью отключены, без UI switch.
     """
     from app.services.doctor_autocomplete_readiness import get_doctor_readiness_service
-    
+
     service = get_doctor_readiness_service(db)
     result = service.check_readiness(doctor_id)
-    
+
     return ReadinessResponse(**result.to_dict())
 
 
@@ -217,7 +217,7 @@ async def record_telemetry(
 ) -> TelemetryResponse:
     """
     Записать событие показа/принятия подсказки.
-    
+
     Используется для расчёта acceptance_rate.
     """
     try:
@@ -255,7 +255,7 @@ async def get_telemetry_stats(
 ) -> TelemetryStatsResponse:
     """
     Получить статистику telemetry врача.
-    
+
     Показывает acceptance rate и топ принятых фраз.
     """
     return TelemetryStatsResponse(
@@ -293,7 +293,7 @@ async def get_field_preferences(
 ) -> FieldPreferencesResponse:
     """
     Получить per-field preferences для врача.
-    
+
     Доступно ТОЛЬКО после readiness=true.
     """
     # TODO: Store in UserPreferences table
@@ -319,7 +319,7 @@ async def update_field_preferences(
 ) -> FieldPreferencesResponse:
     """
     Обновить per-field preferences.
-    
+
     Позволяет врачу приостановить подсказки для конкретных полей.
     Доступно ТОЛЬКО после readiness=true.
     """
@@ -363,20 +363,20 @@ async def batch_index_emrs(
 ) -> BatchIndexResponse:
     """
     Batch-индексация EMR всех врачей.
-    
+
     ⚠️ ADMIN ONLY - используется для миграции.
     Может занять много времени при большом количестве данных.
     """
     from app.services.emr_phrase_indexer import get_emr_phrase_indexer
-    
+
     indexer = get_emr_phrase_indexer(db)
-    
+
     try:
         result = indexer.index_all_doctors(
             limit=request.limit,
             offset=request.offset
         )
-        
+
         return BatchIndexResponse(
             success=True,
             totalDoctors=result.total_doctors,
@@ -418,15 +418,15 @@ async def index_doctor_emrs(
     Проиндексировать все EMR одного врача.
     """
     from app.services.emr_phrase_indexer import get_emr_phrase_indexer
-    
+
     indexer = get_emr_phrase_indexer(db)
-    
+
     try:
         result = indexer.index_doctor_emrs(
             doctor_id=request.doctorId,
             specialty=request.specialty
         )
-        
+
         return DoctorIndexResponse(
             success=True,
             doctorId=result.doctor_id,

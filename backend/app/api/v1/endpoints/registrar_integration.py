@@ -451,28 +451,28 @@ def get_queue_profiles(
 ):
     """
     Получить список профилей очередей для динамических вкладок.
-    
+
     Каждый профиль определяет:
     - key: уникальный ключ (cardiology, ecg, dermatology и т.д.)
     - title/title_ru: названия для отображения
     - queue_tags: список queue_tag значений, которые относятся к этому профилю
     - icon/color: UI конфигурация
-    
+
     Frontend использует queue_tags для фильтрации записей по вкладкам.
-    
+
     SSOT: Вкладки определяются в БД, НЕ хардкодятся в frontend.
     """
     try:
         from app.models.queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
-        
+
         # Пытаемся получить из БД
         query = db.query(QueueProfile)
-        
+
         if active_only:
             query = query.filter(QueueProfile.is_active == True)
-        
+
         profiles = query.order_by(QueueProfile.display_order).all()
-        
+
         # Если таблица не существует или пуста - возвращаем fallback
         if not profiles:
             logger.warning("Queue profiles table is empty, returning hardcoded fallback")
@@ -493,7 +493,7 @@ def get_queue_profiles(
                 ],
                 "source": "fallback",
             }
-        
+
         return {
             "success": True,
             "profiles": [
@@ -513,12 +513,12 @@ def get_queue_profiles(
             ],
             "source": "database",
         }
-        
+
     except Exception as e:
         # При любой ошибке (включая отсутствие таблицы) возвращаем fallback
         logger.error("Error fetching queue profiles", exc_info=True)
         from app.models.queue_profile import INITIAL_QUEUE_PROFILES
-        
+
         return {
             "success": True,
             "profiles": [
@@ -545,15 +545,15 @@ def get_queue_profiles_public(
 ):
     """
     ⭐ PUBLIC ENDPOINT: Получить список профилей для QR-страницы регистрации.
-    
+
     Не требует авторизации - используется пациентами при самостоятельной регистрации.
     Возвращает только профили с is_active=True И show_on_qr_page=True.
-    
+
     Используется на странице /queue/join для выбора специальности.
     """
     try:
         from app.models.queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
-        
+
         # Получаем только активные профили, которые видны на QR странице
         profiles = (
             db.query(QueueProfile)
@@ -564,7 +564,7 @@ def get_queue_profiles_public(
             .order_by(QueueProfile.display_order)
             .all()
         )
-        
+
         if not profiles:
             # Fallback: возвращаем все из INITIAL_QUEUE_PROFILES (кроме general и ecg)
             logger.warning("Queue profiles table is empty for QR page, returning fallback")
@@ -583,7 +583,7 @@ def get_queue_profiles_public(
                 ],
                 "source": "fallback",
             }
-        
+
         return {
             "success": True,
             "specialists": [
@@ -598,7 +598,7 @@ def get_queue_profiles_public(
             ],
             "source": "database",
         }
-        
+
     except Exception as e:
         logger.error("Error fetching queue profiles for QR page", exc_info=True)
         # Fallback на базовый список
@@ -674,17 +674,17 @@ def create_queue_profile(
 ):
     """
     Create a new QueueProfile (admin only).
-    
+
     SSOT: Tabs are defined in DB, not hardcoded in frontend.
     """
     try:
         from app.models.queue_profile import QueueProfile
-        
+
         # Check if key already exists
         existing = db.query(QueueProfile).filter(QueueProfile.key == profile_data.key).first()
         if existing:
             raise HTTPException(status_code=400, detail=f"Profile with key '{profile_data.key}' already exists")
-        
+
         # Create new profile
         new_profile = QueueProfile(
             key=profile_data.key,
@@ -697,13 +697,13 @@ def create_queue_profile(
             icon=profile_data.icon,
             color=profile_data.color,
         )
-        
+
         db.add(new_profile)
         db.commit()
         db.refresh(new_profile)
-        
+
         logger.info(f"Created QueueProfile: {new_profile.key}")
-        
+
         return {
             "success": True,
             "profile": {
@@ -719,7 +719,7 @@ def create_queue_profile(
                 "color": new_profile.color,
             },
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -737,28 +737,28 @@ def update_queue_profile(
 ):
     """
     Update an existing QueueProfile by key (admin only).
-    
+
     SSOT: Changes here reflect immediately in Registrar Panel tabs.
     """
     try:
         from app.models.queue_profile import QueueProfile
-        
+
         # Find profile
         profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
-        
+
         # Update fields (only those provided)
         update_data = profile_data.dict(exclude_unset=True)
         for field, value in update_data.items():
             if hasattr(profile, field):
                 setattr(profile, field, value)
-        
+
         db.commit()
         db.refresh(profile)
-        
+
         logger.info(f"Updated QueueProfile: {profile.key}")
-        
+
         return {
             "success": True,
             "profile": {
@@ -774,7 +774,7 @@ def update_queue_profile(
                 "color": profile.color,
             },
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -791,27 +791,27 @@ def delete_queue_profile(
 ):
     """
     Delete a QueueProfile by key (admin only).
-    
+
     Warning: This will remove the tab from Registrar Panel.
     """
     try:
         from app.models.queue_profile import QueueProfile
-        
+
         # Find profile
         profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
-        
+
         db.delete(profile)
         db.commit()
-        
+
         logger.info(f"Deleted QueueProfile: {profile_key}")
-        
+
         return {
             "success": True,
             "message": f"Profile '{profile_key}' deleted successfully",
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -828,28 +828,28 @@ def reorder_queue_profiles(
 ):
     """
     Batch update display_order for multiple profiles (admin only).
-    
+
     Request body: {"cardiology": 1, "ecg": 2, "dermatology": 3, ...}
     """
     try:
         from app.models.queue_profile import QueueProfile
-        
+
         updated = 0
         for key, order in orders.items():
             profile = db.query(QueueProfile).filter(QueueProfile.key == key).first()
             if profile:
                 profile.display_order = order
                 updated += 1
-        
+
         db.commit()
-        
+
         logger.info(f"Reordered {updated} QueueProfiles")
-        
+
         return {
             "success": True,
             "updated": updated,
         }
-        
+
     except Exception as e:
         logger.error(f"Error reordering queue profiles: {e}")
         db.rollback()
@@ -2591,7 +2591,7 @@ def get_today_queues(
                     visit.id,
                 )
                 continue
-            
+
             # ✅ Только Visit БЕЗ OQE добавляем в seen_visit_ids
             seen_visit_ids.add(visit.id)
 
@@ -2739,7 +2739,7 @@ def get_today_queues(
 
             # ⭐ PHASE 1.2: Visit без OQE всегда type='visit'
             # Visit с source='online' уже пропущен выше (имеет OnlineQueueEntry)
-            
+
             queues_by_specialty[specialty]["entries"].append(
                 {
                     "type": "visit",  # ✅ PHASE 1.2: Всегда 'visit' для Visit без OQE
