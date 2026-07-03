@@ -23,6 +23,7 @@ import {
   Checkbox,
 } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import './cardiology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -518,7 +519,7 @@ const MacOSCardiologistPanelUnified = () => {
         const data = await response.json();
 
         // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-        let allAppointments = [];
+        const allAppointments = [];
         const seenIds = new Set(); // Для отслеживания уже добавленных записей
 
         if (data && data.queues && Array.isArray(data.queues)) {
@@ -582,7 +583,7 @@ const MacOSCardiologistPanelUnified = () => {
         }
 
         // ✅ Фильтруем только кардиологические записи, исключая ЭКГ
-        let appointmentsData = allAppointments.filter((apt) => {
+        const appointmentsData = allAppointments.filter((apt) => {
           // Исключаем записи из очереди ЭКГ
           if (apt.specialty === 'echokg' || apt.specialty === 'ecg') {
             return false;
@@ -1537,28 +1538,13 @@ const MacOSCardiologistPanelUnified = () => {
             gap: '24px'
           }}>
               {/* Информация о пациенте */}
-              <MacOSCard style={{ padding: '24px' }}>
-                <h3 style={{
-                display: 'flex',
-                alignItems: 'center',
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                marginBottom: '20px',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-              }}>
-                  <User size={20} style={{
-                  marginRight: '8px',
-                  color: 'var(--mac-blue-500)'
-                }} />
+              <MacOSCard className="cardio-card-padded">
+                <h3 className="cardio-section-heading">
+                  <User size={20} className="cardio-icon-mr cardio-icon-blue" />
                   Пациент #{selectedPatient.number}
                 </h3>
 
-                <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '20px'
-              }}>
+                <div className="cardio-grid-auto">
                   <div>
                     <label style={{
                     display: 'block',
@@ -1612,17 +1598,9 @@ const MacOSCardiologistPanelUnified = () => {
 
 
               {/* Электронная медицинская карта */}
-              <MacOSCard style={{ padding: '24px' }}>
-                <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                marginBottom: '20px',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                  <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
+              <MacOSCard className="cardio-card-padded">
+                <h3 className="cardio-section-heading">
+                  <FileText size={20} className="cardio-icon-mr cardio-icon-blue" />
                   Электронная медицинская карта
                 </h3>
                 <EMRContainerV2
@@ -1633,7 +1611,7 @@ const MacOSCardiologistPanelUnified = () => {
               </MacOSCard>
 
               {/* Действия */}
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="cardio-card-padded">
                 <div className="flex justify-end" style={{ gap: '12px' }}>
                   <Button
                   variant="outline"
@@ -1718,7 +1696,7 @@ const MacOSCardiologistPanelUnified = () => {
             flexDirection: 'column',
             gap: getSpacing('xl')
           }}>
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard className="cardio-card-padded">
                 <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1865,7 +1843,7 @@ const MacOSCardiologistPanelUnified = () => {
 
               {/* Форма анализа крови */}
               {showForm.open && showForm.type === 'blood' &&
-            <MacOSCard style={{ padding: '24px' }}>
+            <MacOSCard className="cardio-card-padded">
                   <h3 style={{
                 fontSize: getFontSize('lg'),
                 fontWeight: '500',
@@ -1879,12 +1857,7 @@ const MacOSCardiologistPanelUnified = () => {
               }}>
                     <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: getSpacing('lg') }}>
                       <div>
-                        <label className="block" style={{
-                      fontSize: getFontSize('sm'),
-                      fontWeight: '500',
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('sm')
-                    }}>
+                        <label className="cardio-form-label">
                           Дата анализа *
                         </label>
                         <input
@@ -1905,12 +1878,7 @@ const MacOSCardiologistPanelUnified = () => {
 
                       </div>
                       <div>
-                        <label className="block" style={{
-                      fontSize: getFontSize('sm'),
-                      fontWeight: '500',
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('sm')
-                    }}>
+                        <label className="cardio-form-label">
                           Общий холестерин (мг/дл)
                         </label>
                         <input
@@ -1934,12 +1902,7 @@ const MacOSCardiologistPanelUnified = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
                       <div>
-                        <label className="block" style={{
-                      fontSize: getFontSize('sm'),
-                      fontWeight: '500',
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('sm')
-                    }}>
+                        <label className="cardio-form-label">
                           HDL холестерин (мг/дл)
                         </label>
                         <input
@@ -1960,12 +1923,7 @@ const MacOSCardiologistPanelUnified = () => {
 
                       </div>
                       <div>
-                        <label className="block" style={{
-                      fontSize: getFontSize('sm'),
-                      fontWeight: '500',
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('sm')
-                    }}>
+                        <label className="cardio-form-label">
                           LDL холестерин (мг/дл)
                         </label>
                         <input
@@ -1986,12 +1944,7 @@ const MacOSCardiologistPanelUnified = () => {
 
                       </div>
                       <div>
-                        <label className="block" style={{
-                      fontSize: getFontSize('sm'),
-                      fontWeight: '500',
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('sm')
-                    }}>
+                        <label className="cardio-form-label">
                           Триглицериды (мг/дл)
                         </label>
                         <input
@@ -2015,12 +1968,7 @@ const MacOSCardiologistPanelUnified = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
                       <div>
-                        <label className="block" style={{
-                      fontSize: getFontSize('sm'),
-                      fontWeight: '500',
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('sm')
-                    }}>
+                        <label className="cardio-form-label">
                           Глюкоза (мг/дл)
                         </label>
                         <input
@@ -2041,12 +1989,7 @@ const MacOSCardiologistPanelUnified = () => {
 
                       </div>
                       <div>
-                        <label className="block" style={{
-                      fontSize: getFontSize('sm'),
-                      fontWeight: '500',
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('sm')
-                    }}>
+                        <label className="cardio-form-label">
                           CRP (мг/л)
                         </label>
                         <input
@@ -2067,12 +2010,7 @@ const MacOSCardiologistPanelUnified = () => {
 
                       </div>
                       <div>
-                        <label className="block" style={{
-                      fontSize: getFontSize('sm'),
-                      fontWeight: '500',
-                      color: getColor('textSecondary'),
-                      marginBottom: getSpacing('sm')
-                    }}>
+                        <label className="cardio-form-label">
                           Тропонин (нг/мл)
                         </label>
                         <input
@@ -2191,7 +2129,7 @@ const MacOSCardiologistPanelUnified = () => {
                 </MacOSCard> :
 
             <>
-                  <MacOSCard style={{ padding: '24px' }}>
+                  <MacOSCard className="cardio-card-padded">
                     <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -2336,7 +2274,7 @@ const MacOSCardiologistPanelUnified = () => {
                     </div>
                   </MacOSCard>
 
-                  <MacOSCard style={{ padding: '24px' }}>
+                  <MacOSCard className="cardio-card-padded">
                     <h3 style={{
                   fontSize: getFontSize('lg'),
                   fontWeight: '500',
