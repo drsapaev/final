@@ -53,6 +53,8 @@ import {
 import './EMRContainerV2.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+// QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
+import notify from '../../services/notify';
 
 /**
  * EMRContainerV2 Component
@@ -381,7 +383,10 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
     // Toggle Ghost Mode with validation
     const toggleGhostMode = () => {
         if (isSigned || isAmended) {
-            alert('Ghost Mode недоступен в подписанной карте.');
+            // QW-03 (UX audit): replaced native alert() with notify.warning to keep
+            // the visual style consistent with the rest of the app and to avoid
+            // blocking the main thread.
+            notify.warning('Ghost Mode недоступен в подписанной карте.');
             return;
         }
         const newValue = !experimentalGhostMode;
