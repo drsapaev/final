@@ -32,8 +32,9 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
 
   const doctorId = Number(specialistId);
 
-  // ✅ ОТЛАДКА: Логируем входные данные
-  logger.log('[useQueueManager] pickQueueForDoctor:', {
+  // ✅ ОТЛАДКА: Логируем входные данные (только в dev — logger.debug
+  // is gated by isDevelopment check in utils/logger.js)
+  logger.debug('[useQueueManager] pickQueueForDoctor:', {
     specialistId,
     doctorId,
     doctorIdFromDoctor: doctor?.id,
@@ -51,7 +52,7 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
     if (queue.specialist_id !== undefined && queue.specialist_id !== null) {
       const queueSpecialistId = Number(queue.specialist_id);
       if (queueSpecialistId === doctorId || (doctor?.id && queueSpecialistId === Number(doctor.id))) {
-        logger.log('[useQueueManager] ✅ Найдена очередь по specialist_id:', {
+        logger.debug('[useQueueManager] ✅ Найдена очередь по specialist_id:', {
           queueSpecialistId,
           doctorId,
           doctorIdFromDoctor: doctor?.id,
