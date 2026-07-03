@@ -65,6 +65,12 @@ services:
       RUN_ALEMBIC_ON_START: ${RUN_ALEMBIC_ON_START:-1}
       # Redis (for WebSocket pubsub + arq task queue)
       ARQ_REDIS_URL: ${ARQ_REDIS_URL:-redis://redis:6379/0}
+      # Sentry (DSN is public send-only key — safe to commit; ENV/TRACES_RATE
+      # can be overridden in .env file)
+      SENTRY_DSN: ${SENTRY_DSN:-https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016}
+      SENTRY_ENV: ${SENTRY_ENV:-${ENV:-dev}}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.05}
+      APP_VERSION: ${APP_VERSION:-0.9.0}
       # Licensing / Activation
       REQUIRE_LICENSE: ${REQUIRE_LICENSE:-0}
       LICENSE_MODE: ${LICENSE_MODE:-activation}
@@ -144,9 +150,10 @@ services:
       ENV: ${ENV:-dev}
       SECRET_KEY: ${SECRET_KEY:-local-dev-secret-key-for-visual-testing-only-2026}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
-      # Sentry (optional — no-op if unset)
-      SENTRY_DSN: ${SENTRY_DSN:-}
+      # Sentry (DSN is public send-only key — safe to commit)
+      SENTRY_DSN: ${SENTRY_DSN:-https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016}
       SENTRY_ENV: ${SENTRY_ENV:-${ENV:-dev}}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.05}
     volumes:
       - ../backend:/app:rw
       - backend_data:/data
