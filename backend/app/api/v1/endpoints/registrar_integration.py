@@ -1732,6 +1732,139 @@ def _process_legacy_appointments(
 
 
 
+# ===================== R-22 Phase 4: Entry serialization + queue payload =====================
+
+
+def _serialize_queue_entry(
+    *,
+    entry_type: str,
+    record_id: int | None,
+    source: str,
+    appointment_id_value: int | None,
+    entry_visit_id: int | None,
+    queue_entry_number: int,
+    patient_id: int | None,
+    patient_name: str,
+    patient_birth_year: int | None,
+    phone: str,
+    address: str | None,
+    services: list,
+    service_codes: list,
+    service_details: list,
+    entry_wrapper: dict,
+    total_cost: float | int,
+    payment_status: str | None,
+    payment_type: str | None,
+    available_actions: list,
+    canonical_status: str,
+    entry_queue_time: Any,
+    entry_updated_at: Any,
+    entry_display_time_kind: str,
+    visit_time: str | None,
+    discount_mode: str,
+    entry_data: Any,
+    latest_lab_report: dict | None,
+    entry_department_key: str | None,
+    entry_department: str | None,
+) -> dict:
+    """R-22 Phase 4: Serialize a single queue entry into the API response dict."""
+    can_mark_paid = "mark_paid" in available_actions
+    can_start_visit = "start_visit" in available_actions
+    can_print_ticket = "print_ticket" in available_actions
+    can_complete = "complete" in available_actions
+    can_cancel = "cancel" in available_actions
+    can_view_emr = "view_emr" in available_actions
+    can_schedule_next = "schedule_next" in available_actions
+
+    return {
+        "id": record_id,
+        "canonical_record_id": record_id,
+        "record_kind": entry_type,
+        "source_kind": source,
+        "appointment_id": appointment_id_value,
+        "visit_id": entry_visit_id,
+        "number": queue_entry_number,
+        "patient_id": patient_id,
+        "patient_name": patient_name,
+        "patient_birth_year": patient_birth_year,
+        "phone": phone,
+        "address": address,
+        "services": services,
+        "service_codes": service_codes,
+        "service_details": service_details,
+        "service_name": entry_wrapper.get("service_name"),
+        "service_id": entry_wrapper.get("service_id"),
+        "cost": total_cost,
+        "payment_status": payment_status,
+        "payment_type": payment_type,
+        "can_mark_paid": can_mark_paid,
+        "can_start_visit": can_start_visit,
+        "can_print_ticket": can_print_ticket,
+        "can_complete": can_complete,
+        "can_cancel": can_cancel,
+        "can_view_emr": can_view_emr,
+        "can_schedule_next": can_schedule_next,
+        "available_actions": available_actions,
+        "source": source,
+        "status": canonical_status,
+        "canonical_status": canonical_status,
+        "queue_status": canonical_status,
+        "queue_position": queue_entry_number,
+        "created_at": _serialize_registrar_datetime(entry_wrapper.get("created_at")),
+        "queue_time": _serialize_registrar_datetime(entry_queue_time),
+        "updated_at": _serialize_registrar_datetime(entry_updated_at),
+        "last_changed_at": _serialize_registrar_datetime(entry_updated_at),
+        "display_time_kind": entry_display_time_kind,
+        "timezone": "Asia/Tashkent",
+        "called_at": None,
+        "visit_time": visit_time,
+        "discount_mode": discount_mode,
+        "approval_status": getattr(entry_data, "approval_status", None),
+        "latest_lab_report": latest_lab_report,
+        "type": entry_type,
+        "record_type": entry_type,
+        "queue_entry_id": entry_wrapper.get("queue_entry_id"),
+        "department_key": entry_department_key,
+        "department": entry_department,
+        "session_id": getattr(entry_data, 'session_id', None),
+    }
+
+
+def _build_queue_payload(
+    *,
+    queue_data: dict,
+    specialty: str,
+    queue_number: int,
+    entries: list,
+) -> dict:
+    """R-22 Phase 4: Build the final queue payload wrapper with stats."""
+    return {
+        "queue_id": queue_number,
+        "specialist_id": queue_data["doctor_id"],
+        "specialist_name": (
+            queue_data["doctor"].user.full_name
+            if queue_data.get("doctor") and queue_data["doctor"].user
+            else f"Специалист #{queue_data['doctor_id']}"
+        ),
+        "specialty": specialty,
+        "timezone": "Asia/Tashkent",
+        "cabinet": queue_data["doctor"].cabinet if queue_data.get("doctor") else "N/A",
+        "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
+        "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
+        "opened_at": datetime.now(timezone.utc).isoformat(),
+        "entries": entries,
+        "stats": {
+            "total": len(entries),
+            "waiting": len([e for e in entries if e.get("status") == "waiting"]),
+            "called": len([e for e in entries if e.get("status") == "called"]),
+            "served": len([e for e in entries if e.get("status") == "served"]),
+            "online_entries": len(
+                [e for e in entries if e.get("source") == "online"]
+            ),
+        },
+    }
+
+
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
 
 
@@ -2769,101 +2902,49 @@ def get_today_queues(
                     visit_id=entry_visit_id,
                     patient_id=patient_id,
                 )
-                can_mark_paid = "mark_paid" in available_actions
-                can_start_visit = "start_visit" in available_actions
-                can_print_ticket = "print_ticket" in available_actions
-                can_complete = "complete" in available_actions
-                can_cancel = "cancel" in available_actions
-                can_view_emr = "view_emr" in available_actions
-                can_schedule_next = "schedule_next" in available_actions
-
+                # R-22 Phase 4: entry serialization extracted to helper
+                # (can_* flags are computed inside _serialize_queue_entry)
                 entries.append(
-                    {
-                        "id": record_id,
-                        "canonical_record_id": record_id,
-                        "record_kind": entry_type,
-                        "source_kind": source,
-                        "appointment_id": appointment_id_value,  # Явно добавляем appointment_id
-                        "visit_id": entry_visit_id,
-                        "number": queue_entry_number,  # [OK] ИСПРАВЛЕНО: реальный номер из queue_entries
-                        "patient_id": patient_id,
-                        "patient_name": patient_name,
-                        "patient_birth_year": patient_birth_year,
-                        "phone": phone,
-                        "address": address,
-                        "services": services,
-                        "service_codes": service_codes,
-                        "service_details": service_details,  # ✅ НОВОЕ: Полные данные услуг для редактирования
-                        "service_name": entry_wrapper.get("service_name"),  # ✅ НОВОЕ: Название услуги для отображения
-                        "service_id": entry_wrapper.get("service_id"),  # ✅ SSOT: ID услуги из БД
-                        "cost": total_cost,
-                        "payment_status": payment_status,
-                        "payment_type": payment_type,
-                        "can_mark_paid": can_mark_paid,
-                        "can_start_visit": can_start_visit,
-                        "can_print_ticket": can_print_ticket,
-                        "can_complete": can_complete,
-                        "can_cancel": can_cancel,
-                        "can_view_emr": can_view_emr,
-                        "can_schedule_next": can_schedule_next,
-                        "available_actions": available_actions,
-                        "source": source,
-                        "status": canonical_status,
-                        "canonical_status": canonical_status,
-                        "queue_status": canonical_status,
-                        "queue_position": queue_entry_number,
-                        "created_at": _serialize_registrar_datetime(
-                            entry_wrapper.get("created_at")
-                        ),
-                        "queue_time": _serialize_registrar_datetime(entry_queue_time),
-                        "updated_at": _serialize_registrar_datetime(entry_updated_at),
-                        "last_changed_at": _serialize_registrar_datetime(entry_updated_at),
-                        "display_time_kind": entry_display_time_kind,
-                        "timezone": "Asia/Tashkent",
-                        "called_at": None,
-                        "visit_time": visit_time,
-                        "discount_mode": discount_mode,
-                        "approval_status": getattr(
-                            entry_data, "approval_status", None
-                        ),
-                        "latest_lab_report": latest_lab_report,
-                        "type": entry_type,  # ✅ ИСПРАВЛЕНО: Добавляем type для frontend (online_queue, visit, appointment)
-                        "record_type": entry_type,  # Добавляем тип записи: 'visit' или 'appointment' (для совместимости)
-                        "queue_entry_id": entry_wrapper.get("queue_entry_id"),  # ✅ SSOT FIX: ID OnlineQueueEntry для QR-записей
-                        "department_key": entry_department_key,  # [OK] ДОБАВЛЯЕМ department_key для динамических отделений
-                        "department": entry_department,  # ✅ ДОБАВЛЕНО: department из модели Visit (для новых записей из сценария 5)
-                        "session_id": getattr(entry_data, 'session_id', None),  # ⭐ NEW: Session grouping for frontend
-                    }
+                    _serialize_queue_entry(
+                        entry_type=entry_type,
+                        record_id=record_id,
+                        source=source,
+                        appointment_id_value=appointment_id_value,
+                        entry_visit_id=entry_visit_id,
+                        queue_entry_number=queue_entry_number,
+                        patient_id=patient_id,
+                        patient_name=patient_name,
+                        patient_birth_year=patient_birth_year,
+                        phone=phone,
+                        address=address,
+                        services=services,
+                        service_codes=service_codes,
+                        service_details=service_details,
+                        entry_wrapper=entry_wrapper,
+                        total_cost=total_cost,
+                        payment_status=payment_status,
+                        payment_type=payment_type,
+                        available_actions=available_actions,
+                        canonical_status=canonical_status,
+                        entry_queue_time=entry_queue_time,
+                        entry_updated_at=entry_updated_at,
+                        entry_display_time_kind=entry_display_time_kind,
+                        visit_time=visit_time,
+                        discount_mode=discount_mode,
+                        entry_data=entry_data,
+                        latest_lab_report=latest_lab_report,
+                        entry_department_key=entry_department_key,
+                        entry_department=entry_department,
+                    )
                 )
 
-            queue_data = {
-                "queue_id": queue_number,
-                # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
-                # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
-                # Если doctor не найден, оставляем raw specialist_id видимым для repair.
-                "specialist_id": queue_data["doctor_id"],
-                "specialist_name": (
-                    queue_data["doctor"].user.full_name
-                    if queue_data.get("doctor") and queue_data["doctor"].user
-                    else f"Специалист #{queue_data['doctor_id']}"
-                ),
-                "specialty": specialty,
-                "timezone": "Asia/Tashkent",
-                "cabinet": queue_data["doctor"].cabinet if queue_data.get("doctor") else "N/A",
-                "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
-                "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
-                        "opened_at": datetime.now(timezone.utc).isoformat(),
-                "entries": entries,
-                "stats": {
-                    "total": len(entries),
-                    "waiting": len([e for e in entries if e.get("status") == "waiting"]),
-                    "called": len([e for e in entries if e.get("status") == "called"]),
-                    "served": len([e for e in entries if e.get("status") == "served"]),
-                    "online_entries": len(
-                        [e for e in entries if e.get("source") == "online"]
-                    ),
-                },
-            }
+            # R-22 Phase 4: queue payload construction extracted to helper
+            queue_data = _build_queue_payload(
+                queue_data=queue_data,
+                specialty=specialty,
+                queue_number=queue_number,
+                entries=entries,
+            )
 
             result.append(queue_data)
             queue_number += 1
