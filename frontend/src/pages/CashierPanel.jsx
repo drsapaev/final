@@ -930,7 +930,7 @@ const CashierPanel = () => {void
               fontSize: '11px',
               fontWeight: '600',
               backgroundColor: 'rgba(0, 122, 255, 0.12)',
-              color: '#007AFF',
+              color: 'var(--mac-accent-blue)',
               border: '1px solid rgba(0, 122, 255, 0.25)',
               whiteSpace: 'nowrap',
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
@@ -1164,7 +1164,7 @@ const CashierPanel = () => {void
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#34C759' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-green)' }}>
                       {format(stats.cash_amount)}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
@@ -1172,7 +1172,7 @@ const CashierPanel = () => {void
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#007AFF' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-blue)' }}>
                       {format(stats.card_amount)}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
@@ -1180,7 +1180,7 @@ const CashierPanel = () => {void
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#5856D6' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-purple)' }}>
                       {stats.paid_count}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
@@ -1189,7 +1189,7 @@ const CashierPanel = () => {void
                   </div>
                   {stats.cancelled_count > 0 &&
                 <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '20px', fontWeight: '700', color: '#ff4d4f' }}>
+                      <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-danger)' }}>
                         {stats.cancelled_count}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
@@ -1200,7 +1200,7 @@ const CashierPanel = () => {void
                 </> :
 
               <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#FF9500' }}>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--mac-accent-orange)' }}>
                     {format(stats.pending_amount || 0)}
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
