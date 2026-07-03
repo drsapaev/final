@@ -1506,10 +1506,7 @@ const MacOSCardiologistPanelUnified = () => {
             }}>
                 <div style={cardiologyAppointmentsHeaderStyle}>
                   <h3 style={cardiologyAppointmentsTitleStyle}>
-                    <Calendar size={20} style={{
-                    marginRight: '12px',
-                    color: 'var(--mac-accent)'
-                  }} />
+                    <Calendar size={20} className="cardio-icon-mr" style={{ marginRight: '12px', color: 'var(--mac-accent)' }} />
                     Записи к кардиологу
                   </h3>
                   <AppointmentSummaryBar
@@ -1554,14 +1551,7 @@ const MacOSCardiologistPanelUnified = () => {
           }
 
           {activeTab === 'visit' && selectedPatient &&
-          <div style={{
-            width: '100%',
-            maxWidth: 'none',
-            overflow: 'visible',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px'
-          }}>
+          <div className="cardio-flex-col-visible" style={{ gap: '24px' }}>
               {/* Информация о пациенте */}
               <MacOSCard className="cardio-card-padded">
                 <h3 className="cardio-section-heading">
@@ -1571,34 +1561,15 @@ const MacOSCardiologistPanelUnified = () => {
 
                 <div className="cardio-grid-auto">
                   <div>
-                    <label style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    color: 'var(--mac-text-secondary)',
-                    marginBottom: '6px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>
+                    <label className="cardio-form-label-block">
                       ФИО пациента
                     </label>
-                    <div style={{
-                    fontSize: '16px',
-                    fontWeight: '500',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>{selectedPatient.patient_name}</div>
+                    <div className="cardio-patient-name" style={{ color: 'var(--mac-text-primary)' }}>{selectedPatient.patient_name}</div>
                   </div>
 
                   {selectedPatient.phone &&
                 <div>
-                      <label style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    color: 'var(--mac-text-secondary)',
-                    marginBottom: '6px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>
+                      <label className="cardio-form-label-block">
                         Телефон
                       </label>
                       <div style={{
@@ -1609,12 +1580,7 @@ const MacOSCardiologistPanelUnified = () => {
                       marginRight: '6px',
                       color: 'var(--mac-text-secondary)'
                     }} />
-                        <span style={{
-                      fontSize: '16px',
-                      fontWeight: '500',
-                      color: 'var(--mac-text-primary)',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>{selectedPatient.phone}</span>
+                        <span className="cardio-patient-name" style={{ color: 'var(--mac-text-primary)' }}>{selectedPatient.phone}</span>
                       </div>
                     </div>
                 }
@@ -2090,11 +2056,7 @@ const MacOSCardiologistPanelUnified = () => {
 
           {/* AI Помощник */}
           {activeTab === 'ai' &&
-          <div style={{
-            width: '100%',
-            maxWidth: 'none',
-            overflow: 'visible'
-          }}>
+          <div className="cardio-w-full-visible">
               <AIAssistant
               specialty="cardiology"
               onSuggestionSelect={handleAISuggestion} />
@@ -2104,11 +2066,7 @@ const MacOSCardiologistPanelUnified = () => {
 
           {/* Управление услугами */}
           {activeTab === 'services' &&
-          <div style={{
-            width: '100%',
-            maxWidth: 'none',
-            overflow: 'visible'
-          }}>
+          <div className="cardio-w-full-visible">
               <DoctorServiceSelector
               specialty="cardiology"
               selectedServices={[]}
