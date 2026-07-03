@@ -45,9 +45,9 @@ describe('Telegram Mini App deep-link guardrails', () => {
     expect(aliases).not.toContain('admin:');
     expect(aliases).not.toContain('record:');
     expect(aliases).not.toContain('billing:');
-    expect(selectedSectionParser).toContain('new URLSearchParams(search || \'\').get(\'section\') || \'\'');
+    expect(selectedSectionParser).toContain("new URLSearchParams(search || '').get('section') || ''");
     expect(selectedSectionParser).toContain('section.trim().toLowerCase()');
-    expect(selectedSectionParser).toContain('MINI_APP_SECTION_ALIASES[section.trim().toLowerCase()] || \'\'');
+    expect(selectedSectionParser).toContain("MINI_APP_SECTION_ALIASES[section.trim().toLowerCase()] || ''");
   });
 
   it('keeps unknown sections from opening a selected-section panel', () => {
@@ -59,7 +59,7 @@ describe('Telegram Mini App deep-link guardrails', () => {
     const selectedSectionPanel = sourceBetween(
       appSource,
       '{selectedSection && (',
-      '{selectedSection === \'cabinet\' && cabinetSummary.status === \'loading\' && ('
+      "{selectedSection === 'cabinet' && cabinetSummary.status === 'loading' && ("
     );
 
     expect(shellSetup).toContain('const selectedSection = getTelegramMiniAppSelectedSection(location.search);');
@@ -110,8 +110,8 @@ describe('Telegram Mini App deep-link guardrails', () => {
       '</section>'
     );
 
-    expect(capabilitySelectHandler).toContain('new URLSearchParams(location.search || \'\')');
-    expect(capabilitySelectHandler).toContain('params.set(\'section\', section)');
+    expect(capabilitySelectHandler).toContain("new URLSearchParams(location.search || '')");
+    expect(capabilitySelectHandler).toContain("params.set('section', section)");
     expect(capabilitySelectHandler).toContain('navigate({');
     expect(capabilitySelectHandler).toContain('pathname: location.pathname');
     expect(capabilitySelectHandler).toContain('search: `?${params.toString()}`');

@@ -60,14 +60,14 @@ describe('Telegram Mini App protected runtime guardrails', () => {
   it('keeps queue summary read-only from the patient Mini App surface', () => {
     const queuePanel = sourceBetween(
       appSource,
-      '{selectedSection === \'queue\' && cabinetSummary.status === \'loading\' && (',
-      '{selectedSection === \'visits\' && cabinetSummary.status === \'loading\' && ('
+      "{selectedSection === 'queue' && cabinetSummary.status === 'loading' && (",
+      "{selectedSection === 'visits' && cabinetSummary.status === 'loading' && ("
     );
 
     expect(queuePanel).toContain('currentQueueEntry');
-    expect(queuePanel).toContain('t(\'queueInactive\')');
-    expect(queuePanel).toContain('t(\'queueEmptyRecovery\')');
-    expect(queuePanel).toContain('t(\'queuePrivacyNote\')');
+    expect(queuePanel).toContain("t('queueInactive')");
+    expect(queuePanel).toContain("t('queueEmptyRecovery')");
+    expect(queuePanel).toContain("t('queuePrivacyNote')");
     expect(queuePanel).not.toContain('api.post(');
     expect(queuePanel).not.toMatch(/queue_time|call_next|skip|cancel|move|mutat/i);
   });
@@ -79,7 +79,7 @@ describe('Telegram Mini App protected runtime guardrails', () => {
       'const previewAppointment = appointmentPreview.payload?.appointment || null;'
     );
 
-    expect(reportDownloadHandler).toContain('getTelegramMiniAppAuthPayload(location.search, \'results\')');
+    expect(reportDownloadHandler).toContain("getTelegramMiniAppAuthPayload(location.search, 'results')");
     expect(reportDownloadHandler).toContain('/telegram/mini-app/reports/download');
     expect(reportDownloadHandler).toContain('reportId: report.id');
     expect(reportDownloadHandler).toContain('responseType: \'blob\'');

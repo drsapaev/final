@@ -22,12 +22,12 @@ describe('Telegram Mini App expired link guardrails', () => {
       'function isMiniAppCapabilityEnabled(capability)'
     );
 
-    expect(sessionMapping).toContain('\'entry_token_invalid\'');
-    expect(sessionMapping).toContain('\'entry_token_expired\'');
+    expect(sessionMapping).toContain("'entry_token_invalid'");
+    expect(sessionMapping).toContain("'entry_token_expired'");
     expect(appSource).toContain('Ссылка устарела. Откройте Mini App заново из Telegram');
     expect(sessionMapping).toContain('MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS.has(reason)');
-    expect(sessionMapping).toContain('return translateMiniAppText(languageCode, \'sessionExpired\');');
-    expect(sessionMapping).toContain('return translateMiniAppText(languageCode, \'sessionNotConfirmed\');');
+    expect(sessionMapping).toContain("return translateMiniAppText(languageCode, 'sessionExpired');");
+    expect(sessionMapping).toContain("return translateMiniAppText(languageCode, 'sessionNotConfirmed');");
     expect(sessionMapping).not.toContain('Request failed with status code');
   });
 
@@ -47,11 +47,11 @@ describe('Telegram Mini App expired link guardrails', () => {
     expect(handledConfig).toContain('expectedErrorStatuses: [400, 403, 503]');
 
     [
-      'api.post(\'/telegram/mini-app/patient/manifest\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
-      'api.post(\'/telegram/mini-app/cabinet/summary\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
-      'api.post(\'/telegram/mini-app/forms/preview\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
-      'api.post(\'/telegram/mini-app/appointments/preview\', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
-      'api.post(\'/telegram/mini-app/appointments\', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
+      "api.post('/telegram/mini-app/patient/manifest', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "api.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "api.post('/telegram/mini-app/forms/preview', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "api.post('/telegram/mini-app/appointments/preview', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "api.post('/telegram/mini-app/appointments', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
       'MINI_APP_HANDLED_ERROR_REQUEST_CONFIG',
     ].forEach((expectedSnippet) => {
       expect(miniAppShell).toContain(expectedSnippet);
@@ -70,13 +70,13 @@ describe('Telegram Mini App expired link guardrails', () => {
       '{state.status === \'ready\' && ('
     );
 
-    expect(statusBadge).toContain('case \'error\':');
-    expect(statusBadge).toContain('variant: \'danger\'');
-    expect(statusBadge).toContain('\'sessionUnavailableBadge\'');
-    expect(heroMarkup).toContain('aria-live={state.status === \'error\' ? \'assertive\' : \'polite\'}');
+    expect(statusBadge).toContain("case 'error':");
+    expect(statusBadge).toContain("variant: 'danger'");
+    expect(statusBadge).toContain("'sessionUnavailableBadge'");
+    expect(heroMarkup).toContain("aria-live={state.status === 'error' ? 'assertive' : 'polite'}");
     expect(heroMarkup).toContain('<Alert severity='error' style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>');
-    expect(appSource).toContain('role: \'alert\'');
-    expect(appSource).toContain('\'aria-live\': \'assertive\'');
+    expect(appSource).toContain("role: 'alert'");
+    expect(appSource).toContain("'aria-live': 'assertive'");
   });
 
   it('allows the status badge to wrap instead of crowding the mobile title', () => {
@@ -101,13 +101,13 @@ describe('Telegram Mini App expired link guardrails', () => {
       '</section>'
     );
 
-    expect(heroStyle).toContain('flexWrap: \'wrap\'');
-    expect(heroStyle).toContain('rowGap: \'10px\'');
-    expect(heroTitleGroupStyle).toContain('flex: \'1 1 220px\'');
+    expect(heroStyle).toContain("flexWrap: 'wrap'");
+    expect(heroStyle).toContain("rowGap: '10px'");
+    expect(heroTitleGroupStyle).toContain("flex: '1 1 220px'");
     expect(heroTitleGroupStyle).toContain('minWidth: 0');
     expect(heroMarkup).toContain('<div style={miniAppHeroTitleGroupStyle}>');
-    expect(badgeStyle).toContain('maxWidth: \'min(100%, 220px)\'');
-    expect(badgeStyle).toContain('whiteSpace: \'normal\'');
-    expect(badgeStyle).toContain('textAlign: \'center\'');
+    expect(badgeStyle).toContain("maxWidth: 'min(100%, 220px)'");
+    expect(badgeStyle).toContain("whiteSpace: 'normal'");
+    expect(badgeStyle).toContain("textAlign: 'center'");
   });
 });
