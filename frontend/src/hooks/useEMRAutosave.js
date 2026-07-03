@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
+import logger from '../utils/logger';
 
 const DEFAULT_DEBOUNCE_MS = 3000;   // 3 seconds
 const DEFAULT_MAX_WAIT_MS = 30000;  // 30 seconds
@@ -112,8 +113,7 @@ export function useEMRAutosave({
                 errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
                 pendingSaveRef.current = false;
                 clearTimers();
-                // eslint-disable-next-line no-console
-                console.warn('[Autosave] Paused because EMR access is denied.');
+                                logger.warn('[Autosave] Paused because EMR access is denied.');
                 onAutosaveError?.({
                     type: 'accessDenied',
                     error: result,
@@ -139,8 +139,7 @@ export function useEMRAutosave({
                 errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
                 pendingSaveRef.current = false;
                 clearTimers();
-                // eslint-disable-next-line no-console
-                console.warn('[Autosave] Paused because EMR access is denied.');
+                                logger.warn('[Autosave] Paused because EMR access is denied.');
                 onAutosaveError?.({
                     type: 'accessDenied',
                     error,
@@ -151,8 +150,7 @@ export function useEMRAutosave({
 
             // Only log once, not spam
             if (errorCountRef.current === 1) {
-                // eslint-disable-next-line no-console
-                console.error('[Autosave] Error:', error.message || error);
+                                logger.error('[Autosave] Error:', error.message || error);
             }
 
             // For 503 errors, apply backoff silently
@@ -160,8 +158,7 @@ export function useEMRAutosave({
             if (is503 && errorCountRef.current < MAX_CONSECUTIVE_ERRORS) {
                 // Schedule retry with backoff
                 const backoffDelay = getBackoffDelay();
-                // eslint-disable-next-line no-console
-                console.log(`[Autosave] Server unavailable. Retrying in ${backoffDelay / 1000}s...`);
+                                logger.info(`[Autosave] Server unavailable. Retrying in ${backoffDelay / 1000}s...`);
             }
 
             onAutosaveError?.({ type: 'error', error, retryCount: errorCountRef.current });
