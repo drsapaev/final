@@ -492,6 +492,8 @@ const RegistrarPanel = () => {
   // reschedule slots dialog. Replaces the previous window.prompt() call that was
   // jarring, blocking, and lacked a date picker.
   const [customRescheduleDate, setCustomRescheduleDate] = useState('');
+  // R-27 fix: optional time picker for reschedule (HH:MM)
+  const [customRescheduleTime, setCustomRescheduleTime] = useState('');
   const autoRefresh = true; // Новые состояния для интеграции с админ панелью
   // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
   const {
@@ -2758,6 +2760,8 @@ const RegistrarPanel = () => {
                 notify.success('Визит успешно перенесён на завтра');
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
+                setCustomRescheduleDate('');
+                setCustomRescheduleTime('');
                 loadAppointments({ source: 'reschedule_tomorrow' });
               } catch (e) {
                 logger.error('Ошибка переноса на завтра:', e);
@@ -2778,6 +2782,7 @@ const RegistrarPanel = () => {
               if (!rescheduleData) return;
 
               const dateStr = customRescheduleDate || '';
+              const timeStr = (customRescheduleTime || '').trim();
 
               if (!dateStr) {
                 notify.error('Выберите дату переноса');
@@ -2786,6 +2791,12 @@ const RegistrarPanel = () => {
 
               if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
                 notify.error('Неверный формат даты. Используйте YYYY-MM-DD');
+                return;
+              }
+
+              // R-27 fix: validate optional time (HH:MM)
+              if (timeStr && !/^\d{2}:\d{2}$/.test(timeStr)) {
+                notify.error('Неверный формат времени. Используйте HH:MM');
                 return;
               }
 
@@ -2799,7 +2810,9 @@ const RegistrarPanel = () => {
               // R-43 fix: confirmation dialog для destructive action.
               const ok = await confirm({
                 title: 'Перенос на другую дату',
-                message: `Перенести запись пациента на ${dateStr}?`,
+                message: timeStr
+                  ? `Перенести запись пациента на ${dateStr} в ${timeStr}?`
+                  : `Перенести запись пациента на ${dateStr}?`,
                 confirmLabel: 'Перенести',
                 cancelLabel: 'Отмена',
                 intent: 'primary',
@@ -2813,12 +2826,13 @@ const RegistrarPanel = () => {
                   notify.error('Не удалось определить визит для переноса');
                   return;
                 }
-                logger.info(`Перенос визита ${targetVisitId} на ${dateStr}`);
-                await rescheduleVisit(targetVisitId, dateStr);
-                notify.success(`Визит перенесён на ${dateStr}`);
+                logger.info(`Перенос визита ${targetVisitId} на ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
+                await rescheduleVisit(targetVisitId, dateStr, timeStr || undefined);
+                notify.success(`Визит перенесён на ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
                 setCustomRescheduleDate('');
+                setCustomRescheduleTime('');
                 loadAppointments({ source: 'reschedule_date' });
               } catch (e) {
                 logger.error('Ошибка переноса на дату:', e);
@@ -2875,8 +2889,25 @@ const RegistrarPanel = () => {
                   color: getColor('textPrimary')
                 }}
             />
+            {/* R-27 fix: optional time picker (HH:MM) */}
+            <label htmlFor="reschedule-custom-time" className="registrar-reschedule-label" style={{ color: getColor('textPrimary'), marginTop: '12px' }}>
+              Время переноса (необязательно)
+            </label>
+            <input
+              id="reschedule-custom-time"
+              type="time"
+              value={customRescheduleTime}
+              aria-label="Время переноса записи"
+              onChange={(e) => setCustomRescheduleTime(e.target.value)}
+              className="registrar-reschedule-input"
+              style={{
+                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
+                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'var(--mac-bg-primary)',
+                color: getColor('textPrimary')
+              }}
+            />
             <div className="registrar-reschedule-hint" style={{ color: getColor('textSecondary') }}>
-              Выберите дату и нажмите «{t('select_date')}».
+              Выберите дату и нажмите «{t('select_date')}». Время необязательно — если не указано, сохранится текущее.
             </div>
           </div>
         </div>
