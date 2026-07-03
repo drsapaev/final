@@ -1,0 +1,9 @@
+/**
+ * Doctor Panel — utility CSS classes.
+ * Extracted from DoctorPanel.jsx inline styles.
+ */
+
+.doctor-flex-col {
+  display: flex;
+  flex-direction: column;
+}
