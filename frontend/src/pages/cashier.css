@@ -1,0 +1,14 @@
+/**
+ * Cashier Panel — utility CSS classes.
+ */
+.cashier-stat-value { font-size: var(--mac-font-size-2xl); font-weight: 700; text-align: center; padding: var(--mac-spacing-2); }
+.cashier-stat-label { font-size: var(--mac-font-size-sm); text-align: center; padding: var(--mac-spacing-2); }
+.cashier-text-sm { font-size: var(--mac-font-size-sm); }
+.cashier-text-base { font-size: var(--mac-font-size-base); font-weight: 500; }
+.cashier-text-bold { font-size: var(--mac-font-size-sm); font-weight: 700; text-align: center; padding: var(--mac-spacing-2); }
+.cashier-text-center { text-align: center; }
+.cashier-p-4 { padding: var(--mac-spacing-4); }
+.cashier-p-2 { padding: var(--mac-spacing-2); }
+.cashier-mb-4 { margin-bottom: var(--mac-spacing-4); }
+.cashier-mt-4 { margin-top: var(--mac-spacing-4); }
+.cashier-min-w { min-width: 120px; }

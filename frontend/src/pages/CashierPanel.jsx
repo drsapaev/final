@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import './cashier.css';
 import { useLocation } from 'react-router-dom';
 import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt } from 'lucide-react';
 import {
@@ -1023,7 +1024,7 @@ const CashierPanel = () => {void
           <Card
             variant="default"
             padding="default"
-            style={{ marginBottom: '16px' }}>
+            className="cashier-mb-4">
 
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
               {/* Поиск */}
@@ -1041,20 +1042,7 @@ const CashierPanel = () => {void
                   aria-label="Search cashier payments"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    paddingLeft: '40px',
-                    paddingRight: '12px',
-                    paddingTop: '8px',
-                    paddingBottom: '8px',
-                    border: '1px solid var(--mac-border)',
-                    borderRadius: 'var(--mac-radius-sm)',
-                    backgroundColor: 'var(--mac-bg-primary)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
-                    outline: 'none',
-                    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                  }}
+                  className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}
                   placeholder="Поиск по пациенту (Server Search)" />
 
               </div>
@@ -1063,16 +1051,7 @@ const CashierPanel = () => {void
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  backgroundColor: 'var(--mac-bg-primary)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: '14px',
-                  outline: 'none',
-                  minWidth: '140px'
-                }}>
+                className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
 
                 <option value="all">Все статусы</option>
                 <option value="paid">Оплачено</option>
@@ -1155,7 +1134,7 @@ const CashierPanel = () => {void
               {/* Conditional Stats based on Active Tab */}
               {activeTab === 'history' ?
               <>
-                  <div style={{ textAlign: 'center' }}>
+                  <div className="cashier-text-center">
                     <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent)' }}>
                       {format(stats.total_amount)}
                     </div>
@@ -1163,7 +1142,7 @@ const CashierPanel = () => {void
                       Всего за период
                     </div>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
+                  <div className="cashier-text-center">
                     <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-green)' }}>
                       {format(stats.cash_amount)}
                     </div>
@@ -1171,7 +1150,7 @@ const CashierPanel = () => {void
                       Наличные
                     </div>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
+                  <div className="cashier-text-center">
                     <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-blue)' }}>
                       {format(stats.card_amount)}
                     </div>
@@ -1179,7 +1158,7 @@ const CashierPanel = () => {void
                       Карта
                     </div>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
+                  <div className="cashier-text-center">
                     <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent-purple)' }}>
                       {stats.paid_count}
                     </div>
@@ -1188,7 +1167,7 @@ const CashierPanel = () => {void
                     </div>
                   </div>
                   {stats.cancelled_count > 0 &&
-                <div style={{ textAlign: 'center' }}>
+                <div className="cashier-text-center">
                       <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-danger)' }}>
                         {stats.cancelled_count}
                       </div>
@@ -1199,7 +1178,7 @@ const CashierPanel = () => {void
                 }
                 </> :
 
-              <div style={{ textAlign: 'center' }}>
+              <div className="cashier-text-center">
                   <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--mac-accent-orange)' }}>
                     {format(stats.pending_amount || 0)}
                   </div>
@@ -1279,12 +1258,12 @@ const CashierPanel = () => {void
                       backgroundColor: 'var(--mac-bg-tertiary)',
                       borderBottom: '1px solid var(--mac-border)'
                     }}>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Дата/Время</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Пациент</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Услуги</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Сумма</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Статус</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Действия</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Дата/Время</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Пациент</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Услуги</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Сумма</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Статус</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Действия</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1300,7 +1279,7 @@ const CashierPanel = () => {void
 
                             <td
                               aria-label="Pending appointment date and time"
-                              style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <span style={{ fontWeight: '500' }}>
                                   {appointment.created_at ?
@@ -1316,16 +1295,16 @@ const CashierPanel = () => {void
                                 </span>
                               </div>
                             </td>
-                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                            <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
                               {appointment.patient_last_name && appointment.patient_first_name ?
                         `${appointment.patient_last_name} ${appointment.patient_first_name}` :
                         appointment.patient_name || `Пациент #${appointment.patient_id}`
                         }
                             </td>
-                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                            <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
                               {renderServiceBadges(appointment.services, appointment.services_names)}
                             </td>
-                            <td style={{ padding: '12px 16px', color: 'var(--mac-accent)', fontSize: '14px', fontWeight: '600' }}>
+                            <td className="cashier-text-sm" style={{ color: 'var(--mac-accent)' }}>
                               {format(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0)}
                             </td>
                             <td style={{ padding: '12px 16px' }}>
@@ -1397,12 +1376,7 @@ const CashierPanel = () => {void
                 }
                   </div> :
 
-              <div style={{
-                padding: '48px',
-                textAlign: 'center',
-                color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
-              }}>
+              <div className="cashier-text-sm" style={{ color: 'var(--mac-text-secondary)' }}>
                     Нет записей, ожидающих оплаты
                   </div>
               }
@@ -1421,13 +1395,13 @@ const CashierPanel = () => {void
                       backgroundColor: 'var(--mac-bg-tertiary)',
                       borderBottom: '1px solid var(--mac-border)'
                     }}>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Дата/Время</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Пациент</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Услуга</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Способ</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Сумма</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Статус</th>
-                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Действия</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Дата/Время</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Пациент</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Услуга</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Способ</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Сумма</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Статус</th>
+                          <th className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>Действия</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1442,23 +1416,23 @@ const CashierPanel = () => {void
 
                               <td
                                 aria-label="Payment history date and time"
-                                style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                                className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <span style={{ fontWeight: '500' }}>{row.date || '—'}</span>
                                   <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{row.time || '—'}</span>
                                 </div>
                               </td>
-                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
                                 {row.patient}
                               </td>
-                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
                                 {/* TODO: Render services info properly if available in history item */}
                                  {row.service || '—'}
                               </td>
-                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
                                 {row.method}
                               </td>
-                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px', fontWeight: '500' }}>
+                              <td className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
                                 {format(row.total_amount || row.amount || 0)}
                               </td>
                               <td style={{ padding: '12px 16px' }}>
@@ -1517,12 +1491,7 @@ const CashierPanel = () => {void
                     ) :
 
                     <tr>
-                            <td colSpan="7" style={{
-                        padding: '48px',
-                        textAlign: 'center',
-                        color: 'var(--mac-text-secondary)',
-                        fontSize: '14px'
-                      }}>
+                            <td colSpan="7" className="cashier-text-sm" style={{ color: 'var(--mac-text-secondary)' }}>
                               Нет данных для отображения
                             </td>
                           </tr>
@@ -1584,7 +1553,7 @@ const CashierPanel = () => {void
 
             <DialogTitle>Отмена платежа</DialogTitle>
             <DialogContent>
-              <Typography variant="body2" style={{ marginBottom: '16px' }}>
+              <Typography variant="body2" className="cashier-mb-4">
                 Вы уверены, что хотите отменить платёж #{confirmingPaymentId}?
               </Typography>
               <textarea
@@ -1592,18 +1561,7 @@ const CashierPanel = () => {void
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Причина отмены (необязательно)"
-                style={{
-                  width: '100%',
-                  minHeight: '80px',
-                  padding: '8px 12px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  backgroundColor: 'var(--mac-bg-primary)',
-                  color: 'var(--mac-text-primary)',
-                  resize: 'vertical',
-                  fontFamily: 'inherit',
-                  fontSize: '14px'
-                }} />
+                className="cashier-text-sm" style={{ color: 'var(--mac-text-primary)' }} />
 
             </DialogContent>
             <DialogActions>
