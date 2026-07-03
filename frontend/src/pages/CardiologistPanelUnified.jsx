@@ -185,6 +185,23 @@ const MacOSCardiologistPanelUnified = () => {
     return Number.isFinite(parsed) ? parsed : null;
   };
 
+  // R-17 / P-011 (UX audit): surface critical LDL values to the cardiologist.
+  // The `settings.ldlThreshold` (default 100 мг/дл) was previously declared
+  // in the floating settings popover but never actually used anywhere in
+  // the code. ESC guidelines flag LDL ≥ 190 мг/дл as very-high-risk, but the
+  // doctor may want a different threshold depending on patient context —
+  // that's why the threshold is configurable. We use it to paint the LDL
+  // value red wherever it appears: in the entry form, in the average-LDL
+  // stat card, and in the blood-test history list.
+  const isLdlCritical = useCallback((rawValue) => {
+    const parsed = typeof rawValue === 'number' ? rawValue : Number(rawValue);
+    if (!Number.isFinite(parsed)) {
+      return false;
+    }
+    const threshold = Number(settings?.ldlThreshold);
+    return Number.isFinite(threshold) && threshold > 0 && parsed > threshold;
+  }, [settings?.ldlThreshold]);
+
   const openBloodTestForm = () => {
     const { patientId } = getSelectedPatientContext();
     if (!patientId) {
@@ -1749,27 +1766,34 @@ const MacOSCardiologistPanelUnified = () => {
                   };
                   const items = [
                   { label: 'Средний общий холестерин', value: avg('cholesterol_total'), unit: 'мг/дл' },
-                  { label: 'Средний LDL', value: avg('cholesterol_ldl'), unit: 'мг/дл' },
+                  { label: 'Средний LDL', value: avg('cholesterol_ldl'), unit: 'мг/дл', critical: isLdlCritical(avg('cholesterol_ldl')) },
                   { label: 'Средняя глюкоза', value: avg('glucose'), unit: 'мг/дл' }];
 
                   return items.map((it, idx) =>
                   <div key={idx} style={{
                     padding: getSpacing('md'),
-                    border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface'),
+                    border: `1px solid ${it.critical ? '#dc2626' : getColor('border')}`,
+                    backgroundColor: it.critical ? '#fef2f2' : getColor('surface'),
                     color: getColor('text'),
                     borderRadius: '8px'
                   }}>
                           <div style={{
                       fontSize: getFontSize('sm'),
-                      color: getColor('textSecondary'),
+                      color: it.critical ? '#dc2626' : getColor('textSecondary'),
                       marginBottom: getSpacing('xs')
                     }}>{it.label}</div>
                           <div style={{
                       fontSize: getFontSize('xl'),
                       fontWeight: '600',
-                      color: getColor('text')
-                    }}>{it.value} {typeof it.value === 'number' ? it.unit : ''}</div>
+                      color: it.critical ? '#dc2626' : getColor('text')
+                    }}>
+                        {it.value} {typeof it.value === 'number' ? it.unit : ''}
+                        {it.critical && (
+                          <span style={{ marginLeft: '6px', fontSize: getFontSize('xs'), fontWeight: '500' }}>
+                            ⚠ {it.value} &gt; {settings?.ldlThreshold ?? 100}
+                          </span>
+                        )}
+                      </div>
                         </div>
                   );
                 })()}
@@ -1808,7 +1832,15 @@ const MacOSCardiologistPanelUnified = () => {
                   }}>
                           <div>🩸 Холестерин: {test.cholesterol_total} мг/дл</div>
                           <div>HDL: {test.cholesterol_hdl}</div>
-                          <div>LDL: {test.cholesterol_ldl}</div>
+                          <div style={isLdlCritical(test.cholesterol_ldl) ? {
+                            color: '#dc2626',
+                            fontWeight: '600'
+                          } : undefined}>
+                            LDL: {test.cholesterol_ldl}
+                            {isLdlCritical(test.cholesterol_ldl) && (
+                              <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>⚠ критический</span>
+                            )}
+                          </div>
                           <div>Триглицериды: {test.triglycerides}</div>
                         </div>
                         <div style={{
@@ -1932,11 +1964,21 @@ const MacOSCardiologistPanelUnified = () => {
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        color: getColor('text')
+                        border: `1px solid ${isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#dc2626' : getColor('border')}`,
+                        backgroundColor: isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#fef2f2' : getColor('surface'),
+                        color: isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#dc2626' : getColor('text')
                       }}
                       placeholder="<100" />
+                      {isLdlCritical(bloodTestForm.cholesterol_ldl) && (
+                        <div role="alert" style={{
+                          marginTop: '4px',
+                          fontSize: getFontSize('xs'),
+                          color: '#dc2626',
+                          fontWeight: '500'
+                        }}>
+                          LDL превышает порог {settings?.ldlThreshold ?? 100} мг/дл — рекомендуется интенсивная терапия статинами.
+                        </div>
+                      )}
 
                       </div>
                       <div>
