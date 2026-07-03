@@ -28,6 +28,7 @@ from app.core.rbac import AIPermission, has_permission, require_ai_permission
 from app.models.user import User
 from app.services.ai.chat_service import get_chat_service
 from app.services.ai_chat_api_service import AIChatApiDomainError, AIChatApiService
+from app.services.ai_feature_gating import RequireAiFeature
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,8 @@ async def get_messages(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.post("/sessions/{session_id}/messages", response_model=ChatMessageResponse)
+@router.post("/sessions/{session_id}/messages", response_model=ChatMessageResponse,
+             dependencies=[Depends(RequireAiFeature("ai_chat_assistant"))])
 async def send_message(
     session_id: int,
     request: ChatMessageCreate,

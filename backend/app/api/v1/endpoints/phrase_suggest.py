@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.services.doctor_phrase_service import get_doctor_phrase_service
 from app.services.phrase_suggest_api_service import PhraseSuggestApiService
+from app.services.ai_feature_gating import RequireAiFeature
 
 router = APIRouter()
 
@@ -69,7 +70,8 @@ class IndexPhraseResponse(BaseModel):
 # ENDPOINTS
 # ============================================
 
-@router.post("/phrase-suggest", response_model=PhraseSuggestResponse)
+@router.post("/phrase-suggest", response_model=PhraseSuggestResponse,
+             dependencies=[Depends(RequireAiFeature("ai_phrase_suggest"))])
 async def suggest_phrases(
     request: PhraseSuggestRequest,
     db: Session = Depends(deps.get_db),
