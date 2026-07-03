@@ -1937,7 +1937,7 @@ const DentistPanelUnified = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '4px'
               }}>{patient.name}</h3>
-                  <p className="dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>{patient.phone}</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>{patient.phone}</p>
                 </div>
               </div>
               <Badge variant={patient.status === 'active' ? 'success' : 'warning'}>
@@ -2438,7 +2438,7 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '4px'
           }}>Шаблоны протоколов</h3>
-            <p className="dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+            <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
               Стандартные протоколы для быстрого создания протоколов визитов
             </p>
           </div>
@@ -2658,7 +2658,7 @@ const DentistPanelUnified = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '4px'
             }}>Сохранённые протоколы визитов</h3>
-              <p className="dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+              <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
                 Последние протоколы доступны для повторного открытия без ручной пересборки
               </p>
             </div>
@@ -2727,7 +2727,7 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '4px'
           }}>Отчеты и аналитика</h3>
-            <p className="dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+            <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
               Статистика по пациентам, врачам, процедурам и клинике
             </p>
           </div>
@@ -2748,13 +2748,7 @@ const DentistPanelUnified = () => {
           <div
           role="button"
           tabIndex={0}
-          style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-lg)',
-            cursor: 'pointer',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}
+          className="dental-procedure-card"
           onClick={handleReports}
           onKeyDown={(event) => handleCardKeyDown(event, handleReports)}
           onMouseEnter={(e) => {
@@ -2804,13 +2798,7 @@ const DentistPanelUnified = () => {
           <div
           role="button"
           tabIndex={0}
-          style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-lg)',
-            cursor: 'pointer',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}
+          className="dental-procedure-card"
           onClick={handleReports}
           onKeyDown={(event) => handleCardKeyDown(event, handleReports)}
           onMouseEnter={(e) => {
@@ -2860,13 +2848,7 @@ const DentistPanelUnified = () => {
           <div
           role="button"
           tabIndex={0}
-          style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-lg)',
-            cursor: 'pointer',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}
+          className="dental-procedure-card"
           onClick={handleReports}
           onKeyDown={(event) => handleCardKeyDown(event, handleReports)}
           onMouseEnter={(e) => {
@@ -2916,13 +2898,7 @@ const DentistPanelUnified = () => {
           <div
           role="button"
           tabIndex={0}
-          style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-lg)',
-            cursor: 'pointer',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}
+          className="dental-procedure-card"
           onClick={handleReports}
           onKeyDown={(event) => handleCardKeyDown(event, handleReports)}
           onMouseEnter={(e) => {
@@ -3142,15 +3118,7 @@ const DentistPanelUnified = () => {
           }}>
 
               <div className="dental-flex" style={{ gap: '16px' }}>
-                <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--mac-warning)',
-              borderRadius: 'var(--mac-radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+                <div className="dental-icon-bg-40" style={{ background: 'var(--mac-warning)'  }}>
                   <Smile className="dental-icon-20" style={{ color: 'white'  }} />
                 </div>
                 <div>
