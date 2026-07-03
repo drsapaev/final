@@ -354,3 +354,52 @@
   display: flex;
   justify-content: flex-end;
 }
+
+/* ─── Root page container (static overrides spread on top of pageStyle) ─── */
+.cardio-root-container {
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--mac-gradient-window);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  color: var(--mac-text-primary);
+  transition: background var(--mac-duration-normal) var(--mac-ease);
+}
+
+/* ─── Full-width card (no overflow, border-box) ─── */
+.cardio-card-fullwidth {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 24px;
+}
+
+/* ─── Appointments header (flex between, wrap) ─── */
+.cardio-appointments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--mac-spacing-4);
+  margin-bottom: var(--mac-spacing-6);
+  flex-wrap: wrap;
+}
+
+/* ─── Appointments title (h3 with calendar icon) ─── */
+.cardio-appointments-title {
+  display: flex;
+  align-items: center;
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin: 0;
+  min-width: min(100%, 260px);
+}
