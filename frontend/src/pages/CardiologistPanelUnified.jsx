@@ -2151,7 +2151,7 @@ const MacOSCardiologistPanelUnified = () => {
                 marginBottom: getSpacing('sm'),
                 color: getColor('text')
               }}>История</h3>
-                  <p style={{ color: getColor('textSecondary') }}>Выберите пациента в очереди или из записей</p>
+                  <p className="cardio-text-secondary">Выберите пациента в очереди или из записей</p>
                 </MacOSCard> :
 
             <>
@@ -2171,14 +2171,14 @@ const MacOSCardiologistPanelUnified = () => {
                       marginBottom: getSpacing('xs'),
                       color: getColor('text')
                     }}>Хронология записей пациента</h3>
-                        <p style={{ color: getColor('textSecondary') }}>
+                        <p className="cardio-text-secondary">
                           {selectedPatientLabel}
                         </p>
                       </div>
                       <Button
                         variant="outline"
                         onClick={loadPatientData}
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        className="cardio-flex" style={{ gap: "8px" }}>
                         <RefreshCw size={16} />
                         Обновить
                       </Button>
@@ -2195,7 +2195,7 @@ const MacOSCardiologistPanelUnified = () => {
                           key={option.value}
                           variant={historyFilter === option.value ? 'primary' : 'outline'}
                           onClick={() => setHistoryFilter(option.value)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          className="cardio-flex" style={{ gap: "8px" }}>
                           {option.label}
                           <Badge variant="info">{option.count}</Badge>
                         </Button>
