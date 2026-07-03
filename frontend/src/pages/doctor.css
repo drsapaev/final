@@ -269,3 +269,55 @@
 .doctor-card-mb-xl { margin-bottom: var(--mac-spacing-xl, 32px); }
 .doctor-badge-ml { margin-left: 4px; font-size: 10px; }
 .doctor-ml-4 { margin-left: 4px; }
+
+/* ─── Quick actions grid (batch 5) ─── */
+.doctor-actions-grid {
+  display: grid;
+  gap: var(--mac-spacing-md, 16px);
+}
+.doctor-actions-grid-1 { grid-template-columns: 1fr; }
+.doctor-actions-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.doctor-actions-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* ─── Queue entries (batch 5) ─── */
+.doctor-queue-entry-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-xs, 4px);
+}
+.doctor-queue-entry-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-xs, 4px);
+  flex-wrap: wrap;
+}
+.doctor-queue-waiting { font-size: 10px; color: var(--mac-accent-orange); }
+.doctor-queue-text-sm { font-size: 12px; color: var(--mac-text-secondary); }
+.doctor-queue-badge-mr { margin-right: 4px; font-size: 10px; }
+.doctor-queue-timer {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--mac-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.doctor-queue-status-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ─── Search width helper (batch 5) ─── */
+.doctor-search-w-mobile { width: 200px; }
+.doctor-search-w-desktop { width: 250px; }
+
+/* ─── Reports grid (batch 6) ─── */
+.doctor-reports-grid {
+  display: grid;
+  gap: var(--mac-spacing-lg, 24px);
+}
+.doctor-reports-grid-1 { grid-template-columns: 1fr; }
+.doctor-reports-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.doctor-reports-grid-3 { grid-template-columns: repeat(3, 1fr); }

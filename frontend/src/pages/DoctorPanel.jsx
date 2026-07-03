@@ -820,23 +820,14 @@ const DoctorPanel = () => {
 
               {/* Быстрые действия */}
               <AnimatedTransition type="fade" delay={600}>
-                <Card style={{ marginBottom: getSpacing('xl') }}>
+                <Card className="doctor-card-mb-xl">
                   <CardHeader>
-                    <h2 style={{
-                    fontSize: getFontSize('xl'),
-                    fontWeight: '700',
-                    color: getColor('secondary', 800),
-                    margin: 0
-                  }}>
+                    <h2 className="doctor-section-title">
                       Быстрые действия
                     </h2>
                   </CardHeader>
                   <CardContent>
-                    <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-                    gap: getSpacing('md')
-                  }}>
+                    <div className={`doctor-actions-grid doctor-actions-grid-${isMobile ? '1' : isTablet ? '2' : '4'}`}>
                       <Button variant="primary" fullWidth>
                         <Plus size={20} />
                         Новый пациент
@@ -878,8 +869,7 @@ const DoctorPanel = () => {
                       placeholder="Поиск пациентов..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="doctor-search-input"
-                      style={{ width: isMobile ? '200px' : '250px' }} />
+                      className={`doctor-search-input ${isMobile ? 'doctor-search-w-mobile' : 'doctor-search-w-desktop'}`} />
 
                     </div>
                     <select
@@ -1024,8 +1014,7 @@ const DoctorPanel = () => {
                       placeholder="Поиск записей..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="doctor-search-input"
-                      style={{ width: isMobile ? '200px' : '250px' }} />
+                      className={`doctor-search-input ${isMobile ? 'doctor-search-w-mobile' : 'doctor-search-w-desktop'}`} />
 
                     </div>
                     <select
@@ -1223,6 +1212,7 @@ const DoctorPanel = () => {
                     return (
                   <tr
                     key={entry.id}
+                    className={`doctor-queue-row ${currentVisitMeta ? 'doctor-queue-row-current' : entry.priority > 0 ? 'doctor-queue-row-priority' : ''}`}
                     style={{
                       background: currentVisitMeta ? 'color-mix(in srgb, var(--mac-accent), transparent 92%)' : entry.priority > 0 ? `${warningColor}10` : 'transparent',
                       borderLeft: currentVisitMeta ? `3px solid ${primaryColor}` : entry.priority > 0 ? `3px solid ${warningColor}` : 'none'
@@ -1235,9 +1225,9 @@ const DoctorPanel = () => {
                             </Badge>
                           </td>
                           <td style={tdStyle} aria-label={getQueuePatientContext(entry)}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('xs') }}>
+                            <div className="doctor-queue-entry-info">
                               <strong>{entry.patient_name}</strong>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs'), flexWrap: 'wrap' }}>
+                              <div className="doctor-queue-entry-row">
                                 {currentVisitMeta &&
                                 <Badge
                                   variant={currentVisitMeta.variant}
@@ -1247,7 +1237,7 @@ const DoctorPanel = () => {
                                 </Badge>
                                 }
                                 {entry.priority > 0 &&
-                                <span style={{ fontSize: '10px', color: warningColor }}>
+                                <span className="doctor-queue-waiting">
                                   ⚡ Следующий
                                 </span>
                                 }
@@ -1258,12 +1248,12 @@ const DoctorPanel = () => {
                           <td style={tdStyle}>
                             {entry.service_details?.length > 0 ?
                       entry.service_details.slice(0, 2).map((svc, i) =>
-                      <Badge key={i} variant="default" style={{ marginRight: '4px', fontSize: '10px' }}>
+                      <Badge key={i} variant="default" className="doctor-queue-badge-mr">
                                   {svc.name || svc.code}
                                 </Badge>
                       ) :
                       entry.services?.length > 0 ?
-                      <span style={{ fontSize: '12px', color: getColor('secondary', 500) }}>
+                      <span className="doctor-queue-text-sm">
                                 {entry.services.slice(0, 2).join(', ')}
                               </span> :
                       '—'}
@@ -1274,14 +1264,7 @@ const DoctorPanel = () => {
                             </Badge>
                             {/* ✅ Таймер для активных статусов */}
                             {(entry.status === 'called' || entry.status === 'diagnostics') && entry.called_at &&
-                      <span style={{
-                        marginLeft: '8px',
-                        fontSize: '11px',
-                        color: getColor('secondary', 500),
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '2px'
-                      }}>
+                      <span className="doctor-queue-timer">
                                 <Clock size={12} />
                                 {formatElapsedTime(entry.called_at)}
                               </span>
@@ -1392,12 +1375,7 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
-                <h2 style={{
-                fontSize: getFontSize('xl'),
-                fontWeight: '700',
-                color: getColor('secondary', 800),
-                margin: 0
-              }}>
+                <h2 className="doctor-section-title">
                   AI Помощник врача
                 </h2>
               </CardHeader>
@@ -1417,21 +1395,12 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
-                <h2 style={{
-                fontSize: getFontSize('xl'),
-                fontWeight: '700',
-                color: getColor('secondary', 800),
-                margin: 0
-              }}>
+                <h2 className="doctor-section-title">
                   Отчеты и аналитика
                 </h2>
               </CardHeader>
               <CardContent>
-                <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-                gap: getSpacing('lg')
-              }}>
+                <div className={`doctor-reports-grid doctor-reports-grid-${isMobile ? '1' : isTablet ? '2' : '3'}`}>
                   <Button variant="primary" fullWidth>
                     <FileText size={20} />
                     Отчет по пациентам
