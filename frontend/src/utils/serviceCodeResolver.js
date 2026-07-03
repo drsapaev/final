@@ -23,6 +23,8 @@
  * Маппинг: specialty/alias → default service code
  * Включает русские и английские варианты
  */
+import logger from './logger';
+
 export const SPECIALTY_TO_CODE = {
     // Cardiology
     cardiology: 'K01',
@@ -629,8 +631,7 @@ export async function loadMappingsFromBackend() {
             return response;
         }
     } catch (error) {
-        // eslint-disable-next-line no-console
-        console.warn('[serviceCodeResolver] Failed to load mappings from backend:', error.message);
+                logger.warn('[serviceCodeResolver] Failed to load mappings from backend:', error.message);
     }
 
     // Fallback на статические маппинги
