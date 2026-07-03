@@ -54,7 +54,7 @@ async def export_kpi_report(
     format: str,
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ANALYTICS_EXPORT_ROLES)),
 ):
@@ -101,7 +101,7 @@ async def export_comprehensive_report(
     format: str,
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     include_predictive: bool = Query(
         True, description="Включить предиктивную аналитику"
     ),
@@ -175,7 +175,7 @@ async def export_doctor_performance_report(
     format: str,
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(CLINICAL_ANALYTICS_EXPORT_ROLES)),
 ):
@@ -223,7 +223,7 @@ async def export_revenue_report(
     format: str,
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ANALYTICS_EXPORT_ROLES)),
 ):

@@ -52,8 +52,8 @@ def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
 
 
 async def authenticate_websocket_token(
-    token: Optional[str], db: Session
-) -> Optional[User]:
+    token: str | None, db: Session
+) -> User | None:
     """
     Аутентификация WebSocket соединения по JWT токену
     """
@@ -216,7 +216,7 @@ async def ws_queue_authenticated(
 
 @router.websocket("/ws/queue/optional-auth")
 async def ws_queue_optional_auth(
-    websocket: WebSocket, department: str, date: str, token: Optional[str] = None
+    websocket: WebSocket, department: str, date: str, token: str | None = None
 ):
     """
     ⚠️ DEPRECATED: WebSocket соединение с опциональной аутентификацией
@@ -371,7 +371,7 @@ async def _handle_authenticated_message(
 async def _handle_message_with_auth_level(
     websocket: WebSocket,
     message: dict,
-    user: Optional[User],
+    user: User | None,
     department: str,
     date: str,
     db: Session,

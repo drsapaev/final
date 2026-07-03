@@ -482,8 +482,8 @@ def get_analytics_overview(
     period: str = Query(
         "week", description="Период: today, week, month, quarter, year"
     ),
-    department: Optional[str] = Query(None, description="Отделение (опционально)"),
-    doctor_id: Optional[int] = Query(None, description="ID врача (опционально)"),
+    department: str | None = Query(None, description="Отделение (опционально)"),
+    doctor_id: int | None = Query(None, description="ID врача (опционально)"),
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:
@@ -647,7 +647,7 @@ def get_analytics_charts(
     chart_type: str = Query(
         "appointments", description="Тип графика: appointments, revenue"
     ),
-    department: Optional[str] = Query(None, description="Отделение (опционально)"),
+    department: str | None = Query(None, description="Отделение (опционально)"),
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:

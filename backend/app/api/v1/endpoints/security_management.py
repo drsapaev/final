@@ -200,7 +200,7 @@ def reset_rate_limits(
     target_type: str = Query(
         ..., pattern="^(ip|patient|all)$", description="Тип цели для сброса"
     ),
-    target_id: Optional[str] = Query(None, description="ID цели (IP или patient_id)"),
+    target_id: str | None = Query(None, description="ID цели (IP или patient_id)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

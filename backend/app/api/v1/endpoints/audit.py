@@ -15,10 +15,10 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 class AuditOut(BaseModel):
     id: int
     action: str
-    entity_type: Optional[str] = None
-    entity_id: Optional[int] = None
-    actor_user_id: Optional[int] = None
-    payload: Optional[dict[str, Any]] = None
+    entity_type: str | None = None
+    entity_id: int | None = None
+    actor_user_id: int | None = None
+    payload: dict[str, Any] | None = None
     created_at: str
 
 
@@ -42,10 +42,10 @@ def _row_to_out(r) -> AuditOut:
 async def list_audit(
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
-    action: Optional[str] = Query(default=None, max_length=64),
-    entity_type: Optional[str] = Query(default=None, max_length=64),
-    entity_id: Optional[int] = Query(default=None, ge=1),
-    actor_user_id: Optional[int] = Query(default=None, ge=1),
+    action: str | None = Query(default=None, max_length=64),
+    entity_type: str | None = Query(default=None, max_length=64),
+    entity_id: int | None = Query(default=None, ge=1),
+    actor_user_id: int | None = Query(default=None, ge=1),
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ):

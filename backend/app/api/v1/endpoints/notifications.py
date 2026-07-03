@@ -65,8 +65,8 @@ def _validate_recipient_scope(
     *,
     platform_service,
     current_user: User,
-    recipient_id: Optional[int],
-    recipient_type: Optional[str],
+    recipient_id: int | None,
+    recipient_type: str | None,
 ) -> None:
     expected_recipient_id = current_user.id
 
@@ -301,7 +301,7 @@ async def send_appointment_reminder(
 async def send_visit_confirmation(
     background_tasks: BackgroundTasks,
     visit_id: int,
-    queue_number: Optional[int] = None,
+    queue_number: int | None = None,
     current_user: User = Depends(require_roles(["admin", "doctor", "nurse"])),
     db: Session = Depends(get_db),
 ):
@@ -409,7 +409,7 @@ async def send_system_alert(
     background_tasks: BackgroundTasks,
     alert_type: str,
     message: str,
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
     current_user: User = Depends(require_roles(["admin"])),
     db: Session = Depends(get_db),
 ):
@@ -574,16 +574,16 @@ async def delete_notification_template(
 @router.get("/inbox", response_model=NotificationInboxResponse)
 @router.get("/history", response_model=NotificationInboxResponse)
 async def get_notification_history(
-    role: Optional[str] = Query(None),
+    role: str | None = Query(None),
     status: str = Query("all"),
-    event_type: Optional[str] = Query(None),
-    severity: Optional[str] = Query(None),
-    department_key: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
-    cursor: Optional[int] = Query(None),
+    event_type: str | None = Query(None),
+    severity: str | None = Query(None),
+    department_key: str | None = Query(None),
+    search: str | None = Query(None),
+    cursor: int | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
-    recipient_id: Optional[int] = Query(None),
-    recipient_type: Optional[str] = Query(None),
+    recipient_id: int | None = Query(None),
+    recipient_type: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -611,16 +611,16 @@ async def get_notification_history(
 
 @router.get("/sync", response_model=NotificationInboxResponse)
 async def sync_notifications(
-    role: Optional[str] = Query(None),
+    role: str | None = Query(None),
     status: str = Query("all"),
-    event_type: Optional[str] = Query(None),
-    severity: Optional[str] = Query(None),
-    department_key: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
-    cursor: Optional[int] = Query(None),
+    event_type: str | None = Query(None),
+    severity: str | None = Query(None),
+    department_key: str | None = Query(None),
+    search: str | None = Query(None),
+    cursor: int | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
-    recipient_id: Optional[int] = Query(None),
-    recipient_type: Optional[str] = Query(None),
+    recipient_id: int | None = Query(None),
+    recipient_type: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -647,10 +647,10 @@ async def sync_notifications(
 
 @router.get("/unread-count", response_model=NotificationUnreadCountResponse)
 async def get_unread_notification_count(
-    role: Optional[str] = Query(None),
-    department_key: Optional[str] = Query(None),
-    recipient_id: Optional[int] = Query(None),
-    recipient_type: Optional[str] = Query(None),
+    role: str | None = Query(None),
+    department_key: str | None = Query(None),
+    recipient_id: int | None = Query(None),
+    recipient_type: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -743,10 +743,10 @@ async def archive_notification(
 
 @router.post("/mark-all-read", response_model=NotificationMutationResponse)
 async def mark_all_notifications_read(
-    role: Optional[str] = Query(None),
-    department_key: Optional[str] = Query(None),
-    recipient_id: Optional[int] = Query(None),
-    recipient_type: Optional[str] = Query(None),
+    role: str | None = Query(None),
+    department_key: str | None = Query(None),
+    recipient_id: int | None = Query(None),
+    recipient_type: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

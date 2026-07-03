@@ -39,8 +39,8 @@ def _raise_roles_internal_error(operation: str, exc: Exception) -> NoReturn:
 
 @router.get("/", response_model=RoleListResponse)
 async def get_roles(
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
-    is_system: Optional[bool] = Query(None, description="Filter by system roles"),
+    is_active: bool | None = Query(None, description="Filter by active status"),
+    is_system: bool | None = Query(None, description="Filter by system roles"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

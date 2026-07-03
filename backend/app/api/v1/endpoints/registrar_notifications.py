@@ -34,7 +34,7 @@ class NotificationRequest(BaseModel):
     priority: str = Field(
         default="normal", description="Приоритет: normal, high, urgent, critical"
     )
-    department: Optional[str] = Field(None, description="Отделение (опционально)")
+    department: str | None = Field(None, description="Отделение (опционально)")
 
 
 class AppointmentNotificationRequest(BaseModel):
@@ -56,7 +56,7 @@ class QueueStatusNotificationRequest(BaseModel):
 
     queue_entry_id: int = Field(..., description="ID записи в очереди")
     status_change: str = Field(..., description="Изменение статуса")
-    additional_info: Optional[str] = Field(
+    additional_info: str | None = Field(
         None, description="Дополнительная информация"
     )
 
@@ -67,7 +67,7 @@ class SystemAlertRequest(BaseModel):
     alert_type: str = Field(..., description="Тип уведомления")
     message: str = Field(..., description="Текст уведомления")
     priority: str = Field(default="normal", description="Приоритет")
-    department: Optional[str] = Field(None, description="Отделение")
+    department: str | None = Field(None, description="Отделение")
 
 
 class NotificationResponse(BaseModel):
@@ -75,8 +75,8 @@ class NotificationResponse(BaseModel):
 
     success: bool
     message: str
-    sent_count: Optional[int] = None
-    results: Optional[list[dict[str, Any]]] = None
+    sent_count: int | None = None
+    results: list[dict[str, Any]] | None = None
 
 
 class RegistrarListResponse(BaseModel):
@@ -101,7 +101,7 @@ class NotificationStatsResponse(BaseModel):
 
 @router.get("/registrars", response_model=RegistrarListResponse)
 async def get_active_registrars(
-    department: Optional[str] = None,
+    department: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar"])),
 ):
@@ -311,7 +311,7 @@ async def send_system_alert(
 
 @router.post("/daily-summary", response_model=NotificationResponse)
 async def send_daily_summary(
-    target_date: Optional[str] = None,
+    target_date: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar"])),
 ):

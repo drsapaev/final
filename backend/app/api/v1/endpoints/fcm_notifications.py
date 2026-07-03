@@ -23,7 +23,7 @@ class FCMTokenRequest(BaseModel):
 
     device_token: str
     device_type: str = "web"  # web, android, ios
-    device_info: Optional[dict[str, str]] = None
+    device_info: dict[str, str] | None = None
 
 
 class FCMNotificationRequest(BaseModel):
@@ -31,13 +31,13 @@ class FCMNotificationRequest(BaseModel):
 
     title: str
     body: str
-    user_ids: Optional[list[int]] = None
-    device_tokens: Optional[list[str]] = None
-    data: Optional[dict[str, Any]] = None
-    image: Optional[str] = None
-    click_action: Optional[str] = None
+    user_ids: list[int] | None = None
+    device_tokens: list[str] | None = None
+    data: dict[str, Any] | None = None
+    image: str | None = None
+    click_action: str | None = None
     sound: str = "default"
-    badge: Optional[int] = None
+    badge: int | None = None
 
 
 class FCMTopicRequest(BaseModel):
@@ -53,9 +53,9 @@ class FCMTopicNotificationRequest(BaseModel):
     topic: str
     title: str
     body: str
-    data: Optional[dict[str, Any]] = None
-    image: Optional[str] = None
-    condition: Optional[str] = None
+    data: dict[str, Any] | None = None
+    image: str | None = None
+    condition: str | None = None
 
 
 @router.post("/register-token")

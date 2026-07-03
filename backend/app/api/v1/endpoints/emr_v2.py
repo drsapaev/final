@@ -155,7 +155,7 @@ def filter_patient_emrs_for_access(
 class DoctorHistoryEntry(BaseModel):
     """Single history entry"""
     content: str
-    diagnosis: Optional[str] = None
+    diagnosis: str | None = None
     created_at: str
 
 
@@ -171,7 +171,7 @@ async def get_doctor_history(
     doctor_id: int = Query(..., description="Doctor ID"),
     field_name: str = Query(..., description="Field name (complaints, diagnosis, etc.)"),
     specialty: str = Query("general", description="Doctor specialty"),
-    search_text: Optional[str] = Query(None, description="Search text for similarity"),
+    search_text: str | None = Query(None, description="Search text for similarity"),
     limit: int = Query(10, ge=1, le=50, description="Max entries"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),

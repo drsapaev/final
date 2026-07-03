@@ -43,9 +43,9 @@ def raise_two_factor_sms_internal_error(
 @router.post("/send-code")
 async def send_verification_code(
     method: str = Query(..., description="Метод отправки: sms или email"),
-    phone_number: Optional[str] = Query(None, description="Номер телефона для SMS"),
-    email_address: Optional[str] = Query(None, description="Email адрес"),
-    provider: Optional[str] = Query(
+    phone_number: str | None = Query(None, description="Номер телефона для SMS"),
+    email_address: str | None = Query(None, description="Email адрес"),
+    provider: str | None = Query(
         None, description="SMS провайдер: eskiz, playmobile, mock"
     ),
     db: Session = Depends(get_db),
@@ -110,8 +110,8 @@ async def send_verification_code(
 async def verify_verification_code(
     method: str = Query(..., description="Метод верификации: sms или email"),
     code: str = Query(..., description="Код подтверждения"),
-    phone_number: Optional[str] = Query(None, description="Номер телефона для SMS"),
-    email_address: Optional[str] = Query(None, description="Email адрес"),
+    phone_number: str | None = Query(None, description="Номер телефона для SMS"),
+    email_address: str | None = Query(None, description="Email адрес"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -173,8 +173,8 @@ async def get_verification_status(
 @router.post("/resend-code")
 async def resend_verification_code(
     method: str = Query(..., description="Метод отправки: sms или email"),
-    phone_number: Optional[str] = Query(None, description="Номер телефона для SMS"),
-    email_address: Optional[str] = Query(None, description="Email адрес"),
+    phone_number: str | None = Query(None, description="Номер телефона для SMS"),
+    email_address: str | None = Query(None, description="Email адрес"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

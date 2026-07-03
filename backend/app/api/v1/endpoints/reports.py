@@ -43,41 +43,41 @@ def log_report_service_error(report_type: str) -> None:
 class ReportRequest(BaseModel):
     """Базовая модель запроса отчета"""
 
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    start_date: date | None = None
+    end_date: date | None = None
     format: str = Field(default="json", pattern="^(json|csv|excel|pdf)$")
-    filters: Optional[dict[str, Any]] = None
+    filters: dict[str, Any] | None = None
 
 
 class PatientReportRequest(ReportRequest):
     """Запрос отчета по пациентам"""
 
-    department: Optional[str] = None
+    department: str | None = None
 
 
 class AppointmentReportRequest(ReportRequest):
     """Запрос отчета по записям"""
 
-    doctor_id: Optional[int] = None
-    department: Optional[str] = None
+    doctor_id: int | None = None
+    department: str | None = None
 
 
 class FinancialReportRequest(ReportRequest):
     """Запрос финансового отчета"""
 
-    department: Optional[str] = None
+    department: str | None = None
 
 
 class QueueReportRequest(ReportRequest):
     """Запрос отчета по очередям"""
 
-    doctor_id: Optional[int] = None
+    doctor_id: int | None = None
 
 
 class DoctorPerformanceReportRequest(ReportRequest):
     """Запрос отчета по производительности врачей"""
 
-    doctor_id: Optional[int] = None
+    doctor_id: int | None = None
 
 
 class ScheduleReportRequest(BaseModel):
@@ -90,7 +90,7 @@ class ScheduleReportRequest(BaseModel):
     schedule: str = Field(..., pattern="^(daily|weekly|monthly)$")
     recipients: list[str] = Field(..., min_length=1)
     format: str = Field(default="excel", pattern="^(json|csv|excel|pdf)$")
-    filters: Optional[dict[str, Any]] = None
+    filters: dict[str, Any] | None = None
 
 
 class ReportResponse(BaseModel):
@@ -100,11 +100,11 @@ class ReportResponse(BaseModel):
     report_type: str
     generated_at: str
     format: str
-    data: Optional[dict[str, Any]] = None
-    filename: Optional[str] = None
-    filepath: Optional[str] = None
-    size: Optional[int] = None
-    error: Optional[str] = None
+    data: dict[str, Any] | None = None
+    filename: str | None = None
+    filepath: str | None = None
+    size: int | None = None
+    error: str | None = None
 
 
 # ===================== ОСНОВНЫЕ ОТЧЕТЫ =====================
@@ -340,7 +340,7 @@ async def generate_doctor_performance_report(
 
 @router.get("/daily-summary")
 async def get_daily_summary(
-    target_date: Optional[date] = Query(
+    target_date: date | None = Query(
         None, description="Дата для сводки (по умолчанию сегодня)"
     ),
     db: Session = Depends(get_db),

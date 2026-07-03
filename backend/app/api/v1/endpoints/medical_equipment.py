@@ -49,17 +49,17 @@ class DeviceInfoResponse(BaseModel):
     connection_type: str
     status: str
     location: str
-    last_seen: Optional[datetime] = None
-    last_measurement: Optional[datetime] = None
-    calibration_date: Optional[datetime] = None
-    maintenance_date: Optional[datetime] = None
+    last_seen: datetime | None = None
+    last_measurement: datetime | None = None
+    calibration_date: datetime | None = None
+    maintenance_date: datetime | None = None
 
 
 class MeasurementRequest(BaseModel):
     """Запрос на измерение"""
 
     device_id: str = Field(..., description="ID устройства")
-    patient_id: Optional[str] = Field(None, description="ID пациента")
+    patient_id: str | None = Field(None, description="ID пациента")
 
 
 class MeasurementResponse(BaseModel):
@@ -68,20 +68,20 @@ class MeasurementResponse(BaseModel):
     device_id: str
     device_type: str
     timestamp: datetime
-    patient_id: Optional[str] = None
+    patient_id: str | None = None
     measurements: dict[str, Any]
-    raw_data: Optional[str] = None
-    quality_score: Optional[float] = None
-    notes: Optional[str] = None
+    raw_data: str | None = None
+    quality_score: float | None = None
+    notes: str | None = None
 
 
 class DeviceConfigRequest(BaseModel):
     """Запрос на обновление конфигурации устройства"""
 
-    name: Optional[str] = None
-    location: Optional[str] = None
-    connection_params: Optional[dict[str, Any]] = None
-    maintenance_date: Optional[datetime] = None
+    name: str | None = None
+    location: str | None = None
+    connection_params: dict[str, Any] | None = None
+    maintenance_date: datetime | None = None
 
 
 class DiagnosticsResponse(BaseModel):
@@ -91,14 +91,14 @@ class DiagnosticsResponse(BaseModel):
     timestamp: datetime
     success: bool
     tests: dict[str, Any]
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class StatisticsResponse(BaseModel):
     """Ответ со статистикой устройства"""
 
     total_measurements: int
-    last_measurement: Optional[datetime] = None
+    last_measurement: datetime | None = None
     average_quality: float
     measurements_today: int
     measurements_this_week: int
@@ -376,11 +376,11 @@ async def take_measurement(
 
 @router.get("/measurements")
 async def get_measurements(
-    device_id: Optional[str] = Query(None, description="ID устройства"),
-    patient_id: Optional[str] = Query(None, description="ID пациента"),
-    device_type: Optional[str] = Query(None, description="Тип устройства"),
-    start_date: Optional[date] = Query(None, description="Начальная дата"),
-    end_date: Optional[date] = Query(None, description="Конечная дата"),
+    device_id: str | None = Query(None, description="ID устройства"),
+    patient_id: str | None = Query(None, description="ID пациента"),
+    device_type: str | None = Query(None, description="Тип устройства"),
+    start_date: date | None = Query(None, description="Начальная дата"),
+    end_date: date | None = Query(None, description="Конечная дата"),
     limit: int = Query(100, ge=1, le=1000, description="Количество записей"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -641,9 +641,9 @@ async def get_equipment_overview(
 @router.get("/measurements/export")
 async def export_measurements(
     format: str = Query("json", pattern="^(json|csv)$", description="Формат экспорта"),
-    device_id: Optional[str] = Query(None, description="ID устройства"),
-    start_date: Optional[date] = Query(None, description="Начальная дата"),
-    end_date: Optional[date] = Query(None, description="Конечная дата"),
+    device_id: str | None = Query(None, description="ID устройства"),
+    start_date: date | None = Query(None, description="Начальная дата"),
+    end_date: date | None = Query(None, description="Конечная дата"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.DOCTOR])),
@@ -699,7 +699,7 @@ async def export_measurements(
 @router.post("/quick-measurement/{device_type}")
 async def quick_measurement(
     device_type: str,
-    patient_id: Optional[str] = Query(None, description="ID пациента"),
+    patient_id: str | None = Query(None, description="ID пациента"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.DOCTOR, Roles.REGISTRAR])),

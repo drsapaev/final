@@ -82,8 +82,8 @@ def list_patients(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    q: Optional[str] = Query(None, description="Поиск по ФИО, телефону или документу"),
-    phone: Optional[str] = Query(None, description="Точный поиск по номеру телефона"),
+    q: str | None = Query(None, description="Поиск по ФИО, телефону или документу"),
+    phone: str | None = Query(None, description="Точный поиск по номеру телефона"),
     current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "Nurse")),
 ):
     """
@@ -311,7 +311,7 @@ def add_family_relation(
     patient_id: int,
     related_patient_id: int = Query(..., description="ID родственника"),
     relation_type: str = Query("other", description="Тип связи: parent, child, guardian, spouse, sibling, other"),
-    description: Optional[str] = Query(None, description="Описание связи"),
+    description: str | None = Query(None, description="Описание связи"),
     is_primary_contact: bool = Query(False, description="Основное контактное лицо"),
     current_user: User = Depends(deps.require_roles("Admin", "Registrar")),
 ):

@@ -643,27 +643,27 @@ class QueueProfileCreate(BaseModel):
     """Schema for creating a new QueueProfile"""
     key: str = Field(..., min_length=1, max_length=50, description="Unique key (e.g., 'cardiology')")
     title: str = Field(..., min_length=1, max_length=100, description="English title")
-    title_ru: Optional[str] = Field(None, max_length=100, description="Russian title")
+    title_ru: str | None = Field(None, max_length=100, description="Russian title")
     queue_tags: list[str] = Field(default=[], description="List of queue_tag values for this profile")
-    department_key: Optional[str] = Field(None, max_length=50)
+    department_key: str | None = Field(None, max_length=50)
     display_order: int = Field(default=0, ge=0)
     is_active: bool = Field(default=True)
     show_on_qr_page: bool = Field(default=True, description="Show this profile on QR join page")
-    icon: Optional[str] = Field(None, max_length=50, description="Lucide icon name (e.g., 'Heart')")
-    color: Optional[str] = Field(None, max_length=20, description="Hex color (e.g., '#E53E3E')")
+    icon: str | None = Field(None, max_length=50, description="Lucide icon name (e.g., 'Heart')")
+    color: str | None = Field(None, max_length=20, description="Hex color (e.g., '#E53E3E')")
 
 
 class QueueProfileUpdate(BaseModel):
     """Schema for updating an existing QueueProfile"""
-    title: Optional[str] = Field(None, max_length=100)
-    title_ru: Optional[str] = Field(None, max_length=100)
-    queue_tags: Optional[list[str]] = None
-    department_key: Optional[str] = Field(None, max_length=50)
-    display_order: Optional[int] = Field(None, ge=0)
-    is_active: Optional[bool] = None
-    show_on_qr_page: Optional[bool] = Field(None, description="Show this profile on QR join page")
-    icon: Optional[str] = Field(None, max_length=50)
-    color: Optional[str] = Field(None, max_length=20)
+    title: str | None = Field(None, max_length=100)
+    title_ru: str | None = Field(None, max_length=100)
+    queue_tags: list[str] | None = None
+    department_key: str | None = Field(None, max_length=50)
+    display_order: int | None = Field(None, ge=0)
+    is_active: bool | None = None
+    show_on_qr_page: bool | None = Field(None, description="Show this profile on QR join page")
+    icon: str | None = Field(None, max_length=50)
+    color: str | None = Field(None, max_length=20)
 
 
 @router.post("/queues/profiles")
@@ -861,7 +861,7 @@ def reorder_queue_profiles(
 
 @router.get("/registrar/services")
 def get_registrar_services(
-    specialty: Optional[str] = Query(None, description="Фильтр по специальности"),
+    specialty: str | None = Query(None, description="Фильтр по специальности"),
     active_only: bool = Query(True, description="Только активные услуги"),
     db: Session = Depends(get_db),
     # Разрешаем доступ также профильным ролям врачей
@@ -1019,7 +1019,7 @@ def get_registrar_services(
 
 @router.get("/registrar/doctors")
 def get_registrar_doctors(
-    specialty: Optional[str] = Query(None, description="Фильтр по специальности"),
+    specialty: str | None = Query(None, description="Фильтр по специальности"),
     with_schedule: bool = Query(True, description="Включить расписание"),
     db: Session = Depends(get_db),
     # Разрешаем доступ также профильным ролям врачей
@@ -2525,10 +2525,10 @@ def _process_visit_entry(
 
 @router.get("/registrar/queues/today")
 def get_today_queues(
-    target_date: Optional[str] = Query(
+    target_date: str | None = Query(
         None, description="Дата (YYYY-MM-DD), по умолчанию сегодня"
     ),
-    department: Optional[str] = Query(None, description="Фильтр по отделению"),
+    department: str | None = Query(None, description="Фильтр по отделению"),
     db: Session = Depends(get_db),
     # [OK] ИСПРАВЛЕНО: Добавлена роль Cashier для доступа к очереди
     current_user: User = Depends(
@@ -3133,7 +3133,7 @@ def get_today_queues(
 def get_registrar_calendar(
     start_date: date = Query(..., description="Начальная дата"),
     end_date: date = Query(..., description="Конечная дата"),
-    doctor_id: Optional[int] = Query(None, description="Фильтр по врачу"),
+    doctor_id: int | None = Query(None, description="Фильтр по врачу"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):

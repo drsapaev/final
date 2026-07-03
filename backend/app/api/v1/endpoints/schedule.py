@@ -31,10 +31,10 @@ def _to_out(r) -> ScheduleRowOut:
 async def list_templates(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
-    department: Optional[str] = Query(default=None, max_length=64),
-    doctor_id: Optional[int] = Query(default=None, ge=1),
-    weekday: Optional[int] = Query(default=None, ge=0, le=6),
-    active: Optional[bool] = Query(default=None),
+    department: str | None = Query(default=None, max_length=64),
+    doctor_id: int | None = Query(default=None, ge=1),
+    weekday: int | None = Query(default=None, ge=0, le=6),
+    active: bool | None = Query(default=None),
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ):
@@ -89,9 +89,9 @@ async def delete_template(
 async def get_weekly_schedule(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
-    department: Optional[str] = Query(default=None, description="Отделение"),
-    doctor_id: Optional[int] = Query(default=None, description="ID врача"),
-    week_start: Optional[str] = Query(
+    department: str | None = Query(default=None, description="Отделение"),
+    doctor_id: int | None = Query(default=None, description="ID врача"),
+    week_start: str | None = Query(
         default=None, description="Начало недели (YYYY-MM-DD)"
     ),
 ):
@@ -121,8 +121,8 @@ async def get_daily_schedule(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
     date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(default=None, description="Отделение"),
-    doctor_id: Optional[int] = Query(default=None, description="ID врача"),
+    department: str | None = Query(default=None, description="Отделение"),
+    doctor_id: int | None = Query(default=None, description="ID врача"),
 ):
     """
     Получить расписание на конкретный день
@@ -146,7 +146,7 @@ async def get_available_slots(
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
     date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
     department: str = Query(..., description="Отделение"),
-    doctor_id: Optional[int] = Query(default=None, description="ID врача"),
+    doctor_id: int | None = Query(default=None, description="ID врача"),
 ):
     """
     Получить доступные слоты времени для записи на конкретную дату
@@ -168,7 +168,7 @@ async def get_available_slots(
 async def get_doctors_by_department(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
-    department: Optional[str] = Query(default=None, description="Отделение"),
+    department: str | None = Query(default=None, description="Отделение"),
 ):
     """
     Получить список врачей, сгруппированных по отделениям

@@ -44,9 +44,9 @@ def open_day_alias(
 @router.get("/stats", name="online_queue_stats")
 def stats_alias(
     department: str = Query(...),
-    date_str: Optional[str] = Query(None),
-    date: Optional[str] = Query(None),
-    d: Optional[str] = Query(None),
+    date_str: str | None = Query(None),
+    date: str | None = Query(None),
+    d: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -64,9 +64,9 @@ def stats_alias(
 @router.get("/qrcode", name="online_queue_qrcode")
 def qrcode_alias(
     department: str = Query(...),
-    date_str: Optional[str] = Query(None),
-    date: Optional[str] = Query(None),
-    d: Optional[str] = Query(None),
+    date_str: str | None = Query(None),
+    date: str | None = Query(None),
+    d: str | None = Query(None),
     current_user=Depends(get_current_user),
 ):
     return impl.qrcode_png(
@@ -83,9 +83,9 @@ def qrcode_alias(
 )
 def close_alias(
     department: str = Query(...),
-    date_str: Optional[str] = Query(None),
-    date: Optional[str] = Query(None),
-    d: Optional[str] = Query(None),
+    date_str: str | None = Query(None),
+    date: str | None = Query(None),
+    d: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):

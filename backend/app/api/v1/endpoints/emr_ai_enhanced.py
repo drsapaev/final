@@ -30,7 +30,7 @@ def ai_safety_meta() -> dict[str, Any]:
 async def generate_smart_template(
     specialty: str = Query(..., description="Специализация врача"),
     patient_data: dict[str, Any] = None,
-    doctor_preferences: Optional[dict[str, Any]] = None,
+    doctor_preferences: dict[str, Any] | None = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
@@ -284,9 +284,9 @@ async def enhance_emr_with_ai(
 
 @router.get("/analytics/quality")
 async def get_emr_quality_analytics(
-    specialty: Optional[str] = Query(None, description="Фильтр по специализации"),
-    date_from: Optional[str] = Query(None, description="Дата начала"),
-    date_to: Optional[str] = Query(None, description="Дата окончания"),
+    specialty: str | None = Query(None, description="Фильтр по специализации"),
+    date_from: str | None = Query(None, description="Дата начала"),
+    date_to: str | None = Query(None, description="Дата окончания"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:

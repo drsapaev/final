@@ -44,7 +44,7 @@ class AIUsageTrackingRequest(BaseModel):
     output_data: dict = Field(..., description="Выходные данные")
     execution_time: float = Field(..., description="Время выполнения в секундах")
     success: bool = Field(True, description="Успешность выполнения")
-    error_message: Optional[str] = Field(None, description="Сообщение об ошибке")
+    error_message: str | None = Field(None, description="Сообщение об ошибке")
 
 
 class AIUsageAnalyticsResponse(BaseModel):
@@ -141,8 +141,8 @@ async def track_ai_usage(
 async def get_ai_usage_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    user_id: Optional[int] = Query(None, description="Фильтр по пользователю"),
-    ai_function: Optional[str] = Query(None, description="Фильтр по AI функции"),
+    user_id: int | None = Query(None, description="Фильтр по пользователю"),
+    ai_function: str | None = Query(None, description="Фильтр по AI функции"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin"])),
 ):
@@ -547,7 +547,7 @@ async def compare_ai_models(
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
-def _get_most_used_function(function_breakdown: dict) -> Optional[str]:
+def _get_most_used_function(function_breakdown: dict) -> str | None:
     """Находит наиболее используемую AI функцию"""
     if not function_breakdown:
         return None

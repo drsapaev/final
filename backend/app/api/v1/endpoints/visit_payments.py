@@ -106,9 +106,9 @@ def update_visit_payment_status(
 )
 def create_visit_from_payment(
     visit_id: int,
-    patient_id: Optional[int] = Query(None, description="ID пациента"),
-    doctor_id: Optional[int] = Query(None, description="ID врача"),
-    notes: Optional[str] = Query(None, description="Заметки к визиту"),
+    patient_id: int | None = Query(None, description="ID пациента"),
+    doctor_id: int | None = Query(None, description="ID врача"),
+    notes: str | None = Query(None, description="Заметки к визиту"),
     db: Session = Depends(get_db),
     _: dict = Depends(require_roles("Admin", "Registrar")),
 ):

@@ -24,7 +24,7 @@ FINANCIAL_SPECIALIZED_PANEL_ROLES = ("Admin", "Manager")
 async def get_cardiology_patients(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    search: Optional[str] = Query(None),
+    search: str | None = Query(None),
     current_user: User = Depends(require_roles("Admin", "Doctor")),
     db: Session = Depends(get_db),
 ):
@@ -40,10 +40,10 @@ async def get_cardiology_patients(
 async def get_cardiology_visits(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = Query(None),
-    status: Optional[str] = Query(None),
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    patient_id: int | None = Query(None),
+    status: str | None = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     current_user: User = Depends(require_roles("Admin", "Doctor")),
     db: Session = Depends(get_db),
 ):
@@ -60,8 +60,8 @@ async def get_cardiology_visits(
 
 @router.get("/cardiology/analytics")
 async def get_cardiology_analytics(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     current_user: User = Depends(require_roles(*FINANCIAL_SPECIALIZED_PANEL_ROLES)),
     db: Session = Depends(get_db),
 ):
@@ -76,7 +76,7 @@ async def get_cardiology_analytics(
 async def get_dentistry_patients(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    search: Optional[str] = Query(None),
+    search: str | None = Query(None),
     current_user: User = Depends(require_roles("Admin", "Doctor")),
     db: Session = Depends(get_db),
 ):
@@ -92,10 +92,10 @@ async def get_dentistry_patients(
 async def get_dentistry_visits(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = Query(None),
-    status: Optional[str] = Query(None),
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    patient_id: int | None = Query(None),
+    status: str | None = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     current_user: User = Depends(require_roles("Admin", "Doctor")),
     db: Session = Depends(get_db),
 ):
@@ -112,8 +112,8 @@ async def get_dentistry_visits(
 
 @router.get("/dentistry/analytics")
 async def get_dentistry_analytics(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     current_user: User = Depends(require_roles(*FINANCIAL_SPECIALIZED_PANEL_ROLES)),
     db: Session = Depends(get_db),
 ):
@@ -126,7 +126,7 @@ async def get_dentistry_analytics(
 
 @router.get("/specialized/services")
 async def get_specialized_services(
-    department: Optional[str] = Query(
+    department: str | None = Query(
         None, description="Отделение: cardiology, dentistry"
     ),
     current_user: User = Depends(require_roles("Admin", "Doctor")),
@@ -139,7 +139,7 @@ async def get_specialized_services(
 @router.get("/specialized/patient-history/{patient_id}")
 async def get_specialized_patient_history(
     patient_id: int,
-    department: Optional[str] = Query(
+    department: str | None = Query(
         None, description="Отделение: cardiology, dentistry"
     ),
     current_user: User = Depends(require_roles("Admin", "Doctor")),
@@ -157,8 +157,8 @@ async def get_specialized_patient_history(
 
 @router.get("/specialized/statistics")
 async def get_specialized_statistics(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     current_user: User = Depends(require_roles(*FINANCIAL_SPECIALIZED_PANEL_ROLES)),
     db: Session = Depends(get_db),
 ):

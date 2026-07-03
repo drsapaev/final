@@ -50,7 +50,7 @@ def _build_context(
     db: Session,
     start: datetime,
     end: datetime,
-    department: Optional[str],
+    department: str | None,
 ) -> dict:
     analytics_service = get_advanced_analytics_service()
     period_days = max((end - start).days + 1, 1)
@@ -378,7 +378,7 @@ def _build_trends(context: dict) -> list[dict]:
 async def get_predictive_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     forecast_days: int = Query(30, description="Дни прогноза"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
@@ -428,7 +428,7 @@ async def get_predictive_analytics(
 async def get_prediction_accuracy(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
@@ -459,7 +459,7 @@ async def get_prediction_accuracy(
 async def get_scenario_analysis(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     scenario: str = Query(
         "optimistic", description="Сценарий: optimistic, realistic, pessimistic"
     ),
@@ -509,7 +509,7 @@ async def get_scenario_analysis(
 async def get_predictive_insights(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
-    department: Optional[str] = Query(None, description="Отделение"),
+    department: str | None = Query(None, description="Отделение"),
     insight_type: str = Query(
         "all", description="Тип инсайтов: all, revenue, patients, efficiency"
     ),

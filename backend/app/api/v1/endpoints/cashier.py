@@ -87,20 +87,20 @@ class PendingPaymentItem(BaseModel):
     id: int
     patient_id: int
     patient_name: str
-    patient_iin: Optional[str] = None
-    visit_id: Optional[int] = None  # Первый visit_id (для совместимости)
+    patient_iin: str | None = None
+    visit_id: int | None = None  # Первый visit_id (для совместимости)
     visit_ids: list[int] = []  # Все visit_id этого пациента
-    appointment_id: Optional[int] = None
+    appointment_id: int | None = None
     services: list[dict[str, Any]] = []
     total_amount: Decimal
     paid_amount: Decimal = Decimal("0")
     remaining_amount: Decimal
     status: str
     created_at: datetime
-    queue_number: Optional[str] = None
-    department: Optional[str] = None
+    queue_number: str | None = None
+    department: str | None = None
     payment_contract: str = "single_visit"
-    payment_visit_id: Optional[int] = None
+    payment_visit_id: int | None = None
     payment_visit_ids: list[int] = Field(default_factory=list)
     can_create_direct_payment: bool = True
     can_create_grouped_payment: bool = False
@@ -113,14 +113,14 @@ class PaymentHistoryItem(BaseModel):
     id: int
     patient_id: int
     patient_name: str
-    visit_id: Optional[int] = None
+    visit_id: int | None = None
     amount: Decimal
     method: str
     status: str
     created_at: datetime
-    paid_at: Optional[datetime] = None
-    note: Optional[str] = None
-    cashier_name: Optional[str] = None
+    paid_at: datetime | None = None
+    note: str | None = None
+    cashier_name: str | None = None
     available_actions: list[str] = Field(default_factory=list)
     can_confirm: bool = False
     can_cancel: bool = False
@@ -142,25 +142,25 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 class CreatePaymentRequest(BaseModel):
     """Запрос на создание платежа"""
-    visit_id: Optional[int] = Field(None, description="ID визита")
-    appointment_id: Optional[int] = Field(None, description="ID записи")
-    patient_id: Optional[int] = Field(None, description="ID пациента")
+    visit_id: int | None = Field(None, description="ID визита")
+    appointment_id: int | None = Field(None, description="ID записи")
+    patient_id: int | None = Field(None, description="ID пациента")
     amount: Decimal = Field(..., gt=0, description="Сумма платежа")
     method: str = Field(default="cash", description="Метод оплаты (cash, card)")
-    note: Optional[str] = Field(None, description="Примечание")
+    note: str | None = Field(None, description="Примечание")
 
 
 class PaymentResponse(BaseModel):
     """Ответ при создании/получении платежа"""
     id: int
-    visit_id: Optional[int] = None
-    patient_id: Optional[int] = None
+    visit_id: int | None = None
+    patient_id: int | None = None
     amount: Decimal
     method: str
     status: str
     created_at: datetime
-    paid_at: Optional[datetime] = None
-    note: Optional[str] = None
+    paid_at: datetime | None = None
+    note: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -168,10 +168,10 @@ class PaymentResponse(BaseModel):
 class CreateGroupedPaymentRequest(BaseModel):
     """Backend-owned allocation request for grouped cashier payment rows."""
     visit_ids: list[int] = Field(..., min_length=1, description="Visit ids from a cashier grouped pending-payment row")
-    patient_id: Optional[int] = Field(None, description="Expected patient id for all grouped visits")
+    patient_id: int | None = Field(None, description="Expected patient id for all grouped visits")
     amount: Decimal = Field(..., gt=0, description="Total payment amount to allocate")
     method: str = Field(default="cash", description="Payment method (cash, card)")
-    note: Optional[str] = Field(None, description="Payment note")
+    note: str | None = Field(None, description="Payment note")
 
 
 class GroupedPaymentAllocationItem(BaseModel):
@@ -196,7 +196,7 @@ class GroupedPaymentResponse(BaseModel):
 
 class CancelPaymentRequest(BaseModel):
     """Запрос на отмену платежа"""
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class RefundRequest(BaseModel):
@@ -218,7 +218,7 @@ class RefundResponse(BaseModel):
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
-def get_patient_name(patient: Optional[Patient], patient_id: int) -> str:
+def get_patient_name(patient: Patient | None, patient_id: int) -> str:
     """Получить имя пациента"""
     if patient:
         if hasattr(patient, 'short_name') and callable(patient.short_name):
@@ -239,7 +239,7 @@ def get_patient_name(patient: Optional[Patient], patient_id: int) -> str:
     return f"Пациент #{patient_id}"
 
 
-def _decimal_to_float(value: Any) -> Optional[float]:
+def _decimal_to_float(value: Any) -> float | None:
     if value is None:
         return None
     try:
@@ -293,10 +293,10 @@ async def _emit_payment_notification(
     payment: Payment,
     current_user: Any,
     change_type: str,
-    patient_id: Optional[int] = None,
-    visit: Optional[Visit] = None,
-    reason: Optional[str] = None,
-    extra_metadata: Optional[dict[str, Any]] = None,
+    patient_id: int | None = None,
+    visit: Visit | None = None,
+    reason: str | None = None,
+    extra_metadata: dict[str, Any] | None = None,
 ) -> None:
     """Emit canonical payment_notification for patient inbox without breaking cashier flow."""
     try:
@@ -391,9 +391,9 @@ async def _emit_payment_notification(
 async def get_pending_payments(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
-    date_from: Optional[date] = Query(None, description="Дата начала"),
-    date_to: Optional[date] = Query(None, description="Дата окончания"),
-    search: Optional[str] = Query(None, description="Поиск по ФИО пациента"),
+    date_from: date | None = Query(None, description="Дата начала"),
+    date_to: date | None = Query(None, description="Дата окончания"),
+    search: str | None = Query(None, description="Поиск по ФИО пациента"),
     page: int = Query(1, ge=1, description="Номер страницы"),
     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
 ):
@@ -638,8 +638,8 @@ class CashierStatsResponse(BaseModel):
 async def get_cashier_stats(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
-    date_from: Optional[date] = Query(None, description="Дата начала"),
-    date_to: Optional[date] = Query(None, description="Дата окончания"),
+    date_from: date | None = Query(None, description="Дата начала"),
+    date_to: date | None = Query(None, description="Дата окончания"),
 ):
     """
     Получить агрегированную статистику платежей за период.
@@ -740,8 +740,8 @@ async def get_cashier_stats(
 async def export_payments(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
-    date_from: Optional[date] = Query(None, description="Дата начала"),
-    date_to: Optional[date] = Query(None, description="Дата окончания"),
+    date_from: date | None = Query(None, description="Дата начала"),
+    date_to: date | None = Query(None, description="Дата окончания"),
 ):
     """
     Экспорт всех платежей за период в CSV.
@@ -833,11 +833,11 @@ async def export_payments(
 async def get_payments(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
-    date_from: Optional[date] = Query(None, description="Дата начала"),
-    date_to: Optional[date] = Query(None, description="Дата окончания"), 
-    search: Optional[str] = Query(None, description="Поиск по пациенту"),
-    status_filter: Optional[str] = Query(None, alias="status", description="Фильтр по статусу (paid/pending/cancelled)"),
-    method: Optional[str] = Query(None, description="Фильтр по методу оплаты (cash/card)"),
+    date_from: date | None = Query(None, description="Дата начала"),
+    date_to: date | None = Query(None, description="Дата окончания"), 
+    search: str | None = Query(None, description="Поиск по пациенту"),
+    status_filter: str | None = Query(None, alias="status", description="Фильтр по статусу (paid/pending/cancelled)"),
+    method: str | None = Query(None, description="Фильтр по методу оплаты (cash/card)"),
     page: int = Query(1, ge=1, description="Номер страницы"),
     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
 ):
@@ -1668,7 +1668,7 @@ class HourlyStatItem(BaseModel):
 async def get_hourly_stats(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
-    target_date: Optional[date] = Query(None, description="Дата для статистики (по умолчанию сегодня)"),
+    target_date: date | None = Query(None, description="Дата для статистики (по умолчанию сегодня)"),
 ):
     """
     Получить почасовую статистику платежей за день.

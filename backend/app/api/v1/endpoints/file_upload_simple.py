@@ -117,7 +117,7 @@ def _build_target_path(safe_filename: str, file_hash: str) -> tuple[Path, str]:
 @router.post("/upload-simple")
 async def upload_file_simple(
     file: UploadFile = File(...),
-    title: Optional[str] = Form(None),
+    title: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

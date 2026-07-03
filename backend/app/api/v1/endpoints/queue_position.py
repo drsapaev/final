@@ -75,7 +75,7 @@ class QueuePositionResponse(BaseModel):
     status: str
     people_ahead: int
     priority: int
-    queue_time: Optional[str] = None
+    queue_time: str | None = None
     queue_info: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -83,9 +83,9 @@ class NotificationResult(BaseModel):
     """Результат отправки уведомления"""
     success: bool
     sent: bool
-    message_id: Optional[str] = None
-    reason: Optional[str] = None
-    error: Optional[str] = None
+    message_id: str | None = None
+    reason: str | None = None
+    error: str | None = None
 
 
 class BatchNotificationResult(BaseModel):
@@ -103,7 +103,7 @@ class SendPositionNotificationRequest(BaseModel):
 class SendCallNotificationRequest(BaseModel):
     """Запрос на отправку уведомления о вызове"""
     entry_id: int = Field(..., description="ID записи в очереди")
-    cabinet_number: Optional[str] = Field(None, description="Номер кабинета")
+    cabinet_number: str | None = Field(None, description="Номер кабинета")
 
 
 # ========================= ЭНДПОИНТЫ =========================

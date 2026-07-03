@@ -106,11 +106,11 @@ def _resolve_effective_cabinet(
 def list_admin_appointments(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-    patient_id: Optional[int] = Query(None),
-    doctor_id: Optional[int] = Query(None),
-    status_filter: Optional[str] = Query(None, alias="status"),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
+    patient_id: int | None = Query(None),
+    doctor_id: int | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

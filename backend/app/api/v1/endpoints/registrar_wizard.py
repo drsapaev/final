@@ -79,16 +79,16 @@ def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user: User) -
 class ServiceItemRequest(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
-    custom_price: Optional[Decimal] = None  # Для врачебного переопределения цены
+    custom_price: Decimal | None = None  # Для врачебного переопределения цены
 
 
 class VisitRequest(BaseModel):
-    doctor_id: Optional[int] = None  # Может быть None для лабораторных услуг
+    doctor_id: int | None = None  # Может быть None для лабораторных услуг
     services: list[ServiceItemRequest]
     visit_date: date
-    visit_time: Optional[str] = None  # HH:MM
-    department: Optional[str] = None
-    notes: Optional[str] = None
+    visit_time: str | None = None  # HH:MM
+    department: str | None = None
+    notes: str | None = None
 
 
 class CartRequest(BaseModel):
@@ -97,7 +97,7 @@ class CartRequest(BaseModel):
     discount_mode: str = Field(default="none")  # none|repeat|benefit|all_free
     payment_method: str = Field(default="cash")  # cash|card|online|click|payme
     all_free: bool = Field(default=False)  # Чекбокс "All Free"
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class CartResponse(BaseModel):
@@ -110,23 +110,23 @@ class CartResponse(BaseModel):
         int, list[dict]
     ]  # visit_id -> [{"queue_tag": str, "number": int, "queue_id": int}]
     print_tickets: list[dict[str, Any]]
-    created_visits: Optional[list[dict[str, Any]]] = (
+    created_visits: list[dict[str, Any]] | None = (
         None  # Информация о созданных визитах
     )
 
 
 class EditDeltaPatientData(BaseModel):
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    birth_date: Optional[date] = None
-    sex: Optional[str] = None
-    address: Optional[str] = None
+    full_name: str | None = None
+    phone: str | None = None
+    birth_date: date | None = None
+    sex: str | None = None
+    address: str | None = None
 
 
 class EditDeltaServiceItem(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
-    specialist_id: Optional[int] = None
+    specialist_id: int | None = None
 
 
 class EditDeltaRequest(BaseModel):
@@ -135,7 +135,7 @@ class EditDeltaRequest(BaseModel):
     payment_method: str = Field(default="cash")
     discount_mode: str = Field(default="none")
     all_free: bool = Field(default=False)
-    patient_data: Optional[EditDeltaPatientData] = None
+    patient_data: EditDeltaPatientData | None = None
     services: list[EditDeltaServiceItem] = Field(default_factory=list)
     existing_queue_entry_ids: list[int] = Field(default_factory=list)
     # R-08 fix: optimistic locking — map of entry_id → ISO updated_at string.
@@ -147,7 +147,7 @@ class EditDeltaRequest(BaseModel):
 class EditDeltaResponse(BaseModel):
     success: bool
     message: str
-    invoice_id: Optional[int] = None
+    invoice_id: int | None = None
     visit_ids: list[int] = Field(default_factory=list)
     total_amount: Decimal = Decimal("0")
     queue_numbers: dict[int, list[dict[str, Any]]] = Field(default_factory=dict)
@@ -157,8 +157,8 @@ class EditDeltaResponse(BaseModel):
 
 
 class MarkPaidRequest(BaseModel):
-    amount: Optional[Decimal] = None
-    method: Optional[str] = Field(default="cash")
+    amount: Decimal | None = None
+    method: str | None = Field(default="cash")
 
 
 class RegistrarRecordRef(BaseModel):
@@ -168,12 +168,12 @@ class RegistrarRecordRef(BaseModel):
 
 class RegistrarRecordActionRequest(BaseModel):
     action: str
-    record_kind: Optional[str] = None
-    record_id: Optional[int] = None
-    records: Optional[list[RegistrarRecordRef]] = None
-    reason: Optional[str] = None
-    amount: Optional[Decimal] = None
-    method: Optional[str] = Field(default="cash")
+    record_kind: str | None = None
+    record_id: int | None = None
+    records: list[RegistrarRecordRef] | None = None
+    reason: str | None = None
+    amount: Decimal | None = None
+    method: str | None = Field(default="cash")
 
 
 class RegistrarRecordActionItemResponse(BaseModel):
@@ -181,10 +181,10 @@ class RegistrarRecordActionItemResponse(BaseModel):
     record_id: int
     success: bool
     skipped: bool = False
-    status: Optional[str] = None
-    payment_status: Optional[str] = None
-    error: Optional[str] = None
-    result: Optional[dict[str, Any]] = None
+    status: str | None = None
+    payment_status: str | None = None
+    error: str | None = None
+    result: dict[str, Any] | None = None
 
 
 class RegistrarRecordActionResponse(BaseModel):
@@ -198,9 +198,9 @@ class RegistrarRecordActionResponse(BaseModel):
 
 class RepeatEligibilityCandidate(BaseModel):
     service_id: int
-    doctor_id: Optional[int] = None
+    doctor_id: int | None = None
     visit_date: date
-    candidate_key: Optional[str] = None
+    candidate_key: str | None = None
 
 
 class RepeatEligibilityPreviewRequest(BaseModel):
@@ -209,9 +209,9 @@ class RepeatEligibilityPreviewRequest(BaseModel):
 
 
 class RepeatEligibilityPreviewItem(BaseModel):
-    candidate_key: Optional[str] = None
+    candidate_key: str | None = None
     service_id: int
-    doctor_id: Optional[int] = None
+    doctor_id: int | None = None
     visit_date: date
     eligible: bool
     reason: str
@@ -607,15 +607,15 @@ def _create_queue_entries(
 class InvoicePaymentRequest(BaseModel):
     invoice_id: int
     provider: str = Field(default="click")  # click|payme
-    return_url: Optional[str] = None
-    cancel_url: Optional[str] = None
+    return_url: str | None = None
+    cancel_url: str | None = None
 
 
 class InvoicePaymentResponse(BaseModel):
     success: bool
-    payment_url: Optional[str] = None
-    provider_payment_id: Optional[str] = None
-    error_message: Optional[str] = None
+    payment_url: str | None = None
+    provider_payment_id: str | None = None
+    error_message: str | None = None
 
 
 SUPPORTED_INVOICE_PAYMENT_PROVIDERS = {"click", "payme"}
@@ -1217,7 +1217,7 @@ def apply_registrar_cart_edit_delta(
 class PriceOverrideApprovalRequest(BaseModel):
     override_id: int
     action: str = Field(..., pattern="^(approve|reject)$")  # approve или reject
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
 
 class PriceOverrideListResponse(BaseModel):
@@ -1227,11 +1227,11 @@ class PriceOverrideListResponse(BaseModel):
     service_name: str
     doctor_name: str
     doctor_specialty: str
-    patient_name: Optional[str]
+    patient_name: str | None
     original_price: Decimal
     new_price: Decimal
     reason: str
-    details: Optional[str]
+    details: str | None
     status: str
     available_actions: list[str]
     can_approve: bool
@@ -1251,7 +1251,7 @@ def _price_override_available_actions(override_status: str) -> list[str]:
 def get_pending_price_overrides(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
-    status_filter: Optional[str] = Query(
+    status_filter: str | None = Query(
         default="pending", pattern="^(pending|approved|rejected|all)$"
     ),
     limit: int = Query(default=50, ge=1, le=100),
@@ -1397,21 +1397,21 @@ def approve_price_override(
 class AllFreeApprovalRequest(BaseModel):
     visit_id: int
     action: str = Field(..., pattern="^(approve|reject)$")  # approve или reject
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
 
 class AllFreeVisitResponse(BaseModel):
     id: int
     patient_id: int
-    patient_name: Optional[str]
-    patient_phone: Optional[str]
+    patient_name: str | None
+    patient_phone: str | None
     services: list[str]
     total_original_amount: Decimal
-    doctor_name: Optional[str]
-    doctor_specialty: Optional[str]
-    visit_date: Optional[date]
-    visit_time: Optional[str]
-    notes: Optional[str]
+    doctor_name: str | None
+    doctor_specialty: str | None
+    visit_date: date | None
+    visit_time: str | None
+    notes: str | None
     created_at: datetime
     approval_status: str
     available_actions: list[str]
@@ -1431,7 +1431,7 @@ def _all_free_available_actions(approval_status: str) -> list[str]:
 def get_all_free_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
-    status_filter: Optional[str] = Query(
+    status_filter: str | None = Query(
         default="pending", pattern="^(pending|approved|rejected|all)$"
     ),
     limit: int = Query(default=50, ge=1, le=100),
@@ -1936,19 +1936,19 @@ def update_wizard_settings(
 class VisitResponse(BaseModel):
     id: int
     patient_id: int
-    patient_fio: Optional[str] = None
-    patient_phone: Optional[str] = None
-    doctor_id: Optional[int] = None
-    doctor_name: Optional[str] = None
-    doctor_specialty: Optional[str] = None
-    department: Optional[str] = None
-    visit_date: Optional[date] = None
-    visit_time: Optional[str] = None
+    patient_fio: str | None = None
+    patient_phone: str | None = None
+    doctor_id: int | None = None
+    doctor_name: str | None = None
+    doctor_specialty: str | None = None
+    department: str | None = None
+    visit_date: date | None = None
+    visit_time: str | None = None
     status: str
     discount_mode: str
     approval_status: str
-    services: Optional[list[str]] = None
-    notes: Optional[str] = None
+    services: list[str] | None = None
+    notes: str | None = None
     created_at: datetime
 
 
@@ -1958,11 +1958,11 @@ def get_visits(
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist", "Cashier", "Lab")),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = Query(None, description="Фильтр по ID пациента"),
-    doctor_id: Optional[int] = Query(None, description="Фильтр по ID врача"),
-    department: Optional[str] = Query(None, description="Фильтр по отделению"),
-    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
+    patient_id: int | None = Query(None, description="Фильтр по ID пациента"),
+    doctor_id: int | None = Query(None, description="Фильтр по ID врача"),
+    department: str | None = Query(None, description="Фильтр по отделению"),
+    date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="Дата окончания (YYYY-MM-DD)"),
 ):
     """Получить объединенный список записей из таблиц visits (новый мастер) и appointments (старый мастер)"""
     try:
@@ -2174,9 +2174,9 @@ def get_all_appointments(
     ),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    search: Optional[str] = Query(
+    date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="Дата окончания (YYYY-MM-DD)"),
+    search: str | None = Query(
         None, description="Поиск по ФИО, телефону или услугам"
     ),
 ):
@@ -2897,7 +2897,7 @@ def _run_single_registrar_record_action(
 @router.post("/registrar/visits/{visit_id}/mark-paid")
 def mark_visit_as_paid(
     visit_id: int,
-    payment_req: Optional[MarkPaidRequest] = Body(default=None),
+    payment_req: MarkPaidRequest | None = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
@@ -3053,7 +3053,7 @@ def mark_visit_as_paid(
 @router.post("/registrar/queue/entry/{entry_id}/mark-paid")
 def mark_queue_entry_as_paid(
     entry_id: int,
-    payment_req: Optional[MarkPaidRequest] = Body(default=None),
+    payment_req: MarkPaidRequest | None = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
@@ -3422,8 +3422,8 @@ def run_registrar_record_action(
 
 class ConfirmVisitRequest(BaseModel):
     confirmation_method: str = Field(default="phone", pattern="^(phone|manual)$")
-    confirmed_by: Optional[str] = None  # Номер телефона или ID сотрудника
-    notes: Optional[str] = None
+    confirmed_by: str | None = None  # Номер телефона или ID сотрудника
+    notes: str | None = None
 
 
 class ConfirmVisitResponse(BaseModel):
@@ -3431,8 +3431,8 @@ class ConfirmVisitResponse(BaseModel):
     message: str
     visit_id: int
     status: str
-    queue_numbers: Optional[dict[str, Any]] = None
-    print_tickets: Optional[list[dict[str, Any]]] = None
+    queue_numbers: dict[str, Any] | None = None
+    print_tickets: list[dict[str, Any]] | None = None
 
 
 @router.post(

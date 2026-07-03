@@ -48,7 +48,7 @@ class ManualAssignmentRequest(BaseModel):
 
 @router.post("/admin/morning-assignment/run", response_model=MorningAssignmentResponse)
 def run_morning_assignment_manual(
-    target_date: Optional[str] = Query(
+    target_date: str | None = Query(
         None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
     ),
     db: Session = Depends(get_db),
@@ -81,7 +81,7 @@ def run_morning_assignment_manual(
 
 @router.get("/admin/morning-assignment/stats", response_model=AssignmentStatsResponse)
 def get_morning_assignment_stats(
-    target_date: Optional[str] = Query(
+    target_date: str | None = Query(
         None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
     ),
     db: Session = Depends(get_db),
@@ -143,7 +143,7 @@ def manual_assignment_for_visits(
 
 @router.get("/admin/morning-assignment/pending-visits")
 def get_pending_visits(
-    target_date: Optional[str] = Query(
+    target_date: str | None = Query(
         None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
     ),
     db: Session = Depends(get_db),
@@ -172,7 +172,7 @@ def get_pending_visits(
 
 @router.get("/admin/morning-assignment/queue-summary")
 def get_queue_summary(
-    target_date: Optional[str] = Query(
+    target_date: str | None = Query(
         None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
     ),
     db: Session = Depends(get_db),

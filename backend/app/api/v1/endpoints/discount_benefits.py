@@ -26,14 +26,14 @@ router = APIRouter()
 
 class DiscountCreate(BaseModel):
     name: str = Field(..., max_length=200)
-    description: Optional[str] = None
+    description: str | None = None
     discount_type: DiscountType
     value: float = Field(..., gt=0)
     min_amount: float = Field(default=0, ge=0)
-    max_discount: Optional[float] = Field(None, gt=0)
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    usage_limit: Optional[int] = Field(None, gt=0)
+    max_discount: float | None = Field(None, gt=0)
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    usage_limit: int | None = Field(None, gt=0)
     applies_to_services: bool = True
     applies_to_appointments: bool = True
     applies_to_packages: bool = True
@@ -42,72 +42,72 @@ class DiscountCreate(BaseModel):
 
 
 class DiscountUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=200)
-    description: Optional[str] = None
-    value: Optional[float] = Field(None, gt=0)
-    min_amount: Optional[float] = Field(None, ge=0)
-    max_discount: Optional[float] = Field(None, gt=0)
-    is_active: Optional[bool] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    usage_limit: Optional[int] = Field(None, gt=0)
-    applies_to_services: Optional[bool] = None
-    applies_to_appointments: Optional[bool] = None
-    applies_to_packages: Optional[bool] = None
-    can_combine_with_others: Optional[bool] = None
-    priority: Optional[int] = Field(None, ge=0)
+    name: str | None = Field(None, max_length=200)
+    description: str | None = None
+    value: float | None = Field(None, gt=0)
+    min_amount: float | None = Field(None, ge=0)
+    max_discount: float | None = Field(None, gt=0)
+    is_active: bool | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    usage_limit: int | None = Field(None, gt=0)
+    applies_to_services: bool | None = None
+    applies_to_appointments: bool | None = None
+    applies_to_packages: bool | None = None
+    can_combine_with_others: bool | None = None
+    priority: int | None = Field(None, ge=0)
 
 
 class BenefitCreate(BaseModel):
     name: str = Field(..., max_length=200)
-    description: Optional[str] = None
+    description: str | None = None
     benefit_type: BenefitType
     discount_percentage: float = Field(..., gt=0, le=100)
-    max_discount_amount: Optional[float] = Field(None, gt=0)
+    max_discount_amount: float | None = Field(None, gt=0)
     requires_document: bool = True
-    document_types: Optional[str] = None
-    age_min: Optional[int] = Field(None, ge=0)
-    age_max: Optional[int] = Field(None, ge=0)
+    document_types: str | None = None
+    age_min: int | None = Field(None, ge=0)
+    age_max: int | None = Field(None, ge=0)
     applies_to_services: bool = True
     applies_to_appointments: bool = True
-    monthly_limit: Optional[float] = Field(None, gt=0)
-    yearly_limit: Optional[float] = Field(None, gt=0)
+    monthly_limit: float | None = Field(None, gt=0)
+    yearly_limit: float | None = Field(None, gt=0)
 
 
 class BenefitUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=200)
-    description: Optional[str] = None
-    discount_percentage: Optional[float] = Field(None, gt=0, le=100)
-    max_discount_amount: Optional[float] = Field(None, gt=0)
-    is_active: Optional[bool] = None
-    requires_document: Optional[bool] = None
-    document_types: Optional[str] = None
-    age_min: Optional[int] = Field(None, ge=0)
-    age_max: Optional[int] = Field(None, ge=0)
-    applies_to_services: Optional[bool] = None
-    applies_to_appointments: Optional[bool] = None
-    monthly_limit: Optional[float] = Field(None, gt=0)
-    yearly_limit: Optional[float] = Field(None, gt=0)
+    name: str | None = Field(None, max_length=200)
+    description: str | None = None
+    discount_percentage: float | None = Field(None, gt=0, le=100)
+    max_discount_amount: float | None = Field(None, gt=0)
+    is_active: bool | None = None
+    requires_document: bool | None = None
+    document_types: str | None = None
+    age_min: int | None = Field(None, ge=0)
+    age_max: int | None = Field(None, ge=0)
+    applies_to_services: bool | None = None
+    applies_to_appointments: bool | None = None
+    monthly_limit: float | None = Field(None, gt=0)
+    yearly_limit: float | None = Field(None, gt=0)
 
 
 class PatientBenefitCreate(BaseModel):
     patient_id: int
     benefit_id: int
-    document_number: Optional[str] = None
-    document_issued_date: Optional[datetime] = None
-    document_expiry_date: Optional[datetime] = None
+    document_number: str | None = None
+    document_issued_date: datetime | None = None
+    document_expiry_date: datetime | None = None
 
 
 class LoyaltyProgramCreate(BaseModel):
     name: str = Field(..., max_length=200)
-    description: Optional[str] = None
+    description: str | None = None
     points_per_ruble: float = Field(default=1.0, gt=0)
     min_purchase_for_points: float = Field(default=0, ge=0)
     ruble_per_point: float = Field(default=1.0, gt=0)
     min_points_to_redeem: int = Field(default=100, gt=0)
-    max_points_per_purchase: Optional[int] = Field(None, gt=0)
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    max_points_per_purchase: int | None = Field(None, gt=0)
+    start_date: datetime | None = None
+    end_date: datetime | None = None
 
 
 class DiscountCalculationRequest(BaseModel):
@@ -119,35 +119,35 @@ class DiscountCalculationRequest(BaseModel):
 class ApplyDiscountRequest(BaseModel):
     discount_id: int
     amount: float = Field(..., gt=0)
-    appointment_id: Optional[int] = None
-    visit_id: Optional[int] = None
-    invoice_id: Optional[int] = None
+    appointment_id: int | None = None
+    visit_id: int | None = None
+    invoice_id: int | None = None
 
 
 class ApplyBenefitRequest(BaseModel):
     patient_benefit_id: int
     amount: float = Field(..., gt=0)
-    appointment_id: Optional[int] = None
-    visit_id: Optional[int] = None
-    invoice_id: Optional[int] = None
+    appointment_id: int | None = None
+    visit_id: int | None = None
+    invoice_id: int | None = None
 
 
 class EarnPointsRequest(BaseModel):
     patient_id: int
     program_id: int
     amount: float = Field(..., gt=0)
-    appointment_id: Optional[int] = None
-    visit_id: Optional[int] = None
-    invoice_id: Optional[int] = None
+    appointment_id: int | None = None
+    visit_id: int | None = None
+    invoice_id: int | None = None
 
 
 class RedeemPointsRequest(BaseModel):
     patient_id: int
     program_id: int
     points: int = Field(..., gt=0)
-    appointment_id: Optional[int] = None
-    visit_id: Optional[int] = None
-    invoice_id: Optional[int] = None
+    appointment_id: int | None = None
+    visit_id: int | None = None
+    invoice_id: int | None = None
 
 
 # === СКИДКИ ===
@@ -177,7 +177,7 @@ async def create_discount(
 @router.get("/discounts")
 async def get_discounts(
     active_only: bool = Query(True),
-    service_ids: Optional[list[int]] = Query(None),
+    service_ids: list[int] | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -363,7 +363,7 @@ async def assign_benefit_to_patient(
 @router.post("/benefits/verify/{patient_benefit_id}")
 async def verify_patient_benefit(
     patient_benefit_id: int,
-    notes: Optional[str] = None,
+    notes: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -618,8 +618,8 @@ async def calculate_total_discount(
 
 @router.get("/analytics/discounts")
 async def get_discount_analytics(
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -632,8 +632,8 @@ async def get_discount_analytics(
 
 @router.get("/analytics/benefits")
 async def get_benefit_analytics(
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -646,7 +646,7 @@ async def get_benefit_analytics(
 
 @router.get("/analytics/loyalty")
 async def get_loyalty_analytics(
-    program_id: Optional[int] = Query(None),
+    program_id: int | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

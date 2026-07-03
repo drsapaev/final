@@ -41,19 +41,19 @@ router = APIRouter()
 class DoctorSearchRequest(BaseModel):
     """Запрос поиска врачей"""
 
-    specialty: Optional[str] = None
-    name: Optional[str] = None
-    available_date: Optional[str] = None
+    specialty: str | None = None
+    name: str | None = None
+    available_date: str | None = None
     limit: int = 10
 
 
 class ServiceSearchRequest(BaseModel):
     """Запрос поиска услуг"""
 
-    category: Optional[str] = None
-    name: Optional[str] = None
-    price_min: Optional[float] = None
-    price_max: Optional[float] = None
+    category: str | None = None
+    name: str | None = None
+    price_min: float | None = None
+    price_max: float | None = None
     limit: int = 20
 
 
@@ -73,7 +73,7 @@ class AppointmentCancelRequest(BaseModel):
     """Запрос отмены записи"""
 
     appointment_id: int
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class AppointmentRescheduleRequest(BaseModel):
@@ -81,36 +81,36 @@ class AppointmentRescheduleRequest(BaseModel):
 
     appointment_id: int
     new_date: str
-    new_time: Optional[str] = None
-    reason: Optional[str] = None
+    new_time: str | None = None
+    reason: str | None = None
 
 
 class FeedbackRequest(BaseModel):
     """Запрос обратной связи"""
 
     type: str  # review, complaint, suggestion, question
-    rating: Optional[int] = None  # 1-5
+    rating: int | None = None  # 1-5
     message: str
-    appointment_id: Optional[int] = None
+    appointment_id: int | None = None
 
 
 class EmergencyContactRequest(BaseModel):
     """Запрос экстренной связи"""
 
     type: str  # ambulance, emergency_doctor, clinic
-    message: Optional[str] = None
-    location: Optional[dict[str, float]] = None  # {"lat": 41.0, "lng": 69.0}
+    message: str | None = None
+    location: dict[str, float] | None = None  # {"lat": 41.0, "lng": 69.0}
 
 
 class ProfileUpdateRequest(BaseModel):
     """Обновление профиля"""
 
-    full_name: Optional[str] = None
-    birth_date: Optional[str] = None
-    address: Optional[str] = None
-    emergency_contact: Optional[str] = None
-    allergies: Optional[str] = None
-    chronic_conditions: Optional[str] = None
+    full_name: str | None = None
+    birth_date: str | None = None
+    address: str | None = None
+    emergency_contact: str | None = None
+    allergies: str | None = None
+    chronic_conditions: str | None = None
 
 
 class NotificationSettingsRequest(BaseModel):

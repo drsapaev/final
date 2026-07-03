@@ -29,17 +29,17 @@ class PatientAppointmentResponse(BaseModel):
     """Ответ с информацией о записи для пациента"""
     id: int
     appointment_date: str
-    appointment_time: Optional[str] = None
-    doctor_name: Optional[str] = None
-    doctor_id: Optional[int] = None
-    department: Optional[str] = None
-    department_name: Optional[str] = None
-    cabinet: Optional[str] = None
+    appointment_time: str | None = None
+    doctor_name: str | None = None
+    doctor_id: int | None = None
+    department: str | None = None
+    department_name: str | None = None
+    cabinet: str | None = None
     status: str
     services: list[str] = []
     can_cancel: bool = False
     can_reschedule: bool = False
-    hours_until_appointment: Optional[float] = None
+    hours_until_appointment: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,7 +50,7 @@ class PatientResultResponse(BaseModel):
     title: str
     date: str
     status: str
-    file_url: Optional[str] = None
+    file_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -101,7 +101,7 @@ def can_modify_appointment(appointment: Appointment, min_hours: int = 24) -> tup
         return False, 0
 
 
-def get_department_display_name(department: Optional[str]) -> str:
+def get_department_display_name(department: str | None) -> str:
     """Получить читаемое название отделения."""
     names = {
         'cardiology': 'Кардиология',
@@ -114,7 +114,7 @@ def get_department_display_name(department: Optional[str]) -> str:
     return names.get(department.lower(), department) if department else 'Не указано'
 
 
-def extract_department_value(appointment: Appointment) -> Optional[str]:
+def extract_department_value(appointment: Appointment) -> str | None:
     """Достать строковое представление отделения из записи."""
     department = getattr(appointment, "department", None)
     if isinstance(department, str):
@@ -132,7 +132,7 @@ def extract_department_value(appointment: Appointment) -> Optional[str]:
 async def get_my_appointments(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
-    status_filter: Optional[str] = Query(None, description="Фильтр по статусу"),
+    status_filter: str | None = Query(None, description="Фильтр по статусу"),
     include_past: bool = Query(False, description="Включить прошедшие записи"),
 ):
     """
@@ -361,7 +361,7 @@ async def reschedule_my_appointment(
 async def get_available_slots(
     appointment_id: int,
     date_from: str = Query(..., description="Начальная дата YYYY-MM-DD"),
-    date_to: Optional[str] = Query(None, description="Конечная дата YYYY-MM-DD"),
+    date_to: str | None = Query(None, description="Конечная дата YYYY-MM-DD"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):

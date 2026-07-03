@@ -36,7 +36,7 @@ class SMSTestRequest(BaseModel):
 
     phone: str
     message: str
-    provider: Optional[str] = None
+    provider: str | None = None
 
 
 class SMSProviderInfo(BaseModel):
@@ -44,9 +44,9 @@ class SMSProviderInfo(BaseModel):
 
     name: str
     available: bool
-    balance: Optional[float] = None
-    currency: Optional[str] = None
-    error: Optional[str] = None
+    balance: float | None = None
+    currency: str | None = None
+    error: str | None = None
 
 
 def _unavailable_provider_info(provider_name: str, exc: Exception) -> SMSProviderInfo:
@@ -68,7 +68,7 @@ def _sanitize_sms_provider_result(result: dict) -> dict:
     return result
 
 
-def _sanitize_sms_response_error(success: bool, error: Optional[str]) -> Optional[str]:
+def _sanitize_sms_response_error(success: bool, error: str | None) -> str | None:
     if not success and error:
         return SMS_PROVIDER_UNAVAILABLE_ERROR
     return error
@@ -189,7 +189,7 @@ async def test_sms_sending(
 async def send_2fa_code(
     phone: str,
     code: str,
-    provider: Optional[str] = None,
+    provider: str | None = None,
     current_user: User = Depends(require_roles(["Admin", "Registrar"])),
 ):
     """Отправить код 2FA (для администраторов и регистраторов)"""

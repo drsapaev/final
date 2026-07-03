@@ -277,15 +277,15 @@ async def create_user(
 async def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    role: Optional[str] = Query(
+    role: str | None = Query(
         None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
         # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     ),
-    status_filter: Optional[str] = Query(
+    status_filter: str | None = Query(
         None, pattern="^(active|inactive|suspended|pending|locked)$", alias="status"
     ),
-    is_active: Optional[bool] = Query(None),
-    search: Optional[str] = Query(None, min_length=1, max_length=100),
+    is_active: bool | None = Query(None),
+    search: str | None = Query(None, min_length=1, max_length=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -361,7 +361,7 @@ async def update_user(
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
-    transfer_to: Optional[int] = Query(
+    transfer_to: int | None = Query(
         None, description="ID пользователя для передачи данных"
     ),
     db: Session = Depends(get_db),

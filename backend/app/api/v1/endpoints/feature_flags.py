@@ -27,15 +27,15 @@ class FeatureFlagResponse(BaseModel):
     id: int
     key: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     enabled: bool
     config: dict[str, Any]
     category: str
     environment: str
     created_at: str
-    updated_at: Optional[str] = None
-    created_by: Optional[str] = None
-    updated_by: Optional[str] = None
+    updated_at: str | None = None
+    created_by: str | None = None
+    updated_by: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,7 +45,7 @@ class FeatureFlagCreateRequest(BaseModel):
 
     key: str = Field(..., min_length=1, max_length=100, pattern="^[a-z0-9_]+$")
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=1000)
+    description: str | None = Field(None, max_length=1000)
     enabled: bool = False
     config: dict[str, Any] = Field(default_factory=dict)
     category: str = Field(default="general", max_length=50)
@@ -57,22 +57,22 @@ class FeatureFlagCreateRequest(BaseModel):
 class FeatureFlagUpdateRequest(BaseModel):
     """Запрос на обновление фича-флага"""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=1000)
-    enabled: Optional[bool] = None
-    config: Optional[dict[str, Any]] = None
-    category: Optional[str] = Field(None, max_length=50)
-    environment: Optional[str] = Field(
+    name: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = Field(None, max_length=1000)
+    enabled: bool | None = None
+    config: dict[str, Any] | None = None
+    category: str | None = Field(None, max_length=50)
+    environment: str | None = Field(
         None, pattern="^(production|staging|development|all)$"
     )
-    reason: Optional[str] = Field(None, max_length=500)
+    reason: str | None = Field(None, max_length=500)
 
 
 class FeatureFlagToggleRequest(BaseModel):
     """Запрос на переключение состояния флага"""
 
     enabled: bool
-    reason: Optional[str] = Field(None, max_length=500)
+    reason: str | None = Field(None, max_length=500)
 
 
 class FeatureFlagHistoryResponse(BaseModel):
@@ -81,13 +81,13 @@ class FeatureFlagHistoryResponse(BaseModel):
     id: int
     flag_key: str
     action: str
-    old_value: Optional[dict[str, Any]] = None
-    new_value: Optional[dict[str, Any]] = None
-    changed_by: Optional[str] = None
+    old_value: dict[str, Any] | None = None
+    new_value: dict[str, Any] | None = None
+    changed_by: str | None = None
     changed_at: str
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    reason: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    reason: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -105,7 +105,7 @@ class BulkToggleRequest(BaseModel):
 
     flag_keys: list[str]
     enabled: bool
-    reason: Optional[str] = Field(None, max_length=500)
+    reason: str | None = Field(None, max_length=500)
 
 
 # ===================== ЭНДПОИНТЫ =====================
@@ -113,7 +113,7 @@ class BulkToggleRequest(BaseModel):
 
 @router.get("/admin/feature-flags", response_model=list[FeatureFlagResponse])
 def get_all_feature_flags(
-    category: Optional[str] = None,
+    category: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -355,7 +355,7 @@ def bulk_toggle_feature_flags(
 @router.delete("/admin/feature-flags/{flag_key}")
 def delete_feature_flag(
     flag_key: str,
-    reason: Optional[str] = None,
+    reason: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

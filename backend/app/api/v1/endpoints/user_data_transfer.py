@@ -24,10 +24,10 @@ router = APIRouter()
 class UserDataSummaryResponse(BaseModel):
     user_id: int
     username: str
-    full_name: Optional[str]
-    email: Optional[str]
-    phone: Optional[str]
-    patient_id: Optional[int]
+    full_name: str | None
+    email: str | None
+    phone: str | None
+    patient_id: int | None
     data_counts: dict[str, int]
     transferable_data: list[dict[str, Any]]
 
@@ -278,7 +278,7 @@ def confirm_data_transfer(
 
 @router.get("/transfer/history")
 def get_transfer_history(
-    user_id: Optional[int] = Query(None, description="ID пользователя для фильтрации"),
+    user_id: int | None = Query(None, description="ID пользователя для фильтрации"),
     limit: int = Query(50, ge=1, le=100, description="Количество записей"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "SuperAdmin")),

@@ -128,7 +128,7 @@ class QRTokenGenerateRequest(BaseModel):
     expires_hours: int = Field(
         default=24, ge=1, le=168, description="Время жизни токена в часах"
     )
-    target_date: Optional[str] = Field(
+    target_date: str | None = Field(
         None, description="Целевая дата для очереди (YYYY-MM-DD)"
     )
     visit_type: str = Field(
@@ -139,7 +139,7 @@ class QRTokenGenerateRequest(BaseModel):
 class ClinicQRTokenGenerateRequest(BaseModel):
     """Запрос на генерацию общего QR токена клиники"""
 
-    target_date: Optional[str] = Field(
+    target_date: str | None = Field(
         None, description="Целевая дата для очереди (YYYY-MM-DD)"
     )
     expires_hours: int = Field(
@@ -163,19 +163,19 @@ class QRTokenInfoResponse(BaseModel):
     """Информация о QR токене"""
 
     token: str
-    specialist_id: Optional[int] = None  # None для общего QR клиники
+    specialist_id: int | None = None  # None для общего QR клиники
     specialist_name: str
     department: str
     department_name: str
     queue_length: int
     queue_active: bool
-    expires_at: Optional[str] = None
-    is_clinic_wide: Optional[bool] = False  # Флаг общего QR
-    target_date: Optional[str] = None  # Дата очереди
-    selectable_specialists: Optional[list[dict[str, Any]]] = None
-    allowed: Optional[bool] = None
-    status: Optional[str] = None
-    message: Optional[str] = None
+    expires_at: str | None = None
+    is_clinic_wide: bool | None = False  # Флаг общего QR
+    target_date: str | None = None  # Дата очереди
+    selectable_specialists: list[dict[str, Any]] | None = None
+    allowed: bool | None = None
+    status: str | None = None
+    message: str | None = None
 
 
 class JoinSessionStartRequest(BaseModel):
@@ -200,8 +200,8 @@ class JoinSessionCompleteRequest(BaseModel):
         ..., min_length=2, max_length=200, description="ФИО пациента"
     )
     phone: str = Field(..., min_length=5, max_length=20, description="Номер телефона")
-    telegram_id: Optional[int] = Field(None, description="Telegram ID")
-    specialist_ids: Optional[list[int]] = Field(
+    telegram_id: int | None = Field(None, description="Telegram ID")
+    specialist_ids: list[int] | None = Field(
         None, description="Список ID специалистов (для общего QR)"
     )
 
@@ -212,7 +212,7 @@ class JoinSessionCompleteMultipleResponse(BaseModel):
     success: bool
     queue_time: str
     entries: list[dict[str, Any]]
-    errors: Optional[list[dict[str, Any]]] = None
+    errors: list[dict[str, Any]] | None = None
     message: str
 
 
@@ -232,7 +232,7 @@ class QueueStatusResponse(BaseModel):
 
     active: bool
     queue_length: int
-    current_number: Optional[int]
+    current_number: int | None
     entries: list[dict[str, Any]]
 
 
@@ -240,9 +240,9 @@ class CallNextPatientResponse(BaseModel):
     """Ответ на вызов следующего пациента"""
 
     success: bool
-    message: Optional[str] = None
-    patient: Optional[dict[str, Any]] = None
-    queue_length: Optional[int] = None
+    message: str | None = None
+    patient: dict[str, Any] | None = None
+    queue_length: int | None = None
 
 
 class ActiveQRTokenResponse(BaseModel):
@@ -677,7 +677,7 @@ def complete_join_session(
 @router.get("/status/{specialist_id}", response_model=QueueStatusResponse)
 def get_queue_status(
     specialist_id: int,
-    target_date: Optional[str] = None,
+    target_date: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
@@ -706,7 +706,7 @@ def get_queue_status(
 @router.post("/{specialist_id}/call-next", response_model=CallNextPatientResponse)
 async def call_next_patient(
     specialist_id: int,
-    target_date: Optional[str] = Query(
+    target_date: str | None = Query(
         None, description="Дата очереди (YYYY-MM-DD), по умолчанию сегодня"
     ),
     db: Session = Depends(get_db),
@@ -852,7 +852,7 @@ def deactivate_qr_token(
 
 class RestoreToNextRequest(BaseModel):
     """Запрос на восстановление пациента следующим в очереди"""
-    reason: Optional[str] = Field(None, description="Причина восстановления")
+    reason: str | None = Field(None, description="Причина восстановления")
 
 
 class SetIncompleteRequest(BaseModel):
@@ -1085,8 +1085,8 @@ def mark_entry_incomplete(
 @router.get("/admin/queue-analytics/{specialist_id}")
 def get_queue_analytics(
     specialist_id: int,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -1193,10 +1193,10 @@ def get_queue_analytics(
 class UpdateOnlineEntryRequest(BaseModel):
     """Запрос на обновление данных онлайн записи"""
 
-    patient_name: Optional[str] = None
-    phone: Optional[str] = None
-    birth_year: Optional[int] = None
-    address: Optional[str] = None
+    patient_name: str | None = None
+    phone: str | None = None
+    birth_year: int | None = None
+    address: str | None = None
 
 
 @router.put("/online-entry/{entry_id}/update")
@@ -1311,7 +1311,7 @@ class FullUpdateOnlineEntryRequest(BaseModel):
     discount_mode: str  # none/repeat/benefit
     services: list[dict]  # [{service_id, quantity}]
     all_free: bool = False
-    aggregated_ids: Optional[list[int]] = None  # ⭐ FIX: IDs of all merged entries for dedup check
+    aggregated_ids: list[int] | None = None  # ⭐ FIX: IDs of all merged entries for dedup check
 
 
 @router.put("/online-entry/{entry_id}/full-update")

@@ -110,7 +110,7 @@ def get_doctors(
     skip: int = 0,
     limit: int = 100,
     active_only: bool = False,
-    specialty: Optional[str] = None,
+    specialty: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -128,7 +128,7 @@ def get_doctors(
 
 @router.get("/doctors/available-users", response_model=list[DoctorUserOption])
 def get_available_doctor_users(
-    doctor_id: Optional[int] = Query(
+    doctor_id: int | None = Query(
         None,
         description="ID редактируемого врача, чтобы вернуть уже привязанного пользователя",
     ),

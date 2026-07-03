@@ -360,24 +360,24 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 
 class PendingPaymentResponse(BaseModel):
     id: int
-    patient_id: Optional[int]
-    patient_name: Optional[str]
-    patient_last_name: Optional[str]
-    patient_first_name: Optional[str]
-    doctor_id: Optional[int]
-    department: Optional[str]
-    appointment_date: Optional[str]
-    appointment_time: Optional[str]
+    patient_id: int | None
+    patient_name: str | None
+    patient_last_name: str | None
+    patient_first_name: str | None
+    doctor_id: int | None
+    department: str | None
+    appointment_date: str | None
+    appointment_time: str | None
     status: str
     services: list[str]
     services_names: list[str]
-    payment_amount: Optional[float]
-    created_at: Optional[str]
+    payment_amount: float | None
+    created_at: str | None
     record_type: str
-    visit_ids: Optional[list[int]] = None
+    visit_ids: list[int] | None = None
 
 
-def _pick_date(date_str: Optional[str], date: Optional[str], d: Optional[str]) -> str:
+def _pick_date(date_str: str | None, date: str | None, d: str | None) -> str:
     value = date_str or date or d
     if not value:
         raise HTTPException(
@@ -396,11 +396,11 @@ def list_appointments(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    patient_id: Optional[int] = Query(None, description="Patient id filter"),
-    doctor_id: Optional[int] = Query(None, description="Doctor id filter"),
-    department: Optional[str] = Query(None, description="Department filter"),
-    date_from: Optional[str] = Query(None, description="From date (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="To date (YYYY-MM-DD)"),
+    patient_id: int | None = Query(None, description="Patient id filter"),
+    doctor_id: int | None = Query(None, description="Doctor id filter"),
+    department: str | None = Query(None, description="Department filter"),
+    date_from: str | None = Query(None, description="From date (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="To date (YYYY-MM-DD)"),
     current_user: User = Depends(deps.get_current_user),
 ):
     del current_user
@@ -441,8 +441,8 @@ async def get_pending_payments(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    date_from: Optional[str] = Query(default=None),
-    date_to: Optional[str] = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
     current_user: User = Depends(deps.get_current_user),
 ):
     del current_user
@@ -591,9 +591,9 @@ def open_day(
 @router.get("/stats", name="stats")
 def stats(
     department: str = Query(...),
-    date_str: Optional[str] = Query(None),
-    date: Optional[str] = Query(None),
-    d: Optional[str] = Query(None),
+    date_str: str | None = Query(None),
+    date: str | None = Query(None),
+    d: str | None = Query(None),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
@@ -643,9 +643,9 @@ def close_day(
 @router.get("/qrcode", name="qrcode_png")
 def qrcode_png(
     department: str = Query(...),
-    date_str: Optional[str] = Query(None),
-    date: Optional[str] = Query(None),
-    d: Optional[str] = Query(None),
+    date_str: str | None = Query(None),
+    date: str | None = Query(None),
+    d: str | None = Query(None),
     current_user: User = Depends(deps.get_current_user),
 ):
     del current_user

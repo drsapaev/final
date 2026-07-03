@@ -35,8 +35,8 @@ def _ai_tracking_http_error(exc: Exception, operation: str) -> HTTPException:
 @router.get("/models/stats", response_model=list[AIModelStats])
 async def get_ai_model_stats(
     days_back: int = Query(30, ge=1, le=365, description="Количество дней назад"),
-    provider_id: Optional[int] = Query(None, description="ID провайдера"),
-    specialty: Optional[str] = Query(None, description="Специализация"),
+    provider_id: int | None = Query(None, description="ID провайдера"),
+    specialty: str | None = Query(None, description="Специализация"),
     db: Session = Depends(get_db),
 ):
     """

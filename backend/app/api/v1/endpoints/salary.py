@@ -39,7 +39,7 @@ class SalaryChangeCreate(BaseModel):
     user_id: int
     new_salary: Decimal
     change_type: str = "adjustment"
-    reason: Optional[str] = None
+    reason: str | None = None
     effective_date: datetime
     currency: str = "UZS"
 
@@ -53,7 +53,7 @@ class SalaryPaymentCreate(BaseModel):
     deductions: Decimal = Decimal("0")
     taxes: Decimal = Decimal("0")
     currency: str = "UZS"
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 def _model_to_dict(model: BaseModel) -> dict:
@@ -128,7 +128,7 @@ async def get_salary_payments(
     user_id: int,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin", "HR")),
-    year: Optional[int] = None,
+    year: int | None = None,
     limit: int = Query(24, ge=1, le=100),
 ) -> list[dict[str, Any]]:
     """
@@ -165,8 +165,8 @@ async def create_salary_payment(
 async def update_payment_status(
     payment_id: int,
     status: str,
-    payment_date: Optional[datetime] = None,
-    payment_method: Optional[str] = None,
+    payment_date: datetime | None = None,
+    payment_method: str | None = None,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin")),
 ) -> dict[str, Any]:

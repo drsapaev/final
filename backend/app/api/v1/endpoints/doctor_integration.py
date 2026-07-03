@@ -83,7 +83,7 @@ def _resolve_queue_allowed_tags(specialty: str) -> list[str]:
     return DOCTOR_QUEUE_ALLOWED_TAGS.get(normalized, [normalized])
 
 
-def _serialize_queue_doctor(doctor: Optional[Doctor], current_user: User, specialty: str):
+def _serialize_queue_doctor(doctor: Doctor | None, current_user: User, specialty: str):
     normalized = _normalize_queue_specialty(specialty)
     if doctor:
         return {
@@ -252,20 +252,20 @@ def _ensure_schedule_next_patient_access(
 class ScheduleNextVisitService(BaseModel):
     service_id: int
     quantity: int = 1
-    custom_price: Optional[float] = None
+    custom_price: float | None = None
 
 
 class ScheduleNextVisitRequest(BaseModel):
     patient_id: int
     services: list[ScheduleNextVisitService] = Field(default_factory=list)
-    service_ids: Optional[list[int]] = None
+    service_ids: list[int] | None = None
     visit_date: date
-    visit_time: Optional[str] = None
+    visit_time: str | None = None
     discount_mode: str = Field(
         default="none", pattern="^(none|repeat|benefit|all_free)$"
     )
     all_free: bool = False
-    notes: Optional[str] = None
+    notes: str | None = None
     confirmation_channel: str = Field(
         default="phone", pattern="^(phone|telegram|pwa|auto)$"
     )
@@ -740,7 +740,7 @@ def start_patient_visit(
 @router.post("/doctor/queue/{entry_id}/complete")
 def complete_patient_visit(
     entry_id: int,
-    visit_data: Optional[dict[str, Any]] = None,
+    visit_data: dict[str, Any] | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles(
@@ -1626,10 +1626,10 @@ def get_today_visits(
 
 @router.get("/doctor/visits/statistics")
 def get_visit_statistics(
-    date_from: Optional[str] = Query(
+    date_from: str | None = Query(
         None, description="Дата начала в формате YYYY-MM-DD"
     ),
-    date_to: Optional[str] = Query(
+    date_to: str | None = Query(
         None, description="Дата окончания в формате YYYY-MM-DD"
     ),
     db: Session = Depends(get_db),
@@ -1769,7 +1769,7 @@ def add_service_to_visit(
     visit_id: int,
     service_id: int,
     quantity: int = 1,
-    custom_price: Optional[float] = None,
+    custom_price: float | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
