@@ -5,6 +5,62 @@
 
 ---
 
+## ✅ Что сделано в PR `fix/workflow-panels-refactor` (2026-07-04)
+
+### Этап 1: Унификация DermatologistPanelUnified — было сделано ранее
+- `completeVisit` удалён, осталась только `handleSaveVisit` с использованием `queueService`.
+- Автовызов следующего пациента через `callNextWaiting('derma')` работает.
+
+### Этап 2: Восстановление завершения визита в DentistPanelUnified ✅
+- Восстановлена функция `handleCompleteVisit` (раздел "Завершение визита" был пустой).
+- Добавлена кнопка "Завершить приём" в `VisitProtocol.jsx` через опциональный prop `onComplete`.
+- Автовызов следующего пациента через `queueService.callNextWaiting(SPECIALTY_KEYS.DENTISTRY)`.
+- Логирование каждого шага через `logger.info/warn/error`.
+- Контракт SSOT (`resolveDoctorQueueEntryId` → `/doctor/queue/${queueEntryId}/complete`) соблюдён.
+
+### Этап 3: LabPanel — оставлено как низкоприоритетное
+LabPanel уже эталонная по обработке ошибок (через `retryAction`). Дальнейшие улучшения — минимальная ценность.
+
+### Этап 4: Синхронизация статусов ✅
+- Унифицированы `SPECIALTY_KEYS` константы в новом модуле `utils/doctorPanelShared.js`.
+- Раньше были смешанные формы: `'cardio'`/`'cardiology'`, `'derma'`/`'dermatology'`, `'dental'`/`'dentistry'`.
+- Backend продолжает толерантно маппить все алиасы через `DOCTOR_QUEUE_SPECIALTY_VARIANTS`.
+- Все панели теперь вызывают `queueService.callNextWaiting(SPECIALTY_KEYS.*)` с каноническим ключом.
+
+### Дополнительно (вне изначального плана):
+- **`utils/doctorPanelShared.js`** — новый shared-модуль:
+  - `countAppointmentsByStatuses` (Set-based, O(n+m) вместо O(n*m))
+  - `normalizeNumericId` (null-safe parseInt)
+  - `SPECIALTY_KEYS` enum — single source of truth
+  - `SPECIALTY_ALIASES` таблица, выровненная с backend
+  - `matchesSpecialty()` tolerant comparison helper
+- **CardiologistPanelUnified.loadEMR** — улучшена обработка ошибок:
+  - 401/403 → "Сессия истекла..." toast (было: generic error)
+  - 5xx → "Сервер недоступен..." toast (было: generic error)
+  - AbortError → silent log (visit changed mid-fetch)
+  - Ранний check токена — fail-fast вместо 401 round-trip
+  - Защитный `setEmr(null)` в каждой non-200 ветке предотвращает утечку данных между визитами
+- **CardiologistPanelUnified** — подключён `useVisitLifecycle` hook для инвалидации кэша:
+  - `cacheService.invalidateByVisit(prevVisitId)` + `invalidateByPatient(prevPatientId)` при смене визита
+  - `onCleanup` сбрасывает локальный `emr` state в null
+
+### Локальная верификация:
+- `npx vitest run` → 467/467 тестов проходят
+- `DoctorPanels.contract.test.jsx` → 9/9 SSOT-ассертов проходят
+- `useVisitLifecycle.test.jsx` → 2/2 теста проходят
+- `npx eslint` на затронутых файлах → 0 ошибок (pre-existing warnings не изменены)
+- Backend не тронут — все контракты сохранены
+
+### Что осталось (требует ручного тестирования в клинике):
+- [ ] Протестировать Cardiologist: вызов → EMR → сохранение → завершение → автовызов следующего
+- [ ] Протестировать Dermatologist: тот же flow
+- [ ] Протестировать Dentist: вызов → протокол визита → "Завершить приём" → автовызов следующего
+- [ ] Проверить синхронизацию статусов между регистратурой и панелями врачей
+- [ ] Проверить в разных браузерах (Chrome, Firefox, Edge, Safari)
+- [ ] Проверить кэширование в Edge (известная проблема из оригинального плана)
+
+---
+
 ## 📊 Текущее состояние
 
 ### ✅ CardiologistPanelUnified.jsx

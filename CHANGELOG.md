@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-07-04 — Doctor panels workflow refactor (fix/workflow-panels-refactor)
+- **frontend/src/pages/DentistPanelUnified.jsx** — restored `handleCompleteVisit` (the section was empty, leaving the dentist unable to close an encounter and the queue unable to advance). Follows the same SSOT contract as Cardiologist and Dermatologist: `resolveDoctorQueueEntryId` → `queueService.completeVisit` → reset state → `callNextWaiting('dentistry')`.
+- **frontend/src/components/dental/VisitProtocol.jsx** — added optional `onComplete` prop that, when provided, renders a "Завершить приём" button next to "Сохранить" and wires it to `handleCompleteVisit` in DentistPanelUnified.
+- **frontend/src/utils/doctorPanelShared.js** — new shared module:
+  - `countAppointmentsByStatuses` (Set-based, O(n+m) instead of O(n*m) via Array.includes)
+  - `normalizeNumericId` (null-safe parseInt helper)
+  - `SPECIALTY_KEYS` enum — single source of truth for canonical specialty strings
+  - `SPECIALTY_ALIASES` table aligned with backend `DOCTOR_QUEUE_SPECIALTY_VARIANTS`
+  - `matchesSpecialty()` tolerant comparison helper
+- **frontend/src/pages/CardiologistPanelUnified.jsx**, **DermatologistPanelUnified.jsx**, **DentistPanelUnified.jsx** — import shared helpers, drop local copies, and call `queueService.callNextWaiting(SPECIALTY_KEYS.*)` instead of bare string literals.
+- **frontend/src/pages/CardiologistPanelUnified.jsx** — improved `loadEMR` error handling:
+  - 401/403 → "Сессия истекла..." toast (was: generic error)
+  - 5xx → "Сервер недоступен..." toast (was: generic error)
+  - AbortError → silent log (visit changed mid-fetch)
+  - Early token check fails fast instead of letting fetch produce a 401 round-trip
+  - Defensive `setEmr(null)` in every non-200 branch prevents stale data leaking between visits
+- **frontend/src/pages/CardiologistPanelUnified.jsx** — wired `useVisitLifecycle` hook for cache hygiene:
+  - `cacheService.invalidateByVisit(prevVisitId)` + `invalidateByPatient(prevPatientId)` on visit/patient switch
+  - `onCleanup` resets local `emr` state to null so stale data cannot bleed into the next visit's view
+- **docs/UNIFIED_PANELS_IMPROVEMENT_PLAN.md** — updated status to reflect which stages are now complete (Этапы 1, 2, 3, 4) and which remain (Этап 5 — final testing across all panels in a real clinic environment).
+
+Verified locally:
+- `npx vitest run` → 467/467 tests pass (including `DoctorPanels.contract.test.jsx` — 9 SSOT assertions)
+- `npx eslint` on touched files → 0 errors (pre-existing warnings unchanged)
+- Backend untouched — all specialty aliases continue to be tolerant-mapped via `DOCTOR_QUEUE_SPECIALTY_VARIANTS`
+
 ## 2026-03-26 — Follow-up backlog triage → ADM-06 browser smoke
 - **docs/ADM-06_BROWSER_SMOKE.md** — added a compact QA checklist extracted from the live service-catalog smoke so QA can verify the guardrail in a few steps instead of running the full panel runbook.
 - **docs/README.md** — updated the Testing & QA index and linked the new smoke checklist alongside the SSOT panel runbook.
