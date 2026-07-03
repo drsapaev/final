@@ -114,8 +114,9 @@ const MacOSCardiologistPanelUnified = () => {
   });
   const [loading, setLoading] = useState(false);
   // QW-01 (UX audit): removed swallowed setMessage — all calls now route through `notify`
-  // (react-toastify) so users actually see error/success/warning feedback.
-  // `message` destructure was dropped, which silently discarded every notification.
+  // (the shared adapter in services/notify.js) so users actually see error/success/warning
+  // feedback. The `message` destructure was dropped, which silently discarded every
+  // notification before this fix.
   // QW-10 (UX audit): confirm hook used before completing a visit (prevents
   // accidental completion with empty diagnosis/treatment).
   const [confirm, confirmDialog] = useConfirm();
