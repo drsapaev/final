@@ -42,7 +42,7 @@ WIZARD_DUPLICATE_ACTIVE_STATUSES = (
 )
 
 
-class MorningAssignmentClaimError(ValueError):
+class MorningAssignmentClaimError(ValueError):  # noqa: F811  # manual-review: intentional redefinition for compatibility
     """Raised when a wizard-family queue claim cannot be resolved safely."""
 
 

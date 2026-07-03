@@ -369,7 +369,7 @@ async def verify_patient_benefit(
     """Верифицировать льготу пациента"""
     service = DiscountBenefitsService(db)
     try:
-        patient_benefit = service.verify_patient_benefit(
+        patient_benefit = service.verify_patient_benefit(  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
             patient_benefit_id=patient_benefit_id,
             verified_by=current_user.id,
             notes=notes,

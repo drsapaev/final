@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Any
 
 
-class MessageEventType(str, Enum):
+class MessageEventType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     NEW_MESSAGE = "new_message"
     MESSAGE_READ = "message_read"
     MESSAGES_READ = "messages_read"

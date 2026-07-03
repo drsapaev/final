@@ -434,7 +434,7 @@ def save_emr(
     return _legacy_emr_response(saved_emr, appointment_id=appointment.id)
 
 
-@router.get("/{appointment_id}/emr", response_model=Optional[EMR])
+@router.get("/{appointment_id}/emr", response_model=Optional[EMR])  # noqa: UP045  # manual-review: complex type expression — manual conversion needed
 def get_emr(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
@@ -557,7 +557,7 @@ def save_prescription(
     return saved_prescription
 
 
-@router.get("/{appointment_id}/prescription", response_model=Optional[Prescription])
+@router.get("/{appointment_id}/prescription", response_model=Optional[Prescription])  # noqa: UP045  # manual-review: complex type expression — manual conversion needed
 def get_prescription(
     appointment_id: int,
     db: Session = Depends(deps.get_db),

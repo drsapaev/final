@@ -13,7 +13,7 @@ from app.utils.url_security import validate_public_http_url
 # ===================== БАЗОВЫЕ СХЕМЫ =====================
 
 
-class WebhookEventTypeEnum(str, Enum):
+class WebhookEventTypeEnum(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы событий для webhook'ов"""
 
     # Пациенты
@@ -56,7 +56,7 @@ class WebhookEventTypeEnum(str, Enum):
     SYSTEM_MAINTENANCE_END = "system.maintenance_end"
 
 
-class WebhookStatusEnum(str, Enum):
+class WebhookStatusEnum(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы webhook'ов"""
 
     ACTIVE = "active"
@@ -65,7 +65,7 @@ class WebhookStatusEnum(str, Enum):
     FAILED = "failed"
 
 
-class WebhookCallStatusEnum(str, Enum):
+class WebhookCallStatusEnum(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы вызовов webhook'ов"""
 
     PENDING = "pending"

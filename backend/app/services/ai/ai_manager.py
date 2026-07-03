@@ -17,7 +17,7 @@ from .openai_provider import OpenAIProvider
 logger = logging.getLogger(__name__)
 
 
-class AIProviderType(str, Enum):
+class AIProviderType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы AI провайдеров"""
 
     OPENAI = "openai"

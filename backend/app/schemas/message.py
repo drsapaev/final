@@ -8,7 +8,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class MessageType(str, Enum):
+class MessageType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы сообщений"""
     TEXT = "text"
     VOICE = "voice"

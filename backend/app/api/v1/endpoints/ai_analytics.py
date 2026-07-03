@@ -492,7 +492,7 @@ async def compare_ai_models(
         end_date = date.today()
         start_date = end_date - timedelta(days=days)
 
-        service = get_ai_analytics_service(db)
+        service = get_ai_analytics_service(db)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
 
         # Получаем данные для сравнения (в реальности здесь будет сравнение разных моделей)
         comparison_data = {

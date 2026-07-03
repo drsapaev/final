@@ -13,7 +13,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
-class IntegrationType(str, Enum):
+class IntegrationType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы внешних интеграций"""
     DMED = "dmed"
     EGOV = "egov"

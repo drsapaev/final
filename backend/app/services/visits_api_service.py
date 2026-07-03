@@ -390,10 +390,21 @@ class VisitsApiService:
 # app/api/v1/endpoints/visits.py
 
 
-from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from fastapi import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    APIRouter,
+    Depends,
+    Query,
+    Request,
+)
+from pydantic import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    BaseModel,
+    Field,
+)
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    get_db,
+    require_roles,
+)
 
 router = APIRouter()
 

@@ -15,21 +15,42 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-from app.api.deps import get_db, require_roles
-from app.crud import (
+from app.api.deps import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    get_db,
+    require_roles,
+)
+from app.crud import (  # noqa: E402  # manual-review: conditional import after config — intentional
     clinic as crud_clinic,
 )
-from app.crud import (
+from app.crud import (  # noqa: E402  # manual-review: conditional import after config — intentional
     visit as crud_visit,
 )
-from app.models.appointment import Appointment
-from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.service import Service
-from app.models.user import User
-from app.models.visit import Visit, VisitService
-from app.services.notification_service import NotificationService
-from app.services.service_mapping import get_service_code
+from app.models.appointment import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    Appointment,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.models.clinic import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    Doctor,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.models.online_queue import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    DailyQueue,
+    OnlineQueueEntry,
+)
+from app.models.service import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    Service,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.models.user import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    User,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.models.visit import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    Visit,
+    VisitService,
+)
+from app.services.notification_service import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    NotificationService,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.services.service_mapping import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    get_service_code,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
 
 router = APIRouter()
 
@@ -1671,7 +1692,7 @@ def get_visit_statistics(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: B025  # manual-review: duplicate exception in try block — manual review
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

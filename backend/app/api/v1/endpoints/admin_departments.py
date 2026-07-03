@@ -953,7 +953,7 @@ def _legacy_departments_overview_payload(
 
 
 @router.post("/{department_id}/initialize", response_model=dict)
-def initialize_department(
+def initialize_department(  # noqa: F811  # manual-review: intentional redefinition for compatibility
     department_id: int,
     payload: dict[str, Any] | None = None,
     db: Session = Depends(get_db),

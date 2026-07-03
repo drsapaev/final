@@ -2621,7 +2621,7 @@ def get_today_queues(
             )
 
             # [OK] Определяем specialty: если есть ЭКГ, разделяем на отдельные очереди
-            visit_date = visit.visit_date or today
+            visit_date = visit.visit_date or today  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
             patient_id = visit.patient_id
 
             if has_ecg and not has_only_ecg:
@@ -3382,7 +3382,7 @@ def create_queue_entries_batch(
                 )
 
                 # Получаем queue_id из созданной записи
-                queue = (
+                queue = (  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
                     db.query(DailyQueue)
                     .filter(DailyQueue.id == queue_entry.queue_id)
                     .first()

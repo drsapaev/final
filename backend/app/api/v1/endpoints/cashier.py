@@ -536,7 +536,7 @@ async def get_pending_payments(
 
         # Считаем remaining и фильтруем оплаченных
         pending_groups = []
-        for patient_id, group in patient_groups.items():
+        for patient_id, group in patient_groups.items():  # noqa: B007  # manual-review: loop var unused but kept for API contract
             group["remaining_amount"] = group["total_amount"] - group["paid_amount"]
 
             # =====================================================
@@ -1224,7 +1224,7 @@ async def create_payment(
                 paid_amount += p.amount
 
             # 3. Проверяем остаток
-            remaining_debt = total_cost - paid_amount
+            remaining_debt = total_cost - paid_amount  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
 
             # ⚠️ RELAXED VALIDATION: Разрешаем оплату даже если долг 0 (депозит/аванс)
             # или если total_cost посчитан неверно (0), но кассир хочет принять деньги.

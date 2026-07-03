@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
-class WebhookEventType(str, enum.Enum):
+class WebhookEventType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы событий для webhook'ов"""
 
     # Пациенты
@@ -63,7 +63,7 @@ class WebhookEventType(str, enum.Enum):
     SYSTEM_MAINTENANCE_END = "system.maintenance_end"
 
 
-class WebhookStatus(str, enum.Enum):
+class WebhookStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы webhook'ов"""
 
     ACTIVE = "active"
@@ -72,7 +72,7 @@ class WebhookStatus(str, enum.Enum):
     FAILED = "failed"
 
 
-class WebhookCallStatus(str, enum.Enum):
+class WebhookCallStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы вызовов webhook'ов"""
 
     PENDING = "pending"

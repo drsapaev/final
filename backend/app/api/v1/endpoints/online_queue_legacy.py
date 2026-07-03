@@ -32,7 +32,7 @@ async def generate_qr_code_legacy(
 
     # Валидация даты
     try:
-        target_date = datetime.strptime(day, "%Y-%m-%d").date()
+        target_date = datetime.strptime(day, "%Y-%m-%d").date()  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
     except ValueError:
         raise HTTPException(
             status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD"

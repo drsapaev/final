@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class AITaskType(str, Enum):
+class AITaskType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """SSOT для типов AI задач"""
     COMPLAINT_ANALYSIS = "complaint_analysis"
     ICD10_SUGGESTION = "icd10_suggestion"
@@ -27,7 +27,7 @@ class AITaskType(str, Enum):
     SYMPTOM_CHECK = "symptom_check"
 
 
-class AIProviderType(str, Enum):
+class AIProviderType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы AI провайдеров"""
     OPENAI = "openai"
     GEMINI = "gemini"

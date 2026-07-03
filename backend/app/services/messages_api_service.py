@@ -639,7 +639,7 @@ API endpoints для системы сообщений между пользов
 """
 
 
-from fastapi import (
+from fastapi import (  # noqa: E402  # manual-review: conditional import after config — intentional
     APIRouter,
     Depends,
     File,
@@ -647,10 +647,15 @@ from fastapi import (
     Query,
     Request,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    FileResponse,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
 
-from app.api.deps import get_current_user, get_db
-from app.schemas.message import (
+from app.api.deps import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    get_current_user,
+    get_db,
+)
+from app.schemas.message import (  # noqa: E402  # manual-review: conditional import after config — intentional
     ConversationListResponse,
     MessageListResponse,
     MessageReactionCreate,

@@ -156,7 +156,7 @@ class ServiceCategory(Base):
 # ===================== ФИЛИАЛЫ КЛИНИКИ =====================
 
 
-class BranchStatus(str, enum.Enum):
+class BranchStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы филиалов"""
 
     ACTIVE = "active"
@@ -208,7 +208,7 @@ class Branch(Base):
 # ===================== ОБОРУДОВАНИЕ =====================
 
 
-class EquipmentStatus(str, enum.Enum):
+class EquipmentStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы оборудования"""
 
     ACTIVE = "active"
@@ -218,7 +218,7 @@ class EquipmentStatus(str, enum.Enum):
     REPLACED = "replaced"
 
 
-class EquipmentType(str, enum.Enum):
+class EquipmentType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы оборудования"""
 
     MEDICAL = "medical"
@@ -306,7 +306,7 @@ class EquipmentMaintenance(Base):
 # ===================== ЛИЦЕНЗИИ И АКТИВАЦИЯ =====================
 
 
-class LicenseStatus(str, enum.Enum):
+class LicenseStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы лицензий"""
 
     ACTIVE = "active"
@@ -315,7 +315,7 @@ class LicenseStatus(str, enum.Enum):
     PENDING = "pending"
 
 
-class LicenseType(str, enum.Enum):
+class LicenseType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы лицензий"""
 
     SOFTWARE = "software"
@@ -389,7 +389,7 @@ class LicenseActivation(Base):
 # ===================== РЕЗЕРВНОЕ КОПИРОВАНИЕ =====================
 
 
-class BackupStatus(str, enum.Enum):
+class BackupStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы резервного копирования"""
 
     PENDING = "pending"
@@ -399,7 +399,7 @@ class BackupStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class BackupType(str, enum.Enum):
+class BackupType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы резервного копирования"""
 
     FULL = "full"

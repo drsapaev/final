@@ -30,7 +30,7 @@ def _log_provider_failure(provider: str, operation: str, exc: Exception) -> None
     )
 
 
-class SMSProviderType(str, Enum):
+class SMSProviderType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы SMS провайдеров"""
 
     ESKIZ = "eskiz"

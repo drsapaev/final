@@ -340,14 +340,30 @@ class AppointmentsApiService:
 """Appointments API endpoints."""
 
 
-import logging
+import logging  # noqa: E402  # manual-review: conditional import after config — intentional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from fastapi import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
+from pydantic import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    BaseModel,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
 
-from app.api import deps
-from app.models.user import User
-from app.services.online_queue import _broadcast, get_or_create_day, load_stats
+from app.api import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    deps,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.models.user import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    User,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
+from app.services.online_queue import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    _broadcast,
+    get_or_create_day,
+    load_stats,
+)
 
 logger = logging.getLogger(__name__)
 

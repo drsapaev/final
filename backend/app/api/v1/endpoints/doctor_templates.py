@@ -167,7 +167,9 @@ async def unpin_template(
 
 # ============== Edit Template Endpoint ==============
 
-from pydantic import BaseModel as PydanticBaseModel
+from pydantic import (  # noqa: E402  # manual-review: conditional import after config — intentional
+    BaseModel as PydanticBaseModel,  # noqa: E402  # manual-review: conditional import after config — intentional
+)
 
 
 class UpdateTemplateRequest(PydanticBaseModel):

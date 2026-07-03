@@ -9,7 +9,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class FileTypeEnum(str, Enum):
+class FileTypeEnum(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     DOCUMENT = "document"
     IMAGE = "image"
     VIDEO = "video"
@@ -24,7 +24,7 @@ class FileTypeEnum(str, Enum):
     OTHER = "other"
 
 
-class FileStatusEnum(str, Enum):
+class FileStatusEnum(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     UPLOADING = "uploading"
     PROCESSING = "processing"
     READY = "ready"
@@ -33,7 +33,7 @@ class FileStatusEnum(str, Enum):
     ARCHIVED = "archived"
 
 
-class FilePermissionEnum(str, Enum):
+class FilePermissionEnum(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     PUBLIC = "public"
     PRIVATE = "private"
     RESTRICTED = "restricted"

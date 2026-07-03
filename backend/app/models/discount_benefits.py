@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
-class DiscountType(str, enum.Enum):
+class DiscountType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы скидок"""
 
     PERCENTAGE = "percentage"  # Процентная скидка
@@ -31,7 +31,7 @@ class DiscountType(str, enum.Enum):
     REFERRAL = "referral"  # Реферальная скидка
 
 
-class BenefitType(str, enum.Enum):
+class BenefitType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы льгот"""
 
     VETERAN = "veteran"  # Ветеран
@@ -44,7 +44,7 @@ class BenefitType(str, enum.Enum):
     EMPLOYEE = "employee"  # Сотрудник клиники
 
 
-class DiscountStatus(str, enum.Enum):
+class DiscountStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы скидок"""
 
     ACTIVE = "active"

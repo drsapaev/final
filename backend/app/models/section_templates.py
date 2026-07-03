@@ -30,7 +30,7 @@ from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
 
-class SectionType(str, Enum):
+class SectionType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """EMR Section types"""
     COMPLAINTS = "complaints"
     ANAMNESIS = "anamnesis"

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
-class FileType(str, enum.Enum):
+class FileType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Типы файлов"""
 
     DOCUMENT = "document"
@@ -38,7 +38,7 @@ class FileType(str, enum.Enum):
     OTHER = "other"
 
 
-class FileStatus(str, enum.Enum):
+class FileStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы файлов"""
 
     UPLOADING = "uploading"
@@ -49,7 +49,7 @@ class FileStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
-class FilePermission(str, enum.Enum):
+class FilePermission(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Права доступа к файлам"""
 
     PUBLIC = "public"

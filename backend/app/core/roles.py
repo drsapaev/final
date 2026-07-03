@@ -6,7 +6,7 @@
 from enum import Enum
 
 
-class Roles(str, Enum):
+class Roles(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Роли пользователей в системе"""
 
     # Основные роли

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
-class UserStatus(str, enum.Enum):
+class UserStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
     """Статусы пользователя"""
 
     ACTIVE = "active"
