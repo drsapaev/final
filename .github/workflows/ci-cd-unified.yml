@@ -618,7 +618,7 @@ jobs:
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
-        npm ci
+        npm ci --legacy-peer-deps
     
     - name: 🔍 Линтинг frontend
       run: |
@@ -665,7 +665,7 @@ jobs:
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
-        npm ci
+        npm ci --legacy-peer-deps
     
     - name: 🧪 Тесты frontend
       run: |
@@ -702,7 +702,7 @@ jobs:
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
-        npm ci
+        npm ci --legacy-peer-deps
     
     - name: 🏗️ Сборка frontend
       run: |
@@ -736,7 +736,7 @@ jobs:
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
-        npm ci
+        npm ci --legacy-peer-deps
 
     - name: 🧪 Registrar time e2e (Chromium)
       run: |
@@ -2022,7 +2022,7 @@ jobs:
     - name: рџ“¦ Install frontend dependencies
       run: |
         cd frontend
-        npm ci
+        npm ci --legacy-peer-deps
 
     - name: рџ§Є Telegram Mini App browser QA artifacts
       run: |

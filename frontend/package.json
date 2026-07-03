@@ -36,7 +36,7 @@
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
     "@sentry/react": "^8.47.0",
-    "@sentry/vite": "^3.0.0",
+    "@sentry/vite-plugin": "^3.6.1",
     "@tanstack/react-virtual": "^3.14.5",
     "@vercel/speed-insights": "^2.0.0",
     "axios": "^1.18.1",
