@@ -272,7 +272,7 @@ export default function HeaderNew() {
         variant="outline"
         size="small"
         title="Главная"
-        onClick={() => navigate(`${registrarHomeRoute}?view=welcome`)}
+        onClick={() => navigate('/registrar/welcome')}
         className="hdr-hide-md"
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
 
@@ -283,7 +283,7 @@ export default function HeaderNew() {
         variant="outline"
         size="small"
         title="Онлайн‑записи"
-        onClick={() => navigate(`${registrarHomeRoute}?view=queue`)}
+        onClick={() => navigate('/registrar/queue')}
         className="hdr-hide-xs"
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
 
