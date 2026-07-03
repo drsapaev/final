@@ -254,6 +254,36 @@ const MacOSCardiologistPanelUnified = () => {
     [FIELD_RANGES]
   );
 
+  // P-020 (UX audit): critical ICD-10 codes that require secondary
+  // confirmation before the visit can be completed. These are diagnoses
+  // with high clinical stakes — an erroneous entry could trigger
+  // unnecessary thrombolysis, coronary angiography, or aggressive
+  // therapy. The doctor must explicitly confirm when one of these codes
+  // is present.
+  const CRITICAL_ICD10_CODES = useRef({
+    'I21': 'Острый инфаркт миокарда',
+    'I22': 'Повторный инфаркт миокарда',
+    'I46': 'Остановка сердца',
+    'I50': 'Сердечная недостаточность',
+    'I71': 'Аневризма и расслоение аорты',
+    'R57': 'Шок (включая кардиогенный)',
+  }).current;
+
+  const getCriticalDiagnosisWarning = useCallback(
+    (icd10Code) => {
+      if (!icd10Code || typeof icd10Code !== 'string') return null;
+      const code = icd10Code.trim().toUpperCase();
+      // Match by prefix (e.g. "I21" matches "I21.0", "I21.9", "I219")
+      for (const [prefix, label] of Object.entries(CRITICAL_ICD10_CODES)) {
+        if (code.startsWith(prefix)) {
+          return { code: prefix, label, fullCode: code };
+        }
+      }
+      return null;
+    },
+    [CRITICAL_ICD10_CODES]
+  );
+
   const openBloodTestForm = () => {
     const { patientId } = getSelectedPatientContext();
     if (!patientId) {
@@ -1029,6 +1059,16 @@ const MacOSCardiologistPanelUnified = () => {
     if (type === 'icd10') {
       setVisitData({ ...visitData, icd10: suggestion });
       notify.success('Код МКБ-10 добавлен из AI предложения');
+      // P-020 (UX audit): immediately warn if the AI-suggested ICD-10 code
+      // is a critical diagnosis, so the doctor can double-check before
+      // completing the visit.
+      const critical = getCriticalDiagnosisWarning(suggestion);
+      if (critical) {
+        notify.warning(
+          `Критический диагноз: ${critical.label} (${critical.fullCode}). ` +
+          'Потребуется подтверждение при завершении приёма.'
+        );
+      }
     } else if (type === 'diagnosis') {
       setVisitData({ ...visitData, diagnosis: suggestion });
       notify.success('Диагноз добавлен из AI предложения');
@@ -1045,35 +1085,60 @@ const MacOSCardiologistPanelUnified = () => {
     // with an empty diagnosis or treatment, leaving the EMR incomplete. We
     // surface a stronger warning (intent='warning') when critical fields are
     // empty, and a normal confirmation otherwise.
+    //
+    // P-020 (UX audit): if the ICD-10 code matches a critical diagnosis
+    // (I21 acute MI, I46 cardiac arrest, I50 heart failure, I71 aortic
+    // dissection, R57 shock), we show the strongest warning (intent='danger')
+    // and require explicit confirmation. This prevents accidental entry of
+    // a life-threatening diagnosis that could trigger aggressive therapy.
     const hasDiagnosis = Boolean(visitData?.diagnosis?.trim());
     const hasComplaint = Boolean(visitData?.complaint?.trim());
     const missingCritical = !hasDiagnosis || !hasComplaint;
+    const criticalWarning = getCriticalDiagnosisWarning(visitData?.icd10);
 
-    const confirmOptions = missingCritical
-      ? {
-          title: 'Завершить приём без диагноза?',
-          message: hasDiagnosis
-            ? 'Не заполнена жалоба пациента.'
-            : hasComplaint
-              ? 'Не заполнен диагноз. Рекомендуется указать диагноз перед завершением приёма.'
-              : 'Не заполнены жалоба и диагноз. Рекомендуется заполнить их перед завершением.',
-          description:
-            'После завершения приёма EMR будет сохранена в текущем состоянии. ' +
-            'Дополнить карту можно будет через поправку (amend).',
-          confirmLabel: 'Завершить всё равно',
-          cancelLabel: 'Вернуться к заполнению',
-          intent: 'warning',
-        }
-      : {
-          title: 'Завершить приём?',
-          message: 'Приём будет сохранён, и система автоматически вызовет следующего пациента.',
-          description:
-            'Перед завершением убедитесь, что диагноз, лечение и рекомендации заполнены корректно. ' +
-            'После подписания EMR изменения возможны только через поправку.',
-          confirmLabel: 'Завершить приём',
-          cancelLabel: 'Отмена',
-          intent: 'primary',
-        };
+    let confirmOptions;
+    if (criticalWarning) {
+      confirmOptions = {
+        title: `Критический диагноз: ${criticalWarning.label} (${criticalWarning.code})`,
+        message:
+          `Код МКБ-10 ${criticalWarning.fullCode} соответствует критическому диагнозу: ` +
+          `"${criticalWarning.label}". Подтвердите, что диагноз установлен корректно. ` +
+          `Ошибочный диагноз может привести к ненужному агрессивному лечению ` +
+          `(тромболизис, коронарография, интенсивная терапия).`,
+        description:
+          'После завершения приёма EMR будет сохранена с этим диагнозом. ' +
+          'Изменение диагноза после подписания возможно только через поправку (amend).',
+        confirmLabel: 'Подтверждаю диагноз',
+        cancelLabel: 'Отмена — проверить диагноз',
+        intent: 'danger',
+      };
+    } else if (missingCritical) {
+      confirmOptions = {
+        title: 'Завершить приём без диагноза?',
+        message: hasDiagnosis
+          ? 'Не заполнена жалоба пациента.'
+          : hasComplaint
+            ? 'Не заполнен диагноз. Рекомендуется указать диагноз перед завершением приёма.'
+            : 'Не заполнены жалоба и диагноз. Рекомендуется заполнить их перед завершением.',
+        description:
+          'После завершения приёма EMR будет сохранена в текущем состоянии. ' +
+          'Дополнить карту можно будет через поправку (amend).',
+        confirmLabel: 'Завершить всё равно',
+        cancelLabel: 'Вернуться к заполнению',
+        intent: 'warning',
+      };
+    } else {
+      confirmOptions = {
+        title: 'Завершить приём?',
+        message: 'Приём будет сохранён, и система автоматически вызовет следующего пациента.',
+        description:
+          'Перед завершением убедитесь, что диагноз, лечение и рекомендации заполнены корректно. ' +
+          'После подписания EMR изменения возможны только через поправку.',
+        confirmLabel: 'Завершить приём',
+        cancelLabel: 'Отмена',
+        intent: 'primary',
+      };
+    }
 
     const ok = await confirm(confirmOptions);
     if (!ok) {
