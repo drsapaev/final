@@ -305,3 +305,36 @@
   font-size: var(--mac-font-size-sm);
   margin-bottom: var(--mac-spacing-xs);
 }
+
+/* ─── Full width visible container ─── */
+.cardio-w-full-visible {
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+}
+
+/* ─── Full width flex column (visible overflow) ─── */
+.cardio-flex-col-visible {
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Form label with fontFamily (block display) ─── */
+.cardio-form-label-block {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mac-text-secondary);
+  margin-bottom: 6px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+/* ─── Patient name text (16px, 500 weight) ─── */
+.cardio-patient-name {
+  font-size: 16px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
