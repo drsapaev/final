@@ -1480,19 +1480,6 @@ const MacOSCardiologistPanelUnified = () => {
     overflow: 'visible'
   };
 
-  const formatHistoryTimestamp = (value) => {
-    if (!value) {
-      return '—';
-    }
-
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return String(value);
-    }
-
-    return parsed.toLocaleString('ru-RU');
-  };
-
   const getHistoryTimestampValue = (value) => {
     if (!value) {
       return 0;
