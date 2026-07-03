@@ -373,7 +373,7 @@ export default function Header() {
                   boxShadow: 'none'
                 })
               }}
-              onClick={() => navigate(`${registrarHomeRoute}?view=welcome`)}
+              onClick={() => navigate('/registrar/welcome')}
               title="Главная">
               
                 <Home size={16} />
@@ -405,7 +405,7 @@ export default function Header() {
                   boxShadow: 'none'
                 })
               }}
-              onClick={() => navigate(`${registrarHomeRoute}?view=queue`)}
+              onClick={() => navigate('/registrar/queue')}
               title="Онлайн‑записи">
               
                 <span>📱</span>
