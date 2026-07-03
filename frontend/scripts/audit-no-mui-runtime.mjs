@@ -32,6 +32,14 @@ const disallowedPatterns = [
     name: 'Mui-prefixed runtime symbol',
     pattern: /\bMui[A-Z0-9_][A-Za-z0-9_]*/,
   },
+  // Emotion was removed from package.json in P1.6 — block re-introduction.
+  // The migration to a custom macOS design system is complete; Emotion deps
+  // are orphan. If you genuinely need a CSS-in-JS lib, raise a discussion
+  // first; do not silently add @emotion/react back.
+  {
+    name: '@emotion package import',
+    pattern: /['"]@emotion\//,
+  },
 ];
 
 function shouldScanFile(filePath) {
@@ -92,8 +100,8 @@ for (const root of scanRoots) {
 }
 
 if (findings.length > 0) {
-  console.error('No-new-MUI runtime gate failed.');
-  console.error('MUI imports/usages are not allowed in frontend/src/pages or frontend/src/components.');
+  console.error('No-new-MUI/Emotion runtime gate failed.');
+  console.error('MUI and Emotion imports/usages are not allowed in frontend/src/pages or frontend/src/components.');
   console.error('Use existing clinic design-system primitives instead, or create a dedicated approved migration plan.');
   console.error('');
   for (const finding of findings) {
@@ -104,4 +112,4 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.log('No-new-MUI runtime gate passed: 0 MUI imports/usages in pages/components.');
+console.log('No-new-MUI/Emotion runtime gate passed: 0 MUI/Emotion imports/usages in pages/components.');
