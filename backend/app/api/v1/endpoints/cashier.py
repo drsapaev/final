@@ -451,7 +451,7 @@ async def get_pending_payments(
             }
 
         # Batch Loading: Пациенты (Visit.patient relationship не существует)
-        patient_ids = list(set([v.patient_id for v in all_visits if v.patient_id]))
+        patient_ids = list({v.patient_id for v in all_visits if v.patient_id})
         patients_map = {}
         if patient_ids:
             patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()

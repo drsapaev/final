@@ -939,8 +939,6 @@ def get_registrar_services(
                 "duration_minutes": service.duration_minutes or 30,
                 "category_id": service.category_id,
                 "doctor_id": service.doctor_id,
-                "category_id": service.category_id,
-                "doctor_id": service.doctor_id,
                 "department_key": service_dept_map.get(service.id)
                 or getattr(
                     service, 'department_key', None
@@ -1099,7 +1097,7 @@ def get_registrar_doctors(
             "total_doctors": len(result),
             "by_specialty": {
                 specialty: len([d for d in result if d["specialty"] == specialty])
-                for specialty in set(d["specialty"] for d in result)
+                for specialty in {d["specialty"] for d in result}
             },
         }
 

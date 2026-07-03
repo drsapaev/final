@@ -77,7 +77,7 @@ async def get_dashboard_visualization(
         "summary": {
             "total_charts": len(chart_configs),
             "chart_types": list(
-                set(config["type"] for config in chart_configs.values())
+                {config["type"] for config in chart_configs.values()}
             ),
             "generated_at": datetime.utcnow().isoformat(),
         },
@@ -127,7 +127,7 @@ async def get_kpi_visualization(
         "summary": {
             "total_charts": len(chart_configs),
             "chart_types": list(
-                set(config["type"] for config in chart_configs.values())
+                {config["type"] for config in chart_configs.values()}
             ),
             "generated_at": datetime.utcnow().isoformat(),
         },
@@ -178,7 +178,7 @@ async def get_doctor_performance_visualization(
         "summary": {
             "total_charts": len(chart_configs),
             "chart_types": list(
-                set(config["type"] for config in chart_configs.values())
+                {config["type"] for config in chart_configs.values()}
             ),
             "generated_at": datetime.utcnow().isoformat(),
         },
@@ -224,7 +224,7 @@ async def get_patient_analytics_visualization(
         "summary": {
             "total_charts": len(chart_configs),
             "chart_types": list(
-                set(config["type"] for config in chart_configs.values())
+                {config["type"] for config in chart_configs.values()}
             ),
             "generated_at": datetime.utcnow().isoformat(),
         },
@@ -274,7 +274,7 @@ async def get_revenue_analytics_visualization(
         "summary": {
             "total_charts": len(chart_configs),
             "chart_types": list(
-                set(config["type"] for config in chart_configs.values())
+                {config["type"] for config in chart_configs.values()}
             ),
             "generated_at": datetime.utcnow().isoformat(),
         },
@@ -336,7 +336,7 @@ async def get_comprehensive_visualization(
     visualization = viz_service.create_comprehensive_visualization(comprehensive_data)
 
     # Конвертируем все графики в конфигурации Chart.js
-    for category, charts in visualization["charts"].items():
+    for _category, charts in visualization["charts"].items():
         for chart_name, chart_data in charts.items():
             charts[chart_name] = viz_service.get_chart_config(chart_data)
 
