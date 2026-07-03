@@ -2182,6 +2182,8 @@ def get_today_queues(
                 entry_data = entry.get("data")
                 entry_id_val = getattr(entry_data, "id", "")
                 entry_key = f"{entry_type}_{entry_id_val}"
+                # R-22 fix: entry_wrapper is alias for entry (used in result serialization)
+                entry_wrapper = entry
                 # Пропускаем дубликаты
                 if entry_key in seen_entry_keys:
                     logger.debug(
