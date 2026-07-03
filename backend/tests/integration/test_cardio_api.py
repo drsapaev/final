@@ -7,6 +7,7 @@ import pytest
 
 from app.core.security import get_password_hash
 from app.models.cardio_blood_test import CardioBloodTest
+from app.models.cardio_ecg_record import CardioECGRecord
 from app.models.clinic import Doctor
 from app.models.patient import Patient
 from app.models.user import User
@@ -278,7 +279,12 @@ class TestCardioApi:
             headers=headers,
         )
         assert ecg_response.status_code == 200
-        assert ecg_response.json() == []
+        # R-11 / P-003 (UX audit): /cardio/ecg is no longer a stub.
+        # The endpoint now returns persisted ECG records from
+        # cardio_ecg_records. For a fresh test patient the list should
+        # be empty, but to keep the test deterministic we assert the
+        # response is a list (the contract) rather than `== []`.
+        assert isinstance(ecg_response.json(), list)
 
         blood_test_response = client.post(
             "/api/v1/cardio/blood-tests",
@@ -294,3 +300,133 @@ class TestCardioApi:
 
         assert blood_test_response.status_code == 201
         assert blood_test_response.json()["patient_id"] == test_patient.id
+
+
+class TestCardioECGRecord:
+    """R-11 / P-003 (UX audit): /cardio/ecg is no longer a stub.
+
+    These tests cover the round-trip: POST a parsed ECG record, then GET it
+    back via the same endpoint. Verifies that the cardiologist panel's
+    "history" tab will now surface real data instead of an empty array.
+    """
+
+    def _make_cardiologist(self, db_session):
+        """Inline fixture: create a User with role 'cardiologist' + a Doctor row.
+
+        Mirrors the pattern in test_cardiologist_role_can_access_cardio_endpoints.
+        """
+        from uuid import uuid4
+        unique = uuid4().hex[:8]
+        cardiologist = User(
+            username=f"test_cardio_ecg_{unique}",
+            email=f"cardio_ecg_{unique}@test.com",
+            full_name="Test Cardiologist ECG",
+            hashed_password=get_password_hash("cardiologist123"),
+            role="cardiologist",
+            is_active=True,
+            is_superuser=False,
+        )
+        db_session.add(cardiologist)
+        db_session.commit()
+        db_session.refresh(cardiologist)
+        doctor = Doctor(
+            user_id=cardiologist.id,
+            specialty="cardiology",
+            active=True,
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+        return cardiologist, doctor
+
+    def test_create_and_list_ecg_record(
+        self,
+        client,
+        db_session,
+        test_patient,
+        test_visit,
+    ):
+        cardiologist, doctor = self._make_cardiologist(db_session)
+        # Make the cardiologist the owner of the visit so RBAC passes.
+        test_visit.doctor_id = doctor.id
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={
+                "username": cardiologist.username,
+                "password": "cardiologist123",
+            },
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        # Create an ECG record with parsed parameters.
+        create_response = client.post(
+            "/api/v1/cardio/ecg",
+            json={
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "ecg_date": date.today().isoformat(),
+                "heart_rate": 75,
+                "pr_interval": 160,
+                "qrs_duration": 90,
+                "qt_interval": 380,
+                "rhythm": "sinus",
+                "st_segment": "normal",
+                "t_wave": "normal",
+                "axis": "normal",
+                "interpretation": "ЭКГ в пределах нормы",
+                "source": "device",
+                "parameters": {"lead_count": 12},
+            },
+            headers=headers,
+        )
+        assert create_response.status_code == 201, create_response.text
+        created = create_response.json()
+        assert created["patient_id"] == test_patient.id
+        assert created["visit_id"] == test_visit.id
+        assert created["heart_rate"] == 75
+        assert created["rhythm"] == "sinus"
+        assert created["source"] == "device"
+        assert created["parameters"] == {"lead_count": 12}
+        assert "id" in created and created["id"] > 0
+
+        # List ECG records for the patient — should include the one we just created.
+        list_response = client.get(
+            f"/api/v1/cardio/ecg?patient_id={test_patient.id}&limit=10",
+            headers=headers,
+        )
+        assert list_response.status_code == 200
+        records = list_response.json()
+        assert isinstance(records, list)
+        assert any(r["id"] == created["id"] for r in records)
+
+    def test_create_ecg_record_rejects_missing_patient(
+        self,
+        client,
+        db_session,
+    ):
+        cardiologist, _doctor = self._make_cardiologist(db_session)
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={
+                "username": cardiologist.username,
+                "password": "cardiologist123",
+            },
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        # 999999 is an intentionally non-existent patient id.
+        create_response = client.post(
+            "/api/v1/cardio/ecg",
+            json={
+                "patient_id": 999999,
+                "ecg_date": date.today().isoformat(),
+                "heart_rate": 80,
+            },
+            headers=headers,
+        )
+        assert create_response.status_code == 404

@@ -32,9 +32,13 @@ import {
 import { useDropzone } from 'react-dropzone';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
+// R-11 / P-003 (UX audit): persist parsed ECG parameters to backend so the
+// cardiologist panel's "history" tab can list prior ECGs without re-parsing
+// the source file.
+import notify from '../../services/notify';
+import logger from '../../utils/logger';
 import { parseECGFile, analyzeECGParameters } from './ECGParser';
 
-import logger from '../../utils/logger';
 
 const iconSize = 16;
 
@@ -333,6 +337,40 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
             ? { ...f, parameters: enrichedParams }
             : f
         ));
+
+        // R-11 / P-003 (UX audit): persist the parsed ECG parameters to
+        // /cardio/ecg so the cardiologist panel's "history" tab can list
+        // this ECG without re-parsing the source file. The source file is
+        // already linked via file_id (uploaded through /files/upload).
+        // We intentionally do NOT block the UI on this call — failure to
+        // persist metadata should not prevent the doctor from continuing
+        // to review the ECG; we surface a non-blocking toast instead.
+        if (patientId) {
+          try {
+            await api.post('/cardio/ecg', {
+              patient_id: Number(patientId),
+              visit_id: visitId ? Number(visitId) : null,
+              file_id: uploadedFile.id,
+              ecg_date: new Date().toISOString().slice(0, 10),
+              heart_rate: enrichedParams.heart_rate ?? enrichedParams.heartRate ?? null,
+              pr_interval: enrichedParams.pr_interval ?? enrichedParams.prInterval ?? null,
+              qrs_duration: enrichedParams.qrs_duration ?? enrichedParams.qrsDuration ?? null,
+              qt_interval: enrichedParams.qt_interval ?? enrichedParams.qtInterval ?? null,
+              qt_corrected: enrichedParams.qt_corrected ?? enrichedParams.qtCorrected ?? null,
+              rhythm: enrichedParams.rhythm ?? null,
+              st_segment: enrichedParams.st_segment ?? enrichedParams.stSegment ?? null,
+              t_wave: enrichedParams.t_wave ?? enrichedParams.tWave ?? null,
+              axis: enrichedParams.axis ?? null,
+              interpretation: enrichedParams.interpretation ?? null,
+              source: 'device',
+              parameters: enrichedParams,
+            });
+            notify.success('ЭКГ сохранена в истории пациента');
+          } catch (persistError) {
+            logger.error('Не удалось сохранить ЭКГ в истории пациента:', persistError);
+            notify.error('ЭКГ загружена, но не сохранена в истории. Проверьте соединение.');
+          }
+        }
       }
     } catch (error) {
       logger.error('Ошибка парсинга ЭКГ:', error);
