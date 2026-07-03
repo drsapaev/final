@@ -78,6 +78,18 @@ def _vservices(db: Session) -> Table:
     return Table("visit_services", md, autoload_with=db.get_bind())
 
 
+def _isValid_time_str(value: str) -> bool:
+    """R-27 fix: validate HH:MM time string (24-hour, leading zeros required)."""
+    if not value or len(value) != 5 or value[2] != ":":
+        return False
+    try:
+        hours = int(value[:2])
+        minutes = int(value[3:])
+    except (ValueError, TypeError):
+        return False
+    return 0 <= hours <= 23 and 0 <= minutes <= 59
+
+
 def _update_queue_entries_for_visit_owner(
     db: Session,
     *,
@@ -327,11 +339,12 @@ def set_status(
 def reschedule_visit(
     visit_id: int,
     new_date: date = Query(..., alias="new_date"),
+    new_time: Optional[str] = Query(None, alias="new_time", description="Опциональное новое время в формате HH:MM"),
     db: Session = Depends(get_db),
 ):
     """
-    Перенос визита на указанную дату (записывается в planned_date).
-    Требует, чтобы в таблице visits была колонка planned_date.
+    Перенос визита на указанную дату (записывается в visit_date).
+    Опционально обновляет visit_time, если передан new_time (формат HH:MM).
     """
     t = _visits(db)
     # Проверка наличия колонки visit_date
@@ -355,8 +368,20 @@ def reschedule_visit(
             status_code=409, detail="Cannot reschedule a visit that has been started"
         )
 
+    # R-27 fix: обновляем и дату, и опционально время
+    update_values: dict = {"visit_date": new_date}
+    if new_time is not None:
+        # Валидация формата HH:MM
+        new_time_str = new_time.strip()
+        if not _isValid_time_str(new_time_str):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="new_time must be in HH:MM format (e.g. 09:30)",
+            )
+        update_values["visit_time"] = new_time_str
+
     upd = (
-        t.update().where(t.c.id == visit_id).values(visit_date=new_date).returning(t)
+        t.update().where(t.c.id == visit_id).values(**update_values).returning(t)
     )
     row = db.execute(upd).mappings().first()
     if not row:
