@@ -8,11 +8,18 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.models.cardio_blood_test import CardioBloodTest
+from app.models.cardio_ecg_record import CardioECGRecord
 from app.models.clinic import Doctor
+from app.models.file_system import File as FileModel
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
-from app.schemas.cardio import CardioBloodTestCreate, CardioBloodTestOut
+from app.schemas.cardio import (
+    CardioBloodTestCreate,
+    CardioBloodTestOut,
+    CardioECGRecordCreate,
+    CardioECGRecordOut,
+)
 
 router = APIRouter(prefix="/cardio", tags=["cardio"])
 logger = logging.getLogger(__name__)
@@ -82,34 +89,141 @@ def _ensure_doctor_can_access_visit(db: Session, visit: Visit, user: User) -> No
         raise HTTPException(status_code=403, detail="Access denied")
 
 
-@router.get("/ecg", summary="ЭКГ исследования")
+@router.get(
+    "/ecg",
+    summary="ЭКГ исследования",
+    response_model=list[CardioECGRecordOut],
+)
 async def get_ecg_results(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*CARDIO_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
-) -> list[Dict[str, Any]]:
+) -> list[CardioECGRecordOut]:
     """
-    Получить список ЭКГ исследований
+    Получить список ЭКГ исследований для пациента.
+
+    R-11 / P-003 (UX audit): this endpoint previously returned `[]`
+    unconditionally, which meant the cardiologist panel's "history" tab
+    never displayed any ECG records — the doctor could not compare prior
+    ECGs side-by-side with blood tests. The endpoint now reads from the
+    cardio_ecg_records table.
     """
     try:
-        return []
-    except Exception as e:
+        query = db.query(CardioECGRecord)
+        if not _is_admin_user(user):
+            if patient_id is not None:
+                _ensure_doctor_can_access_patient(db, patient_id, user)
+            else:
+                allowed_patient_ids = _doctor_allowed_patient_ids(db, user)
+                if not allowed_patient_ids:
+                    return []
+                query = query.filter(CardioECGRecord.patient_id.in_(allowed_patient_ids))
+
+        if patient_id is not None:
+            query = query.filter(CardioECGRecord.patient_id == patient_id)
+
+        records = (
+            query.order_by(
+                desc(CardioECGRecord.ecg_date),
+                desc(CardioECGRecord.created_at),
+                desc(CardioECGRecord.id),
+            )
+            .limit(limit)
+            .all()
+        )
+        logger.info(
+            "[cardio.ecg] listed records user_id=%s filtered_by_patient=%s count=%s",
+            getattr(user, "id", None),
+            patient_id is not None,
+            len(records),
+        )
+        return records
+    except SQLAlchemyError as e:
         _raise_cardio_internal_error("get_ecg_results", e)
 
 
-@router.post("/ecg", summary="Создать ЭКГ исследование")
+@router.post(
+    "/ecg",
+    summary="Создать ЭКГ исследование",
+    response_model=CardioECGRecordOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_ecg(
-    ecg_data: Dict[str, Any],
+    ecg_data: CardioECGRecordCreate,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*CARDIO_ROLES)),
-) -> Dict[str, Any]:
+) -> CardioECGRecordOut:
     """
-    Создать новое ЭКГ исследование
+    Создать новое ЭКГ исследование.
+
+    R-11 / P-003 (UX audit): this endpoint previously returned a fake
+    `{id: 1}` without persisting anything. The frontend's ECGViewer uploads
+    the source file via /files/upload, then calls this endpoint to store
+    the parsed ECG parameters (heart_rate, PR, QRS, QT, rhythm, ST, T-wave)
+    alongside the file_id. The "history" tab then surfaces these records
+    via GET /cardio/ecg.
     """
     try:
-        return {"message": "ЭКГ исследование создано", "id": 1}
-    except Exception as e:
+        patient = db.get(Patient, ecg_data.patient_id)
+        if patient is None:
+            raise HTTPException(status_code=404, detail="Пациент не найден")
+
+        if ecg_data.visit_id is not None:
+            visit = db.get(Visit, ecg_data.visit_id)
+            if visit is None:
+                raise HTTPException(status_code=404, detail="Визит не найден")
+            if visit.patient_id != ecg_data.patient_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Визит не принадлежит выбранному пациенту",
+                )
+
+        if ecg_data.file_id is not None:
+            file_record = db.get(FileModel, ecg_data.file_id)
+            if file_record is None:
+                raise HTTPException(status_code=404, detail="Файл не найден")
+
+        if ecg_data.visit_id is None:
+            _ensure_doctor_can_access_patient(db, ecg_data.patient_id, user)
+        else:
+            _ensure_doctor_can_access_visit(db, visit, user)
+
+        record = CardioECGRecord(
+            patient_id=ecg_data.patient_id,
+            visit_id=ecg_data.visit_id,
+            doctor_id=getattr(user, "id", None),
+            file_id=ecg_data.file_id,
+            ecg_date=ecg_data.ecg_date,
+            heart_rate=ecg_data.heart_rate,
+            pr_interval=ecg_data.pr_interval,
+            qrs_duration=ecg_data.qrs_duration,
+            qt_interval=ecg_data.qt_interval,
+            qt_corrected=ecg_data.qt_corrected,
+            rhythm=ecg_data.rhythm,
+            st_segment=ecg_data.st_segment,
+            t_wave=ecg_data.t_wave,
+            axis=ecg_data.axis,
+            interpretation=ecg_data.interpretation,
+            source=ecg_data.source,
+            parameters=ecg_data.parameters,
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        logger.info(
+            "[cardio.ecg] created record_id=%s visit_id=%s file_id=%s user_id=%s",
+            record.id,
+            record.visit_id,
+            record.file_id,
+            getattr(user, "id", None),
+        )
+        return record
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
         _raise_cardio_internal_error("create_ecg", e)
 
 

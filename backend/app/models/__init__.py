@@ -40,6 +40,7 @@ from .clinic import (
     SystemInfo,
 )
 from .cardio_blood_test import CardioBloodTest
+from .cardio_ecg_record import CardioECGRecord
 from .department import (
     Department,
     DepartmentQueueSettings,
@@ -261,6 +262,7 @@ __all__ = [
     "Schedule",
     "ServiceCategory",
     "CardioBloodTest",
+    "CardioECGRecord",
     "DermaExamination",
     "DermaProcedure",
     "Branch",
