@@ -1280,7 +1280,7 @@ class NotificationPlatformService:
 
         self.repository.commit()
 
-        for user, delivery in zip(users, deliveries):
+        for user, delivery in zip(users, deliveries, strict=False):
             await self._broadcast_delivery_with_policy(
                 user=user,
                 delivery=delivery,

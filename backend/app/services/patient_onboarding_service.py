@@ -850,7 +850,7 @@ class PatientOnboardingService:
             "patient_onboarding_opened",
         }
         telemetry_counts = dict.fromkeys(telemetry_actions, 0)
-        for action, count in (
+        for action, _count in (
             self.db.query(AuditLog.action, AuditLog.id)
             .filter(
                 AuditLog.entity_type == "telegram_onboarding_telemetry",
