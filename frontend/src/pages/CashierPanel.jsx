@@ -1679,7 +1679,7 @@ const CashierPanel = () => {void
 
             <DialogTitle>
               <Box display="flex" alignItems="center">
-                <CheckCircle style={{ color: 'var(--color-status-success)', marginRight: 8 }} />
+                <CheckCircle style={{ color: 'var(--mac-success)', marginRight: 8 }} />
                 Оплата успешна!
               </Box>
             </DialogTitle>
@@ -1788,7 +1788,7 @@ const CashierPanel = () => {void
                         <Box sx={{
                       width: `${Math.min(100, h.count / Math.max(...hourlyStats.map((s) => s.count)) * 100)}%`,
                       height: '100%',
-                      backgroundColor: 'var(--color-status-success)',
+                      backgroundColor: 'var(--mac-success)',
                       borderRadius: 4
                     }} />
                       </Box>
