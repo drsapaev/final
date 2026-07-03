@@ -119,11 +119,14 @@ describe('Doctor panels SSOT contract', () => {
 
   it('renders a safe visit empty state when specialty visit tabs have no selected context', () => {
     const cardiology = read('pages/CardiologistPanelUnified.jsx');
+    const cardiologyVisitTab = read('components/cardiology/VisitTab.jsx');
     const dermatology = read('pages/DermatologistPanelUnified.jsx');
 
-    expect(cardiology).toContain("activeTab === 'visit' && !selectedPatient");
-    expect(cardiology).toContain('title="Выберите визит"');
-    expect(cardiology).toContain("goToTab('appointments')");
+    // R-15: visit tab extracted to VisitTab.jsx — check both files
+    const cardiologySource = cardiology + '\n' + cardiologyVisitTab;
+    expect(cardiologySource).toContain("activeTab === 'visit'");
+    expect(cardiologySource).toContain('title="Выберите визит"');
+    expect(cardiologySource).toContain("goToTab('appointments')");
 
     expect(dermatology).toContain("activeTab === 'visit' && !currentAppointment && !selectedPatient");
     expect(dermatology).toContain('title="Выберите визит"');
