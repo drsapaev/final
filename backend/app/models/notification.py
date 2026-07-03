@@ -64,7 +64,7 @@ class NotificationEvent(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
-    deliveries: Mapped[list["NotificationDelivery"]] = relationship(
+    deliveries: Mapped[list[NotificationDelivery]] = relationship(
         "NotificationDelivery",
         back_populates="event",
         cascade="all, delete-orphan",

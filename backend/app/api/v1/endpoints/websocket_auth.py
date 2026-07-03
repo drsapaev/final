@@ -167,7 +167,7 @@ async def ws_queue_authenticated(
                         websocket, message, authenticated_user, department, date, db
                     )
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Check if connection is still alive
                     # ✅ BUGFIX: Access list element to get current value
                     time_since_pong = asyncio.get_event_loop().time() - last_pong[0]
