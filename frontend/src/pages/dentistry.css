@@ -1,0 +1,140 @@
+/**
+ * Dentist Panel — utility CSS classes.
+ * Extracted from DentistPanelUnified.jsx inline styles.
+ * All classes use macOS design system tokens (var(--mac-*)).
+ */
+
+/* ─── Text values (color + fontSize + fontWeight) ─── */
+.dental-text-value {
+  font-size: var(--mac-font-size-sm);
+  font-weight: 500;
+}
+
+/* ─── Text descriptions (color + fontSize) ─── */
+.dental-text-desc {
+  font-size: var(--mac-font-size-sm);
+}
+
+/* ─── Text labels (color + fontSize + fontWeight + marginBottom) ─── */
+.dental-text-label {
+  font-size: var(--mac-font-size-sm);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* ─── Text hints (color + fontSize + marginTop) ─── */
+.dental-text-hint {
+  font-size: var(--mac-font-size-xs);
+  margin-top: 4px;
+}
+
+/* ─── Flex column (display + flexDirection + gap) ─── */
+.dental-flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3);
+}
+
+/* ─── Flex center (alignItems + display + gap) ─── */
+.dental-flex {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* ─── Flex between (alignItems + display + justifyContent + marginBottom) ─── */
+.dental-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--mac-spacing-4);
+}
+
+/* ─── Flex between with gap + marginBottom ─── */
+.dental-flex-between-gap {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  margin-bottom: var(--mac-spacing-4);
+}
+
+/* ─── Grid auto (display + gap + gridTemplateColumns) ─── */
+.dental-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--mac-spacing-3);
+}
+
+/* ─── Grid 2col ─── */
+.dental-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--mac-spacing-3);
+}
+
+/* ─── Icon container (circle with centered content) ─── */
+.dental-icon-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.dental-icon-circle-sm {
+  width: 32px;
+  height: 32px;
+}
+
+.dental-icon-circle-md {
+  width: 40px;
+  height: 40px;
+}
+
+.dental-icon-circle-lg {
+  width: 48px;
+  height: 48px;
+}
+
+/* ─── Button base (border + borderRadius + cursor + padding + transition) ─── */
+.dental-btn {
+  border: none;
+  border-radius: var(--mac-radius-md);
+  cursor: pointer;
+  padding: 8px 16px;
+  transition: all 0.2s;
+}
+
+.dental-btn-icon {
+  border: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-md);
+  cursor: pointer;
+  padding: 8px;
+  transition: all 0.2s;
+  background: var(--mac-bg-primary);
+}
+
+/* ─── Card surface ─── */
+.dental-card {
+  padding: var(--mac-spacing-4);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-lg);
+}
+
+/* ─── Section heading ─── */
+.dental-heading {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin: 0;
+  margin-bottom: var(--mac-spacing-4);
+}
+
+/* ─── Padding utilities ─── */
+.dental-p-4 { padding: var(--mac-spacing-4); }
+.dental-p-6 { padding: var(--mac-spacing-6); }
+.dental-p-8 { padding: var(--mac-spacing-8); }
+
+/* ─── Font weight utilities ─── */
+.dental-fw-600 { font-weight: 600; }
+.dental-fw-700 { font-weight: 700; }
