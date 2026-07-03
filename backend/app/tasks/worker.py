@@ -41,37 +41,66 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
 
     Enqueued by app.tasks.scheduler.enqueue_reminder().
     Idempotent: checks if a reminder was already sent for this visit before sending.
+
+    Uses the existing NotificationService.send_confirmation_reminder() which
+    handles Telegram/SMS/email dispatch based on patient preferences. The
+    `channel` argument is a hint — the service may override it via
+    _determine_best_channel() based on patient contact info.
+
+    Marks `visits.reminder_sent_at` on success so retries are idempotent.
     """
     from sqlalchemy import create_engine, text
     from sqlalchemy.orm import Session
 
+    from app.models.visit import Visit
+    from app.services.notification_service import NotificationService
+
     logger.info("job.send_visit_reminder visit_id=%s channel=%s", visit_id, channel)
 
-    # Use synchronous SQLAlchemy for simplicity — arq jobs are async but DB ops
-    # can be sync (they're fast). For high-throughput, switch to asyncpg.
     engine = create_engine(str(settings.DATABASE_URL))
     db = Session(engine)
     try:
-        visit = db.execute(
-            text("SELECT id, patient_id, visit_date, reminder_sent_at FROM visits WHERE id = :vid"),
+        # Idempotency: skip if already sent
+        already_sent = db.execute(
+            text("SELECT reminder_sent_at FROM visits WHERE id = :vid"),
             {"vid": visit_id},
-        ).first()
+        ).scalar()
+        if already_sent:
+            logger.info(
+                "job.send_visit_reminder: visit %s already reminded at %s, skipping",
+                visit_id, already_sent,
+            )
+            return
+
+        visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             logger.warning("job.send_visit_reminder: visit %s not found", visit_id)
             return
 
-        if visit.reminder_sent_at:
-            logger.info("job.send_visit_reminder: visit %s already reminded at %s, skipping", visit_id, visit.reminder_sent_at)
-            return
+        # Send via the real notification service.
+        # This dispatches to Telegram bot / SMS gateway / email based on
+        # patient preferences and the channel hint.
+        service = NotificationService(db)
+        result = await service.send_confirmation_reminder(visit, hours_before=24)
 
-        # TODO: integrate with actual notification service (Telegram/SMS/email)
-        # For now, just mark as sent.
+        if not result.get("success"):
+            logger.warning(
+                "job.send_visit_reminder: send failed for visit %s: %s",
+                visit_id, result.get("error", "unknown"),
+            )
+            # Don't mark as sent — let arq retry
+            raise RuntimeError(f"Notification send failed: {result.get('error')}")
+
+        # Mark as sent
         db.execute(
             text("UPDATE visits SET reminder_sent_at = NOW() WHERE id = :vid"),
             {"vid": visit_id},
         )
         db.commit()
-        logger.info("job.send_visit_reminder: marked visit %s as reminded", visit_id)
+        logger.info(
+            "job.send_visit_reminder: visit %s reminded via %s",
+            visit_id, result.get("channel", channel),
+        )
     except Exception:
         db.rollback()
         logger.exception("job.send_visit_reminder failed for visit %s", visit_id)
