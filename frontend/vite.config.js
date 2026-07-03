@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
-import { sentryVitePlugin } from "@sentry/vite";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 
 const apiProxyTarget = process.env.VITE_PROXY_TARGET || process.env.BACKEND_URL || "http://localhost:18000";
 const wsProxyTarget =
@@ -88,7 +88,7 @@ export default defineConfig(({ mode }) => ({
       }
     },
     // Source maps: enable for production so Sentry can de-minify traces.
-    // Files are hidden behind source map upload via @sentry/vite plugin
+    // Files are hidden behind source map upload via @sentry/vite-plugin
     // (no .map files served to clients).
     sourcemap: true
   },
