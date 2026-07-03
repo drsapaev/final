@@ -35,6 +35,8 @@ import { useRegistrarData } from './registrar/useRegistrarData';
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
 import QueueView from './registrar/views/QueueView';
+// Decomp 6b: WelcomeView extracted to component
+import WelcomeView from './registrar/views/WelcomeView';
 // Strategic Direction 3: navigation helpers for canonical nested routes
 import { getViewFromPath } from './registrar/registrarNavigation';
 
@@ -1582,442 +1584,45 @@ const RegistrarPanel = () => {
 
       {/* Основной контент без отступа сверху */}
       <div className="registrar-overflow-hidden">
-        {/* Экран приветствия по параметру view=welcome (с историей: календарь + поиск) */}
-        {currentView === 'welcome' &&
-        <AnimatedTransition type="fade" delay={100}>
-            <Card variant="default" className="registrar-card-surface">
-              <CardHeader className="registrar-card-header">
-                {/* QW-08 fix: reduced AnimatedTransition from 10 to 3 (100/200/300ms). */}
-                {/* Previous delays 400/800/900/1000/1100/1350/1400/1500 blocked first */}
-                {/* user intent until 1.5s after page load. */}
-                <AnimatedTransition type="slide" direction="up" delay={200}>
-                  <h1 className="registrar-hero-title">
-                    {t('welcome')} в панель регистратора!
-                    <Icon name="person" size="default" className="registrar-text-accent" />
-                  </h1>
-                </AnimatedTransition>
-                <AnimatedTransition type="fade" delay={300}>
-                  <div className="registrar-date-subtitle">
-                    {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                  </div>
-                </AnimatedTransition>
-              </CardHeader>
-
-              <CardContent>
-                {/* Современная статистика */}
-                <ModernStatistics
-                appointments={appointments}
-                departmentStats={departmentStats}
-                language={language}
-                selectedDate={showCalendar && historyDate ? historyDate : getLocalDateString()}
-                onExport={() => {
-                  logger.info('Экспорт статистики');
-                }}
-                onRefresh={() => {
-                  loadAppointments({ source: 'statistics_refresh' });
-                }} />
-
-
-                {/* Панель управления и фильтров */}
-                {/* QW-08 fix: unwrapped nested AnimatedTransition (was delays 800-1500). */}
-                  <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
-                      <h2 className="registrar-section-heading">
-                        <Icon name="gear" size="default" className="registrar-text-accent" />
-                        Панель управления
-                      </h2>
-
-                    {/* Быстрые действия */}
-                      <div className="registrar-grid-auto" style={{ marginBottom: 'var(--mac-spacing-6)' }}>
-                          <Button
-                          variant="primary"
-                          size="default"
-                          onClick={() => {
-                            logger.info('Кнопка "Новая запись" нажата');
-                            setWizardEditMode(false); // ✅ Сброс режима
-                            setWizardInitialData(null); // ✅ Сброс данных
-                            setShowWizard(true);
-                          }}
-                          aria-label="Create new appointment"
-                          className="registrar-flex" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
-
-                            <Icon name="plus" size="small" className="registrar-text-white" />
-                            {t('new_appointment')}
-                          </Button>
-
-                        {/* Кнопка модуля оплаты */}
-                          <Button
-                          variant="secondary"
-                          size="default"
-                          onClick={() => setShowPaymentManager(true)}
-                          aria-label="Open payment module"
-                          className="registrar-flex">
-
-                            <Icon name="creditcard" size="small" />
-                            Модуль оплаты
-                          </Button>
-
-                          <Button
-                          variant="outline"
-                          size="default"
-                          onClick={() => {
-                            logger.info('Кнопка "Экспорт CSV" нажата');
-                            const csvContent = generateCSV(appointments);
-                            const filename = `appointments_${getLocalDateString()}.csv`;
-                            downloadCSV(csvContent, filename);
-                            notify.success(`Экспортировано ${appointments.length} записей`);
-                          }}
-                          className="registrar-flex">
-
-                            <Icon name="square.and.arrow.up" size="small" />
-                            {t('export_csv')}
-                          </Button>
-                      </div>
-
-                    {/* Фильтры и навигация */}
-                      <div className="registrar-surface-toolbar">
-                        <h3 className="registrar-subsection-heading">
-                          <Icon name="magnifyingglass" size="default" className="registrar-text-accent" />
-                          Фильтры и навигация
-                        </h3>
-
-                        <div className="registrar-grid-auto">
-                          <Button
-                          variant={showCalendar ? 'warning' : 'outline'}
-                          size="default"
-                          onClick={() => {
-                            logger.info('Кнопка "Календарь" нажата');
-                            setShowCalendar(!showCalendar);
-                          }}
-                          className="registrar-flex">
-
-                            <Icon name="magnifyingglass" size="small" style={{ color: showCalendar ? 'white' : 'var(--mac-text-primary)' }} />
-                            Календарь
-                          </Button>
-
-                          <Button
-                          variant="success"
-                          size="default"
-                          onClick={() => setSearchParams({ status: 'queued' })}
-                          className="registrar-flex">
-
-                            <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
-                            Активная очередь
-                          </Button>
-
-                          <Button
-                          variant="primary"
-                          size="default"
-                          onClick={() => setSearchParams({ status: 'paid_pending' })}
-                          className="registrar-flex">
-
-                            <Icon name="creditcard" size="small" className="registrar-text-white" />
-                            Ожидают оплаты
-                          </Button>
-
-                          <Button
-                          variant="outline"
-                          size="default"
-                          onClick={() => setSearchParams({})}
-                          className="registrar-flex">
-
-                            <Icon name="eye" size="small" />
-                            Все записи
-                          </Button>
-
-                          <Button
-                          variant="outline"
-                          size="default"
-                          onClick={() => navigate('/registrar/queue')}
-                          className="registrar-flex">
-
-                            <Icon name="bell" size="small" />
-                            Онлайн-очередь
-                          </Button>
-
-                          <Button
-                          variant="outline"
-                          size="default"
-                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
-                          className="registrar-flex">
-
-                            <Icon name="gear" size="small" />
-                            Обновить данные
-                          </Button>
-                        </div>
-
-                        {/* Календарный виджет */}
-                        {showCalendar &&
-                      <div className="registrar-info-card" style={{ padding: 'var(--mac-spacing-5)', boxShadow: 'var(--mac-shadow-sm)' }}>
-                            <div className="registrar-flex-col">
-                              <label className="registrar-picker-label">
-                                <Icon name="magnifyingglass" size="small" className="registrar-text-secondary" />
-                                Выберите дату для просмотра истории:
-                              </label>
-                              <Input
-                            type="date"
-                            label=""
-                            value={tempDateInput}
-                            onChange={(e) => {
-                              setTempDateInput(e.target.value);
-                              logger.info('Введена дата (debounced):', e.target.value);
-                            }}
-                            onBlur={(e) => {
-                              if (e.target.value && e.target.value !== historyDate) {
-                                logger.info('📅 Date input blur - applying immediately:', e.target.value);
-                                setHistoryDate(e.target.value);
-                              }
-                            }} />
-
-                              <div className="registrar-flex-wrap" style={{ gap: '8px' }}>
-                                <button
-                              type="button"
-                              onClick={() => {
-                                const today = getLocalDateString();
-                                setTempDateInput(today);
-                                setHistoryDate(today);
-                              }}
-                              className="registrar-date-btn"
-                              style={{
-                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor
-                              }}>
-
-                                  Сегодня
-                                </button>
-                                <button
-                              type="button"
-                              onClick={() => {
-                                const yesterdayStr = getYesterdayDateString();
-                                setTempDateInput(yesterdayStr);
-                                setHistoryDate(yesterdayStr);
-                              }}
-                              className="registrar-date-btn"
-                              style={{
-                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor
-                              }}>
-
-                                  Вчера
-                                </button>
-                                <button
-                              type="button"
-                              onClick={() => {
-                                const weekAgo = new Date();
-                                weekAgo.setDate(weekAgo.getDate() - 7);
-                                const weekAgoStr = getLocalDateString(weekAgo);
-                                setTempDateInput(weekAgoStr);
-                                setHistoryDate(weekAgoStr);
-                              }}
-                              className="registrar-date-btn"
-                              style={{
-                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor
-                              }}>
-
-                                  Неделю назад
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                      }
-                      </div>
-                  </div>
-
-                {/* История записей */}
-                <div>
-                  <div className="registrar-flex-between" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-                    <h3 className="registrar-history-heading">
-                      <Icon name="eye" size="default" className="registrar-text-accent" />
-                      История записей
-                    </h3>
-                    {showCalendar &&
-                  <Badge variant="secondary" className="registrar-badge-date">
-                        <Icon name="magnifyingglass" size="small" />
-                        {new Date(historyDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </Badge>
-                  }
-                  </div>
-                  <div className="registrar-surface-toolbar">
-                    {/* Индикатор источника данных */}
-                    {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
-
-                    {/* ✅ ДОБАВЛЕНО: Сообщение при пустой очереди */}
-                    {(() => {
-                    const token = tokenManager.getAccessToken();
-                    const isNoToken = !token;
-                    const isEmptyQueue = !appointmentsLoading && dataSource === 'api' && filteredAppointments.length === 0;
-
-                    logger.info('🎯 Empty state render check:', {
-                      appointmentsLoading,
-                      dataSource,
-                      filteredLength: filteredAppointments.length,
-                      appointmentsLength: appointments.length,
-                      hasToken: !!token,
-                      isNoToken,
-                      isEmptyQueue,
-                      shouldShow: isEmptyQueue
-                    });
-
-                    return isEmptyQueue;
-                  })() &&
-                  <div className="registrar-empty-state">
-                          {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
-                    {/* Full unification deferred — requires EmptyState.jsx migration */}
-                    {/* from Tailwind/native to macOS design system first. */}
-                    <div className="registrar-empty-icon-lg">
-                            {!tokenManager.hasToken() ?
-                      <Icon name="lock" size="large" /> :
-                      <Icon name="doc.text" size="large" />}
-                          </div>
-                          <h3 className="registrar-empty-heading" style={{ color: textColor }}>
-                            {!tokenManager.hasToken() ? 'Сессия истекла' : 'Очередь пуста'}
-                          </h3>
-                          <p className="registrar-empty-desc-text" style={{ fontSize: '16px', color: textColor }}>
-                            {!tokenManager.hasToken() ?
-                      'Нажмите "Войти снова", чтобы обновить данные.' :
-                      'На сегодня нет записей в очереди.'}
-                          </p>
-
-                          {/* Кнопки действий */}
-                          {!tokenManager.hasToken() &&
-                    <div className="registrar-flex-wrap">
-                              <button
-                        onClick={() => {
-                          // Перенаправляем на страницу входа
-                          window.location.href = '/login';
-                        }}
-                        className="registrar-btn-lg registrar-btn-accent"
-                        onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
-                        onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue)'}>
-
-                                <Icon name="key" size="small" className="registrar-icon-mr" />Войти снова
-                              </button>
-
-                              <button
-                        onClick={() => {
-                          // Обновляем данные
-                          loadAppointments({ source: 'manual_refresh_button' });
-                        }}
-                        className="registrar-btn-lg registrar-btn-success"
-                        onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-green-hover)'}
-                        onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-green)'}>
-
-                                <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Обновить данные
-                              </button>
-
-                              <button
-                        onClick={() => {
-                          // Перезапускаем приложение
-                          window.location.reload();
-                        }}
-                        className="registrar-btn-lg registrar-btn-neutral"
-                        onMouseOver={(e) => e.target.style.background = 'var(--mac-text-secondary)'}
-                        onMouseOut={(e) => e.target.style.background = 'var(--mac-text-tertiary)'}>
-
-                                <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Перезапустить приложение
-                              </button>
-                            </div>
-                    }
-                          <p style={{
-                      fontSize: '14px',
-                      color: textColor,
-                      marginBottom: '24px'
-                    }}>
-                            {activeTab ?
-                      `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :
-                      'Сегодня пока нет записей'}
-                          </p>
-                          {/* QW-04: empty state 3 of 3 (welcome no-records). */}
-                    {/* See empty state 1 above for unification plan. */}
-                    <Button
-                      variant="primary"
-                      onClick={() => {
-                        setWizardEditMode(false); // ✅ Сброс режима
-                        setWizardInitialData(null); // ✅ Сброс данных
-                        setShowWizard(true);
-                      }}
-                      className="registrar-btn-cta">
-
-                            <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
-                          </Button>
-                        </div>
-                  }
-
-                    {/* Таблица отображается только если есть данные */}
-                    {(appointmentsLoading || filteredAppointments.length > 0) &&
-                  <EnhancedAppointmentsTable
-                    data={filteredAppointments}
-                    rawEntries={appointments} // ⭐ SSOT FIX: Сырые данные для полного Tooltip
-                    loading={appointmentsLoading}
-                    theme={theme}
-                    language={language}
-                    outerBorder={true}
-                    services={services}
-                    showCheckboxes={false} // ✅ Отключаем чекбоксы для регистратуры
-                    onRowClick={(row) => {
-                      logger.info('Открыть детали записи:', row);
-                      // Здесь можно открыть модальное окно с деталями записи
-                    }}
-                    onActionClick={(action, row, event) => {
-                      switch (action) {
-                        case 'view':
-                          logger.info('Просмотр записи:', row);
-                          openRecordPreview(row);
-                          break;
-                        case 'edit':
-                          logger.info('[RegistrarPanel] Открытие мастера редактирования для:', row.patient_fio || row.patient_name);
-                          openRecordEditor(row);
-                          break;
-                        case 'payment':
-                          logger.info('Открытие модального окна оплаты для записи (welcome):', row);
-                          setPaymentDialog({ open: true, row, paid: false, source: 'welcome' });
-                          break;
-                        case 'in_cabinet':
-                          logger.info('Отправка пациента в кабинет (welcome):', row);
-                          updateAppointmentStatus(row.id, 'in_cabinet', '', row);
-                          break;
-                        case 'call':
-                          logger.info('Вызов пациента (welcome):', row);
-                          handleStartVisit(row);
-                          break;
-                        case 'complete':
-                          logger.info('Завершение приёма (welcome):', row);
-                          updateAppointmentStatus(row.id, 'done', '', row);
-                          break;
-                        case 'print':
-                          logger.info('Печать талона (welcome):', row);
-                          setPrintDialog({ open: true, type: 'ticket', data: row });
-                          break;
-                        case 'more':{
-                            // Показать контекстное меню с дополнительными действиями
-                            const rect = event?.target?.getBoundingClientRect();
-                            setContextMenu({
-                              open: true,
-                              row,
-                              position: {
-                                x: rect?.right || event?.clientX || 0,
-                                y: rect?.top || event?.clientY || 0
-                              }
-                            });
-                            break;
-                          }
-                        default:
-                          break;
-                      }
-                    }} />
-
-                  }
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </AnimatedTransition>
-        }
+        {/* Экран приветствия — extracted to WelcomeView component (Decomp 6b) */}
+        {currentView === 'welcome' && (
+          <WelcomeView
+            t={t}
+            language={language}
+            theme={theme}
+            textColor={textColor}
+            appointments={appointments}
+            departmentStats={departmentStats}
+            dataSource={dataSource}
+            appointmentsLoading={appointmentsLoading}
+            filteredAppointments={filteredAppointments}
+            services={services}
+            activeTab={activeTab}
+            historyDate={historyDate}
+            showCalendar={showCalendar}
+            tempDateInput={tempDateInput}
+            loadAppointments={loadAppointments}
+            setShowWizard={setShowWizard}
+            setWizardEditMode={setWizardEditMode}
+            setWizardInitialData={setWizardInitialData}
+            setShowPaymentManager={setShowPaymentManager}
+            setHistoryDate={setHistoryDate}
+            setShowCalendar={setShowCalendar}
+            setTempDateInput={setTempDateInput}
+            setSearchParams={setSearchParams}
+            navigate={navigate}
+            setPaymentDialog={setPaymentDialog}
+            setPrintDialog={setPrintDialog}
+            setContextMenu={setContextMenu}
+            openRecordPreview={openRecordPreview}
+            openRecordEditor={openRecordEditor}
+            updateAppointmentStatus={updateAppointmentStatus}
+            handleStartVisit={handleStartVisit}
+            generateCSV={generateCSV}
+            downloadCSV={downloadCSV}
+            DataSourceIndicator={DataSourceIndicator}
+          />
+        )}
 
         {/* Онлайн-очередь — extracted to QueueView component (Decomp 6a) */}
         {currentView === 'queue' &&
