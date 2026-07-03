@@ -321,3 +321,90 @@ Current checkout note:
 - Do not run historical `scripts\dev_brain.py`, `scripts\planner_smoke.py`, `scripts\dossier_smoke.py`, or `scripts\handoff_smoke.py` unless those files are restored and verified in the current checkout.
 - For `plan`, `dossier`, or `handoff` modes, produce the artifact directly from repo-grounded evidence and use `agent_gate.py` only when an execution boundary is needed.
 - Use handoff as the default input contract for the next agent when a real code change is risky or multi-file.
+
+## Medical Domain — PHI / PII / Threat Model
+
+This system handles patient data (PHI — Protected Health Information) for a
+clinic operating in Uzbekistan. While Uzbekistan's data protection regime is
+not HIPAA/GDPR, the same principles apply: patient data leakage is a legal
+and ethical incident. Agents MUST treat the following as hard constraints.
+
+### PII fields — what counts as sensitive
+
+These fields are PII and must NEVER appear in plaintext in:
+
+- Logs (backend or frontend)
+- Sentry breadcrumbs / extra context
+- Error messages returned to the client
+- Audit log payloads (mask except for explicit audit need)
+- Test fixtures committed to the repo
+- AI prompts sent to external LLMs
+
+| Field | Masking rule for logs | Source |
+|---|---|---|
+| `phone` | `+998901•••567` (last 3 digits) | `patients.phone` |
+| `email` | `a•••@example.com` (first char + domain) | `patients.email` |
+| `iin` / `passport_number` / `doc_number` | full redact (`[REDACTED]`) | `patients.doc_number` |
+| `birth_date` | year only (`1985-••-••`) | `patients.birth_date` |
+| `diagnosis`, `icd10_code`, `complaints` | full redact in non-medical contexts | `visits.*`, EMR records |
+| `prescription`, `medications`, `allergies` | full redact in non-medical contexts | EMR |
+| `first_name`, `last_name` | initials only (`I.I.`) | `patients.*` |
+
+The frontend Sentry integration already enforces this in
+`frontend/src/services/sentry.js` (`beforeSend` scrubs 15+ medical field
+keys). Backend Python logging must apply the same masking — see
+`backend/app/core/pii_masker.py` (TODO: P1.x — backfill backend masking).
+
+### Threat model — who can attack, what's at risk, what protects it
+
+| Threat actor | Capability | Asset at risk | Control |
+|---|---|---|---|
+| Compromised patient token | Read own appointments, queue position | Self-PHI only | JWT expiry + refresh rotation |
+| Compromised doctor token | Read all patients in their specialty | Cross-specialty leakage | RBAC per-specialty (`require_roles` + specialty filter) |
+| Compromised admin token | Read all patients, audit logs, finance | Full PHI dump | 2FA mandatory for admin role + audit log on every read |
+| Compromised Telegram bot token | Send messages as clinic, read bot chats | Phishing patients | Bot token in env (not code), scope-limited Telegram API |
+| Compromised DB credentials | Direct PHI/PII read/write | Total compromise | DB not exposed to internet; secrets in env; gitleaks in CI |
+| Malicious insider (admin) | Bulk-export patient data | Mass exfiltration | Audit log on every patient read; weekly audit review |
+| AI hallucination in EMR | Wrong diagnosis/suggestion in medical record | Patient harm | `requires_doctor_confirmation: True` on every AI response; doctor must explicitly save |
+| Backup file leak | Full PHI dump from stolen backup | Total compromise | Backup encryption at rest; access restricted to backup_service |
+
+### AI hallucination response protocol (runbook)
+
+If an AI endpoint (`/ai/*`, `/emr-ai/*`, `/ai-gateway/*`) returns medical
+content WITHOUT the `ai_safety_meta` block containing
+`requires_doctor_confirmation: True`, this is a P0 incident:
+
+1. **Stop** — do not commit or deploy anything related.
+2. **Verify** — check the response payload in the Sentry/audit log.
+3. **Block** — disable the affected endpoint via feature flag (P2.2) or
+   hotfix revert.
+4. **Trace** — find which AI provider returned the unguarded response
+   (check `ai_tracking` table).
+5. **Report** — file an incident in `docs/incidents/` with timestamp,
+   endpoint, provider, and root cause.
+6. **Fix** — re-add `ai_safety_meta()` to the response shape, add a
+   Playwright guardrail test (P2.4) so this can't regress.
+
+### Break-glass procedure (AI/DB unavailable during patient visit)
+
+If the AI/DB is down while a doctor is with a patient:
+
+1. The doctor's panel must show cached patient data (PWA offline cache) —
+   verify `frontend/public/sw.js` includes `/api/v1/patients/:id` and
+   `/api/v1/emr/:patient_id` in the runtime cache.
+2. The doctor can record the visit manually in the EMR editor — all fields
+   are editable, AI suggestions are optional.
+3. When the connection is restored, the frontend must sync offline changes
+   and reconcile with any AI suggestions that arrive late.
+4. **Never block medical care on AI availability.** AI is a suggestion
+   layer, not a system-of-record dependency.
+
+### Synthetic data policy
+
+- Any data used for dev/staging/demo MUST be generated by
+  `backend/app/synthetic_seed.py` or `backend/app/scripts/dev_seed.py`.
+- Both tag generated records with `SYNTHETIC-` prefix or `DEV-DEMO` marker.
+- Never copy production data to staging. If you need realistic volumes, use
+  `synthetic_seed.py --count-patients 10000 --count-visits 100000`.
+- Never commit fixtures containing real-looking names + phone numbers. The
+  pre-commit `gitleaks` hook may flag these — that's a feature, not a bug.
