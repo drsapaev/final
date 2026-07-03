@@ -571,9 +571,8 @@ const DoctorPanel = () => {
   });
 
   const renderEmptyState = ({ icon: Icon, title, description, tone = 'default', action = null }) => {
-    const color = tone === 'error' ? dangerColor : getColor('secondary', 500);
     return (
-      <div className="doctor-empty" style={{ color }}>
+      <div className="doctor-empty" data-tone={tone}>
         <Icon size={48} className="doctor-empty-icon" />
         <div className="doctor-empty-title">
           {title}
@@ -721,7 +720,7 @@ const DoctorPanel = () => {
                   }}>
 
                     <div className="doctor-stat-row">
-                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)` }}>
+                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': primaryColor, '--doctor-gradient-to': getColor('primary', 600) }}>
                         <User size={24} />
                       </div>
                       <div>
@@ -748,7 +747,7 @@ const DoctorPanel = () => {
                   }}>
 
                     <div className="doctor-stat-row">
-                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${successColor} 0%, ${getColor('success', 600)} 100%)` }}>
+                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': successColor, '--doctor-gradient-to': getColor('success', 600) }}>
                         <Calendar size={24} />
                       </div>
                       <div>
@@ -775,7 +774,7 @@ const DoctorPanel = () => {
                   }}>
 
                     <div className="doctor-stat-row">
-                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${warningColor} 0%, ${getColor('warning', 600)} 100%)` }}>
+                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': warningColor, '--doctor-gradient-to': getColor('warning', 600) }}>
                         <Clock size={24} />
                       </div>
                       <div>
@@ -802,7 +801,7 @@ const DoctorPanel = () => {
                   }}>
 
                     <div className="doctor-stat-row">
-                      <div className="doctor-stat-icon" style={{ background: `linear-gradient(135deg, ${accentColor} 0%, ${getColor('info', 600)} 100%)` }}>
+                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': accentColor, '--doctor-gradient-to': getColor('info', 600) }}>
                         <CheckCircle size={24} />
                       </div>
                       <div>
@@ -934,7 +933,7 @@ const DoctorPanel = () => {
 
                           <td style={tdStyle} aria-label={getPatientA11yContext(patient)}>
                             <div className="doctor-patient-cell">
-                              <div className="doctor-avatar-sm" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)` }}>
+                              <div className="doctor-avatar-sm" style={{ '--doctor-gradient-from': primaryColor, '--doctor-gradient-to': getColor('primary', 600) }}>
                                 {String(patient.name || 'Пациент').split(' ').map((n) => n[0]).join('')}
                               </div>
                               <div>
@@ -1183,7 +1182,7 @@ const DoctorPanel = () => {
                     <Skeleton height={40} count={5} />
                   </div> :
               queueError ?
-              <div className="doctor-empty" style={{ color: dangerColor }}>
+              <div className="doctor-empty" data-tone="error">
                     <AlertCircle size={32} className="doctor-empty-icon" />
                     <p>{queueError}</p>
                     <Button variant="ghost" onClick={loadQueue}>Повторить</Button>
@@ -1213,10 +1212,6 @@ const DoctorPanel = () => {
                   <tr
                     key={entry.id}
                     className={`doctor-queue-row ${currentVisitMeta ? 'doctor-queue-row-current' : entry.priority > 0 ? 'doctor-queue-row-priority' : ''}`}
-                    style={{
-                      background: currentVisitMeta ? 'color-mix(in srgb, var(--mac-accent), transparent 92%)' : entry.priority > 0 ? `${warningColor}10` : 'transparent',
-                      borderLeft: currentVisitMeta ? `3px solid ${primaryColor}` : entry.priority > 0 ? `3px solid ${warningColor}` : 'none'
-                    }}
                     aria-label={currentVisitMeta ? `Current patient ${getQueuePatientContext(entry)}` : undefined}>
 
                           <td style={tdStyle}>
