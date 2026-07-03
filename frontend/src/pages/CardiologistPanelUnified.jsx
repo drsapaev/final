@@ -44,6 +44,7 @@ import { useConfirm } from '../components/common/ConfirmDialog';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import tokenManager from '../utils/tokenManager';
 import { countAppointmentsByStatuses, SPECIALTY_KEYS } from '../utils/doctorPanelShared';
+import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 
 const API_V1_BASE = getApiBaseUrl();
 const CARDIOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
@@ -162,6 +163,37 @@ const MacOSCardiologistPanelUnified = () => {
     const visitId = selectedPatient?.visit_id || null;
     return { patientId, visitId };
   }, [selectedPatient]);
+
+  // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
+  // is invalidated when the doctor switches between visits or patients.
+  // Previously, cache entries tagged with `visit:${prevVisitId}` could
+  // linger and leak data between patients on rapid visit switches.
+  //
+  // We pass the lifecycle hook only the canonical patientId / visitId
+  // derived from selectedPatient — when those change, the hook:
+  //   1. aborts all in-flight requests via AbortController
+  //   2. calls cacheService.invalidateByVisit(prevVisitId)
+  //   3. calls cacheService.invalidateByPatient(prevPatientId)
+  //   4. invokes our onCleanup callback (resets the local EMR state)
+  //
+  // This is a non-breaking change: existing loadEMR / loadPatientData
+  // functions are untouched. The lifecycle hook only adds cache hygiene
+  // on top of the existing data flow.
+  const currentVisitId = selectedPatient?.visit_id || visitIdFromUrl || null;
+  const currentPatientId =
+    selectedPatient?.patient?.id ||
+    selectedPatient?.patient_id ||
+    patientIdFromUrl ||
+    null;
+  useVisitLifecycle(currentVisitId, currentPatientId, {
+    invalidateCacheOnChange: true,
+    onCleanup: () => {
+      // Reset local EMR state so stale data does not bleed into the
+      // next visit's view. loadEMR will be re-invoked by the existing
+      // useEffect when selectedPatient changes.
+      setEmr(null);
+    },
+  });
 
   const getEmptyBloodTestForm = useCallback((overrides = {}) => ({
     patient_id: '',
