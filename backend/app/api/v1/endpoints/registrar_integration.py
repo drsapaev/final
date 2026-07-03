@@ -2177,7 +2177,7 @@ def get_today_queues(
                 )
             )
 
-            for entry in entries:
+            for idx, entry in enumerate(entries):
                 entry_type = entry.get("type")
                 entry_data = entry.get("data")
                 entry_id_val = getattr(entry_data, "id", "")
