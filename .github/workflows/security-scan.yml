@@ -42,16 +42,21 @@ jobs:
       # Switched from safety to pip-audit because safety CLI v3 has unstable
       # options across minor versions (--output-format vs --output vs --json).
       # pip-audit is maintained by PyPA and has stable CLI.
+      #
+      # Uses -r requirements.txt to scan ONLY our declared deps, not the
+      # whole environment (which includes pip-audit/safety's own deps like
+      # setuptools 65.5.0 with 5 false-positive vulns).
       run: |
         cd backend
-        pip-audit --strict --format json --output pip-audit-report.json
+        pip-audit --strict -r requirements.txt --format json --output pip-audit-report.json
       continue-on-error: false
 
     - name: 🔍 Сканирование зависимостей (safety) — report-only
       # Safety runs in parallel as report-only for cross-validation.
+      # Uses -r requirements.txt to scan only our declared deps.
       run: |
         cd backend
-        safety check --json --output safety-report.json || true
+        safety check -r requirements.txt --json --output safety-report.json || true
 
     - name: 🔍 Сканирование кода (bandit) — блокирующее на MEDIUM+
       # Bandit: -ll = MEDIUM+ threshold. All HIGH and MEDIUM findings
