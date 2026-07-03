@@ -1455,7 +1455,7 @@ const MacOSCardiologistPanelUnified = () => {
       transition: 'background var(--mac-duration-normal) var(--mac-ease)'
     }}>
 
-      <div style={{ padding: '0px' }}> {/* Убираем padding, так как он уже есть в main контейнере */}
+      <div className="cardio-card-padded" style={{ padding: 0 }}> {/* Убираем padding, так как он уже есть в main контейнере */}
 
         {/* Навигация по вкладкам удалена — управление через сайдбар и URL */}
 
@@ -1635,9 +1635,9 @@ const MacOSCardiologistPanelUnified = () => {
                   disabled={loading}>
 
                     {loading ?
-                  <RefreshCw size={16} style={{ marginRight: '8px' }} /> :
+                  <RefreshCw size={16} className="cardio-icon-mr" /> :
 
-                  <Save size={16} style={{ marginRight: '8px' }} />
+                  <Save size={16} className="cardio-icon-mr" />
                   }
                     Завершить прием
                   </Button>
@@ -1648,7 +1648,7 @@ const MacOSCardiologistPanelUnified = () => {
 
           {/* ЭКГ */}
           {activeTab === 'visit' && !selectedPatient &&
-          <MacOSCard style={{ padding: '48px' }}>
+          <MacOSCard className="cardio-empty-state" style={{ padding: "48px" }}>
               <MacOSEmptyState
               icon={Calendar}
               title="Выберите визит"
@@ -1672,7 +1672,7 @@ const MacOSCardiologistPanelUnified = () => {
           }}>
               <div className="flex justify-end">
                 <Button onClick={() => setShowForm({ open: true, type: 'ecg' })}>
-                  <Plus size={16} style={{ marginRight: '8px' }} /> Добавить ЭКГ
+                  <Plus size={16} className="cardio-icon-mr" /> Добавить ЭКГ
                 </Button>
               </div>
               {/* Используем новые компоненты ЭКГ и ЭхоКГ */}
@@ -1725,7 +1725,7 @@ const MacOSCardiologistPanelUnified = () => {
                     Анализы крови
                   </h3>
                   <Button onClick={openBloodTestForm}>
-                    <Plus size={16} style={{ marginRight: '8px' }} />
+                    <Plus size={16} className="cardio-icon-mr" />
                     Новый анализ
                   </Button>
                 </div>
@@ -2045,7 +2045,7 @@ const MacOSCardiologistPanelUnified = () => {
                         Отмена
                       </Button>
                       <Button type="submit">
-                        <Save size={16} style={{ marginRight: '8px' }} />
+                        <Save size={16} className="cardio-icon-mr" />
                         Сохранить анализ
                       </Button>
                     </div>
@@ -2445,7 +2445,7 @@ const MacOSCardiologistPanelUnified = () => {
             marginTop: getSpacing('lg')
           }}>
               <Button variant="outline" onClick={() => setSettingsOpen(false)}>Закрыть</Button>
-              <Button onClick={() => setSettingsOpen(false)}><Save size={16} style={{ marginRight: '8px' }} />Сохранить</Button>
+              <Button onClick={() => setSettingsOpen(false)}><Save size={16} className="cardio-icon-mr" />Сохранить</Button>
             </div>
           </MacOSCard>
         }
