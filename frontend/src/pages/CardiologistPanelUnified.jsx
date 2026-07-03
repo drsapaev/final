@@ -1046,6 +1046,21 @@ const MacOSCardiologistPanelUnified = () => {
     }
   };
 
+  // P-019 (UX audit): load EMR when a patient is selected so the audit
+  // badge on the visit tab can show status, version, last-modified, and
+  // signed-by. Previously EMR was only loaded when the doctor clicked a
+  // specific action (call/complete/view_emr), not on initial patient
+  // selection — so the doctor had no visibility into who last touched
+  // the record.
+  // MUST be above the isDemoMode early return to satisfy the
+  // rules-of-hooks lint rule (no conditional hook calls).
+  useEffect(() => {
+    const { visitId } = getSelectedPatientContext();
+    if (visitId && selectedPatient) {
+      loadEMR(visitId);
+    }
+  }, [selectedPatient, authRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Проверяем демо-режим после всех хуков
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
@@ -1227,24 +1242,8 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   // Сохранение EMR
-
-  // P-019 (UX audit): load EMR when a patient is selected so the audit
-  // badge on the visit tab can show status, version, last-modified, and
-  // signed-by. Previously EMR was only loaded when the doctor clicked a
-  // specific action (call/complete/view_emr), not on initial patient
-  // selection — so the doctor had no visibility into who last touched
-  // the record.
-  // MUST be above the isDemoMode early return to satisfy the
-  // rules-of-hooks lint rule.
-  useEffect(() => {
-    const { visitId } = getSelectedPatientContext();
-    if (visitId && selectedPatient) {
-      loadEMR(visitId);
-    }
-  }, [selectedPatient, authRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // isDemoMode and early return are already declared above (before the
-  // P-019 useEffect was inserted). The duplicate declaration was removed.
+  // (P-019 useEffect was moved above the isDemoMode early return
+  //  to satisfy the rules-of-hooks lint rule. See line ~1049.)
 
 
 
