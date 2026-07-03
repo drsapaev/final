@@ -36,3 +36,6 @@ pandas>=3.0.3,<4.0.0
 packaging>=21.0,<24.0
 psutil>=5.9.0,<6.0.0
 strawberry-graphql>=0.315.5
+
+# Background task queue — replaces Celery stub. arq is asyncio-native.
+arq>=0.26.0,<0.27
