@@ -413,7 +413,7 @@ const DermatologistPanelUnified = () => {
           }
         });
 
-        let allAppointments = [];
+        const allAppointments = [];
         if (queuesResponse.ok) {
           const queuesData = await queuesResponse.json();
 
