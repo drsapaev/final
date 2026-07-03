@@ -1144,7 +1144,7 @@ class ReportingService:
     ) -> dict[str, Any]:
         """Планирует автоматический отчет"""
         try:
-            # В реальной системе здесь была бы интеграция с Celery или другим планировщиком
+            # В реальной системе здесь была бы интеграция с arq или другим планировщиком
             scheduled_report = {
                 "id": f"auto_{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                 "report_type": report_type,

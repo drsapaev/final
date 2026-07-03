@@ -118,9 +118,10 @@ class Settings(BaseSettings):
     QUEUE_START_HOUR: int = 7  # локальное время, начало утреннего окна
     ONLINE_MAX_PER_DAY: int = 15  # лимит онлайн-талонов на отделение/день
 
-    # --- Celery ---
-    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0")
-    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0")
+    # --- Background tasks (arq + Redis) ---
+    # Replaces previous Celery stub. arq is asyncio-native and matches the
+    # FastAPI stack. See app/tasks/worker.py for the worker entry point.
+    ARQ_REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
     # --- Payment providers ---
     CLICK_ENABLED: bool = Field(default=False, description="Enable Click payments")
