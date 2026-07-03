@@ -1061,7 +1061,7 @@ def get_registrar_doctors(
                 "user": (
                     {
                         "full_name": (
-                            doctor.user.full_name
+                            queue_data["doctor"].user.full_name
                             if doctor.user
                             else f"Врач #{doctor.id}"
                         ),
@@ -1161,7 +1161,7 @@ def get_registrar_queue_settings(
                 {
                     "id": doctor.id,
                     "name": (
-                        doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
+                        queue_data["doctor"].user.full_name if doctor.user else f"Врач #{doctor.id}"
                     ),
                     "cabinet": doctor.cabinet,
                 }
@@ -1599,7 +1599,7 @@ def _process_online_queue_entries(
 
         if doctor and not doctor.user_id:
             integrity_warnings.append("doctor_without_user")
-        if doctor and doctor.user and not doctor.user.is_active:
+        if queue_data.get("doctor") and queue_data["doctor"].user and not doctor.user.is_active:
             integrity_warnings.append("doctor_user_inactive")
         if doctor and not doctor.active:
             integrity_warnings.append("doctor_inactive")
@@ -2087,7 +2087,7 @@ def get_today_queues(
 
             if doctor and not doctor.user_id:
                 integrity_warnings.append("doctor_without_user")
-            if doctor and doctor.user and not doctor.user.is_active:
+            if queue_data.get("doctor") and queue_data["doctor"].user and not doctor.user.is_active:
                 integrity_warnings.append("doctor_user_inactive")
             if doctor and not doctor.active:
                 integrity_warnings.append("doctor_inactive")
@@ -2956,13 +2956,13 @@ def get_today_queues(
                 # Если doctor не найден, оставляем raw specialist_id видимым для repair.
                 "specialist_id": queue_data["doctor_id"],
                 "specialist_name": (
-                    doctor.user.full_name
-                    if doctor and doctor.user
+                    queue_data["doctor"].user.full_name
+                    if queue_data.get("doctor") and queue_data["doctor"].user
                     else f"Специалист #{queue_data['doctor_id']}"
                 ),
                 "specialty": specialty,
                 "timezone": "Asia/Tashkent",
-                "cabinet": doctor.cabinet if doctor else "N/A",
+                "cabinet": queue_data.get("doctor").cabinet if queue_data.get("doctor") else "N/A",
                 "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
                 "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
                         "opened_at": datetime.now(timezone.utc).isoformat(),
@@ -3375,7 +3375,7 @@ def get_doctor_user_id(
             "doctor_id": doctor_id,
             "canonical_specialist_id": doctor.id,
             "user_id": doctor.user_id,
-            "doctor_name": doctor.user.full_name if doctor.user else None,
+            "doctor_name": queue_data["doctor"].user.full_name if doctor.user else None,
             "deprecated": True,
             "note": "Use doctor_id as the canonical specialist identifier in queue flows.",
         }
