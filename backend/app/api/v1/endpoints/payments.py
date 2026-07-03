@@ -270,7 +270,7 @@ def create_payment(
         )
     except PaymentCreateDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -383,7 +383,7 @@ def generate_receipt(
         return service.generate_receipt(payment_id=payment_id, format_type=format_type)
     except PaymentReadDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -411,7 +411,7 @@ def download_receipt(
 
     except PaymentReadDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -442,7 +442,7 @@ async def create_payment_invoice(
         )
     except PaymentInvoiceDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -461,7 +461,7 @@ async def get_pending_invoices(
         return [PaymentInvoiceResponse(**invoice) for invoice in invoices]
     except PaymentInvoiceDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

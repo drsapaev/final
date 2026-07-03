@@ -302,7 +302,7 @@ def set_status(
                 patient_id=visit.patient_id,
                 status_value="canceled",
             )
-        except Exception as e:
+        except Exception:
             # Ошибка обновления очереди не должна блокировать обновление визита
             pass
 
