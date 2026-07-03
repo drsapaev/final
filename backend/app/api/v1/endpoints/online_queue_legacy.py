@@ -39,7 +39,7 @@ async def generate_qr_code_legacy(
         )
 
     # Проверяем права доступа
-    if not current_user.role in ["admin", "registrar"]:
+    if current_user.role not in ["admin", "registrar"]:
         raise HTTPException(
             status_code=403, detail="Недостаточно прав для генерации QR токенов"
         )

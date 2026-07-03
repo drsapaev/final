@@ -5,9 +5,9 @@ Telegram Bot сервис для клиники
 
 import json
 import logging
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime
 from typing import Any
-from collections.abc import Awaitable, Callable, Mapping
 
 import requests
 from sqlalchemy.orm import Session

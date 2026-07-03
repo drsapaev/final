@@ -1,7 +1,6 @@
 # app/api/v1/endpoints/visit_payments.py
 from __future__ import annotations
 
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 

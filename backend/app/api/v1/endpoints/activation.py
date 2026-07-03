@@ -1,7 +1,6 @@
 # app/api/v1/endpoints/activation.py
 from __future__ import annotations
 
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
