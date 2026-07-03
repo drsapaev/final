@@ -1727,8 +1727,8 @@ const MacOSCardiologistPanelUnified = () => {
                       fontSize: '11px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
-                      background: emr.status === 'signed' ? '#16a34a' : emr.status === 'amended' ? '#ca8a04' : '#6b7280',
-                      color: '#ffffff',
+                      background: emr.status === 'signed' ? 'var(--mac-success)' : emr.status === 'amended' ? 'var(--mac-warning)' : 'var(--mac-text-tertiary)',
+                      color: 'var(--mac-text-on-accent)',
                     }}>
                       {emr.status || 'draft'}
                     </span>
