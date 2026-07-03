@@ -12,9 +12,6 @@ from app.api.deps import get_db, require_roles
 from app.crud import ai_config as crud_ai
 from app.models.user import User
 from app.schemas.ai_config import (
-    AIPromptTemplateCreate,
-    AIPromptTemplateOut,
-    AIPromptTemplateUpdate,
     AIProviderCreate,
     AIProviderOut,
     AIProviderTestRequest,

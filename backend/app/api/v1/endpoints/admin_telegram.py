@@ -2,7 +2,6 @@
 API endpoints для управления Telegram в админ панели
 """
 
-import asyncio
 import hashlib
 import hmac
 import logging

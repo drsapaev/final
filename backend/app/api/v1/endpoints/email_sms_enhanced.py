@@ -3,13 +3,13 @@
 Поддержка массовых рассылок, шаблонов и аналитики
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.crud import appointment as crud_appointment, patient as crud_patient
 from app.models.clinic import Doctor
 from app.models.payment import Payment

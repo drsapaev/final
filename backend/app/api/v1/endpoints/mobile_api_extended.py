@@ -3,7 +3,7 @@
 """
 
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
@@ -20,7 +20,6 @@ from app.crud import (
 )
 from app.db.session import get_db
 from app.models.user import User
-from app.services.sms_providers import get_sms_manager
 from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
 router = APIRouter()

@@ -7,10 +7,10 @@ from datetime import date, datetime, timedelta
 from typing import List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.wait_time_analytics_service import get_wait_time_analytics_service
 

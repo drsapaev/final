@@ -7,16 +7,12 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.crud import service as crud
-from app.models.clinic import Doctor, ServiceCategory
+from app.models.clinic import ServiceCategory
 from app.models.service import Service
-from app.models.visit import VisitService
-from app.models.service_audit import ServiceAuditLog
 from app.models.user import User
 from app.services.queue_domain_service import QueueDomainService
 from app.services.service_mapping import (

@@ -13,7 +13,7 @@ from app.api.deps import get_current_user, require_roles
 from app.crud import user as crud_user
 from app.db.session import get_db
 from app.models.user import User
-from app.services.fcm_service import FCMService, get_fcm_service
+from app.services.fcm_service import get_fcm_service
 
 router = APIRouter()
 

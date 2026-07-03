@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.rbac import AIPermission, require_any_ai_permission
 from app.models.user import User
-from app.services.emr_ai_service import EMRService, get_emr_ai_service
+from app.services.emr_ai_service import get_emr_ai_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -203,7 +203,7 @@ async def ai_health_check(current_user: User = Depends(EMR_AI_ACCESS)):
 # =============================================================================
 
 import uuid
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class AISuggestionV2(BaseModel):

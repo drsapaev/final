@@ -4,8 +4,6 @@ API endpoints для интеграции регистратуры с админ
 """
 
 import logging
-import re  # ✅ ДОБАВЛЕНО: для нормализации телефонов в дедупликации
-import traceback
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -1455,7 +1453,6 @@ def _detect_ecg_services(services: list) -> tuple[bool, int, int]:
     Returns:
         tuple of (has_ecg, ecg_count, non_ecg_count)
     """
-    from app.services.service_mapping import get_service_code
 
     has_ecg = False
     ecg_count = 0
@@ -2560,11 +2557,6 @@ def get_today_queues(
     try:
         from datetime import datetime
 
-        from app.models.appointment import Appointment
-        from app.models.clinic import Doctor
-        from app.models.online_queue import DailyQueue, OnlineQueueEntry
-        from app.models.patient import Patient
-        from app.models.visit import Visit
 
         # R-22 Phase 5: _same_patient_queue_entry_for_visit_id and _same_patient_queue_entry_for_visit
         # promoted to module-level helpers (take db as first parameter).
@@ -3450,7 +3442,6 @@ def create_queue_entries_batch(
         logger.error(
             f"[create_queue_entries_batch] Непредвиденная ошибка: {type(e).__name__}: {e}"
         )
-        import traceback
 
         logger.exception("Registrar operation failed")
         db.rollback()

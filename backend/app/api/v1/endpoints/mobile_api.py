@@ -4,8 +4,8 @@
 
 import gzip
 import json
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
@@ -17,7 +17,6 @@ from app.crud import (
     appointment as crud_appointment,
     lab as crud_lab,
     patient as crud_patient,
-    payment as crud_payment,
     user as crud_user,
     notification as crud_notification,
 )
@@ -31,10 +30,7 @@ from app.schemas.mobile import (
     MobileAppointmentDetailOut,
     MobileLoginRequest,
     MobileLoginResponse,
-    MobileNotificationCreate,
-    MobileNotificationOut,
     MobileQuickStats,
-    MobileVisitDetailOut,
     PatientProfileOut,
 )
 from app.services.mobile_api_service import MobileApiService

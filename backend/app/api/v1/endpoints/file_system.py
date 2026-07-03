@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, NoReturn, Optional
+from typing import List, NoReturn, Optional
 
 from fastapi import (
     APIRouter,
@@ -22,31 +22,25 @@ from fastapi import (
     status,
     UploadFile,
 )
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.core.audit import extract_model_changes
 from app.schemas.file_system import (
     FileExportRequest,
     FileExportResponse,
-    FileFolderCreate,
-    FileFolderOut,
-    FileFolderTree,
     FileImportRequest,
     FileImportResponse,
     FileList,
     FileOut,
-    FileQuotaOut,
     FileSearchRequest,
     FileSearchResponse,
     FileShareCreate,
     FileShareOut,
     FileStats,
-    FileStorageOut,
     FileUploadRequest,
-    FileUploadResponse,
 )
 from app.services.file_system_api_service import FileSystemApiService
 from app.services.file_system_service import get_file_system_service

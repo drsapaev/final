@@ -10,17 +10,16 @@ API endpoints для batch-операций с записями пациента
 
 from __future__ import annotations
 
-from datetime import date as date_type, datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.batch_patient_service import (
-    BatchPatientService,
     BatchUpdateRequest,
     BatchUpdateResponse,
     get_batch_patient_service,

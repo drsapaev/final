@@ -2,17 +2,13 @@
 API endpoints для экспорта и импорта EMR данных
 """
 
-import io
 import logging
 from typing import List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user
-from app.db.session import get_db
 from app.models.user import User
-from app.schemas.emr import EMRBase, EMRUpdate
 from app.services.emr_export_service import EMRExportService
 
 router = APIRouter()

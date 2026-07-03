@@ -4,7 +4,7 @@ Backup Management API Endpoints
 ✅ SECURITY: Endpoints for database backup management
 """
 import logging
-from typing import Dict, List
+from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session

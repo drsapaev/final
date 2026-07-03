@@ -6,7 +6,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
 from sqlalchemy.orm import Session
@@ -23,9 +23,7 @@ from app.schemas.clinic import (
     TicketPrintSettingsUpdate,
     QueueSettingsUpdate,
     QueueTestRequest,
-    ServiceCategoryCreate,
     ServiceCategoryOut,
-    ServiceCategoryUpdate,
 )
 
 router = APIRouter()

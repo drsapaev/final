@@ -5,7 +5,6 @@ Phrase Suggest API - Endpoint для подсказок из истории вр
 НЕ генерация нового текста.
 """
 
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.services.doctor_phrase_service import DoctorPhraseService, get_doctor_phrase_service
+from app.services.doctor_phrase_service import get_doctor_phrase_service
 from app.services.phrase_suggest_api_service import PhraseSuggestApiService
 
 router = APIRouter()

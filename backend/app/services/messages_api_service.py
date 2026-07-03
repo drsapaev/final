@@ -635,7 +635,6 @@ API endpoints для системы сообщений между пользов
 """
 
 import os
-from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse

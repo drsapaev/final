@@ -4,30 +4,26 @@ API endpoints для управления webhook'ами
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api import deps
 from app.api.deps import require_roles
 from app.core.roles import Roles
 from app.crud.webhook import crud_webhook, crud_webhook_call, crud_webhook_event
 from app.db.session import get_db
 from app.models.user import User
-from app.models.webhook import WebhookCallStatus, WebhookEventType, WebhookStatus
+from app.models.webhook import WebhookCallStatus, WebhookStatus
 from app.schemas.webhook import (
     SystemWebhookStats,
     Webhook,
     WebhookBulkAction,
     WebhookBulkActionResponse,
     WebhookCall,
-    WebhookCallFilter,
     WebhookCallListResponse,
     WebhookCreate,
-    WebhookEvent,
     WebhookEventCreate,
-    WebhookFilter,
     WebhookListResponse,
     WebhookStats,
     WebhookTestRequest,

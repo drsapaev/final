@@ -6,17 +6,15 @@ API endpoints для работы с фото в дерматологии
 import logging
 import os
 import uuid
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, status, UploadFile
 from PIL import Image
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.crud import dermatology_photos as crud_photos
-from app.models.dermatology_photos import DermatologyPhoto
 from app.models.user import User
 
 router = APIRouter()

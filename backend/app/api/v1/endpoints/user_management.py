@@ -22,13 +22,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles, require_staff
 from app.crud.user_management import (
     user_audit_log,
-    user_extended,
-    user_group,
     user_notification_settings,
-    user_permission,
     user_preferences,
     user_profile,
-    user_role,
 )
 from app.db.session import get_db
 from app.models.user import User
@@ -39,11 +35,6 @@ from app.schemas.user_management import (
     UserCreateRequest,
     UserExportRequest,
     UserExportResponse,
-    UserGroupCreate,
-    UserGroupMemberCreate,
-    UserGroupMemberResponse,
-    UserGroupResponse,
-    UserGroupUpdate,
     UserListResponse,
     UserNotificationSettingsResponse,
     UserNotificationSettingsUpdate,
@@ -52,16 +43,12 @@ from app.schemas.user_management import (
     UserProfileResponse,
     UserProfileUpdate,
     UserResponse,
-    UserRoleCreate,
-    UserRoleResponse,
-    UserRoleUpdate,
     UserSearchRequest,
     UserStatsResponse,
     UserUpdateRequest,
 )
 from app.services.user_management_service import (
     get_user_management_service,
-    UserManagementService,
 )
 from app.services.user_management_api_service import UserManagementApiService
 

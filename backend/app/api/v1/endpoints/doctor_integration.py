@@ -15,10 +15,9 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.crud import (
     clinic as crud_clinic,
-    online_queue as crud_queue,
     visit as crud_visit,
 )
 from app.models.appointment import Appointment

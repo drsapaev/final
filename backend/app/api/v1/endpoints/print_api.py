@@ -6,18 +6,15 @@ API endpoints для печати документов
 from datetime import datetime
 import asyncio
 import logging
-from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.crud import print_config as crud_print
 from app.models.user import User
 from app.schemas.print_config import (
     PrintCertificateRequest,
-    PrintersListResponse,
-    PrinterStatusResponse,
     PrintLabResultsRequest,
     PrintPrescriptionRequest,
     PrintReceiptRequest,
@@ -25,7 +22,6 @@ from app.schemas.print_config import (
     PrintTicketRequest,
     QuickReceiptRequest,
     QuickTicketRequest,
-    TestPrintResponse,
 )
 from app.services.print_service import get_print_service, PrintService
 
