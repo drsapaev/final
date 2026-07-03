@@ -83,3 +83,10 @@ repos:
         entry: Test files at repo root are not collected by pytest. Move to backend/tests/ or scripts/legacy_tests/.
         language: fail
         files: ^test_.*\.py$
+
+      - id: no-stray-backend-root-scripts
+        name: Block stray .py scripts at backend/ root
+        entry: Scripts at backend/ root are not part of the app. Move to backend/app/scripts/ (production) or scripts/legacy_scripts/backend/ (one-off dev scripts).
+        language: fail
+        files: ^backend/[^/]+\.py$
+        exclude: ^backend/(run\.py|wsgi\.py|asgi\.py|manage\.py)$
