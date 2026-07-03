@@ -51,10 +51,14 @@ repos:
     hooks:
       - id: eslint
         name: 🧹 ESLint (frontend)
-        entry: bash -c 'cd frontend && npx --no-install eslint --fix'
+        # Strip the 'frontend/' prefix that pre-commit adds, then run eslint
+        # from inside frontend/ with the relative path. npx --no-install
+        # fails fast if node_modules is missing (better than silent skip).
+        entry: bash -c 'cd frontend && npx --no-install eslint --fix "$@"' --
         language: system
         files: ^frontend/.*\.(js|jsx|ts|tsx)$
         pass_filenames: true
+        types: [file]
 
   # ---------------------------------------------------------------------------
   # Local project-specific guards
