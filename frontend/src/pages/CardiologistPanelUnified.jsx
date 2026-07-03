@@ -30,17 +30,16 @@ import {
 } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import './cardiology.css';
-import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
 import EcgTab from '../components/cardiology/EcgTab';
 import HistoryTab from '../components/cardiology/HistoryTab';
 import ServicesTab from '../components/cardiology/ServicesTab';
 import AiTab from '../components/cardiology/AiTab';
+import AppointmentsTab from '../components/cardiology/AppointmentsTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
-import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 import { getApiBaseUrl } from '../api/runtime';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
@@ -1607,54 +1606,18 @@ const MacOSCardiologistPanelUnified = () => {
           gap: getSpacing('lg')
         }}>
           {/* Записи кардиолога */}
+          {/* Записи кардиолога — R-15: extracted to AppointmentsTab component */}
           {activeTab === 'appointments' &&
-          <div style={{
-            width: '100%',
-            maxWidth: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: getSpacing('xl')
-          }}>
-              <MacOSCard className="cardio-card-fullwidth">
-                <div className="cardio-appointments-header">
-                  <h3 className="cardio-appointments-title">
-                    <Calendar size={20} className="cardio-icon-mr" style={{ marginRight: '12px', color: 'var(--mac-accent)' }} />
-                    Записи к кардиологу
-                  </h3>
-                  <AppointmentSummaryBar
-                    ariaLabel="Сводка записей кардиолога"
-                    items={appointmentSummaryItems}
-                    onRefresh={loadMacOSCardiologyAppointments}
-                    refreshDisabled={appointmentsLoading}
-                    buttonProps={{ variant: 'outline' }}
-                  />
-                </div>
-
-                {appointmentsLoading ?
-              <Skeleton type="table" count={5} /> :
-              appointments.length === 0 ?
-              <MacOSEmptyState
-                type="calendar"
-                title="Записи не найдены"
-                description="В системе пока нет записей к кардиологу" /> :
-
-
-              <EnhancedAppointmentsTable
-                data={appointments}
-                loading={appointmentsLoading}
-                theme={isDark ? 'dark' : 'light'}
-                language="ru"
-                selectedRows={new Set()}
-                outerBorder={false}
-                services={services}
-                showCheckboxes={false}
-                view="doctor"
-                onRowClick={handleAppointmentRowClick}
-                onActionClick={handleAppointmentActionClick} />
-
-              }
-              </MacOSCard>
-            </div>
+            <AppointmentsTab
+              appointments={appointments}
+              appointmentsLoading={appointmentsLoading}
+              appointmentSummaryItems={appointmentSummaryItems}
+              onRefresh={loadMacOSCardiologyAppointments}
+              onRowClick={handleAppointmentRowClick}
+              onActionClick={handleAppointmentActionClick}
+              services={services}
+              isDark={isDark}
+            />
           }
 
           {/* Прием пациента */}
