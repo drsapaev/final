@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   Button,
 } from '../ui/macos';
-import { useFade, useSlide } from '../ui/native';
+import { useFade, useSlide } from '../../hooks/uiAnimations';
 import { colors } from '../../theme/tokens';
 import PropTypes from 'prop-types';
 

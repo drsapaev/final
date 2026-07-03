@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, Button } from '../ui/native';
+import { Card, Button } from '../ui/macos';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 /**

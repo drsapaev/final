@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellOff, Settings, Check } from 'lucide-react';
-import { Button, Card, Badge } from '../ui/native';
+import { Button, Card, Badge } from '../ui/macos';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 

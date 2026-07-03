@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { HelpCircle, Keyboard, X } from 'lucide-react';
-import { Card, Button } from '../ui/native';
+import { Card, Button } from '../ui/macos';
 import PropTypes from 'prop-types';
 
 /**

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Button } from '../ui/native';
+import { Card, Button } from '../ui/macos';
 import {
   Download,
   FileText,

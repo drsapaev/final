@@ -19,7 +19,7 @@ import {
   FileX,
   Loader2 } from
 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button, Badge } from '../ui/macos';
 import {
   MacOSStatCard,
   Table,

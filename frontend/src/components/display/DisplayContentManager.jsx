@@ -13,8 +13,7 @@ import {
 
   Monitor } from
 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
-
+import { Card, Button, Badge } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';

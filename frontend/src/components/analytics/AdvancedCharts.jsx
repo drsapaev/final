@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Chart, registerables } from 'chart.js';
-import { Card, Button } from '../ui/native';
+import { Card, Button } from '../ui/macos';
 import {
   Download,
   RefreshCw,

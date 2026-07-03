@@ -1,4 +1,4 @@
-import { Card } from '../ui/native';
+import { Card } from '../ui/macos';
 import {
   AppError, AppLoading, Button,
 } from '../ui/macos';

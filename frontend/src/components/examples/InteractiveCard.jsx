@@ -1,4 +1,4 @@
-import { Card } from '../ui/native';
+import { Card } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
 import PropTypes from 'prop-types';

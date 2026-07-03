@@ -1,5 +1,6 @@
 import React from 'react';
-import { Card, useFade, useScale } from '../ui/native';
+import { Card } from '../ui/macos';
+import { useFade, useScale } from '../../hooks/uiAnimations';
 import PropTypes from 'prop-types';
 
 const KPICard = ({ 

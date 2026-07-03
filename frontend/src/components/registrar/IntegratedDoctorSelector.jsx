@@ -11,7 +11,7 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
-import { Card, Badge } from '../ui/native';
+import { Card, Badge } from '../ui/macos';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';

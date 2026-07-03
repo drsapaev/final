@@ -11,7 +11,7 @@ import {
   RefreshCw } from
 'lucide-react';
 import { useId } from 'react';
-import { Card } from '../ui/native';
+import { Card } from '../ui/macos';
 import PropTypes from 'prop-types';
 
 const EmptyState = ({

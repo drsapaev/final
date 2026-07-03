@@ -10,7 +10,8 @@ import {
   Badge,
   Skeleton,
 } from '../components/ui/macos';
-import AnimatedTransition from '../components/ui/native/AnimatedTransition';
+// R-14: AnimatedTransition moved from native/ to macos/ kit.
+import AnimatedTransition from '../components/ui/macos/AnimatedTransition';
 import { useTheme } from '../contexts/ThemeContext';
 import '../styles/animations.css';
 import {
