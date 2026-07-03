@@ -304,7 +304,7 @@ class AIService:
         try:
             from jinja2 import Environment
 
-            env = Environment()
+            env = Environment(autoescape=True)
 
             # Формируем полный промпт
             full_prompt = template.system_prompt

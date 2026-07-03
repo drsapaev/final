@@ -105,6 +105,7 @@ class PDFService:
             loader=FileSystemLoader(self.templates_dir),
             trim_blocks=True,
             lstrip_blocks=True,
+            autoescape=True,
         )
 
         # Добавляем фильтры

@@ -170,7 +170,7 @@ class PaymentWebhookService:
             sign_string += secret_key
 
             # Создаём подпись
-            expected_signature = hashlib.md5(sign_string.encode("utf-8")).hexdigest()
+            expected_signature = hashlib.md5(sign_string.encode("utf-8"), usedforsecurity=False).hexdigest()  # nosec B324 — payment provider API spec requires MD5
 
             return data["sign_string"] == expected_signature
         except Exception:

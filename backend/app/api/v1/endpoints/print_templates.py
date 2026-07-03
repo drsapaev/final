@@ -159,7 +159,7 @@ def create_print_template(
 
         # Валидируем шаблон Jinja2
         try:
-            env = Environment()
+            env = Environment(autoescape=True)
             env.from_string(template_data.template_content)
         except TemplateError as e:
             raise HTTPException(
@@ -227,7 +227,7 @@ def update_print_template(
         # Валидируем новый шаблон если он обновляется
         if template_data.template_content:
             try:
-                env = Environment()
+                env = Environment(autoescape=True)
                 env.from_string(template_data.template_content)
             except TemplateError as e:
                 raise HTTPException(
@@ -305,7 +305,7 @@ def upload_template_file(
 
         # Валидируем шаблон
         try:
-            env = Environment()
+            env = Environment(autoescape=True)
             env.from_string(content.decode('utf-8'))
         except TemplateError as e:
             raise HTTPException(
@@ -353,7 +353,7 @@ def preview_template(
             )
 
         # Рендерим шаблон с тестовыми данными
-        env = Environment()
+        env = Environment(autoescape=True)
         jinja_template = env.from_string(template.template_content)
 
         rendered_content = jinja_template.render(**preview_data)

@@ -499,7 +499,7 @@ class TelegramService:
         try:
             from jinja2 import Environment
 
-            env = Environment()
+            env = Environment(autoescape=True)
             template = env.from_string(template_text)
             return template.render(**data)
         except Exception as e:

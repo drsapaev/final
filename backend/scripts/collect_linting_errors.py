@@ -11,7 +11,7 @@ from datetime import datetime
 def run_command(cmd, cwd=None):
     """Запускает команду и возвращает результат"""
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B602 — dev-only script, commands are hardcoded
             cmd,
             shell=True,
             capture_output=True,
