@@ -408,3 +408,71 @@ If the AI/DB is down while a doctor is with a patient:
   `synthetic_seed.py --count-patients 10000 --count-visits 100000`.
 - Never commit fixtures containing real-looking names + phone numbers. The
   pre-commit `gitleaks` hook may flag these — that's a feature, not a bug.
+
+## Monitoring — Sentry Integration
+
+The clinic uses **Sentry** for error monitoring (both frontend and backend).
+Full setup instructions: `docs/runbooks/SENTRY_SETUP.md`.
+
+### DSNs (public, safe to commit)
+
+- Frontend (React PWA): `https://57fde20209e223ec5a4a96e3a5a59fa2@o4511673323749376.ingest.us.sentry.io/4511673366282240`
+- Backend (FastAPI): `https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016`
+
+Both DSNs are **send-only public keys** — they cannot read your Sentry data,
+only submit events. They are safe to commit to the repo (and already are, in
+`frontend/.env.example`, `backend/.env.example`, `ops/docker-compose.yml`).
+
+### What gets captured
+
+- Unhandled exceptions (frontend + backend)
+- Failed HTTP 5xx responses
+- Slow DB queries (>1s, via SQLAlchemy integration)
+- WebSocket disconnects
+- Failed arq background jobs (visit reminders, data retention)
+- 5% of performance traces (errors always captured regardless)
+
+### PII scrubbing (3 layers)
+
+PII is scrubbed before any event leaves your infrastructure:
+
+1. **Code layer** — `backend/app/core/pii_masker.py` scrubs dicts before logging
+2. **Log layer** — `PIIMaskingFilter` in `logging_config.py` scrubs log records
+3. **Sentry layer** — `beforeSend` callback scrubs request bodies, breadcrumbs,
+   extras before sending to sentry.io
+
+All three layers use the same field list (`MEDICAL_PII_KEYS`) — keep them in
+sync when adding new PII fields. See `docs/runbooks/SENTRY_SETUP.md` section
+"Maintenance → Adding new PII fields".
+
+### Smoke testing Sentry
+
+After deploy, verify Sentry is receiving events:
+
+```bash
+# Frontend (in browser DevTools console on production URL):
+setTimeout(() => { throw new Error("smoke test sentry frontend") }, 1000)
+# Check Sentry dashboard → Issues in 10 seconds
+
+# Backend (in shell with SENTRY_DSN set):
+cd backend
+python -c "
+from app.core.sentry import init_sentry, capture_exception
+init_sentry()
+try:
+    raise RuntimeError('smoke test sentry backend')
+except RuntimeError as e:
+    capture_exception(e)
+"
+# Check Sentry dashboard → Issues in 10 seconds
+```
+
+### Incident: "Sentry is silent"
+
+If you suspect Sentry isn't capturing errors:
+
+1. Verify `SENTRY_DSN` env var is set (frontend: `VITE_SENTRY_DSN`)
+2. Check `[sentry] initialized` log line on backend startup
+3. Verify network reachability: `curl -I https://o4511673323749376.ingest.us.sentry.io`
+4. Check Sentry UI → Settings → Projects → "Last received event" timestamp
+5. See `docs/runbooks/SENTRY_SETUP.md` section 9 for full troubleshooting
