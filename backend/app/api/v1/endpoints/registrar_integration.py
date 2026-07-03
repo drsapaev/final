@@ -2469,6 +2469,10 @@ def get_today_queues(
                         entry_wrapper["visit_id"] = None
 
                 elif entry_type == "online_queue":
+                    # R-22 fix: guard against None entry_data
+                    if entry_data is None:
+                        logger.warning("get_today_queues: online_queue entry with None data, skipping")
+                        continue
                     # ✅ SSOT FIX: entry_data может быть OnlineQueueEntry или Visit (для QR-визитов)
                     is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
                     
