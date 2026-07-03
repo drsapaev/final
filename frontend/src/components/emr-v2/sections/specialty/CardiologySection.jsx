@@ -197,9 +197,24 @@ export function CardiologySection({
                 </div>
       }
 
-            {/* Lab Results Tab */}
+            {/* Lab Results Tab - R-12 / P-004 (UX audit): unified units to мг/дл */}
             {activeTab === 'labs' &&
       <div className="cardiology-tab-content">
+                    <div className="cardiology-info-panel" role="status">
+                            <div className="cardiology-info-icon">📋</div>
+                            <div className="cardiology-info-text">
+                                <h4>Полная форма анализов крови — на вкладке «Анализы крови»</h4>
+                                <p>
+                                    Ввод, история и средние значения анализов крови доступны на
+                                    отдельной вкладке <strong>«Анализы крови»</strong> в боковой панели
+                                    кардиолога. Ниже приведены единицы измерения и нормальные значения
+                                    для быстрого ориентирования. <strong>Все единицы унифицированы
+                                    с основной формой (мг/дл)</strong> — устраняет риск путаницы
+                                    между мг/дл и ммоль/л (разница в 38.7 раз).
+                                </p>
+                            </div>
+                        </div>
+
                     <div className="cardiology-labs-grid">
                         <EMRTextField
             label="Тропонин I (нг/мл)"
@@ -208,7 +223,7 @@ export function CardiologySection({
             disabled={disabled}
             type="number"
             placeholder="< 0.04" />
-          
+
                         <EMRTextField
             label="CRP (мг/л)"
             value={labResults?.crp || ''}
@@ -216,42 +231,47 @@ export function CardiologySection({
             disabled={disabled}
             type="number"
             placeholder="< 3.0" />
-          
+
                         <EMRTextField
-            label="Холестерин общий (ммоль/л)"
+            label="Холестерин общий (мг/дл)"
             value={labResults?.cholesterol_total || ''}
             onChange={(e) => handleLabResultChange('cholesterol_total', e.target.value)}
             disabled={disabled}
-            type="number" />
-          
+            type="number"
+            placeholder="< 200" />
+
                         <EMRTextField
-            label="Холестерин ЛПВП (ммоль/л)"
+            label="Холестерин ЛПВП (мг/дл)"
             value={labResults?.cholesterol_hdl || ''}
             onChange={(e) => handleLabResultChange('cholesterol_hdl', e.target.value)}
             disabled={disabled}
-            type="number" />
-          
+            type="number"
+            placeholder="> 40" />
+
                         <EMRTextField
-            label="Холестерин ЛПНП (ммоль/л)"
+            label="Холестерин ЛПНП (мг/дл)"
             value={labResults?.cholesterol_ldl || ''}
             onChange={(e) => handleLabResultChange('cholesterol_ldl', e.target.value)}
             disabled={disabled}
-            type="number" />
-          
+            type="number"
+            placeholder="< 100" />
+
                         <EMRTextField
-            label="Триглицериды (ммоль/л)"
+            label="Триглицериды (мг/дл)"
             value={labResults?.triglycerides || ''}
             onChange={(e) => handleLabResultChange('triglycerides', e.target.value)}
             disabled={disabled}
-            type="number" />
-          
+            type="number"
+            placeholder="< 150" />
+
                         <EMRTextField
-            label="Глюкоза (ммоль/л)"
+            label="Глюкоза (мг/дл)"
             value={labResults?.glucose || ''}
             onChange={(e) => handleLabResultChange('glucose', e.target.value)}
             disabled={disabled}
-            type="number" />
-          
+            type="number"
+            placeholder="70-100" />
+
                     </div>
                 </div>
       }
@@ -310,12 +330,12 @@ export function CardiologySection({
               placeholder="120-180" />
             
                             <EMRTextField
-              label="Общий холестерин (ммоль/л)"
+              label="Общий холестерин для SCORE2 (ммоль/л)"
               value={labResults?.cholesterol_total || ''}
               onChange={(e) => handleLabResultChange('cholesterol_total', e.target.value)}
               disabled={disabled}
               type="number"
-              placeholder="4-8" />
+              placeholder="4-8 (ммоль/л)" />
             
                         </div>
 
