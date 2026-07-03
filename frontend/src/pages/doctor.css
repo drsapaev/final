@@ -188,16 +188,18 @@
 .doctor-action-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
+  padding: var(--mac-spacing-xs, 4px);
+  border-radius: 8px;
   border: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  margin-right: var(--mac-spacing-xs, 4px);
 }
-.doctor-action-btn-primary { background: var(--mac-accent-light, rgba(0,122,255,0.1)); color: var(--mac-accent); }
+.doctor-action-btn-primary { background: rgba(0, 122, 255, 0.12); color: var(--mac-accent); }
 .doctor-action-btn-success { background: rgba(52, 199, 89, 0.12); color: var(--mac-success); }
 .doctor-action-btn-danger { background: rgba(255, 59, 48, 0.12); color: var(--mac-danger); }
 .doctor-action-btn-info { background: rgba(88, 86, 214, 0.12); color: var(--mac-accent-purple); }
