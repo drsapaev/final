@@ -2,7 +2,6 @@
 Расширенная API документация с примерами и описаниями
 """
 
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 

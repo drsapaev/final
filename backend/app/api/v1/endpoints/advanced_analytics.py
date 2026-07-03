@@ -3,7 +3,6 @@ API endpoints для расширенной аналитики
 """
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session

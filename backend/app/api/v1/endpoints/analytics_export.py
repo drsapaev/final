@@ -4,7 +4,6 @@ API endpoints для экспорта аналитических отчетов
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session

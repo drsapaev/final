@@ -6,7 +6,7 @@ Salary History API Endpoints
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, NoReturn, Optional
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel

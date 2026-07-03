@@ -4,7 +4,6 @@ API endpoints для верификации телефонных номеров
 
 import re
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator

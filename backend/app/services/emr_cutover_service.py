@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections import Counter
 from datetime import datetime
-from typing import Callable
+from collections.abc import Callable
 
 from sqlalchemy.orm import Session
 

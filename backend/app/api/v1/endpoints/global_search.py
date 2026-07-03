@@ -5,7 +5,6 @@ Aggregated search across patients, visits, and lab results.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict

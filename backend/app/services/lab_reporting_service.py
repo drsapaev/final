@@ -2263,7 +2263,7 @@ class LabReportingService:
         if not expected_updated_at:
             return  # optimistic locking опционален, backward compatible
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
             # Парсим ISO string (frontend передаёт ISO 8601)
             expected_dt = datetime.fromisoformat(
                 expected_updated_at.replace("Z", "+00:00")

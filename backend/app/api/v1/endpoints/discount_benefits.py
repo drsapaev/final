@@ -3,7 +3,6 @@ API endpoints для системы скидок и льгот
 """
 
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field

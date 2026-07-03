@@ -4,7 +4,7 @@ AI API endpoints
 
 import json
 import logging
-from typing import Any, Dict, List, NoReturn, Optional
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel

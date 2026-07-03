@@ -203,7 +203,6 @@ class RegistrarEditDeltaService:
         Это предотвращает silent data loss когда два регистратора одновременно
         редактируют одного пациента (добавляют услуги, меняют количество и т.д.).
         """
-        from datetime import timezone
 
         entry_ids = list(expected_entry_updated_at.keys())
         if not entry_ids:

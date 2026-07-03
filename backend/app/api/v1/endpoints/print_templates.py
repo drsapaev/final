@@ -5,7 +5,7 @@ API endpoints для управления шаблонами печати
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from jinja2 import Environment, TemplateError

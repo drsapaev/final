@@ -1,5 +1,4 @@
 # app/api/v1/endpoints/online_queue.py
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session

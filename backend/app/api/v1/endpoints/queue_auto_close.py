@@ -2,7 +2,7 @@
 API endpoints для автозакрытия очередей
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session

@@ -4,7 +4,6 @@ API endpoints для расширенной аналитики AI использ
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field

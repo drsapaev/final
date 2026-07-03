@@ -5,7 +5,7 @@ CRUD endpoints для управления отделениями в админ-
 import logging
 from datetime import date
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field

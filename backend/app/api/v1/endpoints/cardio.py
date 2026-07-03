@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, NoReturn, Optional
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc

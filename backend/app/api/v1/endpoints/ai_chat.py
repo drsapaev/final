@@ -8,7 +8,7 @@ AI Chat Endpoints - REST и WebSocket API для AI чата.
 
 import asyncio
 import logging
-from typing import Any, List, Optional
+from typing import Any
 
 from fastapi import (
     APIRouter,

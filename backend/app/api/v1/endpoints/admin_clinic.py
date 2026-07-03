@@ -6,7 +6,6 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session

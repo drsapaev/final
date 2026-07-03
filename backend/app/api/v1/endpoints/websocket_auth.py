@@ -6,7 +6,6 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from jose import JWTError, jwt

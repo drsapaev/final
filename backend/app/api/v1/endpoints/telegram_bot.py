@@ -6,7 +6,7 @@ import json
 import logging
 import secrets
 from json import JSONDecodeError
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse

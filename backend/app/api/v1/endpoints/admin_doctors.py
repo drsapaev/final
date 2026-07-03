@@ -1,7 +1,6 @@
 """API endpoints для управления врачами в админ панели."""
 
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_

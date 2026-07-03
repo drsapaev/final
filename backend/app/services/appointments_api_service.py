@@ -341,16 +341,12 @@ class AppointmentsApiService:
 
 
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.crud.appointment import appointment as appointment_crud
 from app.models.user import User
-from app.schemas import appointment as appointment_schemas
 from app.services.online_queue import _broadcast, get_or_create_day, load_stats
 
 logger = logging.getLogger(__name__)

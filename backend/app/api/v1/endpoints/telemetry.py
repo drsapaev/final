@@ -3,7 +3,7 @@ Telemetry API - Product metrics collection
 
 WHAT THIS IS:
 - System usage patterns
-- AI suggestion usage stats  
+- AI suggestion usage stats
 - UX performance metrics
 
 WHAT THIS IS NOT:
@@ -19,7 +19,7 @@ RULES:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel, Field

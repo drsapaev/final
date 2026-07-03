@@ -3,7 +3,7 @@ API endpoints для Firebase Cloud Messaging (FCM) push уведомлений
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel

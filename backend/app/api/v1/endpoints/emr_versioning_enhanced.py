@@ -2,7 +2,7 @@
 API endpoints для расширенного версионирования EMR
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
