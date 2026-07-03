@@ -210,3 +210,68 @@
 .dental-text-primary {
   color: var(--mac-text-primary);
 }
+
+/* ─── Icon container 56px (stat card icon) ─── */
+.dental-icon-bg-56 {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--mac-radius-full);
+}
+
+/* ─── Icon container 40px (procedure icon) ─── */
+.dental-icon-bg-40 {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--mac-radius-full);
+}
+
+/* ─── Stat card container (bg + border + radius + shadow + padding) ─── */
+.dental-stat-card {
+  background: var(--mac-bg-primary);
+  border-radius: var(--mac-radius-lg);
+  box-shadow: var(--mac-shadow-sm);
+  padding: var(--mac-spacing-5);
+}
+
+/* ─── Procedure card (border + radius + padding) ─── */
+.dental-procedure-card {
+  padding: 16px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+}
+
+/* ─── Ghost button (no background/border) ─── */
+.dental-btn-ghost {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--mac-radius-sm);
+  transition: all 0.2s;
+}
+
+/* ─── Icon button with border + shadow ─── */
+.dental-btn-icon-lg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  box-shadow: var(--mac-shadow-xs);
+  cursor: pointer;
+  padding: 8px 16px;
+  transition: all 0.2s;
+}
+
+/* ─── Grid 3col ─── */
+.dental-grid-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--mac-spacing-3);
+}
