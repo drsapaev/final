@@ -118,7 +118,7 @@ const MacOSCardiologistPanelUnified = () => {
     ldlThreshold: 100,
     showEcgEchoTogether: true,
   });
-  const [, setEmr] = useState(null);
+  const [emr, setEmr] = useState(null);
 
   // Ref для отслеживания предыдущего пациента для очистки EMR
   const prevSelectedPatientRef = useRef(null);
@@ -1046,6 +1046,21 @@ const MacOSCardiologistPanelUnified = () => {
     }
   };
 
+  // P-019 (UX audit): load EMR when a patient is selected so the audit
+  // badge on the visit tab can show status, version, last-modified, and
+  // signed-by. Previously EMR was only loaded when the doctor clicked a
+  // specific action (call/complete/view_emr), not on initial patient
+  // selection — so the doctor had no visibility into who last touched
+  // the record.
+  // MUST be above the isDemoMode early return to satisfy the
+  // rules-of-hooks lint rule (no conditional hook calls).
+  useEffect(() => {
+    const { visitId } = getSelectedPatientContext();
+    if (visitId && selectedPatient) {
+      loadEMR(visitId);
+    }
+  }, [selectedPatient, authRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Проверяем демо-режим после всех хуков
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
@@ -1227,6 +1242,8 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   // Сохранение EMR
+  // (P-019 useEffect was moved above the isDemoMode early return
+  //  to satisfy the rules-of-hooks lint rule. See line ~1049.)
 
 
 
@@ -1679,6 +1696,66 @@ const MacOSCardiologistPanelUnified = () => {
                     </div>
                 }
                 </div>
+
+                {/* P-019 (UX audit): EMR audit badge — show status, version,
+                    last-modified date, and who signed/amended the record.
+                    Previously this info was hidden inside the EMR container's
+                    toggle-only history panel; now the cardiologist sees it at
+                    a glance on the visit tab. */}
+                {emr && (
+                  <div className="cardio-emr-audit-badge" style={{
+                    marginTop: '12px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '12px',
+                    fontSize: getFontSize('sm'),
+                    color: getColor('textSecondary'),
+                    background: emr.status === 'signed' ? 'var(--mac-success-bg, #f0fdf4)' : 'var(--mac-surface-secondary, #f8fafc)',
+                    border: `1px solid ${emr.status === 'signed' ? 'var(--mac-success-border, #bbf7d0)' : getColor('border')}`,
+                    borderRadius: '8px',
+                  }}>
+                    <span style={{ fontWeight: '600', color: getColor('text') }}>
+                      EMR #{emr.id ?? '—'}
+                    </span>
+                    <span style={{
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontWeight: '600',
+                      fontSize: '11px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      background: emr.status === 'signed' ? '#16a34a' : emr.status === 'amended' ? '#ca8a04' : '#6b7280',
+                      color: '#ffffff',
+                    }}>
+                      {emr.status || 'draft'}
+                    </span>
+                    {emr.version != null && (
+                      <span title="Версия EMR">v{emr.version}</span>
+                    )}
+                    {emr.updated_at && (
+                      <span title="Последнее изменение">
+                        изм. {new Date(emr.updated_at).toLocaleDateString('ru-RU', {
+                          day: '2-digit', month: '2-digit', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </span>
+                    )}
+                    {emr.signed_at && (
+                      <span title="Подписана">
+                        подписана {new Date(emr.signed_at).toLocaleDateString('ru-RU', {
+                          day: '2-digit', month: '2-digit', year: 'numeric',
+                        })}
+                      </span>
+                    )}
+                    {emr.signed_by != null && emr.signed_by > 0 && (
+                      <span title="Кем подписана">
+                        врач #{emr.signed_by}
+                      </span>
+                    )}
+                  </div>
+                )}
               </MacOSCard>
 
 
