@@ -14,6 +14,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
+from app.core.sentry import init_sentry as init_backend_sentry
 
 # -----------------------------------------------------------------------------
 # Логирование
@@ -24,6 +25,11 @@ from app.core.logging_config import setup_logging
 settings = get_settings()
 log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 setup_logging(level=log_level, structured=settings.LOG_STRUCTURED)
+
+# Sentry — no-op if SENTRY_DSN env var is unset.
+# Requires sentry-sdk (in backend/requirements-monitoring.txt).
+init_backend_sentry()
+
 log = logging.getLogger("clinic.main")
 API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
 
