@@ -870,9 +870,13 @@ const MacOSCardiologistPanelUnified = () => {
         }
         break;
       case 'payment':
-        // Открыть окно оплаты
-        // Здесь можно добавить модальное окно оплаты
-        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
+        // QW-05 (UX audit): removed dead "functionality will be added later" stub.
+        // The `payment` action is disabled for doctor view at the table level
+        // (canPay = !isDoctorView && backendCanPay), so we should never arrive
+        // here in production. If we do, log the event for debugging rather than
+        // surfacing a "feature not implemented" toast to the doctor — that
+        // breaks Nielsen heuristic #2 (match between system and real world).
+        logger.info('[Cardiology] payment action invoked (disabled for doctor view)', row);
         break;
       case 'print':
         try {
