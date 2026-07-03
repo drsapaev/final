@@ -51,23 +51,6 @@ const API_V1_BASE = getApiBaseUrl();
 const CARDIOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
 const CARDIOLOGY_CALLED_STATUSES = ['called', 'in_progress'];
 const CARDIOLOGY_COMPLETED_STATUSES = ['completed', 'done'];
-const cardiologyAppointmentsHeaderStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 'var(--mac-spacing-4)',
-  marginBottom: 'var(--mac-spacing-6)',
-  flexWrap: 'wrap'
-};
-const cardiologyAppointmentsTitleStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  fontSize: 'var(--mac-font-size-lg)',
-  fontWeight: 'var(--mac-font-weight-semibold)',
-  color: 'var(--mac-text-primary)',
-  margin: 0,
-  minWidth: 'min(100%, 260px)'
-};
 function countAppointmentsByStatuses(appointments, statuses) {
   return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
 }
@@ -1454,23 +1437,7 @@ const MacOSCardiologistPanelUnified = () => {
   ];
 
   return (
-    <div style={{
-      ...pageStyle,
-      padding: 0,
-      boxSizing: 'border-box',
-      overflow: 'hidden',
-      width: '100%',
-      position: 'relative',
-      zIndex: 1,
-      display: 'block',
-      maxWidth: '100%',
-      margin: 0,
-      minHeight: '100vh',
-      background: 'var(--mac-gradient-window)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-      color: 'var(--mac-text-primary)',
-      transition: 'background var(--mac-duration-normal) var(--mac-ease)'
-    }}>
+    <div className="cardio-root-container" style={{ ...pageStyle }}>
 
       <div className="cardio-card-padded" style={{ padding: 0 }}> {/* Убираем padding, так как он уже есть в main контейнере */}
 
@@ -1496,16 +1463,9 @@ const MacOSCardiologistPanelUnified = () => {
             flexDirection: 'column',
             gap: getSpacing('xl')
           }}>
-              <MacOSCard style={{
-              width: '100%',
-              maxWidth: '100%',
-              minWidth: 0,
-              boxSizing: 'border-box',
-              overflow: 'hidden',
-              padding: '24px'
-            }}>
-                <div style={cardiologyAppointmentsHeaderStyle}>
-                  <h3 style={cardiologyAppointmentsTitleStyle}>
+              <MacOSCard className="cardio-card-fullwidth">
+                <div className="cardio-appointments-header">
+                  <h3 className="cardio-appointments-title">
                     <Calendar size={20} className="cardio-icon-mr" style={{ marginRight: '12px', color: 'var(--mac-accent)' }} />
                     Записи к кардиологу
                   </h3>
