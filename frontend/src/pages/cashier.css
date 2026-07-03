@@ -1,6 +1,8 @@
 /**
  * Cashier Panel — utility CSS classes.
  */
+
+/* ─── Stat values + labels (batch 1) ─── */
 .cashier-stat-value { font-size: var(--mac-font-size-2xl); font-weight: 700; text-align: center; padding: var(--mac-spacing-2); }
 .cashier-stat-label { font-size: var(--mac-font-size-sm); text-align: center; padding: var(--mac-spacing-2); }
 .cashier-text-sm { font-size: var(--mac-font-size-sm); }
@@ -12,3 +14,135 @@
 .cashier-mb-4 { margin-bottom: var(--mac-spacing-4); }
 .cashier-mt-4 { margin-top: var(--mac-spacing-4); }
 .cashier-min-w { min-width: 120px; }
+
+/* ─── Text color helpers (batch 2) ─── */
+.cashier-text-primary { color: var(--mac-text-primary); }
+.cashier-text-secondary { color: var(--mac-text-secondary); }
+.cashier-text-tertiary { color: var(--mac-text-tertiary); }
+.cashier-text-accent { color: var(--mac-accent); }
+.cashier-text-danger { color: var(--mac-danger); }
+.cashier-text-success { color: var(--mac-success); }
+
+/* ─── Filter bar (batch 2) ─── */
+.cashier-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.cashier-search-wrap { position: relative; flex: 1; min-width: 200px; }
+.cashier-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--mac-text-tertiary);
+  pointer-events: none;
+}
+.cashier-date-mode { display: flex; align-items: center; gap: 8px; }
+.cashier-date-icon { width: 16px; height: 16px; color: var(--mac-text-secondary); }
+.cashier-min-w-160 { min-width: 160px; }
+.cashier-min-w-140 { min-width: 140px; }
+.cashier-date-sep { font-size: 13px; color: var(--mac-text-secondary); }
+
+/* ─── Stats card (batch 2) ─── */
+.cashier-stats-card { margin-bottom: 16px; padding: 16px; }
+.cashier-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  align-items: center;
+}
+.cashier-stat-num { font-size: 20px; font-weight: 700; }
+.cashier-stat-num-lg { font-size: 24px; font-weight: 700; }
+.cashier-stat-cap { font-size: 11px; color: var(--mac-text-secondary); }
+.cashier-stat-cap-base { font-size: 13px; color: var(--mac-text-secondary); }
+.cashier-stat-accent { color: var(--mac-accent); }
+.cashier-stat-green { color: var(--mac-accent-green); }
+.cashier-stat-blue { color: var(--mac-accent-blue); }
+.cashier-stat-purple { color: var(--mac-accent-purple); }
+.cashier-stat-orange { color: var(--mac-accent-orange); }
+.cashier-stat-danger { color: var(--mac-danger); }
+.cashier-refresh-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* ─── Service badges (batch 2) ─── */
+.cashier-empty { color: var(--mac-text-tertiary); }
+.cashier-badge-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  cursor: help;
+  max-width: 280px;
+}
+.cashier-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background-color: rgba(0, 122, 255, 0.12);
+  color: var(--mac-accent-blue);
+  border: 1px solid rgba(0, 122, 255, 0.25);
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cashier-tooltip { padding: 4px 0; max-width: 300px; }
+.cashier-tooltip-row { margin-bottom: 6px; line-height: 1.4; font-size: 12px; }
+.cashier-tooltip-row:last-child { margin-bottom: 0; }
+
+/* ─── Tables (batch 2) ─── */
+.cashier-table { width: 100%; }
+.cashier-table-scroll { overflow-x: auto; }
+.cashier-table-row { border-bottom: 1px solid var(--mac-separator); }
+.cashier-table-row:hover { background-color: var(--mac-fill-quaternary); }
+.cashier-cell-padded { padding: 12px 16px; }
+.cashier-cell-actions { padding: 12px 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+.cashier-date-stack { display: flex; flex-direction: column; gap: 2px; }
+.cashier-date-main { font-weight: 500; }
+.cashier-date-sub { font-size: 12px; color: var(--mac-text-secondary); }
+.cashier-section-gap { margin-top: 24px; }
+.cashier-empty-row td { color: var(--mac-text-secondary); }
+.cashier-empty-text { font-size: 14px; color: var(--mac-text-secondary); }
+.cashier-skeleton-h { height: 192px; }
+
+/* ─── Alert / status row (batch 2) ─── */
+.cashier-alert-error { margin-bottom: 8px; }
+.cashier-check-icon { color: var(--mac-success); margin-right: 8px; }
+
+/* ─── Pagination (batch 2) ─── */
+.cashier-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px;
+}
+.cashier-pagination-info { font-size: 14px; color: var(--mac-text-secondary); }
+
+/* ─── Root layout (batch 3) ─── */
+.cashier-root {
+  padding: 0;
+  min-height: 100vh;
+  background: var(--mac-gradient-window);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  color: var(--mac-text-primary);
+  transition: background var(--mac-duration-normal) var(--mac-ease);
+}
+.cashier-root-inner { padding: 0; }
+
+/* ─── Refund form fields (batch 3) ─── */
+.cashier-refund-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--mac-border);
+  font-size: 14px;
+}
+.cashier-refund-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--mac-border);
+  font-size: 14px;
+  resize: vertical;
+}
