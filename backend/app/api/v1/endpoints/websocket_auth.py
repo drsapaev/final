@@ -204,7 +204,7 @@ async def ws_queue_authenticated(
             await websocket.close(
                 code=status.WS_1011_INTERNAL_ERROR, reason="Authentication error"
             )
-        except:
+        except Exception:
             pass
     finally:
         # ✅ SECURITY: Remove connection from rate limiter
@@ -277,7 +277,7 @@ async def ws_queue_optional_auth(
             await websocket.close(
                 code=status.WS_1011_INTERNAL_ERROR, reason="Connection error"
             )
-        except:
+        except Exception:
             pass
     finally:
         if 'room' in locals():
