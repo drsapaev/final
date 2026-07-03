@@ -5,9 +5,9 @@ import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointments
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
 import {
-  Button, Card, CardHeader, CardContent, Badge, Icon, Input,
+  Button, Badge, Icon,
 } from '../components/ui/macos';
-import { AnimatedTransition, AnimatedLoader } from '../components/ui';
+import { AnimatedLoader } from '../components/ui';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
 import '../components/ui/animations.css';
@@ -68,18 +68,15 @@ import { printPanelTicketInBrowserAsync } from '../services/panelPrint';
 import AppointmentWizardV2 from '../components/wizard/AppointmentWizardV2';
 import PaymentManager from '../components/payment/PaymentManager';
 
-// Современная очередь
-import ModernQueueManager from '../components/queue/ModernQueueManager';
-
-// Современная статистика
-import ModernStatistics from '../components/statistics/ModernStatistics';
+// Modern queue manager — extracted to QueueView component (Decomp 6a)
+// Modern statistics — extracted to WelcomeView component (Decomp 7a)
 
 // Модальное окно редактирования пациента
 // ✨ ЗАКОММЕНТИРОВАНО: Теперь используется AppointmentWizardV2 для редактирования
 // import EditPatientModal from '../components/common/EditPatientModal';
 
 // Утилиты для работы с датами
-import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
+import { getLocalDateString } from '../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
 // Note: formatNetworkErrorMessage + isNetworkFetchError moved to useRegistrarData.js (Decomp 4)
 import { getErrorMessage } from '../utils/errorHandler';
@@ -280,13 +277,10 @@ const RegistrarPanel = () => {
   const t = useMemo(() => getRegistrarTranslator(language), [language]);
   const currentWorklistLabel = t(REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments');
   const statusFilterLabel = statusFilter ? t(REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter) : null;
-  const { theme, isDark, getSpacing, getFontSize, getColor } = useTheme();
+  const { theme, getSpacing, getFontSize, getColor } = useTheme();
   // Адаптивные цвета из централизованной системы темизации
   // DS-2 fix: replaced --color-* variables with --mac-* canonical tokens
-  const cardBg = isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)';
   const textColor = 'var(--mac-text-primary)';
-  const borderColor = isDark ? 'var(--mac-border)' : 'var(--mac-border-secondary)';
-  const accentColor = 'var(--mac-accent-blue)';
 
   // Используем централизованную типографику и отступы
   // Используем CSS переменные вместо getSpacing и getColor
