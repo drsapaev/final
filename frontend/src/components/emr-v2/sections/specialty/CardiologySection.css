@@ -270,3 +270,55 @@
     background: #fecaca;
     color: #991b1b;
 }
+/* R-13 / P-005 (UX audit): info panel replacing the duplicate ECGViewer / EchoForm */
+.cardiology-info-panel {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.cardiology-info-panel .cardiology-info-icon {
+    font-size: 24px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.cardiology-info-panel .cardiology-info-text h4 {
+    margin: 0 0 6px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0c4a6e;
+}
+
+.cardiology-info-panel .cardiology-info-text p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #075985;
+}
+
+.cardiology-ecg-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin: 8px 0;
+    font-size: 13px;
+    color: #334155;
+}
+
+.cardiology-ecg-summary div {
+    padding: 4px 8px;
+    background: #f8fafc;
+    border-radius: 4px;
+}
+
+.cardiology-ecg-interpretation {
+    margin: 8px 0 0 0;
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+}

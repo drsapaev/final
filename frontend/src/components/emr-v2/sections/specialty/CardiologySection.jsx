@@ -1,19 +1,25 @@
 /**
  * CardiologySection - Специализированная секция для кардиологии
- * 
- * Интегрирует:
- * - ECGViewer для просмотра и анализа ЭКГ
- * - Поля для ЭхоКГ результатов
- * - Кардиологические маркеры (тропонин, CRP, холестерин)
- * - Калькуляторы рисков
+ *
+ * R-13 / P-005 (UX audit): the ECGViewer and EchoForm were previously
+ * rendered inside this EMR specialty section AND on the dedicated
+ * 'ecg' tab of CardiologistPanelUnified - two independent instances of
+ * the same component sharing the same visitId/patientId but with
+ * independent local state. Edits in one place were not visible in the
+ * other without a reload, which violated DRY and created cognitive load
+ * (the doctor had to remember "where did I enter this?").
+ *
+ * Fix: this section now shows a read-only summary of the latest ECG and
+ * Echo data stored in specialty_data.ecg / specialty_data.echo, plus a
+ * pointer to the dedicated 'ecg' tab where the full ECGViewer / EchoForm
+ * live. Labs and the SCORE2 risk calculator stay here (they are unique
+ * to the EMR context and not duplicated elsewhere).
  */
 
 import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
 import EMRSection from '../EMRSection';
 import EMRTextField from '../EMRTextField';
-import ECGViewer from '../../../cardiology/ECGViewer';
-import EchoForm from '../../../cardiology/EchoForm';
 import { useAppData } from '../../../../contexts/AppDataContext';
 import './CardiologySection.css';
 
@@ -35,21 +41,17 @@ export function CardiologySection({
   labResults = {},
   onChange,
   disabled = false,
-  visitId,
-  patientId
+  // R-13: visitId and patientId are no longer used inside this section
+  // (ECGViewer was removed). They are still accepted in propTypes for
+  // backwards compatibility with EMRContainerV2, which passes them
+  // unconditionally.
+  visitId: _visitId,
+  patientId: _patientId
 }) {void
   useAppData();
   const [activeTab, setActiveTab] = useState('ecg'); // 'ecg' | 'echo' | 'labs' | 'risk'
 
   // Handlers
-  const handleECGDataUpdate = useCallback((updatedData) => {
-    onChange?.('ecg', updatedData);
-  }, [onChange]);
-
-  const handleEchoDataUpdate = useCallback((updatedData) => {
-    onChange?.('echo', updatedData);
-  }, [onChange]);
-
   const handleLabResultChange = useCallback((field, value) => {
     onChange?.('cardio_labs', {
       ...labResults,
@@ -96,31 +98,102 @@ export function CardiologySection({
                 </button>
             </div>
 
-            {/* ECG Tab */}
+            {/* ECG Tab - R-13: read-only summary instead of duplicate ECGViewer */}
             {activeTab === 'ecg' &&
       <div className="cardiology-tab-content">
-                    <ECGViewer
-          visitId={visitId}
-          patientId={patientId}
-          onDataUpdate={handleECGDataUpdate} />
-        
-                    {ecgData?.interpretation &&
+                    <div className="cardiology-info-panel" role="status">
+                            <div className="cardiology-info-icon">📋</div>
+                            <div className="cardiology-info-text">
+                                <h4>ЭКГ доступна на отдельной вкладке</h4>
+                                <p>
+                                    Полный просмотрщик ЭКГ (загрузка файлов, парсинг параметров,
+                                    AI-анализ) находится на вкладке <strong>«ЭКГ»</strong> в боковой
+                                    панели кардиолога. Это устраняет дублирование данных и
+                                    гарантирует, что изменения отображаются в одном месте.
+                                </p>
+                            </div>
+                        </div>
+
+                    {/* Summary of the latest ECG data stored in specialty_data.ecg */}
+                    {(ecgData?.heart_rate || ecgData?.rhythm || ecgData?.interpretation) &&
         <div className="cardiology-interpretation">
-                            <h4>Интерпретация ЭКГ:</h4>
-                            <p>{ecgData.interpretation}</p>
+                            <h4>Последняя запись ЭКГ:</h4>
+                            <div className="cardiology-ecg-summary">
+                                {ecgData?.heart_rate &&
+                                    <div><strong>ЧСС:</strong> {ecgData.heart_rate} уд/мин</div>
+                                }
+                                {ecgData?.rhythm &&
+                                    <div><strong>Ритм:</strong> {ecgData.rhythm}</div>
+                                }
+                                {ecgData?.pr_interval &&
+                                    <div><strong>PR:</strong> {ecgData.pr_interval} мс</div>
+                                }
+                                {ecgData?.qrs_duration &&
+                                    <div><strong>QRS:</strong> {ecgData.qrs_duration} мс</div>
+                                }
+                                {ecgData?.qt_interval &&
+                                    <div><strong>QT:</strong> {ecgData.qt_interval} мс</div>
+                                }
+                                {ecgData?.st_segment &&
+                                    <div><strong>ST:</strong> {ecgData.st_segment}</div>
+                                }
+                                {ecgData?.t_wave &&
+                                    <div><strong>T:</strong> {ecgData.t_wave}</div>
+                                }
+                            </div>
+                            {ecgData?.interpretation &&
+                                <p className="cardiology-ecg-interpretation">
+                                    <em>Интерпретация:</em> {ecgData.interpretation}
+                                </p>
+                            }
                         </div>
         }
                 </div>
       }
 
-            {/* Echo Tab */}
+            {/* Echo Tab - R-13: read-only summary instead of duplicate EchoForm */}
             {activeTab === 'echo' &&
       <div className="cardiology-tab-content">
-                    <EchoForm
-          initialData={echoData}
-          onSave={handleEchoDataUpdate}
-          disabled={disabled} />
-        
+                    <div className="cardiology-info-panel" role="status">
+                            <div className="cardiology-info-icon">📋</div>
+                            <div className="cardiology-info-text">
+                                <h4>ЭхоКГ доступна на отдельной вкладке</h4>
+                                <p>
+                                    Полная форма ЭхоКГ (левый желудочек, предсердия, клапаны,
+                                    заключение) находится на вкладке <strong>«ЭКГ»</strong> в боковой
+                                    панели кардиолога (в разделе ЭхоКГ под загрузчиком ЭКГ).
+                                </p>
+                            </div>
+                        </div>
+
+                    {/* Summary of the latest Echo data stored in specialty_data.echo */}
+                    {(echoData?.ef || echoData?.edd || echoData?.la || echoData?.conclusion) &&
+        <div className="cardiology-interpretation">
+                            <h4>Последние данные ЭхоКГ:</h4>
+                            <div className="cardiology-ecg-summary">
+                                {echoData?.edd &&
+                                    <div><strong>КДО ЛЖ:</strong> {echoData.edd} мм</div>
+                                }
+                                {echoData?.esd &&
+                                    <div><strong>КСО ЛЖ:</strong> {echoData.esd} мм</div>
+                                }
+                                {echoData?.ef &&
+                                    <div><strong>ФВ:</strong> {echoData.ef}%</div>
+                                }
+                                {echoData?.la &&
+                                    <div><strong>ЛП:</strong> {echoData.la} мм</div>
+                                }
+                                {echoData?.aortic?.peak_velocity &&
+                                    <div><strong>Vmax аорт. клапана:</strong> {echoData.aortic.peak_velocity} м/с</div>
+                                }
+                            </div>
+                            {echoData?.conclusion &&
+                                <p className="cardiology-ecg-interpretation">
+                                    <em>Заключение:</em> {echoData.conclusion}
+                                </p>
+                            }
+                        </div>
+        }
                 </div>
       }
 
