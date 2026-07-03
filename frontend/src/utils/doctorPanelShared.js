@@ -113,12 +113,92 @@ export function normalizeNumericId(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Collect all unique services + service_codes for a given patient across
+ * all their appointments.
+ *
+ * Previously duplicated verbatim in CardiologistPanelUnified,
+ * DermatologistPanelUnified, and DentistPanelUnified (~20 lines each).
+ * Now exported from here so future bug fixes land in one place.
+ *
+ * @param {number|string} patientId - The patient id to filter by.
+ * @param {Array<{patient_id: *, services?: Array, service_codes?: Array}>} allAppointments
+ * @returns {{services: Array, service_codes: Array}} Deduplicated arrays.
+ */
+export function getAllPatientServices(patientId, allAppointments) {
+  const patientServices = new Set();
+  const patientServiceCodes = new Set();
+
+  if (Array.isArray(allAppointments)) {
+    allAppointments.forEach((appointment) => {
+      if (appointment && appointment.patient_id === patientId) {
+        if (Array.isArray(appointment.services)) {
+          appointment.services.forEach((service) => patientServices.add(service));
+        }
+        if (Array.isArray(appointment.service_codes)) {
+          appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
+        }
+      }
+    });
+  }
+
+  return {
+    services: Array.from(patientServices),
+    service_codes: Array.from(patientServiceCodes),
+  };
+}
+
+/**
+ * Factory that creates an `ensureCanonicalVisitId` callback bound to a
+ * specific appointments setter.
+ *
+ * The three doctor specialty panels each had an identical copy of this
+ * function, differing only in which setter they call:
+ *   - CardiologistPanelUnified: setAppointments
+ *   - DermatologistPanelUnified: setAppointments
+ *   - DentistPanelUnified:       setAppointmentsTableData
+ *
+ * The function body resolves the canonical visit_id for a row (either
+ * from the row itself, or by calling resolveCanonicalVisitId with the
+ * appointment_id), and writes it back into the appointments state so
+ * subsequent lookups skip the API call.
+ *
+ * Usage in a panel:
+ *   const ensureCanonicalVisitId = useCallback(
+ *     makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId),
+ *     [resolveCanonicalVisitId]
+ *   );
+ *
+ * @param {(updater: (prev: Array) => Array) => void} setAppointments - The
+ *   panel-specific appointments setter (from useState).
+ * @param {(appointmentId: number|string) => Promise<number|null>} resolveCanonicalVisitId -
+ *   Imported from utils/canonicalVisit. Resolves an appointment_id to a
+ *   canonical visit_id via backend API.
+ * @returns {(row: {appointment_id?: *, visit_id?: *, id: *}) => Promise<number|null>}
+ */
+export function makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId) {
+  return async function ensureCanonicalVisitId(row) {
+    const appointmentId = row?.appointment_id || null;
+    const visitId = row?.visit_id || (appointmentId ? await resolveCanonicalVisitId(appointmentId) : null);
+
+    if (visitId && typeof setAppointments === 'function') {
+      setAppointments((prev) => (Array.isArray(prev) ? prev.map((appointment) =>
+        appointment && appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
+      ) : prev));
+    }
+
+    return visitId;
+  };
+}
+
 const doctorPanelShared = {
   SPECIALTY_KEYS,
   SPECIALTY_ALIASES,
   matchesSpecialty,
   countAppointmentsByStatuses,
   normalizeNumericId,
+  getAllPatientServices,
+  makeEnsureCanonicalVisitId,
 };
 
 export default doctorPanelShared;

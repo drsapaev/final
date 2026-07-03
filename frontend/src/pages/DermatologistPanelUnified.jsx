@@ -51,6 +51,8 @@ import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import {
   countAppointmentsByStatuses,
+  getAllPatientServices,
+  makeEnsureCanonicalVisitId,
   normalizeNumericId,
   SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
@@ -353,25 +355,8 @@ const DermatologistPanelUnified = () => {
   }, []);
 
   // Функция для получения всех услуг пациента из всех записей
-  const getAllPatientServices = useCallback((patientId, allAppointments) => {
-    const patientServices = new Set();
-    const patientServiceCodes = new Set();
-
-    allAppointments.forEach((appointment) => {
-      if (appointment.patient_id === patientId) {
-        if (appointment.services && Array.isArray(appointment.services)) {
-          appointment.services.forEach((service) => patientServices.add(service));
-        }
-        if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-          appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
-        }
-      }
-    });
-
-    return {
-      services: Array.from(patientServices),
-      service_codes: Array.from(patientServiceCodes)
-    };
+  const getAllPatientServicesCb = useCallback((patientId, allAppointments) => {
+    return getAllPatientServices(patientId, allAppointments);
   }, []);
 
   // Загрузка записей дерматолога
@@ -477,7 +462,7 @@ const DermatologistPanelUnified = () => {
 
         // Добавляем информацию о всех услугах пациента
         const enrichedAppointmentsData = appointmentsData.map((apt) => {
-          const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
+          const allPatientServices = getAllPatientServicesCb(apt.patient_id, allAppointments);
           return {
             ...apt,
             all_patient_services: allPatientServices.services,
@@ -511,7 +496,7 @@ const DermatologistPanelUnified = () => {
         dermatologyRequestCache.appointments.promise = null;
       }
     }
-  }, [getAllPatientServices]);
+  }, [getAllPatientServicesCb]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
@@ -533,18 +518,10 @@ const DermatologistPanelUnified = () => {
     };
   }, [activeTab, loadDermatologyAppointments]);
 
-  const ensureCanonicalVisitId = useCallback(async (row) => {
-    const appointmentId = row?.appointment_id || null;
-    const visitId = row?.visit_id || (appointmentId ? await resolveCanonicalVisitId(appointmentId) : null);
-
-    if (visitId) {
-      setAppointments((prev) => prev.map((appointment) =>
-        appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
-      ));
-    }
-
-    return visitId;
-  }, []);
+  const ensureCanonicalVisitId = useCallback(
+    makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId),
+    [resolveCanonicalVisitId]
+  );
 
   // Функция для создания частичного объекта пациента из данных row (для QR-пациентов)
   const createPartialPatientFromRow = useCallback((row) => {
