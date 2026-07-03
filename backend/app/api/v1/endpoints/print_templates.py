@@ -404,7 +404,7 @@ def get_default_template(
                 detail=f"Стандартный шаблон '{template_type}' не найден",
             )
 
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             content = f.read()
 
         return {
