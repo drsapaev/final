@@ -1865,14 +1865,11 @@ const MacOSCardiologistPanelUnified = () => {
                       aria-label="Blood test date"
                       value={bloodTestForm.test_date}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
-                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
                         border: `1px solid ${getColor('border')}`,
                         backgroundColor: getColor('surface'),
-                        color: getColor('text'),
-                        fontSize: getFontSize('base'),
-                        borderRadius: '6px'
+                        color: getColor('text')
                       }}
                       required />
 
@@ -1886,14 +1883,11 @@ const MacOSCardiologistPanelUnified = () => {
                       aria-label="Total cholesterol"
                       value={bloodTestForm.cholesterol_total}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_total: e.target.value })}
-                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
                         border: `1px solid ${getColor('border')}`,
                         backgroundColor: getColor('surface'),
-                        color: getColor('text'),
-                        fontSize: getFontSize('base'),
-                        borderRadius: '6px'
+                        color: getColor('text')
                       }}
                       placeholder="<200" />
 
@@ -1910,14 +1904,11 @@ const MacOSCardiologistPanelUnified = () => {
                       aria-label="HDL cholesterol"
                       value={bloodTestForm.cholesterol_hdl}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_hdl: e.target.value })}
-                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
                         border: `1px solid ${getColor('border')}`,
                         backgroundColor: getColor('surface'),
-                        color: getColor('text'),
-                        fontSize: getFontSize('base'),
-                        borderRadius: '6px'
+                        color: getColor('text')
                       }}
                       placeholder=">40" />
 
@@ -1931,14 +1922,11 @@ const MacOSCardiologistPanelUnified = () => {
                       aria-label="LDL cholesterol"
                       value={bloodTestForm.cholesterol_ldl}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
-                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
                         border: `1px solid ${getColor('border')}`,
                         backgroundColor: getColor('surface'),
-                        color: getColor('text'),
-                        fontSize: getFontSize('base'),
-                        borderRadius: '6px'
+                        color: getColor('text')
                       }}
                       placeholder="<100" />
 
@@ -1952,14 +1940,11 @@ const MacOSCardiologistPanelUnified = () => {
                       aria-label="Triglycerides"
                       value={bloodTestForm.triglycerides}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, triglycerides: e.target.value })}
-                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
                         border: `1px solid ${getColor('border')}`,
                         backgroundColor: getColor('surface'),
-                        color: getColor('text'),
-                        fontSize: getFontSize('base'),
-                        borderRadius: '6px'
+                        color: getColor('text')
                       }}
                       placeholder="<150" />
 
@@ -1976,14 +1961,11 @@ const MacOSCardiologistPanelUnified = () => {
                       aria-label="Glucose"
                       value={bloodTestForm.glucose}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, glucose: e.target.value })}
-                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
                         border: `1px solid ${getColor('border')}`,
                         backgroundColor: getColor('surface'),
-                        color: getColor('text'),
-                        fontSize: getFontSize('base'),
-                        borderRadius: '6px'
+                        color: getColor('text')
                       }}
                       placeholder="70-100" />
 
@@ -1997,14 +1979,11 @@ const MacOSCardiologistPanelUnified = () => {
                       aria-label="CRP"
                       value={bloodTestForm.crp}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, crp: e.target.value })}
-                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
                         border: `1px solid ${getColor('border')}`,
                         backgroundColor: getColor('surface'),
-                        color: getColor('text'),
-                        fontSize: getFontSize('base'),
-                        borderRadius: '6px'
+                        color: getColor('text')
                       }}
                       placeholder="<3.0" />
 
@@ -2018,14 +1997,11 @@ const MacOSCardiologistPanelUnified = () => {
                       aria-label="Troponin"
                       value={bloodTestForm.troponin}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, troponin: e.target.value })}
-                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
                         border: `1px solid ${getColor('border')}`,
                         backgroundColor: getColor('surface'),
-                        color: getColor('text'),
-                        fontSize: getFontSize('base'),
-                        borderRadius: '6px'
+                        color: getColor('text')
                       }}
                       placeholder="<0.04" />
 
@@ -2176,7 +2152,7 @@ const MacOSCardiologistPanelUnified = () => {
                       ))}
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('md') }}>
+                    <div className="cardio-flex-col">
                       {filteredHistoryEntries.length === 0 && (
                         <MacOSEmptyState
                           type="calendar"
@@ -2286,11 +2262,10 @@ const MacOSCardiologistPanelUnified = () => {
                   gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                   gap: getSpacing('lg')
                 }}>
-                      <div style={{
-                    padding: getSpacing('md'),
+                      <div className="cardio-input-container"
+                  style={{
                     border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface'),
-                    borderRadius: '8px'
+                    backgroundColor: getColor('surface')
                   }}>
                         <div style={{
                       fontSize: getFontSize('sm'),
@@ -2303,11 +2278,10 @@ const MacOSCardiologistPanelUnified = () => {
                       color: getColor('text')
                     }}>{ecgResults.length}</div>
                       </div>
-                      <div style={{
-                    padding: getSpacing('md'),
+                      <div className="cardio-input-container"
+                  style={{
                     border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface'),
-                    borderRadius: '8px'
+                    backgroundColor: getColor('surface')
                   }}>
                         <div style={{
                       fontSize: getFontSize('sm'),
@@ -2320,11 +2294,10 @@ const MacOSCardiologistPanelUnified = () => {
                       color: getColor('text')
                     }}>{bloodTests.length}</div>
                       </div>
-                      <div style={{
-                    padding: getSpacing('md'),
+                      <div className="cardio-input-container"
+                  style={{
                     border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface'),
-                    borderRadius: '8px'
+                    backgroundColor: getColor('surface')
                   }}>
                         <div style={{
                       fontSize: getFontSize('sm'),
@@ -2337,11 +2310,10 @@ const MacOSCardiologistPanelUnified = () => {
                       color: getColor('text')
                     }}>{patientFiles.length}</div>
                       </div>
-                      <div style={{
-                    padding: getSpacing('md'),
+                      <div className="cardio-input-container"
+                  style={{
                     border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface'),
-                    borderRadius: '8px'
+                    backgroundColor: getColor('surface')
                   }}>
                         <div style={{
                       fontSize: getFontSize('sm'),
@@ -2422,7 +2394,7 @@ const MacOSCardiologistPanelUnified = () => {
             marginBottom: getSpacing('md'),
             color: getColor('text')
           }}>Настройки кардиолога</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('md') }}>
+            <div className="cardio-flex-col">
               <label className="flex items-center" style={{
               gap: '8px',
               color: 'var(--mac-text-primary)',
