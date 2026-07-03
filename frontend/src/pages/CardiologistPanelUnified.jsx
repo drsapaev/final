@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
+// P-016 (UX audit): persist cardiologist settings (ldlThreshold,
+// showEcgEchoTogether) in localStorage so they survive page reloads.
+import { useLocalStorage } from '../hooks/useLocalStorage';
 import {
   FileText,
   User,
@@ -106,7 +109,12 @@ const MacOSCardiologistPanelUnified = () => {
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState({ ldlThreshold: 100, showEcgEchoTogether: true });
+  // P-016 (UX audit): settings now persist in localStorage. The doctor's
+  // LDL threshold and ECG/Echo layout preference survive page reloads.
+  const [settings, setSettings] = useLocalStorage('cardio.settings', {
+    ldlThreshold: 100,
+    showEcgEchoTogether: true,
+  });
   const [, setEmr] = useState(null);
 
   // Ref для отслеживания предыдущего пациента для очистки EMR
@@ -184,6 +192,48 @@ const MacOSCardiologistPanelUnified = () => {
     const threshold = Number(settings?.ldlThreshold);
     return Number.isFinite(threshold) && threshold > 0 && parsed > threshold;
   }, [settings?.ldlThreshold]);
+
+  // P-023 (UX audit): range validation for blood-test fields. Returns
+  // { valid, message } so the form can paint the field red and show an
+  // inline hint when the entered value is physiologically impossible
+  // (e.g. negative cholesterol, heart rate > 250). Ranges are based on
+  // standard clinical reference intervals in mg/dL (matching R-12 unification).
+  // LDL uses the configurable settings.ldlThreshold as its upper "critical"
+  // marker; the hard physiological ceiling is 1000 mg/dL.
+  const FIELD_RANGES = useRef({
+    cholesterol_total: { min: 50, max: 1000, unit: 'мг/дл', label: 'Общий холестерин' },
+    cholesterol_hdl: { min: 5, max: 200, unit: 'мг/дл', label: 'HDL' },
+    cholesterol_ldl: { min: 5, max: 1000, unit: 'мг/дл', label: 'LDL' },
+    triglycerides: { min: 10, max: 2000, unit: 'мг/дл', label: 'Триглицериды' },
+    glucose: { min: 20, max: 1000, unit: 'мг/дл', label: 'Глюкоза' },
+    crp: { min: 0, max: 500, unit: 'мг/л', label: 'CRP' },
+    troponin: { min: 0, max: 100, unit: 'нг/мл', label: 'Тропонин' },
+  }).current;
+
+  const getFieldRangeWarning = useCallback(
+    (fieldName, rawValue) => {
+      const range = FIELD_RANGES[fieldName];
+      if (!range) return null;
+      const parsed = Number(rawValue);
+      if (!Number.isFinite(parsed) || rawValue === '' || rawValue === null || rawValue === undefined) {
+        return null;
+      }
+      if (parsed < range.min) {
+        return {
+          valid: false,
+          message: `${range.label} ${parsed} ${range.unit} ниже физиологического минимума (${range.min}). Проверьте значение.`,
+        };
+      }
+      if (parsed > range.max) {
+        return {
+          valid: false,
+          message: `${range.label} ${parsed} ${range.unit} превышает физиологический максимум (${range.max}). Проверьте значение.`,
+        };
+      }
+      return { valid: true, message: null };
+    },
+    [FIELD_RANGES]
+  );
 
   const openBloodTestForm = () => {
     const { patientId } = getSelectedPatientContext();
@@ -1847,11 +1897,16 @@ const MacOSCardiologistPanelUnified = () => {
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_total: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        color: getColor('text')
+                        border: `1px solid ${getFieldRangeWarning('cholesterol_total', bloodTestForm.cholesterol_total)?.valid === false ? '#dc2626' : getColor('border')}`,
+                        backgroundColor: getFieldRangeWarning('cholesterol_total', bloodTestForm.cholesterol_total)?.valid === false ? '#fef2f2' : getColor('surface'),
+                        color: getFieldRangeWarning('cholesterol_total', bloodTestForm.cholesterol_total)?.valid === false ? '#dc2626' : getColor('text')
                       }}
                       placeholder="<200" />
+                      {getFieldRangeWarning('cholesterol_total', bloodTestForm.cholesterol_total)?.valid === false && (
+                        <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
+                          {getFieldRangeWarning('cholesterol_total', bloodTestForm.cholesterol_total).message}
+                        </div>
+                      )}
 
                       </div>
                     </div>
@@ -1868,11 +1923,16 @@ const MacOSCardiologistPanelUnified = () => {
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_hdl: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        color: getColor('text')
+                        border: `1px solid ${getFieldRangeWarning('cholesterol_hdl', bloodTestForm.cholesterol_hdl)?.valid === false ? '#dc2626' : getColor('border')}`,
+                        backgroundColor: getFieldRangeWarning('cholesterol_hdl', bloodTestForm.cholesterol_hdl)?.valid === false ? '#fef2f2' : getColor('surface'),
+                        color: getFieldRangeWarning('cholesterol_hdl', bloodTestForm.cholesterol_hdl)?.valid === false ? '#dc2626' : getColor('text')
                       }}
                       placeholder=">40" />
+                      {getFieldRangeWarning('cholesterol_hdl', bloodTestForm.cholesterol_hdl)?.valid === false && (
+                        <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
+                          {getFieldRangeWarning('cholesterol_hdl', bloodTestForm.cholesterol_hdl).message}
+                        </div>
+                      )}
 
                       </div>
                       <div>
@@ -1914,11 +1974,16 @@ const MacOSCardiologistPanelUnified = () => {
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, triglycerides: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        color: getColor('text')
+                        border: `1px solid ${getFieldRangeWarning('triglycerides', bloodTestForm.triglycerides)?.valid === false ? '#dc2626' : getColor('border')}`,
+                        backgroundColor: getFieldRangeWarning('triglycerides', bloodTestForm.triglycerides)?.valid === false ? '#fef2f2' : getColor('surface'),
+                        color: getFieldRangeWarning('triglycerides', bloodTestForm.triglycerides)?.valid === false ? '#dc2626' : getColor('text')
                       }}
                       placeholder="<150" />
+                      {getFieldRangeWarning('triglycerides', bloodTestForm.triglycerides)?.valid === false && (
+                        <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
+                          {getFieldRangeWarning('triglycerides', bloodTestForm.triglycerides).message}
+                        </div>
+                      )}
 
                       </div>
                     </div>
@@ -1935,11 +2000,16 @@ const MacOSCardiologistPanelUnified = () => {
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, glucose: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        color: getColor('text')
+                        border: `1px solid ${getFieldRangeWarning('glucose', bloodTestForm.glucose)?.valid === false ? '#dc2626' : getColor('border')}`,
+                        backgroundColor: getFieldRangeWarning('glucose', bloodTestForm.glucose)?.valid === false ? '#fef2f2' : getColor('surface'),
+                        color: getFieldRangeWarning('glucose', bloodTestForm.glucose)?.valid === false ? '#dc2626' : getColor('text')
                       }}
                       placeholder="70-100" />
+                      {getFieldRangeWarning('glucose', bloodTestForm.glucose)?.valid === false && (
+                        <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
+                          {getFieldRangeWarning('glucose', bloodTestForm.glucose).message}
+                        </div>
+                      )}
 
                       </div>
                       <div>
@@ -1953,11 +2023,16 @@ const MacOSCardiologistPanelUnified = () => {
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, crp: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        color: getColor('text')
+                        border: `1px solid ${getFieldRangeWarning('crp', bloodTestForm.crp)?.valid === false ? '#dc2626' : getColor('border')}`,
+                        backgroundColor: getFieldRangeWarning('crp', bloodTestForm.crp)?.valid === false ? '#fef2f2' : getColor('surface'),
+                        color: getFieldRangeWarning('crp', bloodTestForm.crp)?.valid === false ? '#dc2626' : getColor('text')
                       }}
                       placeholder="<3.0" />
+                      {getFieldRangeWarning('crp', bloodTestForm.crp)?.valid === false && (
+                        <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
+                          {getFieldRangeWarning('crp', bloodTestForm.crp).message}
+                        </div>
+                      )}
 
                       </div>
                       <div>
@@ -1971,11 +2046,16 @@ const MacOSCardiologistPanelUnified = () => {
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, troponin: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                       style={{
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        color: getColor('text')
+                        border: `1px solid ${getFieldRangeWarning('troponin', bloodTestForm.troponin)?.valid === false ? '#dc2626' : getColor('border')}`,
+                        backgroundColor: getFieldRangeWarning('troponin', bloodTestForm.troponin)?.valid === false ? '#fef2f2' : getColor('surface'),
+                        color: getFieldRangeWarning('troponin', bloodTestForm.troponin)?.valid === false ? '#dc2626' : getColor('text')
                       }}
                       placeholder="<0.04" />
+                      {getFieldRangeWarning('troponin', bloodTestForm.troponin)?.valid === false && (
+                        <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
+                          {getFieldRangeWarning('troponin', bloodTestForm.troponin).message}
+                        </div>
+                      )}
 
                       </div>
                     </div>
@@ -2364,7 +2444,14 @@ const MacOSCardiologistPanelUnified = () => {
             marginTop: getSpacing('lg')
           }}>
               <Button variant="outline" onClick={() => setSettingsOpen(false)}>Закрыть</Button>
-              <Button onClick={() => setSettingsOpen(false)}><Save size={16} className="cardio-icon-mr" />Сохранить</Button>
+              <Button onClick={() => {
+                // P-016 (UX audit): settings are already persisted to
+                // localStorage on every change via useLocalStorage. The
+                // "Save" button gives the doctor explicit feedback that
+                // the values are stored.
+                notify.success('Настройки сохранены');
+                setSettingsOpen(false);
+              }}><Save size={16} className="cardio-icon-mr" />Сохранить</Button>
             </div>
           </MacOSCard>
         }
