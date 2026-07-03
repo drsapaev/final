@@ -141,6 +141,27 @@ const RegistrarPanel = () => {
 
     return explicitView;
   }, [searchParams, location.pathname]);
+
+  // ✅ Phase 2: redirect legacy ?view=welcome|queue to canonical paths
+  // /registrar?view=welcome → /registrar/welcome
+  // /registrar?view=queue   → /registrar/queue
+  // Preserves all other query params (q, status, date, patientId, dept).
+  // The redirect is replace-only (no history pollution) and runs once per
+  // legacy-view occurrence.
+  useEffect(() => {
+    const legacyView = searchParams.get('view');
+    if (legacyView !== 'welcome' && legacyView !== 'queue') return;
+    // Only redirect when on the bare /registrar path (not already on a sub-path)
+    if (location.pathname !== '/registrar') return;
+
+    const params = new URLSearchParams(searchParams);
+    params.delete('view');
+    params.delete('tab');
+    const qs = params.toString();
+    const target = qs ? `/registrar/${legacyView}?${qs}` : `/registrar/${legacyView}`;
+    navigate(target, { replace: true });
+  }, [searchParams, location.pathname, navigate]);
+
   const searchQuery = useMemo(() => (searchParams.get('q') || '').toLowerCase(), [searchParams]);
   const statusFilter = useMemo(() => searchParams.get('status'), [searchParams]);
   const todayStr = getLocalDateString();
@@ -1505,11 +1526,14 @@ const RegistrarPanel = () => {
         <button
           type="button"
           onClick={() => {
+            // Phase 2: navigate to canonical path (replaces legacy ?view=welcome)
             const p = new URLSearchParams(searchParams);
-            p.set('view', 'welcome');
             p.delete('q');
             p.delete('status');
-            setSearchParams(p, { replace: true });
+            p.delete('view');
+            p.delete('tab');
+            const qs = p.toString();
+            navigate(qs ? `/registrar/welcome?${qs}` : '/registrar/welcome', { replace: true });
           }}
           className="registrar-breadcrumb-link"
         >
