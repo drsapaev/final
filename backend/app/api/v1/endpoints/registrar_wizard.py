@@ -139,6 +139,10 @@ class EditDeltaRequest(BaseModel):
     patient_data: Optional[EditDeltaPatientData] = None
     services: List[EditDeltaServiceItem] = Field(default_factory=list)
     existing_queue_entry_ids: List[int] = Field(default_factory=list)
+    # R-08 fix: optimistic locking — map of entry_id → ISO updated_at string.
+    # Frontend передаёт updated_at каждой existing entry при последнем чтении.
+    # Если какая-либо entry была изменена другим пользователем — 409 Conflict.
+    expected_entry_updated_at: Dict[int, str] = Field(default_factory=dict)
 
 
 class EditDeltaResponse(BaseModel):
@@ -1189,6 +1193,7 @@ def apply_registrar_cart_edit_delta(
                 else None
             ),
             existing_queue_entry_ids=request.existing_queue_entry_ids,
+            expected_entry_updated_at=request.expected_entry_updated_at,
             current_user=current_user,
         )
         return EditDeltaResponse(**result)
