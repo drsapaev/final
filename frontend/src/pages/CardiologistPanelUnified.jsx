@@ -42,6 +42,8 @@ import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import notify from '../services/notify';
+// QW-10 (UX audit): shared ConfirmDialog hook used before completing a visit.
+import { useConfirm } from '../components/common/ConfirmDialog';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import tokenManager from '../utils/tokenManager';
 
@@ -114,6 +116,9 @@ const MacOSCardiologistPanelUnified = () => {
   // QW-01 (UX audit): removed swallowed setMessage — all calls now route through `notify`
   // (react-toastify) so users actually see error/success/warning feedback.
   // `message` destructure was dropped, which silently discarded every notification.
+  // QW-10 (UX audit): confirm hook used before completing a visit (prevents
+  // accidental completion with empty diagnosis/treatment).
+  const [confirm, confirmDialog] = useConfirm();
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -963,6 +968,47 @@ const MacOSCardiologistPanelUnified = () => {
   // Обработка сохранения визита
   const handleSaveVisit = async () => {
     if (!selectedPatient) return;
+
+    // QW-10 (UX audit): confirm before completing the visit. completeVisit is
+    // an irreversible action that closes the encounter and auto-calls the next
+    // patient. Without a confirm, a doctor could accidentally complete a visit
+    // with an empty diagnosis or treatment, leaving the EMR incomplete. We
+    // surface a stronger warning (intent='warning') when critical fields are
+    // empty, and a normal confirmation otherwise.
+    const hasDiagnosis = Boolean(visitData?.diagnosis?.trim());
+    const hasComplaint = Boolean(visitData?.complaint?.trim());
+    const missingCritical = !hasDiagnosis || !hasComplaint;
+
+    const confirmOptions = missingCritical
+      ? {
+          title: 'Завершить приём без диагноза?',
+          message: hasDiagnosis
+            ? 'Не заполнена жалоба пациента.'
+            : hasComplaint
+              ? 'Не заполнен диагноз. Рекомендуется указать диагноз перед завершением приёма.'
+              : 'Не заполнены жалоба и диагноз. Рекомендуется заполнить их перед завершением.',
+          description:
+            'После завершения приёма EMR будет сохранена в текущем состоянии. ' +
+            'Дополнить карту можно будет через поправку (amend).',
+          confirmLabel: 'Завершить всё равно',
+          cancelLabel: 'Вернуться к заполнению',
+          intent: 'warning',
+        }
+      : {
+          title: 'Завершить приём?',
+          message: 'Приём будет сохранён, и система автоматически вызовет следующего пациента.',
+          description:
+            'Перед завершением убедитесь, что диагноз, лечение и рекомендации заполнены корректно. ' +
+            'После подписания EMR изменения возможны только через поправку.',
+          confirmLabel: 'Завершить приём',
+          cancelLabel: 'Отмена',
+          intent: 'primary',
+        };
+
+    const ok = await confirm(confirmOptions);
+    if (!ok) {
+      return;
+    }
 
     try {
       setLoading(true);
@@ -2348,6 +2394,9 @@ const MacOSCardiologistPanelUnified = () => {
           theme={{ isDark, getColor, getSpacing, getFontSize }} />
 
         }
+
+        {/* QW-10 (UX audit): portal-mounted ConfirmDialog used before completing a visit */}
+        {confirmDialog}
 
         {/* Настройки кардиолога: плавающая кнопка и панель */}
         <button
