@@ -100,7 +100,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -163,7 +163,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -236,7 +236,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -304,7 +304,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -347,7 +347,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return []
 
     async def interpret_lab_results(
@@ -400,7 +400,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -463,7 +463,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -536,7 +536,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -604,7 +604,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -664,7 +664,7 @@ class OpenAIProvider(BaseAIProvider):
                         "recommendations": [content],
                         "ai_confidence": "low",
                     }
-            except:
+            except Exception:
                 return {"analysis": content, "structured": False}
 
         except Exception as e:
@@ -722,7 +722,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -785,7 +785,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -858,7 +858,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -926,7 +926,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -1181,7 +1181,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -1243,7 +1243,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -1296,7 +1296,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -1349,7 +1349,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -1482,7 +1482,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -1613,7 +1613,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -1726,7 +1726,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -1855,7 +1855,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -2006,7 +2006,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -2141,7 +2141,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -2287,7 +2287,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -2446,7 +2446,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -2633,7 +2633,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -2810,7 +2810,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -2955,7 +2955,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -3076,7 +3076,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -3190,7 +3190,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -3350,7 +3350,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -3486,7 +3486,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -3618,7 +3618,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -3760,7 +3760,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -3937,7 +3937,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -4080,7 +4080,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -4223,7 +4223,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -4393,7 +4393,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -4518,7 +4518,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -4687,7 +4687,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -4895,7 +4895,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -5097,7 +5097,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -5340,7 +5340,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -5599,7 +5599,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -5851,7 +5851,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             return json.loads(response.content)
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,

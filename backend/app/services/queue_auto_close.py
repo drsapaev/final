@@ -180,7 +180,7 @@ class QueueAutoCloseService:
             end_minutes = end.hour * 60 + end.minute
 
             return max(0, end_minutes - current_minutes)
-        except:
+        except Exception:
             return 0
 
 

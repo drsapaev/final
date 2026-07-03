@@ -222,7 +222,7 @@ class MonitoringService:
                         count = result.scalar()
                         records_count[table] = count
                         total_records += count
-                    except:
+                    except Exception:
                         records_count[table] = 0
 
                 return {
@@ -295,7 +295,7 @@ class MonitoringService:
                 with engine.connect() as conn:
                     conn.execute(text("SELECT 1"))
                 db_response_time = time.time() - start_time
-            except:
+            except Exception:
                 db_response_time = -1
 
             # Загрузка системы
@@ -506,7 +506,7 @@ class MonitoringService:
                     metric_time = datetime.fromisoformat(metric["timestamp"])
                     if metric_time >= cutoff_time:
                         filtered_metrics.append(metric)
-                except:
+                except Exception:
                     continue
 
             return filtered_metrics

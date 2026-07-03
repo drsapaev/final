@@ -373,7 +373,7 @@ class AIService:
         try:
             # Пробуем парсить как JSON
             return json.loads(response)
-        except:
+        except Exception:
             # Если не JSON, возвращаем как текст
             return {
                 "analysis_text": response,
@@ -393,7 +393,7 @@ class AIService:
                 return data["codes"]
             else:
                 return [{"code": "Z00.0", "description": response}]
-        except:
+        except Exception:
             # Если не JSON, возвращаем базовый результат
             return [
                 {
@@ -407,7 +407,7 @@ class AIService:
         """Парсинг ответа анализа документов"""
         try:
             return json.loads(response)
-        except:
+        except Exception:
             return {
                 "summary": response,
                 "diagnoses": [],

@@ -623,7 +623,7 @@ class PrintService:
                 # Удаляем временный файл
                 try:
                     os.unlink(temp_file_path)
-                except:
+                except Exception:
                     pass
 
         except Exception as e:
