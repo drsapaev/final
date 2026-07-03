@@ -181,3 +181,32 @@
   justify-content: center;
   border-radius: var(--mac-radius-full);
 }
+
+/* ─── Stat number (3xl, bold) ─── */
+.dental-stat-number {
+  font-size: var(--mac-font-size-3xl);
+  font-weight: var(--mac-font-weight-bold);
+}
+
+/* ─── Section heading (xl, semibold) ─── */
+.dental-heading-xl {
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+/* ─── Body text medium (base, medium) ─── */
+.dental-text-base-med {
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* ─── Body text semibold (lg, semibold) ─── */
+.dental-text-lg-semi {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+/* ─── Text primary color ─── */
+.dental-text-primary {
+  color: var(--mac-text-primary);
+}

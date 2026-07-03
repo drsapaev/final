@@ -1500,11 +1500,7 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-secondary)',
             marginBottom: '4px'
           }}>Всего пациентов</p>
-            <p style={{
-            fontSize: 'var(--mac-font-size-3xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)'
-          }}>{stats.totalPatients}</p>
+            <p className="dental-stat-number dental-text-primary">{stats.totalPatients}</p>
             <p style={{
             fontSize: 'var(--mac-font-size-xs)',
             color: 'var(--mac-success)',
@@ -1544,11 +1540,7 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-secondary)',
             marginBottom: '4px'
           }}>Записей сегодня</p>
-            <p style={{
-            fontSize: 'var(--mac-font-size-3xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)'
-          }}>{stats.todayAppointments}</p>
+            <p className="dental-stat-number dental-text-primary">{stats.todayAppointments}</p>
             <p style={{
             fontSize: 'var(--mac-font-size-xs)',
             color: 'var(--mac-accent-blue)',
@@ -1588,11 +1580,7 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-secondary)',
             marginBottom: '4px'
           }}>Активные планы</p>
-            <p style={{
-            fontSize: 'var(--mac-font-size-3xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)'
-          }}>{stats.activeTreatmentPlans}</p>
+            <p className="dental-stat-number dental-text-primary">{stats.activeTreatmentPlans}</p>
             <p style={{
             fontSize: 'var(--mac-font-size-xs)',
             color: 'var(--mac-accent-purple)',
@@ -1632,11 +1620,7 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-secondary)',
             marginBottom: '4px'
           }}>Протезы</p>
-            <p style={{
-            fontSize: 'var(--mac-font-size-3xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)'
-          }}>{stats.completedProsthetics}</p>
+            <p className="dental-stat-number dental-text-primary">{stats.completedProsthetics}</p>
             <p style={{
             fontSize: 'var(--mac-font-size-xs)',
             color: 'var(--mac-warning)',
@@ -1672,11 +1656,7 @@ const DentistPanelUnified = () => {
         justifyContent: 'space-between',
         marginBottom: '24px'
       }}>
-          <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)'
-        }}>Быстрые действия</h3>
+          <h3 className="dental-text-lg-semi dental-text-primary">Быстрые действия</h3>
         </div>
         <div style={{
         display: 'grid',
@@ -1779,11 +1759,7 @@ const DentistPanelUnified = () => {
         justifyContent: 'space-between',
         marginBottom: '24px'
       }}>
-          <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)'
-        }}>Последние записи</h3>
+          <h3 className="dental-text-lg-semi dental-text-primary">Последние записи</h3>
         </div>
         <div className="dental-flex-col" style={{ gap: '16px' }}>
           {appointmentsTableData.slice(0, 5).map((appointment) =>
@@ -1961,7 +1937,7 @@ const DentistPanelUnified = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '4px'
               }}>{patient.name}</h3>
-                  <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>{patient.phone}</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>{patient.phone}</p>
                 </div>
               </div>
               <Badge variant={patient.status === 'active' ? 'success' : 'warning'}>
@@ -2462,7 +2438,7 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '4px'
           }}>Шаблоны протоколов</h3>
-            <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+            <p className="dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
               Стандартные протоколы для быстрого создания протоколов визитов
             </p>
           </div>
@@ -2682,7 +2658,7 @@ const DentistPanelUnified = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '4px'
             }}>Сохранённые протоколы визитов</h3>
-              <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+              <p className="dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
                 Последние протоколы доступны для повторного открытия без ручной пересборки
               </p>
             </div>
@@ -2751,7 +2727,7 @@ const DentistPanelUnified = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '4px'
           }}>Отчеты и аналитика</h3>
-            <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+            <p className="dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
               Статистика по пациентам, врачам, процедурам и клинике
             </p>
           </div>
@@ -3448,11 +3424,7 @@ const DentistPanelUnified = () => {
             justifyContent: 'space-between',
             marginBottom: '16px'
           }}>
-              <h2 style={{
-              fontSize: 'var(--mac-font-size-xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)'
-            }}>
+              <h2 className="dental-heading-xl dental-text-primary">
                 Схема зубов: {selectedPatientDisplayName}
               </h2>
               <button
@@ -3522,11 +3494,7 @@ const DentistPanelUnified = () => {
             justifyContent: 'space-between',
             marginBottom: '16px'
           }}>
-              <h2 style={{
-              fontSize: 'var(--mac-font-size-xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)'
-            }}>
+              <h2 className="dental-heading-xl dental-text-primary">
                 План лечения: {selectedPatientDisplayName}
               </h2>
               <button
