@@ -2945,17 +2945,17 @@ def get_today_queues(
                 # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
                 # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
                 # Если doctor не найден, оставляем raw specialist_id видимым для repair.
-                "specialist_id": queue_queue_data["doctor_id"],
+                "specialist_id": queue_data["doctor_id"],
                 "specialist_name": (
                     doctor.user.full_name
                     if doctor and doctor.user
-                    else f"Специалист #{queue_data["doctor_id"]}"
+                    else f"Специалист #{queue_data['doctor_id']}"
                 ),
                 "specialty": specialty,
                 "timezone": "Asia/Tashkent",
                 "cabinet": doctor.cabinet if doctor else "N/A",
-                "integrity_warnings": list(dict.fromkeys(data.get("integrity_warnings", []))),
-                "has_integrity_warnings": bool(data.get("integrity_warnings")),
+                "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
+                "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
                         "opened_at": datetime.now(timezone.utc).isoformat(),
                 "entries": entries,
                 "stats": {
