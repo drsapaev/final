@@ -560,7 +560,7 @@ async def send_broadcast_message(
                     sent_count += 1
                 else:
                     failed_count += 1
-            except Exception as e:
+            except Exception:
                 failed_count += 1
                 continue
 

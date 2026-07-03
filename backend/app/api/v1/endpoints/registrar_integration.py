@@ -427,7 +427,7 @@ def get_registrar_departments(
 
         return {"success": True, "data": result, "count": len(result)}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Внутренняя ошибка сервера. Подробности в журнале.",
@@ -991,7 +991,7 @@ def get_registrar_services(
             "total_services": len(services),
         }
 
-    except (ValueError, AttributeError) as e:
+    except (ValueError, AttributeError):
         # Ошибки валидации или доступа к атрибутам
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1103,7 +1103,7 @@ def get_registrar_doctors(
             },
         }
 
-    except (ValueError, AttributeError) as e:
+    except (ValueError, AttributeError):
         # Ошибки валидации или доступа к атрибутам
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1173,7 +1173,7 @@ def get_registrar_queue_settings(
             "current_time": datetime.now(timezone.utc).isoformat(),
         }
 
-    except (ValueError, AttributeError) as e:
+    except (ValueError, AttributeError):
         # Ошибки валидации или доступа к атрибутам
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1235,7 +1235,7 @@ def generate_qr_for_registrar(
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Внутренняя ошибка сервера. Подробности в журнале.",
@@ -1266,7 +1266,7 @@ def open_reception(
             "online_entries_transferred": result["online_entries_count"],
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Внутренняя ошибка сервера. Подробности в журнале.",
@@ -1361,7 +1361,7 @@ def start_queue_visit(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Внутренняя ошибка сервера. Подробности в журнале.",
@@ -3157,7 +3157,7 @@ def get_registrar_calendar(
             },
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Внутренняя ошибка сервера. Подробности в журнале.",
