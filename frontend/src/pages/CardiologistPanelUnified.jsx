@@ -41,7 +41,7 @@ import notify from '../services/notify';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import tokenManager from '../utils/tokenManager';
-import { countAppointmentsByStatuses, SPECIALTY_KEYS } from '../utils/doctorPanelShared';
+import { countAppointmentsByStatuses, SPECIALTY_KEYS, getAllPatientServices, makeEnsureCanonicalVisitId } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 
 const API_V1_BASE = getApiBaseUrl();
@@ -429,7 +429,7 @@ const MacOSCardiologistPanelUnified = () => {
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
-  }, [location.search, activeTab]);
+  }, [location.search, activeTab, setActiveTab]);
 
   useEffect(() => {
     const handleAuthLikeRefresh = () => {
@@ -513,7 +513,7 @@ const MacOSCardiologistPanelUnified = () => {
     } catch (error) {
       notify.error(getErrorMessage(error, 'Не удалось загрузить пациента. Проверьте соединение и попробуйте снова.'));
     }
-  }, [patientIdFromUrl, visitIdFromUrl, selectedPatient]);
+  }, [patientIdFromUrl, visitIdFromUrl, selectedPatient, setSelectedPatient, setActiveTab]);
 
   useEffect(() => {
     hydratePatientFromUrl();
@@ -524,18 +524,10 @@ const MacOSCardiologistPanelUnified = () => {
 
   // P-009: goToTab is now handleTabChange from useDoctorPanelState
 
-  const ensureCanonicalVisitId = useCallback(async (row) => {
-    const appointmentId = row?.appointment_id || null;
-    const visitId = row?.visit_id || (appointmentId ? await resolveCanonicalVisitId(appointmentId) : null);
-
-    if (visitId) {
-      setAppointments((prev) => prev.map((appointment) =>
-        appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
-      ));
-    }
-
-    return visitId;
-  }, []);
+  const ensureCanonicalVisitId = useCallback(
+    (row) => makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId)(row),
+    []
+  );
 
   useEffect(() => {
     // P-009: patientIdFromUrl / visitIdFromUrl come from useDoctorPanelState
@@ -592,28 +584,11 @@ const MacOSCardiologistPanelUnified = () => {
 
       return didChange ? nextPatient : prev;
     });
-  }, [appointments, patientIdFromUrl, visitIdFromUrl]);
+  }, [appointments, patientIdFromUrl, visitIdFromUrl, setSelectedPatient]);
 
   // Функция для получения всех услуг пациента из всех записей
-  const getAllPatientServices = useCallback((patientId, allAppointments) => {
-    const patientServices = new Set();
-    const patientServiceCodes = new Set();
-
-    allAppointments.forEach((appointment) => {
-      if (appointment.patient_id === patientId) {
-        if (appointment.services && Array.isArray(appointment.services)) {
-          appointment.services.forEach((service) => patientServices.add(service));
-        }
-        if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-          appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
-        }
-      }
-    });
-
-    return {
-      services: Array.from(patientServices),
-      service_codes: Array.from(patientServiceCodes)
-    };
+  const getAllPatientServicesCb = useCallback((patientId, allAppointments) => {
+    return getAllPatientServices(patientId, allAppointments);
   }, []);
 
   // Загрузка записей кардиолога
@@ -737,7 +712,7 @@ const MacOSCardiologistPanelUnified = () => {
 
         // Добавляем информацию о всех услугах пациента в каждую запись
         const enrichedAppointmentsData = appointmentsData.map((apt) => {
-          const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
+          const allPatientServices = getAllPatientServicesCb(apt.patient_id, allAppointments);
           return {
             ...apt,
             all_patient_services: allPatientServices.services,
@@ -752,7 +727,7 @@ const MacOSCardiologistPanelUnified = () => {
     } finally {
       setAppointmentsLoading(false);
     }
-  }, [getAllPatientServices]);
+  }, [getAllPatientServicesCb]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
