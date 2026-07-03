@@ -13,6 +13,7 @@ import {
 // R-14: AnimatedTransition moved from native/ to macos/ kit.
 import AnimatedTransition from '../components/ui/macos/AnimatedTransition';
 import { useTheme } from '../contexts/ThemeContext';
+import './doctor.css';
 import '../styles/animations.css';
 import {
   Activity,
@@ -1623,20 +1624,9 @@ const DoctorPanel = () => {
               </button>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--mac-accent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--mac-text-on-accent)',
-                fontSize: '18px',
-                fontWeight: '600'
-              }}>
+            <div className="doctor-mb-4">
+              <div className="doctor-flex" style={{ gap: '12px' }}>
+                <div className="doctor-text-sm" style={{ color: 'var(--mac-text-on-accent)' }}>
                   {patientModal.selectedItem.name?.charAt(0) || 'П'}
                 </div>
                 <div>
@@ -1674,30 +1664,12 @@ const DoctorPanel = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
               <button
               onClick={patientModal.closeModal}
-              style={{
-                padding: '8px 16px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: '6px',
-                backgroundColor: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}>
+              className="doctor-text-sm" style={{ color: 'var(--mac-text-primary)' }}>
 
                 Закрыть
               </button>
               <button
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: 'var(--mac-accent)',
-                color: 'var(--mac-text-on-accent)',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}>
+              className="doctor-text-sm" style={{ color: 'var(--mac-text-on-accent)' }}>
 
                 Редактировать
               </button>

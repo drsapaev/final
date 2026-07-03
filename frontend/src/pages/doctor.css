@@ -7,3 +7,27 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ─── Text styles ─── */
+.doctor-text-sm { font-size: var(--mac-font-size-sm); }
+.doctor-text-base { font-size: var(--mac-font-size-base); font-weight: 500; }
+.doctor-text-label { font-size: var(--mac-font-size-sm); font-weight: 600; margin: 0; }
+.doctor-text-bold { font-size: var(--mac-font-size-sm); font-weight: 700; }
+
+/* ─── Flex ─── */
+.doctor-flex { display: flex; align-items: center; gap: var(--mac-spacing-2); }
+.doctor-flex-wrap { display: flex; align-items: center; gap: var(--mac-spacing-2); flex-wrap: wrap; }
+.doctor-flex-between { display: flex; align-items: center; justify-content: space-between; gap: var(--mac-spacing-2); flex-wrap: wrap; }
+
+/* ─── Grid ─── */
+.doctor-grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--mac-spacing-3); }
+
+/* ─── Padding ─── */
+.doctor-p-4 { padding: var(--mac-spacing-4); }
+.doctor-p-6 { padding: var(--mac-spacing-6); }
+
+/* ─── Margins ─── */
+.doctor-mb-4 { margin-bottom: var(--mac-spacing-4); }
+
+/* ─── Badge bg ─── */
+.doctor-badge-bg { padding: var(--mac-spacing-2); text-align: center; }
