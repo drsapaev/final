@@ -338,3 +338,19 @@
   font-weight: 500;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
+
+/* ─── Stat value default color (getColor('text')) ─── */
+.cardio-stat-value-default {
+  color: var(--mac-text-primary);
+}
+
+/* ─── Patient name default color ─── */
+.cardio-patient-name-primary {
+  color: var(--mac-text-primary);
+}
+
+/* ─── Flex justify-end with gap ─── */
+.cardio-flex-end-gap {
+  display: flex;
+  justify-content: flex-end;
+}

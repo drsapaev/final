@@ -1564,7 +1564,7 @@ const MacOSCardiologistPanelUnified = () => {
                     <label className="cardio-form-label-block">
                       ФИО пациента
                     </label>
-                    <div className="cardio-patient-name" style={{ color: 'var(--mac-text-primary)' }}>{selectedPatient.patient_name}</div>
+                    <div className="cardio-patient-name cardio-patient-name-primary">{selectedPatient.patient_name}</div>
                   </div>
 
                   {selectedPatient.phone &&
@@ -1580,7 +1580,7 @@ const MacOSCardiologistPanelUnified = () => {
                       marginRight: '6px',
                       color: 'var(--mac-text-secondary)'
                     }} />
-                        <span className="cardio-patient-name" style={{ color: 'var(--mac-text-primary)' }}>{selectedPatient.phone}</span>
+                        <span className="cardio-patient-name cardio-patient-name-primary">{selectedPatient.phone}</span>
                       </div>
                     </div>
                 }
@@ -2032,7 +2032,7 @@ const MacOSCardiologistPanelUnified = () => {
 
                     </div>
 
-                    <div className="flex justify-end" style={{ gap: getSpacing('md') }}>
+                    <div className="cardio-flex-end-gap" style={{ gap: getSpacing('md') }}>
                       <Button
                     type="button"
                     variant="outline"
@@ -2267,7 +2267,7 @@ const MacOSCardiologistPanelUnified = () => {
                     backgroundColor: getColor('surface')
                   }}>
                         <div className="cardio-stat-label-sm cardio-text-secondary">Количество ЭКГ</div>
-                        <div className="cardio-stat-value" style={{ color: getColor('text') }}>{ecgResults.length}</div>
+                        <div className="cardio-stat-value cardio-stat-value-default">{ecgResults.length}</div>
                       </div>
                       <div className="cardio-input-container"
                   style={{
@@ -2275,7 +2275,7 @@ const MacOSCardiologistPanelUnified = () => {
                     backgroundColor: getColor('surface')
                   }}>
                         <div className="cardio-stat-label-sm cardio-text-secondary">Количество анализов</div>
-                        <div className="cardio-stat-value" style={{ color: getColor('text') }}>{bloodTests.length}</div>
+                        <div className="cardio-stat-value cardio-stat-value-default">{bloodTests.length}</div>
                       </div>
                       <div className="cardio-input-container"
                   style={{
@@ -2283,7 +2283,7 @@ const MacOSCardiologistPanelUnified = () => {
                     backgroundColor: getColor('surface')
                   }}>
                         <div className="cardio-stat-label-sm cardio-text-secondary">Вложения</div>
-                        <div className="cardio-stat-value" style={{ color: getColor('text') }}>{patientFiles.length}</div>
+                        <div className="cardio-stat-value cardio-stat-value-default">{patientFiles.length}</div>
                       </div>
                       <div className="cardio-input-container"
                   style={{
@@ -2291,7 +2291,7 @@ const MacOSCardiologistPanelUnified = () => {
                     backgroundColor: getColor('surface')
                   }}>
                         <div className="cardio-stat-label-sm cardio-text-secondary">Выбранный пациент</div>
-                        <div className="cardio-stat-value" style={{ color: getColor('text') }}>{selectedPatientLabel}</div>
+                        <div className="cardio-stat-value cardio-stat-value-default">{selectedPatientLabel}</div>
                       </div>
                     </div>
                   </MacOSCard>
