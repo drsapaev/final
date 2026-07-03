@@ -1676,8 +1676,8 @@ const MacOSCardiologistPanelUnified = () => {
                     gap: '12px',
                     fontSize: getFontSize('sm'),
                     color: getColor('textSecondary'),
-                    background: emr.status === 'signed' ? 'var(--mac-success-bg, #f0fdf4)' : 'var(--mac-surface-secondary, #f8fafc)',
-                    border: `1px solid ${emr.status === 'signed' ? 'var(--mac-success-border, #bbf7d0)' : getColor('border')}`,
+                    background: emr.status === 'signed' ? 'var(--mac-success-bg)' : 'var(--mac-bg-secondary)',
+                    border: `1px solid ${emr.status === 'signed' ? 'var(--mac-success-border)' : getColor('border')}`,
                     borderRadius: '8px',
                   }}>
                     <span style={{ fontWeight: '600', color: getColor('text') }}>
