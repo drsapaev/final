@@ -144,7 +144,7 @@ class GeminiProvider(BaseAIProvider):
             if content.endswith("```"):
                 content = content[:-3]
             return json.loads(content.strip())
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -189,7 +189,7 @@ class GeminiProvider(BaseAIProvider):
             if content.endswith("```"):
                 content = content[:-3]
             return json.loads(content.strip())
-        except:
+        except Exception:
             return []
 
     async def interpret_lab_results(
@@ -245,7 +245,7 @@ class GeminiProvider(BaseAIProvider):
             if content.endswith("```"):
                 content = content[:-3]
             return json.loads(content.strip())
-        except:
+        except Exception:
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content,
@@ -289,7 +289,7 @@ class GeminiProvider(BaseAIProvider):
                 if content.endswith("```"):
                     content = content[:-3]
                 return json.loads(content.strip())
-            except:
+            except Exception:
                 return {
                     "error": "Не удалось разобрать ответ AI",
                     "raw_response": response.text,

@@ -409,7 +409,7 @@ class DisplayWebSocketManager:
                     },
                 }
                 await websocket.send_text(json.dumps(empty_state, ensure_ascii=False))
-            except:
+            except Exception:
                 pass
 
     def _format_patient_name(

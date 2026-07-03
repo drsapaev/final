@@ -430,7 +430,7 @@ class TCPDeviceDriver(BaseDeviceDriver):
         try:
             # Попытка парсинга JSON
             return json.loads(raw_data)
-        except:
+        except Exception:
             # Простой парсинг ключ:значение
             measurements = {}
             parts = raw_data.split(',')
@@ -439,7 +439,7 @@ class TCPDeviceDriver(BaseDeviceDriver):
                     key, value = part.split(':', 1)
                     try:
                         measurements[key.strip()] = float(value.strip())
-                    except:
+                    except Exception:
                         measurements[key.strip()] = value.strip()
             return measurements
 

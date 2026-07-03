@@ -369,7 +369,7 @@ class MockProvider(BaseAIProvider):
                                 ),
                             }
                         )
-            except:
+            except Exception:
                 pass
 
         # Генерируем возможные состояния на основе отклонений
