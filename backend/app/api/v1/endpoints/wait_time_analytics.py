@@ -420,3 +420,53 @@ def _calculate_intensity(average_wait_minutes: float) -> float:
     # Нормализуем время ожидания к диапазону 0-1
     # 0 минут = 0, 60+ минут = 1
     return min(1.0, average_wait_minutes / 60.0)
+
+
+
+# ===================== ML-ПРОГНОЗ ВРЕМЕНИ ОЖИДАНИЯ =====================
+
+
+class WaitTimePredictionResponse(BaseModel):
+    """Прогноз времени ожидания для нового пациента"""
+
+    predicted_minutes: float
+    confidence: str  # 'high' | 'medium' | 'low'
+    sample_size: int
+    source: str  # 'bucket' | 'specialty' | 'global' | 'default'
+    p75_minutes: float
+    p90_minutes: float
+    queue_adjustment_minutes: float | None = None
+    bucket: dict | None = None
+    note: str | None = None
+
+
+@router.get(
+    "/predict",
+    response_model=WaitTimePredictionResponse,
+    summary="Прогноз времени ожидания для нового пациента",
+    description=(
+        "Прогнозирует, сколько минут пациент будет ждать в очереди, "
+        "на основе исторических данных по (специальность, день недели, час). "
+        "Кэш 5 минут. Доверие 'low' если выборка <20 визитов."
+    ),
+)
+def predict_wait_time(
+    specialty: str = Query("general", description="cardiology | dermatology | dental | general"),
+    target_datetime: datetime | None = Query(None, description="ISO datetime; default: now"),
+    current_queue_length: int = Query(0, ge=0, le=100, description="Сколько людей уже в очереди"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "cardio", "derma", "dentist")),
+) -> WaitTimePredictionResponse:
+    """Predict wait time for a new patient."""
+    from app.services.wait_time_predictor import predict_wait_minutes
+
+    try:
+        result = predict_wait_minutes(
+            db,
+            specialty=specialty,
+            target_dt=target_datetime,
+            current_queue_length=current_queue_length,
+        )
+        return WaitTimePredictionResponse(**result)
+    except Exception as e:
+        raise_wait_time_internal_error("predict_wait_time", e)
