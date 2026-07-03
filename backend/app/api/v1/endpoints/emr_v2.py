@@ -37,15 +37,15 @@ from app.schemas.emr_v2 import (
     EMRSaveRequest,
     EMRSignRequest,
 )
+from app.services.emr_doctor_history_service import (
+    EMRDoctorHistoryDomainError,
+    EMRDoctorHistoryService,
+)
 from app.services.emr_v2_service import (
     ConcurrencyError,
     EMRNotFoundException,
     EMRSignedError,
     emr_v2_service,
-)
-from app.services.emr_doctor_history_service import (
-    EMRDoctorHistoryDomainError,
-    EMRDoctorHistoryService,
 )
 from app.services.section_templates_service import DoctorSectionTemplatesService
 
@@ -161,7 +161,7 @@ class DoctorHistoryEntry(BaseModel):
 
 class DoctorHistoryResponse(BaseModel):
     """Doctor history response"""
-    entries: List[DoctorHistoryEntry]
+    entries: list[DoctorHistoryEntry]
     total: int
     field_name: str
 
@@ -325,7 +325,7 @@ async def compare_versions(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/patient/{patient_id}", response_model=List[EMRRecordSummary])
+@router.get("/patient/{patient_id}", response_model=list[EMRRecordSummary])
 async def get_patient_emrs(
     patient_id: int,
     limit: int = Query(100, ge=1, le=500, description="Maximum EMRs to return"),

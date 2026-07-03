@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from jinja2 import Environment, TemplateError
 from sqlalchemy.orm import Session
 
@@ -115,7 +115,7 @@ def _template_path(filename: str) -> Path:
 # ===================== УПРАВЛЕНИЕ ШАБЛОНАМИ =====================
 
 
-@router.get("/templates", response_model=List[PrintTemplateOut])
+@router.get("/templates", response_model=list[PrintTemplateOut])
 def get_print_templates(
     template_type: Optional[str] = None,
     language: Optional[str] = None,
@@ -337,7 +337,7 @@ def upload_template_file(
 @router.post("/templates/{template_id}/preview")
 def preview_template(
     template_id: int,
-    preview_data: Dict[str, Any],
+    preview_data: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
@@ -494,7 +494,7 @@ def _print_template_types_payload():
 # ===================== ЗАДАНИЯ ПЕЧАТИ =====================
 
 
-@router.get("/jobs", response_model=List[PrintJobOut])
+@router.get("/jobs", response_model=list[PrintJobOut])
 def get_print_jobs(
     status_filter: Optional[str] = None,
     document_type: Optional[str] = None,

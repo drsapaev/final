@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user, get_db, require_roles
@@ -19,11 +19,11 @@ from app.schemas.clinic import (
     ClinicSettingsCreate,
     ClinicSettingsOut,
     ClinicSettingsUpdate,
-    TicketPrintSettingsOut,
-    TicketPrintSettingsUpdate,
     QueueSettingsUpdate,
     QueueTestRequest,
     ServiceCategoryOut,
+    TicketPrintSettingsOut,
+    TicketPrintSettingsUpdate,
 )
 
 router = APIRouter()
@@ -44,7 +44,7 @@ def _admin_clinic_http_error(exc: Exception) -> HTTPException:
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
 
-@router.get("/clinic/settings", response_model=List[ClinicSettingsOut])
+@router.get("/clinic/settings", response_model=list[ClinicSettingsOut])
 def get_clinic_settings(
     category: str = "clinic",
     db: Session = Depends(get_db),
@@ -79,7 +79,7 @@ def get_clinic_setting(
     return setting
 
 
-@router.put("/clinic/settings", response_model=List[ClinicSettingsOut])
+@router.put("/clinic/settings", response_model=list[ClinicSettingsOut])
 def update_clinic_settings_batch(
     settings: ClinicSettingsBatch,
     db: Session = Depends(get_db),
@@ -350,7 +350,7 @@ def get_system_info(current_user: User = Depends(require_roles("Admin"))):
 # ===================== КАТЕГОРИИ УСЛУГ =====================
 
 
-@router.get("/service-categories", response_model=List[ServiceCategoryOut])
+@router.get("/service-categories", response_model=list[ServiceCategoryOut])
 def get_service_categories(
     specialty: Optional[str] = None,
     active_only: bool = True,

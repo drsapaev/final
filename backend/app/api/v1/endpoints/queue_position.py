@@ -11,7 +11,7 @@ API endpoints для Push-уведомлений о позиции в очере
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -23,9 +23,7 @@ from app.services.queue_position_api_service import (
     QueuePositionApiDomainError,
     QueuePositionApiService,
 )
-from app.services.queue_position_notifications import (
-    get_queue_position_service
-)
+from app.services.queue_position_notifications import get_queue_position_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -78,7 +76,7 @@ class QueuePositionResponse(BaseModel):
     people_ahead: int
     priority: int
     queue_time: Optional[str] = None
-    queue_info: Dict[str, Any] = Field(default_factory=dict)
+    queue_info: dict[str, Any] = Field(default_factory=dict)
 
 
 class NotificationResult(BaseModel):
@@ -94,7 +92,7 @@ class BatchNotificationResult(BaseModel):
     """Результат массовой отправки уведомлений"""
     success: bool
     total_notified: int
-    details: List[Dict[str, Any]] = Field(default_factory=list)
+    details: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SendPositionNotificationRequest(BaseModel):

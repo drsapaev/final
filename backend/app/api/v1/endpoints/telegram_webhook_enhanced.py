@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.crud import telegram_config as crud_telegram
-from app.models.user import User
 from app.db.session import get_db
+from app.models.user import User
 from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
 router = APIRouter()
@@ -23,7 +23,7 @@ TELEGRAM_ENHANCED_PUBLIC_ERROR = "Internal server error"
 MAX_TELEGRAM_ENHANCED_WEBHOOK_BODY_BYTES = 256 * 1024
 
 
-async def _read_telegram_enhanced_webhook_json(request: Request) -> Dict[str, Any]:
+async def _read_telegram_enhanced_webhook_json(request: Request) -> dict[str, Any]:
     chunks: list[bytes] = []
     total_size = 0
 
@@ -86,7 +86,7 @@ def _raise_telegram_enhanced_internal_error(
     ) from exc
 
 
-def _telegram_enhanced_test_failure(exc: Exception) -> Dict[str, Any]:
+def _telegram_enhanced_test_failure(exc: Exception) -> dict[str, Any]:
     logger.warning(
         "Enhanced Telegram webhook endpoint failed operation=test_webhook error_type=%s",
         type(exc).__name__,
@@ -158,7 +158,7 @@ async def webhook_info(
 
 @router.post("/webhook/test")
 async def test_webhook(
-    test_data: Dict[str, Any],
+    test_data: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

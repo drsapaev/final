@@ -57,7 +57,7 @@ class AIUsageAnalyticsResponse(BaseModel):
     performance_metrics: dict
     cost_analysis: dict
     trends: dict
-    recommendations: List[str]
+    recommendations: list[str]
 
 
 class AILearningInsightsResponse(BaseModel):
@@ -69,17 +69,17 @@ class AILearningInsightsResponse(BaseModel):
     treatment_effectiveness: dict
     patient_outcomes: dict
     seasonal_trends: dict
-    learning_recommendations: List[str]
+    learning_recommendations: list[str]
 
 
 class AIOptimizationResponse(BaseModel):
     """Схема ответа с результатами оптимизации AI"""
 
     timestamp: str
-    models_analyzed: List[dict]
-    optimizations_applied: List[dict]
+    models_analyzed: list[dict]
+    optimizations_applied: list[dict]
     performance_improvements: dict
-    recommendations: List[str]
+    recommendations: list[str]
 
 
 class TrainingDatasetRequest(BaseModel):
@@ -102,7 +102,7 @@ class TrainingDatasetResponse(BaseModel):
     anonymized: bool
     generated_at: str
     records_count: int
-    features: List[str]
+    features: list[str]
     quality_score: float
     privacy_compliance: dict
     dataset_path: str
@@ -570,7 +570,7 @@ def _calculate_performance_rating(function_stats: dict) -> str:
         return "Требует улучшения"
 
 
-def _get_optimization_suggestions(function_name: str, stats: dict) -> List[str]:
+def _get_optimization_suggestions(function_name: str, stats: dict) -> list[str]:
     """Генерирует предложения по оптимизации функции"""
     suggestions = []
 
@@ -630,7 +630,7 @@ def _calculate_potential_savings(function_costs: dict) -> dict:
     }
 
 
-def _generate_cost_recommendations(function_costs: dict) -> List[str]:
+def _generate_cost_recommendations(function_costs: dict) -> list[str]:
     """Генерирует рекомендации по оптимизации затрат"""
     recommendations = []
 
@@ -652,7 +652,7 @@ def _generate_cost_recommendations(function_costs: dict) -> List[str]:
     return recommendations
 
 
-def _check_budget_alerts(cost_analysis: dict, monthly_forecast: float) -> List[dict]:
+def _check_budget_alerts(cost_analysis: dict, monthly_forecast: float) -> list[dict]:
     """Проверяет превышение бюджета"""
     alerts = []
 

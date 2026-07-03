@@ -10,7 +10,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.crud import appointment as crud_appointment, patient as crud_patient
+from app.crud import appointment as crud_appointment
+from app.crud import patient as crud_patient
 from app.models.clinic import Doctor
 from app.models.payment import Payment
 from app.models.user import User
@@ -59,7 +60,7 @@ def _ensure_doctor_can_send_appointment_reminder(
         )
 
 
-def _payment_id_from_payload(payment_data: Dict[str, Any]) -> int | None:
+def _payment_id_from_payload(payment_data: dict[str, Any]) -> int | None:
     for key in ("payment_id", "id"):
         value = payment_data.get(key)
         if value is None:
@@ -78,7 +79,7 @@ def _ensure_payment_confirmation_belongs_to_patient(
     db: Session,
     *,
     patient_id: int,
-    payment_data: Dict[str, Any],
+    payment_data: dict[str, Any],
 ) -> None:
     payment_id = _payment_id_from_payload(payment_data)
     if payment_id is None:
@@ -102,8 +103,8 @@ def _ensure_payment_confirmation_belongs_to_patient(
 @router.post("/send-appointment-reminder-enhanced")
 async def send_appointment_reminder_enhanced(
     appointment_id: int,
-    channels: List[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: Optional[Dict[str, Any]] = None,
+    channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
+    template_data: Optional[dict[str, Any]] = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
@@ -175,8 +176,8 @@ async def send_appointment_reminder_enhanced(
 async def send_lab_results_enhanced(
     patient_id: int,
     lab_results_id: int,
-    channels: List[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: Optional[Dict[str, Any]] = None,
+    channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
+    template_data: Optional[dict[str, Any]] = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
@@ -237,9 +238,9 @@ async def send_lab_results_enhanced(
 @router.post("/send-payment-confirmation-enhanced")
 async def send_payment_confirmation_enhanced(
     patient_id: int,
-    payment_data: Dict[str, Any],
-    channels: List[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: Optional[Dict[str, Any]] = None,
+    payment_data: dict[str, Any],
+    channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
+    template_data: Optional[dict[str, Any]] = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
@@ -296,10 +297,10 @@ async def send_payment_confirmation_enhanced(
 
 @router.post("/send-bulk-email")
 async def send_bulk_email(
-    recipients: List[Dict[str, Any]],
+    recipients: list[dict[str, Any]],
     subject: str,
     template_name: Optional[str] = None,
-    template_data: Optional[Dict[str, Any]] = None,
+    template_data: Optional[dict[str, Any]] = None,
     html_content: Optional[str] = None,
     text_content: Optional[str] = None,
     batch_size: int = Query(50, description="Размер батча"),
@@ -350,10 +351,10 @@ async def send_bulk_email(
 
 @router.post("/send-bulk-sms")
 async def send_bulk_sms(
-    recipients: List[Dict[str, Any]],
+    recipients: list[dict[str, Any]],
     message: Optional[str] = None,
     template_name: Optional[str] = None,
-    template_data: Optional[Dict[str, Any]] = None,
+    template_data: Optional[dict[str, Any]] = None,
     batch_size: int = Query(100, description="Размер батча"),
     delay_between_batches: float = Query(
         0.5, description="Задержка между батчами (сек)"
@@ -403,10 +404,10 @@ async def send_custom_email(
     to_email: str,
     subject: str,
     template_name: Optional[str] = None,
-    template_data: Optional[Dict[str, Any]] = None,
+    template_data: Optional[dict[str, Any]] = None,
     html_content: Optional[str] = None,
     text_content: Optional[str] = None,
-    attachments: Optional[List[Dict[str, Any]]] = None,
+    attachments: Optional[list[dict[str, Any]]] = None,
     priority: str = Query("normal", description="Приоритет: normal, high"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
@@ -448,7 +449,7 @@ async def send_custom_sms(
     phone: str,
     message: Optional[str] = None,
     template_name: Optional[str] = None,
-    template_data: Optional[Dict[str, Any]] = None,
+    template_data: Optional[dict[str, Any]] = None,
     sender: Optional[str] = None,
     priority: str = Query("normal", description="Приоритет: normal, high"),
     background_tasks: BackgroundTasks = BackgroundTasks(),

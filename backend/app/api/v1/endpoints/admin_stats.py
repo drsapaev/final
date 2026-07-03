@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta, timezone
 from typing import Any, Dict, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -32,7 +32,7 @@ def raise_admin_stats_error(action: str, public_detail: str, exc: Exception) -> 
 def get_admin_stats(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Агрегированная статистика для админ-панели."""
     try:
         # Даты/границы
@@ -92,7 +92,7 @@ def get_admin_stats(
         )
 
         # Разбивка по ролям
-        role_stats: Dict[str, int] = {}
+        role_stats: dict[str, int] = {}
         roles = [
             "Admin",
             "Registrar",
@@ -131,7 +131,7 @@ def get_admin_stats(
 def get_quick_stats(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     try:
         today: date = datetime.utcnow().date()
 
@@ -190,11 +190,11 @@ def get_recent_activities(
     limit: int = Query(10, ge=1, le=50, description="Количество записей"),
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Получение последних действий: записи, платежи, регистрации пользователей."""
     try:
         activities = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Последние записи (appointments) - фильтруем только записи с created_at
         recent_appointments = (
@@ -232,9 +232,9 @@ def get_recent_activities(
                 continue
             # Приводим к UTC если есть timezone, иначе считаем что уже UTC
             if apt_created.tzinfo is None:
-                apt_created = apt_created.replace(tzinfo=timezone.utc)
+                apt_created = apt_created.replace(tzinfo=UTC)
             else:
-                apt_created = apt_created.astimezone(timezone.utc)
+                apt_created = apt_created.astimezone(UTC)
             time_diff = now - apt_created
             if time_diff < timedelta(minutes=1):
                 time_str = "только что"
@@ -286,9 +286,9 @@ def get_recent_activities(
                 continue
             # Приводим к UTC если есть timezone, иначе считаем что уже UTC
             if payment_created.tzinfo is None:
-                payment_created = payment_created.replace(tzinfo=timezone.utc)
+                payment_created = payment_created.replace(tzinfo=UTC)
             else:
-                payment_created = payment_created.astimezone(timezone.utc)
+                payment_created = payment_created.astimezone(UTC)
             time_diff = now - payment_created
             if time_diff < timedelta(minutes=1):
                 time_str = "только что"
@@ -332,9 +332,9 @@ def get_recent_activities(
                 continue
             # Приводим к UTC если есть timezone, иначе считаем что уже UTC
             if user_created.tzinfo is None:
-                user_created = user_created.replace(tzinfo=timezone.utc)
+                user_created = user_created.replace(tzinfo=UTC)
             else:
-                user_created = user_created.astimezone(timezone.utc)
+                user_created = user_created.astimezone(UTC)
             time_diff = now - user_created
             if time_diff < timedelta(minutes=1):
                 time_str = "только что"
@@ -389,7 +389,7 @@ def get_activity_chart(
     days: int = Query(7, ge=1, le=30, description="Количество дней для графика"),
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Получение данных для графика активности за последние N дней."""
     try:
         end_date = datetime.utcnow().date()
@@ -486,7 +486,7 @@ def get_analytics_overview(
     doctor_id: Optional[int] = Query(None, description="ID врача (опционально)"),
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Получение обзора аналитики для админ-панели с фильтрами."""
     try:
         now = datetime.utcnow()
@@ -650,7 +650,7 @@ def get_analytics_charts(
     department: Optional[str] = Query(None, description="Отделение (опционально)"),
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Получение данных для графиков аналитики."""
     try:
         now = datetime.utcnow()

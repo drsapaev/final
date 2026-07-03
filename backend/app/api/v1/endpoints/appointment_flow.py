@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.core.audit import extract_model_changes
+from app.core.config import settings
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
-from app.core.config import settings
 from app.models.clinic import Doctor
 from app.models.enums import AppointmentStatus
 from app.models.user import User
@@ -259,8 +259,9 @@ def create_or_update_emr(
     )
 
     # ✅ SECURITY: Validate medical record data
-    from app.services.medical_validation import MedicalValidationService
     from fastapi import HTTPException, status
+
+    from app.services.medical_validation import MedicalValidationService
 
     validation_service = MedicalValidationService()
 
@@ -639,7 +640,7 @@ def get_appointment_status(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles(*APPOINTMENT_FLOW_READ_ROLES)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Получить полную информацию о статусе записи и связанных данных
     """

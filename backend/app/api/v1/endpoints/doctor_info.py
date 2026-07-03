@@ -28,7 +28,7 @@ class DoctorInfoResponse(BaseModel):
     specialization: str
     department: str
     department_id: Optional[int] = None
-    cabinet: Optional[Dict[str, Any]] = None
+    cabinet: Optional[dict[str, Any]] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     is_active: bool
@@ -51,14 +51,14 @@ class DepartmentInfoResponse(BaseModel):
 class DoctorListResponse(BaseModel):
     """Схема списка врачей"""
 
-    doctors: List[DoctorInfoResponse]
+    doctors: list[DoctorInfoResponse]
     total_count: int
 
 
 class DepartmentListResponse(BaseModel):
     """Схема списка отделений"""
 
-    departments: List[DepartmentInfoResponse]
+    departments: list[DepartmentInfoResponse]
     total_count: int
 
 

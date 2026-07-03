@@ -41,11 +41,11 @@ class QueueReorderRequest(BaseModel):
     """Запрос на изменение порядка очереди"""
 
     queue_id: int
-    entry_orders: List[Dict[str, int]]  # [{"entry_id": 1, "new_position": 2}, ...]
+    entry_orders: list[dict[str, int]]  # [{"entry_id": 1, "new_position": 2}, ...]
 
     @field_validator('entry_orders')
     @classmethod
-    def validate_entry_orders(cls, v: List[Dict[str, int]]) -> List[Dict[str, int]]:
+    def validate_entry_orders(cls, v: list[dict[str, int]]) -> list[dict[str, int]]:
         if not v:
             raise ValueError('Список изменений не может быть пустым')
 
@@ -67,7 +67,7 @@ class QueueReorderResponse(BaseModel):
     success: bool
     message: str
     updated_entries: int
-    queue_info: Dict[str, Any]
+    queue_info: dict[str, Any]
 
 
 class QueueEntryMoveRequest(BaseModel):

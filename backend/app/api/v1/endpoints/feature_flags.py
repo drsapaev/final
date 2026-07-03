@@ -10,11 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
+from app.services.feature_flags import get_feature_flag_service
 from app.services.feature_flags_api_service import (
     FeatureFlagsApiDomainError,
     FeatureFlagsApiService,
 )
-from app.services.feature_flags import get_feature_flag_service
 
 router = APIRouter()
 
@@ -29,7 +29,7 @@ class FeatureFlagResponse(BaseModel):
     name: str
     description: Optional[str] = None
     enabled: bool
-    config: Dict[str, Any]
+    config: dict[str, Any]
     category: str
     environment: str
     created_at: str
@@ -47,7 +47,7 @@ class FeatureFlagCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=1000)
     enabled: bool = False
-    config: Dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
     category: str = Field(default="general", max_length=50)
     environment: str = Field(
         default="all", pattern="^(production|staging|development|all)$"
@@ -60,7 +60,7 @@ class FeatureFlagUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=1000)
     enabled: Optional[bool] = None
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[dict[str, Any]] = None
     category: Optional[str] = Field(None, max_length=50)
     environment: Optional[str] = Field(
         None, pattern="^(production|staging|development|all)$"
@@ -81,8 +81,8 @@ class FeatureFlagHistoryResponse(BaseModel):
     id: int
     flag_key: str
     action: str
-    old_value: Optional[Dict[str, Any]] = None
-    new_value: Optional[Dict[str, Any]] = None
+    old_value: Optional[dict[str, Any]] = None
+    new_value: Optional[dict[str, Any]] = None
     changed_by: Optional[str] = None
     changed_at: str
     ip_address: Optional[str] = None
@@ -97,13 +97,13 @@ class FeatureFlagStatusResponse(BaseModel):
 
     key: str
     enabled: bool
-    config: Dict[str, Any]
+    config: dict[str, Any]
 
 
 class BulkToggleRequest(BaseModel):
     """Запрос на массовое переключение флагов"""
 
-    flag_keys: List[str]
+    flag_keys: list[str]
     enabled: bool
     reason: Optional[str] = Field(None, max_length=500)
 
@@ -111,7 +111,7 @@ class BulkToggleRequest(BaseModel):
 # ===================== ЭНДПОИНТЫ =====================
 
 
-@router.get("/admin/feature-flags", response_model=List[FeatureFlagResponse])
+@router.get("/admin/feature-flags", response_model=list[FeatureFlagResponse])
 def get_all_feature_flags(
     category: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -380,7 +380,7 @@ def delete_feature_flag(
 
 @router.get(
     "/admin/feature-flags/{flag_key}/history",
-    response_model=List[FeatureFlagHistoryResponse],
+    response_model=list[FeatureFlagHistoryResponse],
 )
 def get_feature_flag_history(
     flag_key: str,

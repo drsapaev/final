@@ -1,16 +1,19 @@
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
-from app.crud import patient as patient_crud, visit as visit_crud
+from app.crud import patient as patient_crud
+from app.crud import visit as visit_crud
 from app.crud.notification import crud_notification_template
 from app.crud.user_management import (
     user_notification_settings as crud_user_notification_settings,
+)
+from app.crud.user_management import (
     user_profile as crud_user_profile,
 )
 from app.models.user import User
@@ -20,10 +23,10 @@ from app.schemas.notification import (
     NotificationInboxResponse,
     NotificationMutationResponse,
     NotificationStatsResponse,
-    NotificationUnreadCountResponse,
     NotificationTemplate,
     NotificationTemplateCreate,
     NotificationTemplateUpdate,
+    NotificationUnreadCountResponse,
     SendNotificationRequest,
 )
 from app.schemas.user_management import (
@@ -31,8 +34,8 @@ from app.schemas.user_management import (
     UserNotificationSettingsResponse,
     UserNotificationSettingsUpdate,
 )
-from app.services.notifications import notification_sender_service
 from app.services.notification_platform_service import get_notification_platform_service
+from app.services.notifications import notification_sender_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -137,7 +140,7 @@ def _parse_policy_datetime(value: Any, *, field_name: str) -> str | None:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=f"{field_name} has invalid ISO datetime") from exc
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed.isoformat()
 
 
@@ -175,9 +178,9 @@ def _normalize_realtime_control(control: Any, *, field_name: str) -> bool | dict
 
 def _normalize_notification_policy_payload(
     *,
-    policy_data: Dict[str, Any],
+    policy_data: dict[str, Any],
     platform_service,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     supported_keys = {
         "muted_until",
         "snooze_until",
@@ -186,7 +189,7 @@ def _normalize_notification_policy_payload(
         "family_controls",
         "channel_controls",
     }
-    normalized_policy: Dict[str, Any] = {}
+    normalized_policy: dict[str, Any] = {}
 
     for key in supported_keys:
         if key not in policy_data:
@@ -406,7 +409,7 @@ async def send_system_alert(
     background_tasks: BackgroundTasks,
     alert_type: str,
     message: str,
-    details: Optional[Dict[str, Any]] = None,
+    details: Optional[dict[str, Any]] = None,
     current_user: User = Depends(require_roles(["admin"])),
     db: Session = Depends(get_db),
 ):
@@ -518,7 +521,7 @@ async def get_notification_status(
 
 
 # Управление шаблонами уведомлений
-@router.get("/templates", response_model=List[NotificationTemplate])
+@router.get("/templates", response_model=list[NotificationTemplate])
 async def get_notification_templates(
     current_user: User = Depends(require_roles(["admin"])),
     db: Session = Depends(get_db),
@@ -842,7 +845,7 @@ async def get_user_notification_policy(
 @router.put("/settings/{user_id}/policy")
 async def update_user_notification_policy(
     user_id: int,
-    policy_data: Dict[str, Any],
+    policy_data: dict[str, Any],
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -911,7 +914,7 @@ async def send_notification(
     return {"message": "Уведомления отправлены в фоновом режиме"}
 
 
-@router.post("/send-bulk", response_model=Dict[str, Any])
+@router.post("/send-bulk", response_model=dict[str, Any])
 async def send_bulk_notification(
     background_tasks: BackgroundTasks,
     request: BulkNotificationRequest,

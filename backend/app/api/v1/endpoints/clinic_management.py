@@ -69,7 +69,7 @@ def create_branch(
         )
 
 
-@router.get("/branches", response_model=List[BranchOut])
+@router.get("/branches", response_model=list[BranchOut])
 def get_branches(
     *,
     db: Session = Depends(get_db),
@@ -177,7 +177,7 @@ def create_equipment(
         )
 
 
-@router.get("/equipment", response_model=List[EquipmentOut])
+@router.get("/equipment", response_model=list[EquipmentOut])
 def get_equipment(
     *,
     db: Session = Depends(get_db),
@@ -253,7 +253,7 @@ def delete_equipment(
         )
 
 
-@router.get("/equipment/maintenance/due", response_model=List[EquipmentOut])
+@router.get("/equipment/maintenance/due", response_model=list[EquipmentOut])
 def get_maintenance_due(
     *,
     db: Session = Depends(get_db),
@@ -293,7 +293,7 @@ def schedule_maintenance(
 
 @router.get(
     "/equipment/{equipment_id}/maintenance",
-    response_model=List[EquipmentMaintenanceOut],
+    response_model=list[EquipmentMaintenanceOut],
 )
 def get_maintenance_history(
     *,
@@ -331,7 +331,7 @@ def create_license(
         )
 
 
-@router.get("/licenses", response_model=List[LicenseOut])
+@router.get("/licenses", response_model=list[LicenseOut])
 def get_licenses(
     *,
     db: Session = Depends(get_db),
@@ -355,7 +355,7 @@ def get_licenses(
     )
 
 
-@router.get("/licenses/expiring", response_model=List[LicenseOut])
+@router.get("/licenses/expiring", response_model=list[LicenseOut])
 def get_expiring_licenses(
     *,
     db: Session = Depends(get_db),
@@ -452,7 +452,7 @@ def activate_license(
 
 
 @router.get(
-    "/licenses/{license_id}/activations", response_model=List[LicenseActivationOut]
+    "/licenses/{license_id}/activations", response_model=list[LicenseActivationOut]
 )
 def get_license_activations(
     *,
@@ -488,7 +488,7 @@ def create_backup(
         )
 
 
-@router.get("/backups", response_model=List[BackupOut])
+@router.get("/backups", response_model=list[BackupOut])
 def get_backups(
     *,
     db: Session = Depends(get_db),
@@ -554,7 +554,7 @@ def delete_backup(
         )
 
 
-@router.post("/backups/cleanup", response_model=Dict[str, int])
+@router.post("/backups/cleanup", response_model=dict[str, int])
 def cleanup_expired_backups(
     *, db: Session = Depends(get_db), current_user: User = Depends(require_admin)
 ):
@@ -616,7 +616,7 @@ def set_system_info(
     *,
     db: Session = Depends(get_db),
     key: str,
-    value: Dict[str, Any],
+    value: dict[str, Any],
     description: Optional[str] = None,
     current_user: User = Depends(require_admin),
 ):
@@ -626,7 +626,7 @@ def set_system_info(
     )
 
 
-@router.get("/system/info", response_model=Dict[str, Any])
+@router.get("/system/info", response_model=dict[str, Any])
 def get_all_system_info(
     *, db: Session = Depends(get_db), current_user: User = Depends(require_admin)
 ):
@@ -645,7 +645,7 @@ def get_clinic_stats(
     return clinic_management.get_clinic_stats(db=db)
 
 
-@router.get("/health", response_model=Dict[str, Any])
+@router.get("/health", response_model=dict[str, Any])
 def get_system_health(
     *, db: Session = Depends(get_db), current_user: User = Depends(require_admin)
 ):
@@ -653,7 +653,7 @@ def get_system_health(
     return clinic_management.get_system_health(db=db)
 
 
-@router.post("/initialize", response_model=Dict[str, Any])
+@router.post("/initialize", response_model=dict[str, Any])
 def initialize_clinic_data(
     *, db: Session = Depends(get_db), current_user: User = Depends(require_admin)
 ):

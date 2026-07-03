@@ -3,8 +3,7 @@ Pydantic schemas for Role management
 """
 from datetime import datetime
 
-from pydantic import BaseModel, Field
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RoleBase(BaseModel):

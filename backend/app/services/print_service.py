@@ -5,10 +5,10 @@
 
 import asyncio
 import json
+import logging
+import os
 import platform
 import re
-import os
-import logging
 import socket
 import subprocess
 from datetime import datetime
@@ -1040,9 +1040,9 @@ class PrintService:
         Returns:
             Dict с результатом печати
         """
+        from app.core.config import settings
         from app.models.payment import Payment
         from app.models.visit import Visit
-        from app.core.config import settings
         from app.services.queue_service import queue_service
 
         # Получаем данные платежа
@@ -1189,9 +1189,9 @@ class PrintService:
         Returns:
             Dict с результатом печати
         """
+        from app.core.config import settings
         from app.models.online_queue import OnlineQueueEntry
         from app.models.visit import Visit
-        from app.core.config import settings
         from app.services.queue_service import queue_service
 
         # Получаем данные из очереди

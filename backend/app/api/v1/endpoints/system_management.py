@@ -50,7 +50,7 @@ class RestoreRequest(BaseModel):
     """Запрос восстановления из бэкапа"""
 
     backup_name: str
-    components: List[str] = Field(default=["database", "configuration"])
+    components: list[str] = Field(default=["database", "configuration"])
     confirm: bool = False
 
 

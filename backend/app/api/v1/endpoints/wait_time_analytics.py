@@ -58,7 +58,7 @@ class WaitTimeAnalyticsResponse(BaseModel):
     hourly_breakdown: dict
     daily_breakdown: dict
     trends: dict
-    recommendations: List[str]
+    recommendations: list[str]
 
 
 class RealTimeWaitEstimateResponse(BaseModel):

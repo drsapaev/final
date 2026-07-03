@@ -346,7 +346,7 @@ async def get_risk_assessment(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*CARDIO_ROLES)),
     patient_id: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Получить оценку кардиологических рисков
     """

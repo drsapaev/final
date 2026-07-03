@@ -18,7 +18,7 @@ class AuditOut(BaseModel):
     entity_type: Optional[str] = None
     entity_id: Optional[int] = None
     actor_user_id: Optional[int] = None
-    payload: Optional[Dict[str, Any]] = None
+    payload: Optional[dict[str, Any]] = None
     created_at: str
 
 
@@ -38,7 +38,7 @@ def _row_to_out(r) -> AuditOut:
     )
 
 
-@router.get("", response_model=List[AuditOut], summary="Список аудита c фильтрами")
+@router.get("", response_model=list[AuditOut], summary="Список аудита c фильтрами")
 async def list_audit(
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),

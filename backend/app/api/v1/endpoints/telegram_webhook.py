@@ -3,13 +3,13 @@ Webhook endpoint для обработки входящих сообщений �
 """
 
 import hashlib
-import html
 import hmac
+import html
 import ipaddress
 import logging
 import secrets
 import socket
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, NoReturn
 from urllib.parse import urlsplit, urlunsplit
@@ -37,9 +37,9 @@ from app.api.v1.endpoints.admin_telegram import (
     validate_staff_link_start_token,
 )
 from app.core.config import settings
-from app.crud.appointment import appointment as appointment_crud
 from app.crud import audit as crud_audit
 from app.crud import telegram_config as crud_telegram
+from app.crud.appointment import appointment as appointment_crud
 from app.db.session import get_db
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
@@ -75,9 +75,6 @@ from app.services.patient_onboarding_service import PatientOnboardingService
 from app.services.payment_reconciliation_api_service import (
     PaymentReconciliationApiService,
 )
-from app.services.telegram_staff_confirmation_token_service import (
-    TelegramStaffConfirmationTokenService,
-)
 from app.services.telegram_bot import (
     get_telegram_bot_service,
     telegram_text_corruption_reason,
@@ -91,6 +88,9 @@ from app.services.telegram_mini_app_init_data import (
     resolve_telegram_mini_app_session_scope,
     save_telegram_mini_app_patient_form_submission,
     validate_telegram_mini_app_init_data,
+)
+from app.services.telegram_staff_confirmation_token_service import (
+    TelegramStaffConfirmationTokenService,
 )
 from app.services.visit_confirmation_service import (
     TELEGRAM_TICKET_QR_PREFIX,
@@ -962,7 +962,7 @@ PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS = {
 }
 
 
-def _telegram_update_summary(update: Dict[str, Any]) -> Dict[str, Any]:
+def _telegram_update_summary(update: dict[str, Any]) -> dict[str, Any]:
     message = update.get("message") or update.get("edited_message") or {}
     callback_query = update.get("callback_query") or {}
     return {
@@ -975,8 +975,8 @@ def _telegram_update_summary(update: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _extract_ticket_qr_start_payload(
-    update: Dict[str, Any],
-) -> tuple[str, Dict[str, Any]] | None:
+    update: dict[str, Any],
+) -> tuple[str, dict[str, Any]] | None:
     message = update.get("message") or {}
     text = str(message.get("text") or "").strip()
     parts = text.split(maxsplit=1)
@@ -992,8 +992,8 @@ def _extract_ticket_qr_start_payload(
 
 
 def _extract_staff_link_start_payload(
-    update: Dict[str, Any],
-) -> tuple[str, Dict[str, Any]] | None:
+    update: dict[str, Any],
+) -> tuple[str, dict[str, Any]] | None:
     message = update.get("message") or {}
     text = str(message.get("text") or "").strip()
     parts = text.split(maxsplit=1)
@@ -1074,7 +1074,7 @@ def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
             _patient_mini_app_token_section(section),
             _base36_encode(int(chat_id)),
             _base36_encode(
-                int(expires_at.replace(tzinfo=timezone.utc).timestamp())
+                int(expires_at.replace(tzinfo=UTC).timestamp())
             ),
             _base36_encode(secrets.randbits(48)),
         ]
@@ -1093,7 +1093,7 @@ def _build_patient_onboarding_entry_token(chat_id: int, section: str = "appointm
             _patient_mini_app_token_section(section),
             _base36_encode(int(chat_id)),
             _base36_encode(
-                int(expires_at.replace(tzinfo=timezone.utc).timestamp())
+                int(expires_at.replace(tzinfo=UTC).timestamp())
             ),
             _base36_encode(secrets.randbits(48)),
         ]
@@ -1124,11 +1124,11 @@ def _parse_patient_mini_app_entry_token(
 
     try:
         chat_id = _base36_decode(parts[2])
-        expires_at = datetime.fromtimestamp(_base36_decode(parts[3]), tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(_base36_decode(parts[3]), tz=UTC)
     except (TypeError, ValueError, OverflowError, OSError):
         return None
 
-    if expires_at < datetime.now(timezone.utc):
+    if expires_at < datetime.now(UTC):
         return None
 
     return {
@@ -1160,11 +1160,11 @@ def _parse_patient_onboarding_entry_token(
 
     try:
         chat_id = _base36_decode(parts[2])
-        expires_at = datetime.fromtimestamp(_base36_decode(parts[3]), tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(_base36_decode(parts[3]), tz=UTC)
     except (TypeError, ValueError, OverflowError, OSError):
         return None
 
-    if expires_at < datetime.now(timezone.utc):
+    if expires_at < datetime.now(UTC):
         return None
 
     return {
@@ -1250,8 +1250,8 @@ def _patient_entry_url(section: str | None = None) -> str | None:
     return f"{frontend_url.rstrip('/')}{route}"
 
 
-def _telegram_entry_button(text: str, entry_url: str) -> Dict[str, Any]:
-    button: Dict[str, Any] = {"text": text}
+def _telegram_entry_button(text: str, entry_url: str) -> dict[str, Any]:
+    button: dict[str, Any] = {"text": text}
     if entry_url.lower().startswith("https://"):
         button["web_app"] = {"url": entry_url}
     else:
@@ -1272,7 +1272,7 @@ def _telegram_service_entry_markup(
     chat_id: int,
     section: str,
     button_text_key: str,
-) -> Dict[str, Any] | None:
+) -> dict[str, Any] | None:
     telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
         return None
@@ -1301,7 +1301,7 @@ def _telegram_service_entry_markup(
     }
 
 
-def _telegram_onboarding_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_onboarding_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     entry_url = _patient_entry_url("booking")
     if not entry_url:
         return None
@@ -1331,7 +1331,7 @@ def _telegram_protected_or_onboarding_markup(
     chat_id: int,
     section: str,
     button_text_key: str,
-) -> Dict[str, Any] | None:
+) -> dict[str, Any] | None:
     protected_markup = _telegram_service_entry_markup(
         db,
         chat_id,
@@ -1343,7 +1343,7 @@ def _telegram_protected_or_onboarding_markup(
     return _telegram_onboarding_entry_markup(db, chat_id)
 
 
-def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_payment_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1352,7 +1352,7 @@ def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] 
     )
 
 
-def _telegram_booking_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_booking_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1361,7 +1361,7 @@ def _telegram_booking_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] 
     )
 
 
-def _telegram_queue_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_queue_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1370,7 +1370,7 @@ def _telegram_queue_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | 
     )
 
 
-def _telegram_visits_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_visits_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1379,7 +1379,7 @@ def _telegram_visits_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] |
     )
 
 
-def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1388,7 +1388,7 @@ def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> Dict[str,
     )
 
 
-def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1397,7 +1397,7 @@ def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> Dict[
     )
 
 
-def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1406,7 +1406,7 @@ def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> Dict[st
     )
 
 
-def _telegram_patient_cabinet_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+def _telegram_patient_cabinet_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1415,27 +1415,27 @@ def _telegram_patient_cabinet_entry_markup(db: Session, chat_id: int) -> Dict[st
     )
 
 
-def _localized_main_menu(language_code: Any) -> Dict[str, Any]:
+def _localized_main_menu(language_code: Any) -> dict[str, Any]:
     return TELEGRAM_MAIN_MENUS.get(
         _normalize_patient_language(language_code), TELEGRAM_MAIN_MENU
     )
 
 
-def _localized_services_menu(language_code: Any) -> Dict[str, Any]:
+def _localized_services_menu(language_code: Any) -> dict[str, Any]:
     return TELEGRAM_PATIENT_SERVICES_MENUS.get(
         _normalize_patient_language(language_code),
         TELEGRAM_PATIENT_SERVICES_MENUS[TELEGRAM_LANGUAGE_RU],
     )
 
 
-def _localized_notification_consent_menu(language_code: Any) -> Dict[str, Any]:
+def _localized_notification_consent_menu(language_code: Any) -> dict[str, Any]:
     return TELEGRAM_NOTIFICATION_CONSENT_MENUS.get(
         _normalize_patient_language(language_code),
         TELEGRAM_NOTIFICATION_CONSENT_MENUS[TELEGRAM_LANGUAGE_RU],
     )
 
 
-def _localized_settings_menu(language_code: Any) -> Dict[str, Any]:
+def _localized_settings_menu(language_code: Any) -> dict[str, Any]:
     language = _normalize_patient_language(language_code)
     settings_menu = TELEGRAM_SETTINGS_MENUS.get(
         language,
@@ -1458,7 +1458,7 @@ def _telegram_chat_text(db: Session, chat_id: int, key: str) -> str:
     return _localized_text(key, _telegram_chat_language(db, chat_id))
 
 
-def _telegram_chat_menu(db: Session, chat_id: int) -> Dict[str, Any]:
+def _telegram_chat_menu(db: Session, chat_id: int) -> dict[str, Any]:
     return _localized_main_menu(_telegram_chat_language(db, chat_id))
 
 
@@ -1513,8 +1513,8 @@ def _normalize_patient_button_text(text: Any) -> str:
     return value
 
 
-def _patient_text_handler_aliases(pairs: list[tuple[str, Any]]) -> Dict[str, Any]:
-    aliases: Dict[str, Any] = {}
+def _patient_text_handler_aliases(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    aliases: dict[str, Any] = {}
     for label, handler in pairs:
         raw_original = " ".join(str(label or "").strip().lower().split())
         if raw_original:
@@ -1533,7 +1533,7 @@ async def _send_patient_bot_reply(
     bot_service,
     chat_id: int,
     text: str,
-    reply_markup: Dict[str, Any],
+    reply_markup: dict[str, Any],
     template_key: str,
 ) -> bool:
     corruption_reason = telegram_text_corruption_reason(text)
@@ -1616,7 +1616,7 @@ def _is_patient_settings_context_template(template_key: str | None) -> bool:
 
 def _upsert_ticket_qr_telegram_user(
     db: Session,
-    message: Dict[str, Any],
+    message: dict[str, Any],
     patient_id: int | None = None,
     language_code: str | None = None,
     notifications_enabled: bool | None = None,
@@ -1672,13 +1672,13 @@ def _upsert_ticket_qr_telegram_user(
 
 
 def _staff_telegram_reference_hash(chat_id: int) -> str:
-    digest = hashlib.sha256(f"staff-telegram-chat:{chat_id}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"staff-telegram-chat:{chat_id}".encode()).hexdigest()
     return f"telegram_chat:{digest[:24]}"
 
 
 def _upsert_staff_link_telegram_user(
     db: Session,
-    message: Dict[str, Any],
+    message: dict[str, Any],
     *,
     linked_user_id: int,
 ) -> TelegramUser | None:
@@ -1932,14 +1932,14 @@ def _create_staff_action_confirmation_request(
     actor_user_id: int,
     telegram_user_id: int | None,
     role: str,
-    operation: Dict[str, Any],
+    operation: dict[str, Any],
     command_key: str,
 ) -> str:
     operation_key = str(operation.get("key") or "staff_action").strip()
     confirmation_window_seconds = int(
         STAFF_BOT_CONFIRMATION_CONTRACT.get("confirmation_window_seconds") or 120
     )
-    expires_at = datetime.now(timezone.utc) + timedelta(
+    expires_at = datetime.now(UTC) + timedelta(
         seconds=confirmation_window_seconds
     )
     target_reference_hash = _staff_action_reference_hash(operation_key)
@@ -2007,7 +2007,7 @@ def _staff_read_only_commands() -> set[str]:
     }
 
 
-def _staff_menu_for_role(role: Any) -> Dict[str, Any] | None:
+def _staff_menu_for_role(role: Any) -> dict[str, Any] | None:
     role_key = _normalize_staff_role(role)
     for role_menu in STAFF_BOT_READ_ONLY_MENU_CONTRACT:
         if role_menu.get("role") == role_key:
@@ -2044,7 +2044,7 @@ STAFF_MENU_BUTTON_ICON_PREFIXES = tuple(
 )
 
 
-def _staff_menu_item_label(item: Dict[str, Any]) -> str:
+def _staff_menu_item_label(item: dict[str, Any]) -> str:
     key = str(item.get("key") or "").strip()
     label = str(item.get("label") or key).strip()
     icon = STAFF_MENU_ITEM_ICONS.get(key)
@@ -2062,7 +2062,7 @@ def _normalize_staff_button_text(text: Any) -> str:
     return value
 
 
-def _staff_menu_keyboard(role_menu: Dict[str, Any]) -> Dict[str, Any]:
+def _staff_menu_keyboard(role_menu: dict[str, Any]) -> dict[str, Any]:
     rows = [
         [{"text": _staff_menu_item_label(item)}]
         for item in role_menu.get("items", [])
@@ -2076,7 +2076,7 @@ def _staff_menu_keyboard(role_menu: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _staff_menu_message(user: User, role_menu: Dict[str, Any]) -> str:
+def _staff_menu_message(user: User, role_menu: dict[str, Any]) -> str:
     items = [
         _staff_menu_item_label(item)
         for item in role_menu.get("items", [])
@@ -2131,8 +2131,8 @@ def _staff_read_only_item_labels() -> set[str]:
 
 
 def _staff_menu_item_for_text(
-    role_menu: Dict[str, Any], text: str
-) -> Dict[str, Any] | None:
+    role_menu: dict[str, Any], text: str
+) -> dict[str, Any] | None:
     normalized_text = _normalize_staff_button_text(text)
     for item in role_menu.get("items", []):
         label = str(item.get("label") or "").strip().lower()
@@ -2144,8 +2144,8 @@ def _staff_menu_item_for_text(
 
 
 def _staff_menu_item_for_command(
-    role_menu: Dict[str, Any], command: str
-) -> Dict[str, Any] | None:
+    role_menu: dict[str, Any], command: str
+) -> dict[str, Any] | None:
     allowed_keys = set(STAFF_COMMAND_DOMAIN_ITEM_KEYS.get(command, ()))
     if not allowed_keys:
         return None
@@ -2159,7 +2159,7 @@ def _today_start() -> datetime:
     return datetime.combine(date.today(), datetime.min.time())
 
 
-def _status_counts(rows: list[tuple[Any, Any]]) -> Dict[str, int]:
+def _status_counts(rows: list[tuple[Any, Any]]) -> dict[str, int]:
     return {str(status or "unknown"): int(count or 0) for status, count in rows}
 
 
@@ -2168,7 +2168,7 @@ def _format_money(amount: Any) -> str:
     return f"{value.quantize(Decimal('0.01'))} UZS"
 
 
-def _queue_status_counts(db: Session) -> Dict[str, int]:
+def _queue_status_counts(db: Session) -> dict[str, int]:
     rows = (
         db.query(OnlineQueueEntry.status, func.count(OnlineQueueEntry.id))
         .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
@@ -2211,7 +2211,7 @@ def _payment_invoice_status_rows(db: Session) -> list[tuple[str, int, Decimal]]:
     ]
 
 
-def _lab_status_counts(db: Session) -> Dict[str, int]:
+def _lab_status_counts(db: Session) -> dict[str, int]:
     rows = (
         db.query(LabReportInstance.status, func.count(LabReportInstance.id))
         .filter(LabReportInstance.created_at >= _today_start())
@@ -2221,7 +2221,7 @@ def _lab_status_counts(db: Session) -> Dict[str, int]:
     return _status_counts(rows)
 
 
-def _lab_delivery_status_counts(db: Session) -> Dict[str, int]:
+def _lab_delivery_status_counts(db: Session) -> dict[str, int]:
     rows = (
         db.query(
             NotificationDelivery.delivery_status,
@@ -2239,7 +2239,7 @@ def _lab_delivery_status_counts(db: Session) -> Dict[str, int]:
     return _status_counts(rows)
 
 
-def _integration_error_counts(db: Session) -> Dict[str, int]:
+def _integration_error_counts(db: Session) -> dict[str, int]:
     failed_webhook_calls_today = (
         db.query(func.count(WebhookCall.id))
         .filter(
@@ -2278,7 +2278,7 @@ def _integration_error_counts(db: Session) -> Dict[str, int]:
     }
 
 
-def _visit_status_counts(db: Session, user: User | None = None) -> Dict[str, int]:
+def _visit_status_counts(db: Session, user: User | None = None) -> dict[str, int]:
     query = db.query(Visit.status, func.count(Visit.id)).filter(
         Visit.visit_date == date.today()
     )
@@ -2713,7 +2713,7 @@ def _staff_readiness_message(db: Session) -> str:
 
 
 def _staff_read_only_domain_data_message(
-    db: Session, menu_item: Dict[str, Any] | None, user: User | None = None
+    db: Session, menu_item: dict[str, Any] | None, user: User | None = None
 ) -> str | None:
     item_key = str((menu_item or {}).get("key") or "").strip()
     if item_key not in STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS:
@@ -2751,8 +2751,8 @@ def _staff_read_only_domain_data_message(
     return None
 
 
-def _staff_state_change_operations_by_command() -> Dict[str, Dict[str, Any]]:
-    operations: Dict[str, Dict[str, Any]] = {}
+def _staff_state_change_operations_by_command() -> dict[str, dict[str, Any]]:
+    operations: dict[str, dict[str, Any]] = {}
     for operation in STAFF_BOT_CONFIRMATION_CONTRACT.get("operations", []):
         for command in operation.get("telegram_commands", []):
             command_key = str(command or "").strip().lower()
@@ -2763,13 +2763,13 @@ def _staff_state_change_operations_by_command() -> Dict[str, Dict[str, Any]]:
 
 def _staff_state_change_operation_for_command(
     command: str,
-) -> Dict[str, Any] | None:
+) -> dict[str, Any] | None:
     return _staff_state_change_operations_by_command().get(command)
 
 
 def _linked_staff_for_chat(
     db: Session, chat_id: int
-) -> tuple[TelegramUser | None, User | None, Dict[str, Any] | None]:
+) -> tuple[TelegramUser | None, User | None, dict[str, Any] | None]:
     telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
     if not telegram_user or not telegram_user.user_id:
         return telegram_user, None, None
@@ -2782,7 +2782,7 @@ def _linked_staff_for_chat(
 
 
 async def _handle_staff_read_only_menu(
-    update: Dict[str, Any], db: Session, bot_service
+    update: dict[str, Any], db: Session, bot_service
 ) -> bool:
     message = _message_from_update(update)
     if not message:
@@ -2986,7 +2986,7 @@ async def _handle_staff_read_only_menu(
     return True
 
 
-async def _handle_ticket_qr_start(update: Dict[str, Any], db: Session, bot_service) -> bool:
+async def _handle_ticket_qr_start(update: dict[str, Any], db: Session, bot_service) -> bool:
     extracted = _extract_ticket_qr_start_payload(update)
     if not extracted:
         return False
@@ -3045,7 +3045,7 @@ async def _handle_ticket_qr_start(update: Dict[str, Any], db: Session, bot_servi
 
 
 async def _handle_staff_link_start(
-    update: Dict[str, Any], db: Session, bot_service
+    update: dict[str, Any], db: Session, bot_service
 ) -> bool:
     extracted = _extract_staff_link_start_payload(update)
     if not extracted:
@@ -3134,16 +3134,16 @@ async def _handle_staff_link_start(
         )
         return True
 
-def _message_from_update(update: Dict[str, Any]) -> Dict[str, Any]:
+def _message_from_update(update: dict[str, Any]) -> dict[str, Any]:
     return update.get("message") or {}
 
 
-def _message_chat_id(message: Dict[str, Any]) -> int | None:
+def _message_chat_id(message: dict[str, Any]) -> int | None:
     chat_id = (message.get("chat") or {}).get("id")
     return int(chat_id) if chat_id is not None else None
 
 
-def _message_text(message: Dict[str, Any]) -> str:
+def _message_text(message: dict[str, Any]) -> str:
     return str(message.get("text") or "").strip()
 
 
@@ -3840,7 +3840,7 @@ async def _set_notification_consent(
 
 
 async def _handle_contact_link(
-    message: Dict[str, Any], db: Session, bot_service
+    message: dict[str, Any], db: Session, bot_service
 ) -> bool:
     contact = message.get("contact")
     if not contact:
@@ -3931,9 +3931,9 @@ async def _handle_contact_link(
 
 
 async def _handle_clinic_bot_update(
-    update: Dict[str, Any], db: Session, bot_service
+    update: dict[str, Any], db: Session, bot_service
 ) -> bool:
-    async def start_handler(chat_id: int, message: Dict[str, Any]) -> None:
+    async def start_handler(chat_id: int, message: dict[str, Any]) -> None:
         _upsert_ticket_qr_telegram_user(db, message, notifications_enabled=False)
         db.commit()
         await _send_language_choice(db, bot_service, chat_id)
@@ -4420,7 +4420,7 @@ def _raise_telegram_webhook_internal_error(
     ) from exc
 
 
-def _telegram_bot_info_failure(exc: Exception) -> Dict[str, Any]:
+def _telegram_bot_info_failure(exc: Exception) -> dict[str, Any]:
     logger.warning(
         "Telegram webhook endpoint failed operation=get_bot_info error_type=%s",
         type(exc).__name__,
@@ -5510,7 +5510,7 @@ def create_mini_app_appointment_booking(
 
 @router.post("/webhook")
 async def telegram_webhook(
-    update: Dict[str, Any], request: Request, db: Session = Depends(get_db)
+    update: dict[str, Any], request: Request, db: Session = Depends(get_db)
 ):
     """
     Webhook endpoint для получения обновлений от Telegram
@@ -5571,7 +5571,7 @@ async def send_message_to_user(
     chat_id: int,
     message: str,
     parse_mode: str = "HTML",
-    reply_markup: Dict[str, Any] = None,
+    reply_markup: dict[str, Any] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

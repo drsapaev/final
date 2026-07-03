@@ -52,7 +52,7 @@ class InvoiceCreate(BaseModel):
     visit_id: Optional[int] = None
     appointment_id: Optional[int] = None
     invoice_type: InvoiceType = InvoiceType.STANDARD
-    items: List[InvoiceItemCreate] = Field(..., min_length=1)
+    items: list[InvoiceItemCreate] = Field(..., min_length=1)
     description: Optional[str] = None
     notes: Optional[str] = None
     payment_terms: Optional[str] = None
@@ -235,7 +235,7 @@ def create_invoice(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/invoices", response_model=List[InvoiceResponse])
+@router.get("/invoices", response_model=list[InvoiceResponse])
 def get_invoices(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),

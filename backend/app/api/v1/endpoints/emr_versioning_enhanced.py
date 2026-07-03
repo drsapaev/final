@@ -110,7 +110,7 @@ async def get_version_statistics(
 @router.post("/{emr_id}/versions/create")
 async def create_version_with_analysis(
     emr_id: int,
-    version_data: Dict[str, Any],
+    version_data: dict[str, Any],
     change_type: str = Query(..., description="Тип изменения"),
     change_description: Optional[str] = Query(None, description="Описание изменения"),
     db: Session = Depends(deps.get_db),

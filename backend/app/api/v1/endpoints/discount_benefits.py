@@ -112,7 +112,7 @@ class LoyaltyProgramCreate(BaseModel):
 
 class DiscountCalculationRequest(BaseModel):
     patient_id: int
-    service_ids: List[int]
+    service_ids: list[int]
     amount: float = Field(..., gt=0)
 
 
@@ -177,7 +177,7 @@ async def create_discount(
 @router.get("/discounts")
 async def get_discounts(
     active_only: bool = Query(True),
-    service_ids: Optional[List[int]] = Query(None),
+    service_ids: Optional[list[int]] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

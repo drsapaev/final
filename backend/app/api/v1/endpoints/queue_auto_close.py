@@ -19,7 +19,7 @@ router = APIRouter()
 async def check_and_close_expired_queues(
     current_user: User = Depends(require_roles(["admin", "registrar"])),
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Проверяет и закрывает очереди с истекшим временем записи
     """
@@ -43,7 +43,7 @@ async def check_and_close_expired_queues(
 async def get_queues_pending_close(
     current_user: User = Depends(require_roles(["admin", "registrar"])),
     db: Session = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Возвращает список очередей, которые скоро будут закрыты
     """
@@ -64,7 +64,7 @@ async def force_close_queue(
     queue_id: int,
     current_user: User = Depends(require_roles(["admin", "registrar"])),
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Принудительно закрывает очередь
     """
@@ -86,7 +86,7 @@ async def force_close_queue(
 async def get_auto_close_status(
     current_user: User = Depends(require_roles(["admin"])),
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Возвращает статус системы автозакрытия
     """

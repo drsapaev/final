@@ -10,17 +10,24 @@ import asyncio
 import logging
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.core.messaging_contract import CONTRACT_VERSION
 from app.core.config import settings
+from app.core.messaging_contract import CONTRACT_VERSION
 from app.core.rbac import AIPermission, has_permission, require_ai_permission
 from app.models.user import User
-from app.services.ai_chat_api_service import AIChatApiDomainError, AIChatApiService
 from app.services.ai.chat_service import get_chat_service
+from app.services.ai_chat_api_service import AIChatApiDomainError, AIChatApiService
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +135,7 @@ async def create_session(
     )
 
 
-@router.get("/sessions", response_model=List[ChatSessionResponse])
+@router.get("/sessions", response_model=list[ChatSessionResponse])
 async def list_sessions(
     limit: int = Query(20, ge=1, le=100),
     include_inactive: bool = Query(False),
@@ -199,7 +206,7 @@ async def delete_session(
     return {"message": "Session deleted", "session_id": session_id}
 
 
-@router.get("/sessions/{session_id}/messages", response_model=List[ChatMessageResponse])
+@router.get("/sessions/{session_id}/messages", response_model=list[ChatMessageResponse])
 async def get_messages(
     session_id: int,
     limit: int = Query(50, ge=1, le=200),

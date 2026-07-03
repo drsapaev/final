@@ -15,10 +15,18 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.crud import (
     appointment as crud_appointment,
+)
+from app.crud import (
     lab as crud_lab,
-    patient as crud_patient,
-    user as crud_user,
+)
+from app.crud import (
     notification as crud_notification,
+)
+from app.crud import (
+    patient as crud_patient,
+)
+from app.crud import (
+    user as crud_user,
 )
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
@@ -193,7 +201,7 @@ async def get_mobile_patient_profile(
         )
 
 
-@router.get("/appointments/upcoming", response_model=List[AppointmentUpcomingOut])
+@router.get("/appointments/upcoming", response_model=list[AppointmentUpcomingOut])
 async def get_upcoming_appointments(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -345,7 +353,7 @@ async def book_mobile_appointment(
         raise HTTPException(status_code=500, detail=f"Ошибка записи к врачу: {str(e)}")
 
 
-@router.get("/lab/results", response_model=List[LabResultOut])
+@router.get("/lab/results", response_model=list[LabResultOut])
 async def get_lab_results(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -433,7 +441,7 @@ async def get_mobile_quick_stats(
         )
 
 
-@router.get("/notifications", response_model=List[dict])
+@router.get("/notifications", response_model=list[dict])
 async def get_mobile_notifications(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),

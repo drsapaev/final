@@ -7,7 +7,7 @@ import hmac
 import logging
 import os
 import secrets
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from html import escape
 from typing import Any, Dict, List, NoReturn, Optional
@@ -19,16 +19,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.config import settings
-from app.crud import audit as crud_audit, clinic as crud_clinic, telegram_config as crud_telegram
+from app.crud import audit as crud_audit
+from app.crud import clinic as crud_clinic
+from app.crud import telegram_config as crud_telegram
 from app.models.telegram_config import TelegramStaffConfirmationToken
 from app.models.user import User
-from app.services.telegram_staff_link_token_service import TelegramStaffLinkTokenService
-from app.services.telegram_staff_action_adapter_service import (
-    TelegramStaffActionAdapterService,
-)
-from app.services.telegram_staff_confirmation_token_service import (
-    TelegramStaffConfirmationTokenService,
-)
 from app.services.telegram_bot import (
     PATIENT_BOT_COMMANDS_RU,
     PATIENT_BOT_COMMANDS_UZ,
@@ -36,6 +31,13 @@ from app.services.telegram_bot import (
     PATIENT_BOT_PROFILE_TEXTS,
     get_telegram_bot_service,
 )
+from app.services.telegram_staff_action_adapter_service import (
+    TelegramStaffActionAdapterService,
+)
+from app.services.telegram_staff_confirmation_token_service import (
+    TelegramStaffConfirmationTokenService,
+)
+from app.services.telegram_staff_link_token_service import TelegramStaffLinkTokenService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1050,9 +1052,9 @@ def _base36_decode(value: str) -> int:
 
 def _staff_link_token_expires_epoch(expires_at: datetime) -> int:
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        expires_at = expires_at.replace(tzinfo=UTC)
     else:
-        expires_at = expires_at.astimezone(timezone.utc)
+        expires_at = expires_at.astimezone(UTC)
     return int(expires_at.timestamp())
 
 
@@ -1130,7 +1132,7 @@ def issue_staff_link_start_token(
 
 def _decode_staff_link_start_token(
     token: str,
-) -> tuple[Dict[str, Any] | None, str | None]:
+) -> tuple[dict[str, Any] | None, str | None]:
     parts = (token or "").split(STAFF_LINK_TOKEN_SEPARATOR)
     if len(parts) != 6 or parts[0] != STAFF_LINK_TOKEN_PREFIX:
         return None, "signature_invalid"
@@ -1144,7 +1146,7 @@ def _decode_staff_link_start_token(
         chat_id = int(parts[2])
         expires_at = datetime.fromtimestamp(
             _base36_decode(parts[3]),
-            tz=timezone.utc,
+            tz=UTC,
         )
     except (TypeError, ValueError, OverflowError, OSError):
         return None, "signature_invalid"
@@ -1158,12 +1160,12 @@ def _decode_staff_link_start_token(
         "expires_at": expires_at.replace(tzinfo=None),
         "token_hash": _hash_staff_link_start_token(token),
     }
-    if expires_at < datetime.now(timezone.utc):
+    if expires_at < datetime.now(UTC):
         return decoded, "expired"
     return decoded, None
 
 
-def parse_staff_link_start_token(token: str) -> Dict[str, Any] | None:
+def parse_staff_link_start_token(token: str) -> dict[str, Any] | None:
     decoded, rejection_reason = _decode_staff_link_start_token(token)
     if rejection_reason:
         return None
@@ -1193,7 +1195,7 @@ def validate_staff_link_start_token(
     telegram_chat_id: int,
     *,
     enforce_single_use: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     parsed, rejection_reason = _decode_staff_link_start_token(token)
     if not parsed:
         return {"valid": False, "reason": rejection_reason or "signature_invalid"}
@@ -1284,7 +1286,7 @@ def validate_staff_link_start_token(
     return result
 
 
-def _build_staff_role_menus_summary() -> Dict[str, Any]:
+def _build_staff_role_menus_summary() -> dict[str, Any]:
     menu_roles = [
         role_menu["role"] for role_menu in STAFF_BOT_READ_ONLY_MENU_CONTRACT
     ]
@@ -1310,8 +1312,8 @@ def _build_staff_role_menus_summary() -> Dict[str, Any]:
 
 
 def _build_staff_role_menu_enablement_contract(
-    role_menus: Dict[str, Any],
-) -> Dict[str, Any]:
+    role_menus: dict[str, Any],
+) -> dict[str, Any]:
     return {
         **STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT,
         "roles_covered": role_menus["roles"],
@@ -1320,7 +1322,7 @@ def _build_staff_role_menu_enablement_contract(
     }
 
 
-def _build_staff_bot_next_slice(token_contract: Dict[str, Any]) -> str:
+def _build_staff_bot_next_slice(token_contract: dict[str, Any]) -> str:
     if not token_contract["ready"]:
         return "dedicated_staff_bot_token_runtime_config"
 
@@ -1340,8 +1342,8 @@ def _build_staff_bot_next_slice(token_contract: Dict[str, Any]) -> str:
 
 
 def _build_staff_bot_status(
-    webhook_set: bool, staff_bot_token_status: Dict[str, Any] | None = None
-) -> Dict[str, Any]:
+    webhook_set: bool, staff_bot_token_status: dict[str, Any] | None = None
+) -> dict[str, Any]:
     role_menus = _build_staff_role_menus_summary()
     token_status = staff_bot_token_status or {
         "configured": False,
@@ -1451,18 +1453,18 @@ def _build_staff_bot_status(
 
 
 def _staff_runtime_reference_hash(kind: str, value: Any) -> str:
-    digest = hashlib.sha256(f"{kind}:{value}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{kind}:{value}".encode()).hexdigest()
     return f"{kind}:{digest[:24]}"
 
 
 def _telegram_ai_approval_reference_hash(value: Any) -> str:
     digest = hashlib.sha256(
-        f"telegram_ai_approval:{value}".encode("utf-8")
+        f"telegram_ai_approval:{value}".encode()
     ).hexdigest()
     return f"telegram_ai_approval:{digest[:24]}"
 
 
-def _telegram_ai_approval_workflow(workflow_key: str) -> Dict[str, Any]:
+def _telegram_ai_approval_workflow(workflow_key: str) -> dict[str, Any]:
     key = str(workflow_key or "").strip().lower()
     workflow = TELEGRAM_AI_APPROVAL_WORKFLOWS.get(key)
     if not workflow:
@@ -1496,12 +1498,12 @@ def _safe_ai_approval_value(value: Any) -> str:
 
 
 def _safe_ai_approval_metrics(
-    workflow: Dict[str, Any], metrics: Dict[str, Any] | None
-) -> Dict[str, str]:
+    workflow: dict[str, Any], metrics: dict[str, Any] | None
+) -> dict[str, str]:
     if not isinstance(metrics, dict):
         return {}
     allowed_keys = {str(key) for key in workflow.get("allowed_metric_keys", [])}
-    safe_metrics: Dict[str, str] = {}
+    safe_metrics: dict[str, str] = {}
     for key in sorted(allowed_keys):
         if key in metrics:
             safe_metrics[key] = _safe_ai_approval_value(metrics.get(key))
@@ -1511,8 +1513,8 @@ def _safe_ai_approval_metrics(
 def build_telegram_ai_approval_message(
     workflow_key: str,
     protected_url: str,
-    metrics: Dict[str, Any] | None = None,
-) -> Dict[str, Any]:
+    metrics: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build a PHI-free Telegram AI approval message with only a protected link."""
 
     workflow = _telegram_ai_approval_workflow(workflow_key)
@@ -1545,7 +1547,7 @@ def build_telegram_ai_approval_message(
     }
 
 
-def _build_telegram_ai_approval_status() -> Dict[str, Any]:
+def _build_telegram_ai_approval_status() -> dict[str, Any]:
     return {
         **TELEGRAM_AI_APPROVAL_CONTRACT,
         "workflow_count": len(TELEGRAM_AI_APPROVAL_WORKFLOWS),
@@ -1560,7 +1562,7 @@ def _build_telegram_ai_approval_status() -> Dict[str, Any]:
 
 
 def _assert_ai_approval_role_allowed(
-    workflow: Dict[str, Any],
+    workflow: dict[str, Any],
     role: Any,
     *,
     role_field: str,
@@ -1614,7 +1616,7 @@ class TelegramAiApprovalAlertRequest(BaseModel):
     workflow_key: str
     recipient_user_id: int
     target_reference: str | None = None
-    metrics: Dict[str, Any] | None = None
+    metrics: dict[str, Any] | None = None
 
 
 class TelegramAiApprovalOutcomeRequest(BaseModel):
@@ -1624,7 +1626,7 @@ class TelegramAiApprovalOutcomeRequest(BaseModel):
     reason_code: str | None = None
 
 
-def _staff_state_change_operation_by_key(operation_key: str) -> Dict[str, Any] | None:
+def _staff_state_change_operation_by_key(operation_key: str) -> dict[str, Any] | None:
     for operation in STAFF_BOT_CONFIRMATION_CONTRACT.get("operations", []):
         if str(operation.get("key") or "") == operation_key:
             return operation
@@ -1771,7 +1773,7 @@ async def send_telegram_ai_approval_alert(
             "doctor",
         )
     ),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Send one safe AI approval alert to a linked staff Telegram chat."""
 
     workflow_key = str(request.workflow_key or "").strip().lower()
@@ -1899,7 +1901,7 @@ def capture_telegram_ai_approval_outcome(
             "doctor",
         )
     ),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Capture human accepted/rejected feedback without mutating domain state."""
 
     workflow_key = str(request.workflow_key or "").strip().lower()
@@ -1973,7 +1975,7 @@ def confirm_staff_action(
         )
     ),
     request: StaffActionConfirmRequest | None = Body(default=None),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Confirm one explicitly enabled Telegram staff action in the protected app."""
 
     if not isinstance(request, StaffActionConfirmRequest):
@@ -2268,7 +2270,7 @@ def raise_admin_telegram_error(
 
 def webhook_info_error_response(
     action: str, public_error: str, exc: Exception
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     logger.warning(
         "Admin Telegram webhook info failed action=%s error_type=%s",
         action,
@@ -2277,7 +2279,7 @@ def webhook_info_error_response(
     return {"webhook_set": False, "error": public_error}
 
 
-def _sanitize_telegram_webhook_info(webhook_info: Dict[str, Any]) -> Dict[str, Any]:
+def _sanitize_telegram_webhook_info(webhook_info: dict[str, Any]) -> dict[str, Any]:
     pending_update_count = webhook_info.get("pending_update_count")
     if isinstance(pending_update_count, bool) or not isinstance(
         pending_update_count, int
@@ -2313,7 +2315,7 @@ def _build_staff_bot_token_status(
     source: str,
     source_key: str,
     patient_bot_token: str | None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     token_text = str(token_value or "").strip()
     patient_token_text = str(patient_bot_token or "").strip()
     token_present = bool(token_text)
@@ -2333,7 +2335,7 @@ def _build_staff_bot_token_status(
 
 def _get_staff_bot_token_runtime_status(
     db: Session, patient_bot_token: str | None = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     for env_key in STAFF_BOT_TOKEN_ENV_KEYS:
         token_value = os.getenv(env_key)
         if _has_secret_value(token_value):
@@ -2383,7 +2385,7 @@ def _get_configured_staff_bot_token(
     return None
 
 
-def _build_staff_bot_token_contract(token_status: Dict[str, Any]) -> Dict[str, Any]:
+def _build_staff_bot_token_contract(token_status: dict[str, Any]) -> dict[str, Any]:
     configured = bool(token_status.get("configured"))
     ready = bool(token_status.get("ready"))
     blocked_by = []
@@ -2427,7 +2429,7 @@ def _build_staff_bot_token_contract(token_status: Dict[str, Any]) -> Dict[str, A
     }
 
 
-def _staff_bot_read_only_command_payload() -> list[Dict[str, str]]:
+def _staff_bot_read_only_command_payload() -> list[dict[str, str]]:
     commands = []
     for item in STAFF_BOT_COMMAND_REGISTRATION_CONTRACT.get("commands", []):
         if item.get("intent") != "read_only":
@@ -2445,8 +2447,8 @@ def _staff_bot_read_only_command_payload() -> list[Dict[str, str]]:
 
 
 def _build_staff_command_registration_contract(
-    token_contract: Dict[str, Any],
-) -> Dict[str, Any]:
+    token_contract: dict[str, Any],
+) -> dict[str, Any]:
     token_ready = bool(token_contract.get("ready"))
     return {
         **STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
@@ -2476,7 +2478,7 @@ def _get_configured_bot_username(db: Session) -> str | None:
     )
 
 
-def _fetch_telegram_webhook_info(bot_token: str) -> Dict[str, Any]:
+def _fetch_telegram_webhook_info(bot_token: str) -> dict[str, Any]:
     response = requests.get(
         f"https://api.telegram.org/bot{bot_token}/getWebhookInfo", timeout=10
     )
@@ -2530,7 +2532,7 @@ def get_telegram_settings(
 
 @router.put("/telegram/settings")
 def update_telegram_settings(
-    settings: Dict[str, Any],
+    settings: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -3298,7 +3300,7 @@ def get_telegram_users(
 @router.post("/telegram/broadcast")
 def send_broadcast_message(
     message: str,
-    target_groups: List[str],  # ["patients", "doctors", "admins"]
+    target_groups: list[str],  # ["patients", "doctors", "admins"]
     language: str = "ru",
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),

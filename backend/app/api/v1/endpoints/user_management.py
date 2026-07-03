@@ -47,10 +47,10 @@ from app.schemas.user_management import (
     UserStatsResponse,
     UserUpdateRequest,
 )
+from app.services.user_management_api_service import UserManagementApiService
 from app.services.user_management_service import (
     get_user_management_service,
 )
-from app.services.user_management_api_service import UserManagementApiService
 
 router = APIRouter()
 
@@ -802,7 +802,7 @@ async def update_user_notification_settings(
         )
 
 
-@router.get("/users/{user_id}/activity", response_model=List[UserAuditLogResponse])
+@router.get("/users/{user_id}/activity", response_model=list[UserAuditLogResponse])
 async def get_user_activity(
     user_id: int,
     limit: int = Query(50, ge=1, le=200),

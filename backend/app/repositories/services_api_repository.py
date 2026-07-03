@@ -7,13 +7,12 @@ import logging
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.crud import service as crud
 from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
 from app.models.visit import VisitService
-from app.services.service_mapping import normalize_service_code
 from app.services.service_audit_service import ServiceAuditService
-from app.crud import service as crud
-
+from app.services.service_mapping import normalize_service_code
 
 logger = logging.getLogger(__name__)
 

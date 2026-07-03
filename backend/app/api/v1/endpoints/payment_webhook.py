@@ -238,7 +238,7 @@ async def click_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get(
-    "/payment/providers", name="list_providers", response_model=List[PaymentProviderOut]
+    "/payment/providers", name="list_providers", response_model=list[PaymentProviderOut]
 )
 def list_providers(
     db: Session = Depends(get_db), current_user=Depends(require_roles("Admin"))
@@ -317,7 +317,7 @@ def delete_provider_endpoint(
 # --- Admin endpoints (требуют аутентификации) ---
 
 
-@router.get("/payment", name="list_webhooks", response_model=List[PaymentWebhookOut])
+@router.get("/payment", name="list_webhooks", response_model=list[PaymentWebhookOut])
 def list_webhooks(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -339,7 +339,7 @@ def list_webhooks(
 @router.get(
     "/payment/transactions",
     name="list_transactions",
-    response_model=List[PaymentTransactionOut],
+    response_model=list[PaymentTransactionOut],
 )
 def list_transactions(
     skip: int = Query(0, ge=0),

@@ -2,10 +2,10 @@
 API endpoints для SMS/Email двухфакторной аутентификации
 """
 
+import logging
 import random
 import string
 from datetime import datetime, timedelta
-import logging
 from typing import NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status

@@ -12,14 +12,15 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
 from app.core.config import settings
 from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
@@ -29,7 +30,6 @@ from app.services.display_websocket_api_service import (
     DisplayWebSocketApiDomainError,
     DisplayWebSocketApiService,
 )
-from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ async def websocket_display_board(
 
 @router.post("/call-patient")
 async def call_patient_to_board(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
@@ -232,7 +232,7 @@ async def _send_department_queue_state(websocket: WebSocket, department: str):
 
 @router.post("/announcement")
 async def send_announcement_to_board(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):

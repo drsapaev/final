@@ -59,10 +59,10 @@ class GroupResponse(BaseModel):
 class UserPermissionsResponse(BaseModel):
     user_id: int
     username: str
-    permissions: List[str]
+    permissions: list[str]
     permissions_count: int
-    roles: List[str]
-    groups: List[str]
+    roles: list[str]
+    groups: list[str]
 
 
 class GroupPermissionsSummaryResponse(BaseModel):
@@ -71,10 +71,10 @@ class GroupPermissionsSummaryResponse(BaseModel):
     group_display_name: str
     group_type: str
     users_count: int
-    roles: List[Dict[str, Any]]
+    roles: list[dict[str, Any]]
     permissions_count: int
-    permissions_by_category: Dict[str, List[Dict[str, Any]]]
-    total_permissions: List[str]
+    permissions_by_category: dict[str, list[dict[str, Any]]]
+    total_permissions: list[str]
 
 
 class AssignRoleRequest(BaseModel):
@@ -160,7 +160,7 @@ def check_user_permission(
 # ===================== УПРАВЛЕНИЕ ГРУППАМИ =====================
 
 
-@router.get("/groups", response_model=List[GroupResponse])
+@router.get("/groups", response_model=list[GroupResponse])
 def get_groups(
     active_only: bool = Query(True, description="Только активные группы"),
     group_type: Optional[str] = Query(None, description="Тип группы"),
@@ -353,7 +353,7 @@ def remove_user_from_group(
 # ===================== УПРАВЛЕНИЕ РОЛЯМИ И РАЗРЕШЕНИЯМИ =====================
 
 
-@router.get("/roles", response_model=List[RoleResponse])
+@router.get("/roles", response_model=list[RoleResponse])
 def get_roles(
     active_only: bool = Query(True, description="Только активные роли"),
     include_system: bool = Query(True, description="Включить системные роли"),
@@ -379,7 +379,7 @@ def get_roles(
         ) from e
 
 
-@router.get("/permissions", response_model=List[PermissionResponse])
+@router.get("/permissions", response_model=list[PermissionResponse])
 def get_permissions(
     active_only: bool = Query(True, description="Только активные разрешения"),
     category: Optional[str] = Query(None, description="Категория разрешений"),

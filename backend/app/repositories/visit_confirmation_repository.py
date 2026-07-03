@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.crud import clinic as crud_clinic
 from app.models.clinic import Doctor
-from app.models.patient import Patient
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService

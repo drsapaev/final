@@ -1,7 +1,8 @@
 # app/api/v1/endpoints/appointments.py
 import logging
 from datetime import datetime
-from typing import Any, List, List as TypingList, Optional
+from typing import Any, List, Optional
+from typing import List as TypingList
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -15,8 +16,11 @@ from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
-from app.services.online_queue import _broadcast  # Добавляем _broadcast
-from app.services.online_queue import get_or_create_day, load_stats
+from app.services.online_queue import (
+    _broadcast,  # Добавляем _broadcast
+    get_or_create_day,
+    load_stats,
+)
 from app.services.service_mapping import get_service_code
 
 logger = logging.getLogger(__name__)
@@ -236,12 +240,12 @@ class PendingPaymentResponse(BaseModel):
     appointment_date: Optional[str]
     appointment_time: Optional[str]
     status: str
-    services: TypingList[str]
-    services_names: TypingList[str]
+    services: list[str]
+    services_names: list[str]
     payment_amount: Optional[float]
     created_at: Optional[str]
     record_type: str
-    visit_ids: Optional[TypingList[int]] = None
+    visit_ids: Optional[list[int]] = None
 
 
 # --- helpers ---------------------------------------------------------------
@@ -281,7 +285,7 @@ def _upsert_queue_setting(db: Session, key: str, value: str) -> None:
 # --- endpoints -------------------------------------------------------------
 
 
-@router.get("/", response_model=List[appointment_schemas.Appointment])
+@router.get("/", response_model=list[appointment_schemas.Appointment])
 def list_appointments(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),

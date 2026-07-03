@@ -26,7 +26,7 @@ async def get_cost_summary(
     days_back: int = Query(30, ge=1, le=365, description="Период в днях"),
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Сводка расходов на AI.
     
@@ -48,7 +48,7 @@ async def get_cost_summary(
 async def get_budget_status(
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Статус бюджета на AI.
     
@@ -68,7 +68,7 @@ async def get_budget_status(
 async def get_provider_stats(
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Статистика по AI провайдерам.
     
@@ -89,7 +89,7 @@ async def get_my_usage(
     days_back: int = Query(30, ge=1, le=365),
     current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Моя статистика использования AI.
     
@@ -117,7 +117,7 @@ async def get_my_usage(
 async def get_pricing_info(
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Информация о ценах провайдеров.
     
@@ -136,7 +136,7 @@ async def get_pricing_info(
 async def get_active_alerts(
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Активные предупреждения по AI.
     """

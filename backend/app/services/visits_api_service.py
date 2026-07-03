@@ -431,10 +431,10 @@ class VisitServiceIn(BaseModel):
 
 class VisitWithServices(BaseModel):
     visit: VisitOut
-    services: List[VisitServiceIn]
+    services: list[VisitServiceIn]
 
 
-@router.get("/visits", response_model=List[VisitOut], summary="Список визитов")
+@router.get("/visits", response_model=list[VisitOut], summary="Список визитов")
 def list_visits(
     patient_id: Optional[int] = Query(default=None),
     doctor_id: Optional[int] = Query(default=None),

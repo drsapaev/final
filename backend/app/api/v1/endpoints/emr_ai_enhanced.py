@@ -15,7 +15,7 @@ from app.services.emr_ai_enhanced import emr_ai_enhanced
 router = APIRouter()
 
 
-def ai_safety_meta() -> Dict[str, Any]:
+def ai_safety_meta() -> dict[str, Any]:
     return {
         "decision_boundary": "suggestion_only",
         "requires_doctor_confirmation": True,
@@ -29,8 +29,8 @@ def ai_safety_meta() -> Dict[str, Any]:
 @router.post("/generate-smart-template")
 async def generate_smart_template(
     specialty: str = Query(..., description="Специализация врача"),
-    patient_data: Dict[str, Any] = None,
-    doctor_preferences: Optional[Dict[str, Any]] = None,
+    patient_data: dict[str, Any] = None,
+    doctor_preferences: Optional[dict[str, Any]] = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
@@ -61,7 +61,7 @@ async def generate_smart_template(
 @router.post("/smart-suggestions")
 async def get_smart_suggestions(
     field_name: str = Query(..., description="Название поля"),
-    current_data: Dict[str, Any] = None,
+    current_data: dict[str, Any] = None,
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
@@ -90,8 +90,8 @@ async def get_smart_suggestions(
 
 @router.post("/auto-fill")
 async def auto_fill_emr_fields(
-    template_structure: Dict[str, Any],
-    patient_data: Dict[str, Any],
+    template_structure: dict[str, Any],
+    patient_data: dict[str, Any],
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
@@ -117,7 +117,7 @@ async def auto_fill_emr_fields(
 
 @router.post("/validate")
 async def validate_emr_data(
-    emr_data: Dict[str, Any],
+    emr_data: dict[str, Any],
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
@@ -164,7 +164,7 @@ async def get_icd10_suggestions(
 
 @router.post("/analyze-patient")
 async def analyze_patient_data(
-    patient_data: Dict[str, Any],
+    patient_data: dict[str, Any],
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:

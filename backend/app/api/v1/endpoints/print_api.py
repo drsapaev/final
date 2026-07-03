@@ -3,9 +3,9 @@ API endpoints для печати документов
 Основа: detail.md стр. 3721-3888, passport.md стр. 1925-2063
 """
 
-from datetime import datetime
 import asyncio
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -23,7 +23,7 @@ from app.schemas.print_config import (
     QuickReceiptRequest,
     QuickTicketRequest,
 )
-from app.services.print_service import get_print_service, PrintService
+from app.services.print_service import PrintService, get_print_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

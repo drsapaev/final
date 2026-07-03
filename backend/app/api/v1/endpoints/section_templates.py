@@ -12,18 +12,19 @@ Endpoints:
 """
 
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
-from app.models.user import User
 from app.models.section_templates import (
-    SectionType,
     DoctorSectionTemplateResponse,
     DoctorSectionTemplatesListResponse,
     DoctorSectionTemplateUpdate,
+    SectionType,
 )
+from app.models.user import User
 from app.services.section_templates_service import DoctorSectionTemplatesService
 
 router = APIRouter(

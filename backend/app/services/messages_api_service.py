@@ -445,7 +445,11 @@ class MessagesApiService:
         audio_file: UploadFile,
         current_user: User,
     ) -> MessageOut:
-        from app.utils.audio import MAX_AUDIO_SIZE, get_audio_duration, validate_audio_file
+        from app.utils.audio import (
+            MAX_AUDIO_SIZE,
+            get_audio_duration,
+            validate_audio_file,
+        )
         from app.ws.chat_ws import chat_manager
 
         recipient = self.validate_recipient(recipient_id=recipient_id, current_user=current_user)
@@ -636,7 +640,16 @@ API endpoints для системы сообщений между пользов
 
 import os
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 

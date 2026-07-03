@@ -189,7 +189,10 @@ class QueueDomainService:
 
         return result
     def get_queue_groups_payload(self) -> dict[str, Any]:
-        from app.services.service_mapping import QUEUE_GROUPS, get_queue_group_for_service
+        from app.services.service_mapping import (
+            QUEUE_GROUPS,
+            get_queue_group_for_service,
+        )
 
         groups: dict[str, dict[str, Any]] = {}
         for key, data in QUEUE_GROUPS.items():

@@ -50,7 +50,7 @@ def _serialize_transaction(transaction: FinanceTransaction) -> FinanceTransactio
     )
 
 
-@router.get("/admin/finance/transactions", response_model=List[FinanceTransactionOut])
+@router.get("/admin/finance/transactions", response_model=list[FinanceTransactionOut])
 def list_finance_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, ge=1, le=5000),

@@ -19,6 +19,8 @@ from .authentication import (
     UserActivity,
     UserSession,
 )
+from .cardio_blood_test import CardioBloodTest
+from .cardio_ecg_record import CardioECGRecord
 from .clinic import (
     Backup,
     BackupStatus,
@@ -39,8 +41,6 @@ from .clinic import (
     ServiceCategory,
     SystemInfo,
 )
-from .cardio_blood_test import CardioBloodTest
-from .cardio_ecg_record import CardioECGRecord
 from .department import (
     Department,
     DepartmentQueueSettings,
@@ -49,6 +49,34 @@ from .department import (
 )
 from .derma_examination import DermaExamination
 from .derma_procedure import DermaProcedure
+
+# Временно отключены из-за проблем с relationships
+# from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+# from .billing import Invoice, InvoiceItem, BillingPayment, InvoiceTemplate, BillingRule, PaymentReminder
+# from .discount_benefits import Discount, Benefit, LoyaltyProgram
+# from .dynamic_pricing import PricingRule, ServicePackage, PackagePurchase
+# from .emr import EMR, Prescription
+# from .emr_template import EMRTemplate
+# from .emr_version import EMRVersion
+# from .two_factor_auth import TwoFactorAuth, TwoFactorBackupCode, TwoFactorRecovery, TwoFactorSession, TwoFactorDevice
+# from .user_profile import UserProfile, UserPreferences, UserNotificationSettings, UserAuditLog
+# from .role_permission import Role, Permission, UserRole, UserGroup, GroupRole, UserPermissionOverride, RoleHierarchy, PermissionAuditLog
+# from .authentication import UserSession, RefreshToken, PasswordResetToken, EmailVerificationToken, LoginAttempt, UserActivity, SecurityEvent
+# from .clinic import ClinicSettings, Branch, License, Backup, SystemInfo, Equipment, EquipmentMaintenance
+# from .file_system import FileStorage, FileFolder, FileQuota, File, FileAccessLog, FileShare, FileVersion
+# from .queue_new import QueueEntry, QueueToken, QueueStatistics
+# from .queue_old import QueueTicket
+# from .online_queue import OnlineQueueEntry, OnlineQueueToken
+# from .schedule import ScheduleTemplate
+# from .doctor_price_override import DoctorPriceOverride
+# from .webhook import Webhook, WebhookCall, WebhookEvent
+# from .ai_config import AIProvider, AIProviderSettings
+from .display_config import (
+    DisplayAnnouncement,
+    DisplayBanner,
+    DisplayBoard,
+    DisplayTheme,
+)
 from .doctor_phrase_history import DoctorPhraseHistory
 from .doctor_price_override import DoctorPriceOverride
 from .doctor_templates import (
@@ -67,7 +95,6 @@ from .emr_v2 import (
     EMRRevision,
 )
 from .emr_version import EMRVersion
-from .finance import FinanceTransaction
 from .family_relation import FamilyRelation, RelationType
 from .file_system import (
     File,
@@ -81,6 +108,7 @@ from .file_system import (
     FileType,
     FileVersion,
 )
+from .finance import FinanceTransaction
 from .global_search_audit import GlobalSearchAudit
 
 # КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!
@@ -111,6 +139,7 @@ from .patient import Patient
 from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
+from .print_config import PrinterConfig, PrintJob, PrintTemplate
 from .queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
 from .refund_deposit import (
     DepositTransaction,
@@ -122,29 +151,6 @@ from .refund_deposit import (
 )
 from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
 
-# Временно отключены из-за проблем с relationships
-# from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
-# from .billing import Invoice, InvoiceItem, BillingPayment, InvoiceTemplate, BillingRule, PaymentReminder
-# from .discount_benefits import Discount, Benefit, LoyaltyProgram
-# from .dynamic_pricing import PricingRule, ServicePackage, PackagePurchase
-# from .emr import EMR, Prescription
-# from .emr_template import EMRTemplate
-# from .emr_version import EMRVersion
-# from .two_factor_auth import TwoFactorAuth, TwoFactorBackupCode, TwoFactorRecovery, TwoFactorSession, TwoFactorDevice
-# from .user_profile import UserProfile, UserPreferences, UserNotificationSettings, UserAuditLog
-# from .role_permission import Role, Permission, UserRole, UserGroup, GroupRole, UserPermissionOverride, RoleHierarchy, PermissionAuditLog
-# from .authentication import UserSession, RefreshToken, PasswordResetToken, EmailVerificationToken, LoginAttempt, UserActivity, SecurityEvent
-# from .clinic import ClinicSettings, Branch, License, Backup, SystemInfo, Equipment, EquipmentMaintenance
-# from .file_system import FileStorage, FileFolder, FileQuota, File, FileAccessLog, FileShare, FileVersion
-# from .queue_new import QueueEntry, QueueToken, QueueStatistics
-# from .queue_old import QueueTicket
-# from .online_queue import OnlineQueueEntry, OnlineQueueToken
-# from .schedule import ScheduleTemplate
-# from .doctor_price_override import DoctorPriceOverride
-# from .webhook import Webhook, WebhookCall, WebhookEvent
-# from .ai_config import AIProvider, AIProviderSettings
-from .display_config import DisplayAnnouncement, DisplayBanner, DisplayBoard, DisplayTheme
-from .print_config import PrinterConfig, PrintJob, PrintTemplate
 # from .dermatology_photos import DermatologyPhoto
 # from .telegram import TelegramConfig, TelegramUser, TelegramMessage, TelegramTemplate
 # from .notification import NotificationTemplate, NotificationHistory, NotificationSettings

@@ -15,12 +15,12 @@ from app.models.clinic import ServiceCategory
 from app.models.service import Service
 from app.models.user import User
 from app.services.queue_domain_service import QueueDomainService
+from app.services.service_audit_service import ServiceAuditService
 from app.services.service_mapping import (
     get_allowed_service_code_prefixes,
     normalize_service_code,
     resolve_queue_group_key,
 )
-from app.services.service_audit_service import ServiceAuditService
 from app.services.services_api_service import ServicesApiService
 
 router = APIRouter(tags=["services"])
@@ -315,7 +315,7 @@ def _row_to_out(r) -> ServiceOut:
 
 @router.get(
     "/categories",
-    response_model=List[ServiceCategoryOut],
+    response_model=list[ServiceCategoryOut],
     summary="Список категорий услуг",
 )
 async def list_service_categories(
@@ -387,7 +387,7 @@ async def delete_service_category(
 # ==================== УСЛУГИ ====================
 
 
-@router.get("", response_model=List[ServiceOut], summary="Каталог услуг")
+@router.get("", response_model=list[ServiceOut], summary="Каталог услуг")
 async def list_services(
     db: Session = Depends(get_db),
     # user=Depends(
@@ -425,18 +425,18 @@ class QueueGroupInfo(BaseModel):
     """Schema for a single queue group"""
     display_name: str
     display_name_uz: Optional[str] = None
-    service_codes: List[str] = []
-    service_prefixes: List[str] = []
-    exclude_codes: List[str] = []
+    service_codes: list[str] = []
+    service_prefixes: list[str] = []
+    exclude_codes: list[str] = []
     queue_tag: str
     tab_key: str
 
 
 class QueueGroupsResponse(BaseModel):
     """Response schema for queue-groups endpoint"""
-    groups: Dict[str, QueueGroupInfo] = {}
-    code_to_group: Dict[str, str] = {}
-    tab_to_group: Dict[str, str] = {}
+    groups: dict[str, QueueGroupInfo] = {}
+    code_to_group: dict[str, str] = {}
+    tab_to_group: dict[str, str] = {}
 
 
 @router.get(
@@ -487,8 +487,8 @@ class ServiceCodeRepairResponse(BaseModel):
     dry_run: bool
     scanned: int
     updated: int
-    conflicts: List[Dict[str, Any]] = Field(default_factory=list)
-    affected_services: List[ServiceCodeRepairItem] = Field(default_factory=list)
+    conflicts: list[dict[str, Any]] = Field(default_factory=list)
+    affected_services: list[ServiceCodeRepairItem] = Field(default_factory=list)
 
 
 @router.post(
@@ -676,7 +676,7 @@ class DoctorOut(BaseModel):
 
 @router.get(
     "/admin/doctors",
-    response_model=List[DoctorOut],
+    response_model=list[DoctorOut],
     summary="Список врачей (временный)",
 )
 async def list_doctors_temp(
@@ -711,7 +711,7 @@ class ServiceAuditLogOut(BaseModel):
 
 @router.get(
     "/{service_id}/history",
-    response_model=List[ServiceAuditLogOut],
+    response_model=list[ServiceAuditLogOut],
     summary="История изменений услуги",
 )
 async def get_service_history(
@@ -760,7 +760,7 @@ async def get_service_history(
 
 @router.get(
     "/admin/audit/recent",
-    response_model=List[ServiceAuditLogOut],
+    response_model=list[ServiceAuditLogOut],
     summary="Последние изменения услуг",
 )
 async def get_recent_service_changes(
@@ -812,7 +812,7 @@ class ServiceResolveResponse(BaseModel):
     normalized_code: Optional[str] = None
     category: Optional[str] = None
     subcategory: Optional[str] = None
-    departments: List[str] = []
+    departments: list[str] = []
     ui_type: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -856,8 +856,8 @@ async def resolve_service_endpoint(
 class ServiceBatchUpdateRequest(BaseModel):
     """Request schema for batch update"""
 
-    service_ids: List[int] = Field(..., min_items=1, max_items=100)
-    updates: Dict[str, Any] = Field(..., min_items=1)
+    service_ids: list[int] = Field(..., min_items=1, max_items=100)
+    updates: dict[str, Any] = Field(..., min_items=1)
     comment: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -868,8 +868,8 @@ class ServiceBatchUpdateResponse(BaseModel):
 
     updated_count: int
     failed_count: int
-    updated_services: List[int] = []
-    failed_services: List[Dict[str, Any]] = []
+    updated_services: list[int] = []
+    failed_services: list[dict[str, Any]] = []
 
     model_config = ConfigDict(from_attributes=True)
 

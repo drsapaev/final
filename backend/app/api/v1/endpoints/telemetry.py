@@ -25,6 +25,7 @@ from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
@@ -98,12 +99,12 @@ class TelemetryEvent(BaseModel):
     entity: str = Field(default="emr", max_length=20)
     timestamp: Optional[int] = None
     session_id: Optional[str] = Field(None, max_length=50)
-    meta: Optional[Dict[str, Any]] = None
+    meta: Optional[dict[str, Any]] = None
 
 
 class TelemetryBatch(BaseModel):
     """Batch of telemetry events"""
-    events: List[TelemetryEvent] = Field(..., max_length=100)
+    events: list[TelemetryEvent] = Field(..., max_length=100)
 
 
 class TelemetryResponse(BaseModel):
@@ -130,7 +131,7 @@ def validate_event(event: TelemetryEvent) -> bool:
         for key, value in event.meta.items():
             # Block long strings (could be content)
             if isinstance(value, str) and len(value) > 100:
-                logger.debug(f"[Telemetry] Rejected: meta value too long")
+                logger.debug("[Telemetry] Rejected: meta value too long")
                 return False
             # Block suspicious keys
             if key.lower() in (
@@ -162,7 +163,7 @@ def validate_event(event: TelemetryEvent) -> bool:
 # =============================================================================
 
 
-async def store_events(events: List[TelemetryEvent]):
+async def store_events(events: list[TelemetryEvent]):
     """
     Store telemetry events.
     

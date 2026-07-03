@@ -6,25 +6,25 @@ API endpoints для кассира
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Generic, TypeVar
+from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
+from sqlalchemy.orm import Session, joinedload
 
 from app.api import deps
-from app.models.payment import Payment
-from app.models.visit import Visit
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.user import User
+from app.models.visit import Visit
 from app.services.canonical_visit_service import (
     CanonicalVisitResolutionError,
     CanonicalVisitService,
 )
-from app.services.payment_read_service import PaymentReadService
 from app.services.notifications import notification_sender_service
+from app.services.payment_read_service import PaymentReadService
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +89,9 @@ class PendingPaymentItem(BaseModel):
     patient_name: str
     patient_iin: Optional[str] = None
     visit_id: Optional[int] = None  # Первый visit_id (для совместимости)
-    visit_ids: List[int] = []  # Все visit_id этого пациента
+    visit_ids: list[int] = []  # Все visit_id этого пациента
     appointment_id: Optional[int] = None
-    services: List[Dict[str, Any]] = []
+    services: list[dict[str, Any]] = []
     total_amount: Decimal
     paid_amount: Decimal = Decimal("0")
     remaining_amount: Decimal
@@ -101,7 +101,7 @@ class PendingPaymentItem(BaseModel):
     department: Optional[str] = None
     payment_contract: str = "single_visit"
     payment_visit_id: Optional[int] = None
-    payment_visit_ids: List[int] = Field(default_factory=list)
+    payment_visit_ids: list[int] = Field(default_factory=list)
     can_create_direct_payment: bool = True
     can_create_grouped_payment: bool = False
 
@@ -121,7 +121,7 @@ class PaymentHistoryItem(BaseModel):
     paid_at: Optional[datetime] = None
     note: Optional[str] = None
     cashier_name: Optional[str] = None
-    available_actions: List[str] = Field(default_factory=list)
+    available_actions: list[str] = Field(default_factory=list)
     can_confirm: bool = False
     can_cancel: bool = False
     can_refund: bool = False
@@ -133,7 +133,7 @@ class PaymentHistoryItem(BaseModel):
 T = TypeVar("T")
 
 class PaginatedResponse(BaseModel, Generic[T]):
-    items: List[T]
+    items: list[T]
     total: int
     page: int
     size: int
@@ -167,7 +167,7 @@ class PaymentResponse(BaseModel):
 
 class CreateGroupedPaymentRequest(BaseModel):
     """Backend-owned allocation request for grouped cashier payment rows."""
-    visit_ids: List[int] = Field(..., min_length=1, description="Visit ids from a cashier grouped pending-payment row")
+    visit_ids: list[int] = Field(..., min_length=1, description="Visit ids from a cashier grouped pending-payment row")
     patient_id: Optional[int] = Field(None, description="Expected patient id for all grouped visits")
     amount: Decimal = Field(..., gt=0, description="Total payment amount to allocate")
     method: str = Field(default="cash", description="Payment method (cash, card)")
@@ -190,8 +190,8 @@ class GroupedPaymentResponse(BaseModel):
     method: str
     status: str
     created_at: datetime
-    payments: List[PaymentResponse]
-    allocations: List[GroupedPaymentAllocationItem]
+    payments: list[PaymentResponse]
+    allocations: list[GroupedPaymentAllocationItem]
 
 
 class CancelPaymentRequest(BaseModel):
@@ -296,7 +296,7 @@ async def _emit_payment_notification(
     patient_id: Optional[int] = None,
     visit: Optional[Visit] = None,
     reason: Optional[str] = None,
-    extra_metadata: Optional[Dict[str, Any]] = None,
+    extra_metadata: Optional[dict[str, Any]] = None,
 ) -> None:
     """Emit canonical payment_notification for patient inbox without breaking cashier flow."""
     try:
@@ -321,7 +321,7 @@ async def _emit_payment_notification(
             return
 
         amount_value = _decimal_to_float(getattr(payment, "amount", None))
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "payment_id": payment.id,
             "visit_id": payment.visit_id,
             "patient_id": resolved_patient_id,
@@ -406,8 +406,8 @@ async def get_pending_payments(
     - Если у пациента есть неоплаченные услуги - все объединяются в один блок
     """
     try:
-        from collections import defaultdict
         import math
+        from collections import defaultdict
         
         # Базовый запрос - получаем все визиты (не отменённые и не оплаченные)
         # Исключаем визиты со статусами: canceled, paid, completed, done, closed
@@ -746,9 +746,10 @@ async def export_payments(
     """
     Экспорт всех платежей за период в CSV.
     """
-    from fastapi.responses import StreamingResponse
-    import io
     import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
     
     try:
         query = db.query(Payment)
@@ -1083,8 +1084,9 @@ async def create_grouped_payment(
             )
 
         try:
-            from app.ws.cashier_ws import broadcast_cashier_update
             import asyncio
+
+            from app.ws.cashier_ws import broadcast_cashier_update
 
             for payment in created_payments:
                 asyncio.create_task(broadcast_cashier_update("payment_created", {
@@ -1261,8 +1263,9 @@ async def create_payment(
         
         # 🔔 WebSocket: Broadcast payment_created event
         try:
-            from app.ws.cashier_ws import broadcast_cashier_update
             import asyncio
+
+            from app.ws.cashier_ws import broadcast_cashier_update
             asyncio.create_task(broadcast_cashier_update("payment_created", {
                 "payment_id": new_payment.id,
                 "visit_id": new_payment.visit_id,
@@ -1661,7 +1664,7 @@ class HourlyStatItem(BaseModel):
     amount: Decimal
 
 
-@router.get("/stats/hourly", response_model=List[HourlyStatItem])
+@router.get("/stats/hourly", response_model=list[HourlyStatItem])
 async def get_hourly_stats(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),

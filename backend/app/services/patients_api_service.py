@@ -9,10 +9,10 @@ from app.crud.patient import patient as patient_crud
 from app.models.appointment import Appointment
 from app.models.lab import LabOrder
 from app.models.user import User
+from app.repositories.patients_api_repository import PatientsApiRepository
 from app.schemas import appointment as appointment_schemas
 from app.schemas import lab as lab_schemas
 from app.schemas import patient as patient_schemas
-from app.repositories.patients_api_repository import PatientsApiRepository
 
 logger = logging.getLogger(__name__)
 

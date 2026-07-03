@@ -4,7 +4,7 @@ API endpoints для интеграции регистратуры с админ
 """
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,7 +13,8 @@ from sqlalchemy import and_, func, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.crud import clinic as crud_clinic, online_queue as crud_queue
+from app.crud import clinic as crud_clinic
+from app.crud import online_queue as crud_queue
 from app.models.department import Department, DepartmentService
 from app.models.service import Service
 from app.models.user import User
@@ -222,7 +223,7 @@ def _serialize_registrar_datetime(value: Any) -> str | None:
         return None
 
     if isinstance(value, datetime):
-        dt = value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+        dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
         return dt.isoformat()
 
     if isinstance(value, str):
@@ -462,7 +463,7 @@ def get_queue_profiles(
     SSOT: Вкладки определяются в БД, НЕ хардкодятся в frontend.
     """
     try:
-        from app.models.queue_profile import QueueProfile, INITIAL_QUEUE_PROFILES
+        from app.models.queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
         
         # Пытаемся получить из БД
         query = db.query(QueueProfile)
@@ -551,7 +552,7 @@ def get_queue_profiles_public(
     Используется на странице /queue/join для выбора специальности.
     """
     try:
-        from app.models.queue_profile import QueueProfile, INITIAL_QUEUE_PROFILES
+        from app.models.queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
         
         # Получаем только активные профили, которые видны на QR странице
         profiles = (
@@ -633,8 +634,9 @@ def _get_emoji_for_key(key: str) -> str:
 # ===================== QUEUE PROFILE CRUD (ADMIN) =====================
 
 
-from pydantic import BaseModel, Field
 from typing import List
+
+from pydantic import BaseModel, Field
 
 
 class QueueProfileCreate(BaseModel):
@@ -642,7 +644,7 @@ class QueueProfileCreate(BaseModel):
     key: str = Field(..., min_length=1, max_length=50, description="Unique key (e.g., 'cardiology')")
     title: str = Field(..., min_length=1, max_length=100, description="English title")
     title_ru: Optional[str] = Field(None, max_length=100, description="Russian title")
-    queue_tags: List[str] = Field(default=[], description="List of queue_tag values for this profile")
+    queue_tags: list[str] = Field(default=[], description="List of queue_tag values for this profile")
     department_key: Optional[str] = Field(None, max_length=50)
     display_order: int = Field(default=0, ge=0)
     is_active: bool = Field(default=True)
@@ -655,7 +657,7 @@ class QueueProfileUpdate(BaseModel):
     """Schema for updating an existing QueueProfile"""
     title: Optional[str] = Field(None, max_length=100)
     title_ru: Optional[str] = Field(None, max_length=100)
-    queue_tags: Optional[List[str]] = None
+    queue_tags: Optional[list[str]] = None
     department_key: Optional[str] = Field(None, max_length=50)
     display_order: Optional[int] = Field(None, ge=0)
     is_active: Optional[bool] = None
@@ -1170,7 +1172,7 @@ def get_registrar_queue_settings(
             "queue_start_hour": queue_settings.get("queue_start_hour", 7),
             "auto_close_time": queue_settings.get("auto_close_time", "09:00"),
             "specialties": specialty_info,
-            "current_time": datetime.now(timezone.utc).isoformat(),
+            "current_time": datetime.now(UTC).isoformat(),
         }
 
     except (ValueError, AttributeError):
@@ -1329,7 +1331,7 @@ def start_queue_visit(
                         detail="Queue entry visit does not belong to the queue patient",
                     )
 
-            changed_at = datetime.now(timezone.utc)
+            changed_at = datetime.now(UTC)
             queue_entry.status = "in_progress"
             queue_entry.updated_at = changed_at
             if linked_visit:
@@ -1848,7 +1850,7 @@ def _build_queue_payload(
         "cabinet": queue_data["doctor"].cabinet if queue_data.get("doctor") else "N/A",
         "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
         "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
-        "opened_at": datetime.now(timezone.utc).isoformat(),
+        "opened_at": datetime.now(UTC).isoformat(),
         "entries": entries,
         "stats": {
             "total": len(entries),
@@ -3187,7 +3189,7 @@ class BatchQueueEntriesRequest(BaseModel):
         description="Источник регистрации: 'online', 'desk', 'morning_assignment'",
         pattern="^(online|desk|morning_assignment)$",
     )
-    services: List[BatchServiceItem] = Field(
+    services: list[BatchServiceItem] = Field(
         ..., min_length=1, description="Список услуг с указанием специалистов"
     )
 
@@ -3205,7 +3207,7 @@ class BatchQueueEntriesResponse(BaseModel):
     """Ответ на массовое создание очередей"""
 
     success: bool
-    entries: List[BatchQueueEntryResponse]
+    entries: list[BatchQueueEntryResponse]
     message: str
 
 
@@ -3258,7 +3260,7 @@ def create_queue_entries_batch(
         current_time = datetime.now(timezone)
 
         # Группируем услуги по specialist_id (один врач = одна запись в очереди)
-        services_by_specialist: Dict[int, List[BatchServiceItem]] = {}
+        services_by_specialist: dict[int, list[BatchServiceItem]] = {}
         for service_item in request.services:
             service = db.query(Service).filter(Service.id == service_item.service_id).first()
             if not service:

@@ -8,8 +8,8 @@ from typing import Any, Dict, List, NoReturn, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.core.rbac import AIPermission, require_any_ai_permission
+from app.db.session import get_db
 from app.models.user import User
 from app.services.emr_ai_service import get_emr_ai_service
 
@@ -35,7 +35,7 @@ def _raise_emr_ai_internal_error(operation: str, exc: Exception) -> NoReturn:
     raise HTTPException(status_code=500, detail=EMR_AI_PUBLIC_ERROR) from exc
 
 
-def ai_safety_meta() -> Dict[str, Any]:
+def ai_safety_meta() -> dict[str, Any]:
     return {
         "decision_boundary": "suggestion_only",
         "requires_doctor_confirmation": True,
@@ -48,7 +48,7 @@ def ai_safety_meta() -> Dict[str, Any]:
 
 @router.post("/suggestions/diagnosis")
 async def get_diagnosis_suggestions(
-    symptoms: List[str],
+    symptoms: list[str],
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
     current_user: User = Depends(EMR_AI_ACCESS),
@@ -114,8 +114,8 @@ async def get_icd10_suggestions(
 
 @router.post("/auto-fill")
 async def auto_fill_emr_fields(
-    template_structure: Dict[str, Any],
-    patient_data: Dict[str, Any],
+    template_structure: dict[str, Any],
+    patient_data: dict[str, Any],
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
     current_user: User = Depends(EMR_AI_ACCESS),
@@ -139,8 +139,8 @@ async def auto_fill_emr_fields(
 
 @router.post("/validate")
 async def validate_emr_data(
-    emr_data: Dict[str, Any],
-    template_structure: Dict[str, Any],
+    emr_data: dict[str, Any],
+    template_structure: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(EMR_AI_ACCESS),
 ):
@@ -160,7 +160,7 @@ async def validate_emr_data(
 
 @router.post("/suggestions/ai")
 async def get_ai_suggestions(
-    emr_data: Dict[str, Any],
+    emr_data: dict[str, Any],
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
     current_user: User = Depends(EMR_AI_ACCESS),
@@ -203,6 +203,7 @@ async def ai_health_check(current_user: User = Depends(EMR_AI_ACCESS)):
 # =============================================================================
 
 import uuid
+
 from pydantic import BaseModel
 
 
@@ -230,13 +231,13 @@ class DoctorContext(BaseModel):
     doctor_id: Optional[int] = None
     specialty: Optional[str] = None
     field_name: Optional[str] = None
-    previous_entries: Optional[List[DoctorContextEntry]] = None
-    unique_phrases: Optional[List[str]] = None
+    previous_entries: Optional[list[DoctorContextEntry]] = None
+    unique_phrases: Optional[list[str]] = None
 
 
 class SuggestRequestV2(BaseModel):
     """EMR v2 suggest request"""
-    emr_snapshot: Dict[str, Any]
+    emr_snapshot: dict[str, Any]
     specialty: str = "general"
     language: str = "ru"
     doctor_context: Optional[DoctorContext] = None
@@ -244,7 +245,7 @@ class SuggestRequestV2(BaseModel):
 
 class SuggestResponseV2(BaseModel):
     """EMR v2 suggest response"""
-    suggestions: List[AISuggestionV2]
+    suggestions: list[AISuggestionV2]
     model: str = "mock"
     specialty: str
     used_doctor_context: bool = False
@@ -253,10 +254,10 @@ class SuggestResponseV2(BaseModel):
 
 
 def generate_v2_suggestions(
-    emr_data: Dict[str, Any], 
+    emr_data: dict[str, Any], 
     specialty: str,
     doctor_context: Optional[DoctorContext] = None,
-) -> List[AISuggestionV2]:
+) -> list[AISuggestionV2]:
     """Generate mock suggestions in EMR v2 format"""
     suggestions = []
     

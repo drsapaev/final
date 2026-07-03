@@ -391,7 +391,7 @@ def _service(db: Session) -> AppointmentsApiService:
     return AppointmentsApiService(db)
 
 
-@router.get("/", response_model=List[appointment_schemas.Appointment])
+@router.get("/", response_model=list[appointment_schemas.Appointment])
 def list_appointments(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),

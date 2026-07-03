@@ -46,7 +46,7 @@ class PhraseSuggestion(BaseModel):
 
 class PhraseSuggestResponse(BaseModel):
     """Ответ с подсказками"""
-    suggestions: List[PhraseSuggestion]
+    suggestions: list[PhraseSuggestion]
     field: str
     doctorId: int
 
@@ -55,7 +55,7 @@ class IndexPhraseRequest(BaseModel):
     """Запрос на индексацию фраз из EMR"""
     doctorId: int
     specialty: Optional[str] = None
-    emrData: Dict[str, Any]
+    emrData: dict[str, Any]
 
 
 class IndexPhraseResponse(BaseModel):
@@ -147,7 +147,7 @@ async def get_phrase_stats(
     doctor_id: int,
     db: Session = Depends(deps.get_db),
     _current_user=Depends(phrase_clinical_access),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Получить статистику фраз врача.
     """
@@ -161,8 +161,8 @@ async def get_phrase_stats(
 class ReadinessResponse(BaseModel):
     """Результат проверки готовности"""
     ready: bool
-    progress: Dict[str, Any]
-    missing: List[str]
+    progress: dict[str, Any]
+    missing: list[str]
     message: str
 
 
@@ -244,7 +244,7 @@ class TelemetryStatsResponse(BaseModel):
     totalAccepted: int
     acceptanceRate: float
     avgTimeToAcceptMs: Optional[int]
-    topAcceptedPhrases: List[Dict[str, Any]]
+    topAcceptedPhrases: list[dict[str, Any]]
 
 
 @router.get("/telemetry-stats/{doctor_id}", response_model=TelemetryStatsResponse)
@@ -276,13 +276,13 @@ class FieldPreference(BaseModel):
 class FieldPreferencesRequest(BaseModel):
     """Запрос на обновление preferences"""
     doctorId: int
-    preferences: List[FieldPreference]
+    preferences: list[FieldPreference]
 
 
 class FieldPreferencesResponse(BaseModel):
     """Ответ с preferences"""
     doctorId: int
-    preferences: Dict[str, bool]  # field -> paused
+    preferences: dict[str, bool]  # field -> paused
 
 
 @router.get("/preferences/{doctor_id}", response_model=FieldPreferencesResponse)
@@ -352,7 +352,7 @@ class BatchIndexResponse(BaseModel):
     totalPhrases: int
     doctorsNowReady: int
     durationMs: int
-    errors: List[str]
+    errors: list[str]
 
 
 @router.post("/batch-index", response_model=BatchIndexResponse)

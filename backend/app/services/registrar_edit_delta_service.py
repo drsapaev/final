@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -18,7 +18,6 @@ from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.queue_service import queue_service
 from app.services.service_mapping import get_service_code, normalize_service_code
-
 
 ACTIVE_APPEND_STATUSES = ("waiting", "called", "in_service", "diagnostics")
 
@@ -236,13 +235,13 @@ class RegistrarEditDeltaService:
 
             # Нормализуем оба к timezone-aware UTC для сравнения
             if expected_dt.tzinfo is None:
-                expected_dt = expected_dt.replace(tzinfo=timezone.utc)
+                expected_dt = expected_dt.replace(tzinfo=UTC)
 
             actual_dt = entry.updated_at
             if actual_dt is None:
                 continue
             if actual_dt.tzinfo is None:
-                actual_dt = actual_dt.replace(tzinfo=timezone.utc)
+                actual_dt = actual_dt.replace(tzinfo=UTC)
 
             # Допускаем 1 секунду разницы (clock skew, округление БД)
             if abs((actual_dt - expected_dt).total_seconds()) > 1:

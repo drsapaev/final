@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -37,10 +37,10 @@ class Visit(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=True, default=lambda: datetime.now(UTC)
     )
 
     # ✅ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ

@@ -32,7 +32,7 @@ def _ai_tracking_http_error(exc: Exception, operation: str) -> HTTPException:
     return HTTPException(status_code=500, detail=AI_TRACKING_PUBLIC_ERROR)
 
 
-@router.get("/models/stats", response_model=List[AIModelStats])
+@router.get("/models/stats", response_model=list[AIModelStats])
 async def get_ai_model_stats(
     days_back: int = Query(30, ge=1, le=365, description="Количество дней назад"),
     provider_id: Optional[int] = Query(None, description="ID провайдера"),
@@ -60,7 +60,7 @@ async def get_ai_model_stats(
         raise _ai_tracking_http_error(e, "get_ai_model_stats") from e
 
 
-@router.get("/providers/stats", response_model=List[AIProviderStats])
+@router.get("/providers/stats", response_model=list[AIProviderStats])
 async def get_ai_provider_stats(
     days_back: int = Query(30, ge=1, le=365, description="Количество дней назад"),
     db: Session = Depends(get_db),

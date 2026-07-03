@@ -4,18 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.crud.patient import patient as patient_crud
 from app.core.audit import log_critical_change
+from app.crud.patient import patient as patient_crud
 from app.models.user import User
+from app.schemas import appointment as appointment_schemas
+from app.schemas import lab as lab_schemas
 from app.schemas import patient as patient_schemas
 from app.services.patient_portal_service import (
     PatientPortalDomainError,
     PatientPortalService,
 )
 from app.services.patient_service import PatientService
-
-from app.schemas import appointment as appointment_schemas
-from app.schemas import lab as lab_schemas
 
 router = APIRouter()
 
@@ -27,7 +26,7 @@ def _ensure_patient_self_access(current_user: User, patient_id: int) -> None:
         raise HTTPException(status_code=403, detail="Access denied")
 
 
-@router.get("/appointments", response_model=List[appointment_schemas.Appointment])
+@router.get("/appointments", response_model=list[appointment_schemas.Appointment])
 def get_my_appointments(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Patient")),
@@ -64,7 +63,7 @@ def get_my_appointment_details(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/results", response_model=List[lab_schemas.LabOrderOut])
+@router.get("/results", response_model=list[lab_schemas.LabOrderOut])
 def get_my_results(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Patient")),
@@ -78,7 +77,7 @@ def get_my_results(
     return PatientPortalService(db).get_my_results(patient_id=current_user.patient.id)
 
 
-@router.get("/", response_model=List[patient_schemas.Patient])
+@router.get("/", response_model=list[patient_schemas.Patient])
 def list_patients(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
@@ -113,7 +112,7 @@ def create_patient(
     )
 
 
-@router.get("/deleted", response_model=List[patient_schemas.Patient])
+@router.get("/deleted", response_model=list[patient_schemas.Patient])
 def get_deleted_patients(
     *,
     db: Session = Depends(deps.get_db),
@@ -283,8 +282,8 @@ def get_patient_family(
     
     Возвращает список связей с данными родственников.
     """
-    from app.crud.family_relation import get_patient_family as do_get_family
     from app.crud.family_relation import get_patient_as_relative
+    from app.crud.family_relation import get_patient_family as do_get_family
     
     patient = patient_crud.get(db, id=patient_id)
     if not patient:

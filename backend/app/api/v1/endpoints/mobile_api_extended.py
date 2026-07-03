@@ -12,10 +12,20 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.crud import (
     appointment as crud_appointment,
+)
+from app.crud import (
     clinic as crud_doctor,
+)
+from app.crud import (
     patient as crud_patient,
+)
+from app.crud import (
     queue as crud_queue,
+)
+from app.crud import (
     service as crud_service,
+)
+from app.crud import (
     user as crud_user,
 )
 from app.db.session import get_db
@@ -89,7 +99,7 @@ class EmergencyContactRequest(BaseModel):
 
     type: str  # ambulance, emergency_doctor, clinic
     message: Optional[str] = None
-    location: Optional[Dict[str, float]] = None  # {"lat": 41.0, "lng": 69.0}
+    location: Optional[dict[str, float]] = None  # {"lat": 41.0, "lng": 69.0}
 
 
 class ProfileUpdateRequest(BaseModel):

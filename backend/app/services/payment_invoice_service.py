@@ -12,7 +12,6 @@ from app.models.payment_invoice import PaymentInvoice
 from app.repositories.payment_invoice_repository import PaymentInvoiceRepository
 from app.services.notifications import notification_sender_service
 
-
 logger = logging.getLogger(__name__)
 
 

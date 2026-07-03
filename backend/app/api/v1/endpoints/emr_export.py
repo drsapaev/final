@@ -112,7 +112,7 @@ async def export_emr_to_xml(
 @router.post("/export/csv")
 async def export_emr_to_csv(
     emr_data: dict,
-    fields: Optional[List[str]] = Query(None, description="Поля для экспорта"),
+    fields: Optional[list[str]] = Query(None, description="Поля для экспорта"),
     current_user: User = Depends(get_current_user),
 ):
     """Экспорт EMR в CSV формат"""

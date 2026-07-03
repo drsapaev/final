@@ -36,9 +36,9 @@ class PatientEntriesResponse(BaseModel):
     """Ответ с записями пациента за день"""
     patient_id: int
     date: str
-    online_queue_entries: List[Dict[str, Any]]
-    visits: List[Dict[str, Any]]
-    aggregated: Dict[str, Any]
+    online_queue_entries: list[dict[str, Any]]
+    visits: list[dict[str, Any]]
+    aggregated: dict[str, Any]
 
 
 # ============================================================================

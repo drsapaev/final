@@ -21,8 +21,8 @@ from app.crud.user_management import (
 from app.models.notification import NotificationHistory
 from app.models.user import User
 from app.schemas.notification import NotificationHistoryCreate
-from app.services.notification_platform_service import get_notification_platform_service
 from app.services.fcm_service import get_fcm_service
+from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notification_websocket import get_notification_ws_manager
 from app.services.telegram.bot import telegram_bot
 

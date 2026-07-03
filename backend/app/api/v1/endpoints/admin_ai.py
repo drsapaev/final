@@ -44,7 +44,7 @@ def _admin_ai_http_error(exc: Exception, operation: str) -> HTTPException:
 # ===================== AI ПРОВАЙДЕРЫ =====================
 
 
-@router.get("/ai/providers", response_model=List[AIProviderOut])
+@router.get("/ai/providers", response_model=list[AIProviderOut])
 def get_ai_providers(
     active_only: bool = False,
     db: Session = Depends(get_db),
@@ -303,7 +303,7 @@ def get_ai_stats(
         raise _admin_ai_http_error(e, "get_ai_stats") from e
 
 
-@router.get("/ai/usage-logs", response_model=List[AIUsageLogOut])
+@router.get("/ai/usage-logs", response_model=list[AIUsageLogOut])
 def get_ai_usage_logs(
     skip: int = 0,
     limit: int = 100,

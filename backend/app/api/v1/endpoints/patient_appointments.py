@@ -36,7 +36,7 @@ class PatientAppointmentResponse(BaseModel):
     department_name: Optional[str] = None
     cabinet: Optional[str] = None
     status: str
-    services: List[str] = []
+    services: list[str] = []
     can_cancel: bool = False
     can_reschedule: bool = False
     hours_until_appointment: Optional[float] = None
@@ -128,7 +128,7 @@ def extract_department_value(appointment: Appointment) -> Optional[str]:
 # Endpoints
 # ============================================================================
 
-@router.get("/appointments", response_model=List[PatientAppointmentResponse])
+@router.get("/appointments", response_model=list[PatientAppointmentResponse])
 async def get_my_appointments(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
@@ -357,7 +357,7 @@ async def reschedule_my_appointment(
     }
 
 
-@router.get("/appointments/{appointment_id}/available-slots", response_model=List[AvailableSlotResponse])
+@router.get("/appointments/{appointment_id}/available-slots", response_model=list[AvailableSlotResponse])
 async def get_available_slots(
     appointment_id: int,
     date_from: str = Query(..., description="Начальная дата YYYY-MM-DD"),
@@ -403,7 +403,7 @@ async def get_available_slots(
     return [AvailableSlotResponse(**slot) for slot in slots[:20]]
 
 
-@router.get("/results", response_model=List[PatientResultResponse])
+@router.get("/results", response_model=list[PatientResultResponse])
 async def get_my_results(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),

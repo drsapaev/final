@@ -8,11 +8,12 @@ import logging
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any
 
 from app.core.config import settings
-from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
+from app.crud import clinic as crud_clinic
+from app.crud import telegram_config as crud_telegram
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.visit import Visit
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
@@ -68,7 +69,7 @@ def _base36_decode(value: str) -> int:
 def _as_utc_naive(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value.astimezone(UTC).replace(tzinfo=None)
 
 
 def _ticket_qr_signature(body: str) -> str:
@@ -87,7 +88,7 @@ def _hash_telegram_ticket_start_token(token: str) -> str:
 
 def build_telegram_ticket_start_token(*, expires_at: datetime, nonce: str | None = None) -> str:
     """Build a compact signed Telegram /start payload without patient data."""
-    exp = int(_as_utc_naive(expires_at).replace(tzinfo=timezone.utc).timestamp())
+    exp = int(_as_utc_naive(expires_at).replace(tzinfo=UTC).timestamp())
     token_nonce = nonce or _base36_encode(secrets.randbits(48))
     body = (
         f"{TELEGRAM_TICKET_QR_PREFIX}{TELEGRAM_TICKET_QR_SEPARATOR}"
@@ -109,11 +110,11 @@ def parse_telegram_ticket_start_token(token: str) -> dict[str, Any] | None:
         return None
 
     try:
-        expires_at = datetime.fromtimestamp(_base36_decode(parts[1]), tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(_base36_decode(parts[1]), tz=UTC)
     except (TypeError, ValueError, OverflowError, OSError):
         return None
 
-    if expires_at < datetime.now(timezone.utc):
+    if expires_at < datetime.now(UTC):
         return None
 
     return {

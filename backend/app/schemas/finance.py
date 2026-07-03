@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.base import ORMModel
 
-
 FinanceTransactionType = Literal["income", "expense"]
 FinanceTransactionStatus = Literal["pending", "completed", "cancelled", "refunded"]
 FinancePaymentMethod = Literal["cash", "card", "transfer", "mobile"]

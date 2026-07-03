@@ -8,7 +8,7 @@ import json
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -2270,7 +2270,7 @@ class LabReportingService:
             )
             actual_dt = instance.updated_at
             if actual_dt and actual_dt.tzinfo is None:
-                actual_dt = actual_dt.replace(tzinfo=timezone.utc)
+                actual_dt = actual_dt.replace(tzinfo=UTC)
             if expected_dt and actual_dt and abs((actual_dt - expected_dt).total_seconds()) > 1:
                 raise LabReportingDomainError(
                     409,

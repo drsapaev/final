@@ -75,7 +75,7 @@ class ComplaintAnalysisRequest(BaseModel):
 class ICD10SuggestRequest(BaseModel):
     """Запрос на подсказки МКБ-10"""
 
-    symptoms: List[str]
+    symptoms: list[str]
     diagnosis: Optional[str] = None
     provider: Optional[AIProviderType] = None
 
@@ -83,7 +83,7 @@ class ICD10SuggestRequest(BaseModel):
 class LabInterpretRequest(BaseModel):
     """Запрос на интерпретацию анализов"""
 
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
     provider: Optional[AIProviderType] = None
@@ -92,7 +92,7 @@ class LabInterpretRequest(BaseModel):
 class ECGInterpretRequest(BaseModel):
     """Запрос на интерпретацию ЭКГ"""
 
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     auto_interpretation: Optional[str] = None
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
@@ -102,7 +102,7 @@ class ECGInterpretRequest(BaseModel):
 @router.get("/providers")
 async def get_available_providers(
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Получить список доступных AI провайдеров"""
     return {
         "providers": ai_manager.get_available_providers(),
@@ -115,7 +115,7 @@ async def get_available_providers(
 @router.post("/complaint-to-plan")
 async def analyze_complaint(
     request: ComplaintAnalysisRequest, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Анализ жалоб пациента и создание плана обследования"""
     try:
         # Проверяем права доступа
@@ -175,7 +175,7 @@ async def analyze_complaint(
 @router.post("/icd-suggest")
 async def suggest_icd10_codes(
     request: ICD10SuggestRequest, current_user: User = Depends(get_current_user)
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """Получить подсказки кодов МКБ-10"""
     try:
         # Проверяем права доступа
@@ -198,7 +198,7 @@ async def suggest_icd10_codes(
 @router.post("/lab-interpret")
 async def interpret_lab_results(
     request: LabInterpretRequest, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Интерпретация результатов лабораторных анализов"""
     try:
         # Проверяем права доступа
@@ -230,7 +230,7 @@ async def analyze_skin(
     metadata: Optional[str] = Form(None),
     provider: Optional[AIProviderType] = Form(None),
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Анализ состояния кожи по фото"""
     try:
         # Проверяем права доступа
@@ -266,7 +266,7 @@ async def analyze_skin(
 @router.post("/ecg-interpret")
 async def interpret_ecg(
     request: ECGInterpretRequest, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Интерпретация данных ЭКГ"""
     try:
         # Проверяем права доступа
@@ -300,23 +300,23 @@ async def interpret_ecg(
 class DifferentialDiagnosisRequest(BaseModel):
     """Запрос на дифференциальную диагностику"""
 
-    symptoms: List[str]
-    patient_info: Optional[Dict[str, Any]] = None
+    symptoms: list[str]
+    patient_info: Optional[dict[str, Any]] = None
     provider: Optional[AIProviderType] = None
 
 
 class SymptomAnalysisRequest(BaseModel):
     """Запрос на анализ симптомов"""
 
-    symptoms: List[str]
-    severity: Optional[List[int]] = None
+    symptoms: list[str]
+    severity: Optional[list[int]] = None
     provider: Optional[AIProviderType] = None
 
 
 class ClinicalDecisionRequest(BaseModel):
     """Запрос на поддержку клинических решений"""
 
-    case_data: Dict[str, Any]
+    case_data: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
@@ -374,7 +374,7 @@ class MedicalImageAnalysisRequest(BaseModel):
     """Запрос на анализ медицинского изображения"""
 
     image_type: str  # xray, ultrasound, dermatoscopy, generic
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[dict[str, Any]] = None
     provider: Optional[AIProviderType] = None
 
 
@@ -521,17 +521,17 @@ async def analyze_medical_image_generic(
 class TreatmentPlanRequest(BaseModel):
     """Запрос на генерацию плана лечения"""
 
-    patient_data: Dict[str, Any]
+    patient_data: dict[str, Any]
     diagnosis: str
-    medical_history: Optional[List[Dict[str, Any]]] = None
+    medical_history: Optional[list[dict[str, Any]]] = None
     provider: Optional[AIProviderType] = None
 
 
 class MedicationOptimizationRequest(BaseModel):
     """Запрос на оптимизацию медикаментозной терапии"""
 
-    current_medications: List[Dict[str, Any]]
-    patient_profile: Dict[str, Any]
+    current_medications: list[dict[str, Any]]
+    patient_profile: dict[str, Any]
     condition: str
     provider: Optional[AIProviderType] = None
 
@@ -539,16 +539,16 @@ class MedicationOptimizationRequest(BaseModel):
 class TreatmentEffectivenessRequest(BaseModel):
     """Запрос на оценку эффективности лечения"""
 
-    treatment_history: List[Dict[str, Any]]
-    patient_response: Dict[str, Any]
+    treatment_history: list[dict[str, Any]]
+    patient_response: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
 class LifestyleModificationsRequest(BaseModel):
     """Запрос на рекомендации по образу жизни"""
 
-    patient_profile: Dict[str, Any]
-    conditions: List[str]
+    patient_profile: dict[str, Any]
+    conditions: list[str]
     provider: Optional[AIProviderType] = None
 
 
@@ -628,17 +628,17 @@ async def suggest_lifestyle_modifications(
 class DrugInteractionRequest(BaseModel):
     """Запрос на проверку лекарственных взаимодействий"""
 
-    medications: List[Dict[str, Any]]
-    patient_profile: Optional[Dict[str, Any]] = None
+    medications: list[dict[str, Any]]
+    patient_profile: Optional[dict[str, Any]] = None
     provider: Optional[AIProviderType] = None
 
 
 class DrugSafetyRequest(BaseModel):
     """Запрос на анализ безопасности препарата"""
 
-    medication: Dict[str, Any]
-    patient_profile: Dict[str, Any]
-    conditions: List[str]
+    medication: dict[str, Any]
+    patient_profile: dict[str, Any]
+    conditions: list[str]
     provider: Optional[AIProviderType] = None
 
 
@@ -647,7 +647,7 @@ class DrugAlternativesRequest(BaseModel):
 
     medication: str
     reason: str
-    patient_profile: Dict[str, Any]
+    patient_profile: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
@@ -655,7 +655,7 @@ class DrugDosageRequest(BaseModel):
     """Запрос на расчет дозировки препарата"""
 
     medication: str
-    patient_profile: Dict[str, Any]
+    patient_profile: dict[str, Any]
     indication: str
     provider: Optional[AIProviderType] = None
 
@@ -734,8 +734,8 @@ async def calculate_drug_dosage(
 class RiskAssessmentRequest(BaseModel):
     """Запрос на комплексную оценку рисков пациента"""
 
-    patient_data: Dict[str, Any]
-    risk_factors: List[str]
+    patient_data: dict[str, Any]
+    risk_factors: list[str]
     condition: str
     provider: Optional[AIProviderType] = None
 
@@ -743,7 +743,7 @@ class RiskAssessmentRequest(BaseModel):
 class ComplicationPredictionRequest(BaseModel):
     """Запрос на прогнозирование осложнений"""
 
-    patient_profile: Dict[str, Any]
+    patient_profile: dict[str, Any]
     procedure_or_condition: str
     timeline: str
     provider: Optional[AIProviderType] = None
@@ -752,7 +752,7 @@ class ComplicationPredictionRequest(BaseModel):
 class MortalityRiskRequest(BaseModel):
     """Запрос на расчет риска смертности"""
 
-    patient_data: Dict[str, Any]
+    patient_data: dict[str, Any]
     condition: str
     scoring_system: Optional[str] = None
     provider: Optional[AIProviderType] = None
@@ -761,7 +761,7 @@ class MortalityRiskRequest(BaseModel):
 class SurgicalRiskRequest(BaseModel):
     """Запрос на оценку хирургических рисков"""
 
-    patient_profile: Dict[str, Any]
+    patient_profile: dict[str, Any]
     surgery_type: str
     anesthesia_type: str
     provider: Optional[AIProviderType] = None
@@ -770,9 +770,9 @@ class SurgicalRiskRequest(BaseModel):
 class ReadmissionRiskRequest(BaseModel):
     """Запрос на прогнозирование риска повторной госпитализации"""
 
-    patient_data: Dict[str, Any]
+    patient_data: dict[str, Any]
     discharge_condition: str
-    social_factors: Dict[str, Any]
+    social_factors: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
@@ -901,7 +901,7 @@ class MedicalSummaryRequest(BaseModel):
 class RecordValidationRequest(BaseModel):
     """Запрос на валидацию медицинской записи"""
 
-    record_data: Dict[str, Any]
+    record_data: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
@@ -1005,32 +1005,32 @@ async def validate_medical_record(
 class ScheduleOptimizationRequest(BaseModel):
     """Запрос на оптимизацию расписания врача"""
 
-    schedule_data: Dict[str, Any]
-    constraints: Dict[str, Any]
+    schedule_data: dict[str, Any]
+    constraints: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
 class AppointmentDurationRequest(BaseModel):
     """Запрос на прогнозирование длительности приема"""
 
-    appointment_data: Dict[str, Any]
-    historical_data: List[Dict[str, Any]]
+    appointment_data: dict[str, Any]
+    historical_data: list[dict[str, Any]]
     provider: Optional[AIProviderType] = None
 
 
 class OptimalSlotsRequest(BaseModel):
     """Запрос на предложение оптимальных временных слотов"""
 
-    doctor_profile: Dict[str, Any]
-    patient_requirements: Dict[str, Any]
-    available_slots: List[Dict[str, Any]]
+    doctor_profile: dict[str, Any]
+    patient_requirements: dict[str, Any]
+    available_slots: list[dict[str, Any]]
     provider: Optional[AIProviderType] = None
 
 
 class WorkloadAnalysisRequest(BaseModel):
     """Запрос на анализ распределения рабочей нагрузки"""
 
-    doctors_data: List[Dict[str, Any]]
+    doctors_data: list[dict[str, Any]]
     time_period: str
     provider: Optional[AIProviderType] = None
 
@@ -1038,8 +1038,8 @@ class WorkloadAnalysisRequest(BaseModel):
 class ShiftRecommendationsRequest(BaseModel):
     """Запрос на генерацию рекомендаций по составлению смен"""
 
-    department_data: Dict[str, Any]
-    staffing_requirements: Dict[str, Any]
+    department_data: dict[str, Any]
+    staffing_requirements: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
@@ -1132,24 +1132,24 @@ async def generate_shift_recommendations(
 class DocumentationQualityRequest(BaseModel):
     """Запрос на анализ качества медицинской документации"""
 
-    medical_records: List[Dict[str, Any]]
-    quality_standards: Dict[str, Any]
+    medical_records: list[dict[str, Any]]
+    quality_standards: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
 class DocumentationGapsRequest(BaseModel):
     """Запрос на выявление пробелов в документации"""
 
-    patient_record: Dict[str, Any]
-    required_fields: List[str]
+    patient_record: dict[str, Any]
+    required_fields: list[str]
     provider: Optional[AIProviderType] = None
 
 
 class DocumentationImprovementsRequest(BaseModel):
     """Запрос на предложение улучшений документации"""
 
-    record_analysis: Dict[str, Any]
-    best_practices: Dict[str, Any]
+    record_analysis: dict[str, Any]
+    best_practices: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
@@ -1157,16 +1157,16 @@ class ClinicalConsistencyRequest(BaseModel):
     """Запрос на валидацию клинической согласованности"""
 
     diagnosis: str
-    symptoms: List[str]
-    treatment: Dict[str, Any]
+    symptoms: list[str]
+    treatment: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
 class PrescriptionSafetyRequest(BaseModel):
     """Запрос на аудит безопасности назначений"""
 
-    prescriptions: List[Dict[str, Any]]
-    patient_profile: Dict[str, Any]
+    prescriptions: list[dict[str, Any]]
+    patient_profile: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
@@ -1260,7 +1260,7 @@ async def audit_prescription_safety(
 class MedicalTrendsRequest(BaseModel):
     """Запрос на анализ медицинских трендов"""
 
-    medical_data: List[Dict[str, Any]]
+    medical_data: list[dict[str, Any]]
     time_period: str
     analysis_type: str
     provider: Optional[AIProviderType] = None
@@ -1269,23 +1269,23 @@ class MedicalTrendsRequest(BaseModel):
 class AnomalyDetectionRequest(BaseModel):
     """Запрос на выявление аномалий"""
 
-    dataset: List[Dict[str, Any]]
-    baseline_data: Dict[str, Any]
+    dataset: list[dict[str, Any]]
+    baseline_data: dict[str, Any]
     provider: Optional[AIProviderType] = None
 
 
 class OutcomePredictionRequest(BaseModel):
     """Запрос на прогнозирование исходов"""
 
-    patient_data: Dict[str, Any]
-    historical_outcomes: List[Dict[str, Any]]
+    patient_data: dict[str, Any]
+    historical_outcomes: list[dict[str, Any]]
     provider: Optional[AIProviderType] = None
 
 
 class InsightsReportRequest(BaseModel):
     """Запрос на генерацию отчета с инсайтами"""
 
-    analytics_data: Dict[str, Any]
+    analytics_data: dict[str, Any]
     report_type: str
     provider: Optional[AIProviderType] = None
 
@@ -1293,8 +1293,8 @@ class InsightsReportRequest(BaseModel):
 class RiskPatternsRequest(BaseModel):
     """Запрос на выявление паттернов рисков"""
 
-    population_data: List[Dict[str, Any]]
-    risk_factors: List[str]
+    population_data: list[dict[str, Any]]
+    risk_factors: list[str]
     provider: Optional[AIProviderType] = None
 
 

@@ -12,9 +12,18 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.emr import EMR
-from app.models.emr_v2 import EMRAuditLog, EMRMigrationLedger, EMRRecord, EMRRevision, SYSTEM_USER_ID
+from app.models.emr_v2 import (
+    SYSTEM_USER_ID,
+    EMRAuditLog,
+    EMRMigrationLedger,
+    EMRRecord,
+    EMRRevision,
+)
 from app.repositories.emr_cutover_repository import EMRCutoverRepository
-from app.services.canonical_visit_service import CanonicalVisitResolutionError, CanonicalVisitService
+from app.services.canonical_visit_service import (
+    CanonicalVisitResolutionError,
+    CanonicalVisitService,
+)
 from app.services.emr_contract import (
     extract_diagnosis_main,
     extract_icd10_code,

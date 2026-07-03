@@ -8,18 +8,32 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.crud.display_config import (
     ensure_default_display_config,
+)
+from app.crud.display_config import (
     get_display_board as crud_get_display_board,
+)
+from app.crud.display_config import (
     get_display_boards as crud_get_display_boards,
+)
+from app.crud.display_config import (
     get_display_themes as crud_get_display_themes,
+)
+from app.crud.display_config import (
     update_display_board as crud_update_display_board,
 )
-from app.models.display_config import DisplayAnnouncement, DisplayBanner, DisplayBoard, DisplayTheme, DisplayVideo
+from app.models.display_config import (
+    DisplayAnnouncement,
+    DisplayBanner,
+    DisplayBoard,
+    DisplayTheme,
+    DisplayVideo,
+)
 from app.models.user import User
 from app.schemas.display_config import DisplayBoardUpdate
 
@@ -224,7 +238,7 @@ def get_display_banners(
 @router.post("/display/boards/{board_id}/banners")
 def create_display_banner(
     board_id: int,
-    banner_data: Dict[str, Any],
+    banner_data: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -314,7 +328,7 @@ def get_display_themes(
 @router.post("/display/boards/{board_id}/test")
 def test_display_board(
     board_id: int,
-    test_data: Dict[str, Any],
+    test_data: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.patient import PatientCreate
 
-
 PatientOnboardingStatus = Literal[
     "pending_review",
     "linked_existing",

@@ -36,7 +36,7 @@ class ForceMajeureTransferRequest(BaseModel):
     specialist_id: int = Field(..., description="ID специалиста")
     target_date: Optional[date] = Field(None, description="Дата очереди (по умолчанию сегодня)")
     reason: str = Field(..., min_length=5, description="Причина переноса")
-    entry_ids: Optional[List[int]] = Field(None, description="ID конкретных записей (все если не указано)")
+    entry_ids: Optional[list[int]] = Field(None, description="ID конкретных записей (все если не указано)")
     send_notifications: bool = Field(True, description="Отправить уведомления пациентам")
 
 
@@ -47,7 +47,7 @@ class ForceMajeureCancelRequest(BaseModel):
     target_date: Optional[date] = Field(None, description="Дата очереди (по умолчанию сегодня)")
     reason: str = Field(..., min_length=5, description="Причина отмены")
     refund_type: str = Field("deposit", description="Тип возврата: deposit или bank_transfer")
-    entry_ids: Optional[List[int]] = Field(None, description="ID конкретных записей (все если не указано)")
+    entry_ids: Optional[list[int]] = Field(None, description="ID конкретных записей (все если не указано)")
     send_notifications: bool = Field(True, description="Отправить уведомления пациентам")
 
 
@@ -69,7 +69,7 @@ class RefundRequestResponse(BaseModel):
     created_at: datetime
     processed_at: Optional[datetime] = None
     processed_by_name: Optional[str] = None
-    available_actions: List[str] = Field(default_factory=list)
+    available_actions: list[str] = Field(default_factory=list)
     can_approve: bool = False
     can_reject: bool = False
     can_complete: bool = False
@@ -134,7 +134,7 @@ class UseDepositRequest(BaseModel):
 # ========================= ФОРС-МАЖОР =========================
 
 
-@router.post("/transfer", response_model=Dict[str, Any])
+@router.post("/transfer", response_model=dict[str, Any])
 async def transfer_queue_to_tomorrow(
     request: ForceMajeureTransferRequest,
     db: Session = Depends(get_db),
@@ -157,7 +157,7 @@ async def transfer_queue_to_tomorrow(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.post("/cancel-with-refund", response_model=Dict[str, Any])
+@router.post("/cancel-with-refund", response_model=dict[str, Any])
 async def cancel_queue_with_refund(
     request: ForceMajeureCancelRequest,
     db: Session = Depends(get_db),
@@ -180,7 +180,7 @@ async def cancel_queue_with_refund(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/pending-entries", response_model=List[Dict[str, Any]])
+@router.get("/pending-entries", response_model=list[dict[str, Any]])
 async def get_pending_entries_for_force_majeure(
     specialist_id: int = Query(..., description="ID специалиста"),
     target_date: Optional[date] = Query(None, description="Дата очереди"),
@@ -203,7 +203,7 @@ async def get_pending_entries_for_force_majeure(
 # ========================= ЗАЯВКИ НА ВОЗВРАТ =========================
 
 
-@router.get("/refund-requests", response_model=List[RefundRequestResponse])
+@router.get("/refund-requests", response_model=list[RefundRequestResponse])
 async def get_refund_requests(
     status_filter: Optional[str] = Query(None, description="Фильтр по статусу"),
     patient_id: Optional[int] = Query(None, description="Фильтр по пациенту"),
@@ -279,7 +279,7 @@ async def process_refund_request(
 # ========================= ДЕПОЗИТЫ =========================
 
 
-@router.get("/deposits", response_model=List[DepositResponse])
+@router.get("/deposits", response_model=list[DepositResponse])
 async def get_deposits(
     active_only: bool = Query(True, description="Только активные"),
     min_balance: Optional[float] = Query(None, description="Минимальный баланс"),
@@ -320,7 +320,7 @@ async def get_patient_deposit(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/deposits/{deposit_id}/transactions", response_model=List[DepositTransactionResponse])
+@router.get("/deposits/{deposit_id}/transactions", response_model=list[DepositTransactionResponse])
 async def get_deposit_transactions(
     deposit_id: int,
     limit: int = Query(50, ge=1, le=200),
