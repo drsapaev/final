@@ -2945,11 +2945,11 @@ def get_today_queues(
                 # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
                 # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
                 # Если doctor не найден, оставляем raw specialist_id видимым для repair.
-                "specialist_id": data["doctor_id"],
+                "specialist_id": queue_queue_data["doctor_id"],
                 "specialist_name": (
                     doctor.user.full_name
                     if doctor and doctor.user
-                    else f"Специалист #{data['doctor_id']}"
+                    else f"Специалист #{queue_data["doctor_id"]}"
                 ),
                 "specialty": specialty,
                 "timezone": "Asia/Tashkent",
