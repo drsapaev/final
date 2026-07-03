@@ -484,19 +484,6 @@ const DoctorPanel = () => {
     color: 'var(--mac-text-secondary)'
   };
 
-  const actionButtonStyle = {
-    padding: getSpacing('xs'),
-    borderRadius: '8px',
-    border: 'none',
-    outline: '2px solid transparent',
-    outlineOffset: '2px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: getSpacing('xs')
-  };
 
   // Функции
   const getStatusVariant = (status) => {
@@ -1001,7 +988,7 @@ const DoctorPanel = () => {
                           <td style={tdStyle} aria-label={`${getPatientA11yContext(patient)} actions`}>
                             <button
                         aria-label={`Edit ${getPatientA11yContext(patient)}`}
-                        style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                        className="doctor-action-btn doctor-action-btn-primary"
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePatientClick(patient);
@@ -1011,7 +998,7 @@ const DoctorPanel = () => {
                             </button>
                             <button
                         aria-label={`View ${getPatientA11yContext(patient)}`}
-                        style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                        className="doctor-action-btn doctor-action-btn-success"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('View patient', patient.id);
@@ -1021,7 +1008,7 @@ const DoctorPanel = () => {
                             </button>
                             <button
                         aria-label={`Delete ${getPatientA11yContext(patient)}`}
-                        style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                        className="doctor-action-btn doctor-action-btn-danger"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('Delete patient', patient.id);
@@ -1165,7 +1152,7 @@ const DoctorPanel = () => {
                           <td style={tdStyle}>
                             <button
                         aria-label={`Edit ${getAppointmentA11yContext(appointment)}`}
-                        style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                        className="doctor-action-btn doctor-action-btn-primary"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('Edit appointment', appointment.id);
@@ -1175,7 +1162,7 @@ const DoctorPanel = () => {
                             </button>
                             <button
                         aria-label={`Complete ${getAppointmentA11yContext(appointment)}`}
-                        style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                        className="doctor-action-btn doctor-action-btn-success"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('Complete appointment', appointment.id);
@@ -1185,7 +1172,7 @@ const DoctorPanel = () => {
                             </button>
                             <button
                         aria-label={`Cancel ${getAppointmentA11yContext(appointment)}`}
-                        style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                        className="doctor-action-btn doctor-action-btn-danger"
                         onClick={(e) => {
                           e.stopPropagation();
                           logger.log('Cancel appointment', appointment.id);
@@ -1359,7 +1346,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Mark no-show', entry)}
                           aria-label={`Mark no-show for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                          className="doctor-action-btn doctor-action-btn-danger"
                           onClick={() => markNoShow(entry.id)}
                           title="Отметить неявку">
 
@@ -1372,7 +1359,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Send to diagnostics', entry)}
                           aria-label={`Send to diagnostics for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('info', 100), color: accentColor }}
+                          className="doctor-action-btn doctor-action-btn-info"
                           onClick={() => sendToDiagnostics(entry.id)}
                           title="На обследование">
 
@@ -1381,7 +1368,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Complete visit', entry)}
                           aria-label={`Complete visit for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                          className="doctor-action-btn doctor-action-btn-success"
                           onClick={() => completeVisit(entry.id)}
                           title="Завершить приём">
 
@@ -1390,7 +1377,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Mark no-show', entry)}
                           aria-label={`Mark no-show for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                          className="doctor-action-btn doctor-action-btn-danger"
                           onClick={() => markNoShow(entry.id)}
                           title="Не явился">
 
@@ -1403,7 +1390,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Call back from diagnostics', entry)}
                           aria-label={`Call back from diagnostics for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                          className="doctor-action-btn doctor-action-btn-primary"
                           onClick={() => callFromDiagnostics(entry.id)}
                           title="Вернуть с диагностики (Push)">
 
@@ -1412,7 +1399,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Complete visit', entry)}
                           aria-label={`Complete visit for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                          className="doctor-action-btn doctor-action-btn-success"
                           onClick={() => completeVisit(entry.id)}
                           title="Завершить приём">
 
@@ -1421,7 +1408,7 @@ const DoctorPanel = () => {
                                 <button
                           {...getQueueActionA11yProps('Mark visit incomplete', entry)}
                           aria-label={`Mark visit incomplete for ${getQueuePatientContext(entry)}`}
-                          style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+                          className="doctor-action-btn doctor-action-btn-warning"
                           onClick={() => markIncomplete(entry.id, 'Не вернулся с обследования')}
                           title="Не вернулся">
 
@@ -1433,7 +1420,7 @@ const DoctorPanel = () => {
                       <button
                         {...getQueueActionA11yProps('Restore as next patient', entry)}
                         aria-label={`Restore as next patient for ${getQueuePatientContext(entry)}`}
-                        style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+                        className="doctor-action-btn doctor-action-btn-warning"
                         onClick={() => restoreToNext(entry.id)}
                         title="Восстановить следующим">
 
