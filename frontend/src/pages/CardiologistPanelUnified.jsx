@@ -35,6 +35,7 @@ import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
 import EcgTab from '../components/cardiology/EcgTab';
+import HistoryTab from '../components/cardiology/HistoryTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
@@ -1867,230 +1868,25 @@ const MacOSCardiologistPanelUnified = () => {
           }
 
           {/* История и вложения */}
+          {/* История — R-15: extracted to HistoryTab component */}
           {activeTab === 'history' &&
-          <div style={{
-            width: '100%',
-            maxWidth: 'none',
-            overflow: 'visible',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: getSpacing('xl')
-          }}>
-              {!selectedPatient ?
-            <MacOSCard style={{
-              padding: getSpacing('xl'),
-              textAlign: 'center'
-            }}>
-                  <Calendar size={48} style={{
-                margin: '0 auto 16px',
-                color: getColor('textSecondary')
-              }} />
-                  <h3 style={{
-                fontSize: getFontSize('lg'),
-                fontWeight: '500',
-                marginBottom: getSpacing('sm'),
-                color: getColor('text')
-              }}>История</h3>
-                  <p className="cardio-text-secondary">Выберите пациента в очереди или из записей</p>
-                </MacOSCard> :
-
-            <>
-                  <MacOSCard className="cardio-card-padded">
-                    <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: getSpacing('md'),
-                  flexWrap: 'wrap',
-                  marginBottom: getSpacing('lg')
-                }}>
-                      <div>
-                        <h3 style={{
-                      fontSize: getFontSize('lg'),
-                      fontWeight: '500',
-                      marginBottom: getSpacing('xs'),
-                      color: getColor('text')
-                    }}>Хронология записей пациента</h3>
-                        <p className="cardio-text-secondary">
-                          {selectedPatientLabel}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={loadPatientData}
-                        className="cardio-flex" style={{ gap: "8px" }}>
-                        <RefreshCw size={16} />
-                        Обновить
-                      </Button>
-                    </div>
-
-                    <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: getSpacing('sm'),
-                  marginBottom: getSpacing('lg')
-                }}>
-                      {historyFilterOptions.map((option) => (
-                        <Button
-                          key={option.value}
-                          variant={historyFilter === option.value ? 'primary' : 'outline'}
-                          onClick={() => setHistoryFilter(option.value)}
-                          className="cardio-flex" style={{ gap: "8px" }}>
-                          {option.label}
-                          <Badge variant="info">{option.count}</Badge>
-                        </Button>
-                      ))}
-                    </div>
-
-                    <div className="cardio-flex-col">
-                      {filteredHistoryEntries.length === 0 && (
-                        <MacOSEmptyState
-                          type="calendar"
-                          title="История пуста"
-                          description="Для выбранного фильтра пока нет записей" />
-                      )}
-
-                      {filteredHistoryEntries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: getSpacing('md'),
-                            padding: getSpacing('md'),
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            borderRadius: '12px'
-                          }}>
-                          <div style={{
-                            width: '10px',
-                            height: '10px',
-                            borderRadius: '50%',
-                            backgroundColor: entry.badgeVariant === 'success'
-                              ? getColor('success', 500)
-                              : entry.badgeVariant === 'secondary'
-                                ? getColor('secondary', 500)
-                                : getColor('primary', 500),
-                            marginTop: getSpacing('sm')
-                          }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: getSpacing('sm'),
-                              flexWrap: 'wrap'
-                            }}>
-                              <div style={{
-                                fontSize: getFontSize('base'),
-                                fontWeight: '500',
-                                color: getColor('text')
-                              }}>{entry.title}</div>
-                              <Badge variant={entry.badgeVariant}>
-                                {entry.kind === 'attachments'
-                                  ? 'Вложение'
-                                  : entry.kind === 'ecg'
-                                    ? 'ЭКГ'
-                                    : 'Анализ'}
-                              </Badge>
-                            </div>
-                            <div style={{
-                              fontSize: getFontSize('sm'),
-                              color: getColor('textSecondary'),
-                              marginTop: getSpacing('xs')
-                            }}>
-                              {entry.subtitle}
-                            </div>
-                            <div style={{
-                              fontSize: getFontSize('sm'),
-                              color: getColor('textSecondary'),
-                              marginTop: getSpacing('xs'),
-                              display: 'flex',
-                              gap: getSpacing('md'),
-                              flexWrap: 'wrap'
-                            }}>
-                              <span>{formatHistoryTimestamp(entry.timestamp)}</span>
-                              <span>{entry.meta}</span>
-                            </div>
-
-                            {entry.kind === 'attachments' && entry.file && (
-                              <div style={{
-                                marginTop: getSpacing('md'),
-                                display: 'flex',
-                                gap: getSpacing('sm'),
-                                flexWrap: 'wrap'
-                              }}>
-                                {canPreviewAttachment(entry.file) && (
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => previewPatientFile(entry.file)}>
-                                    Просмотр
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="outline"
-                                  onClick={() => downloadPatientFile(entry.file)}>
-                                  Скачать
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </MacOSCard>
-
-                  <MacOSCard className="cardio-card-padded">
-                    <h3 style={{
-                  fontSize: getFontSize('lg'),
-                  fontWeight: '500',
-                  marginBottom: getSpacing('lg'),
-                  color: getColor('text')
-                }}>Сводка по пациенту</h3>
-                    <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: getSpacing('lg')
-                }}>
-                      <div className="cardio-input-container"
-                  style={{
-                    border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface')
-                  }}>
-                        <div className="cardio-stat-label-sm cardio-text-secondary">Количество ЭКГ</div>
-                        <div className="cardio-stat-value cardio-stat-value-default">{ecgResults.length}</div>
-                      </div>
-                      <div className="cardio-input-container"
-                  style={{
-                    border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface')
-                  }}>
-                        <div className="cardio-stat-label-sm cardio-text-secondary">Количество анализов</div>
-                        <div className="cardio-stat-value cardio-stat-value-default">{bloodTests.length}</div>
-                      </div>
-                      <div className="cardio-input-container"
-                  style={{
-                    border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface')
-                  }}>
-                        <div className="cardio-stat-label-sm cardio-text-secondary">Вложения</div>
-                        <div className="cardio-stat-value cardio-stat-value-default">{patientFiles.length}</div>
-                      </div>
-                      <div className="cardio-input-container"
-                  style={{
-                    border: `1px solid ${getColor('border')}`,
-                    backgroundColor: getColor('surface')
-                  }}>
-                        <div className="cardio-stat-label-sm cardio-text-secondary">Выбранный пациент</div>
-                        <div className="cardio-stat-value cardio-stat-value-default">{selectedPatientLabel}</div>
-                      </div>
-                    </div>
-                  </MacOSCard>
-                </>
-            }
-            </div>
+            <HistoryTab
+              selectedPatient={selectedPatient}
+              selectedPatientLabel={selectedPatientLabel}
+              filteredHistoryEntries={filteredHistoryEntries}
+              historyFilterOptions={historyFilterOptions}
+              historyFilter={historyFilter}
+              setHistoryFilter={setHistoryFilter}
+              canPreviewAttachment={canPreviewAttachment}
+              downloadPatientFile={downloadPatientFile}
+              previewPatientFile={previewPatientFile}
+              getColor={getColor}
+              getFontSize={getFontSize}
+              getSpacing={getSpacing}
+            />
           }
-        </div>
+
+        </div>{/* End of tab content wrapper */}
 
         {/* Модальное окно Schedule Next */}
         {scheduleNextModal.open &&
