@@ -31,11 +31,11 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import './cardiology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
-import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
-import AIAssistant from '../components/ai/AIAssistant';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
 import EcgTab from '../components/cardiology/EcgTab';
 import HistoryTab from '../components/cardiology/HistoryTab';
+import ServicesTab from '../components/cardiology/ServicesTab';
+import AiTab from '../components/cardiology/AiTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
@@ -1846,25 +1846,14 @@ const MacOSCardiologistPanelUnified = () => {
             />
           }
 
-          {/* AI Помощник */}
+          {/* AI Помощник — R-15: extracted to AiTab component */}
           {activeTab === 'ai' &&
-          <div className="cardio-w-full-visible">
-              <AIAssistant
-              specialty="cardiology"
-              onSuggestionSelect={handleAISuggestion} />
-
-            </div>
+            <AiTab onSuggestionSelect={handleAISuggestion} />
           }
 
-          {/* Управление услугами */}
+          {/* Управление услугами — R-15: extracted to ServicesTab component */}
           {activeTab === 'services' &&
-          <div className="cardio-w-full-visible">
-              <DoctorServiceSelector
-              specialty="cardiology"
-              selectedServices={[]}
-              canEditPrices={false} />
-
-            </div>
+            <ServicesTab />
           }
 
           {/* История и вложения */}
