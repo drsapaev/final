@@ -2215,6 +2215,9 @@ def get_today_queues(
                 )
 
                 if entry_type == "visit":
+                    if entry_data is None:
+                        logger.warning("get_today_queues: visit entry with None data, skipping")
+                        continue
                     # Обработка Visit
                     visit = entry_data
                     record_id = visit.id
@@ -2368,6 +2371,9 @@ def get_today_queues(
                     visit_department = getattr(visit, 'department', None)
 
                 elif entry_type == "appointment":
+                    if entry_data is None:
+                        logger.warning("get_today_queues: appointment entry with None data, skipping")
+                        continue
                     # Обработка Appointment
                     appointment = entry_data
                     record_id = appointment.id
@@ -2800,6 +2806,9 @@ def get_today_queues(
                                 entry_department_key = svc.department_key
                                 break
                 elif entry_type == "appointment":
+                    if entry_data is None:
+                        logger.warning("get_today_queues: appointment entry with None data, skipping")
+                        continue
                     # Для Appointment получаем из услуг или напрямую
                     appointment_obj = entry_data
                     if (
