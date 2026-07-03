@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   countAppointmentsByStatuses,
+  getAllPatientServices,
+  makeEnsureCanonicalVisitId,
   matchesSpecialty,
   normalizeNumericId,
   SPECIALTY_ALIASES,
@@ -291,6 +293,246 @@ describe('doctorPanelShared — normalizeNumericId', () => {
   });
 });
 
+describe('doctorPanelShared — getAllPatientServices', () => {
+  it('collects unique services + service_codes for a patient across appointments', () => {
+    const appointments = [
+      { patient_id: 1, services: ['consultation', 'ecg'], service_codes: ['A01', 'A02'] },
+      { patient_id: 1, services: ['ecg', 'blood-test'], service_codes: ['A03'] },
+      { patient_id: 2, services: ['consultation'], service_codes: ['A01'] },
+      { patient_id: 1, services: ['consultation'], service_codes: ['A01', 'A04'] }, // duplicates
+    ];
+    const result = getAllPatientServices(1, appointments);
+    expect(result.services.sort()).toEqual(['blood-test', 'consultation', 'ecg']);
+    expect(result.service_codes.sort()).toEqual(['A01', 'A02', 'A03', 'A04']);
+  });
+
+  it('returns empty arrays when patient has no appointments', () => {
+    const appointments = [{ patient_id: 2, services: ['x'] }];
+    const result = getAllPatientServices(1, appointments);
+    expect(result.services).toEqual([]);
+    expect(result.service_codes).toEqual([]);
+  });
+
+  it('returns empty arrays when appointments array is empty', () => {
+    const result = getAllPatientServices(1, []);
+    expect(result.services).toEqual([]);
+    expect(result.service_codes).toEqual([]);
+  });
+
+  it('handles null/undefined appointments array gracefully', () => {
+    expect(getAllPatientServices(1, null)).toEqual({ services: [], service_codes: [] });
+    expect(getAllPatientServices(1, undefined)).toEqual({ services: [], service_codes: [] });
+  });
+
+  it('handles appointments with missing services/service_codes fields', () => {
+    const appointments = [
+      { patient_id: 1 }, // no services, no service_codes
+      { patient_id: 1, services: null, service_codes: undefined },
+      { patient_id: 1, services: ['x'] },
+    ];
+    const result = getAllPatientServices(1, appointments);
+    expect(result.services).toEqual(['x']);
+    expect(result.service_codes).toEqual([]);
+  });
+
+  it('handles non-array services/service_codes gracefully (treats as empty)', () => {
+    const appointments = [
+      { patient_id: 1, services: 'not-an-array', service_codes: 42 },
+    ];
+    const result = getAllPatientServices(1, appointments);
+    expect(result.services).toEqual([]);
+    expect(result.service_codes).toEqual([]);
+  });
+
+  it('handles null/undefined patientId (matches appointments with null/undefined patient_id via strict equality)', () => {
+    // Note: null === null is true in JS, so appointments with patient_id: null
+    // WILL match when patientId is null. This matches the legacy in-panel
+    // implementation. undefined === undefined is also true.
+    const appointments = [
+      { patient_id: null, services: ['x'], service_codes: ['X1'] },
+      { patient_id: undefined, services: ['y'], service_codes: ['Y1'] },
+      { patient_id: 1, services: ['z'], service_codes: ['Z1'] },
+    ];
+    expect(getAllPatientServices(null, appointments)).toEqual({ services: ['x'], service_codes: ['X1'] });
+    expect(getAllPatientServices(undefined, appointments)).toEqual({ services: ['y'], service_codes: ['Y1'] });
+    // Sanity: patientId 1 matches only the third appointment
+    expect(getAllPatientServices(1, appointments)).toEqual({ services: ['z'], service_codes: ['Z1'] });
+  });
+
+  it('matches the legacy in-panel implementation bit-for-bit', () => {
+    // Regression guard: the new shared implementation must return the same
+    // result as the previous in-panel implementations for every input shape.
+    const legacyImpl = (patientId, allAppointments) => {
+      const patientServices = new Set();
+      const patientServiceCodes = new Set();
+      allAppointments.forEach((appointment) => {
+        if (appointment.patient_id === patientId) {
+          if (appointment.services && Array.isArray(appointment.services)) {
+            appointment.services.forEach((service) => patientServices.add(service));
+          }
+          if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
+            appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
+          }
+        }
+      });
+      return {
+        services: Array.from(patientServices),
+        service_codes: Array.from(patientServiceCodes),
+      };
+    };
+
+    const testCases = [
+      { patientId: 1, appointments: [] },
+      { patientId: 1, appointments: [{ patient_id: 1, services: ['a'], service_codes: ['x'] }] },
+      { patientId: 2, appointments: [{ patient_id: 1, services: ['a'] }] },
+      {
+        patientId: 1,
+        appointments: [
+          { patient_id: 1, services: ['a', 'b'], service_codes: ['x'] },
+          { patient_id: 1, services: ['b', 'c'], service_codes: ['y', 'z'] },
+        ],
+      },
+      { patientId: null, appointments: [{ patient_id: null, services: ['a'] }] },
+    ];
+
+    for (const { patientId, appointments } of testCases) {
+      const shared = getAllPatientServices(patientId, appointments);
+      const legacy = legacyImpl(patientId, appointments);
+      // Compare as sorted arrays to ignore Set iteration order
+      expect(shared.services.sort()).toEqual(legacy.services.sort());
+      expect(shared.service_codes.sort()).toEqual(legacy.service_codes.sort());
+    }
+  });
+});
+
+describe('doctorPanelShared — makeEnsureCanonicalVisitId', () => {
+  it('returns visit_id from row when already present (no API call)', async () => {
+    const setAppointments = vi.fn();
+    const resolveCanonicalVisitId = vi.fn();
+    const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
+
+    const row = { id: 1, visit_id: 42, appointment_id: 100 };
+    const result = await ensure(row);
+
+    expect(result).toBe(42);
+    expect(resolveCanonicalVisitId).not.toHaveBeenCalled();
+    expect(setAppointments).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('resolves visit_id via resolveCanonicalVisitId when row has appointment_id but no visit_id', async () => {
+    const setAppointments = vi.fn();
+    const resolveCanonicalVisitId = vi.fn().mockResolvedValue(99);
+    const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
+
+    const row = { id: 1, appointment_id: 100 };
+    const result = await ensure(row);
+
+    expect(result).toBe(99);
+    expect(resolveCanonicalVisitId).toHaveBeenCalledWith(100);
+    expect(setAppointments).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('returns null when row has no appointment_id and no visit_id', async () => {
+    const setAppointments = vi.fn();
+    const resolveCanonicalVisitId = vi.fn();
+    const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
+
+    const row = { id: 1 };
+    const result = await ensure(row);
+
+    expect(result).toBeNull();
+    expect(resolveCanonicalVisitId).not.toHaveBeenCalled();
+    expect(setAppointments).not.toHaveBeenCalled();
+  });
+
+  it('does not call setAppointments when visit_id is null', async () => {
+    const setAppointments = vi.fn();
+    const resolveCanonicalVisitId = vi.fn().mockResolvedValue(null);
+    const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
+
+    const row = { id: 1, appointment_id: 100 };
+    const result = await ensure(row);
+
+    expect(result).toBeNull();
+    expect(setAppointments).not.toHaveBeenCalled();
+  });
+
+  it('updates the matching appointment in state with the resolved visit_id', async () => {
+    let capturedUpdater;
+    const setAppointments = vi.fn((updater) => { capturedUpdater = updater; });
+    const resolveCanonicalVisitId = vi.fn().mockResolvedValue(55);
+    const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
+
+    const row = { id: 1, appointment_id: 100 };
+    await ensure(row);
+
+    const prevState = [
+      { id: 1, appointment_id: 100 },          // should be updated
+      { id: 2, appointment_id: 200 },          // should be unchanged
+      { id: 1, appointment_id: 100, visit_id: 99 }, // different row with same id (edge case - first match wins)
+    ];
+    const nextState = capturedUpdater(prevState);
+    expect(nextState[0]).toEqual({ id: 1, appointment_id: 100, visit_id: 55 });
+    expect(nextState[1]).toEqual({ id: 2, appointment_id: 200 });
+  });
+
+  it('handles null/undefined setAppointments gracefully (no crash)', async () => {
+    const resolveCanonicalVisitId = vi.fn().mockResolvedValue(42);
+    const ensure = makeEnsureCanonicalVisitId(null, resolveCanonicalVisitId);
+
+    const row = { id: 1, visit_id: 42 };
+    const result = await ensure(row);
+
+    expect(result).toBe(42);
+    // No crash - setAppointments was null, so it wasn't called.
+  });
+
+  it('handles null/undefined resolveCanonicalVisitId gracefully', async () => {
+    const setAppointments = vi.fn();
+    const ensure = makeEnsureCanonicalVisitId(setAppointments, null);
+
+    const row = { id: 1, appointment_id: 100 };
+    const result = await ensure(row);
+
+    // resolveCanonicalVisitId is null, so the ternary falls through to null
+    expect(result).toBeNull();
+    expect(setAppointments).not.toHaveBeenCalled();
+  });
+
+  it('handles setAppointments updater receiving non-array prev state', async () => {
+    let capturedUpdater;
+    const setAppointments = vi.fn((updater) => { capturedUpdater = updater; });
+    const resolveCanonicalVisitId = vi.fn().mockResolvedValue(42);
+    const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
+
+    const row = { id: 1, visit_id: 42 };
+    await ensure(row);
+
+    // Should not crash if prev is not an array
+    expect(() => capturedUpdater(null)).not.toThrow();
+    expect(() => capturedUpdater(undefined)).not.toThrow();
+    expect(capturedUpdater(null)).toBeNull();
+    expect(capturedUpdater(undefined)).toBeUndefined();
+  });
+
+  it('handles appointments with null/undefined entries in the array', async () => {
+    let capturedUpdater;
+    const setAppointments = vi.fn((updater) => { capturedUpdater = updater; });
+    const resolveCanonicalVisitId = vi.fn().mockResolvedValue(42);
+    const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
+
+    const row = { id: 1, visit_id: 42 };
+    await ensure(row);
+
+    const prevState = [null, undefined, { id: 1, visit_id: 0 }, { id: 1 }];
+    const nextState = capturedUpdater(prevState);
+    // Should not crash on null/undefined entries
+    expect(nextState).toHaveLength(4);
+    // The entry with id:1 and no visit_id should be updated
+    expect(nextState[3]).toEqual({ id: 1, visit_id: 42 });
+  });
+});
+
 describe('doctorPanelShared — default export', () => {
   it('exposes all named exports on the default object', () => {
     expect(doctorPanelSharedDefault.SPECIALTY_KEYS).toBe(SPECIALTY_KEYS);
@@ -300,5 +542,7 @@ describe('doctorPanelShared — default export', () => {
       countAppointmentsByStatuses,
     );
     expect(doctorPanelSharedDefault.normalizeNumericId).toBe(normalizeNumericId);
+    expect(doctorPanelSharedDefault.getAllPatientServices).toBe(getAllPatientServices);
+    expect(doctorPanelSharedDefault.makeEnsureCanonicalVisitId).toBe(makeEnsureCanonicalVisitId);
   });
 });

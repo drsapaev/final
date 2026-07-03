@@ -479,18 +479,24 @@ VITE_ENABLE_WS=1
 
 ### Остались облачные задачи (не сделаны):
 
-- [ ] **Вынести ещё 4-5 shared helpers** из панелей (P1-4) — `getAllPatientServices`, `ensureCanonicalVisitId`, `appointmentSummaryItems`, `loadXxxAppointments`, `handleAppointmentActionClick` switch. Контракт требует `resolveDoctorQueueEntryId` оставить локально, остальные можно вынести.
-- [ ] **Fix оставшихся 5 `react-hooks/exhaustive-deps` warnings** — требует ручного анализа dependency array каждого хука
-- [ ] **Создать ADR-0004** — план включения `VITE_ENABLE_WS=1` + реконнект в `openQueueWS` (P1-1)
-- [ ] **Создать ADR-0005** — план unified WSManager (P1-3)
-- [ ] **Создать ADR-0006** — план IndexedDB persistence layer для cacheService (P1-2)
+- [x] ✅ **Вынести ещё shared helpers** из панелей (P1-4) — `getAllPatientServices` и `makeEnsureCanonicalVisitId` factory вынесены в `utils/doctorPanelShared.js`
+- [x] ✅ **Fix оставшихся 5 `react-hooks/exhaustive-deps` warnings** — все 5 исправлены (добавлены stable setState в deps)
+- [x] ✅ **Создать ADR-0004** — план включения `VITE_ENABLE_WS=1` + реконнект в `openQueueWS` (P1-1) — Proposed, 3-phase plan
+- [x] ✅ **Создать ADR-0005** — план unified WSManager (P1-3) — Proposed, 4-phase plan
+- [x] ✅ **Создать ADR-0006** — план IndexedDB persistence layer для cacheService (P1-2) — Proposed, 4-phase plan
+
+### Остались облачные задачи (ещё не сделаны):
+
+- [ ] **Вынести ещё 3-4 shared helpers** — `appointmentSummaryItems`, `loadXxxAppointments` (3 варианта), `handleAppointmentActionClick` switch. Требует более глубокого анализа, т.к. эти функции имеют panel-specific variations.
+- [ ] **Создать ADR-0007** — план generic GET-дедупликации в axios interceptor (P1-5)
+- [ ] **Добавить unit-тесты для новых shared helpers** — `getAllPatientServices`, `makeEnsureCanonicalVisitId` (расширить `doctorPanelShared.test.js`)
 
 ---
 
 **Дата создания:** 2026-07-04
 **Автор:** dr-sapaev-bot
-**Статус:** Partially closed — quick wins выполнены, P0/P1 требуют локальной разработки
+**Статус:** Mostly closed — все облачные quick wins выполнены, P0/P1 требуют локальной разработки
 **Связанные merged PR:**
 - #1779 (`c77aa2b`) — основной workflow refactor
 - #1780 (`e2e15a9`) — этот follow-up документ
-- Cloud follow-up PR (this branch) — quick wins
+- #1789 (`8913f31`) — cloud follow-up: useVisitLifecycle, tests, dead code, ADR-0002/0003

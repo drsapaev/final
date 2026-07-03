@@ -179,7 +179,7 @@ export function getAllPatientServices(patientId, allAppointments) {
 export function makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId) {
   return async function ensureCanonicalVisitId(row) {
     const appointmentId = row?.appointment_id || null;
-    const visitId = row?.visit_id || (appointmentId ? await resolveCanonicalVisitId(appointmentId) : null);
+    const visitId = row?.visit_id || (appointmentId && typeof resolveCanonicalVisitId === 'function' ? await resolveCanonicalVisitId(appointmentId) : null);
 
     if (visitId && typeof setAppointments === 'function') {
       setAppointments((prev) => (Array.isArray(prev) ? prev.map((appointment) =>
