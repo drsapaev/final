@@ -2180,7 +2180,8 @@ def get_today_queues(
             for entry in entries:
                 entry_type = entry.get("type")
                 entry_data = entry.get("data")
-                entry_key = f"{entry_type}_{getattr(entry_data, "id", "")}"
+                entry_id_val = getattr(entry_data, "id", "")
+                entry_key = f"{entry_type}_{entry_id_val}"
                 # Пропускаем дубликаты
                 if entry_key in seen_entry_keys:
                     logger.debug(
