@@ -1681,7 +1681,7 @@ def full_update_online_entry(
                                     # ⭐ FIX: Сохраняем оригинальное queue_time
                                     if svc.get('queue_time') and svc_id not in existing_service_queue_times:
                                         existing_service_queue_times[svc_id] = svc.get('queue_time')
-                        except:
+                        except Exception:
                             pass
             else:
                 # Fallback: только текущая entry (как было раньше)

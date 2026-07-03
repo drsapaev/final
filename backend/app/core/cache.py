@@ -153,7 +153,7 @@ class InMemoryCache:
         """Rough estimate of cache memory usage in bytes"""
         try:
             return len(json.dumps({k: str(v.value) for k, v in self._cache.items()}))
-        except:
+        except Exception:
             return len(self._cache) * 1000  # Rough estimate
 
 

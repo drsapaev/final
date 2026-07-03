@@ -249,7 +249,7 @@ async def analyze_skin(
         if metadata:
             try:
                 metadata_dict = json.loads(metadata)
-            except:
+            except Exception:
                 metadata_dict = {"description": metadata}
 
         result = await ai_manager.analyze_skin(

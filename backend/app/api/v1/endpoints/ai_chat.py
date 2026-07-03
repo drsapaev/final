@@ -447,5 +447,5 @@ async def chat_websocket(
         logger.exception(f"WebSocket error: {e}")
         try:
             await websocket.close(code=1011, reason=str(e))
-        except:
+        except Exception:
             pass
