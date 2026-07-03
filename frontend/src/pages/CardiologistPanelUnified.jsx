@@ -1243,13 +1243,8 @@ const MacOSCardiologistPanelUnified = () => {
     }
   }, [selectedPatient, authRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Проверяем демо-режим после всех хуков
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    return null;
-  }
+  // isDemoMode and early return are already declared above (before the
+  // P-019 useEffect was inserted). The duplicate declaration was removed.
 
 
 
