@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -115,19 +115,33 @@ def _create_visit(db_session, *, patient, doctor_id: int | None, department: str
     return visit
 
 
-def _post_edit_delta(client, registrar_auth_headers, *, patient_id: int, services: list[dict], entry_ids: list[int] | None = None):
+def _post_edit_delta(
+    client,
+    registrar_auth_headers,
+    *,
+    patient_id: int,
+    services: list[dict],
+    entry_ids: list[int] | None = None,
+    expected_entry_updated_at: dict | None = None,
+):
+    payload = {
+        "patient_id": patient_id,
+        "target_date": date.today().isoformat(),
+        "payment_method": "cash",
+        "discount_mode": "none",
+        "all_free": False,
+        "services": services,
+        "existing_queue_entry_ids": entry_ids or [],
+    }
+    if expected_entry_updated_at is not None:
+        # Pydantic Dict[int, str] — ключи должны быть строками в JSON
+        payload["expected_entry_updated_at"] = {
+            str(k): v for k, v in expected_entry_updated_at.items()
+        }
     return client.post(
         "/api/v1/registrar/cart/edit-delta",
         headers=registrar_auth_headers,
-        json={
-            "patient_id": patient_id,
-            "target_date": date.today().isoformat(),
-            "payment_method": "cash",
-            "discount_mode": "none",
-            "all_free": False,
-            "services": services,
-            "existing_queue_entry_ids": entry_ids or [],
-        },
+        json=payload,
     )
 
 
@@ -672,3 +686,136 @@ def test_edit_delta_paid_invoice_creates_supplemental_invoice(
     )
     assert [invoice.status for invoice in invoices] == ["paid", "pending"]
     assert invoices[-1].total_amount == Decimal("45000.00")
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_edit_delta_optimistic_locking_rejects_concurrent_modification(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    """R-08 fix: если entry.updated_at изменился с момента последнего чтения — 400."""
+    original_service = _create_service(
+        db_session,
+        code="LAB-LOCK-01",
+        name="Lock Lab",
+        queue_tag="laboratory_general",
+    )
+    added_service = _create_service(
+        db_session,
+        code="LAB-LOCK-02",
+        name="Lock Lab 2",
+        queue_tag="laboratory_general",
+    )
+    queue = _create_queue(
+        db_session,
+        specialist_id=test_doctor.id,
+        queue_tag="laboratory_general",
+    )
+    entry = _create_entry(
+        db_session,
+        queue=queue,
+        patient=test_patient,
+        service=original_service,
+        status="waiting",
+    )
+
+    # Simulate: frontend прочитал entry со старым updated_at,
+    # но другой пользователь уже изменил entry в БД
+    stale_updated_at = (datetime.now(ZoneInfo("UTC")) - timedelta(seconds=30)).isoformat()
+
+    response = _post_edit_delta(
+        client,
+        registrar_auth_headers,
+        patient_id=test_patient.id,
+        services=[{"service_id": added_service.id, "quantity": 1}],
+        entry_ids=[entry.id],
+        expected_entry_updated_at={entry.id: stale_updated_at},
+    )
+
+    assert response.status_code == 400, response.text
+    assert "изменена другим пользователем" in response.json()["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_edit_delta_optimistic_locking_allows_fresh_timestamp(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    """R-08 fix: если expected_entry_updated_at совпадает с актуальным — 200."""
+    original_service = _create_service(
+        db_session,
+        code="LAB-OK-01",
+        name="Ok Lab",
+        queue_tag="laboratory_general",
+    )
+    added_service = _create_service(
+        db_session,
+        code="LAB-OK-02",
+        name="Ok Lab 2",
+        queue_tag="laboratory_general",
+    )
+    queue = _create_queue(
+        db_session,
+        specialist_id=test_doctor.id,
+        queue_tag="laboratory_general",
+    )
+    entry = _create_entry(
+        db_session,
+        queue=queue,
+        patient=test_patient,
+        service=original_service,
+        status="waiting",
+    )
+    db_session.refresh(entry)
+    fresh_updated_at = entry.updated_at.isoformat() if entry.updated_at else None
+
+    response = _post_edit_delta(
+        client,
+        registrar_auth_headers,
+        patient_id=test_patient.id,
+        services=[{"service_id": added_service.id, "quantity": 1}],
+        entry_ids=[entry.id],
+        expected_entry_updated_at={entry.id: fresh_updated_at} if fresh_updated_at else None,
+    )
+
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_edit_delta_optimistic_locking_rejects_deleted_entry(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    """R-08 fix: если entry уже удалена другим пользователем — 400."""
+    added_service = _create_service(
+        db_session,
+        code="LAB-DEL-01",
+        name="Del Lab",
+        queue_tag="laboratory_general",
+    )
+    # Frontend передаёт ID несуществующей entry (уже удалена)
+    fake_entry_id = 999999
+
+    response = _post_edit_delta(
+        client,
+        registrar_auth_headers,
+        patient_id=test_patient.id,
+        services=[{"service_id": added_service.id, "quantity": 1}],
+        entry_ids=[fake_entry_id],
+        expected_entry_updated_at={fake_entry_id: datetime.now(ZoneInfo("UTC")).isoformat()},
+    )
+
+    assert response.status_code == 400, response.text
+    assert "удалена" in response.json()["detail"]

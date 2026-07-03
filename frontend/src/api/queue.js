@@ -126,6 +126,10 @@ export async function applyRegistrarEditDelta({
   discountMode = 'none',
   allFree = false,
   existingQueueEntryIds = [],
+  // R-08 fix: optimistic locking — map of entry_id → ISO updated_at string.
+  // Если передан, backend проверит что ни одна entry не была изменена
+  // другим пользователем с момента последнего чтения.
+  expectedEntryUpdatedAt = null,
 }) {
   const payload = {
     patient_id: Number(patientId),
@@ -145,6 +149,10 @@ export async function applyRegistrarEditDelta({
       .filter((id) => id !== null && id !== undefined && id !== '')
       .map((id) => Number(id)),
   };
+  // R-08 fix: add optimistic locking map if provided
+  if (expectedEntryUpdatedAt && typeof expectedEntryUpdatedAt === 'object') {
+    payload.expected_entry_updated_at = expectedEntryUpdatedAt;
+  }
   const response = await api.post('/registrar/cart/edit-delta', payload);
   return response.data;
 }

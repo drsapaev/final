@@ -47,11 +47,19 @@ class RegistrarEditDeltaService:
         all_free: bool,
         patient_data: dict[str, Any] | None = None,
         existing_queue_entry_ids: list[int] | None = None,
+        expected_entry_updated_at: dict[int, str] | None = None,
         current_user: User | None = None,
     ) -> dict[str, Any]:
         patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
         if not patient:
             raise ValueError(f"Patient {patient_id} not found")
+
+        # R-08 fix: optimistic locking — проверяем что existing entries не были
+        # изменены другим пользователем с момента последнего чтения frontend'ом.
+        if expected_entry_updated_at:
+            self._assert_entries_not_concurrently_modified(
+                expected_entry_updated_at
+            )
 
         if patient_data:
             self._apply_patient_data(patient, patient_data)
@@ -182,6 +190,66 @@ class RegistrarEditDeltaService:
             "created_visits": list(created_visit_payloads.values()),
             "updated_queue_entries": updated_queue_entries,
         }
+
+    def _assert_entries_not_concurrently_modified(
+        self,
+        expected_entry_updated_at: dict[int, str],
+    ) -> None:
+        """R-08 fix: optimistic locking via updated_at.
+
+        Проверяет что ни одна из existing queue entries не была изменена
+        другим пользователем с момента последнего чтения frontend'ом.
+
+        Если хотя бы одна entry изменилась — raises ValueError (caller maps to 400).
+        Это предотвращает silent data loss когда два регистратора одновременно
+        редактируют одного пациента (добавляют услуги, меняют количество и т.д.).
+        """
+        from datetime import timezone
+
+        entry_ids = list(expected_entry_updated_at.keys())
+        if not entry_ids:
+            return
+
+        entries = (
+            self.db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.id.in_(entry_ids))
+            .all()
+        )
+        entries_by_id = {e.id: e for e in entries}
+
+        for entry_id, expected_iso in expected_entry_updated_at.items():
+            entry = entries_by_id.get(entry_id)
+            if entry is None:
+                # Entry уже удалена другим пользователем
+                raise ValueError(
+                    f"Запись очереди #{entry_id} была удалена другим пользователем. "
+                    "Обновите страницу, чтобы получить актуальные данные."
+                )
+
+            try:
+                expected_dt = datetime.fromisoformat(
+                    expected_iso.replace("Z", "+00:00")
+                )
+            except (ValueError, TypeError):
+                # graceful degradation: не блокируем если не удалось распарсить
+                continue
+
+            # Нормализуем оба к timezone-aware UTC для сравнения
+            if expected_dt.tzinfo is None:
+                expected_dt = expected_dt.replace(tzinfo=timezone.utc)
+
+            actual_dt = entry.updated_at
+            if actual_dt is None:
+                continue
+            if actual_dt.tzinfo is None:
+                actual_dt = actual_dt.replace(tzinfo=timezone.utc)
+
+            # Допускаем 1 секунду разницы (clock skew, округление БД)
+            if abs((actual_dt - expected_dt).total_seconds()) > 1:
+                raise ValueError(
+                    f"Запись очереди #{entry_id} была изменена другим пользователем. "
+                    "Обновите страницу, чтобы получить актуальные данные."
+                )
 
     def _apply_patient_data(self, patient: Patient, patient_data: dict[str, Any]) -> None:
         if patient_data.get("full_name"):
