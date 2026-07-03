@@ -259,3 +259,30 @@
   font-size: var(--mac-font-size-sm);
   outline: none;
 }
+
+/* ─── Stat value (large number display) ─── */
+.cardio-stat-value {
+  font-size: var(--mac-font-size-xl);
+  font-weight: 600;
+}
+
+/* ─── Stat label (small text under stat value) ─── */
+.cardio-stat-label {
+  font-size: var(--mac-font-size-sm);
+}
+
+/* ─── Section heading without flex (getFontSize variant) ─── */
+.cardio-heading-lg {
+  font-size: var(--mac-font-size-lg);
+  font-weight: 500;
+  margin-bottom: var(--mac-spacing-lg);
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+}
+
+/* ─── Critical warning span ─── */
+.cardio-critical-warn {
+  margin-left: 6px;
+  font-size: var(--mac-font-size-xs);
+  font-weight: 500;
+}

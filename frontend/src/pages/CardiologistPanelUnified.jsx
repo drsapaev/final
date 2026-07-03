@@ -1782,14 +1782,10 @@ const MacOSCardiologistPanelUnified = () => {
                       color: it.critical ? '#dc2626' : getColor('textSecondary'),
                       marginBottom: getSpacing('xs')
                     }}>{it.label}</div>
-                          <div style={{
-                      fontSize: getFontSize('xl'),
-                      fontWeight: '600',
-                      color: it.critical ? '#dc2626' : getColor('text')
-                    }}>
+                          <div className="cardio-stat-value" style={{ color: it.critical ? '#dc2626' : getColor('text') }}>
                         {it.value} {typeof it.value === 'number' ? it.unit : ''}
                         {it.critical && (
-                          <span style={{ marginLeft: '6px', fontSize: getFontSize('xs'), fontWeight: '500' }}>
+                          <span className="cardio-critical-warn">
                             ⚠ {it.value} &gt; {settings?.ldlThreshold ?? 100}
                           </span>
                         )}
@@ -2059,12 +2055,7 @@ const MacOSCardiologistPanelUnified = () => {
                     </div>
 
                     <div>
-                      <label className="block" style={{
-                    fontSize: getFontSize('sm'),
-                    fontWeight: '500',
-                    color: getColor('textSecondary'),
-                    marginBottom: getSpacing('sm')
-                  }}>
+                      <label className="cardio-form-label">
                         Интерпретация
                       </label>
                       <Textarea
@@ -2322,11 +2313,7 @@ const MacOSCardiologistPanelUnified = () => {
                       color: getColor('textSecondary'),
                       marginBottom: getSpacing('xs')
                     }}>Количество ЭКГ</div>
-                        <div style={{
-                      fontSize: getFontSize('xl'),
-                      fontWeight: '600',
-                      color: getColor('text')
-                    }}>{ecgResults.length}</div>
+                        <div className="cardio-stat-value" style={{ color: getColor('text') }}>{ecgResults.length}</div>
                       </div>
                       <div className="cardio-input-container"
                   style={{
@@ -2338,11 +2325,7 @@ const MacOSCardiologistPanelUnified = () => {
                       color: getColor('textSecondary'),
                       marginBottom: getSpacing('xs')
                     }}>Количество анализов</div>
-                        <div style={{
-                      fontSize: getFontSize('xl'),
-                      fontWeight: '600',
-                      color: getColor('text')
-                    }}>{bloodTests.length}</div>
+                        <div className="cardio-stat-value" style={{ color: getColor('text') }}>{bloodTests.length}</div>
                       </div>
                       <div className="cardio-input-container"
                   style={{
@@ -2354,11 +2337,7 @@ const MacOSCardiologistPanelUnified = () => {
                       color: getColor('textSecondary'),
                       marginBottom: getSpacing('xs')
                     }}>Вложения</div>
-                        <div style={{
-                      fontSize: getFontSize('xl'),
-                      fontWeight: '600',
-                      color: getColor('text')
-                    }}>{patientFiles.length}</div>
+                        <div className="cardio-stat-value" style={{ color: getColor('text') }}>{patientFiles.length}</div>
                       </div>
                       <div className="cardio-input-container"
                   style={{
@@ -2370,11 +2349,7 @@ const MacOSCardiologistPanelUnified = () => {
                       color: getColor('textSecondary'),
                       marginBottom: getSpacing('xs')
                     }}>Выбранный пациент</div>
-                        <div style={{
-                      fontSize: getFontSize('xl'),
-                      fontWeight: '600',
-                      color: getColor('text')
-                    }}>{selectedPatientLabel}</div>
+                        <div className="cardio-stat-value" style={{ color: getColor('text') }}>{selectedPatientLabel}</div>
                       </div>
                     </div>
                   </MacOSCard>
