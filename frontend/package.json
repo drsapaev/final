@@ -38,6 +38,8 @@
     "@emotion/babel-plugin": "^11.13.5",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@sentry/react": "^8.47.0",
+    "@sentry/vite": "^3.0.0",
     "@tanstack/react-virtual": "^3.14.5",
     "@vercel/speed-insights": "^2.0.0",
     "axios": "^1.18.1",

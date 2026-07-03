@@ -12,6 +12,10 @@ import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
 // Инициализация API interceptors
 import { setupInterceptors, initializeAuth } from './api/interceptors';
 
+// Sentry — no-op if VITE_SENTRY_DSN is unset
+import { initSentry } from './services/sentry';
+
+initSentry();
 bootstrapStoredColorScheme();
 
 // Настраиваем interceptors
