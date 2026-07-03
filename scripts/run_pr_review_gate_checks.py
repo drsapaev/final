@@ -26,13 +26,12 @@ def _ensure_repo_imports() -> None:
 
 def _run_unit_tests() -> bool:
     _ensure_repo_imports()
-    # P0.4 moved root test_*.py files to scripts/legacy_tests/root/.
-    # Add that directory to sys.path so the imports below still resolve.
+    # PR #1781 moved the root test_*.py files to scripts/legacy_tests/root/.
+    # Add that directory to sys.path so the legacy test module names resolve.
     legacy_tests_root = REPO_ROOT / "scripts" / "legacy_tests" / "root"
-    if legacy_tests_root.exists():
-        legacy_path = str(legacy_tests_root)
-        if legacy_path not in sys.path:
-            sys.path.insert(0, legacy_path)
+    legacy_tests_text = str(legacy_tests_root)
+    if legacy_tests_text not in sys.path:
+        sys.path.insert(0, legacy_tests_text)
     suite = unittest.defaultTestLoader.loadTestsFromNames(
         [
             "test_check_pr_review_template",
