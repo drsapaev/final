@@ -1998,6 +1998,143 @@ def _resolve_queue_entry_metadata(
 
 
 
+# ===================== R-22 Phase 6: Per-type entry processing =====================
+
+
+_APPOINTMENT_STATUS_MAPPING = {
+    "scheduled": "waiting",
+    "pending": "waiting",
+    "confirmed": "waiting",
+    "paid": "waiting",
+    "in_progress": "called",
+    "in_visit": "called",
+    "completed": "served",
+    "cancelled": "no_show",
+    "canceled": "no_show",
+    "no_show": "no_show",
+}
+
+
+def _process_appointment_entry(
+    *,
+    db: Session,
+    entry_data: Any,
+    entry_wrapper: dict,
+    today: "date",
+) -> dict | None:
+    """R-22 Phase 6: Process an Appointment row into entry fields.
+
+    Returns a dict with the populated fields, or None to signal "skip this entry"
+    (caller should `continue` to the next iteration).
+    """
+    if entry_data is None:
+        logger.warning("get_today_queues: appointment entry with None data, skipping")
+        return None
+
+    from app.models.patient import Patient
+
+    appointment = entry_data
+    record_id = appointment.id
+    patient_id = appointment.patient_id
+    appointment_date = getattr(appointment, 'appointment_date', today)
+    doctor_id = getattr(appointment, 'doctor_id', None)
+    visit_time = (
+        str(appointment.appointment_time)
+        if hasattr(appointment, 'appointment_time')
+        else None
+    )
+
+    patient_name = "Неизвестный пациент"
+    phone = "Не указан"
+    patient_birth_year = None
+    address = None
+
+    patient = (
+        db.query(Patient)
+        .filter(Patient.id == appointment.patient_id)
+        .first()
+    )
+    if patient:
+        patient_name = patient.short_name()
+        phone = patient.phone or "Не указан"
+        if patient.birth_date:
+            patient_birth_year = patient.birth_date.year
+        address = patient.address
+    else:
+        logger.warning(
+            "get_today_queues: Пациент не найден для Appointment ID=%d, patient_id=%s",
+            appointment.id,
+            appointment.patient_id,
+        )
+        patient_name = (
+            f"Пациент ID={appointment.patient_id}"
+            if appointment.patient_id
+            else "Неизвестный пациент"
+        )
+
+    services: list = []
+    service_codes: list = []
+    if hasattr(appointment, 'services') and appointment.services:
+        if isinstance(appointment.services, list):
+            services = appointment.services
+            for service in services:
+                if isinstance(service, str):
+                    if (
+                        len(service) <= 10
+                        or '-' in service
+                        or service.isalnum()
+                    ):
+                        service_codes.append(service)
+
+    total_cost = 0.0
+    if (
+        hasattr(appointment, 'payment_amount')
+        and appointment.payment_amount
+    ):
+        total_cost = float(appointment.payment_amount)
+
+    entry_status = _APPOINTMENT_STATUS_MAPPING.get(appointment.status, "waiting")
+    discount_mode = _normalize_registration_discount_mode(
+        getattr(appointment, "visit_type", None)
+    )
+    source = "desk"  # Appointment обычно создается регистратором
+
+    try:
+        entry_wrapper["visit_id"] = CanonicalVisitService(
+            db
+        ).resolve_canonical_visit(
+            appointment.id,
+            create_if_missing=False,
+        )
+    except CanonicalVisitResolutionError as exc:
+        if exc.status_code != 404:
+            logger.warning(
+                "get_today_queues: failed to resolve canonical visit for appointment_id=%s: %s",
+                appointment.id,
+                exc.detail,
+            )
+        entry_wrapper["visit_id"] = None
+
+    return {
+        "record_id": record_id,
+        "patient_id": patient_id,
+        "appointment_date": appointment_date,
+        "doctor_id": doctor_id,
+        "visit_time": visit_time,
+        "patient_name": patient_name,
+        "phone": phone,
+        "patient_birth_year": patient_birth_year,
+        "address": address,
+        "services": services,
+        "service_codes": service_codes,
+        "total_cost": total_cost,
+        "entry_status": entry_status,
+        "discount_mode": discount_mode,
+        "source": source,
+    }
+
+
+
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
 
 
@@ -2501,110 +2638,30 @@ def get_today_queues(
                     visit_department = getattr(visit, 'department', None)
 
                 elif entry_type == "appointment":
-                    if entry_data is None:
-                        logger.warning("get_today_queues: appointment entry with None data, skipping")
+                    # R-22 Phase 6: appointment processing extracted to helper
+                    _appt = _process_appointment_entry(
+                        db=db,
+                        entry_data=entry_data,
+                        entry_wrapper=entry_wrapper,
+                        today=today,
+                    )
+                    if _appt is None:
                         continue
-                    # Обработка Appointment
-                    appointment = entry_data
-                    record_id = appointment.id
-                    patient_id = appointment.patient_id
-                    appointment_date = getattr(appointment, 'appointment_date', today)
-                    doctor_id = getattr(appointment, 'doctor_id', None)
-                    visit_time = (
-                        str(appointment.appointment_time)
-                        if hasattr(appointment, 'appointment_time')
-                        else None
-                    )
-
-                    # Загружаем пациента
-                    patient = (
-                        db.query(Patient)
-                        .filter(Patient.id == appointment.patient_id)
-                        .first()
-                    )
-                    if patient:
-                        # [OK] ИСПОЛЬЗУЕМ short_name() - теперь он всегда возвращает корректное значение
-                        # Метод short_name() гарантирует, что всегда возвращается непустая строка
-                        patient_name = patient.short_name()
-                        phone = patient.phone or "Не указан"
-                        if patient.birth_date:
-                            patient_birth_year = patient.birth_date.year
-                        address = patient.address
-                    else:
-                        # [OK] ЛОГИРОВАНИЕ: Пациент не найден
-                        logger.warning(
-                            "get_today_queues: Пациент не найден для Appointment ID=%d, patient_id=%s",
-                            appointment.id,
-                            appointment.patient_id,
-                        )
-                        patient_name = (
-                            f"Пациент ID={appointment.patient_id}"
-                            if appointment.patient_id
-                            else "Неизвестный пациент"
-                        )
-
-                    # Загружаем услуги из appointment
-                    if hasattr(appointment, 'services') and appointment.services:
-                        if isinstance(appointment.services, list):
-                            # [OK] Оставляем services как есть (уже должны быть коды), но дублируем в service_codes
-                            services = appointment.services
-                            # Если services содержит коды услуг (например, "ECG-001" или "C01"), добавляем их в service_codes
-                            for service in services:
-                                # Проверяем, является ли это кодом (формат "C01", "D02", "ECG-001" или просто код)
-                                if isinstance(service, str):
-                                    # Если это код (короткая строка, не похожая на полное название), добавляем в service_codes
-                                    if (
-                                        len(service) <= 10
-                                        or '-' in service
-                                        or service.isalnum()
-                                    ):
-                                        service_codes.append(service)
-                                    # Если это полное название (длинное, с пробелами), не добавляем в service_codes
-                                    # но это означает, что данные приходят в неправильном формате
-
-                    # Стоимость
-                    if (
-                        hasattr(appointment, 'payment_amount')
-                        and appointment.payment_amount
-                    ):
-                        total_cost = float(appointment.payment_amount)
-
-                    # Определяем статус записи
-                    status_mapping = {
-                        "scheduled": "waiting",
-                        "pending": "waiting",
-                        "confirmed": "waiting",
-                        "paid": "waiting",  # Оплачено, но еще в очереди
-                        "in_progress": "called",
-                        "in_visit": "called",
-                        "completed": "served",
-                        "cancelled": "no_show",
-                        "canceled": "no_show",
-                        "no_show": "no_show",
-                    }
-                    entry_status = status_mapping.get(appointment.status, "waiting")
-
-                    # [OK] Используем единый сервис для определения оплаты (Single Source of Truth)
-                    discount_mode = _normalize_registration_discount_mode(
-                        getattr(appointment, "visit_type", None)
-                    )
-
-                    source = "desk"  # Appointment обычно создается регистратором
-                    try:
-                        entry_wrapper["visit_id"] = CanonicalVisitService(
-                            db
-                        ).resolve_canonical_visit(
-                            appointment.id,
-                            create_if_missing=False,
-                        )
-                    except CanonicalVisitResolutionError as exc:
-                        if exc.status_code != 404:
-                            logger.warning(
-                                "get_today_queues: failed to resolve canonical visit for appointment_id=%s: %s",
-                                appointment.id,
-                                exc.detail,
-                            )
-                        entry_wrapper["visit_id"] = None
+                    record_id = _appt["record_id"]
+                    patient_id = _appt["patient_id"]
+                    appointment_date = _appt["appointment_date"]
+                    doctor_id = _appt["doctor_id"]
+                    visit_time = _appt["visit_time"]
+                    patient_name = _appt["patient_name"]
+                    phone = _appt["phone"]
+                    patient_birth_year = _appt["patient_birth_year"]
+                    address = _appt["address"]
+                    services = _appt["services"]
+                    service_codes = _appt["service_codes"]
+                    total_cost = _appt["total_cost"]
+                    entry_status = _appt["entry_status"]
+                    discount_mode = _appt["discount_mode"]
+                    source = _appt["source"]
 
                 elif entry_type == "online_queue":
                     # R-22 fix: guard against None entry_data
