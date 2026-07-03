@@ -2000,159 +2000,6 @@ def get_today_queues(
             # ✅ ИСПРАВЛЕНО: Убрана логика обновления doctor_id для visit записей, если specialty уже существует
             # Это предотвращает перезапись doctor_id, установленного online_queue записями (которые обрабатываются позже)
 
-        # [OK] ДОБАВЛЕНО: Обрабатываем записи из онлайн-очереди (OnlineQueueEntry)
-        from app.models.clinic import Doctor
-        from app.models.online_queue import DailyQueue, OnlineQueueEntry
-
-        for online_entry in online_entries:
-            # ⭐ PHASE 1.1: OnlineQueueEntry теперь ЕДИНСТВЕННЫЙ источник очереди
-            # Проверка seen_visit_ids нужна только для Visit БЕЗ OQE (редкий edge case)
-            if online_entry.visit_id and online_entry.visit_id in seen_visit_ids:
-                logger.debug(
-                    "get_today_queues: PHASE 1.1 - OQE %d пропущен, Visit %d был обработан (без OQE - edge case)",
-                    online_entry.id,
-                    online_entry.visit_id,
-                )
-                continue
-            
-            # ⭐ ДОПОЛНИТЕЛЬНО: Пропускаем "сиротские" OnlineQueueEntry (без visit_id) 
-            # если для этого пациента уже есть Visit на сегодня
-            # ✅ FIX 11: НО НЕ пропускаем QR-записи! Они должны показывать source='online'
-            if not online_entry.visit_id and online_entry.patient_id:
-                # ✅ FIX 11: QR-записи (source='online' или 'confirmation') НЕ пропускаем
-                is_qr_entry = online_entry.source in ('online', 'confirmation')
-                if is_qr_entry:
-                    logger.debug(
-                        "get_today_queues: OnlineQueueEntry - QR-запись, НЕ пропускаем",
-                    )
-                else:
-                    # Проверяем есть ли Visit для этого пациента на сегодня
-                    patient_has_visit = any(
-                        v.patient_id == online_entry.patient_id 
-                        for v in visits
-                    )
-                    if patient_has_visit:
-                        logger.debug(
-                            "get_today_queues: Пропуск OnlineQueueEntry %d - пациент %d уже имеет Visit на сегодня",
-                            online_entry.id,
-                            online_entry.patient_id,
-                        )
-                        continue
-            
-            daily_queue = (
-                db.query(DailyQueue)
-                .filter(DailyQueue.id == online_entry.queue_id)
-                .first()
-            )
-            if not daily_queue:
-                continue
-
-            # ✅ CANONICAL: DailyQueue.specialist_id должен указывать на Doctor.id.
-            # Старые записи с user_id больше не auto-link'им: вместо этого оставляем
-            # запись видимой и помечаем её как требующую deterministic repair.
-            doctor = db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
-            integrity_warnings: list[str] = []
-            if not doctor:
-                integrity_warnings.append("linked_doctor_missing")
-                logger.warning(
-                    "get_today_queues: DailyQueue %d specialist_id=%s does not resolve to Doctor.id",
-                    daily_queue.id,
-                    daily_queue.specialist_id,
-                )
-
-            # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.department
-            # queue_tag - это точное указание очереди, созданное при регистрации
-            specialty = None
-            if daily_queue.queue_tag:
-                specialty = daily_queue.queue_tag.lower()
-            elif doctor.department:
-                specialty = doctor.department.lower()
-            else:
-                specialty = "general"
-
-            # Маппинг specialty для соответствия с другими записями
-            specialty_mapping = {
-                "cardio": "cardiology",
-                "cardiology": "cardiology",
-                "derma": "dermatology",
-                "dermatology": "dermatology",
-                "dentist": "stomatology",
-                "stomatology": "stomatology",
-                "lab": "laboratory",
-                "laboratory": "laboratory",
-                "ecg": "echokg",  # [OK] ДОБАВЛЕНО: маппинг для ЭКГ
-                "echokg": "echokg",
-            }
-            specialty = specialty_mapping.get(specialty, specialty)
-
-            if doctor and not doctor.user_id:
-                integrity_warnings.append("doctor_without_user")
-            if doctor and doctor.user and not doctor.user.is_active:
-                integrity_warnings.append("doctor_user_inactive")
-            if doctor and not doctor.active:
-                integrity_warnings.append("doctor_inactive")
-            if doctor and not doctor.cabinet:
-                integrity_warnings.append("doctor_cabinet_missing")
-
-            if specialty not in queues_by_specialty:
-                queues_by_specialty[specialty] = {
-                    "entries": [],
-                    "doctor": doctor,
-                    "doctor_id": doctor.id if doctor else daily_queue.specialist_id,
-                    "integrity_warnings": list(dict.fromkeys(integrity_warnings)),
-                }
-            else:
-                # ✅ ИСПРАВЛЕНО: Обновляем doctor_id и doctor, если specialty уже существует
-                # Приоритет у online_queue записей (они обрабатываются после visit и отражают актуальное состояние)
-                # Это важно, когда для одной специальности есть записи от разных врачей
-                bucket = queues_by_specialty[specialty]
-                bucket.setdefault("integrity_warnings", [])
-                for warning in integrity_warnings:
-                    if warning not in bucket["integrity_warnings"]:
-                        bucket["integrity_warnings"].append(warning)
-
-                if doctor and doctor.id:
-                    # ✅ ИСПРАВЛЕНО: Всегда обновляем doctor_id для online_queue записей
-                    # Это гарантирует, что если есть QR-записи от врача 4, doctor_id будет 4
-                    queues_by_specialty[specialty]["doctor"] = doctor
-                    queues_by_specialty[specialty]["doctor_id"] = doctor.id
-
-            # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
-            # Приоритет: queue_time > created_at
-            entry_time = (
-                online_entry.queue_time
-                if online_entry.queue_time
-                else (
-                    online_entry.created_at
-                    if online_entry.created_at
-                    else datetime.now()
-                )
-            )
-
-            # Добавляем запись из онлайн-очереди
-            queues_by_specialty[specialty]["entries"].append(
-                {
-                    "type": "online_queue",
-                    "data": online_entry,
-                    "created_at": (
-                        online_entry.created_at
-                        if online_entry.created_at
-                        else datetime.now()
-                    ),
-                    "queue_time": entry_time,  # ⭐ ВАЖНО: queue_time для правильной сортировки
-                }
-            )
-
-            logger.debug(
-                "get_today_queues: QR-запись добавлена: ID=%d, specialty=%s, queue_tag=%s, number=%d, patient=%s",
-                online_entry.id,
-                specialty,
-                daily_queue.queue_tag,
-                online_entry.number,
-                online_entry.patient_name,
-            )
-
-
         # R-22 Phase 3: online entries processing extracted to helper
         _process_online_queue_entries(db, online_entries, visits, queues_by_specialty, seen_visit_ids)
 
@@ -2163,21 +2010,58 @@ def get_today_queues(
         result = []
         queue_number = 1
         seen_entry_keys = set()
+        include_lab_report_summary = bool(
+            department_filter and department_filter.intersection({"lab", "laboratory"})
+        )
+        visible_entry_wrappers = []
+        if include_lab_report_summary:
+            for specialty, data in queues_by_specialty.items():
+                specialty_key = str(specialty or "").strip().lower()
+                if department_filter and specialty_key not in department_filter:
+                    continue
+                visible_entry_wrappers.extend(data["entries"])
+
+        visible_visit_ids: set[int] = set()
+        for entry_wrapper in visible_entry_wrappers:
+            entry_type = entry_wrapper.get("type")
+            entry_data = entry_wrapper.get("data")
+            entry_visit_id = (
+                entry_wrapper.get("visit_id")
+                or getattr(entry_data, "visit_id", None)
+                or (
+                    getattr(entry_data, "id", None)
+                    if entry_type == "visit"
+                    else None
+                )
+            )
+            if entry_visit_id:
+                visible_visit_ids.add(entry_visit_id)
+
+        latest_lab_reports_by_visit = _latest_lab_report_summaries_by_visit(
+            db,
+            visible_visit_ids,
+        )
 
         for specialty, queue_data in queues_by_specialty.items():
-            entries = queue_data.get("entries", [])
-            if not entries:
+            specialty_key = str(specialty or "").strip().lower()
+            if department_filter and specialty_key not in department_filter:
+                continue
+
+            entries_list = queue_data.get("entries", [])
+            if not entries_list:
                 continue
 
             # Сортируем записи по queue_time, затем по created_at
-            entries.sort(
+            entries_list.sort(
                 key=lambda e: (
                     e.get("queue_time") or e.get("created_at") or datetime.max,
                     e.get("data").id if hasattr(e.get("data"), "id") else 0,
                 )
             )
 
-            for idx, entry in enumerate(entries):
+            # R-22 fix: separate output list to avoid in-place mutation during iteration
+            entries = []
+            for idx, entry in enumerate(entries_list):
                 entry_type = entry.get("type")
                 entry_data = entry.get("data")
                 entry_id_val = getattr(entry_data, "id", "")
