@@ -434,6 +434,22 @@ const DentistPanelUnified = () => {
     getFontSize
   } = useTheme();
 
+  // C-1 (UX audit): confirm hook for visit completion
+  const [confirm, confirmDialog] = useConfirm();
+  // C-2 (UX audit): session timeout warning
+  const [sessionWarning, setSessionWarning] = useState(null);
+
+  useSessionTimeoutWarning({
+    onWarning: () => setSessionWarning({ active: true }),
+    onExpired: () => {
+      setSessionWarning(null);
+      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    },
+  });
+
   // Загрузка данных
   // Загрузка услуг для правильного отображения в tooltips
   const loadServices = useCallback(async () => {
