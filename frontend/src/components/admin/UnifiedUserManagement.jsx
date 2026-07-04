@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Database, Download, Shield, Users } from 'lucide-react';
 import {
   SegmentedControl,
-  MacOSTab} from '../ui/macos';
+  MacOSTab } from '../ui/macos';
 import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';

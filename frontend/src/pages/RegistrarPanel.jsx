@@ -1689,6 +1689,10 @@ const RegistrarPanel = () => {
                     setPaymentDialog({ open: true, row, paid: false, source: 'table' });
                     break;
                   case 'in_cabinet':
+                    // UX Audit Registrar #15: confirmation перед отправкой в кабинет.
+                    if (!window.confirm(`Отправить пациента "${row.patient_fio || row.patient_name || ''}" в кабинет?`)) {
+                      break;
+                    }
                     logger.info('Отправка пациента в кабинет:', row);
                     updateAppointmentStatus(row.id, 'in_cabinet', '', row);
                     break;
@@ -1697,6 +1701,10 @@ const RegistrarPanel = () => {
                     handleStartVisit(row);
                     break;
                   case 'complete':
+                    // UX Audit Registrar #15: confirmation перед завершением приёма.
+                    if (!window.confirm(`Завершить приём пациента "${row.patient_fio || row.patient_name || ''}"?`)) {
+                      break;
+                    }
                     logger.info('Завершение приёма:', row);
                     updateAppointmentStatus(row.id, 'done', '', row);
                     break;

@@ -42,6 +42,11 @@ class QueueApiRepository:
         daily_queue.opened_at = datetime.now()
         self.db.commit()
 
+    # UX Audit Registrar #7: close_daily_queue — сброс opened_at.
+    def set_opened_at_none(self, daily_queue: DailyQueue) -> None:
+        daily_queue.opened_at = None
+        self.db.commit()
+
     def get_doctor(self, specialist_id: int) -> Doctor | None:
         return self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
 

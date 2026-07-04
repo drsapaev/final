@@ -6,6 +6,7 @@ import {
   generateDoctorQrToken,
   generateClinicQrToken,
   openReceptionSlot,
+  closeReceptionSlot,
   callNextQueuePatient,
 } from '../api/queue';
 
@@ -242,6 +243,28 @@ export const useQueueManager = () => {
     []
   );
 
+  // UX Audit Registrar #7: closeReceptionForDoctor — закрытие приёма.
+  const closeReceptionForDoctor = useCallback(
+    async ({ specialistId, targetDate }) => {
+      if (!specialistId) {
+        throw new Error('Выберите врача');
+      }
+
+      setLoading(true);
+      try {
+        return await closeReceptionSlot({
+          day: targetDate,
+          specialistId,
+        });
+      } catch (err) {
+        throw toError(err, 'Ошибка закрытия приема');
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   const callNextPatientInQueue = useCallback(
     async ({ specialistId, targetDate }) => {
       if (!specialistId) {
@@ -278,6 +301,7 @@ export const useQueueManager = () => {
     generateDoctorQRCode,
     generateClinicQRCode,
     openReceptionForDoctor,
+    closeReceptionForDoctor,
     callNextPatientInQueue,
     setQrData,
   };

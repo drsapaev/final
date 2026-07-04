@@ -41,6 +41,10 @@ class QueueApiService:
     def open_daily_queue(self, daily_queue) -> None:
         self.repository.set_opened_at_now(daily_queue)
 
+    # UX Audit Registrar #7: close_daily_queue — закрытие приёма (reopen online booking).
+    def close_daily_queue(self, daily_queue) -> None:
+        self.repository.set_opened_at_none(daily_queue)
+
     def get_doctor(self, specialist_id: int):
         return self.repository.get_doctor(specialist_id)
 
