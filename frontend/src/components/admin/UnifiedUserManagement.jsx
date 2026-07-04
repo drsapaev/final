@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import { Database, Download, Shield, Users } from 'lucide-react';
 import {
   SegmentedControl,
-} from '../ui/macos';
+  MacOSTab} from '../ui/macos';
 import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';
@@ -19,43 +18,6 @@ const TAB_ICONS = {
   Shield
 };
 
-const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
-  const options = tabs.map((tab) => {
-    const Icon = TAB_ICONS[tab.icon];
-
-    return {
-      value: tab.id,
-      label: (
-        <span className="admin-inline-flex-center-8-span">
-          {Icon ? <Icon size={14} aria-hidden="true" /> : null}
-          {tab.label}
-        </span>
-      )
-    };
-  });
-
-  return (
-    <div className="admin-tabs-scroll">
-      <SegmentedControl
-        aria-label="Разделы управления пользователями"
-        value={activeTab}
-        onChange={onTabChange}
-        options={options}
-        size="large"
-        className="admin-tabs-segmented" />
-    </div>);
-
-};
-
-AdminTabs.propTypes = {
-  tabs: PropTypes.arrayOf(PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    label: PropTypes.string.isRequired,
-    icon: PropTypes.string
-  })).isRequired,
-  activeTab: PropTypes.string.isRequired,
-  onTabChange: PropTypes.func.isRequired
-};
 
 const UnifiedUserManagement = () => {
   const [searchParams] = useSearchParams();
@@ -102,7 +64,7 @@ const UnifiedUserManagement = () => {
 
   return (
     <div className="admin-unified-root">
-      <AdminTabs
+      <MacOSTab
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={setActiveTab} />
