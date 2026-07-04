@@ -25,22 +25,8 @@ import { api } from '../../api/client';
 import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
+import { REPORT_ENDPOINTS } from '../../utils/reportEndpoints';
 
-const REPORT_ENDPOINTS = {
-  patient_report: 'patient',
-  appointments_report: 'appointments',
-  financial_report: 'financial',
-  queue_report: 'queue',
-  doctor_performance_report: 'doctor-performance',
-  patients: 'patient',
-  appointments: 'appointments',
-  financial: 'financial',
-  queue: 'queue',
-  doctors: 'doctor-performance',
-  performance: 'doctor-performance',
-  revenue: 'financial',
-  analytics: 'financial'
-};
 
 // P1 note: controlled-mode props (onGenerateReport, onReportTypeChange,
 // onDateRangeChange, loading, reportTypes, dateRange, selectedReportType) are

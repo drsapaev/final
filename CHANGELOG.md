@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-07-04 — Admin Sprint 4: P2 polish (fix/admin-sprint4-p2-polish)
+
+Final sprint of 4-sprint admin cleanup roadmap. Reduces duplication, fixes RU/EN mixing, restores codemod-damaged state values.
+
+### P2-1: `IconButton` deduplication (3 copies → 1 shared)
+Created `components/admin/IconButton.jsx` (33 lines) as the canonical icon-only button. Removed 3 byte-identical copies from `AdminAppointments.jsx`, `AdminDoctors.jsx`, `AdminPatients.jsx` and replaced with `import IconButton from './IconButton'`. Behavior unchanged (same className, style, props).
+
+### P2-2: `formatCurrency` deduplication (2 copies → 1 shared)
+Created `utils/formatCurrency.js` (Intl.NumberFormat ru-RU UZS, 0 fractional digits, null-safe). Removed 2 identical copies from `AdminDashboard.jsx` and `AdminFinanceOverview.jsx`. `useUtils.js` has a separate formatCurrency (goes through formatNumber) — kept as-is because it has different null-handling and call sites.
+
+### P2-3: `REPORT_ENDPOINTS` map deduplication (2 copies → 1 shared)
+Created `utils/reportEndpoints.js` with the full 12-entry map (ReportGenerator superset) + `getReportEndpoint` helper. Removed local `REPORT_ENDPOINTS` map from `ReportGenerator.jsx` and inline `getReportEndpoint` function from `ReportsManager.jsx`. ReportsManager now uses the superset (5→12 entries — more report types recognized).
+
+### P2-4: `const [, setX]` codemod artifacts restored (3 files, 6 state slots)
+The same codemod that caused the P0 void-`useState` artifacts (fixed in Sprint 1) also left `const [, setX] = useState(...)` patterns where the value was discarded but the setter was called. Restored the values:
+- `WebhookManager.jsx:55,56` — `showEditModal`, `showTestModal` (buttons call setters; modal UI not yet implemented, but state slots are now reachable for future work).
+- `DynamicPricingManager.jsx:178,179` — `editingRule`, `editingPackage` (same pattern).
+- `DisplayBoardSettings.jsx:35,40` — `boards`, `showBannerForm` (loadDisplayData populates boards; button onClick sets showBannerForm).
+
+### P2-5: RU/EN mixing standardized to RU (admin-facing UI is Russian)
+- `ReportsManager.jsx` — 7 English strings → Russian: "Select an available report type" → "Выберите доступный тип отчёта", "Generating report"/"Generate report" → "Генерация отчёта"/"Сгенерировать отчёт", "Download report" → "Скачать отчёт" (×2 variants).
+- `UnifiedSettings.jsx` — "Accent color" → "Акцентный цвет" (heading + description).
+
+Verification:
+- `vite build` → ✓ built in ~26s, exit 0, all chunks emitted.
+- `vitest run` → ✓ 515/515 tests pass across 105 test files.
+- `eslint` on 14 modified/new files → 0 errors (9 pre-existing warnings unchanged).
+
 ## 2026-07-04 — Admin Sprint 3: P1 architectural cleanup (fix/admin-sprint3-p1-architectural)
 
 ### A-1: Removed `admin-advanced-users` route + `AdvancedUserManagement` stub + dead `UserManagement` ROUTE_COMPONENTS entry

@@ -25,6 +25,7 @@ import {
 import useAdminData from '../../hooks/useAdminData';
 import AdminRouteSwitcher from './AdminRouteSwitcher';
 import ErrorBoundary from '../common/ErrorBoundary';
+import formatCurrency from '../../utils/formatCurrency';
 
 const adminSurface = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 72%) 0%, color-mix(in srgb, var(--mac-card-bg), white 64%) 100%)';
 const adminInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 82%)';
@@ -40,13 +41,6 @@ const defaultStats = {
   pendingApprovals: 0,
 };
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'UZS',
-    minimumFractionDigits: 0,
-  }).format(amount);
-}
 
 function formatTimeAgo(date) {
   if (!date) return 'Недавно';

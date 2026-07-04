@@ -32,12 +32,12 @@ import logger from '../../utils/logger';
 const DisplayBoardSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [, setBoards] = useState([]);
+  const [boards, setBoards] = useState([]); // P2 fix: restored value (was const [, setX]; used in loadDisplayData L75)
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [themes, setThemes] = useState([]);
   const [stats, setStats] = useState({});
   const [banners] = useState([]);
-  const [, setShowBannerForm] = useState(false);
+  const [showBannerForm, setShowBannerForm] = useState(false); // P2 fix: restored value (used at L545 onClick)
   const [testResults, setTestResults] = useState({});
   const [message, setMessage] = useState({ type: '', text: '' });
 
