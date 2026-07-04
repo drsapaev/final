@@ -38,6 +38,7 @@ import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
 import SkinAnalysis from '../components/dermatology/SkinAnalysis';
 import PriceOverrideManager from '../components/dermatology/PriceOverrideManager';
 import DermaExamsTab from '../components/dermatology/DermaExamsTab';
+import DermaHistoryTab from '../components/dermatology/DermaHistoryTab';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import { printPanelTicket } from '../services/panelPrint';
@@ -1940,98 +1941,14 @@ const DermatologistPanelUnified = () => {
           }
 
           {/* История */}
+          {/* История — R-15: extracted to DermaHistoryTab */}
           {activeTab === 'history' &&
-          <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
-                <h3 className="derma-flex-center">
-                  <Calendar size={20} className="derma-icon-mr derma-text-secondary" />
-                  История приемов и процедур
-                </h3>
-
-                <div className="derma-grid-auto-350-24">
-                  {/* История осмотров кожи */}
-                  <div>
-                    <h4 className="derma-flex-center">
-                      <Activity size={16} className="derma-icon-mr-green" />
-                      Осмотры кожи ({skinExaminations.length})
-                    </h4>
-                    <div className="derma-history-list-scroll">
-                      {skinExaminations.map((exam) =>
-                    <div key={exam.id} className="derma-card-p12-bg2-13">
-                          <div className="derma-flex-between-start">
-                            <span className="derma-text-14-600-primary">#{exam.id}</span>
-                            <Badge variant="info">{exam.examination_date}</Badge>
-                          </div>
-                          <div className="derma-history-detail-list">
-                            <div>{exam.skin_type} • {exam.skin_condition}</div>
-                            <div>{exam.lesions}</div>
-                            {exam.diagnosis && <div>{exam.diagnosis}</div>}
-                          </div>
-                        </div>
-                    )}
-                    </div>
-                  </div>
-
-                  {/* История косметических процедур */}
-                  <div>
-                    <h4 className="derma-flex-center">
-                      <Sparkles size={16} className="derma-icon-mr-pink" />
-                      Косметические процедуры ({cosmeticProcedures.length})
-                    </h4>
-                    <div className="derma-history-list-scroll">
-                      {cosmeticProcedures.map((procedure) =>
-                    <div key={procedure.id} className="derma-card-p12-bg2-13">
-                          <div className="derma-flex-between-start">
-                            <span className="derma-text-14-600-primary">#{procedure.id}</span>
-                            <Badge variant="info">{procedure.procedure_date}</Badge>
-                          </div>
-                          <div className="derma-history-detail-list">
-                            <div>{procedure.procedure_type}</div>
-                            <div>{procedure.area_treated}</div>
-                            {procedure.results && <div>📊 {procedure.results}</div>}
-                            {procedure.total_cost &&
-                        <div className="derma-history-cost">
-                                {Number(procedure.total_cost).toLocaleString()} UZS
-                              </div>
-                        }
-                          </div>
-                        </div>
-                    )}
-                    </div>
-                  </div>
-                </div>
-
-                {skinExaminations.length === 0 && cosmeticProcedures.length === 0 &&
-              <MacOSEmptyState
-                type="calendar"
-                title="Нет данных о приемах и процедурах"
-                description="История приемов и процедур будет отображаться здесь" />
-
-              }
-              </MacOSCard>
-            </div>
+            <DermaHistoryTab
+              skinExaminations={skinExaminations}
+              cosmeticProcedures={cosmeticProcedures}
+              getSpacing={getSpacing}
+            />
           }
-        </div>
-
-        {/* PriceOverrideManager Modal */}
-        {showPriceOverride && selectedServiceForPriceOverride &&
-        <PriceOverrideManager
-          visitId={selectedPatient?.visit_id}
-          serviceId={selectedServiceForPriceOverride.id}
-          serviceName={selectedServiceForPriceOverride.name}
-          originalPrice={selectedServiceForPriceOverride.price}
-          isOpen={showPriceOverride}
-          onClose={() => {
-            setShowPriceOverride(false);
-            setSelectedServiceForPriceOverride(null);
-          }}
-          onPriceOverrideCreated={(override) => {
-            logger.info('Price override created:', override);
-            // Можно добавить логику обновления состояния
-          }} />
-
-        }
-
         {/* Модальное окно Schedule Next */}
         {scheduleNextModal.open &&
         <ScheduleNextModal
