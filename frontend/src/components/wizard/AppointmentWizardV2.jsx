@@ -35,15 +35,43 @@ import {
 } from '../../utils/phoneUtils';
 import { applyRegistrarEditDelta, createQueueEntriesBatch, updateOnlineQueueEntry } from '../../api/queue';
 import { api } from '../../api/client';
+// UX Audit Stage 3 (Wizard issue 5.1):
+// Все 13 raw fetch() к /patients/* и /registrar/cart заменены на
+// централизованный patients API client. Это убирает дублирование
+// headers/JSON-parsing/error-handling и использует axios-interceptor
+// из api/client.js для auth/CSRF/refresh-token.
+import {
+  getPatient,
+  createPatient,
+  updatePatient,
+  searchPatientsByPhone,
+  searchPatients as searchPatientsApi,
+  checkAuthProbe,
+  createRegistrarCart,
+  findPatientByPhoneVariants,
+} from '../../api/patients';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 // ⭐ SSOT: Unified service extraction
 import { normalizeServicesFromInitialData } from '../../utils/serviceCodeResolver';
 import './AppointmentWizardV2.css';
 
-const API_BASE = '/api/v1';
+// UX Audit Stage 3 (Wizard issue 5.1):
+// API_BASE удалён — все вызовы идут через api-клиент, который сам
+// добавляет baseURL. Раньше API_BASE использовался в 13 raw fetch().
+// Константа оставлена закомментированной для исторического контекста.
+// const API_BASE = '/api/v1';
+
 const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
 const MIXED_REPEAT_WARNING = 'В текущей модели repeat применяется на весь checkout; для точного применения разделите оформление по специалистам.';
+
+// UX Audit Stage 3 (Wizard issue 5.3):
+// Именованные константы шагов wizard'а вместо магических чисел 1/2.
+// Раньше в коде было: setCurrentStep(1), setCurrentStep(2), currentStep === 1 и т.д.
+// Теперь: STEP_PATIENT, STEP_CART — сразу понятно, о каком шаге речь.
+const STEP_PATIENT = 1;
+const STEP_CART = 2;
+const TOTAL_STEPS = 2;
 // QW-08 fix: removed LEGACY_DRAFT_KEY constant — it was a dead-code remnant from a
 // draft-autosave feature that was disabled to keep patient PHI out of browser storage.
 // All 7 `localStorage.removeItem(LEGACY_DRAFT_KEY)` call sites were no-ops (removing
@@ -326,7 +354,7 @@ const AppointmentWizardV2 = ({
   const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
 
   // Состояние мастера
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(STEP_PATIENT);
 
   // Данные мастера
   const [wizardData, setWizardData] = useState({
@@ -452,13 +480,11 @@ const AppointmentWizardV2 = ({
       if (!token) return;
 
       try {
-        const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (!response.ok) return;
-
-        const patient = await response.json();
+        // UX Audit Stage 3 (Wizard issue 5.1):
+        // Заменён raw fetch() с багом двойного префикса `/api/v1/api/v1/patients/{id}`
+        // на централизованный api.get() через getPatient().
+        // Раньше было: fetch(`${API_BASE}/api/v1/patients/${patientId}`) — двойной префикс!
+        const patient = await getPatient(patientId);
         const normalizedGender = normalizeGenderForForm(resolvePatientGenderValue(patient));
         if (!normalizedGender || cancelled) return;
 
@@ -497,7 +523,7 @@ const AppointmentWizardV2 = ({
         cart: { items: [], discount_mode: 'none', all_free: false, notes: '' },
         payment: { method: 'cash', total_amount: 0 }
       });
-      setCurrentStep(1);
+      setCurrentStep(STEP_PATIENT);
       setFormattedBirthDate('');
       setRepeatEligibilityByItemId({});
       setIsRepeatEligibilityLoading(false);
@@ -538,7 +564,7 @@ const AppointmentWizardV2 = ({
   const handleCompleteRef = useRef(async () => {});
 
   // Общее количество шагов
-  const totalSteps = 2;
+  const totalSteps = TOTAL_STEPS;
 
   // ===================== ПРОВЕРКА ТЕЛЕФОНА =====================
 
@@ -553,33 +579,26 @@ const AppointmentWizardV2 = ({
     }
 
     try {
-      const response = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(normalizedPhone)}`, {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        }
+      // UX Audit Stage 3 (Wizard issue 5.1):
+      // Заменён raw fetch() на searchPatientsByPhone() из api/patients.
+      const data = await searchPatientsByPhone(normalizedPhone);
+      // Если найден пациент и это не тот же самый пациент (если мы редактируем, но тут мы создаем/ищем)
+      // В мастере мы всегда предполагаем, что если ID не выбран, то это новый.
+      // Если ID выбран, то мы не проверяем (или проверяем, не занят ли другим).
+
+      const existingPatient = data.find((p) => {
+        // Сравниваем телефоны (очищенные)
+        const pPhone = (p.phone || '').replace(/\D/g, '');
+        return pPhone === cleanPhone;
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        // Если найден пациент и это не тот же самый пациент (если мы редактируем, но тут мы создаем/ищем)
-        // В мастере мы всегда предполагаем, что если ID не выбран, то это новый.
-        // Если ID выбран, то мы не проверяем (или проверяем, не занят ли другим).
-
-        const existingPatient = data.find((p) => {
-          // Сравниваем телефоны (очищенные)
-          const pPhone = (p.phone || '').replace(/\D/g, '');
-          return pPhone === cleanPhone;
+      if (existingPatient && existingPatient.id !== wizardData.patient.id) {
+        setPhoneError({
+          message: 'Пациент с таким номером уже существует',
+          patient: existingPatient
         });
-
-        if (existingPatient && existingPatient.id !== wizardData.patient.id) {
-          setPhoneError({
-            message: 'Пациент с таким номером уже существует',
-            patient: existingPatient
-          });
-        } else {
-          setPhoneError(null);
-        }
+      } else {
+        setPhoneError(null);
       }
     } catch (error) {
       logger.error('Ошибка проверки телефона:', error);
@@ -619,7 +638,7 @@ const AppointmentWizardV2 = ({
       payment: { method: 'cash', total_amount: 0 }
     });
     setFormattedBirthDate('');
-    setCurrentStep(1);
+    setCurrentStep(STEP_PATIENT);
     toast.success('Форма очищена');
   };
 
@@ -665,17 +684,12 @@ const AppointmentWizardV2 = ({
     }
 
     try {
-      const response = await fetch(`${API_BASE}/patients/?q=${encodeURIComponent(query)}`, {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
+      // UX Audit Stage 3 (Wizard issue 5.1):
+      // Заменён raw fetch() на searchPatientsApi() из api/patients.
+      const data = await searchPatientsApi(query);
 
-        // ✅ Формируем fio из отдельных полей, если его нет
-        const patientsWithFio = data.map((patient) => {
+      // ✅ Формируем fio из отдельных полей, если его нет
+      const patientsWithFio = data.map((patient) => {
           if (!patient.fio && (patient.last_name || patient.first_name)) {
             const parts = [
             patient.last_name || '',
@@ -715,9 +729,8 @@ const AppointmentWizardV2 = ({
           return 0;
         });
 
-        setPatientSuggestions(sorted.slice(0, 10)); // Максимум 10 результатов
-        setShowSuggestions(true);
-      }
+      setPatientSuggestions(sorted.slice(0, 10)); // Максимум 10 результатов
+      setShowSuggestions(true);
     } catch (error) {
       logger.error('Ошибка поиска пациентов:', error);
     }
@@ -1504,17 +1517,17 @@ const AppointmentWizardV2 = ({
     if (isRepeatMode) {
       if (!repeatSuggestionSummary.hasConsultations) {
         setErrors((prev) => ({ ...prev, repeat: 'Повторная скидка применяется только к консультациям. Добавьте консультацию в корзину или выберите другой тип скидки.' }));
-        setCurrentStep(2); // Ensure user is on the cart step to see the error
+        setCurrentStep(STEP_CART); // Ensure user is on the cart step to see the error
         return;
       }
       if (repeatSuggestionSummary.hasUnknown || isRepeatEligibilityLoading) {
         setErrors((prev) => ({ ...prev, repeat: 'Дождитесь завершения проверки повторной скидки перед завершением.' }));
-        setCurrentStep(2);
+        setCurrentStep(STEP_CART);
         return;
       }
       if (!repeatSuggestionSummary.fullyEligible) {
         setErrors((prev) => ({ ...prev, repeat: MIXED_REPEAT_WARNING }));
-        setCurrentStep(2);
+        setCurrentStep(STEP_CART);
         return;
       }
       // Clear any prior repeat error if validation now passes
@@ -1541,17 +1554,12 @@ const AppointmentWizardV2 = ({
       return;
     }
 
-    // Проверяем валидность токена
+    // UX Audit Stage 3 (Wizard issue 5.1):
+    // Проверяем валидность токена через централизованный helper.
+    // Раньше это был raw fetch() с проверкой status === 401.
     try {
-      const testResponse = await fetch(`${API_BASE}/patients/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (testResponse.status === 401) {
+      const isAuthorized = await checkAuthProbe();
+      if (!isAuthorized) {
         toast.error('Сессия истекла. Пожалуйста, войдите в систему заново.');
         return;
       }
@@ -1627,36 +1635,12 @@ const AppointmentWizardV2 = ({
         // Ищем пациента по телефону
         const cleanPhone = normalizedPhoneDigits;
 
-        // Попытка 1: Поиск по форматированному номеру
-        let searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(normalizedPhone)}`, {
-          headers: {
-            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        let patients = [];
-        if (searchResponse.ok) {
-          patients = await searchResponse.json();
-          logger.log('📋 Found patients (by phone):', patients.length);
-        }
-
-        let foundPatient = patients.find((p) => (p.phone || '').replace(/\D/g, '') === cleanPhone);
-
-        // Попытка 2: Если не нашли, пробуем по очищенному номеру
-        if (!foundPatient && cleanPhone.length >= 9) {
-          logger.log('🔄 Trying search with cleaned phone:', cleanPhone);
-          searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(cleanPhone)}`, {
-            headers: {
-              'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (searchResponse.ok) {
-            patients = await searchResponse.json();
-            foundPatient = patients.find((p) => (p.phone || '').replace(/\D/g, '') === cleanPhone);
-          }
+        // UX Audit Stage 3 (Wizard issue 5.1 + 5.3):
+        // Заменён двойной raw fetch() (по форматированному + очищенному телефону)
+        // на единый helper findPatientByPhoneVariants из api/patients.
+        let foundPatient = await findPatientByPhoneVariants(normalizedPhone);
+        if (foundPatient) {
+          logger.log('📋 Found existing patient by phone:', foundPatient.id);
         }
 
         if (foundPatient) {
@@ -1684,14 +1668,8 @@ const AppointmentWizardV2 = ({
             if (selectedPatientSex) updateData.sex = selectedPatientSex;
 
             try {
-              await fetch(`${API_BASE}/patients/${foundPatient.id}`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(updateData)
-              });
+              // UX Audit Stage 3: заменён raw fetch() PUT на updatePatient().
+              await updatePatient(foundPatient.id, updateData);
               logger.log('✅ Patient data updated');
             } catch (e) {
               logger.warn('⚠️ Failed to update patient:', e);
@@ -1701,8 +1679,6 @@ const AppointmentWizardV2 = ({
           // ✅ НОВОЕ: Если в режиме редактирования по QR пациент по телефону не найден,
           // создаем НОВОГО пациента с данными из формы, чтобы не блокировать завершение мастера.
           logger.warn(`⚠️ Пациент с телефоном ${wizardData.patient.phone} не найден. Создаем нового пациента (editMode + QR).`);
-
-          const token = tokenManager.getAccessToken();
 
           const patientData = {
             full_name: wizardData.patient.fio.trim(),
@@ -1720,28 +1696,16 @@ const AppointmentWizardV2 = ({
 
           logger.log('📋 Данные для СОЗДАНИЯ пациента в editMode (QR fallback):', patientData);
 
-          const createResponse = await fetch(`${API_BASE}/patients/`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(patientData)
-          });
-
-          if (createResponse.ok) {
-            const newPatient = await createResponse.json();
-            patientId = newPatient.id;
-            setWizardData((prev) => ({
-              ...prev,
-              patient: { ...prev.patient, id: newPatient.id }
-            }));
-            logger.log('✅ Новый пациент создан в editMode (QR fallback):', newPatient.id);
-          } else {
-            const errorText = await createResponse.text();
-            logger.error('❌ Ошибка создания пациента в editMode (QR fallback):', createResponse.status, errorText);
-            throw new Error(`Пациент с телефоном ${wizardData.patient.phone} не найден и не удалось создать нового: ${createResponse.status} ${errorText}`);
-          }
+          // UX Audit Stage 3: заменён raw fetch() POST на createPatient().
+          // createPatient() бросает Error с детальным сообщением при неудаче
+          // (например, «пациент уже существует»), нам не нужен else-блок.
+          const newPatient = await createPatient(patientData);
+          patientId = newPatient.id;
+          setWizardData((prev) => ({
+            ...prev,
+            patient: { ...prev.patient, id: newPatient.id }
+          }));
+          logger.log('✅ Новый пациент создан в editMode (QR fallback):', newPatient.id);
         }
       }
       // В обычном режиме (не edit) создаем пациента если нужно
@@ -1775,80 +1739,47 @@ const AppointmentWizardV2 = ({
 
         logger.log('📋 Данные для создания пациента:', patientData);
 
-        const patientResponse = await fetch(`${API_BASE}/patients/`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(patientData)
-        });
-
-        if (patientResponse.ok) {
-          const patient = await patientResponse.json();
-          // Обновляем локальный patientId и wizardData с созданным patient_id
+        // UX Audit Stage 3 (Wizard issue 5.1):
+        // Заменён большой raw fetch() блок (с if/else if/else для 200/400/other)
+        // на createPatient() из api/patients, который инкапсулирует 400-логику.
+        try {
+          const patient = await createPatient(patientData);
           patientId = patient.id;
           setWizardData((prev) => ({
             ...prev,
             patient: { ...prev.patient, id: patient.id }
           }));
           logger.log('✅ Пациент создан успешно:', patient.id);
-        } else if (patientResponse.status === 400) {
-          // Получаем детальную информацию об ошибке
-          let errorDetail = 'Пациент с таким номером телефона уже существует';
-          try {
-            const errorData = await patientResponse.json();
-            errorDetail = errorData.detail || errorDetail;
-            logger.log('⚠️ Ошибка 400 при создании пациента:', errorDetail);
-          } catch {
-            const errorText = await patientResponse.text();
-            logger.log('⚠️ Текст ошибки создания пациента:', errorText);
-            errorDetail = errorText || errorDetail;
-          }
-
-          // Пациент уже существует или другая ошибка валидации - ищем по номеру телефона
-          if (wizardData.patient.phone) {
+        } catch (createError) {
+          // createPatient бросает Error с .status === 400 если «пациент уже существует»
+          if (createError.status === 400 && wizardData.patient.phone) {
+            // Пациент уже существует — ищем по телефону
             const cleanPhone = normalizedPhoneDigits;
             logger.log(`⚠️ Ищем существующего пациента по номеру телефона: ${wizardData.patient.phone} (clean: ${cleanPhone})`);
 
-            // Пробуем искать и по форматированному, и по чистому номеру (если API поддерживает)
-            // Обычно API ищет по частичному совпадению или точному
-            const searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(normalizedPhone)}`, {
-              headers: {
-                'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-                'Content-Type': 'application/json'
-              }
-            });
+            // UX Audit Stage 3 (issue 5.3): используем findPatientByPhoneVariants
+            const foundPatient = await findPatientByPhoneVariants(normalizedPhone);
 
-            if (searchResponse.ok) {
-              const patients = await searchResponse.json();
-              // Ищем точное совпадение по очищенному номеру
-              const foundPatient = patients.find((p) => (p.phone || '').replace(/\D/g, '') === cleanPhone);
-
-              if (foundPatient) {
-                // Обновляем локальный patientId и wizardData с найденным patient_id
-                patientId = foundPatient.id;
-                setWizardData((prev) => ({
-                  ...prev,
-                  patient: { ...prev.patient, id: foundPatient.id }
-                }));
-                logger.log('✅ Найден существующий пациент (по телефону):', foundPatient.id);
-              } else {
-                // 🚨 НЕ используем fallback - требуем точное совпадение
-                logger.error('❌ Exact phone match not found. API returned', patients.length, 'patients');
-                throw new Error(`Пациент с телефоном ${wizardData.patient.phone} уже существует, но не найден в базе данных.`);
-              }
+            if (foundPatient) {
+              patientId = foundPatient.id;
+              setWizardData((prev) => ({
+                ...prev,
+                patient: { ...prev.patient, id: foundPatient.id }
+              }));
+              logger.log('✅ Найден существующий пациент (по телефону):', foundPatient.id);
             } else {
-              throw new Error('Ошибка поиска пациента');
+              // 🚨 НЕ используем fallback - требуем точное совпадение
+              logger.error('❌ Exact phone match not found after 400');
+              throw new Error(`Пациент с телефоном ${wizardData.patient.phone} уже существует, но не найден в базе данных.`);
             }
-          } else {
+          } else if (createError.status === 400) {
             // Нет телефона и ошибка создания - это проблема валидации
-            throw new Error(`Ошибка валидации данных пациента: ${errorDetail}`);
+            throw new Error(`Ошибка валидации данных пациента: ${createError.message}`);
+          } else {
+            // Другие ошибки (5xx, network)
+            logger.error('❌ Ошибка создания пациента:', createError.status, createError.message);
+            throw new Error(`Ошибка создания пациента: ${createError.status || ''} ${createError.message}`);
           }
-        } else {
-          const errorText = await patientResponse.text();
-          logger.error('❌ Ошибка создания пациента:', patientResponse.status, errorText);
-          throw new Error(`Ошибка создания пациента: ${patientResponse.status} ${errorText}`);
         }
       }
 
@@ -1863,30 +1794,23 @@ const AppointmentWizardV2 = ({
 
       const initialPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(initialData));
       if (editMode && patientId && selectedPatientSex && selectedPatientSex !== initialPatientSex) {
-        const patientResponse = await fetch(`${API_BASE}/patients/${patientId}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ sex: selectedPatientSex })
-        });
-
-        if (!patientResponse.ok) {
-          const errorText = await patientResponse.text().catch(() => '');
+        // UX Audit Stage 3 (Wizard issue 5.1):
+        // Заменён raw fetch() PUT на updatePatient() из api/patients.
+        try {
+          await updatePatient(patientId, { sex: selectedPatientSex });
+          logger.log('[AppointmentWizardV2] Persisted edit-mode patient gender before submit', {
+            patientId,
+            sex: selectedPatientSex
+          });
+        } catch (updateError) {
           logger.error('[AppointmentWizardV2] Failed to persist patient gender before edit submit', {
             patientId,
-            status: patientResponse.status,
-            errorText
+            status: updateError.status,
+            errorText: updateError.message
           });
           toast.error('Не удалось сохранить пол пациента. Проверьте доступ и попробуйте ещё раз.');
           return;
         }
-
-        logger.log('[AppointmentWizardV2] Persisted edit-mode patient gender before submit', {
-          patientId,
-          sex: selectedPatientSex
-        });
       }
 
       // ✅ НОВОЕ: Проверяем, редактируется ли запись в очереди (QR или desk) и есть ли новые услуги
@@ -2489,42 +2413,30 @@ const AppointmentWizardV2 = ({
         );
 
         try {
-          // ✅ ИСПРАВЛЕНО Bug 1: API_BASE уже содержит '/api/v1', не дублируем префикс
-          const patientResponse = await fetch(`${API_BASE}/patients/${patientId}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(patientUpdateData)
-          });
+          // UX Audit Stage 3 (Wizard issue 5.1):
+          // Заменён raw fetch() PUT на updatePatient() из api/patients.
+          // updatePatient() бросает Error с .message и .status при неудаче.
+          await updatePatient(patientId, patientUpdateData);
+          logger.log('✅ Данные пациента успешно обновлены');
+          toast.success('Данные пациента обновлены');
 
-          if (patientResponse.ok) {
-            logger.log('✅ Данные пациента успешно обновлены');
-            // ✅ ИСПРАВЛЕНО: Очищаем draft после успешного обновления
-            toast.success('Данные пациента обновлены');
-
-            // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
-            const currentQueueIds = new Set(
-              wizardData.cart.items.
+          // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
+          const currentQueueIds = new Set(
+            wizardData.cart.items.
               map((item) => item.original_queue_id).
               filter((id) => id)
-            );
+          );
 
-            const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
+          const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
-            if (removedQueueIds.length > 0) {
-              logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
-              await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'patient-update');
-            }
-
-            onComplete?.({ success: true, message: 'Данные пациента обновлены' });
-            onClose();
-            return;
-          } else {
-            const errorData = await patientResponse.json().catch(() => ({ detail: 'Ошибка обновления пациента' }));
-            throw new Error(errorData.detail || `Ошибка ${patientResponse.status}`);
+          if (removedQueueIds.length > 0) {
+            logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
+            await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'patient-update');
           }
+
+          onComplete?.({ success: true, message: 'Данные пациента обновлены' });
+          onClose();
+          return;
         } catch (patientError) {
           logger.error('❌ Ошибка обновления данных пациента:', patientError);
           toast.error(`Ошибка обновления данных пациента: ${patientError.message || 'Неизвестная ошибка'}`);
@@ -2556,71 +2468,23 @@ const AppointmentWizardV2 = ({
       };
 
       // Создаём корзину визитов
-      const cartResponse = await fetch(`${API_BASE}/registrar/cart`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(cartData)
-      });
+      // UX Audit Stage 3 (Wizard issue 5.1):
+      // Заменён raw fetch() POST на createRegistrarCart() из api/patients.
+      // createRegistrarCart бросает Error с .status, .message, .response при неудаче.
+      let result;
+      try {
+        result = await createRegistrarCart(cartData);
+      } catch (cartError) {
+        // Обработка ошибок создания корзины
+        let errorMessage = cartError.message || `Ошибка создания записи (${cartError.status || 'network'})`;
+        let isPermissionError = cartError.status === 403;
 
-      if (cartResponse.ok) {
-        const result = await cartResponse.json();
-
-        logger.log('✅ Запись создана успешно на backend:', result);
-
-        // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
-        // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
-        // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
-
-        toast.success(editMode ? 'Запись обновлена!' : 'Запись создана успешно!');
-
-        // ✅ НОВОЕ: Обработка удаленных записей очереди (для cart creation path)
-        const currentQueueIds = new Set(
-          wizardData.cart.items.
-          map((item) => item.original_queue_id).
-          filter((id) => id)
-        );
-
-        const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
-
-        if (removedQueueIds.length > 0) {
-          logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
-          await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'cart-update');
-        }
-
-        onComplete?.(result);
-        onClose();
-      } else {
-        // Получаем детальную информацию об ошибке
-        let errorMessage = `Ошибка создания записи (${cartResponse.status})`;
-        let isPermissionError = false;
-
-        try {
-          const errorData = await cartResponse.json();
-          logger.error('❌ Детали ошибки создания корзины:', errorData);
-          errorMessage = errorData.detail || errorMessage;
-
-          // Проверяем, является ли это ошибкой прав доступа
-          if (cartResponse.status === 403) {
-            isPermissionError = true;
-            if (errorMessage.includes('Not enough permissions')) {
-              errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
-            }
-          }
-        } catch {
-          logger.error('❌ Не удалось прочитать ошибку как JSON');
-
-          if (cartResponse.status === 403) {
-            isPermissionError = true;
-            errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
-          }
-        }
-
-        logger.error('❌ Ошибка создания корзины:', cartResponse.status, errorMessage);
+        logger.error('❌ Ошибка создания корзины:', cartError.status, errorMessage);
 
         if (isPermissionError) {
+          if (errorMessage.includes('Not enough permissions')) {
+            errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
+          }
           toast.error(errorMessage, {
             duration: 5000,
             style: {
@@ -2636,6 +2500,30 @@ const AppointmentWizardV2 = ({
         }
         return; // ❌ НЕ закрываем мастер при других ошибках
       }
+
+      logger.log('✅ Запись создана успешно на backend:', result);
+
+      // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
+      // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
+
+      toast.success(editMode ? 'Запись обновлена!' : 'Запись создана успешно!');
+
+      // ✅ НОВОЕ: Обработка удаленных записей очереди (для cart creation path)
+      const currentQueueIds = new Set(
+        wizardData.cart.items.
+          map((item) => item.original_queue_id).
+          filter((id) => id)
+      );
+
+      const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
+
+      if (removedQueueIds.length > 0) {
+        logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
+        await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'cart-update');
+      }
+
+      onComplete?.(result);
+      onClose();
     } catch (error) {
       logger.error('Ошибка завершения мастера:', error);
       toast.error(error.message || 'Произошла ошибка');
@@ -2769,7 +2657,7 @@ const AppointmentWizardV2 = ({
     icon: <Trash2 size={16} />,
     disabled: isProcessing
   },
-  currentStep > 1 && {
+  currentStep > STEP_PATIENT && {
     label: 'Назад',
     onClick: prevStep,
     variant: 'secondary',
@@ -3112,7 +3000,7 @@ const AppointmentWizardV2 = ({
       <ModernDialog
         isOpen={isOpen}
         onClose={onClose}
-        customHeader={currentStep === 1 ? Step1Header : Step2Header}
+        customHeader={currentStep === STEP_PATIENT ? Step1Header : Step2Header}
         actions={actions}
         maxWidth="70rem"
         closeOnBackdrop={false}
@@ -3125,7 +3013,7 @@ const AppointmentWizardV2 = ({
         <div className="wizard-container-v2">
           {/* Контент шагов */}
           <div className="wizard-content-v2">
-            {currentStep === 1 &&
+            {currentStep === STEP_PATIENT &&
             <PatientStepV2
               data={wizardData.patient}
               errors={errors}
@@ -3155,7 +3043,7 @@ const AppointmentWizardV2 = ({
 
             }
 
-            {currentStep === 2 &&
+            {currentStep === STEP_CART &&
             <CartStepV2
               cart={wizardData.cart}
               services={filteredServices}
