@@ -355,18 +355,18 @@
   justify-content: flex-end;
 }
 
-/* ─── Root page container (static overrides spread on top of pageStyle) ─── */
+/* ─── Root page container (pageStyle props folded into the class) ─── */
 .cardio-root-container {
-  padding: 0;
+  padding: var(--mac-spacing-6);
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
   width: 100%;
   position: relative;
   z-index: 1;
   display: block;
   max-width: 100%;
   margin: 0;
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
   background: var(--mac-gradient-window);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
   color: var(--mac-text-primary);
@@ -402,4 +402,132 @@
   color: var(--mac-text-primary);
   margin: 0;
   min-width: min(100%, 260px);
+}
+
+/* ─── Padding 0 override for cardio-card-padded (avoids double padding when
+   the root container already provides var(--mac-spacing-6) padding) ─── */
+.cardio-card-padded.cardio-p-0,
+.cardio-p-0 {
+  padding: 0;
+}
+
+/* ─── Tab content wrapper (replaces pageStyle spread + inner style block) ─── */
+.cardio-tab-content {
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+/* ─── Session-timeout modal overlay ─── */
+.cardio-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+/* ─── Session-timeout modal card ─── */
+.cardio-modal-card {
+  background: var(--mac-card-bg);
+  border: 1px solid var(--mac-border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: var(--mac-shadow-xl);
+}
+
+/* ─── Session-timeout modal heading ─── */
+.cardio-modal-heading {
+  margin: 0 0 12px 0;
+  font-size: var(--mac-font-size-lg);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Session-timeout modal body text ─── */
+.cardio-modal-text {
+  margin: 0 0 16px 0;
+  font-size: var(--mac-font-size-base);
+  color: var(--mac-text-secondary);
+  line-height: 1.5;
+}
+
+/* ─── Modal actions row (flex-end with sm gap) ─── */
+.cardio-modal-actions {
+  display: flex;
+  gap: var(--mac-spacing-2);
+  justify-content: flex-end;
+}
+
+/* ─── Settings floating action button (FAB) ─── */
+.cardio-settings-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  background: var(--mac-card-bg);
+  border: 1px solid var(--mac-border);
+  border-radius: 9999px;
+  padding: var(--mac-spacing-4);
+  box-shadow: var(--mac-shadow-lg);
+}
+
+/* ─── Settings floating card (MacOSCard overrides) ─── */
+.cardio-settings-card {
+  padding: 24px !important;
+  position: fixed;
+  right: 16px;
+  bottom: 80px;
+  width: 360px;
+  background-color: var(--mac-card-bg) !important;
+  border: 1px solid var(--mac-border) !important;
+  box-shadow: var(--mac-shadow-xl) !important;
+}
+
+/* ─── Settings card title ─── */
+.cardio-settings-title {
+  font-size: var(--mac-font-size-lg);
+  font-weight: 500;
+  margin-bottom: var(--mac-spacing-4);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Settings checkbox label (merged with .flex.items-center) ─── */
+.cardio-settings-label {
+  gap: 8px;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+/* ─── LDL threshold label (merged with .text-sm) ─── */
+.cardio-ldl-label {
+  color: var(--mac-text-secondary);
+  margin-bottom: var(--mac-spacing-1);
+}
+
+/* ─── Settings input ─── */
+.cardio-settings-input {
+  width: 100%;
+  padding: var(--mac-spacing-2) var(--mac-spacing-4);
+  border: 1px solid var(--mac-border);
+  border-radius: 6px;
+  background-color: var(--mac-card-bg);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  outline: none;
+}
+
+/* ─── Settings actions row (merged with .flex.justify-end) ─── */
+.cardio-settings-actions {
+  gap: var(--mac-spacing-2);
+  margin-top: var(--mac-spacing-6);
 }

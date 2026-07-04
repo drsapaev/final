@@ -1,0 +1,82 @@
+/**
+ * Patient Panel — utility CSS classes.
+ *
+ * CSS migration: extracted from PatientPanel.jsx inline styles.
+ * All classes use macOS design system tokens (var(--mac-*)).
+ */
+
+/* ─── Root page container (full-height window gradient) ─── */
+.patient-root {
+  padding: 0;
+  background: var(--mac-gradient-window);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  color: var(--mac-text-primary);
+}
+
+/* ─── Centered content container (max 1200px, vertical stack) ─── */
+.patient-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ─── Search bar Card (translucent surface) ─── */
+.patient-search-card {
+  background-color: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  padding: 16px;
+  box-shadow: var(--mac-shadow-sm);
+  backdrop-filter: var(--mac-blur-light);
+  -webkit-backdrop-filter: var(--mac-blur-light);
+}
+
+/* ─── Search row (icon + input + button) ─── */
+.patient-flex-center-12 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ─── Search input wrapper (relative for absolute-positioned icon) ─── */
+.patient-search-wrap {
+  position: relative;
+  flex: 1;
+}
+
+/* ─── Search icon (absolutely positioned inside .patient-search-wrap) ─── */
+.patient-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mac-text-tertiary);
+}
+
+/* ─── Search input ─── */
+.patient-search-input {
+  width: 100%;
+  padding: 12px 12px 12px 40px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  background-color: var(--mac-bg-secondary);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--mac-duration-normal) var(--mac-ease);
+  opacity: 1;
+}
+
+/* ─── Search input focus state (replaces onFocus/onBlur JS handlers) ─── */
+.patient-search-input:focus {
+  border-color: var(--mac-accent-blue);
+}
+
+/* ─── Search input disabled state (replaces dynamic opacity ternary) ─── */
+.patient-search-input:disabled {
+  opacity: 0.65;
+}
