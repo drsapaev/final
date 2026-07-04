@@ -4,7 +4,7 @@
  */
 import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
-import { Tooth, Scissors, FileText, Eye } from 'lucide-react';
+import { Smile, Scissors, FileText, Eye } from 'lucide-react';
 
 export function DentalPatientsTab({
   patients = [],
@@ -57,7 +57,7 @@ export function DentalPatientsTab({
                 onClick={() => onDentalChart(patient)}
                 title="Схема зубов"
                 className="dental-p-8px">
-                <Tooth aria-hidden="true" className="dental-icon-16" />
+                <Smile aria-hidden="true" className="dental-icon-16" />
               </Button>
               <Button
                 size="sm"
