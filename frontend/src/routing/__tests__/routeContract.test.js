@@ -33,7 +33,7 @@ const AI_SIDEBAR_BADGE = 'Черновик · не медицинское зак
 const AI_SIDEBAR_ACCESSIBLE_COPY = /черновик, не диагноз, не медицинское заключение/i;
 
 // P-003 fix: 7 of the 8 previously orphaned admin-settings routes are now surfaced
-// in the sidebar under the new 'Настройки' section. Only admin-user-select remains
+// in the sidebar under the new domain-based sections. Only admin-user-select remains
 // nav:false — it is an impersonation tool intended for contextual invocation, not
 // sidebar discovery.
 const ADMIN_CONTEXTUAL_ROUTE_IDS = [
@@ -41,7 +41,7 @@ const ADMIN_CONTEXTUAL_ROUTE_IDS = [
 ];
 
 // P-003 fix: the following routes used to be nav:false entry:'direct' on
-// UnifiedSettings — they are now entry:'menu' with section:'Настройки'. The
+// UnifiedSettings — they are now entry:'menu' with domain-based sections. The
 // contract below tracks the remaining truly-hidden route only.
 const ADMIN_CONTEXTUAL_SETTINGS_DIRECT_ROUTE_IDS = [
   // intentionally empty — all 7 settings routes now visible in the sidebar
@@ -51,9 +51,9 @@ const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
   'admin-dashboard': { path: '/admin', owner: 'admin.operations', component: 'AdminDashboard', entry: 'menu', section: 'Обзор' },
   'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu', section: 'Обзор' },
   'admin-reports': { path: '/admin/reports', owner: 'admin.reports', component: 'UnifiedReports', entry: 'direct', section: 'Обзор' },
-  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'SystemManagement', entry: 'direct', section: 'Операции' },
-  'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'CloudPrintingManager', entry: 'direct', section: 'Операции' },
-  'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'MedicalEquipmentManager', entry: 'direct', section: 'Операции' },
+  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'SystemManagement', entry: 'direct', section: 'Система' },
+  'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'CloudPrintingManager', entry: 'direct', section: 'Интеграции' },
+  'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'MedicalEquipmentManager', entry: 'direct', section: 'Интеграции' },
   'admin-webhooks': { path: '/admin/webhooks', owner: 'admin.integrations', component: 'WebhookManager', entry: 'direct', section: 'Интеграции' },
   'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'GraphQLExplorer', entry: 'direct', section: 'Интеграции' },
 };
@@ -280,7 +280,7 @@ describe('route contract invariants', () => {
     // P-003 fix: 'Настройки' section added to surface 7 previously orphaned
     // admin-settings routes (benefit-settings, wizard-settings, payment-providers,
     // clinic-settings, queue-settings, telegram-settings, display-settings).
-    expect(sectionTitles).toEqual(['Обзор', 'Управление', 'Операции', 'Интеграции', 'Система', 'Настройки']);
+    expect(sectionTitles).toEqual(['Обзор', 'Пациенты и запись', 'Финансы', 'Клиника и очередь', 'Коммуникации', 'Система', 'Интеграции']);
 
     Object.entries(ADMIN_NAV_GROUPING_ROUTE_CONTRACT).forEach(([routeId, expected]) => {
       const route = getRouteById(routeId);
@@ -522,7 +522,7 @@ describe('route contract invariants', () => {
     expect(clinicSettingsRoute.entry).toBe('menu');
     expect(clinicSettingsRoute.nav).not.toBe(false);
     expect(clinicSettingsRoute.nav.sidebar).toBe(true);
-    expect(clinicSettingsRoute.nav.section).toBe('Настройки');
+    expect(clinicSettingsRoute.nav.section).toBe('Клиника и очередь');
     expect(clinicSettingsRoute.component).toBe('UnifiedSettings');
     expect(clinicSettingsRoute.component).not.toBe('AdminPanel');
     expect(clinicSettingsRoute.layout.activeSidebarItem).toBe('admin-clinic-settings');
@@ -557,7 +557,7 @@ describe('route contract invariants', () => {
     expect(telegramSettingsRoute.entry).toBe('menu');
     expect(telegramSettingsRoute.nav).not.toBe(false);
     expect(telegramSettingsRoute.nav.sidebar).toBe(true);
-    expect(telegramSettingsRoute.nav.section).toBe('Настройки');
+    expect(telegramSettingsRoute.nav.section).toBe('Коммуникации');
     expect(telegramSettingsRoute.component).toBe('TelegramSettings');
     expect(isRouteAccessibleToProfile(telegramSettingsRoute, adminProfile)).toBe(true);
 
