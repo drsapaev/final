@@ -4,6 +4,11 @@
 
 ## ⚠️ ВАЖНО ДЛЯ РАЗРАБОТЧИКОВ И ИИ-АГЕНТОВ
 
+**ПЕРЕД ЛЮБЫМ ДЕПЛОЕМ ИЛИ ЗАЯВКОЙ "СИСТЕМА РАБОТАЕТ" — ОБЯЗАТЕЛЬНО:**
+- 📖 `docs/runbooks/STAGING_VALIDATION.md` — **10 проверок** (Sentry, DR drill, AI kill-switch, AI safety, arq, PII, pre-commit, tests, build)
+- 🤖 `bash scripts/smoke_test_staging.sh` — автоматическая версия проверок
+- 📖 `AGENTS.md` — операционные правила для ИИ-агентов (читать первым)
+
 **ПЕРЕД РАБОТОЙ С СИСТЕМОЙ АУТЕНТИФИКАЦИИ ОБЯЗАТЕЛЬНО ПРОЧИТАТЬ:**
 - 📖 `docs/AUTHENTICATION_LAWS_FOR_AI.md` - **ЗАКОНЫ для ИИ-агентов (КРИТИЧЕСКИ ВАЖНО!)**
 - 📖 `docs/AUTHENTICATION_SYSTEM_FINAL_GUIDE.md` - Полное руководство по системе

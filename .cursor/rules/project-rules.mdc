@@ -18,6 +18,22 @@
 
 ## Проверки и валидация
 
+### ⚠️ MANDATORY: Pre-Deploy Validation
+
+**Перед любым деплоем или заявкой "система работает" — ОБЯЗАТЕЛЬНО:**
+
+```bash
+bash scripts/smoke_test_staging.sh
+```
+
+10 проверок: Sentry, DR drill, AI kill-switch, AI safety contract, arq,
+PII scrubbing, pre-commit, backend tests, frontend tests.
+
+Без прохождения всех проверок — НЕ писать "deployment complete" или
+"it works" в коммитах, PR, чате. Безопасность пациентов важнее.
+
+Полный checklist: `docs/runbooks/STAGING_VALIDATION.md`
+
 ### Синтаксические ошибки
 - Валидируйте Python, TypeScript, JavaScript код
 - Убедитесь, что импорты/экспорты корректны
