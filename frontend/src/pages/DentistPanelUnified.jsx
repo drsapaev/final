@@ -2034,7 +2034,7 @@ const DentistPanelUnified = () => {
               }}>
 
                 <div className="dental-flex dental-gap-12">
-                  <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-purple)', borderRadius: 'var(--mac-radius-full)' }}>
+                  <div className="dental-icon-bg dental-icon-bg-purple dental-icon-bg-full">
                     <span className="dental-text-value dental-text-white">
                       {patient.name?.charAt(0)}
                     </span>
@@ -2116,19 +2116,8 @@ const DentistPanelUnified = () => {
           </Button>
         </div>
 
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '16px'
-      }}>
-          <div
-          style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-lg)',
-            cursor: 'default',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}>
+        <div className="dental-grid-auto-fill-280">
+          <div className="dental-template-card">
 
             <div class="dental-flex-center-12">
               <div className="dental-icon-bg" class="dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
@@ -2157,18 +2146,11 @@ const DentistPanelUnified = () => {
             </div>
           </div>
 
-          <div
-          style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-lg)',
-            cursor: 'default',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}>
+          <div className="dental-template-card">
 
             <div class="dental-flex-center-12">
-              <div className="dental-icon-bg" style={{ background: 'var(--mac-danger-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
-                <Scissors className="dental-icon-20" style={{ color: 'var(--mac-danger)' }} />
+              <div className="dental-icon-bg dental-icon-bg-danger-bg dental-icon-radius-lg">
+                <Scissors className="dental-icon-20 dental-text-danger" />
               </div>
               <div>
                 <h4 className="dental-text-primary">Эндодонтическое лечение</h4>
@@ -2193,18 +2175,11 @@ const DentistPanelUnified = () => {
             </div>
           </div>
 
-          <div
-          style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-lg)',
-            cursor: 'default',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}>
+          <div className="dental-template-card">
 
             <div class="dental-flex-center-12">
               <div className="dental-icon-bg" class="dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
-                <Scissors className="dental-icon-20" style={{ color: 'var(--mac-success)'  }} />
+                <Scissors className="dental-icon-20 dental-text-success" />
               </div>
               <div>
                 <h4 className="dental-text-primary">Профессиональная гигиена</h4>
@@ -2247,22 +2222,11 @@ const DentistPanelUnified = () => {
             </div>
           </div>
 
-          <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '16px'
-        }}>
+          <div className="dental-grid-auto-fill-280">
             {savedVisitProtocols.map((protocol) =>
           <div
             key={protocol.visit_id}
-            style={{
-              padding: '16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
+            className="dental-protocol-card-flex">
                 <div>
                   <div className="dental-text-primary">{protocol.patient_name}</div>
                   <div className="dental-text-desc dental-text-desc dental-text-secondary">
@@ -2274,9 +2238,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <Button
                 onClick={() => reopenVisitProtocol(protocol)}
-                style={{
-                  alignSelf: 'flex-start'
-                }}>
+                className="dental-align-self-start">
                   Открыть протокол
                 </Button>
               </div>
@@ -2302,11 +2264,7 @@ const DentistPanelUnified = () => {
           </Button>
         </div>
 
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-        gap: '16px'
-      }}>
+        <div className="dental-grid-auto-fill-240-16">
           <div
           role="button"
           tabIndex={0}
@@ -2322,7 +2280,7 @@ const DentistPanelUnified = () => {
 
             <div class="dental-flex-center-12">
               <div className="dental-icon-bg" class="dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
-                <BarChart3 className="dental-icon-20" style={{ color: 'var(--mac-accent-blue)'  }} />
+                <BarChart3 className="dental-icon-20 dental-text-blue" />
               </div>
               <div>
                 <h4 className="dental-text-primary">Общий обзор</h4>
@@ -2349,7 +2307,7 @@ const DentistPanelUnified = () => {
 
             <div class="dental-flex-center-12">
               <div className="dental-icon-bg" class="dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
-                <Users className="dental-icon-20" style={{ color: 'var(--mac-success)'  }} />
+                <Users className="dental-icon-20 dental-text-success" />
               </div>
               <div>
                 <h4 className="dental-text-primary">По пациентам</h4>
@@ -2516,18 +2474,10 @@ const DentistPanelUnified = () => {
           {prosthetics.map((prosthetic) =>
         <div
           key={prosthetic.id}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '16px',
-            background: 'var(--mac-bg-secondary)',
-            borderRadius: 'var(--mac-radius-lg)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}>
+          className="dental-prosthetic-row">
 
               <div className="dental-flex dental-gap-16">
-                <div className="dental-icon-bg-40" style={{ background: 'var(--mac-warning)'  }}>
+                <div className="dental-icon-bg-40 dental-icon-bg-warning">
                   <Smile className="dental-icon-20 dental-text-white" />
                 </div>
                 <div>
@@ -2615,25 +2565,10 @@ const DentistPanelUnified = () => {
     return (
       <div className="dental-p-8">
         <div className="dental-flex-col dental-gap-24">
-          <div style={{
-            height: '32px',
-            background: 'var(--mac-bg-secondary)',
-            borderRadius: 'var(--mac-radius-md)',
-            width: '25%',
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-          }}></div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: '24px'
-          }}>
+          <div className="dental-skeleton-bar"></div>
+          <div className="dental-skeleton-grid">
             {[...Array(4)].map((_, i) =>
-            <div key={i} style={{
-              height: '96px',
-              background: 'var(--mac-bg-secondary)',
-              borderRadius: 'var(--mac-radius-md)',
-              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-            }}></div>
+            <div key={i} className="dental-skeleton-card"></div>
             )}
           </div>
         </div>
@@ -2749,18 +2684,7 @@ const DentistPanelUnified = () => {
 
       {showDentalChart && selectedPatient &&
       <div class="dental-modal-overlay">
-          <div style={{
-          background: 'var(--mac-bg-primary)',
-          borderRadius: 'var(--mac-radius-xl)',
-          padding: '24px',
-          width: '100%',
-          maxWidth: '1152px',
-          height: '100%',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: 'var(--mac-shadow-xl)',
-          border: '1px solid var(--mac-border)'
-        }}>
+          <div className="dental-modal-card-xl">
             <div class="dental-flex-between-16">
               <h2 className="dental-heading-xl dental-text-primary">
                 Схема зубов: {selectedPatientDisplayName}
@@ -2797,18 +2721,7 @@ const DentistPanelUnified = () => {
 
       {showTreatmentPlanner && selectedPatient &&
       <div class="dental-modal-overlay">
-          <div style={{
-          background: 'var(--mac-bg-primary)',
-          borderRadius: 'var(--mac-radius-xl)',
-          padding: '24px',
-          width: '100%',
-          maxWidth: '1152px',
-          height: '100%',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: 'var(--mac-shadow-xl)',
-          border: '1px solid var(--mac-border)'
-        }}>
+          <div className="dental-modal-card-xl">
             <div class="dental-flex-between-16">
               <h2 className="dental-heading-xl dental-text-primary">
                 План лечения: {selectedPatientDisplayName}
