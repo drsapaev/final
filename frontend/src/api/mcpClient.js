@@ -1,70 +1,93 @@
 /**
  * MCP (Model Context Protocol) API Client
+ *
+ * UX Audit Stage 1 refactor (cross-cutting issue 10.1):
+ * Раньше mcpClient создавал собственный axios-instance со своими
+ * interceptors для auth/401/logging. Это приводило к:
+ *   - дублированию логики token-refresh / CSRF / rate-limit
+ *   - рассинхрону с api/client.js (например, mcpClient не делал refresh-token)
+ *   - двум разным путям редиректа на /login при 401
+ *
+ * Теперь mcpClient — тонкая обёртка над `api` из api/client.js:
+ *   - наследует все interceptors (auth, refresh, CSRF, rate-limit)
+ *   - использует тот же baseURL + суффикс `/mcp`
+ *   - логирование через общий logger
+ *
+ * Backward compatibility: API-методы mcpAPI.* сохраняют сигнатуры.
  */
-import axios from 'axios';
-import { getApiBaseUrl } from './runtime';
-import { getAuthToken } from '../services/auth';
 
+import { api } from './client';
+import { hardRedirectToLogin } from '../utils/navigation';
 import logger from '../utils/logger';
-const API_BASE_URL = getApiBaseUrl();
 
-// Создаем axios instance для MCP
-const mcpClient = axios.create({
-  baseURL: `${API_BASE_URL}/mcp`,
-  timeout: 120000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Добавляем interceptor для авторизации
-mcpClient.interceptors.request.use((config) => {
-  const token = getAuthToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Добавляем interceptor для обработки ошибок
-mcpClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const status = error.response?.status;
-    const detail = error.response?.data?.detail || error.response?.data?.message;
-
-    // Логирование ошибок
-    logger.error(`[MCP Client] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
-      status,
-      detail,
-      data: error.response?.data
-    });
-
-    // Обработка различных статусов
-    if (status === 401) {
-      logger.warn('[MCP Client] 401 Unauthorized - редирект на /login');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    } else if (status === 403) {
-      const message = detail || 'Недостаточно прав для выполнения операции';
-      logger.warn(`[MCP Client] 403 Forbidden: ${message}`);
-      // Не блокируем Promise, позволяем компонентам обработать ошибку
-    } else if (status === 404) {
-      const message = detail || 'Ресурс не найден';
-      logger.warn(`[MCP Client] 404 Not Found: ${message}`);
-    } else if (status >= 500) {
-      logger.error(`[MCP Client] Server Error ${status}: ${detail || 'Внутренняя ошибка сервера'}`);
-    } else if (!error.response) {
-      logger.error('[MCP Client] Network Error - нет ответа от сервера');
-    }
-
-    return Promise.reject(error);
-  }
-);
+// Префикс для всех MCP-эндпоинтов. Подставляется к baseURL из api/client.js.
+const MCP_PREFIX = '/mcp';
 
 /**
- * MCP API методы
+ * Низкоуровневый helper: выполняет запрос через api (axios) с подставленным
+ * MCP-префиксом, возвращает response.data.
+ *
+ * @param {string} method - HTTP method (get/post/put/patch/delete)
+ * @param {string} path - путь без /mcp префикса
+ * @param {object} [config]
+ * @returns {Promise<any>}
+ */
+async function mcpRequest(method, path, config = {}) {
+  try {
+    const url = `${MCP_PREFIX}${path}`;
+    // UX Audit Stage 3: используем api.get()/post()/put() вместо api.request()
+    // для совместимости с существующими тестами, которые мокают get/post методы.
+    const { data, ...restConfig } = config;
+    let response;
+
+    switch (method.toLowerCase()) {
+      case 'get':
+        response = await api.get(url, restConfig);
+        break;
+      case 'post':
+        response = await api.post(url, data, restConfig);
+        break;
+      case 'put':
+        response = await api.put(url, data, restConfig);
+        break;
+      case 'patch':
+        response = await api.patch(url, data, restConfig);
+        break;
+      case 'delete':
+        response = await api.delete(url, restConfig);
+        break;
+      default:
+        throw new Error(`Unsupported HTTP method: ${method}`);
+    }
+
+    return response.data;
+  } catch (error) {
+    const status = error?.response?.status;
+    const detail = error?.response?.data?.detail || error?.response?.data?.message;
+
+    logger.error(`[MCP] ${method.toUpperCase()} ${MCP_PREFIX}${path}`, {
+      status,
+      detail,
+      data: error?.response?.data,
+    });
+
+    // 401 уже обрабатывается в api/client.js response interceptor
+    // (он логирует, но не редиректит). Здесь мы делаем редирект —
+    // MCP-запросы почти всегда требуют активной сессии.
+    if (status === 401) {
+      hardRedirectToLogin({
+        reason: 'mcp-unauthorized',
+        redirectAfter: typeof window !== 'undefined' ? window.location.pathname : undefined,
+      });
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * MCP API методы — публичный интерфейс.
+ * Сигнатуры идентичны предыдущей версии для обратной совместимости.
  */
 export const mcpAPI = {
   // === Управление MCP ===
@@ -73,16 +96,14 @@ export const mcpAPI = {
    * Получить статус MCP системы
    */
   async getStatus() {
-    const response = await mcpClient.get('/status');
-    return response.data;
+    return mcpRequest('get', '/status');
   },
 
   /**
    * Проверка здоровья MCP серверов
    */
   async healthCheck() {
-    const response = await mcpClient.get('/health');
-    return response.data;
+    return mcpRequest('get', '/health');
   },
 
   /**
@@ -90,8 +111,7 @@ export const mcpAPI = {
    */
   async getMetrics(server = null) {
     const params = server ? { server } : {};
-    const response = await mcpClient.get('/metrics', { params });
-    return response.data;
+    return mcpRequest('get', '/metrics', { params });
   },
 
   /**
@@ -99,8 +119,7 @@ export const mcpAPI = {
    */
   async getCapabilities(server = null) {
     const params = server ? { server } : {};
-    const response = await mcpClient.get('/capabilities', { params });
-    return response.data;
+    return mcpRequest('get', '/capabilities', { params });
   },
 
   // === Анализ жалоб ===
@@ -109,26 +128,25 @@ export const mcpAPI = {
    * Анализ жалоб пациента
    */
   async analyzeComplaint(data, options = {}) {
-    const response = await mcpClient.post('/complaint/analyze', {
-      complaint: data.complaint,
-      patient_age: data.patientAge,
-      patient_gender: data.patientGender,
-      urgency_assessment: data.urgencyAssessment !== false,
-      provider: data.provider
-    }, {
-      signal: options.signal
+    return mcpRequest('post', '/complaint/analyze', {
+      data: {
+        complaint: data.complaint,
+        patient_age: data.patientAge,
+        patient_gender: data.patientGender,
+        urgency_assessment: data.urgencyAssessment !== false,
+        provider: data.provider,
+      },
+      signal: options.signal,
     });
-    return response.data;
   },
 
   /**
    * Валидация жалоб
    */
   async validateComplaint(complaint) {
-    const response = await mcpClient.post('/complaint/validate', null, {
-      params: { complaint }
+    return mcpRequest('post', '/complaint/validate', {
+      params: { complaint },
     });
-    return response.data;
   },
 
   /**
@@ -136,8 +154,7 @@ export const mcpAPI = {
    */
   async getComplaintTemplates(specialty = null) {
     const params = specialty ? { specialty } : {};
-    const response = await mcpClient.get('/complaint/templates', { params });
-    return response.data;
+    return mcpRequest('get', '/complaint/templates', { params });
   },
 
   // === МКБ-10 ===
@@ -146,36 +163,34 @@ export const mcpAPI = {
    * Подсказки кодов МКБ-10
    */
   async suggestICD10(data, options = {}) {
-    const response = await mcpClient.post('/icd10/suggest', {
-      symptoms: data.symptoms,
-      diagnosis: data.diagnosis,
-      specialty: data.specialty,
-      provider: data.provider,
-      max_suggestions: data.maxSuggestions || 5
-    }, {
-      signal: options.signal
+    return mcpRequest('post', '/icd10/suggest', {
+      data: {
+        symptoms: data.symptoms,
+        diagnosis: data.diagnosis,
+        specialty: data.specialty,
+        provider: data.provider,
+        max_suggestions: data.maxSuggestions || 5,
+      },
+      signal: options.signal,
     });
-    return response.data;
   },
 
   /**
    * Валидация кода МКБ-10
    */
   async validateICD10(code, symptoms = null, diagnosis = null) {
-    const response = await mcpClient.post('/icd10/validate', null, {
-      params: { code, symptoms, diagnosis }
+    return mcpRequest('post', '/icd10/validate', {
+      params: { code, symptoms, diagnosis },
     });
-    return response.data;
   },
 
   /**
    * Поиск кодов МКБ-10
    */
   async searchICD10(query, category = null, limit = 10) {
-    const response = await mcpClient.get('/icd10/search', {
-      params: { query, category, limit }
+    return mcpRequest('get', '/icd10/search', {
+      params: { query, category, limit },
     });
-    return response.data;
   },
 
   // === Лабораторные анализы ===
@@ -184,22 +199,22 @@ export const mcpAPI = {
    * Интерпретация лабораторных результатов
    */
   async interpretLabResults(data) {
-    const response = await mcpClient.post('/lab/interpret', {
-      results: data.results,
-      patient_age: data.patientAge,
-      patient_gender: data.patientGender,
-      provider: data.provider,
-      include_recommendations: data.includeRecommendations !== false
+    return mcpRequest('post', '/lab/interpret', {
+      data: {
+        results: data.results,
+        patient_age: data.patientAge,
+        patient_gender: data.patientGender,
+        provider: data.provider,
+        include_recommendations: data.includeRecommendations !== false,
+      },
     });
-    return response.data;
   },
 
   /**
    * Проверка критических значений
    */
   async checkCriticalValues(results) {
-    const response = await mcpClient.post('/lab/check-critical', results);
-    return response.data;
+    return mcpRequest('post', '/lab/check-critical', { data: results });
   },
 
   /**
@@ -209,9 +224,7 @@ export const mcpAPI = {
     const params = {};
     if (testName) params.test_name = testName;
     if (patientGender) params.patient_gender = patientGender;
-
-    const response = await mcpClient.get('/lab/normal-ranges', { params });
-    return response.data;
+    return mcpRequest('get', '/lab/normal-ranges', { params });
   },
 
   // === Медицинские изображения ===
@@ -228,10 +241,10 @@ export const mcpAPI = {
     if (options.clinicalContext) formData.append('clinical_context', options.clinicalContext);
     if (options.provider) formData.append('provider', options.provider);
 
-    const response = await mcpClient.post('/imaging/analyze', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    return mcpRequest('post', '/imaging/analyze', {
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return response.data;
   },
 
   /**
@@ -245,10 +258,10 @@ export const mcpAPI = {
     if (patientHistory) formData.append('patient_history', JSON.stringify(patientHistory));
     if (provider) formData.append('provider', provider);
 
-    const response = await mcpClient.post('/imaging/skin-lesion', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    return mcpRequest('post', '/imaging/skin-lesion', {
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return response.data;
   },
 
   /**
@@ -256,8 +269,7 @@ export const mcpAPI = {
    */
   async getImagingTypes(category = null) {
     const params = category ? { category } : {};
-    const response = await mcpClient.get('/imaging/types', { params });
-    return response.data;
+    return mcpRequest('get', '/imaging/types', { params });
   },
 
   // === Пакетная обработка ===
@@ -266,17 +278,19 @@ export const mcpAPI = {
    * Пакетная обработка запросов
    */
   async batchProcess(requests, parallel = true) {
-    const response = await mcpClient.post('/batch', {
-      requests,
-      parallel
+    return mcpRequest('post', '/batch', {
+      data: { requests, parallel },
     });
-    return response.data;
-  }
+  },
 };
 
-// Хук для использования MCP в React компонентах
-export const useMCP = () => {
-  return mcpAPI;
-};
+/**
+ * Хук для использования MCP в React компонентах.
+ * Backward-compatible с предыдущей версией.
+ */
+export const useMCP = () => mcpAPI;
 
-export default mcpClient;
+// Default export — для кода, который импортировал mcpClient напрямую.
+// Раньше это был axios-instance; теперь это сам объект mcpAPI,
+// что покрывает большинство сценариев использования.
+export default mcpAPI;
