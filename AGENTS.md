@@ -14,6 +14,42 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Active local dev-brain tooling lives outside runtime in `ai/langgraph`.
 - `ai/llamaindex` and `ai/lightrag` are not guaranteed to exist in this checkout; use them only after verifying the directories and commands are present.
 
+## ⚠️ MANDATORY: Pre-Deploy Validation
+
+**Before claiming "the system works" or "deployment complete", you MUST run the staging validation checklist:**
+
+```
+docs/runbooks/STAGING_VALIDATION.md
+```
+
+Or run the automated smoke test:
+
+```bash
+bash scripts/smoke_test_staging.sh
+```
+
+**The validation checklist covers 10 checks**:
+1. Sentry smoke test (frontend + backend event delivery)
+2. DR drill (backup actually restores)
+3. AI feature flag kill-switch (toggle → 503)
+4. AI safety contract (Playwright spec — `requires_doctor_confirmation` always present)
+5. arq worker (jobs enqueue + process)
+6. Telegram bot delivery (if used)
+7. PII scrubbing (3 layers: code → logs → Sentry)
+8. Pre-commit hooks installed locally
+9. Backend unit tests pass
+10. Frontend build + unit tests pass
+
+**Agent contract (binding on all AI agents)**:
+- You MUST NOT write "deployment complete", "system verified", or "it works" in any commit message, PR description, or chat response unless every check passed.
+- You MUST report which checks passed and which failed — do not generalize.
+- You MUST NOT skip checks you find inconvenient. If a check is broken, fix it or report it as broken.
+- Code passing CI ≠ system working. CI proves compilation; this runbook proves functionality.
+
+**If a check fails**: stop, fix the root cause, re-run. Do not deploy a broken system. Patient safety depends on honest reporting.
+
+Full details: `docs/runbooks/STAGING_VALIDATION.md`.
+
 ## Project Memory / DevBrain Status
 
 - Use `docs/devbrain/PROJECT_MEMORY.md` as the compact canonical memory anchor for project-wide ownership decisions, failure patterns, and strict domain guardrails.

@@ -4,6 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **⚠️ IMPORTANT:** This file is secondary context. For operational rules, execution modes, and canonical-first discipline, see `AGENTS.md` first. If instructions conflict, prefer the narrower, safer, more canonical rule from `AGENTS.md`.
 
+## ⚠️ MANDATORY: Pre-Deploy Validation
+
+**Before claiming "the system works" or "deployment complete", you MUST run:**
+
+```bash
+bash scripts/smoke_test_staging.sh
+```
+
+This runs the 10 checks documented in `docs/runbooks/STAGING_VALIDATION.md`:
+Sentry, DR drill, AI kill-switch, AI safety contract, arq worker, PII
+scrubbing, pre-commit, backend tests, frontend tests.
+
+**You MUST NOT write "it works" or "deployment complete" in any commit, PR,
+or chat response unless every check passed.** Patient safety depends on
+honest reporting.
+
+See `docs/runbooks/STAGING_VALIDATION.md` for the full checklist with
+exact commands and expected outputs.
+
 ## Project Overview
 
 This is a **Medical Clinic Management System** built with FastAPI (Python backend) and React (Vite frontend). The system manages patient appointments, queues, EMR (Electronic Medical Records), payments, and specialized medical panels (cardiology, dermatology, dentistry, laboratory).
