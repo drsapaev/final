@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-04 — Admin panel dead-code removal — Step 2 (chore/admin-remove-dead-partial-step2)
+- **frontend/src/components/admin/** — deleted 6 dead-code files (2 850 lines) with partial live replacements. No runtime behavior change (all 6 were already unreachable in production).
+  - `SecurityMonitor.jsx` (906) — DEAD, 100% mock data (`mockData = { totalThreats: 23, ... }`). Real threat-monitoring is a backend gap; this file never had real data. Superseded conceptually by `pages/Audit.jsx` (audit log of user actions — different function).
+  - `TelegramBotManager.jsx` (763) — DEAD, only importer was the dead `UnifiedTelegramManagement`. Had 3 broadcast functions (`sendAdminAlert`, `broadcastSystemMessage`, `notificationForm` with `send_to_all_admins`/`send_to_all_users`) hitting backend endpoints `/api/v1/telegram-bot/send-notification` and `/api/v1/telegram-bot/broadcast-system-message` (which still exist). **Feature gap note:** the live `components/TelegramManager.jsx` does NOT have these broadcast features — its "Отправить сообщение" button (`TelegramManager.jsx:1625-1631`) has no `onClick`. Restoring broadcast UI is a separate product decision (re-implement in `TelegramManager.jsx` or wire a new admin tab).
+  - `QueueLimitsManager.jsx` (642) — DEAD, unreachable. `ADMIN_SETTINGS_ROUTE_SECTION_MAP` in `UnifiedSettings.jsx` had no `/admin/queue-limits` entry, so the `case 'queue-limits'` branch was dead. Superseded by `QueueSettings.jsx` (live, `/admin/queue-settings`) which writes the same `max_per_day`/`start_number` fields via `PUT /admin/queue/settings`. **P0 conflict resolved:** the two components wrote the same fields via different endpoints (`PUT /admin/queue-limits` vs `PUT /admin/queue/settings`) — last-writer-wins corruption risk is now eliminated.
+  - `DesignValidator.jsx` (296) — DEAD dev-tool (design-system validator). Not a production feature; design system is enforced via `macos-tokens.css` and `routeContract.test.js`.
+  - `UnifiedAITools.jsx` (143) — DEAD aspirational scaffold. Its 7 AI-tool children (`MedicalImageAnalyzer`, `TreatmentRecommendations`, `DrugInteractionChecker`, `RiskAssessment`, `QualityControl`, `SmartScheduling`, `VoiceToText`) live independently in `components/ai/` and are consumed by clinical panels. No admin AI-tools hub exists; re-creating one is a separate product decision.
+  - `UnifiedTelegramManagement.jsx` (101) — DEAD aspirational scaffold. Its children (`TelegramSettings` + `TelegramBotManager`) are alive via direct routing (different routes). `routeContract.test.js:554` already asserted this wrapper must NOT be routed.
+- **frontend/src/components/admin/UnifiedSettings.jsx** — removed dangling `import QueueLimitsManager` and the dead `case 'queue-limits'` branch (the section was never reachable: `ADMIN_SETTINGS_ROUTE_SECTION_MAP` has no `/admin/queue-limits` entry).
+- **frontend/src/components/common/StateWrapper.jsx** — updated JSDoc comment that listed the deleted `UnifiedAITools` / `UnifiedTelegramManagement` as consumers.
+
+Verification:
+- `vite build` → ✓ built in ~26s, exit 0, all chunks emitted.
+- `eslint` on 2 modified files → 0 errors (12 pre-existing prop-types warnings unchanged).
+- `vitest run` (full suite) → ✓ 517/517 tests pass across 106 test files, including `routeContract.test.js` (40/40 — the `routedComponents.has('UnifiedTelegramManagement')` → false assertion still holds).
+- `grep` for imports of the 6 deleted files across `frontend/src/**/*.{jsx,js}` → 0 matches in live code.
+- `components/admin/` file count: 67 → 61 (-6).
+
+Context: see `analysis/ADMIN_PANEL_A_Z_ANALYSIS.md` (full A-Z audit) and `analysis/DEAD_CODE_REPLACEMENTS.md` (replacement map). Step 2 of a 3-step cleanup; Step 1 (9 files, -2 179 LOC) merged in PR #1827; Step 3 (5 gap candidates, ~4 411 lines — DepartmentManagement, QueueProfilesManager, FCMManager, RegistrarNotificationManager, QRTokenManager) pending product-owner decision.
+
 ## 2026-07-04 — Admin panel dead-code removal — Step 1 (chore/admin-remove-dead-helpers-step1) — PR #1827
 - **frontend/src/components/admin/** — deleted 9 dead-code helper/section files (2 179 lines total) that had full live replacements in the macOS design system or shared/common layer. No behavior change.
   - `AnalyticsDashboard.jsx` (773) — superseded by `pages/AnalyticsPage.jsx` (the active `/admin/analytics` route). File was a phantom with two `void useState(...)` codemod artifacts (non-functional).

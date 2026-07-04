@@ -2,10 +2,11 @@
  * StateWrapper — generic loading / error / empty state wrapper for Unified*
  * panels and any component that fetches async data.
  *
- * P-025 fix: UnifiedSettings, UnifiedUserManagement, UnifiedFinance, UnifiedReports,
- * UnifiedAITools, UnifiedTelegramManagement, UnifiedNotifications all delegated
- * loading/error/empty handling to their child components, with no fallback —
- * if a child failed or returned no data, the user saw a blank panel.
+ * P-025 fix: UnifiedSettings, UnifiedUserManagement, UnifiedFinance, UnifiedReports
+ * all delegated loading/error/empty handling to their child components, with no
+ * fallback — if a child failed or returned no data, the user saw a blank panel.
+ * (Note: UnifiedAITools, UnifiedTelegramManagement were removed as dead code in
+ * Step 2; UnifiedNotifications remains pending Step 3 decision.)
  *
  * Usage:
  *   <StateWrapper
