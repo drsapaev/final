@@ -100,7 +100,11 @@ const AIAssistant = ({
   title = 'AI Ассистент',
   expanded = true,
   useMCP = true,
-  providerOptions = ['deepseek', 'gemini', 'openai', 'default']
+  providerOptions = ['deepseek', 'gemini', 'openai', 'default'],
+  // X-1 (UX audit): specialty + onSuggestionSelect — previously ignored by AIAssistant,
+  // causing all 3 panels' AI tabs to be non-functional.
+  specialty,
+  onSuggestionSelect,
 }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -109,6 +113,16 @@ const AIAssistant = ({
   const [retryCount, setRetryCount] = useState(0);
   const [isOpen, setIsOpen] = useState(expanded);
   const { enqueueSnackbar } = useSnackbar();
+
+  // X-1 (UX audit): If specialty is provided, auto-configure analysisType and data
+  // so the AI tab works without the parent having to pass analysisType explicitly.
+  const effectiveAnalysisType = analysisType || (specialty ? 'icd10' : undefined);
+  const effectiveData = data || (specialty ? {
+    complaint: '',
+    specialty: specialty,
+    patient_age: null,
+    patient_gender: null,
+  } : undefined);
 
   const analyzeData = async (manualRetry = false) => {
     setLoading(true);
@@ -122,7 +136,7 @@ const AIAssistant = ({
       let response;
       let mcpResult;
 
-      switch (analysisType) {
+      switch (effectiveAnalysisType) {
         case 'complaint':
           if (useMCP) {
             mcpResult = await mcpAPI.analyzeComplaint({
@@ -374,9 +388,19 @@ const AIAssistant = ({
                         </span>
                   }
                     </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
                     <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
                       <Copy style={{ width: 14, height: 14, marginRight: 6 }} />Копировать
                     </Button>
+                    {onSuggestionSelect && (
+                    <Button variant="primary" onClick={() => {
+                      onSuggestionSelect('icd10', item.code);
+                      enqueueSnackbar('Код МКБ-10 добавлен в форму', { variant: 'success' });
+                    }}>
+                      <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />Использовать
+                    </Button>
+                    )}
+                    </div>
                   </div>
               )}
               </div>
@@ -400,9 +424,19 @@ const AIAssistant = ({
                 </span>
             }
             </div>
+            <div style={{ display: 'flex', gap: '4px' }}>
             <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
               <Copy style={{ width: 14, height: 14, marginRight: 6 }} />Копировать
             </Button>
+            {onSuggestionSelect && (
+            <Button variant="primary" onClick={() => {
+              onSuggestionSelect('icd10', item.code);
+              enqueueSnackbar('Код МКБ-10 добавлен в форму', { variant: 'success' });
+            }}>
+              <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />Использовать
+            </Button>
+            )}
+            </div>
           </div>
         )}
       </div>);
@@ -510,7 +544,7 @@ const AIAssistant = ({
   const renderResult = () => {
     if (error) return <Alert severity="error">{error}</Alert>;
     if (!result) return null;
-    switch (analysisType) {
+    switch (effectiveAnalysisType) {
       case 'complaint':
         return renderComplaintResult();
       case 'icd10':
@@ -620,7 +654,10 @@ AIAssistant.propTypes = {
   title: PropTypes.string,
   expanded: PropTypes.bool,
   useMCP: PropTypes.bool,
-  providerOptions: PropTypes.array
+  providerOptions: PropTypes.array,
+  // X-1 (UX audit): new props for specialty-scoped AI integration
+  specialty: PropTypes.string,
+  onSuggestionSelect: PropTypes.func,
 };
 
 export default AIAssistant;
