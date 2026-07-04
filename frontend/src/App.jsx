@@ -11,7 +11,6 @@ import './styles/global-fixes.css';
 import './theme/macos-tokens.css';
 import './styles/macos.css';
 import './styles/header-new.css';
-import './components/admin/admin.css';
 import 'react-toastify/dist/ReactToastify.css';
 import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import { bootstrapStoredColorScheme } from './theme/colorScheme.js';

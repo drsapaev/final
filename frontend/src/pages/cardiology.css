@@ -531,3 +531,21 @@
   gap: var(--mac-spacing-2);
   margin-top: var(--mac-spacing-6);
 }
+
+/* ─── Fix: missing class definitions ─── */
+
+/* ─── EMR audit badge (inline-style driven; class provides structural fallback) ─── */
+.cardio-emr-audit-badge {
+  margin-top: var(--mac-spacing-3);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mac-spacing-3);
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+  background: var(--mac-bg-secondary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}

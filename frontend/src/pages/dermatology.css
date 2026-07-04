@@ -496,3 +496,15 @@
 .derma-spin {
   animation: derma-spin 1s linear infinite;
 }
+
+/* ─── Fix: missing class definitions ─── */
+
+/* ─── Form label (block + sm + 600 + primary + mb-8) ─── */
+.derma-form-label {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-2);
+}
