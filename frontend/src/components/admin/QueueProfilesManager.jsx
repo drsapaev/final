@@ -562,7 +562,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                 )}
 
                 {/* Profiles table */}
-                <table className="admin-qp-table">
+                <div className="admin-table-wrapper">
+            <table className="admin-qp-table">
                     <thead>
                         <tr>
                             <th className="admin-ta-left-p-12px-8px-bd-b-2px-solid-var-mac-bo-fs-12-fw-600-secondary-tt-uppercase-w-40">
@@ -690,6 +691,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         ))}
                     </tbody>
                 </table>
+          </div>
 
                 {filteredProfiles.length === 0 && (
                     <div className="admin-ta-center-p-40-secondary">

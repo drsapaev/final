@@ -12470,3 +12470,44 @@
   color: var(--mac-success);
   margin-bottom: 8px;
 }
+
+/* ============================================
+   Sprint 7b: Shared table wrapper — macOS native appearance
+   Rounded corners, clipped overflow, subtle shadow.
+   Usage: <div className="admin-table-wrapper"><table>...</table></div>
+   ============================================ */
+.admin-table-wrapper {
+  border-radius: var(--mac-radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+.admin-table-wrapper table {
+  margin: 0;
+}
+
+.admin-table-wrapper thead {
+  background: var(--mac-bg-secondary);
+}
+
+.admin-table-wrapper th {
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mac-text-secondary);
+}
+
+.admin-table-wrapper tbody tr {
+  transition: background-color var(--mac-duration-fast) var(--mac-ease);
+}
+
+.admin-table-wrapper tbody tr:hover {
+  background: var(--mac-bg-secondary);
+}
+
+.admin-table-wrapper tbody tr:last-child td {
+  border-bottom: none;
+}

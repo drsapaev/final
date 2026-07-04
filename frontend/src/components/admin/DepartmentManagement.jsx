@@ -1091,7 +1091,8 @@ const DepartmentManagement = () => {
 
                     {/* ✅ ТАБЛИЧНЫЙ ВИД ОТДЕЛЕНИЙ */}
                     <div className="admin-table-container">
-                        <table className="admin-table-full">
+                        <div className="admin-table-wrapper">
+            <table className="admin-table-full">
                             <thead>
                                 <tr className="admin-table-head">
                                     <th className="admin-th-w-40">
@@ -1202,6 +1203,7 @@ const DepartmentManagement = () => {
                 })}
                             </tbody>
                         </table>
+          </div>
                     </div>
 
                     {departments.length === 0 &&

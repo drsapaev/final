@@ -321,6 +321,7 @@ const AdminFinanceOverview = () => {
               )}
             />
           ) : (
+            <div className="admin-table-wrapper">
             <table className="admin-w-full" aria-label="Таблица транзакций">
               <thead>
                 <tr className="admin-bd-b-1px-solid-var-mac-se">
@@ -428,6 +429,7 @@ const AdminFinanceOverview = () => {
                 ))}
               </tbody>
             </table>
+          </div>
           )}
         </div>
       </MacOSCard>
