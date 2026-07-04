@@ -380,8 +380,8 @@ const WelcomeView = React.memo(({
             })() &&
             <div className="registrar-empty-state">
                     {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
-              {/* Full unification deferred — requires EmptyState.jsx migration */}
-              {/* from Tailwind/native to macOS design system first. */}
+              {/* Full unification deferred — migrate to MacOSEmptyState from */}
+              {/* the macOS design system (components/ui/macos) first. */}
               <div className="registrar-empty-icon-lg">
                       {!tokenManager.hasToken() ?
                 <Icon name="lock" size="large" /> :
