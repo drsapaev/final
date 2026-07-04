@@ -101,11 +101,10 @@ class PDFService:
         self.templates_dir = Path(__file__).parent.parent / "templates" / "print"
 
         # Настройка Jinja2
-        self.jinja_env = Environment(
+        self.jinja_env = Environment(autoescape=True,
             loader=FileSystemLoader(self.templates_dir),
             trim_blocks=True,
             lstrip_blocks=True,
-            autoescape=True,
         )
 
         # Добавляем фильтры

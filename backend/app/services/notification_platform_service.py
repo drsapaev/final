@@ -574,7 +574,7 @@ class NotificationPlatformService:
 
     def _hash_seed(self, seed: dict[str, Any]) -> str:
         packed = json.dumps(seed, sort_keys=True, default=str, ensure_ascii=False)
-        return hashlib.sha1(packed.encode("utf-8"), usedforsecurity=False).hexdigest()  # nosec B324 — deduplication key, not security
+        return hashlib.sha1(packed.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     # ------------------------------------------------------------------
     # Scope resolution
