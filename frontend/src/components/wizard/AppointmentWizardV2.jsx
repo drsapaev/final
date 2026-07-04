@@ -1316,6 +1316,28 @@ const AppointmentWizardV2 = ({
       return;
     }
 
+    // UX Audit Registrar #9: Summary confirmation перед завершением.
+    // Показываем что именно будет создано — услуги, количество визитов, сумма.
+    // Раньше кнопка «Завершить» сразу создавала запись без preview.
+    const cartItems = wizardData.cart.items || [];
+    const totalAmount = cartItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+    const serviceCount = cartItems.length;
+    const doctorCount = new Set(cartItems.map((item) => item.doctor_id).filter(Boolean)).size;
+
+    const summaryLines = [
+      `Пациент: ${wizardData.patient.fio || '—'}`,
+      `Услуг в корзине: ${serviceCount}`,
+      doctorCount > 1 ? `Врачей: ${doctorCount}` : null,
+      totalAmount > 0 ? `Сумма: ${new Intl.NumberFormat('ru-RU').format(totalAmount)} сум` : 'Бесплатно',
+    ].filter(Boolean);
+
+    const confirmed = window.confirm(
+      'Создать запись?\n\n' + summaryLines.join('\n')
+    );
+    if (!confirmed) {
+      return;
+    }
+
     // UX Audit Stage 3 (Wizard issue 5.1):
     // Проверяем валидность токена через централизованный helper.
     // Раньше это был raw fetch() с проверкой status === 401.
@@ -2773,6 +2795,31 @@ const AppointmentWizardV2 = ({
         }}>
 
         <div className="wizard-container-v2">
+          {/* UX Audit Registrar #22: Progress indicator — визуальный progress bar.
+              Текст «Шаг 1 из 2» уже есть в header, но визуальный bar даёт
+              мгновенное понимание прогресса без чтения. */}
+          <div style={{
+            display: 'flex',
+            gap: '6px',
+            marginBottom: '12px',
+            padding: '0 4px',
+          }}>
+            {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
+              <div
+                key={step}
+                style={{
+                  flex: 1,
+                  height: '4px',
+                  borderRadius: '2px',
+                  backgroundColor: currentStep >= step
+                    ? 'var(--mac-accent-blue, #007aff)'
+                    : 'color-mix(in srgb, var(--mac-text-secondary, #8e8e93), transparent 70%)',
+                  transition: 'background-color 200ms ease',
+                }}
+              />
+            ))}
+          </div>
+
           {/* Контент шагов */}
           <div className="wizard-content-v2">
             {currentStep === STEP_PATIENT &&
