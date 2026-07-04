@@ -43,7 +43,7 @@ describe('LabPanel queue/report status contract', () => {
     expect(loadBlock).toContain('labReportingApi.listQueueToday()');
     // Не должен делать прямой fetch к registrar endpoint.
     expect(loadBlock).not.toContain('/registrar/queues/today');
-    expect(loadBlock).not.toContain("new URLSearchParams({ department: 'lab' })");
+    expect(loadBlock).not.toContain('new URLSearchParams({ department: \'lab\' })');
     // Не должен вручную нормализовать nested queues[] → плоский массив
     // (теперь backend возвращает плоский entries[] напрямую).
     expect(loadBlock).not.toContain('payload?.queues || []');
@@ -64,9 +64,9 @@ describe('LabPanel queue/report status contract', () => {
     );
     expect(loadBlock).toContain('normalizeListPayload(payload?.entries ?? [])');
     // Frontend не долженfabricировать статусы — они приходят готовые с backend.
-    expect(source).not.toContain("status: latestLabReport?.status || entry.status,");
-    expect(source).not.toContain("payment_status: entry.payment_status || 'pending'");
-    expect(source).not.toContain("queue_status: entry.status || 'waiting'");
+    expect(source).not.toContain('status: latestLabReport?.status || entry.status,');
+    expect(source).not.toContain('payment_status: entry.payment_status || \'pending\'');
+    expect(source).not.toContain('queue_status: entry.status || \'waiting\'');
   });
 
   it('does not add BFF-lite endpoints for the lab queue contract repair', () => {
@@ -94,8 +94,8 @@ describe('LabPanel queue/report status contract', () => {
     // Если кто-то их вернёт — это сигнал, что LabPanel снова делает
     // прямые fetch-запросы в обход labReportingApi.
     const source = readLabPanelSource();
-    expect(source).not.toContain("from '../utils/tokenManager'");
-    expect(source).not.toContain("from '../api/runtime'");
+    expect(source).not.toContain('from \'../utils/tokenManager\'');
+    expect(source).not.toContain('from \'../api/runtime\'');
     expect(source).not.toContain('const API_V1_BASE');
   });
 });

@@ -14,7 +14,7 @@ describe('useUserPreferences API contract', () => {
     const source = readSource();
 
     expect(source).toContain('`/users/users/${userId}/preferences`');
-    expect(source).toContain("'/users/me/preferences'");
+    expect(source).toContain('\'/users/me/preferences\'');
   });
 
   it('does not call the stale /user-management preferences path', () => {

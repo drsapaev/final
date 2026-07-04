@@ -15,8 +15,8 @@ describe('auth login API contract', () => {
   it('uses the canonical authentication login route in the API helper', () => {
     const clientSource = readSource('client.js');
 
-    expect(clientSource).toContain("api.post('/authentication/login'");
-    expect(clientSource).not.toContain("api.post('/auth/login'");
+    expect(clientSource).toContain('api.post(\'/authentication/login\'');
+    expect(clientSource).not.toContain('api.post(\'/auth/login\'');
   });
 
   it('uses the canonical authentication login route in endpoint constants', () => {

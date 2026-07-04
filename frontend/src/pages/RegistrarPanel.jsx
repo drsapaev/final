@@ -1369,7 +1369,7 @@ const RegistrarPanel = () => {
       const str = String(value ?? '');
       let escaped = str.replace(/"/g, '""');
       if (/^[=+\-@]/.test(escaped)) {
-        escaped = "'" + escaped;
+        escaped = '\'' + escaped;
       }
       return `"${escaped}"`;
     };

@@ -31,9 +31,9 @@ describe('LabTemplateWorkbench template version command contract', () => {
     expect(helperBlock).toContain('version?.available_actions');
     expect(helperBlock).toContain('TEMPLATE_VERSION_ACTION_CAN_FIELD');
     expect(helperBlock).toContain('return false;');
-    expect(ensureDraftBlock).toContain("hasTemplateVersionAction(activeVersion, 'update')");
-    expect(ensureDraftBlock).toContain("hasTemplateVersionAction(activeVersion, 'create_draft')");
+    expect(ensureDraftBlock).toContain('hasTemplateVersionAction(activeVersion, \'update\')');
+    expect(ensureDraftBlock).toContain('hasTemplateVersionAction(activeVersion, \'create_draft\')');
     expect(ensureDraftBlock).toContain('labReportingApi.createTemplateVersion');
-    expect(ensureDraftBlock).not.toContain("activeVersion?.status === 'DRAFT'");
+    expect(ensureDraftBlock).not.toContain('activeVersion?.status === \'DRAFT\'');
   });
 });

@@ -15,27 +15,27 @@ describe('auth service route contract', () => {
   it('uses canonical authentication endpoints for login', () => {
     const source = readAuthServiceSource();
 
-    expect(source).toContain("api.post('/authentication/login'");
+    expect(source).toContain('api.post(\'/authentication/login\'');
   });
 
   it('does not call the stale auth login endpoint', () => {
     const source = readAuthServiceSource();
 
-    expect(source).not.toContain("api.post('/auth/login'");
+    expect(source).not.toContain('api.post(\'/auth/login\'');
   });
 
   it('uses canonical authentication endpoints for logout and refresh', () => {
     const source = readAuthServiceSource();
 
-    expect(source).toContain("api.post('/authentication/logout')");
-    expect(source).toContain("api.post('/authentication/refresh'");
+    expect(source).toContain('api.post(\'/authentication/logout\')');
+    expect(source).toContain('api.post(\'/authentication/refresh\'');
   });
 
   it('does not call stale auth lifecycle endpoints', () => {
     const source = readAuthServiceSource();
 
-    expect(source).not.toContain("api.post('/auth/logout')");
-    expect(source).not.toContain("api.post('/auth/refresh'");
+    expect(source).not.toContain('api.post(\'/auth/logout\')');
+    expect(source).not.toContain('api.post(\'/auth/refresh\'');
   });
 
   it('exports the canonical logout endpoint constant', () => {

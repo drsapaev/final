@@ -34,28 +34,28 @@ describe('Telegram Mini App onboarding guardrails', () => {
   it('does not fetch protected patient sections for onboarding scope manifests', () => {
     const manifestEffect = sourceBetween(
       appSource,
-      "api.post('/telegram/mini-app/patient/manifest', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      'api.post(\'/telegram/mini-app/patient/manifest\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
       'const capabilities = state.manifest?.capabilities || {};'
     );
 
-    expect(manifestEffect).toContain("manifest?.scope?.type === 'onboarding'");
+    expect(manifestEffect).toContain('manifest?.scope?.type === \'onboarding\'');
     expect(manifestEffect).toContain('if (isOnboardingManifest) {');
-    expect(manifestEffect).toContain("status: 'idle'");
+    expect(manifestEffect).toContain('status: \'idle\'');
     expect(manifestEffect.indexOf('if (isOnboardingManifest) {')).toBeLessThan(
-      manifestEffect.indexOf("api.post('/telegram/mini-app/cabinet/summary'")
+      manifestEffect.indexOf('api.post(\'/telegram/mini-app/cabinet/summary\'')
     );
   });
 
   it('blocks protected onboarding sections with a safe CTA', () => {
     const onboardingBlockedPanel = sourceBetween(
       appSource,
-      "{isOnboardingScope && selectedSection && selectedSection !== 'appointments' && (",
-      "{isOnboardingScope && (selectedSection === 'appointments' || !selectedSection) && ("
+      '{isOnboardingScope && selectedSection && selectedSection !== \'appointments\' && (',
+      '{isOnboardingScope && (selectedSection === \'appointments\' || !selectedSection) && ('
     );
 
-    expect(onboardingBlockedPanel).toContain("t('onboardingBlockedText')");
-    expect(onboardingBlockedPanel).toContain("handleMiniAppCapabilitySelect('appointments')");
-    expect(onboardingBlockedPanel).toContain("handleMiniAppSupportClick");
+    expect(onboardingBlockedPanel).toContain('t(\'onboardingBlockedText\')');
+    expect(onboardingBlockedPanel).toContain('handleMiniAppCapabilitySelect(\'appointments\')');
+    expect(onboardingBlockedPanel).toContain('handleMiniAppSupportClick');
     expect(onboardingBlockedPanel).not.toContain('api.post(');
     expect(onboardingBlockedPanel).not.toMatch(/403|Request failed|entryToken|patientId/);
   });
@@ -63,13 +63,13 @@ describe('Telegram Mini App onboarding guardrails', () => {
   it('adds safe retry and support actions for unavailable and token-error states', () => {
     const statusAlerts = sourceBetween(
       appSource,
-      "{state.status === 'unavailable' && (",
-      "{state.status === 'ready' && ("
+      '{state.status === \'unavailable\' && (',
+      '{state.status === \'ready\' && ('
     );
 
-    expect(statusAlerts).toContain("handleMiniAppRetry");
-    expect(statusAlerts).toContain("handleMiniAppSupportClick");
-    expect(statusAlerts).toContain("t('onboardingRetry')");
+    expect(statusAlerts).toContain('handleMiniAppRetry');
+    expect(statusAlerts).toContain('handleMiniAppSupportClick');
+    expect(statusAlerts).toContain('t(\'onboardingRetry\')');
     expect(statusAlerts).not.toMatch(/AxiosError|Traceback|entryToken=pma_|entryToken=pmo_/);
   });
 
@@ -86,9 +86,9 @@ describe('Telegram Mini App onboarding guardrails', () => {
     );
 
     expect(onboardingGate).toContain('canEditOnboardingRequest');
-    expect(onboardingSummary).toContain("['linked_existing', 'created_patient'].includes(onboardingStatus)");
+    expect(onboardingSummary).toContain('[\'linked_existing\', \'created_patient\'].includes(onboardingStatus)');
     expect(onboardingSummary).toContain('handleMiniAppReturnToTelegram');
-    expect(onboardingSummary).toContain("t('onboardingSupport')");
+    expect(onboardingSummary).toContain('t(\'onboardingSupport\')');
   });
 
   it('emits onboarding telemetry with a safe minimal payload', () => {
@@ -98,9 +98,9 @@ describe('Telegram Mini App onboarding guardrails', () => {
       'function emitMiniAppOnboardingStatusTelemetry(status, meta = {}) {'
     );
 
-    expect(telemetryHelper).toContain("api.post('/telemetry'");
-    expect(telemetryHelper).toContain("role: 'patient'");
-    expect(telemetryHelper).toContain("scope: 'onboarding'");
+    expect(telemetryHelper).toContain('api.post(\'/telemetry\'');
+    expect(telemetryHelper).toContain('role: \'patient\'');
+    expect(telemetryHelper).toContain('scope: \'onboarding\'');
     expect(telemetryHelper).toContain('reason_code: getMiniAppTelemetryReasonCode');
     expect(telemetryHelper).not.toMatch(/entryToken|raw|phone|fullName|payment|invoice|diagnosis|lab|emr/i);
   });
