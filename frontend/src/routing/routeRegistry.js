@@ -93,7 +93,7 @@ export const SIDEBAR_PRESETS = {
       { id: 'queue', label: 'Очередь', icon: 'person.2' },
       { id: 'appointments', label: 'Записи', icon: 'calendar' },
       { id: 'visit', label: 'Приём', icon: 'stethoscope' },
-      { id: 'patients', label: 'Пациенты', icon: 'person' },
+      // D-7 (UX audit): removed duplicate 'patients' tab — appointments already shows patients
       { id: 'photos', label: 'Фото', icon: 'camera' },
       { id: 'skin', label: 'Осмотр кожи', icon: 'eye' },
       { id: 'cosmetic', label: 'Косметология', icon: 'sparkles' },

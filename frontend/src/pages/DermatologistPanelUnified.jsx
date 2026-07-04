@@ -1200,13 +1200,33 @@ const DermatologistPanelUnified = () => {
       selectedPatient?.id ||
       entryId;
 
+      // X-2 (UX audit): fetch latest EMR data for the payload
+      let emrPayload = { complaint: '', diagnosis: '', icd10: '', notes: '' };
+      try {
+        const emrRes = await fetch(`${API_V1_BASE}/v2/emr/${selectedPatient?.visit_id || currentAppointment?.visit_id}`, {
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+        });
+        if (emrRes.ok) {
+          const emrData = await emrRes.json();
+          emrPayload = {
+            complaint: emrData?.complaints || '',
+            diagnosis: emrData?.diagnosis || '',
+            icd10: emrData?.icd10_code || emrData?.icd10 || '',
+            notes: emrData?.notes || '',
+          };
+        }
+      } catch (emrErr) {
+        logger.warn('[Dermatology] Failed to fetch EMR for payload, using local visitData', emrErr);
+        emrPayload = { complaint: visitData.complaint, diagnosis: visitData.diagnosis, icd10: visitData.icd10, notes: visitData.notes };
+      }
+
       const visitPayload = {
         patient_id: patientId,
-        complaint: visitData.complaint,
-        diagnosis: visitData.diagnosis,
-        icd10: visitData.icd10,
+        complaint: emrPayload.complaint,
+        diagnosis: emrPayload.diagnosis,
+        icd10: emrPayload.icd10,
         services: selectedServices,
-        notes: visitData.notes
+        notes: emrPayload.notes
       };
 
       logger.info('[Dermatology] handleSaveVisit: payload', visitPayload);
