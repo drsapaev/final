@@ -270,6 +270,18 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
                 "Не удалось отправить обновление очереди: %s", ws_error, exc_info=True
             )
 
+        # UX Audit Stage 3 (Queue WebSocket): broadcast to /ws/queue admin panel.
+        try:
+            from app.ws.queue_ws import broadcast_queue_update
+            broadcast_queue_update(
+                department=f"specialist_{specialist_id}",
+                date=queue_day.strftime("%Y-%m-%d") if hasattr(queue_day, "strftime") else str(queue_day),
+                event_type="queue_update",
+                data={"action": "entry_added", "entry_id": queue_entry.id, "number": queue_entry.number},
+            )
+        except Exception as ws_error:
+            logger.warning("Queue WS broadcast failed: %s", ws_error, exc_info=True)
+
         return QueueJoinResponse(
             success=True,
             number=queue_entry.number,

@@ -796,6 +796,22 @@ async def call_next_patient(
                     )
             except Exception as e:
                 logger.warning(f"Failed to update display for entry {entry_id}: {e}")
+
+            # UX Audit Stage 3 (Queue WebSocket):
+            # Broadcast to /ws/queue admin panel subscribers (instant update
+            # instead of 30s polling). Room: specialist_{id}::{date}.
+            try:
+                from app.ws.queue_ws import broadcast_queue_update
+
+                queue_date_str = queue_date.strftime("%Y-%m-%d") if queue_date else ""
+                broadcast_queue_update(
+                    department=f"specialist_{specialist_id}",
+                    date=queue_date_str,
+                    event_type="queue_update",
+                    data={"action": "call_next", "entry_id": entry_id},
+                )
+            except Exception as e:
+                logger.warning(f"Failed to broadcast queue WS update for entry {entry_id}: {e}")
         # --------------------------
 
         return CallNextPatientResponse(**result)
@@ -917,6 +933,21 @@ async def restore_entry_to_next(
         await manager.broadcast_queue_update(queue_entry=entry, event_type="queue.restored")
     except Exception as e:
         logger.warning(f"Failed to update display for entry {entry_id}: {e}")
+
+    # UX Audit Stage 3 (Queue WebSocket): broadcast to /ws/queue admin panel.
+    try:
+        from app.ws.queue_ws import broadcast_queue_update
+        from datetime import date as _date
+        _date_str = entry.queue.day.strftime("%Y-%m-%d") if hasattr(entry.queue, "day") and entry.queue.day else _date.today().strftime("%Y-%m-%d")
+        _dept = f"specialist_{entry.queue.specialist_id}" if entry.queue else "unknown"
+        broadcast_queue_update(
+            department=_dept,
+            date=_date_str,
+            event_type="queue_update",
+            data={"action": "restore_next", "entry_id": entry_id},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to broadcast queue WS update for entry {entry_id}: {e}")
     # ----------------------------
 
     return {
@@ -975,6 +1006,21 @@ async def mark_entry_no_show(
         # Also clean up from "Called" section if it was there
     except Exception as e:
         logger.warning(f"Failed to update display for entry {entry_id}: {e}")
+
+    # UX Audit Stage 3 (Queue WebSocket): broadcast to /ws/queue admin panel.
+    try:
+        from app.ws.queue_ws import broadcast_queue_update
+        from datetime import date as _date
+        _date_str = entry.queue.day.strftime("%Y-%m-%d") if hasattr(entry.queue, "day") and entry.queue.day else _date.today().strftime("%Y-%m-%d")
+        _dept = f"specialist_{entry.queue.specialist_id}" if entry.queue else "unknown"
+        broadcast_queue_update(
+            department=_dept,
+            date=_date_str,
+            event_type="queue_update",
+            data={"action": "no_show", "entry_id": entry_id},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to broadcast queue WS update for entry {entry_id}: {e}")
     # ----------------------------
 
     return {
