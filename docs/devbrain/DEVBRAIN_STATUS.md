@@ -27,13 +27,29 @@ Operational status file for the repository's DevBrain layers. Agents must verify
 
 - Base main commit before this status refresh: `81bac240d3b7246dd2a501e9de443c1bb0e24dda`
 - Retrieval layer commit: `10dc91c19c6a6536157c6b4ce9f102dbf86fe9b3`
+- **Z.ai cleanup sprint base**: `b2c22ae7` (pre-PR #1781) → `1aeef136` (post-PR #1805)
+- **Z.ai sprint stats**: 87 commits, 590 files changed, +16381/-9061 lines, 20+ PRs merged
 - Merge handling: use a normal merge commit so the retrieval layer commit remains in main ancestry.
 - Inventory: `passed`
 - Guardrail acceptance: `pass: 5`, `warn: 0`, `fail: 0`
-- LlamaIndex: `active local fallback`
-- LightRAG: `active relationship fallback`
+- LlamaIndex: `active local fallback` (dormant — see ADR-0007)
+- LightRAG: `active relationship fallback` (dormant — see ADR-0007)
 - Unified DevBrain status: `portable accepted in this checkout`
 - Limitation: `not a production autonomous brain`
+
+## Z.ai Cleanup Sprint Impact (2026-07-03 → 2026-07-04)
+
+- **Security**: bandit 0 HIGH/0 MEDIUM (was 17 HIGH/53 MEDIUM), pip-audit 0 CVEs, gitleaks active
+- **Monitoring**: Sentry wired (frontend + backend), DSNs committed, PII scrubbing 3 layers
+- **AI safety**: 18 endpoints feature-flagged, `requires_doctor_confirmation` enforced via Playwright spec
+- **Background jobs**: arq + Redis (replaced dead Celery stub), 3 jobs, cron daily retention
+- **Repo hygiene**: 0 stray .py at root or backend/ root (was 134), 6 canonical root .md (was 70)
+- **Validation**: `docs/runbooks/STAGING_VALIDATION.md` + `scripts/smoke_test_staging.sh` (10 checks, MANDATORY)
+- **CI**: 9 active workflows (was 11 — deleted 2 dead: monitoring.yml, load-testing.yml)
+- **Tests**: 60+ new unit tests (pii_masker, wait_time_predictor, synthetic_seed)
+- **Docs**: 4 ADRs added (0002-0006), Sentry runbook, Staging validation runbook
+
+See `docs/devbrain/PROJECT_MEMORY.md` "Z.ai Cleanup Sprint" section for full fact inventory.
 
 ## Active / Documented / Dormant / Missing Status
 
