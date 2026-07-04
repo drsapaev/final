@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Calendar,
   Clock,
+  CalendarClock,
   User,
   Phone,
   Home, // ✅ Добавлена иконка дома
@@ -15,6 +16,7 @@ import {
   MoreHorizontal,
   Eye,
   Edit,
+  X,
 
   CheckCircle,
   XCircle,
@@ -1584,6 +1586,20 @@ const EnhancedAppointmentsTable = ({
               const canComplete = isDoctorView && backendCanComplete === true;
               const canViewEmr = isDoctorView && backendCanViewEmr === true;
               const canScheduleNext = isDoctorView && backendCanScheduleNext === true;
+              // UX Audit Registrar #4: inline кнопки Cancel и Reschedule для registrar view.
+              // Раньше были доступны только через context menu (правый клик),
+              // что не работало на touch-устройствах (планшеты в регистратуре).
+              const canCancel = !isDoctorView && (
+                row?.status === 'waiting' ||
+                row?.status === 'called' ||
+                row?.status === 'pending' ||
+                row?.status === 'confirmed'
+              );
+              const canReschedule = !isDoctorView && (
+                row?.status === 'waiting' ||
+                row?.status === 'pending' ||
+                row?.status === 'confirmed'
+              );
 
               return (
                 <tr
@@ -2258,6 +2274,62 @@ const EnhancedAppointmentsTable = ({
 
                               <FileText size={14} />
                             </button>
+                      }
+
+                        {/* UX Audit Registrar #4: inline кнопки Cancel и Reschedule.
+                            Раньше только через context menu — недоступно на touch-устройствах. */}
+                        {canReschedule &&
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('reschedule', row, e);
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--mac-warning, #f59e0b)',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto'
+                        }}
+                        title="Перенос"
+                        aria-label="Перенос записи">
+                          <CalendarClock size={14} />
+                        </button>
+                      }
+
+                        {canCancel &&
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('cancel', row, e);
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--mac-error, #ef4444)',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto'
+                        }}
+                        title="Отмена"
+                        aria-label="Отмена записи">
+                          <X size={14} />
+                        </button>
                       }
 
                         {/* Еще */}

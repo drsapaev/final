@@ -26,7 +26,7 @@ const formatSpecialistLabel = (specialist) => {
     specialist?.name ||
     specialist?.specialty_display ||
     specialist?.specialty ||
-    'Мутахассис';
+    'Специалист';
   const specialtyLabel =
     specialist?.specialty_display ||
     specialist?.specialty ||
@@ -699,7 +699,7 @@ const QueueJoin = () => {
             }}>
               <div className="flex items-center">
                 <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
-                <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Мутахассис</span>
+                <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Специалист</span>
               </div>
               <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{queueInfo?.specialist_name}</span>
             </div>
@@ -791,7 +791,7 @@ const QueueJoin = () => {
               onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
               onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
             >
-              Янгилаш
+              Обновить
             </button>
           </div>
         </div>
@@ -872,7 +872,7 @@ const QueueJoin = () => {
                         <span style={{ fontSize: '24px' }}>{entry.icon || '👨‍⚕️'}</span>
                         <div>
                           <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
-                            {entry.specialist_name || entry.department || `Мутахассис ${idx + 1}`}
+                            {entry.specialist_name || entry.department || `Специалист ${idx + 1}`}
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
                             Вақт: {entry.queue_time ? formatRegistrarTime(entry.queue_time, 'uz-UZ') : '—'}
@@ -967,7 +967,7 @@ const QueueJoin = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
-                      <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Мутахассис</span>
+                      <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Специалист</span>
                     </div>
                     <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{result.specialist_name}</span>
                   </div>
@@ -1114,7 +1114,8 @@ const QueueJoin = () => {
                   color: 'var(--mac-text-secondary)',
                   fontSize: '15px'
                 }}>
-                  Мутахассислар юкланмоқда...
+                  {/* UX Audit Registrar #2: унифицирован i18n — был UZ, теперь RU. */}
+                  Загрузка специалистов...
                 </div>
               ) : availableSpecialists.length === 0 ? (
                 <div style={{
@@ -1129,7 +1130,7 @@ const QueueJoin = () => {
                   flexDirection: 'column',
                   gap: '10px'
                 }}>
-                  <span>Ҳозирча QR орқали танлаш учун мутахассислар мавжуд эмас.</span>
+                  <span> {/* UX Audit Registrar #2: был UZ, теперь RU. */} Сейчас нет специалистов для выбора через QR.</span>
                   <button
                     type="button"
                     onClick={loadTokenInfo}
@@ -1151,7 +1152,7 @@ const QueueJoin = () => {
                       e.currentTarget.style.background = A11Y_COLORS.primary;
                     }}
                   >
-                    Янгилаш
+                    Обновить
                   </button>
                 </div>
               ) : (

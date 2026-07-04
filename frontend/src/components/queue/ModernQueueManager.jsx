@@ -198,6 +198,9 @@ const ModernQueueManager = ({
   };
 
   // Открытие приема
+  // UX Audit Registrar #6: добавлен confirmation dialog.
+  // «Открыть приём» — необратимое действие: закрывает онлайн-запись.
+  // Раньше выполнялось без подтверждения.
   const openReception = async () => {
     if (!effectiveDoctor) {
       toast.error('Выберите врача');
@@ -206,6 +209,18 @@ const ModernQueueManager = ({
 
     if (queueData?.is_open) {
       toast.info('Прием уже открыт');
+      return;
+    }
+
+    // Confirmation: открытие приёма закрывает онлайн-запись для новых пациентов.
+    const doctorName = doctors.find((d) => String(d.id) === String(effectiveDoctor))?.full_name || 'выбранного врача';
+    const confirmed = window.confirm(
+      `Открыть приём для "${doctorName}"?\n\n` +
+      'После открытия приёма онлайн-запись через QR будет закрыта — ' +
+      'новые пациенты не смогут записаться онлайн.\n\n' +
+      'Нажмите «ОК» чтобы продолжить, или «Отмена» чтобы вернуться.'
+    );
+    if (!confirmed) {
       return;
     }
 

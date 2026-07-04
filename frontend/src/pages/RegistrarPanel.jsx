@@ -1704,6 +1704,15 @@ const RegistrarPanel = () => {
                     logger.info('Печать талона:', row);
                     setPrintDialog({ open: true, type: 'ticket', data: row });
                     break;
+                  // UX Audit Registrar #4: cancel и reschedule теперь доступны
+                  // как inline кнопки, а не только через context menu.
+                  case 'reschedule':
+                    setRescheduleData(row);
+                    setShowSlotsModal(true);
+                    break;
+                  case 'cancel':
+                    setCancelDialog({ open: true, row, reason: '' });
+                    break;
                   case 'more':{
                       // Показать контекстное меню с дополнительными действиями
                       const rect = event?.target?.getBoundingClientRect();
