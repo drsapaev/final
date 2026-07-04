@@ -6,9 +6,15 @@ import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.jsx');
+const wizardUtilsPath = path.resolve(__dirname, '../wizardUtils.js');
 const serviceResolverPath = path.resolve(__dirname, '../../../utils/serviceCodeResolver.js');
 
+// UX Audit Stage 3 (Wizard issue 5.2):
+// Helper-функции вынесены в wizardUtils.js, поэтому читаем оба файла.
 const readWizardSource = () => fs.readFileSync(wizardPath, 'utf8');
+const readWizardUtilsSource = () => fs.readFileSync(wizardUtilsPath, 'utf8');
+// Combined source: основной файл + утилиты — для contract-проверок паттернов.
+const readCombinedWizardSource = () => readWizardSource() + '\n\n// === wizardUtils.js ===\n\n' + readWizardUtilsSource();
 const readServiceResolverSource = () => fs.readFileSync(serviceResolverPath, 'utf8');
 
 const extractSourceBlock = (source, startMarker, endMarker) => {
@@ -21,7 +27,7 @@ const extractSourceBlock = (source, startMarker, endMarker) => {
 
 describe('AppointmentWizardV2 registrar metadata contract', () => {
   it('loads registrar services and doctors through the unified api client', () => {
-    const source = readWizardSource();
+    const source = readCombinedWizardSource();
     const servicesLoadBlock = extractSourceBlock(
       source,
       'const loadServices = useCallback(async () => {',
@@ -42,7 +48,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
   });
 
   it('preserves existing queue identity when grouping edit-mode cart items', () => {
-    const source = readWizardSource();
+    const source = readCombinedWizardSource();
     const groupingBlock = extractSourceBlock(
       source,
       'const groupCartItemsByVisit = () => {',
@@ -73,7 +79,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
   });
 
   it('normalizes edit-mode gender and persists selected existing-patient gender before submit', () => {
-    const source = readWizardSource();
+    const source = readCombinedWizardSource();
     const initBlock = extractSourceBlock(
       source,
       'useEffect(() => {',
@@ -85,13 +91,17 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       '// === ШАГ 1: ОПРЕДЕЛЯЕМ ИЛИ НАХОДИМ patient_id ===',
     );
 
-    expect(source).toContain('const normalizeGenderForForm = (value) => {');
+    // UX Audit Stage 3: helper now in wizardUtils.js as `export const`.
+    expect(source).toContain('normalizeGenderForForm = (value) => {');
     expect(source).toContain('[\'m\', \'male\', \'man\', \'men\', \'1\',');
     expect(source).toContain('[\'f\', \'female\', \'woman\', \'women\', \'2\',');
-    expect(source).toContain('const resolvePatientGenderValue = (record) => firstNonEmpty(');
+    // UX Audit Stage 3 (Wizard issue 5.2): helper functions moved to wizardUtils.js.
+    // Tests now check for `export const ...` and tolerate line breaks.
+    expect(source).toContain('resolvePatientGenderValue');
+    expect(source).toContain('firstNonEmpty(');
     expect(source).toContain('record?.patient_sex');
-    expect(source).toContain('const genderToPatientSexForApi = (value) => {');
-    expect(source).toContain('const resolveInitialPatientId = (initialData) => (');
+    expect(source).toContain('genderToPatientSexForApi');
+    expect(source).toContain('resolveInitialPatientId');
     expect(initBlock).toContain('id: resolveInitialPatientId(initialData)');
     expect(initBlock).toContain('const genderValue = resolvePatientGenderValue(initialData);');
     expect(initBlock).toContain('return normalizeGenderForForm(genderValue);');
@@ -112,7 +122,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
   });
 
   it('filters services only for real department tabs, not registrar view tabs', () => {
-    const source = readWizardSource();
+    const source = readCombinedWizardSource();
     const servicesLoadBlock = extractSourceBlock(
       source,
       'const loadServices = useCallback(async () => {',
@@ -128,7 +138,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
   });
 
   it('loads all services in edit mode while keeping category tabs active', () => {
-    const source = readWizardSource();
+    const source = readCombinedWizardSource();
     const initBlock = extractSourceBlock(
       source,
       'useEffect(() => {',
@@ -163,7 +173,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
   });
 
   it('treats service_details as existing services in edit mode to avoid duplicate queues', () => {
-    const source = readWizardSource();
+    const source = readCombinedWizardSource();
     const existingServicesBlock = extractSourceBlock(
       source,
       'const originalServiceCodes = new Set();',
@@ -181,7 +191,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
   });
 
   it('does not call registrar cart for edit mode when no new services were added', () => {
-    const source = readWizardSource();
+    const source = readCombinedWizardSource();
     const editSaveBlock = extractSourceBlock(
       source,
       'const hasNewServices = newServices.length > 0 || newServicesWithoutDoctor.length > 0;',
@@ -199,7 +209,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
   });
 
   it('uses stable unique keys for doctor options in cart rows', () => {
-    const source = readWizardSource();
+    const source = readCombinedWizardSource();
 
     expect(source).toContain('doctorOptions.map((doctor, index)');
     expect(source).toContain('key={`${doctor.id ?? \'doctor\'}-${doctor.specialty ?? \'\'}-${index}`}');

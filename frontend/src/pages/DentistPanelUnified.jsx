@@ -1576,7 +1576,7 @@ const DentistPanelUnified = () => {
       patients={patients}
       onGoToAppointments={() => handleTabChange('appointments')}
       onGoToPatients={() => handleTabChange('patients')}
-    />
+    />;
   const renderPatients = () =>
     <DentalPatientsTab
       patients={patients}
@@ -1584,7 +1584,7 @@ const DentistPanelUnified = () => {
       onDentalChart={handleDentalChart}
       onTreatment={handleTreatment}
       onProsthetic={handleProsthetic}
-    />
+    />;
   const renderAppointments = () =>
   <div className="dental-appointments-root">
       <Card padding="lg" className="dental-appointments-card">
@@ -1838,7 +1838,7 @@ const DentistPanelUnified = () => {
       onManageTemplates={handleProtocolTemplates}
       templates={[]}
       onApplyTemplate={() => notify.info('Шаблоны будут реализованы в следующей версии')}
-    />
+    />;
   const renderReports = () =>
     <DentalReportsTab
       savedVisitProtocols={savedVisitProtocols}
@@ -1846,7 +1846,7 @@ const DentistPanelUnified = () => {
       patients={patients}
       diagnoses={[]}
       prosthetics={prosthetics}
-    />
+    />;
   const renderDentalChart = () =>
   <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">

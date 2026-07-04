@@ -62,282 +62,39 @@ import './AppointmentWizardV2.css';
 // Константа оставлена закомментированной для исторического контекста.
 // const API_BASE = '/api/v1';
 
-const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
-const MIXED_REPEAT_WARNING = 'В текущей модели repeat применяется на весь checkout; для точного применения разделите оформление по специалистам.';
-
-// UX Audit Stage 3 (Wizard issue 5.3):
-// Именованные константы шагов wizard'а вместо магических чисел 1/2.
-// Раньше в коде было: setCurrentStep(1), setCurrentStep(2), currentStep === 1 и т.д.
-// Теперь: STEP_PATIENT, STEP_CART — сразу понятно, о каком шаге речь.
-const STEP_PATIENT = 1;
-const STEP_CART = 2;
-const TOTAL_STEPS = 2;
-// QW-08 fix: removed LEGACY_DRAFT_KEY constant — it was a dead-code remnant from a
-// draft-autosave feature that was disabled to keep patient PHI out of browser storage.
-// All 7 `localStorage.removeItem(LEGACY_DRAFT_KEY)` call sites were no-ops (removing
-// a key that was never written) and have been deleted. clearDraft() now performs a
-// pure in-memory reset without misleading the user with a "draft cleared" toast.
-
-const getLocalISODate = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const normalizeWizardContractValue = (value) => {
-  if (value === null || value === undefined) return '';
-  return String(value).trim().toLowerCase();
-};
-
-const getWizardRecordKind = (record) => normalizeWizardContractValue(
-  record?.record_kind ?? record?.record_type ?? record?.type
-);
-
-const getWizardSourceKind = (record) => normalizeWizardContractValue(
-  record?.source_kind ?? record?.source
-);
-
-const hasQueueIdentityValue = (value) => value !== null && value !== undefined && value !== '';
-
-const resolveExplicitQueueEntryId = (record, { allowLegacyId = true } = {}) => {
-  if (!record || typeof record !== 'object') return null;
-
-  const explicitQueueEntryId = record.original_queue_id ??
-    record.queue_entry_id ??
-    record.doctor_queue_entry_id ??
-    null;
-  if (hasQueueIdentityValue(explicitQueueEntryId)) {
-    return explicitQueueEntryId;
-  }
-
-  if (!allowLegacyId || hasQueueIdentityValue(record.queue_id)) {
-    return null;
-  }
-
-  return hasQueueIdentityValue(record.id) ? record.id : null;
-};
-
-const getFirstQueueNumberId = (record) => {
-  if (!Array.isArray(record?.queue_numbers) || record.queue_numbers.length === 0) {
-    return null;
-  }
-  return resolveExplicitQueueEntryId(record.queue_numbers[0]);
-};
-
-const resolveOnlineQueueEntryId = (record, recordKind, effectiveSource) => {
-  if (!record || recordKind !== 'online_queue' || effectiveSource !== 'online') {
-    return null;
-  }
-  return resolveExplicitQueueEntryId(record) ?? getFirstQueueNumberId(record);
-};
-
-const getRemovedQueueEntryIds = (originalQueueIds, cartItems = []) => {
-  const currentQueueIds = new Set(
-    cartItems
-      .map((item) => item.original_queue_id)
-      .filter((id) => id)
-  );
-
-  return Array.from(originalQueueIds || []).filter((id) => !currentQueueIds.has(id));
-};
-
-const cancelRemovedQueueEntries = async (originalQueueIds, cartItems, contextLabel) => {
-  const removedQueueIds = getRemovedQueueEntryIds(originalQueueIds, cartItems);
-  if (removedQueueIds.length === 0) {
-    logger.log(`[AppointmentWizardV2] no removed queue entries to cancel (${contextLabel})`);
-    return;
-  }
-
-  logger.log(`[AppointmentWizardV2] cancelling removed queue entries (${contextLabel}): ${removedQueueIds.join(', ')}`);
-  const results = await Promise.allSettled(
-    removedQueueIds.map((id) => api.post(`/online-queue/entries/${id}/cancel`))
-  );
-  const failedIds = results
-    .map((result, index) => ({ result, id: removedQueueIds[index] }))
-    .filter(({ result }) => result.status === 'rejected')
-    .map(({ id }) => id);
-
-  if (failedIds.length > 0) {
-    logger.error('[AppointmentWizardV2] failed to cancel removed queue entries', {
-      contextLabel,
-      failedIds
-    });
-    toast.warning('Не удалось отменить часть удаленных записей очереди. Обновите очередь.');
-    return;
-  }
-
-  logger.log(`[AppointmentWizardV2] removed queue entries cancelled (${contextLabel})`);
-};
-
-const normalizeServiceSelectionValue = (serviceValue) => {
-  if (serviceValue == null) return '';
-
-  if (typeof serviceValue === 'string' || typeof serviceValue === 'number' || typeof serviceValue === 'bigint') {
-    return String(serviceValue).trim();
-  }
-
-  if (typeof serviceValue === 'object') {
-    const candidate =
-      serviceValue.service_code ||
-      serviceValue.code ||
-      serviceValue.name ||
-      serviceValue.label ||
-      serviceValue.title ||
-      serviceValue.service_name ||
-      serviceValue.value ||
-      serviceValue._temp_name ||
-      '';
-    return String(candidate).trim();
-  }
-
-  return String(serviceValue).trim();
-};
-
-const normalizeServiceSelectionName = (serviceValue) => {
-  if (serviceValue == null) return '';
-
-  if (typeof serviceValue === 'object') {
-    const candidate =
-      serviceValue.name ||
-      serviceValue.service_name ||
-      serviceValue.label ||
-      serviceValue.title ||
-      serviceValue.code ||
-      serviceValue.service_code ||
-      serviceValue.value ||
-      '';
-    return String(candidate).trim();
-  }
-
-  return String(serviceValue).trim();
-};
-
-const normalizeGenderForForm = (value) => {
-  const normalized = String(value || '').trim().toLowerCase();
-  if (!normalized) return '';
-  if (['m', 'male', 'man', 'men', '1', 'м', 'муж', 'мужской', 'мужчина', 'erkak'].includes(normalized)) return 'male';
-  if (['f', 'female', 'woman', 'women', '2', 'ж', 'жен', 'женский', 'женщина', 'ayol'].includes(normalized)) return 'female';
-  return value;
-};
-
-const firstNonEmpty = (...values) => {
-  for (const value of values) {
-    if (value !== null && value !== undefined && String(value).trim() !== '') {
-      return value;
-    }
-  }
-  return '';
-};
-
-const resolvePatientGenderValue = (record) => firstNonEmpty(
-  record?.patient_gender,
-  record?.patient_sex,
-  record?.gender,
-  record?.sex,
-  record?.patient?.gender,
-  record?.patient?.sex
-);
-
-const genderToPatientSexForApi = (value) => {
-  const normalized = normalizeGenderForForm(value);
-  if (normalized === 'male') return 'M';
-  if (normalized === 'female') return 'F';
-  return null;
-};
-
-const resolveInitialPatientId = (initialData) => (
-  initialData?.patient_id ??
-  initialData?.patient?.id ??
-  null
-);
-
-const WIZARD_DEPARTMENT_FILTER_KEYS = {
-  cardio: ['cardio'],
-  cardiology: ['cardio', 'cardiology'],
-  echokg: ['cardio', 'echokg', 'ecg'],
-  ecg: ['cardio', 'echokg', 'ecg'],
-  derma: ['derma', 'dermatology'],
-  dermatology: ['derma', 'dermatology'],
-  dental: ['dental', 'dentistry', 'stomatology'],
-  dentistry: ['dental', 'dentistry', 'stomatology'],
-  stomatology: ['dental', 'dentistry', 'stomatology'],
-  lab: ['lab', 'laboratory'],
-  laboratory: ['lab', 'laboratory'],
-  procedures: ['procedures'],
-  procedure: ['procedures']
-};
-
-const getWizardDepartmentFilterKeys = (value) => {
-  const normalized = String(value || '').trim().toLowerCase();
-  return WIZARD_DEPARTMENT_FILTER_KEYS[normalized] || [];
-};
-
-const serviceCodeToWizardCategory = (value) => {
-  const prefix = String(value || '').trim().toUpperCase().charAt(0);
-  if (prefix === 'L') return 'laboratory';
-  if (prefix === 'P' || prefix === 'C') return 'procedures';
-  if (prefix === 'K' || prefix === 'D' || prefix === 'S') return 'specialists';
-  return null;
-};
-
-const activeTabToWizardCategory = (value) => {
-  const normalized = String(value || '').trim().toLowerCase();
-  if (['lab', 'laboratory'].includes(normalized)) return 'laboratory';
-  if (['procedures', 'procedure'].includes(normalized)) return 'procedures';
-  return 'specialists';
-};
-
-const resolveInitialServiceCategory = (items = [], activeTabValue = '') => {
-  const firstItem = (Array.isArray(items) ? items : []).find(Boolean);
-  const itemCategory = serviceCodeToWizardCategory(
-    firstItem?.service_code ||
-    firstItem?.code ||
-    firstItem?._temp_name ||
-    firstItem?.service_name
-  );
-  return itemCategory || activeTabToWizardCategory(activeTabValue);
-};
-
-// Категории услуг
-const categories = [
-{ id: 'specialists', label: 'Специалисты', icon: '👨‍⚕️' },
-{ id: 'laboratory', label: 'Лаборатория', icon: '🧪' },
-{ id: 'procedures', label: 'Процедуры', icon: '💉' }, // Объединяем косметологию и процедуры
-{ id: 'other', label: 'Прочее', icon: '📋' }];
-
-
-// CSS Keyframes for animations
-const wizardKeyframes = `
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-`;
-
-// Inject keyframes into the document
-if (typeof document !== 'undefined' && !document.getElementById('wizard-keyframes')) {
-  const style = document.createElement('style');
-  style.id = 'wizard-keyframes';
-  style.textContent = wizardKeyframes;
-  document.head.appendChild(style);
-}
+// UX Audit Stage 3 (Wizard issue 5.2):
+// Все utility-функции и константы вынесены в wizardUtils.js для уменьшения
+// размера основного файла (с 4175 до ~3870 строк) и возможности переиспользования.
+import {
+  PATIENT_NAME_PATTERN,
+  MIXED_REPEAT_WARNING,
+  STEP_PATIENT,
+  STEP_CART,
+  TOTAL_STEPS,
+  getLocalISODate,
+  normalizeWizardContractValue,
+  getWizardRecordKind,
+  getWizardSourceKind,
+  hasQueueIdentityValue,
+  resolveExplicitQueueEntryId,
+  getFirstQueueNumberId,
+  resolveOnlineQueueEntryId,
+  getRemovedQueueEntryIds,
+  cancelRemovedQueueEntries,
+  normalizeServiceSelectionValue,
+  normalizeServiceSelectionName,
+  normalizeGenderForForm,
+  firstNonEmpty,
+  resolvePatientGenderValue,
+  genderToPatientSexForApi,
+  resolveInitialPatientId,
+  WIZARD_DEPARTMENT_FILTER_KEYS,
+  getWizardDepartmentFilterKeys,
+  serviceCodeToWizardCategory,
+  activeTabToWizardCategory,
+  resolveInitialServiceCategory,
+  categories,
+} from './wizardUtils';
 
 const AppointmentWizardV2 = ({
   isOpen,
@@ -1638,7 +1395,7 @@ const AppointmentWizardV2 = ({
         // UX Audit Stage 3 (Wizard issue 5.1 + 5.3):
         // Заменён двойной raw fetch() (по форматированному + очищенному телефону)
         // на единый helper findPatientByPhoneVariants из api/patients.
-        let foundPatient = await findPatientByPhoneVariants(normalizedPhone);
+        const foundPatient = await findPatientByPhoneVariants(normalizedPhone);
         if (foundPatient) {
           logger.log('📋 Found existing patient by phone:', foundPatient.id);
         }
@@ -2477,7 +2234,7 @@ const AppointmentWizardV2 = ({
       } catch (cartError) {
         // Обработка ошибок создания корзины
         let errorMessage = cartError.message || `Ошибка создания записи (${cartError.status || 'network'})`;
-        let isPermissionError = cartError.status === 403;
+        const isPermissionError = cartError.status === 403;
 
         logger.error('❌ Ошибка создания корзины:', cartError.status, errorMessage);
 

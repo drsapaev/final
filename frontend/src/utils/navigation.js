@@ -52,7 +52,7 @@ export function hardRedirectToLogin(options = {}) {
   if (typeof window === 'undefined') return;
   if (getCurrentPathname() === '/login') return;
 
-  // eslint-disable-next-line no-console
+   
   console.warn(`[navigation] hard redirect to /login (reason: ${reason})`);
 
   const target = new URL('/login', window.location.origin);
@@ -75,7 +75,7 @@ export function hardRedirectTo(path, options = {}) {
   const { reason = 'init' } = options;
   if (typeof window === 'undefined') return;
   if (isOnPath(path)) return;
-  // eslint-disable-next-line no-console
+   
   console.warn(`[navigation] hard redirect to ${path} (reason: ${reason})`);
   window.location.assign(path);
 }

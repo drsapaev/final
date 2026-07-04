@@ -90,6 +90,48 @@ function buildSystemAlerts(systemAlertsData) {
   }));
 }
 
+// UX Audit Stage 3 (Dashboard issue 4.2): локализация приоритета уведомлений.
+// Раньше отображались английские 'high'/'medium'/'low' в русском UI.
+const PRIORITY_LABELS = {
+  high: 'Высокий',
+  medium: 'Средний',
+  low: 'Низкий',
+};
+
+function getPriorityLabel(priority) {
+  return PRIORITY_LABELS[priority] || priority;
+}
+
+// UX Audit Stage 3 (Dashboard issue 4.1):
+// Helper для экспорта данных активности в CSV.
+// Раньше кнопка «Экспорт» не имела onClick — была кнопкой-призраком.
+function exportActivityToCsv(chartData) {
+  if (!chartData?.data || chartData.data.length === 0) {
+    return;
+  }
+
+  const headers = ['Дата', 'Записи', 'Платежи', 'Пользователи', 'Всего'];
+  const rows = chartData.data.map((entry, index) => [
+    chartData.labels?.[index] || '',
+    entry.appointments || 0,
+    entry.payments || 0,
+    entry.users || 0,
+    entry.total || 0,
+  ]);
+
+  const csv = [headers, ...rows]
+    .map((row) => row.map((cell) => String(cell)).join(';'))
+    .join('\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `activity-${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 const AdminDashboard = () => {
   const {
     data: statsData,
@@ -134,6 +176,21 @@ const AdminDashboard = () => {
   const stats = statsData || defaultStats;
   const recentActivities = recentActivitiesData?.activities || [];
   const systemAlerts = React.useMemo(() => buildSystemAlerts(systemAlertsData), [systemAlertsData]);
+
+  // UX Audit Stage 3 (Dashboard issue 4.1):
+  // Handlers для кнопок «Экспорт» и «Все».
+  // Раньше это были кнопки-призраки без onClick.
+  const handleExportActivity = React.useCallback(() => {
+    exportActivityToCsv(activityChartData);
+  }, [activityChartData]);
+
+  const handleViewAllActivities = React.useCallback(() => {
+    // Переход к странице аналитики (если есть) или скролл к секции последних действий.
+    const analyticsRoute = '/admin/analytics';
+    if (typeof window !== 'undefined') {
+      window.location.assign(analyticsRoute);
+    }
+  }, []);
 
   const dashboardKpis = React.useMemo(() => [
     {
@@ -222,8 +279,8 @@ const AdminDashboard = () => {
           <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-24">
             <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
               <h3 className="admin-fs-lg-fw-semi-primary-m-0">Активность системы</h3>
-              <Button variant="outline" size="sm">
-                <Download className="admin-icon-16-mr-8" />
+              <Button variant="outline" size="sm" onClick={handleExportActivity} disabled={!activityChartData?.data?.length}>
+                <Download className="admin-icon-16-mr-8" aria-hidden="true" />
                 Экспорт
               </Button>
             </div>
@@ -274,8 +331,8 @@ const AdminDashboard = () => {
           <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0-1">
             <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
               <h3 className="admin-fs-lg-fw-semi-primary-m-0">Последние действия</h3>
-              <Button variant="outline" size="sm">
-                <Eye className="admin-icon-16-mr-8" />
+              <Button variant="outline" size="sm" onClick={handleViewAllActivities} disabled={recentActivities.length === 0}>
+                <Eye className="admin-icon-16-mr-8" aria-hidden="true" />
                 Все
               </Button>
             </div>
@@ -342,7 +399,8 @@ const AdminDashboard = () => {
                     <p className="admin-fs-12-secondary-m-4px-0-0-0">{alert.time}</p>
                   </div>
                   <Badge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
-                    {alert.priority}
+                    {/* UX Audit Stage 3 (Dashboard issue 4.2): локализация приоритета. */}
+                    {getPriorityLabel(alert.priority)}
                   </Badge>
                 </div>
               ))}

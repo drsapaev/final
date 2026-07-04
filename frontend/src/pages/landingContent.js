@@ -678,7 +678,7 @@ const UZ_OVERRIDES = {
     description:
       'MediClinic Pro registratura, shifokor, QR-navbat, tolovlar, Telegram va hisobotlarni bitta workflow ichida birlashtiradi, jamoalar orasida qol mehnatisiz.',
     primaryCta: 'Demo ochish',
-    secondaryCta: "Interfeysni ko'rish",
+    secondaryCta: 'Interfeysni ko\'rish',
     proofChips: ['Shifokor EMR', 'QR-navbat', 'Telegram signal', 'Tolovlar va hisobotlar'],
     quickStats: [
       { value: '4', label: 'asosiy rol', detail: 'registratura, shifokor, kassa, rahbar' },
