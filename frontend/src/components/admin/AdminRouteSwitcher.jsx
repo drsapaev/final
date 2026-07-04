@@ -42,6 +42,11 @@ const switcherStyle = {
   border: '1px solid var(--mac-card-border)',
   background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-card-bg), white 10%) 0%, var(--mac-card-bg) 100%)',
   boxShadow: 'var(--mac-shadow-sm)',
+  // UX Audit Stage 3 (Dashboard issue 4.2): sticky position.
+  // Раньше switcher пропадал при прокрутке вниз — теперь остаётся видимым.
+  position: 'sticky',
+  top: 'var(--mac-spacing-3)',
+  zIndex: 10,
 };
 
 const switcherLabelStyle = {

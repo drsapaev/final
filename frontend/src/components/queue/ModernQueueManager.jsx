@@ -7,7 +7,7 @@ import PropTypes from 'prop-types';
 // Заменены SF Symbols (Icon) на lucide-react — единая библиотека иконок.
 // Раньше Queue был единственным экраном, использующим SF Symbols.
 import {
-  QrCode, Building2, CheckCircle, Settings, Bell, User, Clock, ArrowDownCircle,
+  QrCode, Building2, CheckCircle, Settings, Bell, User, Clock, ArrowDownCircle, RefreshCw,
 } from 'lucide-react';
 import {
   Button, CardContent, Badge, Select,
@@ -454,9 +454,9 @@ const ModernQueueManager = ({
                 aria-label={autoRefresh ? 'Отключить автообновление очереди' : 'Включить автообновление очереди'}
                 title={autoRefresh ? 'Автообновление включено' : 'Автообновление выключено'}>
 
-                <Icon
-                  name={autoRefresh ? 'arrow.clockwise.circle.fill' : 'arrow.clockwise.circle'}
-                  size="medium"
+                <RefreshCw
+                  size={20}
+                  aria-hidden="true"
                   style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
 
               </button>

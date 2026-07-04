@@ -75,7 +75,7 @@ describe('Landing', () => {
 
     // Find the UZ option in the dropdown listbox
     const listbox = screen.getByRole('listbox');
-    const uzOption = within(listbox).getByText("O'zbek");
+    const uzOption = within(listbox).getByText('O\'zbek');
     await user.click(uzOption);
 
     expect(
