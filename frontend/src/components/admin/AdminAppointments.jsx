@@ -364,6 +364,7 @@ const AdminAppointments = () => {
               }
             />
           ) : (
+            <div className="admin-table-wrapper">
             <table className="admin-w-100pct-bc-collapse" aria-label="Таблица записей">
               <thead>
                 <tr
@@ -514,6 +515,7 @@ const AdminAppointments = () => {
                 })}
               </tbody>
             </table>
+          </div>
           )}
         </div>
       </MacOSCard>
