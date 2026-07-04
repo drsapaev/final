@@ -880,6 +880,14 @@ const DermatologistPanelUnified = () => {
     loadServices();
   }, [loadPatients, loadSkinExaminations, loadCosmeticProcedures, loadServices]);
 
+  // D-5 (UX audit): auto-promote selectedPatient to currentAppointment
+  // so the first visit branch (with EMRContainerV2) renders correctly.
+  useEffect(() => {
+    if (selectedPatient && !currentAppointment && activeTab === 'visit') {
+      setCurrentAppointment(selectedPatient);
+    }
+  }, [selectedPatient, currentAppointment, activeTab]);
+
   useEffect(() => {
     if (selectedPatient) {
       loadPatientData();
@@ -1610,163 +1618,10 @@ const DermatologistPanelUnified = () => {
           }
 
           {/* Прием пациента - простая версия */}
-          {activeTab === 'visit' && selectedPatient && !currentAppointment &&
-          <div className="derma-flex-col-24">
-              {/* Информация о пациенте */}
-              <MacOSCard className="derma-p-8">
-                <h3 className="derma-flex-center">
-                  <User size={20} className="derma-icon-mr-blue" />
-                  Пациент #{selectedPatient.number}
-                </h3>
+          {/* D-5 (UX audit): removed duplicate visit branch (157 lines).
+              The first visit branch (currentAppointment) handles all rendering via EMRContainerV2.
+              If selectedPatient exists without currentAppointment, a useEffect auto-promotes it. */}
 
-                <div className="derma-grid-auto-200">
-                  <div>
-                    <label className="derma-label-13-mb6">
-                      ФИО пациента
-                    </label>
-                    <div className="derma-text-16-600-primary">{selectedPatient.patient_name}</div>
-                  </div>
-
-                  {selectedPatient.phone &&
-                <div>
-                      <label className="derma-label-13-mb6">
-                        Телефон
-                      </label>
-                      <div className="derma-flex-center">
-                        <Phone size={16} className="derma-icon-mr derma-text-secondary" />
-                        <span className="derma-text-16-500-primary">{selectedPatient.phone}</span>
-                      </div>
-                    </div>
-                }
-                </div>
-              </MacOSCard>
-
-              {/* Жалобы и диагноз */}
-              <MacOSCard className="derma-p-8">
-                <h3 className="derma-section-heading-display">Жалобы и диагноз</h3>
-
-                <div className="derma-flex-col-20">
-                  <div>
-                    <label className="derma-label-13-mb6">
-                      Жалобы пациента
-                    </label>
-                    <Textarea
-                    value={visitData.complaint}
-                    onChange={(e) => setVisitData({ ...visitData, complaint: e.target.value })}
-                    rows={4}
-                    placeholder="Опишите жалобы пациента..." />
-
-                  </div>
-
-                  <div className="derma-grid-auto-200">
-                    <div>
-                      <label className="derma-label-13-mb6">
-                        Диагноз
-                      </label>
-                      <Input
-                      type="text"
-                      value={visitData.diagnosis}
-                      onChange={(e) => setVisitData({ ...visitData, diagnosis: e.target.value })}
-                      placeholder="Диагноз" />
-
-                    </div>
-
-                    <div>
-                      <label className="derma-label-13-mb6">
-                        МКБ-10
-                      </label>
-                      <Input
-                      type="text"
-                      value={visitData.icd10}
-                      onChange={(e) => setVisitData({ ...visitData, icd10: e.target.value })}
-                      placeholder="L70.9" />
-
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="derma-label-13-mb6">
-                      Примечания
-                    </label>
-                    <Textarea
-                    value={visitData.notes}
-                    onChange={(e) => setVisitData({ ...visitData, notes: e.target.value })}
-                    rows={3}
-                    placeholder="Дополнительные примечания..." />
-
-                  </div>
-                </div>
-              </MacOSCard>
-
-              {/* Услуги визита */}
-              <DoctorServiceSelector
-              specialty="dermatology"
-              selectedServices={selectedServices}
-              onServicesChange={setSelectedServices}
-              canEditPrices={true} />
-
-
-              {/* EMR система */}
-              {currentAppointment &&
-            <MacOSCard className="derma-p-8">
-                  <h3 className="derma-flex-center">
-                    <FileText size={20} className="derma-icon-mr-blue" />
-                    Электронная медицинская карта
-                  </h3>
-                  <EMRContainerV2
-                visitId={currentAppointment?.visit_id}
-                patientId={currentAppointment?.patient_id}
-                specialty="dermatology" />
-
-                </MacOSCard>
-            }
-
-              {/* Система рецептов */}
-              {currentAppointment && emr && !emr.is_draft &&
-            <MacOSCard className="derma-p-8">
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <TestTube size={20} className="mr-2 text-green-600" />
-                    Рецепт
-                  </h3>
-                  <PrescriptionSystem
-                appointment={currentAppointment}
-                emr={emr}
-                prescription={prescription}
-                canCreatePrescription={canCreatePrescription}
-                onSave={savePrescription} />
-
-                </MacOSCard>
-            }
-
-              {/* Действия */}
-              <MacOSCard className="derma-p-8">
-                <div className="flex justify-end space-x-3">
-                  <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedPatient(null);
-                    handleTabChange('queue');
-                  }}>
-
-                    Отменить
-                  </Button>
-                  <Button
-                  onClick={handleSaveVisit}
-                  disabled={loading || !visitData.complaint && !emr}>
-
-                    {loading ?
-                  <RefreshCw size={16} className="animate-spin mr-2" /> :
-
-                  <Save size={16} className="mr-2" />
-                  }
-                    {loading ? 'Завершение...' : 'Завершить прием'}
-                  </Button>
-                </div>
-              </MacOSCard>
-            </div>
-          }
-
-          {/* Фото до/после */}
           {activeTab === 'visit' && !currentAppointment && !selectedPatient &&
           <MacOSCard className="derma-p-48">
               <MacOSEmptyState
