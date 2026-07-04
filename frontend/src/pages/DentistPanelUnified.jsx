@@ -24,6 +24,7 @@ import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import DentalReportsTab from '../components/dental/DentalReportsTab';
 import DentalTemplatesTab from '../components/dental/DentalTemplatesTab';
 import DentalDashboardTab from '../components/dental/DentalDashboardTab';
+import DentalPatientsTab from '../components/dental/DentalPatientsTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
@@ -1577,178 +1578,13 @@ const DentistPanelUnified = () => {
       onGoToPatients={() => handleTabChange('patients')}
     />
   const renderPatients = () =>
-  <div className="dental-flex-col dental-gap-24">
-      {/* Поиск и фильтры */}
-      <Card padding="lg">
-        <div className="dental-flex-row-wrap">
-          <div className="dental-flex-1 dental-min-w-200">
-            <div className="dental-search-wrap">
-              <Search className="dental-search-icon dental-icon-16" />
-              <input
-              type="text"
-              placeholder="Поиск пациентов..."
-              aria-label="Search dentist patients"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="dental-text-primary"
-              onFocus={(e) => {
-                e.target.style.outline = 'var(--mac-focus-ring)';
-                e.target.style.outlineOffset = '2px';
-                e.target.style.borderColor = 'var(--mac-accent-blue)';
-              }}
-              onBlur={(e) => {
-                e.target.style.outline = 'none';
-                e.target.style.borderColor = 'var(--mac-border)';
-              }} />
-
-            </div>
-          </div>
-          <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="dental-text-primary"
-          onFocus={(e) => {
-            e.target.style.outline = 'var(--mac-focus-ring)';
-            e.target.style.outlineOffset = '2px';
-            e.target.style.borderColor = 'var(--mac-accent-blue)';
-          }}
-          onBlur={(e) => {
-            e.target.style.outline = 'none';
-            e.target.style.borderColor = 'var(--mac-border)';
-          }}>
-
-            <option value="all">Все статусы</option>
-            <option value="active">Активные</option>
-            <option value="inactive">Неактивные</option>
-          </select>
-        </div>
-      </Card>
-
-      {/* Список пациентов */}
-      <div className="dental-grid-auto-fill-250">
-        {filteredPatients.map((patient) =>
-      <Card
-        key={patient.id}
-        padding="lg"
-        className="dental-card-btn"
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-lg)';
-          e.currentTarget.style.transform = 'translateY(-2px)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}>
-
-            <div className="dental-flex-between-16">
-              <div className="dental-flex dental-gap-12">
-                <div className="dental-avatar dental-icon-bg dental-icon-bg-blue">
-                  <span className="dental-text-value dental-heading dental-text-white">
-                    {patient.name?.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <h3 className="dental-text-primary">{patient.name}</h3>
-                  <p className="dental-text-desc dental-text-secondary">{patient.phone}</p>
-                </div>
-              </div>
-              <Badge variant={patient.status === 'active' ? 'success' : 'warning'}>
-                {patient.status}
-              </Badge>
-            </div>
-
-            <div className="dental-flex-col dental-gap-8">
-              <p className="dental-text-desc dental-text-secondary">
-                <strong className="dental-fw-700">Возраст:</strong> {patient.age} лет
-              </p>
-              <p className="dental-text-desc dental-text-secondary">
-                <strong className="dental-fw-700">Последний визит:</strong> {patient.lastVisit || 'Не было'}
-              </p>
-            </div>
-
-            <div className="dental-grid-2col dental-gap-8">
-              <Button
-            size="sm"
-            onClick={() => handlePatientSelect(patient)}
-            className="dental-grid-span-2">
-
-                <Edit className="dental-icon-16 dental-mr-4" />
-                Карточка пациента
-              </Button>
-              <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            aria-label={`Open examination for ${patient.name || patient.id}`}
-            onClick={() => handleExamination(patient)}
-            title="Осмотр"
-            className="dental-p-8px">
-
-                <Eye aria-hidden="true" className="dental-icon-16" />
-              </Button>
-              <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            aria-label={`Open diagnoses for ${patient.name || patient.id}`}
-            onClick={() => handleDiagnosis(patient)}
-            title="Диагнозы"
-            className="dental-p-8px">
-
-                <Stethoscope aria-hidden="true" className="dental-icon-16" />
-              </Button>
-              <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            aria-label={`Open visit protocol for ${patient.name || patient.id}`}
-            onClick={() => handleVisitProtocol(patient)}
-            title="Протокол визита"
-            className="dental-p-8px">
-
-                <FileText aria-hidden="true" className="dental-icon-16" />
-              </Button>
-              <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            aria-label={`Open dental chart for ${patient.name || patient.id}`}
-            onClick={() => handleDentalChart(patient)}
-            title="Схема зубов"
-            className="dental-p-8px">
-
-                <Tooth aria-hidden="true" className="dental-icon-16" />
-              </Button>
-              <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            aria-label={`Open treatment for ${patient.name || patient.id}`}
-            onClick={() => handleTreatment(patient)}
-            title="Лечение"
-            className="dental-p-8px">
-
-                <Scissors aria-hidden="true" className="dental-icon-16" />
-              </Button>
-              <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            aria-label={`Open prosthetics for ${patient.name || patient.id}`}
-            onClick={() => handleProsthetic(patient)}
-            title="Протезирование"
-            className="dental-p-8px">
-
-                <Smile aria-hidden="true" className="dental-icon-16" />
-              </Button>
-            </div>
-          </Card>
-      )}
-      </div>
-    </div>;
-
-
-  // Рендер записей
+    <DentalPatientsTab
+      patients={patients}
+      onSelectPatient={handlePatientSelect}
+      onDentalChart={handleDentalChart}
+      onTreatment={handleTreatment}
+      onProsthetic={handleProsthetic}
+    />
   const renderAppointments = () =>
   <div className="dental-appointments-root">
       <Card padding="lg" className="dental-appointments-card">
