@@ -167,21 +167,23 @@ const Sidebar = React.forwardRef(({
             const itemStyles = {
               display: 'flex',
               alignItems: 'center',
-              padding: isCollapsed ? '12px' : '8px 12px',
-              borderRadius: '4px',
-              background: isActive ? 'var(--mac-nav-item-active)' : 'var(--mac-nav-item-bg)',
-              color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)',
+              padding: isCollapsed ? '10px' : '7px 10px',
+              borderRadius: 'var(--mac-radius-md, 6px)',
+              // Sprint 8: macOS Finder-style active state — accent bg, no border, subtle
+              background: isActive ? 'var(--mac-accent-bg)' : 'transparent',
+              color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)',
               textDecoration: 'none',
-              fontSize: '13px',
-              fontWeight: isActive ? '600' : '400',
+              fontSize: 'var(--mac-font-size-base, 13px)',
+              fontWeight: isActive ? 'var(--mac-font-weight-semibold, 600)' : 'var(--mac-font-weight-normal, 400)',
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
               cursor: 'pointer',
-              transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-              border: isActive ? '1px solid var(--mac-nav-item-active-border)' : '1px solid var(--mac-border)',
+              transition: 'background-color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease), color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease)',
+              border: 'none',
               width: '100%',
               justifyContent: isCollapsed ? 'center' : 'flex-start',
               gap: isCollapsed ? '0' : '8px',
-              boxShadow: isActive ? '0 8px 18px rgba(0, 0, 0, 0.14)' : 'none',
+              boxShadow: 'none',
+              margin: '1px 0',
             };
 
             const handleItemClick = () => {
@@ -204,7 +206,9 @@ const Sidebar = React.forwardRef(({
                   name={item.icon}
                   size="default"
                   style={{
-                    color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)'
+                    // Sprint 8: active icon = accent color, inactive = secondary
+                    color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                    opacity: isActive ? 1 : 0.85,
                   }} />
 
                 }
@@ -216,7 +220,7 @@ const Sidebar = React.forwardRef(({
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)'
+                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)'
                 }}>
                     {item.label}
                   </span>
@@ -224,12 +228,12 @@ const Sidebar = React.forwardRef(({
 
                 {!isCollapsed && item.badge &&
                 <span style={{
-                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.16)' : 'var(--mac-bg-secondary)',
-                  color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  padding: '2px 6px',
-                  borderRadius: '10px',
+                  backgroundColor: isActive ? 'var(--mac-accent-bg)' : 'var(--mac-bg-tertiary)',
+                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                  fontSize: 'var(--mac-font-size-xs, 11px)',
+                  fontWeight: 'var(--mac-font-weight-semibold, 600)',
+                  padding: '2px 7px',
+                  borderRadius: 'var(--mac-radius-sm, 4px)',
                   minWidth: '18px',
                   textAlign: 'center'
                 }}>
@@ -239,27 +243,35 @@ const Sidebar = React.forwardRef(({
               </button>);
           };
 
-          // Section header style — small uppercase muted label
-          const sectionHeaderStyle = {
-            padding: '12px 12px 4px 12px',
-            fontSize: '10px',
-            fontWeight: '600',
+          // Sprint 8: Section header base style — macOS native: uppercase, muted
+          const sectionHeaderBaseStyle = {
+            padding: '16px 12px 6px 12px',
+            fontSize: 'var(--mac-font-size-xs, 11px)',
+            fontWeight: 'var(--mac-font-weight-semibold, 600)',
             textTransform: 'uppercase',
-            letterSpacing: '0.6px',
-            color: 'var(--mac-text-secondary, #6b7280)',
+            letterSpacing: '0.5px',
+            color: 'var(--mac-text-tertiary, var(--mac-text-secondary))',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           };
 
           // If sections provided AND sidebar is expanded (not collapsed),
-          // render grouped. When collapsed, fall back to flat list — section
-          // headers would just waste vertical space in compact mode.
+          // render grouped with macOS-native visual separators between sections.
           if (Array.isArray(sections) && sections.length > 0 && !isCollapsed) {
             return sections.map((section, sectionIdx) => (
-              <div key={`section-${sectionIdx}-${section.title || ''}`} style={{ marginBottom: '4px' }}>
+              <div key={`section-${sectionIdx}-${section.title || ''}`} style={{ marginBottom: '2px' }}>
                 {section.title && (
-                  <div style={sectionHeaderStyle} aria-hidden="true">{section.title}</div>
+                  <div
+                    style={{
+                      ...sectionHeaderBaseStyle,
+                      borderTop: sectionIdx > 0 ? '1px solid var(--mac-separator, var(--mac-border))' : 'none',
+                      marginTop: sectionIdx > 0 ? '8px' : '0',
+                    }}
+                    aria-hidden="true"
+                    className="mac-sidebar-section-header">
+                    {section.title}
+                  </div>
                 )}
                 {(section.items || []).map(renderItem)}
               </div>
@@ -298,8 +310,7 @@ const Sidebar = React.forwardRef(({
         }
 
         .mac-sidebar-item:hover {
-          background: ${isCollapsed ? 'transparent' : 'var(--mac-nav-item-hover)'} !important;
-          color: var(--mac-text-primary) !important;
+          background: ${isCollapsed ? 'transparent' : 'var(--mac-bg-secondary)'} !important;
         }
 
         .mac-sidebar-item:hover .mac-icon {
@@ -307,6 +318,8 @@ const Sidebar = React.forwardRef(({
         }
 
         .mac-sidebar-item--active:hover {
+          background: var(--mac-accent-bg) !important;
+        }
           background: var(--mac-nav-item-active) !important;
           border-color: var(--mac-nav-item-active-border) !important;
         }
