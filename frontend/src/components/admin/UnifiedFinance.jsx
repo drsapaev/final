@@ -41,8 +41,7 @@ AdminTabs.propTypes = {
 
 const UnifiedFinance = ({ renderFinance }) => {
   const [searchParams] = useSearchParams();
-  const section = searchParams.get('section') || 'finance';void
-  useTheme();
+  const section = searchParams.get('section') || 'finance';
 
   const getActiveTab = (section) => {
     switch (section) {

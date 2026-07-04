@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-07-04 — Admin Sprint 1: P0 silent regressions & data-integrity fixes (fix/admin-sprint1-p0-silent-regressions)
+
+### Void codemod damage — phantom `useState` / `useTheme` (3 files)
+Auto-codemod `const X = useState(...)` → `void useState(...)` left syntax artifacts in 3 live admin files. Removed the phantom lines (the deleted state vars were genuinely unused — codemod was right to remove the binding, wrong to leave the call dangling).
+
+- **`BillingManager.jsx:99–100`** — removed `void\nuseState(null);` (was `selectedInvoice`, unused — `paymentForm.invoice_id` already tracks the target invoice).
+- **`DiscountBenefitsManager.jsx:57–58`** — removed `void\nuseState(null);` (was `editingItem`, unused — create-form is the only flow).
+- **`UnifiedFinance.jsx:44–45`** — removed `void\nuseTheme();` (same fix as `UnifiedNotifications` in Step 3 PR #1830).
+
+Note: 3 other files (`WebhookManager.jsx:55–56`, `DynamicPricingManager.jsx:178–179`, `DisplayBoardSettings.jsx:35,40`) have `const [, setX] = useState(...)` — valid JS, setters are called but UI was never implemented. Not P0 (never-implemented feature, not a codemod break). Deferred to P2 cleanup.
+
+### Raw `fetch()` → axios migration (2 files, P0 security)
+`TelegramSettings.jsx` (7 call sites) and `GraphQLExplorer.jsx` (2 call sites) used raw `fetch()` with manual `Bearer ${tokenManager.getAccessToken()}` headers, bypassing the axios instance's auth-refresh interceptor. On access-token rotation this would silently send a stale token → 401 → silent failure.
+
+- **`TelegramSettings.jsx`** — migrated `loadData` (3 GETs via `Promise.allSettled`), `saveSettings` (PUT), `testBot` (POST), `setWebhook` (POST), `sendTestMessage` (POST) to `api.get/put/post`. Removed `tokenManager` import, added `import { api } from '../../api/client'`.
+- **`GraphQLExplorer.jsx`** — migrated `loadSchema` (POST introspection) and `executeQuery` (POST query) to `api.post('/graphql', ...)`. Removed `tokenManager` import.
+
+### Fake-data fallback removal (2 files, P0 data integrity)
+On API failure, 2 admin components showed fabricated numbers — admin saw a "healthy" dashboard when the backend was down.
+
+- **`ClinicManagement.jsx:75–84, 100–109`** — removed hardcoded fallback `{ total_branches: 3, active_licenses: 7, total_backups: 12, ... }`. On API error now sets `stats = null` / `systemHealth = null`, which triggers the existing `<MacOSEmptyState title="Статистика недоступна" />` and the `systemHealth ?` guard.
+- **`MedicalEquipmentManager.jsx:67–90, 100–112, 124–146`** — removed 3 mock-fallback blocks (devices: "Тонометр Omron M3" / "Термометр Braun"; overview: 2 devices / 15 measurements; measurements: fabricated BP/thermometer readings). On API error now sets empty arrays / zero-defaults overview. Admin no longer risks acting on fabricated equipment data.
+
+Verification:
+- `vite build` → ✓ built in ~25s, exit 0, all chunks emitted.
+- `vitest run` → ✓ 515/515 tests pass across 105 test files.
+- `eslint` on 7 modified files → 0 errors (1 pre-existing warning unchanged).
+- `grep` for `fetch(` / `tokenManager` in TelegramSettings + GraphQLExplorer → 0 matches.
+
 ## 2026-07-04 — Admin panel dead-code cleanup — Step 3 (chore/admin-step3-wire-and-delete)
 - **Wire-in: `UnifiedNotifications` → `/admin/push-notifications`** (new route). Restores 2 admin functions that had live backend endpoints but dead frontend UI:
   - **FCM push notifications** (`FCMManager.jsx`, 521 lines) — `/fcm/status`, `/fcm/user-tokens`, `/fcm/send-test-notification`, `/fcm/send-notification` endpoints.
