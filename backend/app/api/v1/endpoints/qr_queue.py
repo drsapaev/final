@@ -1472,7 +1472,7 @@ def full_update_online_entry(
             # entries as already having the requested services.
             session_filters = [
                 DailyQueue.day == queue_day,
-                OnlineQueueEntry.visit_id is None,
+                OnlineQueueEntry.visit_id.is_(None),
                 OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
             ]
             session_label = None
