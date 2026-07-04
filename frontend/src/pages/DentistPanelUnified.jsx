@@ -81,29 +81,6 @@ const API_V1_BASE = getApiBaseUrl();
 const DENTISTRY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
 const DENTISTRY_CALLED_STATUSES = ['called', 'in_progress'];
 const DENTISTRY_COMPLETED_STATUSES = ['completed', 'done'];
-const DENTISTRY_LAZY_FALLBACK_STYLE = {
-  margin: 'var(--mac-spacing-4)',
-  padding: 'var(--mac-spacing-4)',
-  color: 'var(--mac-text-secondary)',
-  textAlign: 'center'
-};
-const dentistryAppointmentsHeaderStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 'var(--mac-spacing-4)',
-  marginBottom: 'var(--mac-spacing-4)',
-  flexWrap: 'wrap'
-};
-const dentistryAppointmentsTitleStyle = {
-  fontSize: 'var(--mac-font-size-lg)',
-  fontWeight: 'var(--mac-font-weight-medium)',
-  display: 'flex',
-  alignItems: 'center',
-  color: 'var(--mac-text-primary)',
-  margin: 0,
-  minWidth: 'min(100%, 260px)'
-};
 let dentistAppointmentsCache = null;
 let dentistAppointmentsLoadPromise = null;
 let dentistServicesCache = null;
@@ -1706,15 +1683,7 @@ const DentistPanelUnified = () => {
         <div class="dental-flex-row-wrap">
           <div class="dental-flex-1 dental-min-w-200">
             <div class="dental-search-wrap">
-              <Search style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              height: '16px',
-              width: '16px',
-              color: 'var(--mac-text-tertiary)'
-            }} />
+              <Search className="dental-search-icon dental-icon-16" />
               <input
               type="text"
               placeholder="Поиск пациентов..."
@@ -1813,7 +1782,7 @@ const DentistPanelUnified = () => {
             aria-label={`Open examination for ${patient.name || patient.id}`}
             onClick={() => handleExamination(patient)}
             title="Осмотр"
-            style={{ padding: '8px' }}>
+            className="dental-p-8px">
 
                 <Eye aria-hidden="true" className="dental-icon-16" />
               </Button>
@@ -1824,7 +1793,7 @@ const DentistPanelUnified = () => {
             aria-label={`Open diagnoses for ${patient.name || patient.id}`}
             onClick={() => handleDiagnosis(patient)}
             title="Диагнозы"
-            style={{ padding: '8px' }}>
+            className="dental-p-8px">
 
                 <Stethoscope aria-hidden="true" className="dental-icon-16" />
               </Button>
@@ -1835,7 +1804,7 @@ const DentistPanelUnified = () => {
             aria-label={`Open visit protocol for ${patient.name || patient.id}`}
             onClick={() => handleVisitProtocol(patient)}
             title="Протокол визита"
-            style={{ padding: '8px' }}>
+            className="dental-p-8px">
 
                 <FileText aria-hidden="true" className="dental-icon-16" />
               </Button>
@@ -1846,7 +1815,7 @@ const DentistPanelUnified = () => {
             aria-label={`Open dental chart for ${patient.name || patient.id}`}
             onClick={() => handleDentalChart(patient)}
             title="Схема зубов"
-            style={{ padding: '8px' }}>
+            className="dental-p-8px">
 
                 <Tooth aria-hidden="true" className="dental-icon-16" />
               </Button>
@@ -1857,7 +1826,7 @@ const DentistPanelUnified = () => {
             aria-label={`Open treatment for ${patient.name || patient.id}`}
             onClick={() => handleTreatment(patient)}
             title="Лечение"
-            style={{ padding: '8px' }}>
+            className="dental-p-8px">
 
                 <Scissors aria-hidden="true" className="dental-icon-16" />
               </Button>
@@ -1868,7 +1837,7 @@ const DentistPanelUnified = () => {
             aria-label={`Open prosthetics for ${patient.name || patient.id}`}
             onClick={() => handleProsthetic(patient)}
             title="Протезирование"
-            style={{ padding: '8px' }}>
+            className="dental-p-8px">
 
                 <Smile aria-hidden="true" className="dental-icon-16" />
               </Button>
@@ -1881,23 +1850,11 @@ const DentistPanelUnified = () => {
 
   // Рендер записей
   const renderAppointments = () =>
-  <div style={{
-    width: '100%',
-    maxWidth: 'none',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '24px'
-  }}>
-      <Card padding="lg" style={{
-      width: '100%',
-      maxWidth: '100%',
-      minWidth: 0,
-      boxSizing: 'border-box',
-      overflow: 'hidden'
-    }}>
-        <div style={dentistryAppointmentsHeaderStyle}>
-          <h3 style={dentistryAppointmentsTitleStyle}>
-            <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-success)' }} />
+  <div className="dental-appointments-root">
+      <Card padding="lg" className="dental-appointments-card">
+        <div className="dental-appointments-header">
+          <h3 className="dental-appointments-title">
+            <Calendar className="dental-icon-20 dental-text-success dental-mr-8" />
             Записи к стоматологу
           </h3>
           <AppointmentSummaryBar
@@ -2772,7 +2729,7 @@ const DentistPanelUnified = () => {
       {showReports &&
       <Suspense
         fallback={
-          <Card role="status" aria-live="polite" style={DENTISTRY_LAZY_FALLBACK_STYLE}>
+          <Card role="status" aria-live="polite" className="dental-lazy-fallback">
             Загрузка отчетов...
           </Card>
         }>
