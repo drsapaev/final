@@ -1970,9 +1970,12 @@ const DentistPanelUnified = () => {
       <Card padding="lg">
         <h3 className="dental-text-primary">AI Помощник</h3>
         <AIAssistant
-        context="dental"
-        onSuggestion={(suggestion) => {
-          logger.info('AI предложение:', suggestion);
+        specialty="dentistry"
+        onSuggestionSelect={(type, suggestion) => {
+          logger.info('[Dentistry] AI suggestion:', { type, suggestion });
+          if (type === 'icd10') {
+            notify.success('Код МКБ-10 добавлен из AI предложения');
+          }
         }} />
 
       </Card>
