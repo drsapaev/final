@@ -43,7 +43,14 @@ export default [
       'react/prop-types': 'warn', // Только предупреждения для PropTypes
       
       // Общие правила
-      'no-unused-vars': 'warn',
+      'no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'no-console': 'error', // HIPAA Compliance: запрещаем console.log для предотвращения утечки PHI
       'prefer-const': 'warn',
       'no-var': 'error',
