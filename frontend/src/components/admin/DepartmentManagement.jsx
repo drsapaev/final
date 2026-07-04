@@ -34,7 +34,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import { getApiOrigin } from '../../api/runtime';
-// NOTE: IconSelector.jsx was removed as dead code (Step 1, PR #1827). This file (DepartmentManagement.jsx) is itself DEAD — not routed, not imported anywhere. See analysis/ADMIN_PANEL_A_Z_ANALYSIS.md §2.
+// NOTE: IconSelector.jsx was removed as dead code (Step 1, PR #1827). This file is now live (Step 3 wire-in) as a tab in ClinicManagement. Icon selection uses a plain text input below; a richer icon picker can be re-added later if needed.
 // import IconSelector, { iconMap } from './IconSelector';
 
 import logger from '../../utils/logger';
@@ -925,7 +925,7 @@ const DepartmentManagement = () => {
                 }
                                 </div>
                                 <div className="admin-grid-span-all">
-                                    {/* IconSelector removed (dead code, Step 1 PR #1827). DepartmentManagement.jsx is itself DEAD. */}
+                                    <Input value={formData.icon} onChange={(e) => setFormData({ ...formData, icon: e.target.value })} placeholder="Имя иконки (например: Package, Heart, Stethoscope)" />
                 
                                     {validationErrors.icon &&
                 <div className="admin-error-text-mt">
@@ -1122,7 +1122,7 @@ const DepartmentManagement = () => {
                             </thead>
                             <tbody>
                                 {paginatedDepartments.map((dept) => {
-                  const IconComponent = null; // iconMap removed (IconSelector.jsx deleted as dead code, Step 1 PR #1827)
+                  const IconComponent = null; // IconSelector.jsx removed (Step 1); icon picker is a plain text Input. Icon rendering in table rows disabled until a icon-map helper is re-added.
                   return (
                     <tr
                       key={dept.id}
@@ -1317,7 +1317,7 @@ const DepartmentManagement = () => {
             }
                     </div>
                     <div className="admin-grid-span-all">
-                        {/* IconSelector removed (dead code, Step 1 PR #1827). DepartmentManagement.jsx is itself DEAD. */}
+                        <Input value={formData.icon} onChange={(e) => setFormData({ ...formData, icon: e.target.value })} placeholder="Имя иконки (например: Package, Heart, Stethoscope)" />
             
                         {validationErrors.icon &&
             <div className="admin-error-text-mt">

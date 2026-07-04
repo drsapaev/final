@@ -357,9 +357,14 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/advanced-users', '', adminProfile).activeSidebarItem).toBe('admin-advanced-users');
   });
 
-  it('keeps admin notification channels separated until routed deliberately', () => {
+  it('keeps admin notification channels separated, with UnifiedNotifications routed for push', () => {
+    // Step 3 wire-in: UnifiedNotifications (FCM + Registrar tabs) is now routed
+    // on /admin/push-notifications. Email/SMS stays on /admin/notifications via
+    // EmailSMSManager. No separate FCM/registrar routes — they are tabs inside
+    // UnifiedNotifications.
     const adminProfile = { role: 'Admin' };
     const notificationsRoute = getRouteById('admin-notifications');
+    const pushNotificationsRoute = getRouteById('admin-push-notifications');
     const publicNotificationPaths = new Set(ROUTE_REGISTRY.map((route) => route.path));
     const publicNotificationComponents = new Set(ROUTE_REGISTRY.map((route) => route.component));
 
@@ -373,9 +378,16 @@ describe('route contract invariants', () => {
     expect(isRouteAccessibleToProfile(notificationsRoute, adminProfile)).toBe(true);
     expect(getRouteChromeState('/admin/notifications', '', adminProfile).activeSidebarItem).toBe('admin-notifications');
 
+    expect(pushNotificationsRoute).toBeTruthy();
+    expect(pushNotificationsRoute.path).toBe('/admin/push-notifications');
+    expect(pushNotificationsRoute.component).toBe('UnifiedNotifications');
+    expect(pushNotificationsRoute.owner).toBe('admin.notifications');
+    expect(isRouteAccessibleToProfile(pushNotificationsRoute, adminProfile)).toBe(true);
+    expect(getRouteChromeState('/admin/push-notifications', '', adminProfile).activeSidebarItem).toBe('admin-push-notifications');
+
     expect(publicNotificationPaths.has('/admin/fcm-notifications')).toBe(false);
     expect(publicNotificationPaths.has('/admin/registrar-notifications')).toBe(false);
-    expect(publicNotificationComponents.has('UnifiedNotifications')).toBe(false);
+    expect(publicNotificationComponents.has('UnifiedNotifications')).toBe(true);
   });
 
   it('keeps admin phone verification on its direct route owner', () => {
