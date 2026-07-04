@@ -6,7 +6,6 @@ import logger from '../../utils/logger';
 import BenefitSettings from './BenefitSettings';
 import PaymentProviderSettings from './PaymentProviderSettings';
 import QueueSettings from './QueueSettings';
-import QueueLimitsManager from './QueueLimitsManager';
 import AISettings from './AISettings';
 import DisplayBoardSettings from './DisplayBoardSettings';
 import SecuritySettings from './SecuritySettings';
@@ -126,8 +125,6 @@ const UnifiedSettings = () => {
         return <PaymentProviderSettings />;
       case 'queue-settings':
         return <QueueSettings />;
-      case 'queue-limits':
-        return <QueueLimitsManager />;
       case 'ai-settings':
         return <AISettings />;
       case 'display-settings':
