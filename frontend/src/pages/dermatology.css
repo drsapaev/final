@@ -84,3 +84,140 @@
 .derma-flex {
   display: flex;
 }
+
+/* ─── Batch: Text colors ─── */
+.derma-text-primary   { color: var(--mac-text-primary); }
+.derma-text-secondary { color: var(--mac-text-secondary); }
+.derma-text-tertiary  { color: var(--mac-text-tertiary); }
+.derma-text-success   { color: var(--mac-success); }
+.derma-text-danger    { color: var(--mac-danger); }
+.derma-text-warning   { color: var(--mac-warning); }
+.derma-text-accent    { color: var(--mac-accent); }
+.derma-text-blue      { color: var(--mac-accent-blue); }
+.derma-text-green     { color: var(--mac-success); }
+.derma-text-purple    { color: var(--mac-accent-purple); }
+.derma-text-orange    { color: var(--mac-accent-orange); }
+.derma-text-on-accent { color: var(--mac-text-on-accent); }
+
+/* ─── Batch: Flex column with explicit gap ─── */
+.derma-flex-col-24 { display: flex; flex-direction: column; gap: 24px; }
+.derma-flex-col-16 { display: flex; flex-direction: column; gap: 16px; }
+.derma-flex-col-12 { display: flex; flex-direction: column; gap: 12px; }
+.derma-flex-col-8  { display: flex; flex-direction: column; gap: 8px; }
+
+/* ─── Batch: Flex layouts ─── */
+.derma-flex-center        { display: flex; align-items: center; }
+.derma-flex-center-8      { display: flex; align-items: center; gap: 8px; }
+.derma-flex-center-12     { display: flex; align-items: center; gap: 12px; }
+.derma-flex-center-16     { display: flex; align-items: center; gap: 16px; }
+.derma-flex-between-start { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.derma-flex-between-8     { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.derma-flex-wrap          { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* ─── Batch: Gap utilities ─── */
+.derma-gap-4  { gap: 4px; }
+.derma-gap-8  { gap: 8px; }
+.derma-gap-12 { gap: 12px; }
+.derma-gap-16 { gap: 16px; }
+.derma-gap-24 { gap: 24px; }
+
+/* ─── Batch: Margin utilities ─── */
+.derma-mt-8    { margin-top: 8px; }
+.derma-mt-16   { margin-top: 16px; }
+.derma-mt-24   { margin-top: 24px; }
+.derma-mb-8    { margin-bottom: 8px; }
+.derma-mb-16   { margin-bottom: 16px; }
+.derma-mb-20   { margin-bottom: 20px; }
+.derma-mb-24   { margin-bottom: 24px; }
+.derma-mr-4    { margin-right: 4px; }
+.derma-mr-6    { margin-right: 6px; }
+.derma-mr-8    { margin-right: 8px; }
+.derma-mr-12   { margin-right: 12px; }
+
+/* ─── Batch: Grid utilities ─── */
+.derma-grid-auto-250 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+.derma-grid-auto-200 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.derma-grid-auto-150 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.derma-grid-2col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.derma-grid-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+/* ─── Batch: Text styles ─── */
+.derma-text-13-500 {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.derma-text-14-600 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.derma-text-16-600 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.derma-text-18-600-mb20 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+.derma-text-14-secondary {
+  font-size: 14px;
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Batch: Icon with color + margin ─── */
+.derma-icon-mr-green  { margin-right: 8px; color: var(--mac-success); }
+.derma-icon-mr-blue   { margin-right: 8px; color: var(--mac-accent-blue); }
+.derma-icon-mr-red    { margin-right: 8px; color: var(--mac-danger); }
+.derma-icon-mr-orange { margin-right: 8px; color: var(--mac-warning); }
+.derma-icon-mr-secondary { margin-right: 8px; color: var(--mac-text-secondary); }
+.derma-icon-mr-6      { margin-right: 6px; }
+
+/* ─── Batch: Card with border + radius ─── */
+.derma-card-border {
+  border: 1px solid var(--mac-border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.derma-card-border-12 {
+  border: 1px solid var(--mac-border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+/* ─── Batch: Section heading ─── */
+.derma-section-heading {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--mac-text-primary);
+}
+
+/* ─── Batch: Stat number ─── */
+.derma-stat-number {
+  font-size: var(--mac-font-size-2xl);
+  font-weight: var(--mac-font-weight-bold);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Batch: Empty state ─── */
+.derma-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px;
+  text-align: center;
+}
