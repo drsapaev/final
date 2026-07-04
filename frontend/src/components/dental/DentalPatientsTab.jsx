@@ -4,7 +4,9 @@
  */
 import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
-import { Smile, Scissors, FileText, Eye } from 'lucide-react';
+import { Scissors, FileText, Eye } from 'lucide-react';
+// P0 fix: 'Tooth' is not exported by lucide-react. Use Stethoscope as alias (matches DentistPanelUnified.jsx:42).
+import { Stethoscope as Tooth } from 'lucide-react';
 
 export function DentalPatientsTab({
   patients = [],
@@ -57,7 +59,7 @@ export function DentalPatientsTab({
                 onClick={() => onDentalChart(patient)}
                 title="Схема зубов"
                 className="dental-p-8px">
-                <Smile aria-hidden="true" className="dental-icon-16" />
+                <Tooth aria-hidden="true" className="dental-icon-16" />
               </Button>
               <Button
                 size="sm"
