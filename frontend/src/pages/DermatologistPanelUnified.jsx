@@ -1949,6 +1949,9 @@ const DermatologistPanelUnified = () => {
               getSpacing={getSpacing}
             />
           }
+
+        </div>{/* End of tab content wrapper */}
+
         {/* Модальное окно Schedule Next */}
         {scheduleNextModal.open &&
         <ScheduleNextModal
