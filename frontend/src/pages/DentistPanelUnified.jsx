@@ -50,6 +50,8 @@ import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { printPanelTicket } from '../services/panelPrint';
 import notify from '../services/notify';
+import { useConfirm } from '../components/common/ConfirmDialog';
+import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import {
   DENTIST_DOCUMENTS_STORAGE_KEY,
@@ -1063,7 +1065,20 @@ const DentistPanelUnified = () => {
     const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
     if (queueEntryId === null) {
       logger.error('[Dentistry] handleCompleteVisit: нет queueEntryId', { selectedPatient });
-      notify.error('Cannot complete visit without a queue entry id');
+      notify.error('Невозможно завершить приём без ID записи в очереди');
+      return;
+    }
+
+    // C-1 (UX audit): confirm before completing the visit — same pattern as cardio P-010
+    const ok = await confirm({
+      title: 'Завершить приём?',
+      message: 'Приём будет сохранён. Убедитесь, что диагноз, план лечения и протокол заполнены.',
+      description: 'После завершения изменения возможны только через поправку EMR.',
+      confirmLabel: 'Завершить приём',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
+    if (!ok) {
       return;
     }
 
@@ -1660,7 +1675,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{appointment.patientName}</p>
-                  <p className="dental-text-desc dental-text-desc dental-text-secondary">{appointment.date} {appointment.time}</p>
+                  <p className="dental-text-desc dental-text-secondary">{appointment.date} {appointment.time}</p>
                 </div>
               </div>
               <div
@@ -1749,7 +1764,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <h3 className="dental-text-primary">{patient.name}</h3>
-                  <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">{patient.phone}</p>
+                  <p className="dental-text-desc dental-text-secondary">{patient.phone}</p>
                 </div>
               </div>
               <Badge variant={patient.status === 'active' ? 'success' : 'warning'}>
@@ -1758,10 +1773,10 @@ const DentistPanelUnified = () => {
             </div>
 
             <div className="dental-flex-col dental-gap-8">
-              <p className="dental-text-desc dental-text-desc dental-text-secondary">
+              <p className="dental-text-desc dental-text-secondary">
                 <strong className="dental-fw-700">Возраст:</strong> {patient.age} лет
               </p>
-              <p className="dental-text-desc dental-text-desc dental-text-secondary">
+              <p className="dental-text-desc dental-text-secondary">
                 <strong className="dental-fw-700">Последний визит:</strong> {patient.lastVisit || 'Не было'}
               </p>
             </div>
@@ -1919,7 +1934,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Провести осмотр</p>
+                  <p className="dental-text-desc dental-text-secondary">Провести осмотр</p>
                 </div>
               </div>
             </div>
@@ -1963,7 +1978,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Поставить диагноз</p>
+                  <p className="dental-text-desc dental-text-secondary">Поставить диагноз</p>
                 </div>
               </div>
             </div>
@@ -2041,7 +2056,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <p className="dental-text-primary">{patient.name}</p>
-                    <p className="dental-text-desc dental-text-desc dental-text-secondary">Создать протокол</p>
+                    <p className="dental-text-desc dental-text-secondary">Создать протокол</p>
                   </div>
                 </div>
               </div>
@@ -2086,7 +2101,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Открыть архив</p>
+                  <p className="dental-text-desc dental-text-secondary">Открыть архив</p>
                 </div>
               </div>
             </div>
@@ -2103,7 +2118,7 @@ const DentistPanelUnified = () => {
         <div className="dental-flex-between-16">
           <div>
             <h3 className="dental-text-primary">Шаблоны протоколов</h3>
-            <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
+            <p className="dental-text-desc dental-text-secondary">
               Стандартные протоколы для быстрого создания протоколов визитов
             </p>
           </div>
@@ -2125,7 +2140,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">Лечение кариеса</h4>
-                <p className="dental-text-desc dental-text-desc dental-text-secondary">60 мин</p>
+                <p className="dental-text-desc dental-text-secondary">60 мин</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2154,7 +2169,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">Эндодонтическое лечение</h4>
-                <p className="dental-text-desc dental-text-desc dental-text-secondary">120 мин</p>
+                <p className="dental-text-desc dental-text-secondary">120 мин</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2183,7 +2198,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">Профессиональная гигиена</h4>
-                <p className="dental-text-desc dental-text-desc dental-text-secondary">75 мин</p>
+                <p className="dental-text-desc dental-text-secondary">75 мин</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2216,7 +2231,7 @@ const DentistPanelUnified = () => {
           <div className="dental-flex-between-16">
             <div>
               <h3 className="dental-text-primary">Сохранённые протоколы визитов</h3>
-              <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
+              <p className="dental-text-desc dental-text-secondary">
                 Последние протоколы доступны для повторного открытия без ручной пересборки
               </p>
             </div>
@@ -2229,7 +2244,7 @@ const DentistPanelUnified = () => {
             className="dental-protocol-card-flex">
                 <div>
                   <div className="dental-text-primary">{protocol.patient_name}</div>
-                  <div className="dental-text-desc dental-text-desc dental-text-secondary">
+                  <div className="dental-text-desc dental-text-secondary">
                     Визит #{protocol.visit_id} • {new Date(protocol.saved_at).toLocaleString('ru-RU')}
                   </div>
                 </div>
@@ -2251,7 +2266,7 @@ const DentistPanelUnified = () => {
         <div className="dental-flex-between-16">
           <div>
             <h3 className="dental-text-primary">Отчеты и аналитика</h3>
-            <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
+            <p className="dental-text-desc dental-text-secondary">
               Статистика по пациентам, врачам, процедурам и клинике
             </p>
           </div>
@@ -2284,7 +2299,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">Общий обзор</h4>
-                <p className="dental-text-desc dental-text-desc dental-text-secondary">Основные показатели</p>
+                <p className="dental-text-desc dental-text-secondary">Основные показатели</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2311,7 +2326,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">По пациентам</h4>
-                <p className="dental-text-desc dental-text-desc dental-text-secondary">Демография и активность</p>
+                <p className="dental-text-desc dental-text-secondary">Демография и активность</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2338,7 +2353,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">По врачам</h4>
-                <p className="dental-text-desc dental-text-desc dental-text-secondary">Производительность</p>
+                <p className="dental-text-desc dental-text-secondary">Производительность</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2365,7 +2380,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">По клинике</h4>
-                <p className="dental-text-desc dental-text-desc dental-text-secondary">Оборудование и загруженность</p>
+                <p className="dental-text-desc dental-text-secondary">Оборудование и загруженность</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2411,7 +2426,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Открыть схему</p>
+                  <p className="dental-text-desc dental-text-secondary">Открыть схему</p>
                 </div>
               </div>
             </div>
@@ -2455,7 +2470,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Открыть план</p>
+                  <p className="dental-text-desc dental-text-secondary">Открыть план</p>
                 </div>
               </div>
             </div>
@@ -2482,7 +2497,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{prosthetic.patientName}</p>
-                  <p className="dental-text-desc dental-text-desc dental-text-secondary">{prosthetic.type}</p>
+                  <p className="dental-text-desc dental-text-secondary">{prosthetic.type}</p>
                 </div>
               </div>
               <Badge variant={prosthetic.status === 'completed' ? 'success' : 'warning'}>

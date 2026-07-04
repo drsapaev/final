@@ -71,7 +71,7 @@ export function DentistrySection({
     return (
         <EMRSection
             title="Стоматологические данные"
-            icon="🦷"
+            icon="smile"
             disabled={disabled}
             defaultOpen={true}
         >
