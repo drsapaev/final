@@ -149,8 +149,9 @@ describe('QueueJoin Accessibility & UX', () => {
     setupQueueApiMock({ selectableSpecialists: [], clinicWide: true });
     renderQueueJoin('clinic-wide-token');
 
-    expect(await screen.findByText(/ҳозирча qr орқали танлаш учун мутахассислар мавжуд эмас/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /янгилаш/i })).toBeInTheDocument();
+    // UX Audit Registrar #2: UZ text replaced with RU for i18n consistency.
+    expect(await screen.findByText(/сейчас нет специалистов для выбора через qr/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /обновить/i })).toBeInTheDocument();
   });
 
   it('renders backend-provided unavailable message without local queue rule assembly', async () => {

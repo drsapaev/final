@@ -266,9 +266,36 @@ const PrintDialog = ({
                     fontSize: '14px',
                   }}
                 >
-                  Сумма: <strong>{documentData.cost.toLocaleString()} ₽</strong>
+                  {/* UX Audit Registrar #1: toLocaleString() без локали + валюта ₽ (рубли)
+                      вместо UZS (сумы). Исправлено на ru-RU + UZS. */}
+                  Сумма: <strong>{new Intl.NumberFormat('ru-RU').format(documentData.cost)} сум</strong>
                 </p>
               )}
+
+              {/* UX Audit Registrar #1: показываем количество талонов для multi-service записи.
+                  print_tickets и queue_numbers формируются в buildPostWizardPaymentRow.
+                  printPanelTicketInBrowserAsync() уже печатает все талоны в одном окне
+                  с page-break-after, но пользователь не знал, что их будет несколько. */}
+              {(() => {
+                const ticketCount =
+                  (Array.isArray(documentData.print_tickets) ? documentData.print_tickets.length : 0) ||
+                  (Array.isArray(documentData.queue_numbers) ? documentData.queue_numbers.length : 0);
+                if (ticketCount > 1) {
+                  return (
+                    <p
+                      style={{
+                        color: 'var(--mac-accent-blue, #0ea5e9)',
+                        margin: 0,
+                        fontSize: '14px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      🖨️ Будет напечатано талонов: {ticketCount}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
             </div>
           )}
         </div>
