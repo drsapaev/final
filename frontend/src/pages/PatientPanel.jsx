@@ -7,6 +7,7 @@ import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText, ClipboardList, Save, Send } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { api } from '../api/client';
+import './patient.css';
 
 const PanelEmptyState = ({ icon: EmptyIcon, title, description }) => (
   <div className="p-6 border border-dashed border-gray-300 rounded-lg text-center bg-white/60">
@@ -963,38 +964,18 @@ const PatientPanel = () => {
 
   return (
     <div
-      style={{
-        padding: '0px',
-        background: 'var(--mac-gradient-window)',
-        minHeight: '100vh',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-        color: 'var(--mac-text-primary)',
-      }}
+      className="patient-root"
     >
-      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div className="patient-container">
         <Card
-          style={{
-            backgroundColor: 'var(--mac-bg-primary)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-lg)',
-            padding: '16px',
-            boxShadow: 'var(--mac-shadow-sm)',
-            backdropFilter: 'var(--mac-blur-light)',
-            WebkitBackdropFilter: 'var(--mac-blur-light)',
-          }}
+          className="patient-search-card"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ position: 'relative', flex: 1 }}>
+          <div className="patient-flex-center-12">
+            <div className="patient-search-wrap">
               <Icon
                 name="magnifyingglass"
                 size="small"
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--mac-text-tertiary)',
-                }}
+                className="patient-search-icon"
               />
               <input
                 aria-label={
@@ -1005,30 +986,12 @@ const PatientPanel = () => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 disabled={!hasPatientData}
-                style={{
-                  width: '100%',
-                  padding: '12px 12px 12px 40px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-md)',
-                  backgroundColor: 'var(--mac-bg-secondary)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                  transition: 'border-color var(--mac-duration-normal) var(--mac-ease)',
-                  opacity: hasPatientData ? 1 : 0.65,
-                }}
+                className="patient-search-input"
                 placeholder={
                   hasPatientData
                     ? 'Search patient records or use quick actions from links'
                     : 'Patient records are not loaded yet'
                 }
-                onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--mac-accent-blue)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--mac-border)';
-                }}
               />
             </div>
             <Button variant="secondary" disabled title="Quick action is disabled until data is available">
