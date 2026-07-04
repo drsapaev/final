@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import PropTypes from 'prop-types';
 

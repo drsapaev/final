@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import PropTypes from 'prop-types';
 

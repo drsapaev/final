@@ -8,7 +8,6 @@ import { printService } from '../../services/print';
 import logger from '../../utils/logger';
 import {
   formatLabStatus,
-  formatSeverityLabel,
   getLabStatusVariant,
   signerFieldLabels
 } from './labUiLabels';

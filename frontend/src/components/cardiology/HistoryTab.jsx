@@ -12,7 +12,7 @@
  */
 
 import PropTypes from 'prop-types';
-import { Calendar, RefreshCw, Eye, Download, FileText } from 'lucide-react';
+import { Calendar, Eye, Download, FileText } from 'lucide-react';
 import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
 
 /**
