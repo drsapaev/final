@@ -25,6 +25,7 @@ import usePatients from '../../hooks/usePatients';
 import { useModal } from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
+import formatCurrency from '../../utils/formatCurrency';
 import FinanceModal from './FinanceModal';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
@@ -41,13 +42,6 @@ const categoryOptions = [
   { value: 'Медикаменты', label: 'Медикаменты' },
 ];
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'UZS',
-    minimumFractionDigits: 0,
-  }).format(amount);
-}
 
 function getTransactionTypeLabel(type) {
   const typeMap = {

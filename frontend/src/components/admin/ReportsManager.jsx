@@ -32,6 +32,7 @@ import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import { getReportEndpoint } from '../../utils/reportEndpoints';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
@@ -116,7 +117,7 @@ const ReportsManager = () => {
   const generateReport = async () => {
     const endpoint = getReportEndpoint(reportForm.type);
     if (!reportForm.type || !endpoint) {
-      toast.error('Select an available report type');
+      toast.error('Выберите доступный тип отчёта');
       return;
     }
 
@@ -149,16 +150,6 @@ const ReportsManager = () => {
     }
   };
 
-  const getReportEndpoint = (type) => {
-    const endpoints = {
-      'patient_report': 'patient',
-      'appointments_report': 'appointments',
-      'financial_report': 'financial',
-      'queue_report': 'queue',
-      'doctor_performance_report': 'doctor-performance'
-    };
-    return endpoints[type] || null;
-  };
 
 
 
@@ -286,8 +277,8 @@ const ReportsManager = () => {
         <div className="admin-flex-justify-end">
           <Button
           type="button"
-          title={loading ? 'Generating report' : 'Generate report'}
-          aria-label={loading ? 'Generating report' : 'Generate report'}
+          title={loading ? 'Генерация отчёта' : 'Сгенерировать отчёт'}
+          aria-label={loading ? 'Генерация отчёта' : 'Сгенерировать отчёт'}
           onClick={generateReport}
           disabled={loading || !reportForm.type}
           className="admin-btn-blue-w-full-h-44-flex-center admin-opacity-dynamic"
@@ -362,8 +353,8 @@ const ReportsManager = () => {
             type="button"
             size="sm"
             variant="outline"
-            title={`Download report ${row.filename}`}
-            aria-label={`Download report ${row.filename}`}
+            title={`Скачать отчёт ${row.filename}`}
+            aria-label={`Скачать отчёт ${row.filename}`}
             onClick={() => downloadFile(row.filename)}>
                     <Download aria-hidden="true" className="admin-icon-16" />
                   </Button>
@@ -459,8 +450,8 @@ const ReportsManager = () => {
             type="button"
             size="sm"
             variant="ghost"
-            title={`Download report file ${row.filename}`}
-            aria-label={`Download report file ${row.filename}`}
+            title={`Скачать файл отчёта ${row.filename}`}
+            aria-label={`Скачать файл отчёта ${row.filename}`}
             onClick={() => downloadFile(row.filename)}>
 
                     <Download aria-hidden="true" className="admin-icon-18-secondary" />

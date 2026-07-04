@@ -16,6 +16,7 @@ import {
   Skeleton,
   Select,
 } from '../ui/macos';
+import IconButton from './IconButton';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
@@ -145,27 +146,6 @@ const getDoctorOptionLabel = (doctor) => {
   ].filter(Boolean);
 
   return flags.length > 0 ? `${name} • ${flags.join(' • ')}` : name;
-};
-
-const IconButton = ({ label, tone = 'default', onClick, children }) => (
-  <Button
-    type="button"
-    variant="ghost"
-    size="small"
-    onClick={onClick}
-    aria-label={label}
-    title={label}
-    className="admin-w-32-h-32-p-0-radius-var-mac-radius-sm-col-dyn" style={{ '--admin-col0': tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)' }}
-  >
-    {children}
-  </Button>
-);
-
-IconButton.propTypes = {
-  children: PropTypes.node.isRequired,
-  label: PropTypes.string.isRequired,
-  onClick: PropTypes.func.isRequired,
-  tone: PropTypes.oneOf(['default', 'danger']),
 };
 
 const StatCard = ({ label, value, icon: Icon, color }) => (

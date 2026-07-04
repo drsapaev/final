@@ -175,8 +175,8 @@ const DynamicPricingManager = () => {
   const [loading, setLoading] = useState(false);
   const [showCreateRule, setShowCreateRule] = useState(false);
   const [showCreatePackage, setShowCreatePackage] = useState(false);
-  const [, setEditingRule] = useState(null);
-  const [, setEditingPackage] = useState(null);
+  const [editingRule, setEditingRule] = useState(null); // P2 fix: restored value (was const [, setX]; UI not yet implemented)
+  const [editingPackage, setEditingPackage] = useState(null); // P2 fix: restored value (same as above)
 
   // Форма для правила ценообразования
   const [ruleForm, setRuleForm] = useState({

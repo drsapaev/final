@@ -52,8 +52,8 @@ const WebhookManager = () => {
   const [loading, setLoading] = useState(true);
   const [selectedWebhook, setSelectedWebhook] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [, setShowEditModal] = useState(false);
-  const [, setShowTestModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false); // P2 fix: restored value (was const [, setX] codemod artifact; UI not yet implemented — buttons set true but no modal renders)
+  const [showTestModal, setShowTestModal] = useState(false); // P2 fix: restored value (same as above)
   const [filters, setFilters] = useState({
     status: '',
     event_type: '',

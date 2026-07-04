@@ -158,12 +158,12 @@ const UnifiedSettings = () => {
             <ColorSchemeSelector />
             <div className="admin-settings-card-accent">
               <div className="admin-settings-section-title">
-                Accent color
+                Акцентный цвет
               </div>
               <div className="admin-settings-grid-10">
                 <AccentPicker />
                 <div className="admin-settings-hint-12">
-                  Accent color влияет на кнопки, focus states и primary states в админ-панели. Он хранится локально в текущем браузере.
+                  Акцентный цвет влияет на кнопки, focus states и primary states в админ-панели. Он хранится локально в текущем браузере.
                 </div>
               </div>
             </div>
