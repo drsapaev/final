@@ -1586,10 +1586,10 @@ const DentistPanelUnified = () => {
 
       {/* Быстрые действия */}
       <div className="dental-section-card">
-        <div class="dental-flex-between-16">
+        <div className="dental-flex-between-16">
           <h3 className="dental-text-lg-semi dental-text-primary">Быстрые действия</h3>
         </div>
-        <div class="dental-grid-auto">
+        <div className="dental-grid-auto">
           <Button
           onClick={() => handleTabChange('patients')}
           variant="primary"
@@ -1643,7 +1643,7 @@ const DentistPanelUnified = () => {
 
       {/* Последние записи */}
       <div className="dental-section-card">
-        <div class="dental-flex-between-16">
+        <div className="dental-flex-between-16">
           <h3 className="dental-text-lg-semi dental-text-primary">Последние записи</h3>
         </div>
         <div className="dental-flex-col dental-gap-16">
@@ -1680,9 +1680,9 @@ const DentistPanelUnified = () => {
   <div className="dental-flex-col dental-gap-24">
       {/* Поиск и фильтры */}
       <Card padding="lg">
-        <div class="dental-flex-row-wrap">
-          <div class="dental-flex-1 dental-min-w-200">
-            <div class="dental-search-wrap">
+        <div className="dental-flex-row-wrap">
+          <div className="dental-flex-1 dental-min-w-200">
+            <div className="dental-search-wrap">
               <Search className="dental-search-icon dental-icon-16" />
               <input
               type="text"
@@ -1725,12 +1725,12 @@ const DentistPanelUnified = () => {
       </Card>
 
       {/* Список пациентов */}
-      <div class="dental-grid-auto-fill-250">
+      <div className="dental-grid-auto-fill-250">
         {filteredPatients.map((patient) =>
       <Card
         key={patient.id}
         padding="lg"
-        class="dental-card-btn"
+        className="dental-card-btn"
         onMouseEnter={(e) => {
           e.currentTarget.style.boxShadow = 'var(--mac-shadow-lg)';
           e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1740,9 +1740,9 @@ const DentistPanelUnified = () => {
           e.currentTarget.style.transform = 'translateY(0)';
         }}>
 
-            <div class="dental-flex-between-16">
+            <div className="dental-flex-between-16">
               <div className="dental-flex dental-gap-12">
-                <div className="dental-avatar" class="dental-icon-bg dental-icon-bg-blue">
+                <div className="dental-avatar" className="dental-icon-bg dental-icon-bg-blue">
                   <span className="dental-text-value dental-heading dental-text-white">
                     {patient.name?.charAt(0)}
                   </span>
@@ -1757,22 +1757,22 @@ const DentistPanelUnified = () => {
               </Badge>
             </div>
 
-            <div class="dental-flex-col dental-gap-8">
+            <div className="dental-flex-col dental-gap-8">
               <p className="dental-text-desc dental-text-desc dental-text-secondary">
-                <strong class="dental-fw-700">Возраст:</strong> {patient.age} лет
+                <strong className="dental-fw-700">Возраст:</strong> {patient.age} лет
               </p>
               <p className="dental-text-desc dental-text-desc dental-text-secondary">
-                <strong class="dental-fw-700">Последний визит:</strong> {patient.lastVisit || 'Не было'}
+                <strong className="dental-fw-700">Последний визит:</strong> {patient.lastVisit || 'Не было'}
               </p>
             </div>
 
-            <div class="dental-grid-2col dental-gap-8">
+            <div className="dental-grid-2col dental-gap-8">
               <Button
             size="sm"
             onClick={() => handlePatientSelect(patient)}
-            class="dental-grid-span-2">
+            className="dental-grid-span-2">
 
-                <Edit className="dental-icon-16" class="dental-mr-4" />
+                <Edit className="dental-icon-16" className="dental-mr-4" />
                 Карточка пациента
               </Button>
               <Button
@@ -1894,7 +1894,7 @@ const DentistPanelUnified = () => {
           Выберите пациента для проведения или просмотра объективного осмотра
         </p>
 
-        <div class="dental-grid-auto-fill-250">
+        <div className="dental-grid-auto-fill-250">
           {patients.map((patient) =>
         <div
           key={patient.id}
@@ -1938,7 +1938,7 @@ const DentistPanelUnified = () => {
           Выберите пациента для постановки диагнозов и назначений
         </p>
 
-        <div class="dental-grid-auto-fill-250">
+        <div className="dental-grid-auto-fill-250">
           {patients.map((patient) =>
         <div
           key={patient.id}
@@ -1980,7 +1980,7 @@ const DentistPanelUnified = () => {
       return (
         <div className="dental-flex-col dental-gap-24">
           <Card padding="lg">
-            <div class="dental-flex-between-16">
+            <div className="dental-flex-between-16">
               <h3 className="dental-text-primary">
                 <Stethoscope size={20} />
                 Прием пациента: {selectedPatient.patient_name || selectedPatient.name || `№${selectedPatient.number}`}
@@ -2016,7 +2016,7 @@ const DentistPanelUnified = () => {
             Выберите пациента из очереди или выберите из списка для создания протокола визита
           </p>
 
-          <div class="dental-grid-auto-fill-250">
+          <div className="dental-grid-auto-fill-250">
             {patients.map((patient) =>
             <div
               key={patient.id}
@@ -2061,7 +2061,7 @@ const DentistPanelUnified = () => {
           Выберите пациента для просмотра и управления фото и рентгеновскими снимками
         </p>
 
-        <div class="dental-grid-auto-fill-250">
+        <div className="dental-grid-auto-fill-250">
           {patients.map((patient) =>
         <div
           key={patient.id}
@@ -2100,7 +2100,7 @@ const DentistPanelUnified = () => {
   const renderTemplates = () =>
   <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
-        <div class="dental-flex-between-16">
+        <div className="dental-flex-between-16">
           <div>
             <h3 className="dental-text-primary">Шаблоны протоколов</h3>
             <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
@@ -2119,9 +2119,9 @@ const DentistPanelUnified = () => {
         <div className="dental-grid-auto-fill-280">
           <div className="dental-template-card">
 
-            <div class="dental-flex-center-12">
-              <div className="dental-icon-bg" class="dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
-                <Scissors className="dental-icon-20" class="dental-text-blue" />
+            <div className="dental-flex-center-12">
+              <div className="dental-icon-bg" className="dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
+                <Scissors className="dental-icon-20" className="dental-text-blue" />
               </div>
               <div>
                 <h4 className="dental-text-primary">Лечение кариеса</h4>
@@ -2131,8 +2131,8 @@ const DentistPanelUnified = () => {
             <p className="dental-text-value dental-text-primary">
               Стандартный протокол лечения кариеса с анестезией и пломбированием
             </p>
-            <div class="dental-flex dental-gap-8">
-              <Button size="sm" class="dental-flex-1" onClick={handleProtocolTemplates} type="button">
+            <div className="dental-flex dental-gap-8">
+              <Button size="sm" className="dental-flex-1" onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button
@@ -2148,7 +2148,7 @@ const DentistPanelUnified = () => {
 
           <div className="dental-template-card">
 
-            <div class="dental-flex-center-12">
+            <div className="dental-flex-center-12">
               <div className="dental-icon-bg dental-icon-bg-danger-bg dental-icon-radius-lg">
                 <Scissors className="dental-icon-20 dental-text-danger" />
               </div>
@@ -2160,8 +2160,8 @@ const DentistPanelUnified = () => {
             <p className="dental-text-value dental-text-primary">
               Протокол лечения корневых каналов с инструментальной обработкой
             </p>
-            <div class="dental-flex dental-gap-8">
-              <Button size="sm" class="dental-flex-1" onClick={handleProtocolTemplates} type="button">
+            <div className="dental-flex dental-gap-8">
+              <Button size="sm" className="dental-flex-1" onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button
@@ -2177,8 +2177,8 @@ const DentistPanelUnified = () => {
 
           <div className="dental-template-card">
 
-            <div class="dental-flex-center-12">
-              <div className="dental-icon-bg" class="dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
+            <div className="dental-flex-center-12">
+              <div className="dental-icon-bg" className="dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
                 <Scissors className="dental-icon-20 dental-text-success" />
               </div>
               <div>
@@ -2189,8 +2189,8 @@ const DentistPanelUnified = () => {
             <p className="dental-text-value dental-text-primary">
               Протокол профессиональной гигиены полости рта
             </p>
-            <div class="dental-flex dental-gap-8">
-              <Button size="sm" class="dental-flex-1" onClick={handleProtocolTemplates} type="button">
+            <div className="dental-flex dental-gap-8">
+              <Button size="sm" className="dental-flex-1" onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button
@@ -2213,7 +2213,7 @@ const DentistPanelUnified = () => {
   <div className="dental-flex-col dental-gap-24">
       {savedVisitProtocols.length > 0 &&
       <Card padding="lg">
-          <div class="dental-flex-between-16">
+          <div className="dental-flex-between-16">
             <div>
               <h3 className="dental-text-primary">Сохранённые протоколы визитов</h3>
               <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
@@ -2248,7 +2248,7 @@ const DentistPanelUnified = () => {
       }
 
       <Card padding="lg">
-        <div class="dental-flex-between-16">
+        <div className="dental-flex-between-16">
           <div>
             <h3 className="dental-text-primary">Отчеты и аналитика</h3>
             <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
@@ -2278,8 +2278,8 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-            <div class="dental-flex-center-12">
-              <div className="dental-icon-bg" class="dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
+            <div className="dental-flex-center-12">
+              <div className="dental-icon-bg" className="dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
                 <BarChart3 className="dental-icon-20 dental-text-blue" />
               </div>
               <div>
@@ -2305,8 +2305,8 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-            <div class="dental-flex-center-12">
-              <div className="dental-icon-bg" class="dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
+            <div className="dental-flex-center-12">
+              <div className="dental-icon-bg" className="dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
                 <Users className="dental-icon-20 dental-text-success" />
               </div>
               <div>
@@ -2332,7 +2332,7 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-            <div class="dental-flex-center-12">
+            <div className="dental-flex-center-12">
               <div className="dental-icon-bg dental-icon-bg-purple-bg dental-icon-bg-lg-shadow">
                 <Stethoscope className="dental-icon-20 dental-text-purple" />
               </div>
@@ -2359,7 +2359,7 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-            <div class="dental-flex-center-12">
+            <div className="dental-flex-center-12">
               <div className="dental-icon-bg dental-icon-bg-warning-bg dental-icon-bg-lg-shadow">
                 <Building className="dental-icon-20 dental-text-warning" />
               </div>
@@ -2386,7 +2386,7 @@ const DentistPanelUnified = () => {
           Выберите пациента для просмотра и редактирования схемы зубов
         </p>
 
-        <div class="dental-grid-auto-fill-250">
+        <div className="dental-grid-auto-fill-250">
           {patients.map((patient) =>
         <div
           key={patient.id}
@@ -2430,7 +2430,7 @@ const DentistPanelUnified = () => {
           Выберите пациента для создания или редактирования плана лечения
         </p>
 
-        <div class="dental-grid-auto-fill-250">
+        <div className="dental-grid-auto-fill-250">
           {patients.map((patient) =>
         <div
           key={patient.id}
@@ -2683,9 +2683,9 @@ const DentistPanelUnified = () => {
       }
 
       {showDentalChart && selectedPatient &&
-      <div class="dental-modal-overlay">
+      <div className="dental-modal-overlay">
           <div className="dental-modal-card-xl">
-            <div class="dental-flex-between-16">
+            <div className="dental-flex-between-16">
               <h2 className="dental-heading-xl dental-text-primary">
                 Схема зубов: {selectedPatientDisplayName}
               </h2>
@@ -2702,7 +2702,7 @@ const DentistPanelUnified = () => {
                 e.target.style.backgroundColor = 'transparent';
               }}>
 
-                <XCircle class="dental-icon-20" />
+                <XCircle className="dental-icon-20" />
               </button>
             </div>
             <TeethChart
@@ -2720,9 +2720,9 @@ const DentistPanelUnified = () => {
       }
 
       {showTreatmentPlanner && selectedPatient &&
-      <div class="dental-modal-overlay">
+      <div className="dental-modal-overlay">
           <div className="dental-modal-card-xl">
-            <div class="dental-flex-between-16">
+            <div className="dental-flex-between-16">
               <h2 className="dental-heading-xl dental-text-primary">
                 План лечения: {selectedPatientDisplayName}
               </h2>
@@ -2739,7 +2739,7 @@ const DentistPanelUnified = () => {
                 e.target.style.backgroundColor = 'transparent';
               }}>
 
-                <XCircle class="dental-icon-20" />
+                <XCircle className="dental-icon-20" />
               </button>
             </div>
             <TreatmentPlanner
