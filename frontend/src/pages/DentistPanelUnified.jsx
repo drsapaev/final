@@ -1742,7 +1742,7 @@ const DentistPanelUnified = () => {
 
             <div className="dental-flex-between-16">
               <div className="dental-flex dental-gap-12">
-                <div className="dental-avatar" className="dental-icon-bg dental-icon-bg-blue">
+                <div className="dental-avatar dental-icon-bg dental-icon-bg-blue">
                   <span className="dental-text-value dental-heading dental-text-white">
                     {patient.name?.charAt(0)}
                   </span>
@@ -1772,7 +1772,7 @@ const DentistPanelUnified = () => {
             onClick={() => handlePatientSelect(patient)}
             className="dental-grid-span-2">
 
-                <Edit className="dental-icon-16" className="dental-mr-4" />
+                <Edit className="dental-icon-16 dental-mr-4" />
                 Карточка пациента
               </Button>
               <Button
@@ -2120,8 +2120,8 @@ const DentistPanelUnified = () => {
           <div className="dental-template-card">
 
             <div className="dental-flex-center-12">
-              <div className="dental-icon-bg" className="dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
-                <Scissors className="dental-icon-20" className="dental-text-blue" />
+              <div className="dental-icon-bg dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
+                <Scissors className="dental-icon-20 dental-text-blue" />
               </div>
               <div>
                 <h4 className="dental-text-primary">Лечение кариеса</h4>
@@ -2178,7 +2178,7 @@ const DentistPanelUnified = () => {
           <div className="dental-template-card">
 
             <div className="dental-flex-center-12">
-              <div className="dental-icon-bg" className="dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
+              <div className="dental-icon-bg dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
                 <Scissors className="dental-icon-20 dental-text-success" />
               </div>
               <div>
@@ -2279,7 +2279,7 @@ const DentistPanelUnified = () => {
           }}>
 
             <div className="dental-flex-center-12">
-              <div className="dental-icon-bg" className="dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
+              <div className="dental-icon-bg dental-icon-bg-blue-light dental-icon-bg-lg-shadow">
                 <BarChart3 className="dental-icon-20 dental-text-blue" />
               </div>
               <div>
@@ -2306,7 +2306,7 @@ const DentistPanelUnified = () => {
           }}>
 
             <div className="dental-flex-center-12">
-              <div className="dental-icon-bg" className="dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
+              <div className="dental-icon-bg dental-icon-bg-success-bg dental-icon-bg-lg-shadow">
                 <Users className="dental-icon-20 dental-text-success" />
               </div>
               <div>
