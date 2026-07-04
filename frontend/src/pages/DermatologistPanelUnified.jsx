@@ -1327,16 +1327,6 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  const pageStyle = {
-    padding: '20px',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    background: 'var(--mac-bg-primary)',
-    minHeight: '100vh',
-    color: 'var(--mac-text-primary)'
-  };
-
   if (isDemoMode) {
     logger.info('DermatologistPanelUnified: Skipping render in demo mode');
     return null;
@@ -1370,49 +1360,20 @@ const DermatologistPanelUnified = () => {
   ];
 
   return (
-    <div style={{
-      ...pageStyle,
-      padding: '0',
-      boxSizing: 'border-box',
-      overflow: 'hidden',
-      width: '100%',
-      position: 'relative',
-      zIndex: 1,
-      display: 'block',
-      maxWidth: '100%',
-      margin: 0,
-      minHeight: '100vh',
-      background: 'var(--mac-gradient-window)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-      color: 'var(--mac-text-primary)',
-      transition: 'background var(--mac-duration-normal) var(--mac-ease)'
-    }}>
+    <div className="derma-page-root">
 
-      <div style={{ padding: '0px' }}> {/* Убираем padding, так как он уже есть в main контейнере */}
+      <div className="derma-p-0"> {/* Убираем padding, так как он уже есть в main контейнере */}
 
 
         {/* Контент вкладок */}
         <div>
           {/* Записи дерматолога */}
           {activeTab === 'appointments' &&
-          <div style={{
-            width: '100%',
-            maxWidth: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px'
-          }}>
-              <MacOSCard style={{
-              padding: '24px',
-              width: '100%',
-              maxWidth: '100%',
-              minWidth: 0,
-              boxSizing: 'border-box',
-              overflow: 'hidden'
-            }}>
+          <div className="derma-flex-col-24 derma-w-full derma-max-w-none">
+              <MacOSCard className="derma-card-w-full">
                 <div style={dermatologyAppointmentsHeaderStyle}>
                   <h3 style={dermatologyAppointmentsTitleStyle}>
-                    <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
+                    <Calendar size={20} className="derma-icon-mr-green" />
                     Записи к дерматологу
                   </h3>
                   <AppointmentSummaryBar
@@ -1443,68 +1404,49 @@ const DermatologistPanelUnified = () => {
 
           {/* Список пациентов */}
           {activeTab === 'patients' &&
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="derma-flex-col-24">
               <MacOSCard className="derma-p-8">
-                <div className="derma-flex" style={{ alignItems: 'center' }}>
-                  <h3 className="derma-flex" style={{ alignItems: 'center' }}>
-                    <User size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
+                <div className="derma-flex-center">
+                  <h3 className="derma-flex-center">
+                    <User size={20} className="derma-icon-mr-green" />
                     Дерматологические пациенты
                   </h3>
                   <Badge variant="info">Всего: {patients.length} пациентов</Badge>
                 </div>
 
                 {loading ?
-              <div style={{ textAlign: 'center', padding: '32px' }}>
-                    <RefreshCw size={32} style={{ margin: '0 auto 16px', color: 'var(--mac-text-secondary)', animation: 'spin 1s linear infinite' }} />
-                    <p style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>Загрузка пациентов...</p>
+              <div className="derma-loading-state">
+                    <RefreshCw size={32} className="derma-loading-icon" />
+                    <p className="derma-p-14-secondary">Загрузка пациентов...</p>
                   </div> :
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="derma-flex-col-24">
                     {patients.map((patient) =>
-                <div key={patient.id} style={{
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  padding: '24px',
-                  backgroundColor: 'var(--mac-bg-primary)',
-                  transition: 'box-shadow var(--mac-duration-normal) var(--mac-ease)'
-                }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div style={{ flex: 1 }}>
-                            <div className="derma-flex" style={{ alignItems: 'center' }}>
-                              <h4 style={{
-                          fontSize: '16px',
-                          fontWeight: '600',
-                          color: 'var(--mac-text-primary)',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-                          margin: 0
-                        }}>
+                <div key={patient.id} className="derma-patient-card">
+                        <div className="derma-flex-between-top">
+                          <div className="derma-flex-1">
+                            <div className="derma-flex-center">
+                              <h4 className="derma-h4-16-600">
                                 {patient.last_name} {patient.first_name} {patient.middle_name}
                               </h4>
-                              <Badge variant="success" style={{ marginLeft: '12px' }}>Дерматология</Badge>
+                              <Badge variant="success" className="derma-ml-12">Дерматология</Badge>
                             </div>
-                            <div style={{
-                        fontSize: '13px',
-                        color: 'var(--mac-text-secondary)',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                              <div className="derma-flex" style={{ alignItems: 'center' }}>
-                                <Phone size={18} className="derma-icon-mr" style={{ color: 'var(--mac-accent)' }} />
+                            <div className="derma-patient-info-list">
+                              <div className="derma-flex-center">
+                                <Phone size={18} className="derma-icon-mr derma-text-accent" />
                                 {patient.phone}
                               </div>
-                              <div className="derma-flex" style={{ alignItems: 'center' }}>
+                              <div className="derma-flex-center">
                                 <Calendar size={14} className="derma-icon-mr" />
                                 {patient.birth_date}
                               </div>
-                              <div className="derma-flex" style={{ alignItems: 'center' }}>
+                              <div className="derma-flex-center">
                                 <User size={14} className="derma-icon-mr" />
                                 ID: {patient.id}
                               </div>
                             </div>
                           </div>
-                          <div style={{ display: 'flex', gap: '16px' }}>
+                          <div className="derma-flex-gap-16">
                             <Button
                         variant="outline"
                         onClick={() => {
@@ -1516,7 +1458,7 @@ const DermatologistPanelUnified = () => {
                           }));
                           setShowSkinForm(true);
                         }}
-                        className="derma-flex" style={{ alignItems: 'center' }}>
+                        className="derma-flex-center">
 
                               <Activity size={16} />
                               Осмотр
@@ -1532,7 +1474,7 @@ const DermatologistPanelUnified = () => {
                           }));
                           setShowCosmeticForm(true);
                         }}
-                        className="derma-flex" style={{ alignItems: 'center' }}>
+                        className="derma-flex-center">
 
                               <Sparkles size={16} />
                               Процедура
@@ -1540,7 +1482,7 @@ const DermatologistPanelUnified = () => {
                             <Button
                         variant="outline"
                         onClick={() => setSelectedPatient(patient)}
-                        className="derma-flex" style={{ alignItems: 'center' }}>
+                        className="derma-flex-center">
 
                               <User size={16} />
                               Просмотр

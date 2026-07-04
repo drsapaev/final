@@ -451,6 +451,10 @@
   color: var(--mac-text-secondary);
 }
 .derma-input-pl-40 { padding-left: 40px; }
+.derma-ml-12 { margin-left: 12px; }
+.derma-ml-8 { margin-left: 8px; }
+.derma-w-full { width: 100%; }
+.derma-max-w-none { max-width: none; }
 
 /* ─── Batch: History list scroll ─── */
 .derma-history-list-scroll {
