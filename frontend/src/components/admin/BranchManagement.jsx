@@ -243,67 +243,32 @@ const BranchManagement = () => {
   'Создайте первый филиал, чтобы начать управлять филиальной структурой клиники.';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflow: 'hidden' }}>
+    <div className="admin-d-flex-fd-column-gap-24-ov-hidden-1">
       {/* Заголовок и статистика */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '16px'
-      }}>
+      <div className="admin-d-flex-jc-between-ai-center-fw-wrap-gap-16-1">
         <div>
-          <h2 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)',
-            margin: '0 0 8px 0'
-          }}>
+          <h2 className="admin-fs-2xl-fw-bold-primary-m-0-0-8px-0-1">
             Управление филиалами
           </h2>
-          <p style={{
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            margin: 0
-          }}>
+          <p className="admin-secondary-fs-sm-m-0-1">
             Создание и управление филиалами клиники
           </p>
         </div>
         {stats &&
-        <div style={{
-          display: 'flex',
-          gap: '24px',
-          flexWrap: 'wrap'
-        }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-accent-blue)',
-              marginBottom: '4px'
-            }}>
+        <div className="admin-d-flex-gap-24-fw-wrap-1">
+            <div className="admin-text-center">
+              <div className="admin-fs-2xl-fw-bold-blue-mb-4-1">
                 {stats.total_branches}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Всего филиалов
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-success)',
-              marginBottom: '4px'
-            }}>
+            <div className="admin-text-center">
+              <div className="admin-fs-2xl-fw-bold-success-mb-4-1">
                 {stats.active_branches}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Активных
               </div>
             </div>
@@ -321,33 +286,20 @@ const BranchManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ flex: 1, position: 'relative' }}>
+      <MacOSCard className="admin-p-24">
+        <div className="admin-d-flex-fd-column-gap-16-fw-wrap-1">
+          <div className="admin-flex-1-pos-relative">
             <Input
               type="text"
               aria-label="Поиск филиалов по названию, адресу или коду"
               placeholder="Поиск по названию, адресу или коду..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '40px' }} />
+              className="admin-pl-40" />
 
-            <Search aria-hidden="true" style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--mac-text-tertiary)',
-              width: '16px',
-              height: '16px'
-            }} />
+            <Search aria-hidden="true" className="admin-pos-absolute-left-12-top-50pct-tf-translateY-50-tertiary-w-16-h-16-1" />
           </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="admin-d-flex-gap-12-fw-wrap-1">
             <Select
               aria-label="Фильтр филиалов по статусу"
               value={statusFilter}
@@ -357,19 +309,12 @@ const BranchManagement = () => {
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
-              style={{ minWidth: '150px' }} />
+              className="admin-minw-150" />
             <Button
               onClick={() => setShowAddForm(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none',
-                padding: '8px 16px'
-              }}>
+              className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px-1">
               
-              <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <Plus aria-hidden="true" className="admin-icon-16" />
               <span>Добавить филиал</span>
             </Button>
           </div>
@@ -378,19 +323,9 @@ const BranchManagement = () => {
 
       {/* Форма добавления/редактирования */}
       {showAddForm &&
-      <MacOSCard style={{ padding: '24px', overflow: 'hidden' }}>
-          <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+      <MacOSCard className="admin-p-24-ov-hidden-1">
+          <div className="admin-d-flex-jc-between-ai-center-mb-16-1">
+            <h3 className="admin-fs-lg-fw-semi-primary-m-0-1">
               {editingBranch ? 'Редактировать филиал' : 'Добавить филиал'}
             </h3>
             <Button
@@ -402,26 +337,16 @@ const BranchManagement = () => {
               setEditingBranch(null);
               resetForm();
             }}
-            style={{ padding: '8px' }}>
+            className="admin-p-8">
 
-              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <X aria-hidden="true" className="admin-icon-16" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '16px'
-          }}>
+          <form onSubmit={handleSubmit} className="admin-flex-col-16">
+            <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-1">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-17">
                   Название филиала *
                 </label>
                 <Input
@@ -433,13 +358,7 @@ const BranchManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-16">
                   Код филиала *
                 </label>
                 <Input
@@ -451,13 +370,7 @@ const BranchManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-15">
                   Адрес
                 </label>
                 <Input
@@ -468,13 +381,7 @@ const BranchManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-14">
                   Телефон
                 </label>
                 <Input
@@ -488,23 +395,13 @@ const BranchManagement = () => {
                 }}
                 placeholder="+998 71 123 45 67"
                 error={formErrors.phone} />
-              <p style={{
-                margin: '4px 0 0 0',
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-text-secondary)'
-              }}>
+              <p className="admin-m-4px-0-0-0-fs-xs-secondary">
                 Формат: +998 71 123 45 67
               </p>
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-13">
                   Email
                 </label>
                 <Input
@@ -515,13 +412,7 @@ const BranchManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-12">
                   Статус
                 </label>
                 <Select
@@ -532,13 +423,7 @@ const BranchManagement = () => {
                 size="large" />
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-11">
                   Вместимость
                 </label>
                 <Input
@@ -551,28 +436,12 @@ const BranchManagement = () => {
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Доступные услуги
               </label>
-              <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '8px'
-            }}>
+              <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-8">
                 {specialtyOptions.map((specialty) =>
-              <label key={specialty.value} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)'
-              }}>
+              <label key={specialty.value} className="admin-d-flex-ai-center-gap-8-fs-sm-primary">
                     <Checkbox
                   checked={formData.services_available.includes(specialty.value)}
                   onChange={(checked) => {
@@ -595,11 +464,7 @@ const BranchManagement = () => {
               </div>
             </div>
 
-            <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px'
-          }}>
+            <div className="admin-d-flex-jc-end-gap-12-1">
               <Button
               type="button"
               variant="outline"
@@ -616,26 +481,16 @@ const BranchManagement = () => {
               type="submit"
               disabled={saving}
               aria-label={editingBranch ? 'Update branch' : 'Create branch'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none'
-              }}>
+              className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-1">
               
                 {saving ?
               <>
-                    <RefreshCw aria-hidden="true" style={{
-                  width: '16px',
-                  height: '16px',
-                  animation: 'spin 1s linear infinite'
-                }} />
+                    <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin-1" />
                     Сохранение...
                   </> :
 
               <>
-                    <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                    <Save aria-hidden="true" className="admin-icon-16" />
                     {editingBranch ? 'Обновить' : 'Создать'}
                   </>
               }
@@ -647,14 +502,9 @@ const BranchManagement = () => {
 
       {/* Список филиалов */}
       {loading ?
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px',
-        overflow: 'hidden'
-      }}>
+      <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-3">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} style={{ padding: '24px' }}>
+        <MacOSCard key={i} className="admin-p-24">
               <Skeleton height="200px" />
             </MacOSCard>
         )}
@@ -666,40 +516,21 @@ const BranchManagement = () => {
         description={branchEmptyDescription}
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" focusable="false" className="admin-icon-16-mr-8" />
               Добавить филиал
             </Button>
         } /> :
 
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px',
-        overflow: 'hidden'
-      }}>
+      <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-2">
           {filteredBranches.map((branch) =>
-        <MacOSCard key={branch.id} style={{ padding: '24px' }}>
-              <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '16px'
-          }}>
+        <MacOSCard key={branch.id} className="admin-p-24">
+              <div className="admin-d-flex-jc-between-ai-start-mb-16-1">
                 <div>
-                  <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 4px 0'
-              }}>
+                  <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0-1">
                     {branch.name}
                   </h3>
-                  <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0
-              }}>
+                  <p className="admin-fs-sm-secondary-m-0-1">
                     {branch.code}
                   </p>
                 </div>
@@ -709,66 +540,37 @@ const BranchManagement = () => {
             
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <div className="admin-d-flex-fd-column-gap-8-mb-16-1">
                 {branch.address &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                    <MapPin aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+            <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-7">
+                    <MapPin aria-hidden="true" className="admin-icon-16" />
                     <span>{branch.address}</span>
                   </div>
             }
                 {branch.phone &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                    <Phone aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+            <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-6">
+                    <Phone aria-hidden="true" className="admin-icon-16" />
                     <span>{formatBranchPhone(branch.phone)}</span>
                   </div>
             }
                 {branch.email &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                    <Mail aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+            <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-5">
+                    <Mail aria-hidden="true" className="admin-icon-16" />
                     <span>{branch.email}</span>
                   </div>
             }
-                <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                  <Users aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-4">
+                  <Users aria-hidden="true" className="admin-icon-16" />
                   <span>Вместимость: {branch.capacity}</span>
                 </div>
               </div>
 
               {branch.services_available && branch.services_available.length > 0 &&
-          <div style={{ marginBottom: '16px' }}>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+          <div className="admin-mb-16">
+                  <p className="admin-fs-sm-fw-med-primary-mb-8">
                     Услуги:
                   </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  <div className="admin-d-flex-fw-wrap-gap-4">
                     {branch.services_available.map((service) => {
                 const specialty = specialtyOptions.find((s) => s.value === service);
                 return specialty ?
@@ -776,7 +578,7 @@ const BranchManagement = () => {
                   key={service}
                   variant="outline"
                   text={specialty.label}
-                  style={{ fontSize: 'var(--mac-font-size-xs)' }} /> :
+                  className="admin-fs-xs" /> :
 
                 null;
               })}
@@ -784,32 +586,24 @@ const BranchManagement = () => {
                 </div>
           }
 
-              <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px'
-          }}>
+              <div className="admin-d-flex-jc-end-gap-8-1">
                 <Button
               type="button"
               variant="outline"
               aria-label={`Редактировать филиал ${branch.name}`}
               onClick={() => handleEdit(branch)}
-              style={{ padding: '6px 12px' }}>
+              className="admin-p-6px-12px-1">
 
-                  <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Edit aria-hidden="true" className="admin-icon-16" />
                 </Button>
                 <Button
               type="button"
               variant="outline"
               aria-label={`Удалить филиал ${branch.name}`}
               onClick={() => handleDelete(branch.id)}
-              style={{
-                padding: '6px 12px',
-                color: 'var(--mac-error)',
-                borderColor: 'var(--mac-error)'
-              }}>
+              className="admin-p-6px-12px-error-bd-c-error-1">
               
-                  <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Trash2 aria-hidden="true" className="admin-icon-16" />
                 </Button>
               </div>
             </MacOSCard>

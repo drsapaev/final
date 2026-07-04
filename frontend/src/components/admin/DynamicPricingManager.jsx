@@ -91,45 +91,15 @@ const ServiceChecklist = ({ services = [], value = [], onChange }) => {
 
   if (!services.length) {
     return (
-      <div
-        style={{
-          minHeight: '96px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          background: 'var(--mac-bg-secondary)',
-          color: 'var(--mac-text-secondary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}
-      >
+      <div className="admin-checklist-empty">
         {'\u0423\u0441\u043b\u0443\u0433\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b'}
       </div>
     );
   }
 
   return (
-    <div
-      role="group"
-      style={{
-        maxHeight: '220px',
-        overflowY: 'auto',
-        border: '1px solid var(--mac-border)',
-        borderRadius: 'var(--mac-radius-md)',
-        background: 'var(--mac-bg-primary)',
-        padding: '8px',
-        display: 'grid',
-        gap: '6px'
-      }}
-    >
-      <div
-        style={{
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-xs)',
-          padding: '0 2px 4px'
-        }}
-      >
+    <div role="group" className="admin-checklist-container">
+      <div className="admin-checklist-header">
         {selectedIds.length
           ? `${selectedIds.length} ${'\u0432\u044b\u0431\u0440\u0430\u043d\u043e'}`
           : '\u041d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d\u043e'}
@@ -139,21 +109,14 @@ const ServiceChecklist = ({ services = [], value = [], onChange }) => {
         const checked = selectedIds.includes(serviceId);
 
         return (
-          <div
-            key={service.id}
-            style={{
-              padding: '8px',
-              borderRadius: 'var(--mac-radius-sm)',
-              background: checked ? 'var(--mac-accent-blue-light)' : 'var(--mac-bg-secondary)'
-            }}
-          >
+          <div key={service.id} className="admin-checklist-item" style={{ '--admin-checklist-bg': checked ? 'var(--mac-accent-blue-light)' : 'var(--mac-bg-secondary)' }}>
             <Checkbox
               checked={checked}
               onChange={() => onChange(toggleServiceId(selectedIds, service.id))}
               label={
-                <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span className="admin-flex-col-2">
                   <span>{service.name}</span>
-                  <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
+                  <span className="admin-text-xs-secondary">
                     {service.price} {'\u20bd'}
                   </span>
                 </span>
@@ -417,50 +380,29 @@ const DynamicPricingManager = () => {
   };
 
   const renderRulesTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Заголовок и кнопки */}
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }}>
+      <div className="admin-flex-between">
         <div>
-          <h3 style={{
-          margin: '0 0 4px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+          <h3 className="admin-section-h3">
             Правила ценообразования
           </h3>
-          <p style={{
-          margin: 0,
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+          <p className="admin-section-desc">
             Управление автоматическими скидками и правилами
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="admin-flex-gap-8">
           <Button
           onClick={handleUpdateDynamicPrices}
           variant="outline"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          className="admin-flex-center-8">
           
             <TrendingUp size={16} />
             Обновить цены
           </Button>
           <Button
           onClick={() => setShowCreateRule(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          className="admin-flex-center-8">
           
             <Plus size={16} />
             Создать правило
@@ -469,7 +411,7 @@ const DynamicPricingManager = () => {
       </div>
 
       {/* Список правил */}
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="admin-grid-gap-16">
         {pricingRules.length === 0 ?
       <MacOSEmptyState
         type="rule"
@@ -477,32 +419,18 @@ const DynamicPricingManager = () => {
         description="В системе пока нет созданных правил ценообразования"
         action={
         <Button onClick={() => setShowCreateRule(true)}>
-                <Plus size={16} style={{ marginRight: '8px' }} />
+                <Plus size={16} className="admin-mr-8" />
                 Создать первое правило
               </Button>
         } /> :
 
 
       pricingRules.map((rule) =>
-      <MacOSCard key={rule.id} style={{ padding: 0 }}>
-              <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start'
-        }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px'
-            }}>
-                    <h4 style={{
-                margin: 0,
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-md)',
-                fontWeight: 'var(--mac-font-weight-semibold)'
-              }}>
+      <MacOSCard key={rule.id} className="admin-p-0">
+              <div className="admin-card-header-flex-start">
+                <div className="admin-flex-1">
+                  <div className="admin-card-title-badges">
+                    <h4 className="admin-rule-header">
                       {rule.name}
                     </h4>
                     <Badge variant={rule.is_active ? 'success' : 'secondary'}>
@@ -513,64 +441,39 @@ const DynamicPricingManager = () => {
                     </Badge>
                   </div>
 
-                  <p style={{
-              margin: '0 0 12px 0',
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+                  <p className="admin-rule-desc">
                     {rule.description}
                   </p>
 
-                  <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div className="admin-stats-row-info">
+                    <span className="admin-flex-center-4">
                       <Percent size={12} />
                       {normalizePricingEnumValue(rule.discount_type) === 'percentage' ? `${rule.discount_value}%` : `${rule.discount_value} ₽`}
                     </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="admin-flex-center-4">
                       <Users size={12} />
                       Использований: {rule.current_uses || 0}
                       {rule.max_uses && ` / ${rule.max_uses}`}
                     </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="admin-flex-center-4">
                       <BarChart3 size={12} />
                       Приоритет: {rule.priority}
                     </span>
                   </div>
 
                   {(rule.start_time || rule.end_time) &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              marginTop: '8px'
-            }}>
+            <div className="admin-time-info">
                       <Clock size={12} />
                       {rule.start_time} - {rule.end_time}
                     </div>
             }
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="admin-flex-gap-8">
                   <Button
               variant="outline"
               onClick={() => handleToggleRule(rule.id, rule.is_active)}
-              style={{
-                padding: '6px',
-                minWidth: 'auto',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="admin-icon-btn-32"
               title={rule.is_active ? 'Приостановить правило' : 'Активировать правило'}
               type="button"
               aria-label={`${rule.is_active ? 'Приостановить' : 'Активировать'} правило ${rule.name || rule.id}`}>
@@ -580,15 +483,7 @@ const DynamicPricingManager = () => {
                   <Button
               variant="outline"
               onClick={() => setEditingRule(rule)}
-              style={{
-                padding: '6px',
-                minWidth: 'auto',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="admin-icon-btn-32"
               title="Редактировать правило"
               type="button"
               aria-label={`Редактировать правило ${rule.name || rule.id}`}>
@@ -598,15 +493,7 @@ const DynamicPricingManager = () => {
                   <Button
               variant="outline"
               onClick={() => handleDeleteRule(rule.id)}
-              style={{
-                padding: '6px',
-                minWidth: 'auto',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="admin-icon-btn-32"
               title="Удалить правило"
               type="button"
               aria-label={`Удалить правило ${rule.name || rule.id}`}>
@@ -622,19 +509,9 @@ const DynamicPricingManager = () => {
 
       {/* Форма создания правила */}
       {showCreateRule &&
-    <MacOSCard style={{ padding: '24px' }}>
-          <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px'
-      }}>
-            <h4 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+    <MacOSCard className="admin-p-24">
+          <div className="admin-card-header-between">
+            <h4 className="admin-section-h3-m0">
               Создать правило ценообразования
             </h4>
             <Button
@@ -647,19 +524,9 @@ const DynamicPricingManager = () => {
             </Button>
           </div>
 
-          <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '16px'
-      }}>
+          <div className="admin-grid-form-2col">
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Название
               </label>
               <Input
@@ -670,13 +537,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Тип правила
               </label>
               <Select
@@ -687,13 +548,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Тип скидки
               </label>
               <Select
@@ -704,13 +559,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Размер скидки
               </label>
               <Input
@@ -722,13 +571,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Время начала
               </label>
               <Input
@@ -739,13 +582,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Время окончания
               </label>
               <Input
@@ -756,13 +593,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Минимальное количество
               </label>
               <Input
@@ -774,13 +605,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Приоритет
               </label>
               <Input
@@ -791,14 +616,8 @@ const DynamicPricingManager = () => {
           
             </div>
 
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+            <div className="admin-grid-span-2">
+              <label className="admin-form-label">
                 Описание
               </label>
               <Textarea
@@ -808,14 +627,8 @@ const DynamicPricingManager = () => {
           
             </div>
 
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+            <div className="admin-grid-span-2">
+              <label className="admin-form-label">
                 Услуги
               </label>
               <ServiceChecklist
@@ -826,17 +639,12 @@ const DynamicPricingManager = () => {
             </div>
           </div>
 
-          <div style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        gap: '8px',
-        marginTop: '16px'
-      }}>
+          <div className="admin-form-actions-end-8">
             <Button variant="outline" onClick={() => setShowCreateRule(false)}>
               Отмена
             </Button>
             <Button onClick={handleCreateRule}>
-              <Save size={16} style={{ marginRight: '8px' }} />
+              <Save size={16} className="admin-mr-8" />
               Создать
             </Button>
           </div>
@@ -846,37 +654,20 @@ const DynamicPricingManager = () => {
 
 
   const renderPackagesTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Заголовок и кнопки */}
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }}>
+      <div className="admin-flex-between">
         <div>
-          <h3 style={{
-          margin: '0 0 4px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+          <h3 className="admin-section-h3">
             Пакеты услуг
           </h3>
-          <p style={{
-          margin: 0,
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+          <p className="admin-section-desc">
             Управление комплексными предложениями
           </p>
         </div>
         <Button
         onClick={() => setShowCreatePackage(true)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
           <Plus size={16} />
           Создать пакет
@@ -884,7 +675,7 @@ const DynamicPricingManager = () => {
       </div>
 
       {/* Список пакетов */}
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="admin-grid-gap-16">
         {servicePackages.length === 0 ?
       <MacOSEmptyState
         type="package"
@@ -892,32 +683,18 @@ const DynamicPricingManager = () => {
         description="В системе пока нет созданных пакетов услуг"
         action={
         <Button onClick={() => setShowCreatePackage(true)}>
-                <Plus size={16} style={{ marginRight: '8px' }} />
+                <Plus size={16} className="admin-mr-8" />
                 Создать первый пакет
               </Button>
         } /> :
 
 
       servicePackages.map((pkg) =>
-      <MacOSCard key={pkg.id} style={{ padding: 0 }}>
-              <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start'
-        }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px'
-            }}>
-                    <h4 style={{
-                margin: 0,
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-md)',
-                fontWeight: 'var(--mac-font-weight-semibold)'
-              }}>
+      <MacOSCard key={pkg.id} className="admin-p-0">
+              <div className="admin-card-header-flex-start">
+                <div className="admin-flex-1">
+                  <div className="admin-card-title-badges">
+                    <h4 className="admin-rule-header">
                       {pkg.name}
                     </h4>
                     <Badge variant={pkg.is_active ? 'success' : 'secondary'}>
@@ -925,35 +702,17 @@ const DynamicPricingManager = () => {
                     </Badge>
                   </div>
 
-                  <p style={{
-              margin: '0 0 12px 0',
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+                  <p className="admin-rule-desc">
                     {pkg.description}
                   </p>
 
-                  <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
-                    <span style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                color: 'var(--mac-success)',
-                fontWeight: 'var(--mac-font-weight-semibold)'
-              }}>
+                  <div className="admin-flex-center-16-sm">
+                    <span className="admin-price-savings">
                       <DollarSign size={12} />
                       {pkg.package_price} ₽
                     </span>
                     {pkg.original_price &&
-              <span style={{
-                color: 'var(--mac-text-tertiary)',
-                textDecoration: 'line-through'
-              }}>
+              <span className="admin-price-strike">
                         {pkg.original_price} ₽
                       </span>
               }
@@ -962,21 +721,14 @@ const DynamicPricingManager = () => {
                         Экономия {pkg.savings_percentage.toFixed(0)}%
                       </Badge>
               }
-                    <span style={{ color: 'var(--mac-text-secondary)' }}>
+                    <span className="admin-text-secondary">
                       Покупок: {pkg.current_purchases || 0}
                       {pkg.max_purchases && ` / ${pkg.max_purchases}`}
                     </span>
                   </div>
 
                   {(pkg.valid_from || pkg.valid_to) &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              marginTop: '8px'
-            }}>
+            <div className="admin-time-info">
                       <Calendar size={12} />
                       {pkg.valid_from && new Date(pkg.valid_from).toLocaleDateString()} -
                       {pkg.valid_to && new Date(pkg.valid_to).toLocaleDateString()}
@@ -984,19 +736,11 @@ const DynamicPricingManager = () => {
             }
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="admin-flex-gap-8">
                   <Button
               variant="outline"
               onClick={() => setEditingPackage(pkg)}
-              style={{
-                padding: '6px',
-                minWidth: 'auto',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="admin-icon-btn-32"
               title="Редактировать пакет"
               type="button"
               aria-label={`Редактировать пакет ${pkg.name || pkg.id}`}>
@@ -1006,15 +750,7 @@ const DynamicPricingManager = () => {
                   <Button
               variant="outline"
               onClick={() => handleDeletePackage(pkg.id)}
-              style={{
-                padding: '6px',
-                minWidth: 'auto',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="admin-icon-btn-32"
               title="Удалить пакет"
               type="button"
               aria-label={`Удалить пакет ${pkg.name || pkg.id}`}>
@@ -1030,19 +766,9 @@ const DynamicPricingManager = () => {
 
       {/* Форма создания пакета */}
       {showCreatePackage &&
-    <MacOSCard style={{ padding: '24px' }}>
-          <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px'
-      }}>
-            <h4 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+    <MacOSCard className="admin-p-24">
+          <div className="admin-card-header-between">
+            <h4 className="admin-section-h3-m0">
               Создать пакет услуг
             </h4>
             <Button
@@ -1055,19 +781,9 @@ const DynamicPricingManager = () => {
             </Button>
           </div>
 
-          <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '16px'
-      }}>
+          <div className="admin-grid-form-2col">
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Название
               </label>
               <Input
@@ -1078,13 +794,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Цена пакета
               </label>
               <Input
@@ -1096,13 +806,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Действует с
               </label>
               <Input
@@ -1113,13 +817,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+              <label className="admin-form-label">
                 Действует до
               </label>
               <Input
@@ -1129,14 +827,8 @@ const DynamicPricingManager = () => {
           
             </div>
 
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+            <div className="admin-grid-span-2">
+              <label className="admin-form-label">
                 Описание
               </label>
               <Textarea
@@ -1146,14 +838,8 @@ const DynamicPricingManager = () => {
           
             </div>
 
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+            <div className="admin-grid-span-2">
+              <label className="admin-form-label">
                 Услуги в пакете
               </label>
               <ServiceChecklist
@@ -1164,17 +850,12 @@ const DynamicPricingManager = () => {
             </div>
           </div>
 
-          <div style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        gap: '8px',
-        marginTop: '16px'
-      }}>
+          <div className="admin-form-actions-end-8">
             <Button variant="outline" onClick={() => setShowCreatePackage(false)}>
               Отмена
             </Button>
             <Button onClick={handleCreatePackage}>
-              <Save size={16} style={{ marginRight: '8px' }} />
+              <Save size={16} className="admin-mr-8" />
               Создать
             </Button>
           </div>
@@ -1184,126 +865,60 @@ const DynamicPricingManager = () => {
 
 
   const renderAnalyticsTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       <div>
-        <h3 style={{
-        margin: '0 0 4px 0',
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+        <h3 className="admin-section-h3">
           Аналитика ценообразования
         </h3>
-        <p style={{
-        margin: 0,
-        color: 'var(--mac-text-secondary)',
-        fontSize: 'var(--mac-font-size-sm)'
-      }}>
+        <p className="admin-section-desc">
           Статистика применения правил и пакетов
         </p>
       </div>
 
       {analytics ?
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-          <MacOSCard style={{ padding: 0 }}>
-            <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '12px'
-        }}>
+    <div className="admin-grid-auto-300">
+          <MacOSCard className="admin-p-0">
+            <div className="admin-card-title-badges">
               <TrendingUp size={20} color="var(--mac-accent)" />
-              <h4 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-md)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+              <h4 className="admin-rule-header">
                 Общая экономия
               </h4>
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-success)',
-          marginBottom: '8px'
-        }}>
+            <div className="admin-stats-value-success">
               {analytics.summary?.total_savings?.toLocaleString() || 0} ₽
             </div>
-            <p style={{
-          margin: 0,
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <p className="admin-stats-label">
               За период {analytics.period?.start_date && new Date(analytics.period.start_date).toLocaleDateString()} -
               {analytics.period?.end_date && new Date(analytics.period.end_date).toLocaleDateString()}
             </p>
           </MacOSCard>
 
-          <MacOSCard style={{ padding: 0 }}>
-            <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '12px'
-        }}>
+          <MacOSCard className="admin-p-0">
+            <div className="admin-card-title-badges">
               <Settings size={20} color="var(--mac-purple)" />
-              <h4 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-md)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+              <h4 className="admin-rule-header">
                 Активные правила
               </h4>
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
-        }}>
+            <div className="admin-stats-value-primary">
               {analytics.summary?.active_rules_count || 0}
             </div>
-            <p style={{
-          margin: 0,
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <p className="admin-stats-label">
               Правил ценообразования
             </p>
           </MacOSCard>
 
-          <MacOSCard style={{ padding: 0 }}>
-            <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '12px'
-        }}>
+          <MacOSCard className="admin-p-0">
+            <div className="admin-card-title-badges">
               <Package size={20} color="var(--mac-orange)" />
-              <h4 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-md)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+              <h4 className="admin-rule-header">
                 Активные пакеты
               </h4>
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
-        }}>
+            <div className="admin-stats-value-primary">
               {analytics.summary?.active_packages_count || 0}
             </div>
-            <p style={{
-          margin: 0,
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <p className="admin-stats-label">
               Пакетов услуг
             </p>
           </MacOSCard>
@@ -1317,36 +932,21 @@ const DynamicPricingManager = () => {
     }
 
       {analytics?.rules_statistics &&
-    <MacOSCard style={{ padding: '16px' }}>
-          <h4 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-md)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+    <MacOSCard className="admin-p-16">
+          <h4 className="admin-rule-header admin-mb-16">
             Статистика правил
           </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="admin-flex-col-8">
             {analytics.rules_statistics.map((rule, index) =>
-        <div key={index} style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px',
-          backgroundColor: 'var(--mac-bg-secondary)',
-          borderRadius: 'var(--mac-radius-md)'
-        }}>
-                <span style={{
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div key={index} className="admin-stat-list-row">
+                <span className="admin-text-med-primary">
                   {rule.name}
                 </span>
-                <div style={{ display: 'flex', gap: '16px', fontSize: 'var(--mac-font-size-sm)' }}>
-                  <span style={{ color: 'var(--mac-text-secondary)' }}>
+                <div className="admin-flex-center-16-sm">
+                  <span className="admin-text-secondary">
                     Использований: {rule.uses}
                   </span>
-                  <span style={{ color: 'var(--mac-success)' }}>
+                  <span className="admin-text-success">
                     Экономия: {rule.total_savings?.toLocaleString() || 0} ₽
                   </span>
                 </div>
@@ -1357,36 +957,21 @@ const DynamicPricingManager = () => {
     }
 
       {analytics?.packages_statistics &&
-    <MacOSCard style={{ padding: '16px' }}>
-          <h4 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-md)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+    <MacOSCard className="admin-p-16">
+          <h4 className="admin-rule-header admin-mb-16">
             Статистика пакетов
           </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="admin-flex-col-8">
             {analytics.packages_statistics.map((pkg, index) =>
-        <div key={index} style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px',
-          backgroundColor: 'var(--mac-bg-secondary)',
-          borderRadius: 'var(--mac-radius-md)'
-        }}>
-                <span style={{
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div key={index} className="admin-stat-list-row">
+                <span className="admin-text-med-primary">
                   {pkg.name}
                 </span>
-                <div style={{ display: 'flex', gap: '16px', fontSize: 'var(--mac-font-size-sm)' }}>
-                  <span style={{ color: 'var(--mac-text-secondary)' }}>
+                <div className="admin-flex-center-16-sm">
+                  <span className="admin-text-secondary">
                     Покупок: {pkg.purchases}
                   </span>
-                  <span style={{ color: 'var(--mac-success)' }}>
+                  <span className="admin-text-success">
                     Экономия: {pkg.total_savings?.toLocaleString() || 0} ₽
                   </span>
                 </div>
@@ -1405,58 +990,33 @@ const DynamicPricingManager = () => {
 
 
   return (
-    <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
+    <div className="admin-p-0-max-1400">
+      <div className="admin-flex-center-16 admin-mb-24">
         <Package size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-xl)',
-            fontWeight: 'var(--mac-font-weight-bold)'
-          }}>
+          <h2 className="admin-page-title">
             Динамическое ценообразование
           </h2>
-          <p style={{
-            margin: '4px 0 0 0',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          <p className="admin-page-subtitle">
             Управление правилами ценообразования, пакетами услуг и динамическими ценами
           </p>
         </div>
       </div>
 
       {/* Табы */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-tab-bar">
         {tabs.map((tab) => {
           const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              className="admin-dp-tab-btn"
               style={{
-                padding: '16px 24px',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                borderBottom: activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent',
-                color: activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-                fontWeight: activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-                fontSize: 'var(--mac-font-size-sm)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                '--admin-tab-border': isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
+                '--admin-tab-color': isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                '--admin-tab-weight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
               }}>
               
               <Icon size={16} />

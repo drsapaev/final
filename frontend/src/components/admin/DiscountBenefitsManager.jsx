@@ -624,27 +624,14 @@ const DiscountBenefitsManager = () => {
 
   // Рендер списка скидок
   const renderDiscountsList = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="admin-flex-col-24">
+      <div className="admin-flex-between">
+        <h3 className="admin-section-h3-m0">
           Скидки
         </h3>
         <Button
         onClick={() => setShowCreateForm(true)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
           <Plus size={16} />
           Создать скидку
@@ -652,20 +639,15 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-md)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+    <MacOSCard className="admin-p-0">
+          <h4 className="admin-h4-md-semi-primary-mb-16">
             Создание новой скидки
           </h4>
           {renderDiscountForm()}
         </MacOSCard>
     }
 
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="admin-grid-gap-16">
         {discounts.length === 0 ?
       <MacOSEmptyState
         type="discount"
@@ -673,36 +655,23 @@ const DiscountBenefitsManager = () => {
         description="В системе пока нет созданных скидок"
         action={
         <Button onClick={() => setShowCreateForm(true)}>
-                <Plus size={16} style={{ marginRight: '8px' }} />
+                <Plus size={16} className="admin-mr-8" />
                 Создать первую скидку
               </Button>
         } /> :
 
 
       discounts.map((discount) =>
-      <MacOSCard key={discount.id} style={{ padding: 0 }}>
-              <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start'
-        }}>
+      <MacOSCard key={discount.id} className="admin-p-0">
+              <div className="admin-flex-between-flex-start">
                 <div>
-                  <h4 style={{
-              margin: '0 0 8px 0',
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-md)',
-              fontWeight: 'var(--mac-font-weight-semibold)'
-            }}>
+                  <h4 className="admin-h4-md-semi-primary-mb-8">
                     {discount.name}
                   </h4>
-                  <p style={{
-              margin: '0 0 12px 0',
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+                  <p className="admin-p-sm-secondary-mb-12">
                     {discount.description}
                   </p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div className="admin-flex-wrap-8">
                     <Badge variant={discount.is_active ? 'success' : 'error'}>
                       {discount.is_active ? 'Активна' : 'Неактивна'}
                     </Badge>
@@ -714,11 +683,7 @@ const DiscountBenefitsManager = () => {
                     </Badge>
                   </div>
                 </div>
-                <div style={{
-            textAlign: 'right',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+                <div className="admin-text-right admin-text-sm admin-text-secondary">
                   <div>Использований: {discount.usage_count}/{discount.usage_limit || '∞'}</div>
                   <div>Приоритет: {discount.priority}</div>
                 </div>
@@ -732,27 +697,14 @@ const DiscountBenefitsManager = () => {
 
   // Рендер списка льгот
   const renderBenefitsList = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="admin-flex-col-24">
+      <div className="admin-flex-between">
+        <h3 className="admin-section-h3-m0">
           Льготы
         </h3>
         <Button
         onClick={() => setShowCreateForm(true)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
           <Plus size={16} />
           Создать льготу
@@ -760,20 +712,15 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-md)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+    <MacOSCard className="admin-p-0">
+          <h4 className="admin-h4-md-semi-primary-mb-16">
             Создание новой льготы
           </h4>
           {renderBenefitForm()}
         </MacOSCard>
     }
 
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="admin-grid-gap-16">
         {benefits.length === 0 ?
       <MacOSEmptyState
         type="benefit"
@@ -781,36 +728,23 @@ const DiscountBenefitsManager = () => {
         description="В системе пока нет созданных льгот"
         action={
         <Button onClick={() => setShowCreateForm(true)}>
-                <Plus size={16} style={{ marginRight: '8px' }} />
+                <Plus size={16} className="admin-mr-8" />
                 Создать первую льготу
               </Button>
         } /> :
 
 
       benefits.map((benefit) =>
-      <MacOSCard key={benefit.id} style={{ padding: 0 }}>
-              <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start'
-        }}>
+      <MacOSCard key={benefit.id} className="admin-p-0">
+              <div className="admin-flex-between-flex-start">
                 <div>
-                  <h4 style={{
-              margin: '0 0 8px 0',
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-md)',
-              fontWeight: 'var(--mac-font-weight-semibold)'
-            }}>
+                  <h4 className="admin-h4-md-semi-primary-mb-8">
                     {benefit.name}
                   </h4>
-                  <p style={{
-              margin: '0 0 12px 0',
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+                  <p className="admin-p-sm-secondary-mb-12">
                     {benefit.description}
                   </p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div className="admin-flex-wrap-8">
                     <Badge variant={benefit.is_active ? 'success' : 'error'}>
                       {benefit.is_active ? 'Активна' : 'Неактивна'}
                     </Badge>
@@ -827,11 +761,7 @@ const DiscountBenefitsManager = () => {
               }
                   </div>
                 </div>
-                <div style={{
-            textAlign: 'right',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+                <div className="admin-text-right admin-text-sm admin-text-secondary">
                   {benefit.monthly_limit && <div>Месячный лимит: {benefit.monthly_limit} руб.</div>}
                   {benefit.yearly_limit && <div>Годовой лимит: {benefit.yearly_limit} руб.</div>}
                   {benefit.max_discount_amount && <div>Макс. скидка: {benefit.max_discount_amount} руб.</div>}
@@ -846,27 +776,14 @@ const DiscountBenefitsManager = () => {
 
   // Рендер списка программ лояльности
   const renderLoyaltyList = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="admin-flex-col-24">
+      <div className="admin-flex-between">
+        <h3 className="admin-section-h3-m0">
           Программы лояльности
         </h3>
         <Button
         onClick={() => setShowCreateForm(true)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
           <Plus size={16} />
           Создать программу
@@ -874,20 +791,15 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-md)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+    <MacOSCard className="admin-p-0">
+          <h4 className="admin-h4-md-semi-primary-mb-16">
             Создание новой программы лояльности
           </h4>
           {renderLoyaltyForm()}
         </MacOSCard>
     }
 
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="admin-grid-gap-16">
         {loyaltyPrograms.length === 0 ?
       <MacOSEmptyState
         type="loyalty"
@@ -895,36 +807,23 @@ const DiscountBenefitsManager = () => {
         description="В системе пока нет созданных программ лояльности"
         action={
         <Button onClick={() => setShowCreateForm(true)}>
-                <Plus size={16} style={{ marginRight: '8px' }} />
+                <Plus size={16} className="admin-mr-8" />
                 Создать первую программу
               </Button>
         } /> :
 
 
       loyaltyPrograms.map((program) =>
-      <MacOSCard key={program.id} style={{ padding: 0 }}>
-              <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start'
-        }}>
+      <MacOSCard key={program.id} className="admin-p-0">
+              <div className="admin-flex-between-flex-start">
                 <div>
-                  <h4 style={{
-              margin: '0 0 8px 0',
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-md)',
-              fontWeight: 'var(--mac-font-weight-semibold)'
-            }}>
+                  <h4 className="admin-h4-md-semi-primary-mb-8">
                     {program.name}
                   </h4>
-                  <p style={{
-              margin: '0 0 12px 0',
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+                  <p className="admin-p-sm-secondary-mb-12">
                     {program.description}
                   </p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div className="admin-flex-wrap-8">
                     <Badge variant={program.is_active ? 'success' : 'error'}>
                       {program.is_active ? 'Активна' : 'Неактивна'}
                     </Badge>
@@ -936,11 +835,7 @@ const DiscountBenefitsManager = () => {
                     </Badge>
                   </div>
                 </div>
-                <div style={{
-            textAlign: 'right',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+                <div className="admin-text-right admin-text-sm admin-text-secondary">
                   <div>Мин. для списания: {program.min_points_to_redeem} баллов</div>
                 </div>
               </div>
@@ -953,51 +848,29 @@ const DiscountBenefitsManager = () => {
 
   // Рендер аналитики
   const renderAnalytics = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <h3 style={{
-      margin: 0,
-      color: 'var(--mac-text-primary)',
-      fontSize: 'var(--mac-font-size-lg)',
-      fontWeight: 'var(--mac-font-weight-semibold)'
-    }}>
+  <div className="admin-flex-col-24">
+      <h3 className="admin-section-h3-m0">
         Аналитика
       </h3>
 
       {analytics ?
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+    <div className="admin-grid-auto-300">
           {/* Аналитика скидок */}
           {analytics.discounts &&
-      <MacOSCard style={{ padding: 0 }}>
-              <h4 style={{
-          margin: '0 0 12px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-md)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+      <MacOSCard className="admin-p-0">
+              <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <TrendingUp size={16} />
                 Скидки
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Всего применений: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.discounts.total_applications}</span>
+              <div className="admin-flex-col-8">
+                <div className="admin-text-sm admin-text-secondary">
+                  Всего применений: <span className="admin-text-med-primary">{analytics.discounts.total_applications}</span>
                 </div>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Общая сумма скидок: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.discounts.total_discount_amount?.toFixed(2)} руб.</span>
+                <div className="admin-text-sm admin-text-secondary">
+                  Общая сумма скидок: <span className="admin-text-med-primary">{analytics.discounts.total_discount_amount?.toFixed(2)} руб.</span>
                 </div>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Средний процент скидки: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.discounts.average_discount_percentage?.toFixed(1)}%</span>
+                <div className="admin-text-sm admin-text-secondary">
+                  Средний процент скидки: <span className="admin-text-med-primary">{analytics.discounts.average_discount_percentage?.toFixed(1)}%</span>
                 </div>
               </div>
             </MacOSCard>
@@ -1005,37 +878,20 @@ const DiscountBenefitsManager = () => {
 
           {/* Аналитика льгот */}
           {analytics.benefits &&
-      <MacOSCard style={{ padding: 0 }}>
-              <h4 style={{
-          margin: '0 0 12px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-md)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+      <MacOSCard className="admin-p-0">
+              <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <Users size={16} />
                 Льготы
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Всего применений: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.benefits.total_applications}</span>
+              <div className="admin-flex-col-8">
+                <div className="admin-text-sm admin-text-secondary">
+                  Всего применений: <span className="admin-text-med-primary">{analytics.benefits.total_applications}</span>
                 </div>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Общая сумма льгот: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.benefits.total_benefit_amount?.toFixed(2)} руб.</span>
+                <div className="admin-text-sm admin-text-secondary">
+                  Общая сумма льгот: <span className="admin-text-med-primary">{analytics.benefits.total_benefit_amount?.toFixed(2)} руб.</span>
                 </div>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Средний процент льготы: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.benefits.average_benefit_percentage?.toFixed(1)}%</span>
+                <div className="admin-text-sm admin-text-secondary">
+                  Средний процент льготы: <span className="admin-text-med-primary">{analytics.benefits.average_benefit_percentage?.toFixed(1)}%</span>
                 </div>
               </div>
             </MacOSCard>
@@ -1043,43 +899,23 @@ const DiscountBenefitsManager = () => {
 
           {/* Аналитика лояльности */}
           {analytics.loyalty &&
-      <MacOSCard style={{ padding: 0 }}>
-              <h4 style={{
-          margin: '0 0 12px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-md)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+      <MacOSCard className="admin-p-0">
+              <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <DollarSign size={16} />
                 Лояльность
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Всего участников: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.loyalty.total_patients}</span>
+              <div className="admin-flex-col-8">
+                <div className="admin-text-sm admin-text-secondary">
+                  Всего участников: <span className="admin-text-med-primary">{analytics.loyalty.total_patients}</span>
                 </div>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Активных участников: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.loyalty.active_patients}</span>
+                <div className="admin-text-sm admin-text-secondary">
+                  Активных участников: <span className="admin-text-med-primary">{analytics.loyalty.active_patients}</span>
                 </div>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Всего баллов начислено: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.loyalty.total_points_earned}</span>
+                <div className="admin-text-sm admin-text-secondary">
+                  Всего баллов начислено: <span className="admin-text-med-primary">{analytics.loyalty.total_points_earned}</span>
                 </div>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
-                  Процент погашения: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.loyalty.redemption_rate?.toFixed(1)}%</span>
+                <div className="admin-text-sm admin-text-secondary">
+                  Процент погашения: <span className="admin-text-med-primary">{analytics.loyalty.redemption_rate?.toFixed(1)}%</span>
                 </div>
               </div>
             </MacOSCard>
@@ -1103,39 +939,21 @@ const DiscountBenefitsManager = () => {
 
 
   return (
-    <div style={{ padding: 0 }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
+    <div className="admin-p-0">
+      <div className="admin-flex-center-16 admin-mb-24">
         <Percent size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-xl)',
-            fontWeight: 'var(--mac-font-weight-bold)'
-          }}>
+          <h2 className="admin-h2-xl-bold-primary-m0">
             Система скидок и льгот
           </h2>
-          <p style={{
-            margin: '4px 0 0 0',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          <p className="admin-p-sm-secondary-mt-4">
             Управление скидками, льготами и программами лояльности
           </p>
         </div>
       </div>
 
       {/* Навигация по вкладкам */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-tab-bar">
         {tabs.map((tab) =>
         <button
           key={tab.id}
@@ -1143,24 +961,17 @@ const DiscountBenefitsManager = () => {
             setActiveTab(tab.id);
             setShowCreateForm(false);
           }}
+          data-active={activeTab === tab.id ? 'true' : 'false'}
+          className="admin-dp-tab-btn"
           style={{
-            padding: '16px 24px',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            borderBottom: activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent',
-            color: activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            '--admin-tab-border': activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent',
+            '--admin-tab-color': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+            '--admin-tab-weight': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
           }}>
           
             {tab.label}
             {tab.count !== undefined &&
-          <Badge variant="secondary" style={{ marginLeft: '8px' }}>
+          <Badge variant="secondary" className="admin-ml-8">
                 {tab.count}
               </Badge>
           }

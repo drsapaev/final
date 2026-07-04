@@ -143,31 +143,17 @@ const RegistrarNotificationManager = () => {
   };
 
   const renderSendTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Форма отправки уведомления */}
-      <Card style={{ padding: '24px' }}>
-        <h3 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)'
-      }}>
-          <Send style={{ width: '20px', height: '20px' }} />
+      <Card className="admin-p-24">
+        <h3 className="admin-m-0016px0-primary-flex-ai-center-gap-8-lg-med">
+          <Send className="admin-icon-20" />
           Отправить уведомление
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+        <div className="admin-grid-gtc-1fr1fr-gap-16-mb-16">
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-block-sm-med-primary-mb-8">
               Тип уведомления
             </label>
             <Select
@@ -182,18 +168,12 @@ const RegistrarNotificationManager = () => {
             { value: 'maintenance', label: 'Техническое обслуживание' }]
             }
             size="large"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
           
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-block-sm-med-primary-mb-8">
               Приоритет
             </label>
             <Select
@@ -205,37 +185,25 @@ const RegistrarNotificationManager = () => {
             { value: 'critical', label: 'Критический' }]
             }
             size="large"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
           
           </div>
         </div>
 
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-          display: 'block',
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
-        }}>
+        <div className="admin-mb-16">
+          <label className="admin-block-sm-med-primary-mb-8">
             Отделение (опционально)
           </label>
           <Input
           placeholder="Например: Кардиология, Стоматология"
           value={notificationForm.department}
           onChange={(e) => setNotificationForm({ ...notificationForm, department: e.target.value })}
-          style={{ width: '100%' }} />
+          className="admin-w-full" />
         
         </div>
 
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-          display: 'block',
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
-        }}>
+        <div className="admin-mb-16">
+          <label className="admin-block-sm-med-primary-mb-8">
             Текст уведомления
           </label>
           <Textarea
@@ -243,70 +211,50 @@ const RegistrarNotificationManager = () => {
           value={notificationForm.message}
           onChange={(e) => setNotificationForm({ ...notificationForm, message: e.target.value })}
           rows={4}
-          style={{ width: '100%' }} />
+          className="admin-w-full" />
         
         </div>
 
         <Button
         onClick={handleSendNotification}
         disabled={loading || !notificationForm.message.trim()}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
-          {loading ? <RefreshCw style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
+          {loading ? <RefreshCw className="admin-w-16-h-16-anim-spin1slinearinfinite" /> : <Send className="admin-icon-16" />}
           Отправить уведомление
         </Button>
       </Card>
 
       {/* Быстрые действия */}
-      <Card style={{ padding: '24px' }}>
-        <h3 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)'
-      }}>
-          <Activity style={{ width: '20px', height: '20px' }} />
+      <Card className="admin-p-24">
+        <h3 className="admin-m-0016px0-primary-flex-ai-center-gap-8-lg-med">
+          <Activity className="admin-icon-20" />
           Быстрые действия
         </h3>
 
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+        <div className="admin-flex-gap-16-wrap">
           <Button
           onClick={handleSendDailySummary}
           disabled={loading}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          className="admin-flex-center-8">
           
-            <Calendar style={{ width: '16px', height: '16px' }} />
+            <Calendar className="admin-icon-16" />
             Отправить ежедневную сводку
           </Button>
 
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="admin-flex-gap-8-ai-center">
             <Input
             placeholder="Текст тестового уведомления"
             value={testMessage}
             onChange={(e) => setTestMessage(e.target.value)}
-            style={{ minWidth: '200px' }} />
+            className="admin-minw-200" />
           
             <Button
             onClick={handleTestNotification}
             disabled={loading || !testMessage.trim()}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
+            className="admin-flex-center-8">
             
-              <MessageSquare style={{ width: '16px', height: '16px' }} />
+              <MessageSquare className="admin-icon-16" />
               Тест
             </Button>
           </div>
@@ -316,82 +264,47 @@ const RegistrarNotificationManager = () => {
 
 
   const renderRegistrarsTab = () =>
-  <Card style={{ padding: '24px' }}>
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '24px'
-    }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)'
-      }}>
-          <Users style={{ width: '20px', height: '20px' }} />
+  <Card className="admin-p-24">
+      <div className="admin-flex-jc-between-ai-center-mb-24">
+        <h3 className="admin-m-0-primary-flex-ai-center-gap-8-lg-med">
+          <Users className="admin-icon-20" />
           Активные регистраторы ({registrars.length})
         </h3>
         <Button
         onClick={loadRegistrars}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
-          <RefreshCw style={{ width: '16px', height: '16px' }} />
+          <RefreshCw className="admin-icon-16" />
           Обновить
         </Button>
       </div>
 
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="admin-grid-gap-16">
         {registrars.map((registrar) =>
       <div
         key={registrar.id}
-        style={{
-          padding: '16px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-flex-jc-between-ai-center">
         
             <div>
-              <div style={{
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '4px',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+              <div className="admin-semi-primary-mb-4-sm">
                 {registrar.full_name || registrar.username}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px'
-          }}>
+              <div className="admin-sm-secondary-flex-ai-center-gap-16">
                 {registrar.email &&
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Mail style={{ width: '14px', height: '14px' }} />
+            <span className="admin-flex-center admin-gap-4">
+                    <Mail className="admin-icon-14" />
                     {registrar.email}
                   </span>
             }
                 {registrar.phone &&
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Phone style={{ width: '16px', height: '16px', color: 'var(--mac-accent-blue)' }} />
+            <span className="admin-flex-center admin-gap-4">
+                    <Phone className="admin-w-16-h-16-blue" />
                     {registrar.phone}
                   </span>
             }
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="admin-flex-center-8">
               {registrar.telegram_id &&
           <Badge variant="info">
                   Telegram
@@ -408,12 +321,7 @@ const RegistrarNotificationManager = () => {
       </div>
 
       {registrars.length === 0 &&
-    <div style={{
-      textAlign: 'center',
-      padding: '32px',
-      color: 'var(--mac-text-secondary)',
-      fontSize: 'var(--mac-font-size-sm)'
-    }}>
+    <div className="admin-ta-center-p-32-secondary-sm">
           Нет активных регистраторов
         </div>
     }
@@ -421,135 +329,75 @@ const RegistrarNotificationManager = () => {
 
 
   const renderStatsTab = () =>
-  <Card style={{ padding: '24px' }}>
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '24px'
-    }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)'
-      }}>
-          <BarChart3 style={{ width: '20px', height: '20px' }} />
+  <Card className="admin-p-24">
+      <div className="admin-flex-jc-between-ai-center-mb-24">
+        <h3 className="admin-m-0-primary-flex-ai-center-gap-8-lg-med">
+          <BarChart3 className="admin-icon-20" />
           Статистика уведомлений
         </h3>
         <Button
         onClick={loadStats}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
-          <RefreshCw style={{ width: '16px', height: '16px' }} />
+          <RefreshCw className="admin-icon-16" />
           Обновить
         </Button>
       </div>
 
       {stats ?
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-          <div style={{
-        padding: '16px',
-        backgroundColor: 'var(--mac-info-bg)',
-        borderRadius: 'var(--mac-radius-md)',
-        textAlign: 'center',
-        border: '1px solid var(--mac-info-border)'
-      }}>
-            <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-blue)' }}>
+    <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
+          <div className="admin-p-16-bg-info-bg-radius-var--mac-radius-md-ta-center-bd-1solidvar-mac-info-border">
+            <div className="admin-2xl-bold-blue">
               {stats.total_sent}
             </div>
-            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Всего отправлено</div>
+            <div className="admin-secondary-sm">Всего отправлено</div>
           </div>
 
-          <div style={{
-        padding: '16px',
-        backgroundColor: 'var(--mac-success-bg)',
-        borderRadius: 'var(--mac-radius-md)',
-        textAlign: 'center',
-        border: '1px solid var(--mac-success-border)'
-      }}>
-            <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
+          <div className="admin-p-16-bg-success-bg-radius-var--mac-radius-md-ta-center-bd-1solidvar-mac-su-76b6ec4f">
+            <div className="admin-2xl-bold-success">
               {stats.successful_deliveries}
             </div>
-            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Успешно доставлено</div>
+            <div className="admin-secondary-sm">Успешно доставлено</div>
           </div>
 
-          <div style={{
-        padding: '16px',
-        backgroundColor: 'var(--mac-error-bg)',
-        borderRadius: 'var(--mac-radius-md)',
-        textAlign: 'center',
-        border: '1px solid var(--mac-error-border)'
-      }}>
-            <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-error)' }}>
+          <div className="admin-p-16-bg-error-bg-radius-var--mac-radius-md-ta-center-bd-1solidvar-mac-error-border">
+            <div className="admin-2xl-bold-error">
               {stats.failed_deliveries}
             </div>
-            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Ошибки доставки</div>
+            <div className="admin-secondary-sm">Ошибки доставки</div>
           </div>
         </div> :
 
-    <div style={{
-      textAlign: 'center',
-      padding: '32px',
-      color: 'var(--mac-text-secondary)',
-      fontSize: 'var(--mac-font-size-sm)'
-    }}>
+    <div className="admin-ta-center-p-32-secondary-sm">
           Загрузка статистики...
         </div>
     }
 
       {stats && stats.channels_stats &&
-    <div style={{ marginTop: '24px' }}>
-          <h4 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-base)',
-        fontWeight: 'var(--mac-font-weight-medium)'
-      }}>
+    <div className="admin-mt-24">
+          <h4 className="admin-m-0016px0-primary-base-med">
             Статистика по каналам
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
-            <div style={{
-          padding: '12px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-sm)',
-          textAlign: 'center'
-        }}>
-              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-accent-blue)', fontSize: 'var(--mac-font-size-lg)' }}>
+          <div className="admin-grid-gtc-rauto-fitcminmax150pxc1fr-gap-16">
+            <div className="admin-p-12-bd-1solidvar-mac-border-radius-var--mac-radius-sm-ta-center">
+              <div className="admin-semi-blue-lg">
                 {stats.channels_stats.telegram}
               </div>
-              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Telegram</div>
+              <div className="admin-text-sm admin-text-secondary">Telegram</div>
             </div>
 
-            <div style={{
-          padding: '12px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-sm)',
-          textAlign: 'center'
-        }}>
-              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)', fontSize: 'var(--mac-font-size-lg)' }}>
+            <div className="admin-p-12-bd-1solidvar-mac-border-radius-var--mac-radius-sm-ta-center">
+              <div className="admin-semi-success-lg">
                 {stats.channels_stats.email}
               </div>
-              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Email</div>
+              <div className="admin-text-sm admin-text-secondary">Email</div>
             </div>
 
-            <div style={{
-          padding: '12px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-sm)',
-          textAlign: 'center'
-        }}>
-              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-warning)', fontSize: 'var(--mac-font-size-lg)' }}>
+            <div className="admin-p-12-bd-1solidvar-mac-border-radius-var--mac-radius-sm-ta-center">
+              <div className="admin-semi-warning-lg">
                 {stats.channels_stats.sms}
               </div>
-              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>SMS</div>
+              <div className="admin-text-sm admin-text-secondary">SMS</div>
             </div>
           </div>
         </div>
@@ -564,29 +412,16 @@ const RegistrarNotificationManager = () => {
 
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
-        <Bell style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
-        <h2 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+    <div className="admin-p-24">
+      <div className="admin-flex-ai-center-gap-16-mb-24">
+        <Bell className="admin-w-24-h-24-blue" />
+        <h2 className="admin-m-0-primary-2xl-semi">
           Уведомления регистратуры
         </h2>
       </div>
 
       {/* Вкладки */}
-      <div style={{
-        display: 'flex',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-flex-mb-24">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -595,21 +430,7 @@ const RegistrarNotificationManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px 20px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-                fontSize: 'var(--mac-font-size-sm)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-                position: 'relative',
-                marginBottom: '-1px'
-              }}
+              className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}
               onMouseEnter={(e) => {
                 if (!isActive) {
                   e.target.style.color = 'var(--mac-text-primary)';
@@ -621,22 +442,10 @@ const RegistrarNotificationManager = () => {
                 }
               }}>
               
-              <Icon style={{
-                width: '16px',
-                height: '16px',
-                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
-              }} />
+              <Icon className="admin-w-16-h-16" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
               {tab.label}
               {isActive &&
-              <div style={{
-                position: 'absolute',
-                bottom: '0',
-                left: '0',
-                right: '0',
-                height: '3px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                borderRadius: '2px 2px 0 0'
-              }} />
+              <div className="admin-pos-absolute-bottom-0-left-0-right-0-h-3-bg-blue-radius-2px2px00" />
               }
             </button>);
 
@@ -644,10 +453,7 @@ const RegistrarNotificationManager = () => {
       </div>
       
       {/* Разделительная линия */}
-      <div style={{
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }} />
+      <div className="admin-borderbottom-0a48a6-mb-24" />
 
       {/* Содержимое вкладок */}
       {activeTab === 'send' && renderSendTab()}

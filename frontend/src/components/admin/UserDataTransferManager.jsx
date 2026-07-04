@@ -235,81 +235,44 @@ const UserDataTransferManager = () => {
 
 
   const renderTransferTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Поиск пользователей */}
-      <Card style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Search style={{ width: '20px', height: '20px' }} />
+      <Card className="admin-p-24">
+        <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
+          <Search className="admin-icon-20" />
           Поиск пользователей
         </h3>
         
-        <div style={{ position: 'relative' }}>
+        <div className="admin-pos-relative">
           <Input
           type="text"
           placeholder="Введите имя, телефон или email..."
           value={searchQuery}
           onChange={handleSearchChange}
-          style={{ width: '100%' }} />
+          className="admin-w-full" />
         
           
           {isSearching &&
-        <div style={{ position: 'absolute', right: '12px', top: '12px' }}>
-              <div style={{
-            width: '16px',
-            height: '16px',
-            border: '2px solid var(--mac-accent-blue)',
-            borderTop: '2px solid transparent',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }}></div>
+        <div className="admin-pos-absolute-right-12-top-12">
+              <div className="admin-w-16-h-16-bd-2solidvar-mac-accent-blue-bordertop-0dfa98-radius-50pct-anim--9890e947"></div>
             </div>
         }
           
           {searchResults.length > 0 &&
-        <div style={{
-          position: 'absolute',
-          zIndex: 10,
-          width: '100%',
-          marginTop: '4px',
-          backgroundColor: 'var(--mac-bg-primary)',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          boxShadow: 'var(--mac-shadow-lg)',
-          maxHeight: '240px',
-          overflowY: 'auto'
-        }}>
+        <div className="admin-pos-absolute-z-10-w-100pct-mt-4-bg-bg-primary-bd-1solidvar-mac-border-radi-46eacfce">
               {searchResults.map((user) =>
-          <div key={user.id} style={{
-            padding: '12px',
-            borderBottom: '1px solid var(--mac-border)',
-            transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
-          }}>
+          <div key={user.id} className="admin-p-12-borderbottom-0a48a6-transition-background-colorvar--mac-durat">
             
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="admin-flex-jc-between-ai-center">
                     <div>
-                      <div style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-primary)'
-                }}>
+                      <div className="admin-med-sm-primary">
                         {user.full_name || user.username}
                       </div>
-                      <div style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-secondary)'
-                }}>
+                      <div className="admin-xs-secondary">
                         {user.phone} • {user.email}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="admin-flex-gap-8">
                       <Button
                   size="sm"
                   variant="outline"
@@ -336,39 +299,20 @@ const UserDataTransferManager = () => {
       </Card>
 
       {/* Выбранные пользователи */}
-      <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-      gap: '24px'
-    }}>
-        <Card style={{ padding: '24px' }}>
-          <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)',
-          margin: '0 0 16px 0'
-        }}>
+      <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24">
+        <Card className="admin-p-24">
+          <h3 className="admin-lg-med-primary-m-0016px0">
             Пользователь-источник
           </h3>
           {sourceUser ?
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{
-            fontWeight: 'var(--mac-font-weight-medium)',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="admin-flex-col-8">
+              <div className="admin-med-sm-primary">
                 {sourceUser.full_name || sourceUser.username}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-xs-secondary">
                 {sourceUser.phone}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-xs-secondary">
                 {sourceUser.email}
               </div>
               <Button
@@ -378,69 +322,44 @@ const UserDataTransferManager = () => {
               setSourceUser(null);
               setUserDataSummary(null);
             }}
-            style={{ marginTop: '8px', alignSelf: 'flex-start' }}>
+            className="admin-mt-8-alignself-0e92fc">
             
                 Очистить
               </Button>
             </div> :
 
-        <div style={{
-          color: 'var(--mac-text-secondary)',
-          textAlign: 'center',
-          padding: '32px 0',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <div className="admin-secondary-ta-center-p-32px0-sm">
               Выберите пользователя-источника из результатов поиска
             </div>
         }
         </Card>
 
-        <Card style={{ padding: '24px' }}>
-          <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)',
-          margin: '0 0 16px 0'
-        }}>
+        <Card className="admin-p-24">
+          <h3 className="admin-lg-med-primary-m-0016px0">
             Пользователь-получатель
           </h3>
           {targetUser ?
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{
-            fontWeight: 'var(--mac-font-weight-medium)',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="admin-flex-col-8">
+              <div className="admin-med-sm-primary">
                 {targetUser.full_name || targetUser.username}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-xs-secondary">
                 {targetUser.phone}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-xs-secondary">
                 {targetUser.email}
               </div>
               <Button
             size="sm"
             variant="outline"
             onClick={() => setTargetUser(null)}
-            style={{ marginTop: '8px', alignSelf: 'flex-start' }}>
+            className="admin-mt-8-alignself-0e92fc">
             
                 Очистить
               </Button>
             </div> :
 
-        <div style={{
-          color: 'var(--mac-text-secondary)',
-          textAlign: 'center',
-          padding: '32px 0',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <div className="admin-secondary-ta-center-p-32px0-sm">
               Выберите пользователя-получателя из результатов поиска
             </div>
         }
@@ -449,63 +368,32 @@ const UserDataTransferManager = () => {
 
       {/* Сводка данных источника */}
       {userDataSummary &&
-    <Card style={{ padding: '24px' }}>
-          <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0'
-      }}>
+    <Card className="admin-p-24">
+          <h3 className="admin-lg-med-primary-m-0016px0">
             Данные для передачи
           </h3>
-          <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-        gap: '16px',
-        marginBottom: '16px'
-      }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-accent-blue)'
-          }}>
+          <div className="admin-grid-gtc-rauto-fitcminmax150pxc1fr-gap-16-mb-16">
+            <div className="admin-text-center">
+              <div className="admin-2xl-bold-blue">
                 {userDataSummary.data_counts.appointments}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-xs-secondary">
                 Назначений
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-success)'
-          }}>
+            <div className="admin-text-center">
+              <div className="admin-2xl-bold-success">
                 {userDataSummary.data_counts.visits}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-xs-secondary">
                 Визитов
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-warning)'
-          }}>
+            <div className="admin-text-center">
+              <div className="admin-2xl-bold-warning">
                 {userDataSummary.data_counts.queue_entries}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-xs-secondary">
                 Записей в очереди
               </div>
             </div>
@@ -514,26 +402,13 @@ const UserDataTransferManager = () => {
     }
 
       {/* Выбор типов данных */}
-      <Card style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0'
-      }}>
+      <Card className="admin-p-24">
+        <h3 className="admin-lg-med-primary-m-0016px0">
           Типы данных для передачи
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="admin-flex-col-12">
           {availableDataTypes.map((dataType) =>
-        <label key={dataType.key} style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          cursor: 'pointer',
-          padding: '8px',
-          borderRadius: 'var(--mac-radius-sm)',
-          transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
-        }}
+        <label key={dataType.key} className="admin-flex-ai-center-gap-12-cursor-pointer-p-8-radius-var--mac-radius-sm-transit-87a65602"
         onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
         onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
           
@@ -548,17 +423,10 @@ const UserDataTransferManager = () => {
             }} />
           
               <div>
-                <div style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+                <div className="admin-med-sm-primary">
                   {dataType.name}
                 </div>
-                <div style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+                <div className="admin-xs-secondary">
                   {dataType.description}
                 </div>
               </div>
@@ -568,30 +436,22 @@ const UserDataTransferManager = () => {
       </Card>
 
       {/* Кнопка передачи */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
+      <div className="admin-flex-jc-center">
         <Button
         type="button"
         onClick={executeTransfer}
         disabled={!sourceUser || !targetUser || selectedDataTypes.length === 0 || isTransferring}
         aria-label="Transfer selected user data"
-        style={{ padding: '12px 32px' }}>
+        className="admin-p-12px32">
         
           {isTransferring ?
         <>
-              <div style={{
-            width: '16px',
-            height: '16px',
-            border: '2px solid white',
-            borderTop: '2px solid transparent',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            marginRight: '8px'
-          }}></div>
+              <div className="admin-w-16-h-16-bd-2solidwhite-bordertop-0dfa98-radius-50pct-anim-spin1slinearin-62066832"></div>
               Передача данных...
             </> :
 
         <>
-              <ArrowRight style={{ width: '20px', height: '20px', marginRight: '8px' }} />
+              <ArrowRight className="admin-w-20-h-20-mr-8" />
               Передать данные
             </>
         }
@@ -601,63 +461,40 @@ const UserDataTransferManager = () => {
 
 
   const renderHistoryTab = () =>
-  <Card style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: 0
-      }}>
+  <Card className="admin-p-24">
+      <div className="admin-flex-jc-between-ai-center-mb-16">
+        <h3 className="admin-lg-med-primary-m-0">
           История передач
         </h3>
         <Button onClick={loadTransferHistory} variant="outline">
-          <History style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+          <History className="admin-icon-16-mr-8" />
           Обновить
         </Button>
       </div>
       
       {transferHistory.length === 0 ?
-    <div style={{
-      textAlign: 'center',
-      padding: '32px 0',
-      color: 'var(--mac-text-secondary)',
-      fontSize: 'var(--mac-font-size-sm)'
-    }}>
+    <div className="admin-ta-center-p-32px0-secondary-sm">
           История передач пуста
         </div> :
 
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="admin-flex-col-16">
           {transferHistory.map((transfer, index) =>
-      <div key={index} style={{
-        border: '1px solid var(--mac-border)',
-        borderRadius: 'var(--mac-radius-md)',
-        padding: '16px',
-        backgroundColor: 'var(--mac-bg-secondary)',
-        transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-      }}>
+      <div key={index} className="admin-bd-1solidvar-mac-border-radius-var--mac-radius-md-p-16-bg-bg-secondary-tra-c057944f">
         
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div className="admin-flex-jc-between-ai-start">
                 <div>
-                  <div style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+                  <div className="admin-med-sm-primary">
                     {transfer.source_user} → {transfer.target_user}
                   </div>
-                  <div style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+                  <div className="admin-xs-secondary">
                     {new Date(transfer.transfer_date).toLocaleString()}
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="admin-flex-ai-center">
                   {transfer.success ?
-            <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} /> :
+            <CheckCircle className="admin-w-20-h-20-success" /> :
 
-            <XCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+            <XCircle className="admin-w-20-h-20-error" />
             }
                 </div>
               </div>
@@ -669,81 +506,46 @@ const UserDataTransferManager = () => {
 
 
   const renderStatisticsTab = () =>
-  <Card style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: 0
-      }}>
+  <Card className="admin-p-24">
+      <div className="admin-flex-jc-between-ai-center-mb-16">
+        <h3 className="admin-lg-med-primary-m-0">
           Статистика передач
         </h3>
         <Button onClick={loadStatistics} variant="outline">
-          <BarChart3 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+          <BarChart3 className="admin-icon-16-mr-8" />
           Обновить
         </Button>
       </div>
       
       {statistics ?
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '24px'
-    }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-3xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-accent-blue)'
-        }}>
+    <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-24">
+          <div className="admin-text-center">
+            <div className="admin-3xl-bold-blue">
               {statistics.total_transfers}
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-xs)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <div className="admin-xs-secondary">
               Всего передач
             </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-3xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-success)'
-        }}>
+          <div className="admin-text-center">
+            <div className="admin-3xl-bold-success">
               {statistics.successful_transfers}
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-xs)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <div className="admin-xs-secondary">
               Успешных
             </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-3xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-error)'
-        }}>
+          <div className="admin-text-center">
+            <div className="admin-3xl-bold-error">
               {statistics.failed_transfers}
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-xs)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <div className="admin-xs-secondary">
               Неудачных
             </div>
           </div>
         </div> :
 
-    <div style={{
-      textAlign: 'center',
-      padding: '32px 0',
-      color: 'var(--mac-text-secondary)',
-      fontSize: 'var(--mac-font-size-sm)'
-    }}>
+    <div className="admin-ta-center-p-32px0-secondary-sm">
           Нажмите «Обновить» для загрузки статистики
         </div>
     }
@@ -751,43 +553,19 @@ const UserDataTransferManager = () => {
 
 
   return (
-    <div style={{
-      maxWidth: '1200px',
-      margin: '0 auto',
-      padding: '24px',
-      backgroundColor: 'var(--mac-bg-primary)',
-      minHeight: '100vh'
-    }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)',
-          margin: '0 0 8px 0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
-          <Users style={{ width: '28px', height: '28px' }} />
+    <div className="admin-maxw-1200-m-0auto-p-24-bg-bg-primary-minh-100vh">
+      <div className="admin-mb-24">
+        <h1 className="admin-2xl-semi-primary-m-008px0-flex-ai-center-gap-12">
+          <Users className="admin-w-28-h-28" />
           Передача данных пользователей
         </h1>
-        <p style={{
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)',
-          margin: 0
-        }}>
+        <p className="admin-secondary-sm-m-0">
           Управление передачей назначений, визитов и записей в очереди между пользователями
         </p>
       </div>
 
       {/* Навигация по вкладкам */}
-      <div style={{
-        maxWidth: '100%',
-        overflowX: 'auto',
-        paddingBottom: '6px',
-        marginBottom: '24px',
-        scrollbarWidth: 'thin'
-      }}>
+      <div className="admin-maxw-100pct-overflowx-auto-pb-6-mb-24-scrollbarwidth-b2a750">
         <SegmentedControl
           aria-label="Разделы передачи данных пользователей"
           value={activeTab}
@@ -804,7 +582,7 @@ const UserDataTransferManager = () => {
             {
               value: 'transfer',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-ai-center-gap-8">
                   <ArrowRight size={14} aria-hidden="true" />
                   Передача данных
                 </span>
@@ -813,7 +591,7 @@ const UserDataTransferManager = () => {
             {
               value: 'history',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-ai-center-gap-8">
                   <History size={14} aria-hidden="true" />
                   История
                 </span>
@@ -822,7 +600,7 @@ const UserDataTransferManager = () => {
             {
               value: 'statistics',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-ai-center-gap-8">
                   <BarChart3 size={14} aria-hidden="true" />
                   Статистика
                 </span>
@@ -830,13 +608,7 @@ const UserDataTransferManager = () => {
             }
           ]}
           size="large"
-          style={{
-            minWidth: 'max-content',
-            background: 'var(--mac-gradient-sidebar)',
-            border: '1px solid var(--mac-main-shell-border)',
-            borderRadius: '14px',
-            boxShadow: 'var(--mac-main-shell-shadow)'
-          }} />
+          className="admin-minw-max-content-background-3dc2d0-bd-1solidvar-mac-main-shell-border-radi-b45562d1" />
       </div>
 
       {/* Контент вкладок */}

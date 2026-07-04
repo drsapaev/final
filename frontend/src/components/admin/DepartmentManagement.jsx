@@ -34,9 +34,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import { getApiOrigin } from '../../api/runtime';
-// NOTE: IconSelector.jsx was removed as dead code (transitively dead via this file). 
-// This file (DepartmentManagement.jsx) is itself DEAD — not routed, not imported anywhere.
-// See analysis/ADMIN_PANEL_A_Z_ANALYSIS.md §2. Do not extend; resolve fate in Step 3.
+// NOTE: IconSelector.jsx was removed as dead code (Step 1, PR #1827). This file (DepartmentManagement.jsx) is itself DEAD — not routed, not imported anywhere. See analysis/ADMIN_PANEL_A_Z_ANALYSIS.md §2.
 // import IconSelector, { iconMap } from './IconSelector';
 
 import logger from '../../utils/logger';
@@ -729,94 +727,57 @@ const DepartmentManagement = () => {
   if (loading) {
     return (
       <MacOSCard>
-                <div style={{ padding: '40px', textAlign: 'center' }}>
-                    <div className="spinner" style={{ margin: '0 auto 16px' }}></div>
-                    <p style={{ color: 'var(--mac-text-secondary)' }}>Загрузка отделений...</p>
+                <div className="admin-loading-p-40-center">
+                    <div className="spinner admin-spinner-mb-16"></div>
+                    <p className="admin-text-secondary">Загрузка отделений...</p>
                 </div>
             </MacOSCard>);
 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="admin-flex-col-20">
             {/* Статистика отделений */}
-            <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '16px'
-      }}>
-                <MacOSCard style={{ padding: '16px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{
-              fontSize: '24px',
-              fontWeight: 'bold',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
-            }}>
+            <div className="admin-grid-auto-200-mb-16">
+                <MacOSCard className="admin-p-16">
+                    <div className="admin-text-center">
+                        <div className="admin-stat-number-mb-4">
                             {departmentStats.total}
                         </div>
-                        <div style={{
-              fontSize: '14px',
-              color: 'var(--mac-text-secondary)'
-            }}>
+                        <div className="admin-stat-label">
                             Всего отделений
                         </div>
                     </div>
                 </MacOSCard>
 
-                <MacOSCard style={{ padding: '16px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{
-              fontSize: '24px',
-              fontWeight: 'bold',
-              color: 'var(--mac-success)',
-              marginBottom: '4px'
-            }}>
+                <MacOSCard className="admin-p-16">
+                    <div className="admin-text-center">
+                        <div className="admin-stat-number-success-mb-4">
                             {departmentStats.active}
                         </div>
-                        <div style={{
-              fontSize: '14px',
-              color: 'var(--mac-text-secondary)'
-            }}>
+                        <div className="admin-stat-label">
                             Активных
                         </div>
                     </div>
                 </MacOSCard>
 
-                <MacOSCard style={{ padding: '16px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{
-              fontSize: '24px',
-              fontWeight: 'bold',
-              color: 'var(--mac-warning)',
-              marginBottom: '4px'
-            }}>
+                <MacOSCard className="admin-p-16">
+                    <div className="admin-text-center">
+                        <div className="admin-stat-number-warning-mb-4">
                             {departmentStats.inactive}
                         </div>
-                        <div style={{
-              fontSize: '14px',
-              color: 'var(--mac-text-secondary)'
-            }}>
+                        <div className="admin-stat-label">
                             Неактивных
                         </div>
                     </div>
                 </MacOSCard>
 
-                <MacOSCard style={{ padding: '16px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{
-              fontSize: '24px',
-              fontWeight: 'bold',
-              color: 'var(--mac-info)',
-              marginBottom: '4px'
-            }}>
+                <MacOSCard className="admin-p-16">
+                    <div className="admin-text-center">
+                        <div className="admin-stat-number-info-mb-4">
                             {departmentStats.withDoctors}
                         </div>
-                        <div style={{
-              fontSize: '14px',
-              color: 'var(--mac-text-secondary)'
-            }}>
+                        <div className="admin-stat-label">
                             С врачами
                         </div>
                     </div>
@@ -824,28 +785,18 @@ const DepartmentManagement = () => {
             </div>
 
             <MacOSCard>
-                <div style={{ padding: '24px' }}>
-                    <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '24px'
-          }}>
-                        <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+                <div className="admin-p-24">
+                    <div className="admin-flex-between-mb-24">
+                        <h2 className="admin-title-20">
                             Управление отделениями
                         </h2>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div className="admin-flex-gap-8">
                             <Button
                 variant="primary"
                 size="default"
                 onClick={() => setShowAddForm(!showAddForm)}>
                 
-                                <Plus size={16} style={{ marginRight: '8px' }} />
+                                <Plus size={16} className="admin-mr-8" />
                                 Добавить отделение
                             </Button>
 
@@ -855,19 +806,19 @@ const DepartmentManagement = () => {
                 onClick={handleExport}
                 title="Экспортировать отделения в CSV">
                 
-                                <Download size={16} style={{ marginRight: '8px' }} />
+                                <Download size={16} className="admin-mr-8" />
                                 Экспорт
                             </Button>
 
-                            <label style={{ position: 'relative' }}>
+                            <label className="admin-position-relative">
                                 <Button
                   variant="secondary"
                   size="default"
                   as="span"
-                  style={{ cursor: 'pointer' }}
+                  className="admin-cursor-pointer"
                   title="Импортировать отделения из CSV">
                   
-                                    <Upload size={16} style={{ marginRight: '8px' }} />
+                                    <Upload size={16} className="admin-mr-8" />
                                     Импорт
                                 </Button>
                                 <input
@@ -875,49 +826,34 @@ const DepartmentManagement = () => {
                   aria-label="Import departments from CSV"
                   accept=".csv"
                   onChange={handleImport}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    opacity: 0,
-                    cursor: 'pointer'
-                  }} />
+                  className="admin-file-input-overlay" />
                 
                             </label>
                         </div>
                     </div>
 
                     {/* Панель поиска и фильтров */}
-                    <div style={{
-            display: 'flex',
-            gap: '16px',
-            alignItems: 'center',
-            marginBottom: '24px',
-            flexWrap: 'wrap'
-          }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
-                            <Search size={16} style={{ color: 'var(--mac-text-secondary)' }} />
+                    <div className="admin-flex-gap-16-wrap-mb-24">
+                        <div className="admin-flex-search-row">
+                            <Search size={16} className="admin-text-secondary" />
                             <Input
                 placeholder="Поиск по названию или ключу..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ flex: 1 }} />
-              
+                className="admin-flex-1" />
                         </div>
 
                         <Select
               value={statusFilter}
               onChange={(value) => setStatusFilter(value)}
               options={STATUS_FILTER_OPTIONS}
-              style={{ minWidth: '120px' }} />
+              className="admin-min-w-120" />
 
                         <Select
               value={sortBy}
               onChange={(value) => setSortBy(value)}
               options={SORT_OPTIONS}
-              style={{ minWidth: '140px' }} />
+              className="admin-min-w-140" />
 
                         <Button
               variant="secondary"
@@ -930,34 +866,20 @@ const DepartmentManagement = () => {
                     </div>
 
                     {showAddForm &&
-          <div style={{
-            padding: '20px',
-            background: 'var(--mac-bg-tertiary)',
-            borderRadius: 'var(--mac-radius-md)',
-            marginBottom: '24px'
-          }}>
-                            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              marginBottom: '16px',
-              color: 'var(--mac-text-primary)'
-            }}>
+          <div className="admin-form-panel-tertiary-mb-24">
+                            <h3 className="admin-title-16-mb-16">
                                 Новое отделение
                             </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div className="admin-grid-2col">
                                 <div>
                                     <Input
                   placeholder="Название (русский)"
                   value={formData.name_ru}
                   onChange={(e) => setFormData({ ...formData, name_ru: e.target.value })}
-                  style={{ borderColor: validationErrors.name_ru ? 'var(--mac-error)' : undefined }} />
+                  className={validationErrors.name_ru ? 'admin-input-error' : undefined} />
                 
                                     {validationErrors.name_ru &&
-                <div style={{
-                  color: 'var(--mac-error)',
-                  fontSize: '12px',
-                  marginTop: '4px'
-                }}>
+                <div className="admin-error-text-mt">
                                             {validationErrors.name_ru}
                                         </div>
                 }
@@ -967,14 +889,10 @@ const DepartmentManagement = () => {
                   placeholder="Название (узбекский)"
                   value={formData.name_uz}
                   onChange={(e) => setFormData({ ...formData, name_uz: e.target.value })}
-                  style={{ borderColor: validationErrors.name_uz ? 'var(--mac-error)' : undefined }} />
+                  className={validationErrors.name_uz ? 'admin-input-error' : undefined} />
                 
                                     {validationErrors.name_uz &&
-                <div style={{
-                  color: 'var(--mac-error)',
-                  fontSize: '12px',
-                  marginTop: '4px'
-                }}>
+                <div className="admin-error-text-mt">
                                             {validationErrors.name_uz}
                                         </div>
                 }
@@ -984,17 +902,10 @@ const DepartmentManagement = () => {
                   placeholder="Ключ (например, cardio)"
                   value={formData.key}
                   onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-                  style={{
-                    gridColumn: '1',
-                    borderColor: validationErrors.key ? 'var(--mac-error)' : undefined
-                  }} />
+                  className={`admin-grid-col-1${validationErrors.key ? ' admin-input-error' : ''}`} />
                 
                                     {validationErrors.key &&
-                <div style={{
-                  color: 'var(--mac-error)',
-                  fontSize: '12px',
-                  marginTop: '4px'
-                }}>
+                <div className="admin-error-text-mt">
                                             {validationErrors.key}
                                         </div>
                 }
@@ -1005,30 +916,19 @@ const DepartmentManagement = () => {
                   placeholder="Порядок отображения"
                   value={formData.display_order}
                   onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
-                  style={{
-                    gridColumn: '2',
-                    borderColor: validationErrors.display_order ? 'var(--mac-error)' : undefined
-                  }} />
+                  className={`admin-grid-col-2${validationErrors.display_order ? ' admin-input-error' : ''}`} />
                 
                                     {validationErrors.display_order &&
-                <div style={{
-                  color: 'var(--mac-error)',
-                  fontSize: '12px',
-                  marginTop: '4px'
-                }}>
+                <div className="admin-error-text-mt">
                                             {validationErrors.display_order}
                                         </div>
                 }
                                 </div>
-                                <div style={{ gridColumn: '1 / -1' }}>
-                                    {/* IconSelector removed (dead code). DepartmentManagement.jsx is itself DEAD. */}
+                                <div className="admin-grid-span-all">
+                                    {/* IconSelector removed (dead code, Step 1 PR #1827). DepartmentManagement.jsx is itself DEAD. */}
                 
                                     {validationErrors.icon &&
-                <div style={{
-                  color: 'var(--mac-error)',
-                  fontSize: '12px',
-                  marginTop: '4px'
-                }}>
+                <div className="admin-error-text-mt">
                                             {validationErrors.icon}
                                         </div>
                 }
@@ -1038,31 +938,22 @@ const DepartmentManagement = () => {
                   type="color"
                   value={formData.color}
                   onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  style={{ gridColumn: '1' }} />
+                  className="admin-grid-col-1" />
                 
-                                    <label style={{
-                  fontSize: '12px',
-                  color: 'var(--mac-text-secondary)',
-                  marginTop: '4px',
-                  display: 'block'
-                }}>
+                                    <label className="admin-label-hint">
                                         Цвет вкладки
                                     </label>
                                 </div>
-                                <div style={{ gridColumn: '1 / -1' }}>
+                                <div className="admin-grid-span-all">
                                     <Textarea
                   placeholder="Описание отделения (опционально)"
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
-                  style={{ borderColor: validationErrors.description ? 'var(--mac-error)' : undefined }} />
+                  className={validationErrors.description ? 'admin-input-error' : undefined} />
                 
                                     {validationErrors.description &&
-                <div style={{
-                  color: 'var(--mac-error)',
-                  fontSize: '12px',
-                  marginTop: '4px'
-                }}>
+                <div className="admin-error-text-mt">
                                             {validationErrors.description}
                                         </div>
                 }
@@ -1070,23 +961,12 @@ const DepartmentManagement = () => {
                             </div>
 
                             {/* ✅ НОВОЕ: Секция настройки маппинга услуг */}
-                            <div style={{
-              marginTop: '24px',
-              padding: '20px',
-              background: 'var(--mac-bg-secondary)',
-              borderRadius: 'var(--mac-radius-md)',
-              border: '1px solid var(--mac-border)'
-            }}>
-                                <h4 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                marginBottom: '16px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                            <div className="admin-form-panel-secondary">
+                                <h4 className="admin-title-16-mb-16">
                                     Настройка услуг для вкладки
                                 </h4>
 
-                                <div style={{ marginBottom: '16px' }}>
+                                <div className="admin-mb-16">
                                     <Checkbox
                   checked={serviceMapping.create_service}
                   onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
@@ -1095,7 +975,7 @@ const DepartmentManagement = () => {
                                 </div>
 
                                 {serviceMapping.create_service &&
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="admin-grid-2col">
                                         <div>
                                             <Input
                     placeholder="Название услуги"
@@ -1124,17 +1004,13 @@ const DepartmentManagement = () => {
                     onChange={(e) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
                   
                                         </div>
-                                        <div style={{ gridColumn: '1 / -1' }}>
+                                        <div className="admin-grid-span-all">
                                             <Input
                     placeholder="Queue tag (опционально, например: ecg, cardiology_common)"
                     value={serviceMapping.queue_tag}
                     onChange={(e) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
                   
-                                            <div style={{
-                    fontSize: '12px',
-                    color: 'var(--mac-text-secondary)',
-                    marginTop: '4px'
-                  }}>
+                                            <div className="admin-hint-text-12-secondary-mt-4">
                                                 Услуги с department_key=&quot;{formData.key || '...'}&quot; будут отображаться в этой вкладке мастера регистрации
                                             </div>
                                         </div>
@@ -1142,21 +1018,15 @@ const DepartmentManagement = () => {
               }
 
                                 {!serviceMapping.create_service &&
-              <div style={{
-                padding: '12px',
-                background: 'var(--mac-bg-tertiary)',
-                borderRadius: 'var(--mac-radius-sm)',
-                fontSize: '13px',
-                color: 'var(--mac-text-secondary)'
-              }}>
+              <div className="admin-hint-box-tertiary">
                                         💡 Для отображения услуг в этой вкладке мастера регистрации, убедитесь, что услуги имеют <code>department_key=&quot;{formData.key || '...'}&quot;</code> или соответствующий <code>category_code</code>.
                                     </div>
               }
                             </div>
 
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                            <div className="admin-flex-gap-12-mt-16">
                                 <Button variant="primary" onClick={handleAddDepartment}>
-                                    <Save size={16} style={{ marginRight: '8px' }} />
+                                    <Save size={16} className="admin-mr-8" />
                                     Сохранить
                                 </Button>
                                 <Button variant="secondary" onClick={() => {
@@ -1164,7 +1034,7 @@ const DepartmentManagement = () => {
                 setFormData(DEFAULT_FORM);
                 setServiceMapping(DEFAULT_SERVICE_MAPPING);
               }}>
-                                    <X size={16} style={{ marginRight: '8px' }} />
+                                    <X size={16} className="admin-mr-8" />
                                     Отмена
                                 </Button>
                             </div>
@@ -1173,22 +1043,8 @@ const DepartmentManagement = () => {
 
                     {/* Панель массовых операций */}
                     {selectedDepartments.length > 0 &&
-          <div style={{
-            padding: '12px',
-            background: 'var(--mac-bg-tertiary)',
-            borderRadius: 'var(--mac-radius-md)',
-            border: '1px solid var(--mac-border)',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            flexWrap: 'wrap'
-          }}>
-                            <span style={{
-              fontSize: '14px',
-              color: 'var(--mac-text-secondary)',
-              fontWeight: '500'
-            }}>
+          <div className="admin-bulk-action-bar">
+                            <span className="admin-selected-count">
                                 Выбрано: {selectedDepartments.length}
                             </span>
 
@@ -1197,7 +1053,7 @@ const DepartmentManagement = () => {
               size="sm"
               onClick={handleBulkDelete}>
               
-                                <Trash2 size={14} style={{ marginRight: '6px' }} />
+                                <Trash2 size={14} className="admin-mr-6" />
                                 Удалить
                             </Button>
 
@@ -1206,7 +1062,7 @@ const DepartmentManagement = () => {
               size="sm"
               onClick={() => handleBulkActivate(true)}>
               
-                                <CheckCircle size={14} style={{ marginRight: '6px' }} />
+                                <CheckCircle size={14} className="admin-mr-6" />
                                 Активировать
                             </Button>
 
@@ -1215,7 +1071,7 @@ const DepartmentManagement = () => {
               size="sm"
               onClick={() => handleBulkActivate(false)}>
               
-                                <XCircle size={14} style={{ marginRight: '6px' }} />
+                                <XCircle size={14} className="admin-mr-6" />
                                 Деактивировать
                             </Button>
 
@@ -1227,171 +1083,82 @@ const DepartmentManagement = () => {
                 setSelectAll(false);
               }}>
               
-                                <X size={14} style={{ marginRight: '6px' }} />
+                                <X size={14} className="admin-mr-6" />
                                 Очистить
                             </Button>
                         </div>
           }
 
                     {/* ✅ ТАБЛИЧНЫЙ ВИД ОТДЕЛЕНИЙ */}
-                    <div style={{
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            overflow: 'hidden'
-          }}>
-                        <table style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              background: 'var(--mac-bg-primary)'
-            }}>
+                    <div className="admin-table-container">
+                        <table className="admin-table-full">
                             <thead>
-                                <tr style={{
-                  background: 'var(--mac-bg-secondary)',
-                  borderBottom: '2px solid var(--mac-border)'
-                }}>
-                                    <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    width: '40px'
-                  }}>
+                                <tr className="admin-table-head">
+                                    <th className="admin-th-w-40">
                                         <Checkbox
                       checked={selectAll}
                       onChange={(e) => handleSelectAll(e.target.checked)} />
                     
                                     </th>
-                                    <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    width: '60px'
-                  }}>
+                                    <th className="admin-th-w-60">
                                         Иконка
                                     </th>
-                                    <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)'
-                  }}>
+                                    <th className="admin-th">
                                         Название
                                     </th>
-                                    <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    width: '120px'
-                  }}>
+                                    <th className="admin-th-w-120">
                                         Ключ
                                     </th>
-                                    <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    width: '100px'
-                  }}>
+                                    <th className="admin-th-w-100">
                                         Порядок
                                     </th>
-                                    <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'center',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    width: '100px'
-                  }}>
+                                    <th className="admin-th-center">
                                         Статус
                                     </th>
-                                    <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'right',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    width: '120px'
-                  }}>
+                                    <th className="admin-th-right">
                                         Действия
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginatedDepartments.map((dept) => {
-                  const IconComponent = null; // iconMap removed (IconSelector.jsx deleted as dead code)
+                  const IconComponent = null; // iconMap removed (IconSelector.jsx deleted as dead code, Step 1 PR #1827)
                   return (
                     <tr
                       key={dept.id}
-                      style={{
-                        borderBottom: '1px solid var(--mac-border)',
-                        transition: 'background-color 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)';
-                      }}>
+                      className="admin-tr-hover">
                       
-                                            <td style={{ padding: '12px 16px' }}>
+                                            <td className="admin-td-padded">
                                                 <Checkbox
                           checked={selectedDepartments.includes(dept.id)}
                           onChange={(e) => handleSelectDepartment(dept.id, e.target.checked)} />
                         
                                             </td>
-                                            <td style={{ padding: '12px 16px' }}>
-                                                <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: 'var(--mac-radius-md)',
-                          background: dept.color || '#0066cc',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white'
-                        }}>
+                                            <td className="admin-td-padded">
+                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || '#0066cc' }}>
                                                     {IconComponent ?
                           <IconComponent size={20} /> :
 
-                          <span style={{ fontSize: '20px' }}>{dept.icon || '🏥'}</span>
+                          <span className="admin-icon-fallback-20">{dept.icon || '🏥'}</span>
                           }
                                                 </div>
                                             </td>
-                                            <td style={{ padding: '12px 16px' }}>
+                                            <td className="admin-td-padded">
                                                 <div>
-                                                    <div style={{
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            color: 'var(--mac-text-primary)',
-                            marginBottom: '4px'
-                          }}>
+                                                    <div className="admin-cell-name">
                                                         {dept.name_ru || dept.name}
                                                     </div>
                                                     {dept.description &&
-                          <div style={{
-                            fontSize: '12px',
-                            color: 'var(--mac-text-secondary)',
-                            maxWidth: '300px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}>
+                          <div className="admin-cell-desc-truncate">
                                                             {dept.description}
                                                         </div>
                           }
                                                 </div>
                                             </td>
-                                            <td style={{ padding: '12px 16px' }}>
+                                            <td className="admin-td-padded">
                                                 <Badge variant="secondary">{dept.key || dept.code}</Badge>
                                             </td>
-                                            <td style={{ padding: '12px 16px' }}>
+                                            <td className="admin-td-padded">
                                                 <Input
                           type="number"
                           value={dept.display_order || 999}
@@ -1399,21 +1166,17 @@ const DepartmentManagement = () => {
                             const newOrder = parseInt(e.target.value) || 999;
                             handleUpdateOrder(dept, newOrder);
                           }}
-                          style={{
-                            width: '80px',
-                            padding: '6px 8px',
-                            fontSize: '13px'
-                          }} />
+                          className="admin-input-mini-80" />
                         
                                             </td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                            <td className="admin-td-center">
                                                 <Switch
                           checked={dept.active !== false}
                           onChange={(checked) => handleToggleActive(dept, checked)} />
                         
                                             </td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                            <td className="admin-td-right">
+                                                <div className="admin-flex-end-center-8">
                                                     <Button
                             size="sm"
                             variant="secondary"
@@ -1442,43 +1205,27 @@ const DepartmentManagement = () => {
                     </div>
 
                     {departments.length === 0 &&
-          <div style={{
-            padding: '40px',
-            textAlign: 'center',
-            color: 'var(--mac-text-secondary)'
-          }}>
+          <div className="admin-empty-p-40-center-secondary">
                             <p>Нет отделений. Добавьте первое отделение.</p>
                         </div>
           }
 
                     {departments.length > 0 && filteredDepartments.length === 0 &&
-          <div style={{
-            padding: '40px',
-            textAlign: 'center',
-            color: 'var(--mac-text-secondary)'
-          }}>
+          <div className="admin-empty-p-40-center-secondary">
                             <p>По вашему запросу ничего не найдено.</p>
                         </div>
           }
 
                     {/* Пагинация */}
                     {totalPages > 1 &&
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '16px',
-            marginTop: '24px',
-            paddingTop: '16px',
-            borderTop: '1px solid var(--mac-border)'
-          }}>
+          <div className="admin-pagination-bar">
                             <MacOSPagination
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage} />
             
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                            <div className="admin-flex-center-8">
+                                <span className="admin-text-14-secondary">
                                     Показывать:
                                 </span>
                                 <Select
@@ -1488,8 +1235,8 @@ const DepartmentManagement = () => {
                   setCurrentPage(1);
                 }}
                 options={PAGE_SIZE_OPTIONS}
-                style={{ width: '70px' }} />
-                                <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                className="admin-w-70" />
+                                <span className="admin-text-14-secondary">
                                     из {totalItems}
                                 </span>
                             </div>
@@ -1511,21 +1258,17 @@ const DepartmentManagement = () => {
         title="Редактирование отделения"
         size="large">
         
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="admin-grid-2col">
                     <div>
                         <Input
               label="Название (русский)"
               placeholder="Название (русский)"
               value={formData.name_ru}
               onChange={(e) => setFormData({ ...formData, name_ru: e.target.value })}
-              style={{ borderColor: validationErrors.name_ru ? 'var(--mac-error)' : undefined }} />
+              className={validationErrors.name_ru ? 'admin-input-error' : undefined} />
             
                         {validationErrors.name_ru &&
-            <div style={{
-              color: 'var(--mac-error)',
-              fontSize: '12px',
-              marginTop: '4px'
-            }}>
+            <div className="admin-error-text-mt">
                                 {validationErrors.name_ru}
                             </div>
             }
@@ -1536,14 +1279,10 @@ const DepartmentManagement = () => {
               placeholder="Название (узбекский)"
               value={formData.name_uz}
               onChange={(e) => setFormData({ ...formData, name_uz: e.target.value })}
-              style={{ borderColor: validationErrors.name_uz ? 'var(--mac-error)' : undefined }} />
+              className={validationErrors.name_uz ? 'admin-input-error' : undefined} />
             
                         {validationErrors.name_uz &&
-            <div style={{
-              color: 'var(--mac-error)',
-              fontSize: '12px',
-              marginTop: '4px'
-            }}>
+            <div className="admin-error-text-mt">
                                 {validationErrors.name_uz}
                             </div>
             }
@@ -1554,17 +1293,10 @@ const DepartmentManagement = () => {
               placeholder="Ключ (например, cardio)"
               value={formData.key}
               onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-              style={{
-                gridColumn: '1',
-                borderColor: validationErrors.key ? 'var(--mac-error)' : undefined
-              }} />
+              className={`admin-grid-col-1${validationErrors.key ? ' admin-input-error' : ''}`} />
             
                         {validationErrors.key &&
-            <div style={{
-              color: 'var(--mac-error)',
-              fontSize: '12px',
-              marginTop: '4px'
-            }}>
+            <div className="admin-error-text-mt">
                                 {validationErrors.key}
                             </div>
             }
@@ -1576,30 +1308,19 @@ const DepartmentManagement = () => {
               placeholder="Порядок отображения"
               value={formData.display_order}
               onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
-              style={{
-                gridColumn: '2',
-                borderColor: validationErrors.display_order ? 'var(--mac-error)' : undefined
-              }} />
+              className={`admin-grid-col-2${validationErrors.display_order ? ' admin-input-error' : ''}`} />
             
                         {validationErrors.display_order &&
-            <div style={{
-              color: 'var(--mac-error)',
-              fontSize: '12px',
-              marginTop: '4px'
-            }}>
+            <div className="admin-error-text-mt">
                                 {validationErrors.display_order}
                             </div>
             }
                     </div>
-                    <div style={{ gridColumn: '1 / -1' }}>
-                        {/* IconSelector removed (dead code). DepartmentManagement.jsx is itself DEAD. */}
+                    <div className="admin-grid-span-all">
+                        {/* IconSelector removed (dead code, Step 1 PR #1827). DepartmentManagement.jsx is itself DEAD. */}
             
                         {validationErrors.icon &&
-            <div style={{
-              color: 'var(--mac-error)',
-              fontSize: '12px',
-              marginTop: '4px'
-            }}>
+            <div className="admin-error-text-mt">
                                 {validationErrors.icon}
                             </div>
             }
@@ -1610,24 +1331,20 @@ const DepartmentManagement = () => {
               type="color"
               value={formData.color}
               onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              style={{ gridColumn: '2' }} />
+              className="admin-grid-col-2" />
             
                     </div>
-                    <div style={{ gridColumn: '1 / -1' }}>
+                    <div className="admin-grid-span-all">
                         <Textarea
               label="Описание"
               placeholder="Описание отделения (опционально)"
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={4}
-              style={{ borderColor: validationErrors.description ? 'var(--mac-error)' : undefined }} />
+              className={validationErrors.description ? 'admin-input-error' : undefined} />
             
                         {validationErrors.description &&
-            <div style={{
-              color: 'var(--mac-error)',
-              fontSize: '12px',
-              marginTop: '4px'
-            }}>
+            <div className="admin-error-text-mt">
                                 {validationErrors.description}
                             </div>
             }
@@ -1635,23 +1352,12 @@ const DepartmentManagement = () => {
                 </div>
 
                 {/* ✅ НОВОЕ: Секция настройки маппинга услуг в модальном окне */}
-                <div style={{
-          marginTop: '24px',
-          padding: '20px',
-          background: 'var(--mac-bg-secondary)',
-          borderRadius: 'var(--mac-radius-md)',
-          border: '1px solid var(--mac-border)'
-        }}>
-                    <h4 style={{
-            fontSize: '16px',
-            fontWeight: '600',
-            marginBottom: '16px',
-            color: 'var(--mac-text-primary)'
-          }}>
+                <div className="admin-form-panel-secondary">
+                    <h4 className="admin-title-16-mb-16">
                         Настройка услуг для вкладки
                     </h4>
 
-                    <div style={{ marginBottom: '16px' }}>
+                    <div className="admin-mb-16">
                         <Checkbox
               checked={serviceMapping.create_service}
               onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
@@ -1660,7 +1366,7 @@ const DepartmentManagement = () => {
                     </div>
 
                     {serviceMapping.create_service &&
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="admin-grid-2col">
                             <div>
                                 <Input
                 label="Название услуги"
@@ -1670,13 +1376,7 @@ const DepartmentManagement = () => {
               
                             </div>
                             <div>
-                                <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+                                <label className="admin-label-block-md">
                                     Категория услуги
                                 </label>
                                 <Select
@@ -1701,18 +1401,14 @@ const DepartmentManagement = () => {
                 onChange={(e) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
               
                             </div>
-                            <div style={{ gridColumn: '1 / -1' }}>
+                            <div className="admin-grid-span-all">
                                 <Input
                 label="Queue tag (опционально)"
                 placeholder="Queue tag (например: ecg, cardiology_common)"
                 value={serviceMapping.queue_tag}
                 onChange={(e) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
               
-                                <div style={{
-                fontSize: '12px',
-                color: 'var(--mac-text-secondary)',
-                marginTop: '4px'
-              }}>
+                                <div className="admin-hint-text-12-secondary-mt-4">
                                     Услуги с department_key=&quot;{formData.key || '...'}&quot; будут отображаться в этой вкладке мастера регистрации
                                 </div>
                             </div>
@@ -1720,26 +1416,13 @@ const DepartmentManagement = () => {
           }
 
                     {!serviceMapping.create_service &&
-          <div style={{
-            padding: '12px',
-            background: 'var(--mac-bg-tertiary)',
-            borderRadius: 'var(--mac-radius-sm)',
-            fontSize: '13px',
-            color: 'var(--mac-text-secondary)'
-          }}>
+          <div className="admin-hint-box-tertiary">
                             💡 Для отображения услуг в этой вкладке мастера регистрации, убедитесь, что услуги имеют <code>department_key=&quot;{formData.key || '...'}&quot;</code> или соответствующий <code>category_code</code>.
                         </div>
           }
                 </div>
 
-                <div style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '12px',
-          marginTop: '24px',
-          paddingTop: '16px',
-          borderTop: '1px solid var(--mac-border)'
-        }}>
+                <div className="admin-modal-footer">
                     <Button
             variant="secondary"
             onClick={() => {
@@ -1756,7 +1439,7 @@ const DepartmentManagement = () => {
             variant="primary"
             onClick={handleUpdateDepartment}>
             
-                        <Save size={16} style={{ marginRight: '8px' }} />
+                        <Save size={16} className="admin-mr-8" />
                         Сохранить изменения
                     </Button>
                 </div>

@@ -222,20 +222,12 @@ const SystemManagement = () => {
   // ===================== РЕНДЕРИНГ =====================
 
   const renderMonitoringTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Общее состояние системы */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)',
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-            <Activity style={{ width: '20px', height: '20px' }} />
+      <MacOSCard className="admin-p-24">
+        <div className="admin-flex-between-mb-16">
+          <h3 className="admin-h3-icon-m0">
+            <Activity className="admin-icon-20" />
             Состояние системы
           </h3>
           <Button
@@ -243,25 +235,18 @@ const SystemManagement = () => {
           variant="outline"
           size="sm">
 
-            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <RefreshCw className="admin-icon-16-mr-8" />
             Обновить
           </Button>
         </div>
 
         {systemHealth &&
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: getStatusColor(systemHealth.overall_status)
-          }}>
+      <div className="admin-grid-auto-200">
+            <div className="admin-text-center">
+              <div className="admin-stat-value-dynamic" style={{ '--admin-stat-color': getStatusColor(systemHealth.overall_status) }}>
                 {systemHealth.overall_status?.toUpperCase()}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-text-sm-secondary">
                 Общий статус
               </div>
             </div>
@@ -269,23 +254,12 @@ const SystemManagement = () => {
             {systemHealth.components && Object.entries(systemHealth.components).map(([component, status]) => {
           const StatusIcon = getStatusIcon(status);
           return (
-            <div key={component} style={{ textAlign: 'center' }}>
-                  <StatusIcon style={{
-                width: '32px',
-                height: '32px',
-                margin: '0 auto 8px auto',
-                color: getStatusColor(status)
-              }} />
-                  <div style={{
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)'
-              }}>
+            <div key={component} className="admin-text-center">
+                  <StatusIcon className="admin-status-icon-32" style={{ '--admin-icon-color': getStatusColor(status) }} />
+                  <div className="admin-text-med-primary-block">
                     {component}
                   </div>
-                  <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: getStatusColor(status)
-              }}>
+                  <div className="admin-stat-value-sm-dynamic" style={{ '--admin-stat-color': getStatusColor(status) }}>
                     {status}
                   </div>
                 </div>);
@@ -297,37 +271,24 @@ const SystemManagement = () => {
 
       {/* Системные метрики */}
       {systemMetrics &&
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+    <div className="admin-grid-auto-300-24">
           {/* CPU */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h4 style={{
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            margin: 0
-          }}>
-                <Cpu style={{ width: '16px', height: '16px' }} />
+          <MacOSCard className="admin-p-24">
+            <div className="admin-flex-between-mb-16">
+              <h4 className="admin-metric-h4">
+                <Cpu className="admin-icon-16" />
                 CPU
               </h4>
               <Badge variant={systemMetrics.cpu?.usage_percent > 80 ? 'error' : 'success'}>
                 {systemMetrics.cpu?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+            <div className="admin-flex-col-8">
+              <div className="admin-text-sm-primary">
                 Ядер: {systemMetrics.cpu?.count}
             </div>
               {systemMetrics.cpu?.frequency &&
-          <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+          <div className="admin-text-sm-primary">
                   Частота: {systemMetrics.cpu.frequency.toFixed(0)} MHz
                 </div>
           }
@@ -335,80 +296,48 @@ const SystemManagement = () => {
           </MacOSCard>
 
           {/* Память */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h4 style={{
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            margin: 0
-          }}>
-                <MemoryStick style={{ width: '16px', height: '16px' }} />
+          <MacOSCard className="admin-p-24">
+            <div className="admin-flex-between-mb-16">
+              <h4 className="admin-metric-h4">
+                <MemoryStick className="admin-icon-16" />
                 Память
               </h4>
               <Badge variant={systemMetrics.memory?.usage_percent > 85 ? 'error' : 'success'}>
                 {systemMetrics.memory?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+            <div className="admin-flex-col-8">
+              <div className="admin-text-sm-primary">
                 Всего: {formatBytes(systemMetrics.memory?.total)}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+              <div className="admin-text-sm-primary">
                 Используется: {formatBytes(systemMetrics.memory?.used)}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+              <div className="admin-text-sm-primary">
                 Доступно: {formatBytes(systemMetrics.memory?.available)}
             </div>
             </div>
           </MacOSCard>
 
           {/* Диск */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h4 style={{
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            margin: 0
-          }}>
-                <HardDrive style={{ width: '16px', height: '16px' }} />
+          <MacOSCard className="admin-p-24">
+            <div className="admin-flex-between-mb-16">
+              <h4 className="admin-metric-h4">
+                <HardDrive className="admin-icon-16" />
                 Диск
               </h4>
               <Badge variant={systemMetrics.disk?.usage_percent > 90 ? 'error' : 'success'}>
                 {systemMetrics.disk?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+            <div className="admin-flex-col-8">
+              <div className="admin-text-sm-primary">
                 Всего: {formatBytes(systemMetrics.disk?.total)}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+              <div className="admin-text-sm-primary">
                 Используется: {formatBytes(systemMetrics.disk?.used)}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+              <div className="admin-text-sm-primary">
                 Свободно: {formatBytes(systemMetrics.disk?.free)}
             </div>
             </div>
@@ -417,17 +346,9 @@ const SystemManagement = () => {
     }
 
       {/* Алерты */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <AlertTriangle style={{ width: '20px', height: '20px' }} />
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-h3-icon-mb-16">
+          <AlertTriangle className="admin-icon-20" />
           Последние алерты
         </h3>
         
@@ -439,32 +360,18 @@ const SystemManagement = () => {
         iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-success)' }} /> :
 
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div className="admin-flex-col-12">
             {alerts.slice(0, 10).map((alert, index) =>
-        <div key={index} style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px',
-          backgroundColor: 'var(--mac-bg-secondary)',
-          borderRadius: 'var(--mac-radius-md)',
-          border: '1px solid var(--mac-border)'
-        }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div key={index} className="admin-alert-row">
+                <div className="admin-flex-center-12">
                   <Badge variant={getSeverityColor(alert.severity)}>
                     {alert.severity}
                   </Badge>
-                  <span style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+                  <span className="admin-text-sm-primary">
                     {alert.message}
                   </span>
                 </div>
-                <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+                <div className="admin-text-sm-secondary">
                   {new Date(alert.timestamp).toLocaleString()}
                 </div>
               </div>
@@ -476,31 +383,17 @@ const SystemManagement = () => {
 
 
   const renderBackupsTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Создание бэкапа */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Database style={{ width: '20px', height: '20px' }} />
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-h3-icon-mb-16">
+          <Database className="admin-icon-20" />
           Создание бэкапа
         </h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+        <div className="admin-grid-auto-200-mb-16">
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-form-label">
               Тип бэкапа
             </label>
             <Select
@@ -512,23 +405,16 @@ const SystemManagement = () => {
             { value: 'configuration', label: 'Конфигурация' }]
             }
             size="large"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
 
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+          <div className="admin-flex-center">
+            <label className="admin-label-flex-pointer">
               <Checkbox
               checked={backupForm.include_files}
               onChange={(checked) => setBackupForm((prev) => ({ ...prev, include_files: checked }))}
-              style={{ marginRight: '8px' }} />
+              className="admin-mr-8" />
 
               Включить файлы
             </label>
@@ -538,12 +424,12 @@ const SystemManagement = () => {
             <Button
             onClick={createBackup}
             disabled={loading}
-            style={{ width: '100%' }}>
+            className="admin-w-full">
 
               {loading ?
-            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px', animation: 'spin 1s linear infinite' }} /> :
+            <RefreshCw className="admin-icon-16-spin-mr-8" /> :
 
-            <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <Download className="admin-icon-16-mr-8" />
             }
               Создать бэкап
             </Button>
@@ -552,18 +438,10 @@ const SystemManagement = () => {
       </MacOSCard>
 
       {/* Список бэкапов */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)',
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-            <Shield style={{ width: '20px', height: '20px' }} />
+      <MacOSCard className="admin-p-24">
+        <div className="admin-flex-between-mb-16">
+          <h3 className="admin-h3-icon-m0">
+            <Shield className="admin-icon-20" />
             Список бэкапов
           </h3>
           <Button
@@ -571,7 +449,7 @@ const SystemManagement = () => {
           variant="outline"
           size="sm">
 
-            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <RefreshCw className="admin-icon-16-mr-8" />
             Обновить
           </Button>
         </div>
@@ -595,23 +473,23 @@ const SystemManagement = () => {
         data={backups.map((backup) => ({
           ...backup,
           name:
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Database style={{ width: '16px', height: '16px', color: 'var(--mac-text-tertiary)' }} />
-                  <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{backup.name}</span>
+          <div className="admin-flex-center-8">
+                  <Database className="admin-icon-16-tertiary" />
+                  <span className="admin-span-med">{backup.name}</span>
                       </div>,
 
           type: <Badge variant="outline">{backup.type}</Badge>,
           size: formatBytes(backup.size),
           created_at: new Date(backup.created_at).toLocaleString(),
           actions:
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <div className="admin-flex-end-center-8">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     title={`View backup ${backup.name}`}
                     aria-label={`View backup ${backup.name}`}>
-                    <Eye aria-hidden="true" style={{ width: '14px', height: '14px' }} />
+                    <Eye aria-hidden="true" className="admin-icon-14" />
                   </Button>
                   <Button
               type="button"
@@ -620,9 +498,9 @@ const SystemManagement = () => {
               variant="outline"
               title={`Delete backup ${backup.name}`}
               aria-label={`Delete backup ${backup.name}`}
-              style={{ color: 'var(--mac-error)' }}>
+              className="admin-text-error">
 
-                    <Trash2 aria-hidden="true" style={{ width: '14px', height: '14px' }} />
+                    <Trash2 aria-hidden="true" className="admin-icon-14" />
                   </Button>
                       </div>
 
@@ -641,39 +519,21 @@ const SystemManagement = () => {
 
 
   const renderSettingsTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Settings style={{ width: '20px', height: '20px' }} />
+  <div className="admin-flex-col-24">
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-h3-icon-mb-16">
+          <Settings className="admin-icon-20" />
           Настройки мониторинга
         </h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+        <div className="admin-grid-auto-300-24">
           <div>
-            <h4 style={{
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '12px'
-          }}>
+            <h4 className="admin-settings-h4">
               Пороговые значения
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="admin-flex-col-12">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-form-label admin-mb-4">
                   CPU (%)
                 </label>
                 <Input
@@ -682,17 +542,11 @@ const SystemManagement = () => {
                 onChange={(e) => setThresholds((prev) => ({ ...prev, cpu_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
-                style={{ width: '100%' }} />
+                className="admin-w-full" />
 
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-form-label admin-mb-4">
                   Память (%)
                 </label>
                 <Input
@@ -701,17 +555,11 @@ const SystemManagement = () => {
                 onChange={(e) => setThresholds((prev) => ({ ...prev, memory_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
-                style={{ width: '100%' }} />
+                className="admin-w-full" />
 
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-form-label admin-mb-4">
                   Диск (%)
                 </label>
                 <Input
@@ -720,41 +568,23 @@ const SystemManagement = () => {
                 onChange={(e) => setThresholds((prev) => ({ ...prev, disk_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
-                style={{ width: '100%' }} />
+                className="admin-w-full" />
 
               </div>
             </div>
           </div>
           
           <div>
-            <h4 style={{
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '12px'
-          }}>
+            <h4 className="admin-settings-h4">
               Автоматизация
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px',
-              backgroundColor: 'var(--mac-bg-secondary)',
-              borderRadius: 'var(--mac-radius-md)',
-              border: '1px solid var(--mac-border)'
-            }}>
+            <div className="admin-flex-col-12">
+              <div className="admin-automation-row">
                 <div>
-                  <div style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)'
-                }}>
+                  <div className="admin-text-med-primary-block">
                     Автоматические бэкапы
                   </div>
-                  <div style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>
+                  <div className="admin-text-sm-secondary">
                     Ежедневно в 02:00
                   </div>
                 </div>
@@ -763,26 +593,12 @@ const SystemManagement = () => {
                 </Button>
               </div>
               
-              <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px',
-              backgroundColor: 'var(--mac-bg-secondary)',
-              borderRadius: 'var(--mac-radius-md)',
-              border: '1px solid var(--mac-border)'
-            }}>
+              <div className="admin-automation-row">
                 <div>
-                  <div style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)'
-                }}>
+                  <div className="admin-text-med-primary-block">
                     Уведомления
                   </div>
-                  <div style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>
+                  <div className="admin-text-sm-secondary">
                     Email при критических алертах
                   </div>
                 </div>
@@ -794,7 +610,7 @@ const SystemManagement = () => {
           </div>
         </div>
         
-        <div style={{ marginTop: '24px' }}>
+        <div className="admin-mt-24">
           <Button>
             Сохранить настройки
           </Button>
@@ -804,38 +620,20 @@ const SystemManagement = () => {
 
 
   return (
-    <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '24px'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
-          <Server style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
+    <div className="admin-p-0-max-1400">
+      <div className="admin-flex-between admin-mb-24">
+        <div className="admin-flex-center-16">
+          <Server className="admin-icon-32-accent" />
           <div>
-            <h1 style={{
-              margin: 0,
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)'
-            }}>
+            <h1 className="admin-text-2xl admin-text-semi admin-text-primary admin-m-0">
               Управление системой
             </h1>
-            <p style={{
-              margin: '4px 0 0 0',
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+            <p className="admin-page-subtitle">
               Мониторинг, бэкапы и системные настройки
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="admin-flex-center-8">
           {systemHealth &&
           <Badge variant={systemHealth.overall_status === 'healthy' ? 'success' : 'error'}>
               {systemHealth.overall_status}
@@ -845,10 +643,7 @@ const SystemManagement = () => {
       </div>
 
       {/* Табы */}
-      <div style={{
-        display: 'flex',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-tab-bar-simple">
           {[
         { id: 'monitoring', label: 'Мониторинг', icon: Activity },
         { id: 'backups', label: 'Бэкапы', icon: Database },
@@ -861,59 +656,21 @@ const SystemManagement = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px 20px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-                fontSize: 'var(--mac-font-size-sm)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-                position: 'relative',
-                marginBottom: '-1px'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.target.style.color = 'var(--mac-text-primary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.target.style.color = 'var(--mac-text-secondary)';
-                }
-              }}>
+              className="admin-tab-btn"
+              data-active={isActive}>
 
-              <IconComponent style={{
-                width: '16px',
-                height: '16px',
-                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
-              }} />
+              <IconComponent className="admin-icon-16 admin-icon-16-color" style={{ '--admin-icon-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
                 {tab.label}
               {isActive &&
-              <div style={{
-                position: 'absolute',
-                bottom: '0',
-                left: '0',
-                right: '0',
-                height: '3px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                borderRadius: '2px 2px 0 0'
-              }} />
+              <div className="admin-tab-active-underline" />
               }
               </button>);
 
         })}
       </div>
-      
+
       {/* Разделительная линия */}
-      <div style={{
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }} />
+      <div className="admin-tab-divider" />
 
       {/* Контент табов */}
       {activeTab === 'monitoring' && renderMonitoringTab()}

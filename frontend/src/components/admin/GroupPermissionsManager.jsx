@@ -295,19 +295,11 @@ const GroupPermissionsManager = () => {
 
 
   const renderUsersTab = () =>
-  <div style={{ display: 'flex', gap: '24px' }}>
+  <div className="admin-flex admin-gap-24">
       {/* Левая панель - список пользователей */}
-      <Card style={{ flex: '0 0 300px', padding: '16px' }}>
-        <h3 style={{
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)'
-      }}>
-          <Users style={{ width: '20px', height: '20px' }} />
+      <Card className="admin-card-sidebar-300">
+        <h3 className="admin-list-h3">
+          <Users className="admin-icon-20" />
           Пользователи
         </h3>
         
@@ -315,10 +307,10 @@ const GroupPermissionsManager = () => {
         placeholder="Поиск пользователей..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        style={{ marginBottom: '16px' }} />
+        className="admin-mb-16" />
       
         
-        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div className="admin-max-h-400-overflow">
           {filteredUsers.map((user) =>
         <div
           key={user.id}
@@ -332,49 +324,26 @@ const GroupPermissionsManager = () => {
             setSelectedUser(user);
             loadUserPermissions(user.id);
           })}
+          className="admin-perm-list-item"
           style={{
-            padding: '12px',
-            borderRadius: 'var(--mac-radius-sm)',
-            cursor: 'pointer',
-            backgroundColor: selectedUser?.id === user.id ?
-            'var(--mac-accent-blue-light)' :
-            'transparent',
-            marginBottom: '8px',
-            border: selectedUser?.id === user.id ?
-            '2px solid var(--mac-accent-blue)' :
-            '1px solid transparent',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            '--admin-list-bg': selectedUser?.id === user.id ? 'var(--mac-accent-blue-light)' : 'transparent',
+            '--admin-list-border': selectedUser?.id === user.id ? 'var(--mac-accent-blue)' : 'transparent'
           }}>
           
-              <div style={{
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+              <div className="admin-list-username">
                 {user.username}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-list-sub-xs">
                 {user.full_name || 'Без имени'}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-tertiary)'
-          }}>
+              <div className="admin-list-sub-tertiary-xs">
                 Роль: {user.role}
               </div>
             </div>
         )}
 
           {filteredUsers.length === 0 &&
-        <div style={{
-          padding: '16px',
-          textAlign: 'center',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <div className="admin-empty-p-16-sm-secondary">
               Пользователи не найдены
             </div>
         }
@@ -382,77 +351,59 @@ const GroupPermissionsManager = () => {
       </Card>
 
       {/* Правая панель - разрешения пользователя */}
-      <Card style={{ flex: 1, padding: '16px' }}>
+      <Card className="admin-card-main-flex-1">
         {selectedUser ?
       <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
-                <Shield style={{ width: '20px', height: '20px' }} />
+            <div className="admin-flex-between-mb-16">
+              <h3 className="admin-header-h3-m0">
+                <Shield className="admin-icon-20" />
                 Разрешения: {selectedUser.username}
               </h3>
               <Button
             onClick={() => loadUserPermissions(selectedUser.id)}
             disabled={loading}>
             
-                <RefreshCw style={{ width: '16px', height: '16px' }} />
+                <RefreshCw className="admin-icon-16" />
                 Обновить
               </Button>
             </div>
 
             {loading ?
         <div>
-                <Skeleton height="20px" style={{ marginBottom: '8px' }} />
-                <Skeleton height="20px" style={{ marginBottom: '8px' }} />
+                <Skeleton height="20px" className="admin-mb-8" />
+                <Skeleton height="20px" className="admin-mb-8" />
                 <Skeleton height="20px" />
               </div> :
         userPermissions ?
         <div>
-                <div style={{ marginBottom: '16px' }}>
+                <div className="admin-mb-16">
                   <Badge variant="primary">
                     Всего разрешений: {userPermissions.permissions_count}
                   </Badge>
-                  <Badge variant="secondary" style={{ marginLeft: '8px' }}>
+                  <Badge variant="secondary" className="admin-ml-8">
                     Ролей: {userPermissions.roles.length}
                   </Badge>
-                  <Badge variant="info" style={{ marginLeft: '8px' }}>
+                  <Badge variant="info" className="admin-ml-8">
                     Групп: {userPermissions.groups.length}
                   </Badge>
                 </div>
 
-                <div style={{ marginBottom: '24px' }}>
-                  <h4 style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                <div className="admin-mb-24">
+                  <h4 className="admin-form-h4">
                     Роли:
                   </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <div className="admin-flex-wrap-8">
                     {userPermissions.roles.map((role) =>
               <Badge key={role} variant="success">{role}</Badge>
               )}
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '24px' }}>
-                  <h4 style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                <div className="admin-mb-24">
+                  <h4 className="admin-form-h4">
                     Группы:
                   </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <div className="admin-flex-wrap-8">
                     {userPermissions.groups.map((group) =>
               <Badge key={group} variant="info">{group}</Badge>
               )}
@@ -460,36 +411,14 @@ const GroupPermissionsManager = () => {
                 </div>
 
                 <div>
-                  <h4 style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                  <h4 className="admin-form-h4">
                     Разрешения:
                   </h4>
-                  <div style={{
-              maxHeight: '300px',
-              overflowY: 'auto',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-              gap: '8px'
-            }}>
+                  <div className="admin-max-h-300-overflow admin-perms-grid">
                     {userPermissions.permissions.map((permission) =>
-              <div
-                key={permission}
-                style={{
-                  padding: '8px',
-                  backgroundColor: 'var(--mac-success-bg)',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  fontSize: 'var(--mac-font-size-xs)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  border: '1px solid var(--mac-success-border)'
-                }}>
+              <div key={permission} className="admin-perm-card">
                 
-                        <CheckCircle style={{ width: '14px', height: '14px', color: 'var(--mac-success)' }} />
+                        <CheckCircle className="admin-icon-14-success" />
                         {permission}
                       </div>
               )}
@@ -497,23 +426,12 @@ const GroupPermissionsManager = () => {
                 </div>
 
                 {/* Инструменты проверки разрешений */}
-                <div style={{
-            marginTop: '24px',
-            padding: '16px',
-            backgroundColor: 'var(--mac-bg-secondary)',
-            borderRadius: 'var(--mac-radius-md)',
-            border: '1px solid var(--mac-border)'
-          }}>
-                  <h4 style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                <div className="admin-perm-summary-box">
+                  <h4 className="admin-form-h4">
                     Проверить разрешение:
                   </h4>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'end' }}>
-                    <div style={{ flex: 1 }}>
+                  <div className="admin-flex-start-end admin-gap-8">
+                    <div className="admin-flex-1">
                       <Select
                   value={permissionToCheck}
                   onChange={(value) => {
@@ -530,31 +448,22 @@ const GroupPermissionsManager = () => {
                   }))]
                   }
                   size="large"
-                  style={{ width: '100%' }} />
+                  className="admin-w-full" />
                 
                     </div>
                   </div>
                 </div>
               </div> :
 
-        <div style={{
-          textAlign: 'center',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <div className="admin-empty-sm-center-secondary">
                 Выберите пользователя для просмотра разрешений
               </div>
         }
           </> :
 
-      <div style={{
-        textAlign: 'center',
-        color: 'var(--mac-text-secondary)',
-        padding: '32px',
-        fontSize: 'var(--mac-font-size-sm)'
-      }}>
-            <User style={{ width: '48px', height: '48px', marginBottom: '16px', color: 'var(--mac-text-tertiary)' }} />
-            <p style={{ margin: 0 }}>Выберите пользователя из списка слева</p>
+      <div className="admin-empty-p-32-sm-secondary">
+            <User className="admin-icon-48-mb-16-tertiary" />
+            <p className="admin-m-0">Выберите пользователя из списка слева</p>
           </div>
       }
       </Card>
@@ -562,19 +471,11 @@ const GroupPermissionsManager = () => {
 
 
   const renderGroupsTab = () =>
-  <div style={{ display: 'flex', gap: '24px' }}>
+  <div className="admin-flex admin-gap-24">
       {/* Левая панель - список групп */}
-      <Card style={{ flex: '0 0 300px', padding: '16px' }}>
-        <h3 style={{
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)'
-      }}>
-          <Users style={{ width: '20px', height: '20px' }} />
+      <Card className="admin-card-sidebar-300">
+        <h3 className="admin-list-h3">
+          <Users className="admin-icon-20" />
           Группы
         </h3>
         
@@ -582,10 +483,10 @@ const GroupPermissionsManager = () => {
         placeholder="Поиск групп..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        style={{ marginBottom: '16px' }} />
+        className="admin-mb-16" />
       
         
-        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div className="admin-max-h-400-overflow">
           {filteredGroups.map((group) =>
         <div
           key={group.id}
@@ -599,40 +500,22 @@ const GroupPermissionsManager = () => {
             setSelectedGroup(group);
             loadGroupSummary(group.id);
           })}
+          className="admin-perm-list-item"
           style={{
-            padding: '12px',
-            borderRadius: 'var(--mac-radius-sm)',
-            cursor: 'pointer',
-            backgroundColor: selectedGroup?.id === group.id ?
-            'var(--mac-accent-blue-light)' :
-            'transparent',
-            marginBottom: '8px',
-            border: selectedGroup?.id === group.id ?
-            '2px solid var(--mac-accent-blue)' :
-            '1px solid transparent',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            '--admin-list-bg': selectedGroup?.id === group.id ? 'var(--mac-accent-blue-light)' : 'transparent',
+            '--admin-list-border': selectedGroup?.id === group.id ? 'var(--mac-accent-blue)' : 'transparent'
           }}>
           
-              <div style={{
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+              <div className="admin-list-username">
                 {group.display_name}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <div className="admin-list-sub-xs">
                 {group.name}
               </div>
-              <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-tertiary)'
-          }}>
+              <div className="admin-list-sub-tertiary-xs">
                 Пользователей: {group.users_count} | Ролей: {group.roles_count}
               </div>
-              <Badge variant={group.group_type === 'department' ? 'primary' : 'secondary'} style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+              <Badge variant={group.group_type === 'department' ? 'primary' : 'secondary'} className="admin-text-xs">
                 {group.group_type}
               </Badge>
             </div>
@@ -641,63 +524,50 @@ const GroupPermissionsManager = () => {
       </Card>
 
       {/* Правая панель - сводка группы */}
-      <Card style={{ flex: 1, padding: '16px' }}>
+      <Card className="admin-card-main-flex-1">
         {selectedGroup ?
       <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
-                <Shield style={{ width: '20px', height: '20px' }} />
+            <div className="admin-flex-between-mb-16">
+              <h3 className="admin-header-h3-m0">
+                <Shield className="admin-icon-20" />
                 Группа: {selectedGroup.display_name}
               </h3>
               <Button
             onClick={() => loadGroupSummary(selectedGroup.id)}
             disabled={loading}>
             
-                <RefreshCw style={{ width: '16px', height: '16px' }} />
+                <RefreshCw className="admin-icon-16" />
                 Обновить
               </Button>
             </div>
 
             {loading ?
         <div>
-                <Skeleton height="20px" style={{ marginBottom: '8px' }} />
-                <Skeleton height="20px" style={{ marginBottom: '8px' }} />
+                <Skeleton height="20px" className="admin-mb-8" />
+                <Skeleton height="20px" className="admin-mb-8" />
                 <Skeleton height="20px" />
               </div> :
         groupSummary ?
         <div>
-                <div style={{ marginBottom: '16px' }}>
+                <div className="admin-mb-16">
                   <Badge variant="primary">
                     Пользователей: {groupSummary.users_count}
                   </Badge>
-                  <Badge variant="secondary" style={{ marginLeft: '8px' }}>
+                  <Badge variant="secondary" className="admin-ml-8">
                     Ролей: {groupSummary.roles.length}
                   </Badge>
-                  <Badge variant="info" style={{ marginLeft: '8px' }}>
+                  <Badge variant="info" className="admin-ml-8">
                     Разрешений: {groupSummary.permissions_count}
                   </Badge>
                 </div>
 
-                <div style={{ marginBottom: '24px' }}>
-                  <h4 style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                <div className="admin-mb-24">
+                  <h4 className="admin-form-h4">
                     Роли группы:
                   </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                  <div className="admin-flex-wrap-8-mb-8">
                     {groupSummary.roles.map((role) =>
-              <div key={role.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div key={role.id} className="admin-flex-center-8">
                         <Badge variant="success">{role.display_name}</Badge>
                         <Button
                   type="button"
@@ -707,15 +577,15 @@ const GroupPermissionsManager = () => {
                   aria-label={`Revoke ${role.display_name} from group`}
                   onClick={() => revokeRoleFromGroup(selectedGroup.id, role.id)}>
                   
-                          <Trash2 style={{ width: '12px', height: '12px' }} />
+                          <Trash2 className="admin-icon-12" />
                         </Button>
                       </div>
               )}
                   </div>
                   
                   {/* Добавление новой роли */}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'end' }}>
-                    <div style={{ flex: 1 }}>
+                  <div className="admin-flex-start-end admin-gap-8">
+                    <div className="admin-flex-1">
                       <Select
                   value={roleToAssign}
                   onChange={(value) => {
@@ -733,60 +603,30 @@ const GroupPermissionsManager = () => {
                   }))]
                   }
                   size="large"
-                  style={{ width: '100%' }} />
+                  className="admin-w-full" />
                 
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h4 style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                  <h4 className="admin-form-h4">
                     Разрешения по категориям:
                   </h4>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  <div className="admin-max-h-300-overflow">
                     {Object.entries(groupSummary.permissions_by_category).map(([category, perms]) =>
-              <div key={category} style={{ marginBottom: '16px' }}>
-                        <h5 style={{
-                  color: 'var(--mac-accent-blue)',
-                  textTransform: 'capitalize',
-                  marginBottom: '8px',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)'
-                }}>
+              <div key={category} className="admin-mb-16">
+                        <h5 className="admin-perm-category-h5">
                           {category} ({perms.length})
                         </h5>
-                        <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                  gap: '8px',
-                  paddingLeft: '16px'
-                }}>
+                        <div className="admin-perms-grid-200">
                           {perms.map((perm) =>
-                  <div
-                    key={perm.codename}
-                    style={{
-                      padding: '8px',
-                      backgroundColor: 'var(--mac-success-bg)',
-                      borderRadius: 'var(--mac-radius-sm)',
-                      fontSize: 'var(--mac-font-size-xs)',
-                      border: '1px solid var(--mac-success-border)'
-                    }}>
+                  <div key={perm.codename} className="admin-perm-card-static">
                     
-                              <div style={{
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      color: 'var(--mac-text-primary)'
-                    }}>
+                              <div className="admin-perm-name">
                                 {perm.name}
                               </div>
-                              <div style={{
-                      fontSize: 'var(--mac-font-size-xs)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>
+                              <div className="admin-perm-codename">
                                 {perm.codename}
                               </div>
                             </div>
@@ -798,24 +638,15 @@ const GroupPermissionsManager = () => {
                 </div>
               </div> :
 
-        <div style={{
-          textAlign: 'center',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <div className="admin-empty-sm-center-secondary">
                 Загрузка сводки группы...
               </div>
         }
           </> :
 
-      <div style={{
-        textAlign: 'center',
-        color: 'var(--mac-text-secondary)',
-        padding: '32px',
-        fontSize: 'var(--mac-font-size-sm)'
-      }}>
-            <Users style={{ width: '48px', height: '48px', marginBottom: '16px', color: 'var(--mac-text-tertiary)' }} />
-            <p style={{ margin: 0 }}>Выберите группу из списка слева</p>
+      <div className="admin-empty-p-32-sm-secondary">
+            <Users className="admin-icon-48-mb-16-tertiary" />
+            <p className="admin-m-0">Выберите группу из списка слева</p>
           </div>
       }
       </Card>
@@ -823,64 +654,56 @@ const GroupPermissionsManager = () => {
 
 
   const renderCacheTab = () =>
-  <Card style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h3 style={{
-        margin: 0,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)'
-      }}>
-          <Settings style={{ width: '20px', height: '20px' }} />
+  <Card className="admin-p-24">
+      <div className="admin-flex-between-mb-24">
+        <h3 className="admin-header-h3-m0">
+          <Settings className="admin-icon-20" />
           Управление кэшем разрешений
         </h3>
         <Button onClick={clearCache} variant="danger">
-          <Trash2 style={{ width: '16px', height: '16px' }} />
+          <Trash2 className="admin-icon-16" />
           Очистить кэш
         </Button>
       </div>
 
       {cacheStats &&
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-          <Card style={{ padding: '16px', backgroundColor: 'var(--mac-info-bg)', border: '1px solid var(--mac-info-border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Clock style={{ width: '24px', height: '24px', color: 'var(--mac-info)' }} />
+    <div className="admin-grid-auto-200">
+          <Card className="admin-stat-banner-info">
+            <div className="admin-flex-center-12">
+              <Clock className="admin-icon-24-info" />
               <div>
-                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-text-primary)' }}>
+                <div className="admin-stat-number-xl-bold">
                   {cacheStats.cache_ttl}с
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                <div className="admin-text-sm-secondary">
                   TTL кэша
                 </div>
               </div>
             </div>
           </Card>
 
-          <Card style={{ padding: '16px', backgroundColor: 'var(--mac-success-bg)', border: '1px solid var(--mac-success-border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Users style={{ width: '24px', height: '24px', color: 'var(--mac-success)' }} />
+          <Card className="admin-stat-banner-success">
+            <div className="admin-flex-center-12">
+              <Users className="admin-icon-24-success" />
               <div>
-                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-text-primary)' }}>
+                <div className="admin-stat-number-xl-bold">
                   {cacheStats.cache_size}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                <div className="admin-text-sm-secondary">
                   Записей в кэше
                 </div>
               </div>
             </div>
           </Card>
 
-          <Card style={{ padding: '16px', backgroundColor: 'var(--mac-warning-bg)', border: '1px solid var(--mac-warning-border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Key style={{ width: '24px', height: '24px', color: 'var(--mac-warning)' }} />
+          <Card className="admin-stat-banner-warning">
+            <div className="admin-flex-center-12">
+              <Key className="admin-icon-24-warning" />
               <div>
-                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-text-primary)' }}>
+                <div className="admin-stat-number-xl-bold">
                   {cacheStats.cached_users.length}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                <div className="admin-text-sm-secondary">
                   Пользователей в кэше
                 </div>
               </div>
@@ -889,22 +712,11 @@ const GroupPermissionsManager = () => {
         </div>
     }
 
-      <div style={{ marginTop: '24px' }}>
-        <h4 style={{
-        fontSize: 'var(--mac-font-size-sm)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        marginBottom: '8px'
-      }}>
+      <div className="admin-mt-24">
+        <h4 className="admin-form-h4">
           Пользователи в кэше:
         </h4>
-        <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px',
-        maxHeight: '200px',
-        overflowY: 'auto'
-      }}>
+        <div className="admin-cache-users-list">
           {cacheStats?.cached_users.map((userId) =>
         <Badge key={userId} variant="secondary">
               ID: {userId}
@@ -917,36 +729,18 @@ const GroupPermissionsManager = () => {
 
   return (
     <div style={containerStyle}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{
-          margin: 0,
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
-          <Shield style={{ width: '32px', height: '32px' }} />
+      <div className="admin-mb-24">
+        <h1 className="admin-page-h1">
+          <Shield className="admin-icon-32" />
           Управление разрешениями групп
         </h1>
-        <p style={{
-          margin: '8px 0 0 0',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <p className="admin-page-p">
           Управление ролями, группами и разрешениями пользователей
         </p>
       </div>
 
       {/* Табы */}
-      <div style={{
-        maxWidth: '100%',
-        overflowX: 'auto',
-        paddingBottom: '6px',
-        marginBottom: '24px',
-        scrollbarWidth: 'thin'
-      }}>
+      <div className="admin-tabs-scroll">
         <SegmentedControl
           aria-label="Разделы разрешений групп"
           value={activeTab}
@@ -955,7 +749,7 @@ const GroupPermissionsManager = () => {
             {
               value: 'users',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-center-8">
                   <User size={14} aria-hidden="true" />
                   Пользователи
                 </span>
@@ -964,7 +758,7 @@ const GroupPermissionsManager = () => {
             {
               value: 'groups',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-center-8">
                   <Users size={14} aria-hidden="true" />
                   Группы
                 </span>
@@ -973,7 +767,7 @@ const GroupPermissionsManager = () => {
             {
               value: 'cache',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-center-8">
                   <Settings size={14} aria-hidden="true" />
                   Кэш
                 </span>
@@ -981,13 +775,7 @@ const GroupPermissionsManager = () => {
             }
           ]}
           size="large"
-          style={{
-            minWidth: 'max-content',
-            background: 'var(--mac-gradient-sidebar)',
-            border: '1px solid var(--mac-main-shell-border)',
-            borderRadius: '14px',
-            boxShadow: 'var(--mac-main-shell-shadow)'
-          }} />
+          className="admin-tabs-control-sidebar" />
       </div>
 
       {/* Содержимое табов */}

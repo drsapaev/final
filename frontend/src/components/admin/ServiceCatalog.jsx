@@ -360,55 +360,46 @@ const ServiceCatalog = () => {
     return (
       <MacOSCard
         variant="default"
-        style={{ padding: '24px' }}>
+        className="admin-p-24">
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <RefreshCw style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} size={20} />
-          <span style={{ color: 'var(--mac-text-primary)' }}>Загрузка справочника услуг...</span>
+        <div className="admin-flex-center-justify">
+          <RefreshCw className="admin-spinner-20-mr-8" size={20} />
+          <span className="admin-load-text-primary">Загрузка справочника услуг...</span>
         </div>
       </MacOSCard>);
 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="admin-flex-col-24">
       {/* Заголовок */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="admin-flex-between">
         <div>
-          <h2 style={{
-            fontSize: 'var(--mac-font-size-xl)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+          <h2 className="admin-page-h2-xl-semi-primary-m0">
             Справочник услуг
           </h2>
-          <p style={{
-            color: 'var(--mac-text-secondary)',
-            margin: '4px 0 0 0',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          <p className="admin-header-p-mt-4-sm-secondary">
             Управление услугами и ценами по специальностям
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="admin-form-row-gap-12">
           {selectedServiceIds.size > 0 && (
             <Button
               variant="outline"
               onClick={() => setShowBatchEdit(true)}
-              style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'var(--mac-accent)' }}
+              className="admin-btn-filter-active-catalog"
             >
-              <CheckSquare size={16} style={{ marginRight: '8px' }} />
+              <CheckSquare size={16} className="admin-mr-8" />
               Редактировать ({selectedServiceIds.size})
             </Button>
           )}
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw size={16} style={{ marginRight: '8px' }} />
+            <RefreshCw size={16} className="admin-mr-8" />
             Обновить
           </Button>
           <Button onClick={() => setShowAddForm(true)}>
-            <Plus size={16} style={{ marginRight: '8px' }} />
+            <Plus size={16} className="admin-mr-8" />
             Добавить услугу
           </Button>
         </div>
@@ -426,21 +417,11 @@ const ServiceCatalog = () => {
       {/* Фильтры */}
       <MacOSCard
         variant="default"
-        style={{ padding: '24px' }}>
+        className="admin-p-24">
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '16px'
-        }}>
+        <div className="admin-grid-auto-250-12">
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-label-block-sm-med-primary-mb-8">
               Поиск по названию
             </label>
             <Input
@@ -450,17 +431,10 @@ const ServiceCatalog = () => {
               placeholder="Введите название услуги..."
               icon={Search}
               iconPosition="left" />
-
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-label-block-sm-med-primary-mb-8">
               Специальность
             </label>
             <Select
@@ -474,17 +448,10 @@ const ServiceCatalog = () => {
               { value: 'laboratory', label: 'Лаборатория' },
               { value: 'physiotherapy', label: 'Физиотерапия' }]
               } />
-
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-label-14-500-primary-mb-8">
               Категория
             </label>
             <Select
@@ -497,17 +464,10 @@ const ServiceCatalog = () => {
                 label: category.name_ru
               }))]
               } />
-
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-label-14-500-primary-mb-8">
               Отделение
             </label>
             <Select
@@ -520,101 +480,60 @@ const ServiceCatalog = () => {
                 label: dept.name_ru
               }))]
               } />
-
           </div>
         </div>
       </MacOSCard>
 
       {/* Статистика */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
+      <div className="admin-grid-auto-200">
         <MacOSCard
           variant="default"
-          style={{ padding: '24px' }}>
+          className="admin-p-24">
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: 'var(--mac-font-size-xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-info)',
-              margin: 0
-            }}>
+          <div className="admin-text-center">
+            <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-info)' }}>
               {services.length}
             </div>
-            <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '4px 0 0 0'
-            }}>
+            <div className="admin-stat-label-sm-secondary-mt-4">
               Всего услуг
             </div>
           </div>
         </MacOSCard>
         <MacOSCard
           variant="default"
-          style={{ padding: '24px' }}>
+          className="admin-p-24">
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: 'var(--mac-font-size-xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-success)',
-              margin: 0
-            }}>
+          <div className="admin-text-center">
+            <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-success)' }}>
               {services.filter((s) => s.active).length}
             </div>
-            <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '4px 0 0 0'
-            }}>
+            <div className="admin-stat-label-sm-secondary-mt-4">
               Активных
             </div>
           </div>
         </MacOSCard>
         <MacOSCard
           variant="default"
-          style={{ padding: '24px' }}>
+          className="admin-p-24">
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: 'var(--mac-font-size-xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-warning)',
-              margin: 0
-            }}>
+          <div className="admin-text-center">
+            <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>
               {categories.length}
             </div>
-            <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '4px 0 0 0'
-            }}>
+            <div className="admin-stat-label-sm-secondary-mt-4">
               Категорий
             </div>
           </div>
         </MacOSCard>
         <MacOSCard
           variant="default"
-          style={{ padding: '24px' }}>
+          className="admin-p-24">
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: 'var(--mac-font-size-xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-accent)',
-              margin: 0
-            }}>
+          <div className="admin-text-center">
+            <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>
               {filteredServices.length}
             </div>
-            <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '4px 0 0 0'
-            }}>
+            <div className="admin-stat-label-sm-secondary-mt-4">
               Найдено
             </div>
           </div>
@@ -624,7 +543,7 @@ const ServiceCatalog = () => {
       {/* Таблица услуг */}
       <MacOSCard
         variant="default"
-        style={{ padding: '0' }}>
+        className="admin-card-p-0-overflow-hidden">
 
         <Table
           columns={[
@@ -636,7 +555,7 @@ const ServiceCatalog = () => {
                 aria-label="Select all filtered services"
                 checked={selectedServiceIds.size === filteredServices.length && filteredServices.length > 0}
                 onChange={toggleSelectAll}
-                style={{ cursor: 'pointer' }}
+                className="admin-checkbox-cursor-pointer"
               />
             ),
             width: '40px'
@@ -667,41 +586,26 @@ const ServiceCatalog = () => {
                 aria-label={`Select service ${service.name || service.id}`}
                 checked={selectedServiceIds.has(service.id)}
                 onChange={() => toggleServiceSelection(service.id)}
-                style={{ cursor: 'pointer' }}
+                className="admin-checkbox-cursor-pointer"
               />,
               service:
-              <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div className="admin-flex-center">
                   <SpecialtyIcon
                   size={20}
-                  style={{
-                    marginRight: '12px',
-                    color: specialtyColors[specialty] || 'var(--mac-text-tertiary)'
-                  }} />
+                  className="admin-specialty-icon-20"
+                  style={{ '--admin-icon-color': specialtyColors[specialty] || 'var(--mac-text-tertiary)' }} />
 
                   <div>
-                    <div style={{
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: 'var(--mac-text-primary)',
-                    margin: 0
-                  }}>
+                    <div className="admin-service-name">
                       {service.name}
                     </div>
                     {canonicalCode &&
-                  <div style={{
-                    fontSize: '14px',
-                    color: 'var(--mac-text-secondary)',
-                    margin: '2px 0 0 0'
-                  }}>
+                  <div className="admin-service-code">
                         Код: {canonicalCode}
                       </div>
                     }
                     {hasLegacyCodeMismatch &&
-                  <div style={{
-                    fontSize: '12px',
-                    color: 'var(--mac-warning)',
-                    margin: '2px 0 0 0'
-                  }}>
+                  <div className="admin-service-legacy-code">
                         Legacy code: {service.code}
                       </div>
                   }
@@ -714,30 +618,17 @@ const ServiceCatalog = () => {
                 </Badge>,
 
               price:
-              <div style={{
-                fontSize: '14px',
-                fontWeight: '500',
-                color: 'var(--mac-text-primary)',
-                margin: 0
-              }}>
+              <div className="admin-service-price">
                   {service.price ? `${service.price.toLocaleString()} ${service.currency || 'UZS'}` : 'Не указана'}
                 </div>,
 
               duration:
-              <div style={{
-                fontSize: '14px',
-                color: 'var(--mac-text-primary)',
-                margin: 0
-              }}>
+              <div className="admin-service-duration">
                   {service.duration_minutes ? `${service.duration_minutes} мин` : '—'}
                 </div>,
 
               doctor:
-              <div style={{
-                fontSize: '14px',
-                color: 'var(--mac-text-primary)',
-                margin: 0
-              }}>
+              <div className="admin-service-doctor">
                   {doctor ? doctor.user?.full_name || `Врач #${doctor.id}` : '—'}
                 </div>,
 
@@ -747,24 +638,15 @@ const ServiceCatalog = () => {
                 </Badge>,
 
               actions:
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="admin-form-row-gap-8">
                   <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   aria-label={`View change history for ${service.name}`}
                   onClick={() => setShowHistory({ serviceId: service.id, serviceName: service.name })}
-                  style={{
-                    padding: '6px',
-                    minWidth: 'auto',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
+                  className="admin-icon-square-btn"
                   title="История изменений">
-
                     <History aria-hidden="true" size={14} />
                   </Button>
                   <Button
@@ -773,17 +655,8 @@ const ServiceCatalog = () => {
                   variant="outline"
                   aria-label={`Edit service ${service.name}`}
                   onClick={() => setEditingService(service)}
-                  style={{
-                    padding: '6px',
-                    minWidth: 'auto',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
+                  className="admin-icon-square-btn"
                   title="Редактировать">
-
                     <Edit aria-hidden="true" size={14} />
                   </Button>
                   <Button
@@ -792,19 +665,8 @@ const ServiceCatalog = () => {
                   variant="outline"
                   aria-label={`Delete service ${service.name}`}
                   onClick={() => handleDeleteService(service.id)}
-                  style={{
-                    padding: '6px',
-                    minWidth: 'auto',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--mac-error)',
-                    borderColor: 'var(--mac-error)'
-                  }}
+                  className="admin-icon-square-btn-error"
                   title="Удалить">
-
                     <Trash2 aria-hidden="true" size={14} />
                   </Button>
                 </div>
@@ -820,7 +682,7 @@ const ServiceCatalog = () => {
                 'Добавьте первую услугу в справочник'}
                 action={
                 <Button onClick={() => setShowAddForm(true)}>
-                      <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                      <Plus className="admin-icon-16-mr-8" />
                       Добавить услугу
                     </Button>
                 } />
@@ -847,39 +709,15 @@ const ServiceCatalog = () => {
 
       {/* История изменений */}
       {showHistory && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
-            width: '100%',
-            maxWidth: '900px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            position: 'relative'
-          }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-body-catalog">
             <Button
               type="button"
               variant="outline"
               title="Close service history"
               aria-label="Close service history"
               onClick={() => setShowHistory(null)}
-              style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                zIndex: 1001,
-                backgroundColor: 'var(--mac-bg-primary)'
-              }}
+              className="admin-modal-close-btn-catalog"
             >
               <X aria-hidden="true" size={16} />
             </Button>
@@ -893,25 +731,8 @@ const ServiceCatalog = () => {
 
       {/* Batch редактирование */}
       {showBatchEdit && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
-            width: '100%',
-            maxWidth: '700px',
-            maxHeight: '90vh',
-            overflow: 'auto'
-          }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-body-catalog-700">
             <ServiceBatchEdit
               selectedServices={services.filter(s => selectedServiceIds.has(s.id))}
               categories={categories}
@@ -1103,24 +924,13 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
 
   return (
-    <MacOSCard variant="default" style={{ padding: '24px' }}>
-      <h3 style={{
-        fontSize: '18px',
-        fontWeight: '600',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 20px 0'
-      }}>
+    <MacOSCard variant="default" className="admin-p-24">
+      <h3 className="admin-h3-18-600-primary-mb-20">
         {service ? 'Редактирование услуги' : 'Добавление услуги'}
       </h3>
 
       {/* Tab Navigation */}
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        marginBottom: '20px',
-        borderBottom: '1px solid var(--mac-border)',
-        paddingBottom: '0'
-      }}>
+      <div className="admin-tab-bar-catalog">
         {tabs.map((tab) => {
           const TabIcon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -1129,19 +939,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
+              className="admin-tab-btn-catalog"
               style={{
-                padding: '10px 16px',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
-                color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '14px',
-                fontWeight: isActive ? '600' : '500',
-                transition: 'all 0.2s ease'
+                '--admin-tab-border': isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
+                '--admin-tab-color': isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                '--admin-tab-weight': isActive ? '600' : '500'
               }}>
 
               <TabIcon size={16} />
@@ -1151,23 +953,13 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         })}
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <form onSubmit={handleSubmit} className="admin-flex-col-16">
 
         {/* TAB: Основное */}
         {activeTab === 'basic' &&
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '16px'
-        }}>
+        <div className="admin-grid-auto-250-12">
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-label-14-500-primary-mb-8">
                 Название услуги *
               </label>
               <Input
@@ -1175,17 +967,10 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
               required />
-
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-label-14-500-primary-mb-8">
                 Код услуги (K01, D02...)
               </label>
               <Input
@@ -1196,33 +981,33 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               maxLength={3} />
 
               {formData.code && !isValidServiceCode(formData.code) &&
-            <div style={{ fontSize: '12px', color: 'var(--mac-warning)', marginTop: '4px' }}>
+            <div className="admin-hint-12-warning-mt-4">
                   Формат: 1 буква + 2 цифры
                 </div>
             }
               {codeWarning &&
-            <div style={{ fontSize: '12px', color: 'var(--mac-error)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="admin-hint-12-error-mt-4-flex">
                   <AlertCircle size={14} />
                   {codeWarning}
                 </div>
             }
               {checkingDuplicates && !codeWarning &&
-            <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
+            <div className="admin-hint-12-tertiary-mt-4">
                   Проверка...
                 </div>
             }
               {derivedCategoryCode &&
-            <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
+            <div className="admin-hint-12-secondary-mt-4">
                   Префикс кода: {derivedCategoryCode}
                 </div>
             }
               {selectedGroupLabel && !codePrefixMismatch &&
-            <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
+            <div className="admin-hint-12-secondary-mt-4">
                   Ожидаемый префикс для {selectedGroupLabel}: {expectedPrefixLabel}
                 </div>
             }
               {codePrefixMismatch &&
-            <div style={{ fontSize: '12px', color: 'var(--mac-warning)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="admin-hint-12-warning-mt-4-flex">
                   <AlertCircle size={14} />
                   {selectedGroupLabel
                     ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}".`
@@ -1232,13 +1017,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-label-14-500-primary-mb-8">
                 Категория *
               </label>
               <Select
@@ -1251,27 +1030,20 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 label: `${category.name_ru} (${category.specialty})`
               }))]
               } />
-
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-label-14-500-primary-mb-8">
                 Цена
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="admin-form-row-gap-8">
                 <Input
                 type="number"
                 value={formData.price}
                 onChange={(e) => handleChange('price', parseFloat(e.target.value) || '')}
                 min="0"
                 step="0.01"
-                style={{ flex: 1 }} />
+                className="admin-input-flex-1" />
 
                 <Select
                 value={formData.currency}
@@ -1280,19 +1052,12 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 { value: 'UZS', label: 'UZS' },
                 { value: 'USD', label: 'USD' }]
                 }
-                style={{ minWidth: '80px' }} />
-
+                className="admin-input-min-w-80" />
               </div>
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-label-14-500-primary-mb-8">
                 Длительность (мин)
               </label>
               <Input
@@ -1301,17 +1066,10 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               onChange={(e) => handleChange('duration_minutes', parseInt(e.target.value) || 30)}
               min="5"
               step="5" />
-
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-label-14-500-primary-mb-8">
                 Врач (опционально)
               </label>
               <Select
@@ -1324,34 +1082,22 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 label: `${doctor.user?.full_name || `Врач #${doctor.id}`} (${doctor.specialty})`
               }))]
               } />
-
             </div>
           </div>
         }
 
         {/* TAB: Очередь */}
         {activeTab === 'queue' &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-            padding: '12px 16px',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderRadius: '8px',
-            marginBottom: '8px'
-          }}>
-              <p style={{ margin: 0, fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+        <div className="admin-flex-col-16">
+            <div className="admin-info-banner-catalog">
+              <p className="admin-p-14-secondary-m0">
                 Выберите вкладку регистратуры, на которой будет отображаться эта услуга.
                 Это определяет, в какую очередь попадёт пациент.
               </p>
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-label-14-500-primary-mb-8">
                 Вкладка регистратуры
               </label>
               <Select
@@ -1366,16 +1112,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 label: profile.title_ru || profile.title
               }))]
               } />
-
             </div>
 
             {formData.queue_tag &&
-          <div style={{
-            padding: '12px 16px',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            borderRadius: '8px'
-          }}>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--mac-success)' }}>
+          <div className="admin-success-banner-catalog">
+                <p className="admin-p-14-success-m0">
                   ✓ Услуга будет отображаться на вкладке с тегом: <strong>{formData.queue_tag}</strong>
                 </p>
               </div>
@@ -1385,18 +1126,13 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
         {/* TAB: Опции */}
         {activeTab === 'options' &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px'
-          }}>
+        <div className="admin-flex-col-16">
+            <div className="admin-grid-auto-200-12">
               <Checkbox
               id="active"
               checked={formData.active}
               onChange={(checked) => handleChange('active', checked)}
               label="Услуга активна" />
-
 
               <Checkbox
               id="requires_doctor"
@@ -1404,13 +1140,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               onChange={(checked) => handleChange('requires_doctor', checked)}
               label="Требует врача" />
 
-
               <Checkbox
               id="is_consultation"
               checked={formData.is_consultation}
               onChange={(checked) => handleChange('is_consultation', checked)}
               label="Это консультация" />
-
 
               <Checkbox
               id="allow_doctor_price_override"
@@ -1420,16 +1154,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             </div>
 
-            <div style={{
-            backgroundColor: 'var(--mac-bg-secondary)',
-            padding: '16px',
-            borderRadius: '8px',
-            marginTop: '8px'
-          }}>
-              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+            <div className="admin-bg-secondary-box-catalog">
+              <h5 className="admin-h5-14-600-primary-mb-8">
                 Подсказки:
               </h5>
-              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+              <ul className="admin-ul-13-secondary-pl-20">
                 <li><strong>Требует врача</strong> — для ЭхоКГ, сложных процедур</li>
                 <li><strong>Консультация</strong> — участвует в расчёте льгот и повторных визитов</li>
                 <li><strong>Врач может изменить цену</strong> — для индивидуальных случаев</li>
@@ -1439,26 +1168,19 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         }
 
         {/* Кнопки */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '16px',
-          paddingTop: '16px',
-          borderTop: '1px solid var(--mac-border)'
-        }}>
-          <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+        <div className="admin-form-actions-catalog">
+          <div className="admin-progress-indicator-catalog">
             {activeTab === 'basic' && '1 / 3'}
             {activeTab === 'queue' && '2 / 3'}
             {activeTab === 'options' && '3 / 3'}
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="admin-form-row-gap-12">
             <Button type="button" variant="outline" onClick={onCancel}>
-              <X size={16} style={{ marginRight: '8px' }} />
+              <X size={16} className="admin-mr-8" />
               Отменить
             </Button>
             <Button type="submit">
-              <Save size={16} style={{ marginRight: '8px' }} />
+              <Save size={16} className="admin-mr-8" />
               Сохранить
             </Button>
           </div>
@@ -1467,25 +1189,8 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
       {/* ✅ PREVIEW: Changes preview modal */}
       {showPreview && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-          padding: '20px'
-        }}>
-          <div style={{
-            width: '100%',
-            maxWidth: '800px',
-            maxHeight: '90vh',
-            overflow: 'auto'
-          }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-body-catalog-800">
             <ServiceChangesPreview
               oldService={service}
               newService={formData}

@@ -373,17 +373,14 @@ const UserManagement = () => {
     render: (_, user) =>
     <Box display="flex" alignItems="center" gap="12px">
           {/* Placeholder Avatar - can be replaced with MacOSAvatar if available */}
-          <div style={{
-        width: '32px', height: '32px', borderRadius: '50%', background: '#007AFF',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
-      }}>
+          <div className="admin-w-32-h-32-radius-50pct-bg-007AFF-d-flex-ai-center-jc-center-white">
             <User size={16} />
           </div>
           <Box>
-            <Typography style={{ fontWeight: 500, fontSize: '13px' }}>
+            <Typography className="admin-fw-500-fs-13">
               {user.full_name || user.username}
             </Typography>
-            <Typography style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+            <Typography className="admin-fs-12-secondary">
               {user.username}
             </Typography>
           </Box>
@@ -402,12 +399,12 @@ const UserManagement = () => {
   {
     key: 'email',
     title: 'Email',
-    render: (email) => <span style={{ fontSize: '13px' }}>{email || '-'}</span>
+    render: (email) => <span className="admin-fs-13-1">{email || '-'}</span>
   },
   {
     key: 'phone',
     title: 'Телефон',
-    render: (phone) => <span style={{ fontSize: '13px' }}>{phone || '-'}</span>
+    render: (phone) => <span className="admin-fs-13">{phone || '-'}</span>
   },
   {
     key: 'status',
@@ -422,7 +419,7 @@ const UserManagement = () => {
     key: 'last_login',
     title: 'Последний вход',
     render: (last_login) =>
-    <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+    <span className="admin-fs-13-secondary">
           {last_login ? new Date(last_login).toLocaleDateString() : '-'}
         </span>
 
@@ -431,7 +428,7 @@ const UserManagement = () => {
     key: 'actions',
     title: '',
     render: (_, user) =>
-    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+    <div className="admin-d-flex-jc-end">
           <Button
         data-user-actions-trigger="true"
         aria-label={`Действия: ${user.full_name || user.username}`}
@@ -443,7 +440,7 @@ const UserManagement = () => {
         }}
         variant="ghost"
         size="sm"
-        style={{ width: '32px', height: '32px', padding: 0 }}>
+        className="admin-w-32-h-32-p-0">
         
             <MoreVertical size={16} />
           </Button>
@@ -453,10 +450,10 @@ const UserManagement = () => {
 
 
   return (
-    <Box style={{ padding: '24px' }}>
+    <Box className="admin-p-24">
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" style={{ marginBottom: '24px' }}>
-        <Typography variant="h1" style={{ fontSize: '24px', fontWeight: 600 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" className="admin-mb-24">
+        <Typography variant="h1" className="admin-fs-24-fw-600">
           Управление пользователями
         </Typography>
         <Button
@@ -470,30 +467,30 @@ const UserManagement = () => {
 
       {/* Alerts */}
       {error &&
-      <Alert variant="error" title="Ошибка" onClose={() => setError('')} style={{ marginBottom: '16px' }}>
+      <Alert variant="error" title="Ошибка" onClose={() => setError('')} className="admin-mb-16">
           {error}
         </Alert>
       }
       {success &&
-      <Alert variant="success" title="Успешно" onClose={() => setSuccess('')} style={{ marginBottom: '16px' }}>
+      <Alert variant="success" title="Успешно" onClose={() => setSuccess('')} className="admin-mb-16">
           {success}
         </Alert>
       }
 
       {/* Filters */}
-      <MacOSCard style={{ marginBottom: '24px', padding: '16px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end' }}>
+      <MacOSCard className="admin-mb-24-p-16">
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-ai-end">
 
           {/* Search */}
-          <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>Поиск</label>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+          <div className="admin-flex-1">
+            <label className="admin-d-block-mb-6-fs-13-fw-500">Поиск</label>
+            <div className="admin-pos-relative">
+              <Search size={16} className="admin-pos-absolute-left-10-top-50pct-tf-translateY-50-888" />
               <Input
                 placeholder="Поиск пользователей..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ paddingLeft: '32px', width: '100%' }} />
+                className="admin-pl-32-w-100pct" />
               
             </div>
           </div>
@@ -507,7 +504,7 @@ const UserManagement = () => {
               options={roleOptions}
               placeholder="Все роли"
               size="large"
-              style={{ width: '100%' }} />
+              className="admin-w-full" />
 
           </div>
 
@@ -520,18 +517,18 @@ const UserManagement = () => {
               options={statusOptions}
               placeholder="Все статусы"
               size="large"
-              style={{ width: '100%' }} />
+              className="admin-w-full" />
 
           </div>
 
           {/* Refresh Button */}
           <div>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, visibility: 'hidden' }}>Действие</label>
+            <label className="admin-d-block-mb-6-fs-13-fw-500-vis-hidden">Действие</label>
             <Button
               variant="secondary"
               onClick={loadUsers}
               startIcon={<RefreshCw size={16} />}
-              style={{ width: '100%', justifyContent: 'center' }}
+              className="admin-w-100pct-jc-center"
               disabled={loading}>
               Обновить
             </Button>
@@ -555,20 +552,7 @@ const UserManagement = () => {
         ref={actionsMenuRef}
         role="menu"
         aria-label="Действия пользователя"
-        style={{
-          position: 'fixed',
-          top: actionsMenuPosition.top,
-          left: actionsMenuPosition.left,
-          zIndex: 2000,
-          width: '208px',
-          padding: '6px',
-          borderRadius: 'var(--mac-radius-md)',
-          border: '1px solid var(--mac-border)',
-          background: 'var(--mac-bg-primary)',
-          boxShadow: 'var(--mac-shadow-lg)',
-          display: 'grid',
-          gap: '2px'
-        }}>
+        className="admin-pos-fixed-z-2000-w-208-p-6-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo-bg-bg-primary-bsh-var-mac-shadow-lg-d-grid-gap-2-top-dyn-left-dyn" style={{ '--admin-top0': actionsMenuPosition.top, '--admin-left1': actionsMenuPosition.left }}>
 
         <Button
           type="button"
@@ -590,14 +574,14 @@ const UserManagement = () => {
           onClick={handleToggleStatusFromActionsMenu}>
           {actionsMenuUser.is_active ? 'Деактивировать' : 'Активировать'}
         </Button>
-        <div role="separator" style={{ height: '1px', background: 'var(--mac-border)', margin: '4px 0' }} />
+        <div role="separator" className="admin-h-1-bg-var-mac-border-m-4px-0" />
         <Button
           type="button"
           role="menuitem"
           variant="ghost"
           size="sm"
           startIcon={<Trash2 size={16} />}
-          style={{ ...actionMenuItemStyle, color: 'var(--mac-error)' }}
+          className="admin-w-100pct-d-flex-ai-center-gap-10-p-9px-10px-bd-none-radius-var-mac-radius-sm-bg-transparent-primary-font-inherit-fs-13-ta-left-cur-pointer-error"
           onClick={handleDeleteFromActionsMenu}>
           Удалить
         </Button>
@@ -626,7 +610,7 @@ const UserManagement = () => {
         }
         size="sm">
         
-        <div style={{ padding: '0 0 24px 0' }}>
+        <div className="admin-p-0-0-24px-0">
           {deleteDialogMode === 'confirm' ? (
             <Typography>
               Вы уверены, что хотите удалить пользователя <b>{selectedUser?.username}</b>?
@@ -642,7 +626,7 @@ const UserManagement = () => {
             </Typography>
           )}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <div className="admin-d-flex-jc-end-gap-8">
           {deleteDialogMode === 'confirm' ? (
             <>
               <Button variant="secondary" onClick={closeDeleteDialog}>

@@ -145,15 +145,8 @@ const UserModal = ({
 
   // Error message component
   const ErrorMessage = ({ message }) => (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-      marginTop: '4px',
-      fontSize: 'var(--mac-font-size-xs, 12px)',
-      color: 'var(--mac-error, #FF3B30)'
-    }}>
-      <AlertCircle style={{ width: '12px', height: '12px' }} />
+    <div className="admin-field-error-xs">
+      <AlertCircle className="admin-icon-12" />
       {message}
     </div>
   );
@@ -166,29 +159,13 @@ const UserModal = ({
 
   // Form field wrapper with icon
   const FormField = ({ label, required, icon: Icon, error, children }) => (
-    <div style={{ marginBottom: '16px' }}>
-      <label style={{
-        display: 'block',
-        marginBottom: '6px',
-        fontSize: 'var(--mac-font-size-sm, 13px)',
-        fontWeight: '500',
-        color: 'var(--mac-text-primary, #1d1d1f)'
-      }}>
-        {label} {required && <span style={{ color: 'var(--mac-error, #FF3B30)' }}>*</span>}
+    <div className="admin-mb-16">
+      <label className="admin-usermodal-label">
+        {label} {required && <span className="admin-required-asterisk">*</span>}
       </label>
-      <div style={{ position: 'relative' }}>
+      <div className="admin-pos-relative">
         {Icon && (
-          <Icon style={{
-            position: 'absolute',
-            left: '12px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: '16px',
-            height: '16px',
-            color: 'var(--mac-text-tertiary, #86868b)',
-            zIndex: 1,
-            pointerEvents: 'none'
-          }} />
+          <Icon className="admin-usermodal-field-icon" />
         )}
         {children}
       </div>
@@ -228,7 +205,7 @@ const UserModal = ({
             onChange={(e) => handleChange('username', e.target.value)}
             placeholder="Введите имя пользователя"
             error={!!errors.username}
-            style={{ paddingLeft: '40px' }}
+            className="admin-input-pl-40"
           />
         </FormField>
 
@@ -255,7 +232,7 @@ const UserModal = ({
             onChange={(e) => handleChange('email', e.target.value)}
             placeholder="Введите email"
             error={!!errors.email}
-            style={{ paddingLeft: '40px' }}
+            className="admin-input-pl-40"
           />
         </FormField>
 
@@ -266,19 +243,13 @@ const UserModal = ({
             onChange={(value) => handleChange('role', value)}
             options={roleOptions}
             size="large"
-            style={{ paddingLeft: '40px' }}
+            className="admin-input-pl-40"
           />
         </FormField>
 
         {/* Status */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            fontSize: 'var(--mac-font-size-sm, 13px)',
-            fontWeight: '500',
-            color: 'var(--mac-text-primary, #1d1d1f)'
-          }}>
+        <div className="admin-mb-16">
+          <label className="admin-usermodal-label-mb-8">
             Статус
           </label>
           <Checkbox
@@ -301,7 +272,7 @@ const UserModal = ({
             onChange={(e) => handleChange('password', e.target.value)}
             placeholder="Введите пароль"
             error={!!errors.password}
-            style={{ paddingLeft: '40px' }}
+            className="admin-input-pl-40"
           />
         </FormField>
 
@@ -319,20 +290,13 @@ const UserModal = ({
               onChange={(e) => handleChange('confirmPassword', e.target.value)}
               placeholder="Подтвердите пароль"
               error={!!errors.confirmPassword}
-              style={{ paddingLeft: '40px' }}
+              className="admin-input-pl-40"
             />
           </FormField>
         )}
 
         {/* Action Buttons */}
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          justifyContent: 'flex-end',
-          marginTop: '24px',
-          paddingTop: '16px',
-          borderTop: '1px solid var(--mac-border, rgba(0, 0, 0, 0.1))'
-        }}>
+        <div className="admin-usermodal-actions">
           <Button
             type="button"
             variant="secondary"
@@ -349,20 +313,12 @@ const UserModal = ({
           >
             {isSubmitting ? (
               <>
-                <div style={{
-                  width: '14px',
-                  height: '14px',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  borderTopColor: 'white',
-                  borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                  marginRight: '8px'
-                }} />
+                <div className="admin-spinner-14-white" />
                 Сохранение...
               </>
             ) : (
               <>
-                <Save style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                <Save className="admin-icon-14-mr-6" />
                 {user ? 'Сохранить изменения' : 'Создать пользователя'}
               </>
             )}

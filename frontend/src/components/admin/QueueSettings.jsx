@@ -246,24 +246,11 @@ const QueueSettings = () => {
 
   if (loading) {
     return (
-      <div style={{
-        padding: 0,
-        backgroundColor: 'var(--mac-bg-primary)',
-        minHeight: '100vh'
-      }}>
-        <MacOSCard style={{ padding: 0, textAlign: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-            <RefreshCw style={{
-              width: '32px',
-              height: '32px',
-              color: 'var(--mac-accent-blue)',
-              animation: 'spin 1s linear infinite'
-            }} />
-            <span style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              color: 'var(--mac-text-secondary)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}>
+      <div className="admin-outer-container-p-0">
+        <MacOSCard className="admin-card-p-0-text-center">
+          <div className="admin-flex-center-justify admin-gap-12">
+            <RefreshCw className="admin-icon-32-blue-spin" />
+            <span className="admin-span-lg-secondary-med">
               Загрузка настроек очередей...
             </span>
           </div>
@@ -273,78 +260,39 @@ const QueueSettings = () => {
   }
 
   return (
-    <div style={{
-      padding: 0,
-      backgroundColor: 'var(--mac-bg-primary)',
-      minHeight: '100vh'
-    }}>
-      <MacOSCard style={{ padding: '24px' }}>
+    <div className="admin-outer-container-p-0">
+      <MacOSCard className="admin-p-24">
         {/* Заголовок */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '24px',
-          paddingBottom: '24px',
-          borderBottom: '1px solid var(--mac-border)'
-        }}>
+        <div className="admin-header-flex-between-pb-24-border-bottom">
           <div>
-            <h2 style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: '0 0 8px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
-              <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+            <h2 className="admin-h1-2xl-semi-primary-mb-8-flex">
+              <Clock className="admin-icon-32-blue" />
               Настройки очередей
             </h2>
-            <p style={{
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)',
-              margin: 0
-            }}>
+            <p className="admin-p-sm-secondary-m0">
               Управление онлайн-очередью и стартовыми номерами
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="admin-flex-gap-12">
             <Button
               variant="outline"
               onClick={loadSettings}
               disabled={loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px'
-              }}>
+              className="admin-action-btn">
               
-              <RefreshCw style={{ width: '16px', height: '16px' }} />
+              <RefreshCw className="admin-icon-16" />
               Обновить
             </Button>
             <Button
               onClick={saveSettings}
               disabled={saving}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none',
-                padding: '8px 16px'
-              }}>
+              className="admin-action-btn-primary">
               
               {saving ?
-              <RefreshCw style={{
-                width: '16px',
-                height: '16px',
-                animation: 'spin 1s linear infinite'
-              }} /> :
+              <RefreshCw className="admin-icon-16-spin" /> :
 
-              <Save style={{ width: '16px', height: '16px' }} />
+              <Save className="admin-icon-16" />
               }
               Сохранить
             </Button>
@@ -353,23 +301,23 @@ const QueueSettings = () => {
 
         {/* Сообщения */}
         {message.text &&
-        <MacOSCard style={{
-          padding: '16px',
-          marginBottom: '24px',
-          backgroundColor: message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
-          border: message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <MacOSCard
+          className="admin-dynamic-banner-p-16 admin-mb-24"
+          style={{
+            '--admin-banner-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
+            '--admin-banner-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
+          }}
+        >
+            <div className="admin-flex-center-8">
               {message.type === 'success' ?
-            <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} /> :
+            <CheckCircle className="admin-icon-20-success" /> :
 
-            <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+            <AlertCircle className="admin-icon-20-error" />
             }
-              <span style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}>
+              <span
+                className="admin-span-sm-med-dynamic-color"
+                style={{ '--admin-span-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)' }}
+              >
                 {message.text}
               </span>
             </div>
@@ -377,31 +325,24 @@ const QueueSettings = () => {
         }
 
         {/* ⭐ Dev Mode Toggle */}
-        <MacOSCard style={{
-          padding: '16px 20px',
-          marginBottom: '24px',
-          backgroundColor: settings.dev_mode_enabled ? 'rgba(239, 68, 68, 0.1)' : 'var(--mac-bg-secondary)',
-          border: settings.dev_mode_enabled ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--mac-border)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Zap style={{
-                width: '24px',
-                height: '24px',
-                color: settings.dev_mode_enabled ? '#EF4444' : 'var(--mac-text-tertiary)'
-              }} />
+        <MacOSCard
+          className="admin-dev-mode-card"
+          style={{
+            '--admin-card-bg': settings.dev_mode_enabled ? 'rgba(239, 68, 68, 0.1)' : 'var(--mac-bg-secondary)',
+            '--admin-card-border': settings.dev_mode_enabled ? 'rgba(239, 68, 68, 0.3)' : 'var(--mac-border)'
+          }}
+        >
+          <div className="admin-flex-between">
+            <div className="admin-flex-center-12">
+              <Zap
+                className="admin-icon-24-dynamic"
+                style={{ '--admin-icon-color': settings.dev_mode_enabled ? '#EF4444' : 'var(--mac-text-tertiary)' }}
+              />
               <div>
-                <div style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-primary)'
-                }}>
+                <div className="admin-span-sm-semi-primary">
                   Режим разработки (Dev Mode)
                 </div>
-                <div style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-secondary)'
-                }}>
+                <div className="admin-text-xs-secondary">
                   {settings.dev_mode_enabled ?
                   '⚠️ Временные ограничения QR отключены!' :
                   'Отключает проверку времени для QR-регистрации'
@@ -412,28 +353,20 @@ const QueueSettings = () => {
             <button
               onClick={() => handleSettingChange('dev_mode_enabled', !settings.dev_mode_enabled)}
               aria-label={settings.dev_mode_enabled ? 'Отключить режим разработки очереди' : 'Включить режим разработки очереди'}
+              className="admin-dev-mode-btn"
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                backgroundColor: settings.dev_mode_enabled ? '#EF4444' : 'var(--mac-bg-tertiary)',
-                color: settings.dev_mode_enabled ? 'white' : 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
+                '--admin-btn-bg': settings.dev_mode_enabled ? '#EF4444' : 'var(--mac-bg-tertiary)',
+                '--admin-btn-color': settings.dev_mode_enabled ? 'white' : 'var(--mac-text-primary)'
               }}>
               
               {settings.dev_mode_enabled ?
               <>
-                  <ToggleRight style={{ width: '18px', height: '18px' }} />
+                  <ToggleRight className="admin-icon-18" />
                   Включён
                 </> :
 
               <>
-                  <ToggleLeft style={{ width: '18px', height: '18px' }} />
+                  <ToggleLeft className="admin-icon-18" />
                   Выключен
                 </>
               }
@@ -441,40 +374,19 @@ const QueueSettings = () => {
           </div>
         </MacOSCard>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px',
-          marginBottom: '24px'
-        }}>
+        <div className="admin-grid-auto-400-24-mb-24">
 
           {/* Общие настройки */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <Settings style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+          <MacOSCard className="admin-p-24">
+            <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
+              <Settings className="admin-icon-20-blue" />
               Общие настройки
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="admin-flex-col-16">
               <div>
-                <label style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Clock style={{ width: '16px', height: '16px' }} />
+                <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
+                  <Clock className="admin-icon-16" />
                   Час начала онлайн-очереди
                 </label>
                 <Select
@@ -484,112 +396,63 @@ const QueueSettings = () => {
                     value: i,
                     label: `${String(i).padStart(2, '0')}:00`
                   }))}
-                  style={{ width: '100%' }}></Select>
+                  className="admin-w-full"></Select>
                 
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-tertiary)',
-                  marginTop: '4px',
-                  margin: '4px 0 0 0'
-                }}>
+                <p className="admin-p-xs-tertiary-mt-4">
                   С этого времени доступна онлайн-запись через QR-код
                 </p>
               </div>
 
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px'
-                }}>
+                <label className="admin-form-label">
                   Время автозакрытия
                 </label>
                 <Input
                   type="time"
                   value={settings.auto_close_time}
                   onChange={(e) => handleSettingChange('auto_close_time', e.target.value)}
-                  style={{ width: '100%' }} />
+                  className="admin-w-full" />
                 
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-tertiary)',
-                  marginTop: '4px',
-                  margin: '4px 0 0 0'
-                }}>
+                <p className="admin-p-xs-tertiary-mt-4">
                   Автоматическое закрытие онлайн-записи (опционально)
                 </p>
               </div>
 
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px'
-                }}>
+                <label className="admin-form-label">
                   Часовой пояс
                 </label>
                 <Select
                   value={settings.timezone}
                   onChange={(value) => handleSettingChange('timezone', value)}
                   options={TIMEZONE_OPTIONS}
-                  style={{ width: '100%' }}></Select>
+                  className="admin-w-full"></Select>
                 
               </div>
             </div>
           </MacOSCard>
 
           {/* Тестирование */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <TestTube style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
+          <MacOSCard className="admin-p-24">
+            <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
+              <TestTube className="admin-icon-20-success" />
               Тестирование очереди
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0
-              }}>
+            <div className="admin-flex-col-16">
+              <p className="admin-p-sm-secondary-m0">
                 Протестируйте генерацию QR-кода для каждой специальности
               </p>
 
               {specialties.map((specialty) =>
-              <div key={specialty.key} style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-md)',
-                backgroundColor: 'var(--mac-bg-secondary)'
-              }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <specialty.icon style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+              <div key={specialty.key} className="admin-specialty-test-row">
+                  <div className="admin-flex-center-12">
+                    <specialty.icon className="admin-icon-20-blue" />
                     <div>
-                      <div style={{
-                      fontSize: 'var(--mac-font-size-sm)',
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      color: 'var(--mac-text-primary)'
-                    }}>
+                      <div className="admin-text-sm-med-primary">
                         {specialty.name}
                       </div>
-                      <div style={{
-                      fontSize: 'var(--mac-font-size-xs)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>
+                      <div className="admin-text-xs-secondary">
                         {specialty.description}
                       </div>
                     </div>
@@ -600,51 +463,24 @@ const QueueSettings = () => {
                   disabled={testing}
                   title={`Test queue generation for ${specialty.name}`}
                   aria-label={`Test queue generation for ${specialty.name}`}
-                  style={{
-                    padding: '6px 12px',
-                    minWidth: 'auto'
-                  }}>
+                  className="admin-btn-test-p-6-12-min-w-auto">
                   
                     {testing ?
-                  <RefreshCw style={{
-                    width: '14px',
-                    height: '14px',
-                    animation: 'spin 1s linear infinite'
-                  }} /> :
+                  <RefreshCw className="admin-icon-14-spin" /> :
 
-                  <Play style={{ width: '14px', height: '14px' }} />
+                  <Play className="admin-icon-14" />
                   }
                   </Button>
                 </div>
               )}
 
               {testResult &&
-              <MacOSCard style={{
-                padding: '16px',
-                backgroundColor: 'var(--mac-success-bg)',
-                border: '1px solid var(--mac-success-border)'
-              }}>
-                  <h4 style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-success)',
-                  marginBottom: '8px'
-                }}>
+              <MacOSCard className="admin-card-success-p-16">
+                  <h4 className="admin-h4-med-success-mb-8">
                     Результат тестирования:
                   </h4>
-                  <div style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-success)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px'
-                }}>
-                    <div><strong>Токен:</strong> <code style={{
-                      backgroundColor: 'var(--mac-success-bg)',
-                      padding: '2px 4px',
-                      borderRadius: 'var(--mac-radius-sm)',
-                      fontSize: 'var(--mac-font-size-xs)'
-                    }}>{testResult.token?.slice(0, 8)}...</code></div>
+                  <div className="admin-div-xs-success-flex-col-4">
+                    <div><strong>Токен:</strong> <code className="admin-code-success-xs">{testResult.token?.slice(0, 8)}...</code></div>
                     <div><strong>Врач:</strong> {testResult.selected_doctor_name || '—'}</div>
                     <div><strong>Специальность:</strong> {testResult.doctor_specialty}</div>
                     <div><strong>Врач ID:</strong> {testResult.selected_doctor_id || testResult.doctor_id}</div>
@@ -653,12 +489,7 @@ const QueueSettings = () => {
                     <div><strong>Стартовый номер:</strong> {testResult.start_number}</div>
                     <div><strong>Лимит в день:</strong> {testResult.max_per_day}</div>
                     <div><strong>Кандидатов:</strong> {testResult.matched_doctors_count ?? 0}</div>
-                    <div><strong>QR URL:</strong> <code style={{
-                      backgroundColor: 'var(--mac-success-bg)',
-                      padding: '2px 4px',
-                      borderRadius: 'var(--mac-radius-sm)',
-                      fontSize: 'var(--mac-font-size-xs)'
-                    }}>{testResult.qr_url}</code></div>
+                    <div><strong>QR URL:</strong> <code className="admin-code-success-xs">{testResult.qr_url}</code></div>
                   </div>
                 </MacOSCard>
               }
@@ -667,39 +498,18 @@ const QueueSettings = () => {
         </div>
 
         {/* Настройки по специальностям */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '24px',
-          marginBottom: '24px'
-        }}>
+        <div className="admin-grid-auto-280-24-mb-24">
           {specialties.map((specialty) =>
-          <MacOSCard key={specialty.key} style={{ padding: '20px' }}>
-              <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-                <specialty.icon style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+          <MacOSCard key={specialty.key} className="admin-card-p-20">
+              <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
+                <specialty.icon className="admin-icon-20-blue" />
                 {specialty.name}
               </h3>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="admin-flex-col-16">
                 <div>
-                  <label style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                    <Hash style={{ width: '16px', height: '16px' }} />
+                  <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
+                    <Hash className="admin-icon-16" />
                     Стартовый номер
                 </label>
                   <Input
@@ -708,29 +518,16 @@ const QueueSettings = () => {
                   max="100"
                   value={getNumberSetting(settings.start_numbers, specialty.key, 1)}
                   onChange={(e) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
-                  style={{ width: '100%' }} />
+                  className="admin-w-full" />
                 
-                  <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-tertiary)',
-                  marginTop: '4px',
-                  margin: '4px 0 0 0'
-                }}>
+                  <p className="admin-p-xs-tertiary-mt-4">
                     С какого номера начинается онлайн-очередь
                   </p>
                 </div>
 
                 <div>
-                  <label style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                    <Users style={{ width: '16px', height: '16px' }} />
+                  <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
+                    <Users className="admin-icon-16" />
                     Лимит в день
                 </label>
                   <Input
@@ -739,39 +536,18 @@ const QueueSettings = () => {
                   max="100"
                   value={getNumberSetting(settings.max_per_day, specialty.key, 1)}
                   onChange={(e) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
-                  style={{ width: '100%' }} />
+                  className="admin-w-full" />
                 
-                  <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-tertiary)',
-                  marginTop: '4px',
-                  margin: '4px 0 0 0'
-                }}>
+                  <p className="admin-p-xs-tertiary-mt-4">
                     Максимум онлайн-записей в день
                   </p>
                 </div>
 
                 {/* Текущие настройки */}
-                <div style={{
-                paddingTop: '16px',
-                borderTop: '1px solid var(--mac-border)'
-              }}>
-                  <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: 'var(--mac-font-size-sm)'
-                }}>
-                    <span style={{ color: 'var(--mac-text-secondary)' }}>Диапазон номеров:</span>
-                    <div style={{
-                    backgroundColor: 'var(--mac-bg-secondary)',
-                    color: 'var(--mac-text-primary)',
-                    padding: '4px 8px',
-                    borderRadius: 'var(--mac-radius-full)',
-                    fontSize: 'var(--mac-font-size-xs)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    border: '1px solid var(--mac-border)'
-                  }}>
+                <div className="admin-section-divider-pt-16-border-top">
+                  <div className="admin-flex-between-sm">
+                    <span className="admin-text-secondary">Диапазон номеров:</span>
+                    <div className="admin-range-badge">
                       {getNumberSetting(settings.start_numbers, specialty.key, 1)} - {getNumberSetting(settings.start_numbers, specialty.key, 1) + getNumberSetting(settings.max_per_day, specialty.key, 1) - 1}
                     </div>
                   </div>
@@ -782,35 +558,17 @@ const QueueSettings = () => {
         </div>
 
         {/* Информационная панель */}
-        <MacOSCard style={{
-          padding: '24px',
-          backgroundColor: 'var(--mac-info-bg)',
-          border: '1px solid var(--mac-info-border)'
-        }}>
-          <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-info)',
-            marginBottom: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <QrCode style={{ width: '20px', height: '20px' }} />
+        <MacOSCard className="admin-card-info-p-24">
+          <h3 className="admin-h3-lg-semi-info-mb-12-flex">
+            <QrCode className="admin-icon-20" />
             Как работает онлайн-очередь
           </h3>
-          <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-info)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <p style={{ margin: 0 }}>• Пациенты сканируют QR-код с {settings.queue_start_hour}:00 до открытия приема</p>
-            <p style={{ margin: 0 }}>• Каждый телефон/Telegram может получить только один номер в день</p>
-            <p style={{ margin: 0 }}>• При повторном запросе возвращается тот же номер</p>
-            <p style={{ margin: 0 }}>• Кнопка &quot;Открыть прием&quot; в регистратуре закрывает онлайн-набор</p>
-            <p style={{ margin: 0 }}>• Стартовые номера позволяют избежать конфликтов между специалистами</p>
+          <div className="admin-div-sm-info-flex-col-8">
+            <p className="admin-m-0">• Пациенты сканируют QR-код с {settings.queue_start_hour}:00 до открытия приема</p>
+            <p className="admin-m-0">• Каждый телефон/Telegram может получить только один номер в день</p>
+            <p className="admin-m-0">• При повторном запросе возвращается тот же номер</p>
+            <p className="admin-m-0">• Кнопка &quot;Открыть прием&quot; в регистратуре закрывает онлайн-набор</p>
+            <p className="admin-m-0">• Стартовые номера позволяют избежать конфликтов между специалистами</p>
           </div>
         </MacOSCard>
       </MacOSCard>

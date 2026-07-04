@@ -262,32 +262,20 @@ const CloudPrintingManager = () => {
 
   const renderPrinterGrid = (list, emptyTitle) =>
     <>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '16px'
-      }}>
+      <div className="admin-grid-auto-300">
         {list.map((printer) =>
-          <MacOSCard key={`${printer.provider}-${printer.id}`} style={{ padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+          <MacOSCard key={`${printer.provider}-${printer.id}`} className="admin-p-16">
+            <div className="admin-flex-between-flex-start-mb-12">
               <div>
-                <h4 style={{
-                  margin: '0 0 4px 0',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-primary)'
-                }}>{printer.name}</h4>
-                <p style={{
-                  margin: 0,
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>{printer.description}</p>
+                <h4 className="admin-h4-semi-mb-4-primary">{printer.name}</h4>
+                <p className="admin-p-m0-sm-secondary">{printer.description}</p>
               </div>
               <Badge variant={getStatusBadgeVariant(printer.status)}>
                 {getStatusText(printer.status)}
               </Badge>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--mac-font-size-sm)' }}>
+            <div className="admin-data-list-sm">
               <div><strong>Провайдер:</strong> {printer.provider}</div>
               <div><strong>Местоположение:</strong> {printer.location || 'Не указано'}</div>
               <div><strong>ID:</strong> {printer.id}</div>
@@ -296,13 +284,13 @@ const CloudPrintingManager = () => {
               }
             </div>
 
-            <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+            <div className="admin-action-row-mt-16-gap-8">
               <Button
                 size="sm"
                 onClick={() => testPrinter(printer.provider, printer.id)}
                 disabled={printer.status !== 'online'}>
 
-                <TestTube size={16} style={{ marginRight: '4px' }} />
+                <TestTube size={16} className="admin-mr-4" />
                 Тест
               </Button>
               <Button
@@ -310,7 +298,7 @@ const CloudPrintingManager = () => {
                 variant="outline"
                 onClick={() => setSelectedPrinter(printer)}>
 
-                <Eye size={16} style={{ marginRight: '4px' }} />
+                <Eye size={16} className="admin-mr-4" />
                 Подробнее
               </Button>
             </div>
@@ -327,103 +315,48 @@ const CloudPrintingManager = () => {
     </>;
 
   const renderPrintersTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>Принтеры</h3>
+  <div className="admin-flex-col-24">
+      <div className="admin-flex-between">
+        <h3 className="admin-section-h3-m0">Принтеры</h3>
         <Button onClick={loadPrinters} disabled={loading}>
-          <RefreshCw size={16} style={{ marginRight: '8px' }} />
+          <RefreshCw size={16} className="admin-mr-8" />
           {loading ? 'Загрузка...' : 'Обновить'}
         </Button>
       </div>
 
         {statistics &&
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '16px',
-      marginBottom: '24px'
-    }}>
-          <MacOSCard style={{ padding: '24px' }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-accent)'
-        }}>{statistics.total_printers}</div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>Всего принтеров</div>
+    <div className="admin-grid-auto-200-mb-24-printing">
+          <MacOSCard className="admin-p-24">
+            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>{statistics.total_printers}</div>
+            <div className="admin-stat-label-sm-secondary-block">Всего принтеров</div>
           </MacOSCard>
-          <MacOSCard style={{ padding: '24px' }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-success)'
-        }}>{statistics.online_printers}</div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>В сети</div>
+          <MacOSCard className="admin-p-24">
+            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-success)' }}>{statistics.online_printers}</div>
+            <div className="admin-stat-label-sm-secondary-block">В сети</div>
           </MacOSCard>
-          <MacOSCard style={{ padding: '24px' }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-destructive)'
-        }}>{statistics.offline_printers}</div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>Не в сети</div>
+          <MacOSCard className="admin-p-24">
+            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-destructive)' }}>{statistics.offline_printers}</div>
+            <div className="admin-stat-label-sm-secondary-block">Не в сети</div>
           </MacOSCard>
-          <MacOSCard style={{ padding: '24px' }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-warning)'
-        }}>{statistics.providers_count}</div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>Провайдеров</div>
+          <MacOSCard className="admin-p-24">
+            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>{statistics.providers_count}</div>
+            <div className="admin-stat-label-sm-secondary-block">Провайдеров</div>
           </MacOSCard>
-          <MacOSCard style={{ padding: '24px' }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-accent)'
-        }}>{localPrinters.length}</div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>Локальных ОС-принтеров</div>
+          <MacOSCard className="admin-p-24">
+            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>{localPrinters.length}</div>
+            <div className="admin-stat-label-sm-secondary-block">Локальных ОС-принтеров</div>
           </MacOSCard>
         </div>
     }
 
-      <div style={{ display: 'grid', gap: '24px' }}>
-        <div style={{ display: 'grid', gap: '12px' }}>
-          <h4 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-md)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>Облачные принтеры</h4>
+      <div className="admin-grid-gap-24-only">
+        <div className="admin-grid-gap-12-only">
+          <h4 className="admin-h4-md-semi-primary-m0">Облачные принтеры</h4>
           {renderPrinterGrid(printers, 'Принтеры не найдены')}
         </div>
 
-        <div style={{ display: 'grid', gap: '12px' }}>
-          <h4 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-md)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>Локальные ОС-принтеры</h4>
+        <div className="admin-grid-gap-12-only">
+          <h4 className="admin-h4-md-semi-primary-m0">Локальные ОС-принтеры</h4>
           {renderPrinterGrid(localPrinters, 'Локальные принтеры не найдены')}
         </div>
       </div>
@@ -431,35 +364,16 @@ const CloudPrintingManager = () => {
 
 
   const renderPrintTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <h3 style={{
-      margin: 0,
-      color: 'var(--mac-text-primary)',
-      fontSize: 'var(--mac-font-size-lg)',
-      fontWeight: 'var(--mac-font-weight-semibold)'
-    }}>Печать документа</h3>
+  <div className="admin-flex-col-24">
+      <h3 className="admin-section-h3-m0">Печать документа</h3>
       
-      <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-      gap: '24px'
-    }}>
-        <MacOSCard style={{ padding: '24px' }}>
-          <h4 style={{
-          margin: '0 0 16px 0',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)'
-        }}>Настройки печати</h4>
+      <div className="admin-grid-auto-400-24">
+        <MacOSCard className="admin-p-24">
+          <h4 className="admin-h4-lg-semi-primary-mb-16">Настройки печати</h4>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="admin-flex-col-16">
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }} htmlFor="provider">Провайдер</label>
+              <label className="admin-label-block-sm-med-primary-mb-8" htmlFor="provider">Провайдер</label>
               <Select
               id="provider"
               value={printForm.provider_name}
@@ -477,13 +391,7 @@ const CloudPrintingManager = () => {
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }} htmlFor="printer">Принтер</label>
+              <label className="admin-label-block-sm-med-primary-mb-8" htmlFor="printer">Принтер</label>
               <Select
               id="printer"
               value={printForm.printer_id}
@@ -497,13 +405,7 @@ const CloudPrintingManager = () => {
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }} htmlFor="title">Название документа</label>
+              <label className="admin-label-block-sm-med-primary-mb-8" htmlFor="title">Название документа</label>
               <Input
               id="title"
               value={printForm.title}
@@ -513,13 +415,7 @@ const CloudPrintingManager = () => {
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }} htmlFor="format">Формат</label>
+              <label className="admin-label-block-sm-med-primary-mb-8" htmlFor="format">Формат</label>
               <Select
               id="format"
               value={printForm.format}
@@ -533,15 +429,9 @@ const CloudPrintingManager = () => {
             
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+            <div className="admin-grid-3col-16">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }} htmlFor="copies">Копии</label>
+                <label className="admin-label-block-sm-med-primary-mb-8" htmlFor="copies">Копии</label>
                 <Input
                 id="copies"
                 type="number"
@@ -551,61 +441,49 @@ const CloudPrintingManager = () => {
                 onChange={(e) => setPrintForm({ ...printForm, copies: parseInt(e.target.value) })} />
               
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="admin-flex-center-8">
                 <input
                 type="checkbox"
                 id="color"
                 aria-label="Enable color printing"
                 checked={printForm.color}
                 onChange={(e) => setPrintForm({ ...printForm, color: e.target.checked })}
-                style={{ margin: 0 }} />
+                className="admin-checkbox-m0" />
               
-                <label style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)',
-                margin: 0
-              }} htmlFor="color">Цветная</label>
+                <label className="admin-label-block-sm-primary" htmlFor="color">Цветная</label>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="admin-flex-center-8">
                 <input
                 type="checkbox"
                 id="duplex"
                 aria-label="Enable duplex printing"
                 checked={printForm.duplex}
                 onChange={(e) => setPrintForm({ ...printForm, duplex: e.target.checked })}
-                style={{ margin: 0 }} />
+                className="admin-checkbox-m0" />
               
-                <label style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)',
-                margin: 0
-              }} htmlFor="duplex">Двусторонняя</label>
+                <label className="admin-label-block-sm-primary" htmlFor="duplex">Двусторонняя</label>
               </div>
             </div>
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <h4 style={{
-          margin: '0 0 16px 0',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)'
-        }}>Содержимое документа</h4>
+        <MacOSCard className="admin-p-24">
+          <h4 className="admin-h4-lg-semi-primary-mb-16">Содержимое документа</h4>
           
           <Textarea
           value={printForm.content}
           onChange={(e) => setPrintForm({ ...printForm, content: e.target.value })}
           placeholder="Введите содержимое документа (HTML, текст или base64 для PDF)"
           rows={15}
-          style={{ width: '100%' }} />
+          className="admin-w-full" />
         
           
           <Button
           onClick={printDocument}
-          style={{ width: '100%', marginTop: '16px' }}
+          className="admin-btn-w-full-mt-16"
           disabled={!printForm.printer_id || !printForm.title || !printForm.content}>
           
-            <Printer size={16} style={{ marginRight: '8px' }} />
+            <Printer size={16} className="admin-mr-8" />
             Печать
           </Button>
         </MacOSCard>
@@ -614,36 +492,16 @@ const CloudPrintingManager = () => {
 
 
   const renderMedicalTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <h3 style={{
-      margin: 0,
-      color: 'var(--mac-text-primary)',
-      fontSize: 'var(--mac-font-size-lg)',
-      fontWeight: 'var(--mac-font-weight-semibold)'
-    }}>Печать медицинских документов</h3>
+  <div className="admin-flex-col-24">
+      <h3 className="admin-section-h3-m0">Печать медицинских документов</h3>
       
-      <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-      gap: '24px'
-    }}>
-        <MacOSCard style={{ padding: '24px' }}>
-          <h4 style={{
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          fontSize: 'var(--mac-font-size-md)',
-          color: 'var(--mac-text-primary)'
-        }}>Основные настройки</h4>
+      <div className="admin-grid-auto-400-24">
+        <MacOSCard className="admin-p-24">
+          <h4 className="admin-h4-md-semi-primary-mb-16">Основные настройки</h4>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="admin-flex-col-16">
             <div>
-              <label htmlFor="med-provider" style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>Провайдер</label>
+              <label htmlFor="med-provider" className="admin-label-block-sm-med-primary-mb-8">Провайдер</label>
               <Select
               id="med-provider"
               value={medicalForm.provider_name}
@@ -660,13 +518,7 @@ const CloudPrintingManager = () => {
             </div>
 
             <div>
-              <label htmlFor="med-printer" style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>Принтер</label>
+              <label htmlFor="med-printer" className="admin-label-block-sm-med-primary-mb-8">Принтер</label>
               <Select
               id="med-printer"
               value={medicalForm.printer_id}
@@ -679,13 +531,7 @@ const CloudPrintingManager = () => {
             </div>
 
             <div>
-              <label htmlFor="doc-type" style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>Тип документа</label>
+              <label htmlFor="doc-type" className="admin-label-block-sm-med-primary-mb-8">Тип документа</label>
               <Select
               id="doc-type"
               value={medicalForm.document_type}
@@ -699,21 +545,9 @@ const CloudPrintingManager = () => {
               size="large" />
             </div>
 
-            <h5 style={{
-            fontWeight: 'var(--mac-font-weight-medium)',
-            marginTop: '24px',
-            marginBottom: '16px',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-md)'
-          }}>Данные пациента</h5>
+            <h5 className="admin-h5-md-med-primary-mt-24-mb-16">Данные пациента</h5>
             <div>
-              <label htmlFor="patient-name" style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>ФИО пациента *</label>
+              <label htmlFor="patient-name" className="admin-label-block-sm-med-primary-mb-8">ФИО пациента *</label>
               <Input
               id="patient-name"
               value={medicalForm.patient_data.patient_name}
@@ -722,18 +556,11 @@ const CloudPrintingManager = () => {
                 patient_data: { ...medicalForm.patient_data, patient_name: e.target.value }
               })}
               placeholder="Введите ФИО пациента" />
-            
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+            <div className="admin-grid-2col-16">
               <div>
-                <label htmlFor="patient-age" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Возраст</label>
+                <label htmlFor="patient-age" className="admin-label-block-sm-med-primary-mb-8">Возраст</label>
                 <Input
                 id="patient-age"
                 value={medicalForm.patient_data.age}
@@ -742,16 +569,9 @@ const CloudPrintingManager = () => {
                   patient_data: { ...medicalForm.patient_data, age: e.target.value }
                 })}
                 placeholder="Возраст" />
-              
               </div>
               <div>
-                <label htmlFor="patient-phone" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Телефон</label>
+                <label htmlFor="patient-phone" className="admin-label-block-sm-med-primary-mb-8">Телефон</label>
                 <Input
                 id="patient-phone"
                 value={medicalForm.patient_data.phone}
@@ -760,31 +580,19 @@ const CloudPrintingManager = () => {
                   patient_data: { ...medicalForm.patient_data, phone: e.target.value }
                 })}
                 placeholder="+998901234567" />
-              
               </div>
             </div>
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <h4 style={{
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          fontSize: 'var(--mac-font-size-md)',
-          color: 'var(--mac-text-primary)'
-        }}>Данные шаблона</h4>
+        <MacOSCard className="admin-p-24">
+          <h4 className="admin-h4-md-semi-primary-mb-16">Данные шаблона</h4>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="admin-flex-col-16">
             {medicalForm.document_type === 'prescription' &&
           <>
                 <div>
-                  <label htmlFor="diagnosis" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Диагноз</label>
+                  <label htmlFor="diagnosis" className="admin-label-block-sm-med-primary-mb-8">Диагноз</label>
                   <Input
                 id="diagnosis"
                 value={medicalForm.template_data.diagnosis}
@@ -793,16 +601,9 @@ const CloudPrintingManager = () => {
                   template_data: { ...medicalForm.template_data, diagnosis: e.target.value }
                 })}
                 placeholder="Введите диагноз" />
-              
                 </div>
                 <div>
-                  <label htmlFor="prescription" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Назначение</label>
+                  <label htmlFor="prescription" className="admin-label-block-sm-med-primary-mb-8">Назначение</label>
                   <Textarea
                 id="prescription"
                 value={medicalForm.template_data.prescription_text}
@@ -812,16 +613,9 @@ const CloudPrintingManager = () => {
                 })}
                 placeholder="Введите назначение"
                 rows={4} />
-              
                 </div>
                 <div>
-                  <label htmlFor="doctor" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Врач</label>
+                  <label htmlFor="doctor" className="admin-label-block-sm-med-primary-mb-8">Врач</label>
                   <Input
                 id="doctor"
                 value={medicalForm.template_data.doctor_name}
@@ -830,7 +624,6 @@ const CloudPrintingManager = () => {
                   template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                 })}
                 placeholder="ФИО врача" />
-              
                 </div>
               </>
           }
@@ -838,13 +631,7 @@ const CloudPrintingManager = () => {
             {medicalForm.document_type === 'ticket' &&
           <>
                 <div>
-                  <label htmlFor="queue-number" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Номер очереди</label>
+                  <label htmlFor="queue-number" className="admin-label-block-sm-med-primary-mb-8">Номер очереди</label>
                   <Input
                 id="queue-number"
                 value={medicalForm.template_data.queue_number}
@@ -853,16 +640,9 @@ const CloudPrintingManager = () => {
                   template_data: { ...medicalForm.template_data, queue_number: e.target.value }
                 })}
                 placeholder="A001" />
-              
                 </div>
                 <div>
-                  <label htmlFor="ticket-doctor" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Врач</label>
+                  <label htmlFor="ticket-doctor" className="admin-label-block-sm-med-primary-mb-8">Врач</label>
                   <Input
                 id="ticket-doctor"
                 value={medicalForm.template_data.doctor_name}
@@ -871,16 +651,9 @@ const CloudPrintingManager = () => {
                   template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                 })}
                 placeholder="ФИО врача" />
-              
                 </div>
                 <div>
-                  <label htmlFor="cabinet" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Кабинет</label>
+                  <label htmlFor="cabinet" className="admin-label-block-sm-med-primary-mb-8">Кабинет</label>
                   <Input
                 id="cabinet"
                 value={medicalForm.template_data.cabinet}
@@ -889,7 +662,6 @@ const CloudPrintingManager = () => {
                   template_data: { ...medicalForm.template_data, cabinet: e.target.value }
                 })}
                 placeholder="№ кабинета" />
-              
                 </div>
               </>
           }
@@ -897,13 +669,7 @@ const CloudPrintingManager = () => {
             {medicalForm.document_type === 'report' &&
           <>
                 <div>
-                  <label htmlFor="examination" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Результаты обследования</label>
+                  <label htmlFor="examination" className="admin-label-block-sm-med-primary-mb-8">Результаты обследования</label>
                   <Textarea
                 id="examination"
                 value={medicalForm.template_data.examination_results}
@@ -913,16 +679,9 @@ const CloudPrintingManager = () => {
                 })}
                 placeholder="Введите результаты обследования"
                 rows={3} />
-              
                 </div>
                 <div>
-                  <label htmlFor="conclusion" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Заключение</label>
+                  <label htmlFor="conclusion" className="admin-label-block-sm-med-primary-mb-8">Заключение</label>
                   <Textarea
                 id="conclusion"
                 value={medicalForm.template_data.conclusion}
@@ -932,16 +691,9 @@ const CloudPrintingManager = () => {
                 })}
                 placeholder="Введите заключение"
                 rows={3} />
-              
                 </div>
                 <div>
-                  <label htmlFor="report-doctor" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Врач</label>
+                  <label htmlFor="report-doctor" className="admin-label-block-sm-med-primary-mb-8">Врач</label>
                   <Input
                 id="report-doctor"
                 value={medicalForm.template_data.doctor_name}
@@ -950,7 +702,6 @@ const CloudPrintingManager = () => {
                   template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                 })}
                 placeholder="ФИО врача" />
-              
                 </div>
               </>
           }
@@ -958,7 +709,7 @@ const CloudPrintingManager = () => {
 
           <Button
           onClick={printMedicalDocument}
-          style={{ width: '100%', marginTop: '24px' }}
+          className="admin-btn-w-full-mt-24"
           disabled={!medicalForm.printer_id || !medicalForm.patient_data.patient_name}>
           
             Печать {medicalForm.document_type === 'prescription' ? 'рецепта' :
@@ -971,41 +722,21 @@ const CloudPrintingManager = () => {
 
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
+    <div className="admin-page-container">
+      <div className="admin-header-flex-16-mb-24-printing">
         <Printer size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-xl)',
-            fontWeight: 'var(--mac-font-weight-bold)'
-          }}>
+          <h2 className="admin-h2-xl-bold-primary-m0">
             Облачная печать
           </h2>
-          <p style={{
-            margin: '4px 0 0 0',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          <p className="admin-header-p-mt-4-sm-secondary">
             Управление принтерами и печать документов через облачные сервисы
           </p>
         </div>
       </div>
 
       {/* Табы */}
-      <div style={{
-        maxWidth: '100%',
-        overflowX: 'auto',
-        paddingBottom: '6px',
-        marginBottom: '24px',
-        scrollbarWidth: 'thin'
-      }}>
+      <div className="admin-tabs-scroller">
         <SegmentedControl
           aria-label="Разделы облачной печати"
           value={activeTab}
@@ -1014,7 +745,7 @@ const CloudPrintingManager = () => {
             {
               value: 'printers',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-span-inline-flex-center-8">
                   <Printer size={14} aria-hidden="true" />
                   Принтеры
                 </span>
@@ -1023,7 +754,7 @@ const CloudPrintingManager = () => {
             {
               value: 'print',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-span-inline-flex-center-8">
                   <Printer size={14} aria-hidden="true" />
                   Печать документа
                 </span>
@@ -1032,7 +763,7 @@ const CloudPrintingManager = () => {
             {
               value: 'medical',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-span-inline-flex-center-8">
                   <TestTube size={14} aria-hidden="true" />
                   Медицинские документы
                 </span>
@@ -1040,13 +771,7 @@ const CloudPrintingManager = () => {
             }
           ]}
           size="large"
-          style={{
-            minWidth: 'max-content',
-            background: 'var(--mac-gradient-sidebar)',
-            border: '1px solid var(--mac-main-shell-border)',
-            borderRadius: '14px',
-            boxShadow: 'var(--mac-main-shell-shadow)'
-          }} />
+          className="admin-segmented-sidebar" />
       </div>
 
       {activeTab === 'printers' && renderPrintersTab()}
@@ -1060,11 +785,11 @@ const CloudPrintingManager = () => {
         onClose={() => setSelectedPrinter(null)}
         title="Подробности принтера">
         
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="admin-flex-col-12">
             <div><strong>Название:</strong> {selectedPrinter.name}</div>
             <div><strong>Описание:</strong> {selectedPrinter.description}</div>
             <div><strong>Провайдер:</strong> {selectedPrinter.provider}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="admin-flex-center-8">
               <strong>Статус:</strong> 
               <Badge variant={getStatusBadgeVariant(selectedPrinter.status)}>
                 {getStatusText(selectedPrinter.status)}
@@ -1076,34 +801,26 @@ const CloudPrintingManager = () => {
             {selectedPrinter.capabilities && Object.keys(selectedPrinter.capabilities).length > 0 &&
           <div>
                 <strong>Возможности:</strong>
-                <pre style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              backgroundColor: 'var(--mac-surface-secondary)',
-              padding: '8px',
-              borderRadius: 'var(--mac-border-radius-md)',
-              marginTop: '4px',
-              overflow: 'auto',
-              color: 'var(--mac-text-primary)'
-            }}>
+                <pre className="admin-pre-block-mt-4">
                   {JSON.stringify(selectedPrinter.capabilities, null, 2)}
                 </pre>
               </div>
           }
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', marginTop: '24px' }}>
+          <div className="admin-modal-footer-flex-8-mt-24">
             <Button
             onClick={() => testPrinter(selectedPrinter.provider, selectedPrinter.id)}
             disabled={selectedPrinter.status !== 'online'}>
             
-              <TestTube size={16} style={{ marginRight: '8px' }} />
+              <TestTube size={16} className="admin-mr-8" />
               Тестовая печать
             </Button>
             <Button
             variant="outline"
             onClick={() => setSelectedPrinter(null)}>
             
-              <X size={16} style={{ marginRight: '8px' }} />
+              <X size={16} className="admin-mr-8" />
               Закрыть
             </Button>
           </div>

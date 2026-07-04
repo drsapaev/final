@@ -87,80 +87,38 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
 
   if (result) {
     return (
-      <MacOSCard variant="default" style={{ padding: '24px' }}>
-        <div style={{ textAlign: 'center' }}>
+      <MacOSCard variant="default" className="admin-p-24">
+        <div className="admin-text-center">
           {result.failed_count === 0 ? (
             <>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px'
-              }}>
-                <CheckSquare size={32} style={{ color: 'var(--mac-success)' }} />
+              <div className="admin-w-64-h-64-radius-50pct-bgc-rgba-16-185-129-0-1-d-flex-ai-center-jc-center-m-0-auto-16px">
+                <CheckSquare size={32} className="admin-success" />
               </div>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 8px 0'
-              }}>
+              <h3 className="admin-fs-18-fw-600-primary-m-0-0-8px-0-2">
                 Успешно обновлено
               </h3>
-              <p style={{
-                fontSize: '14px',
-                color: 'var(--mac-text-secondary)',
-                margin: '0 0 20px 0'
-              }}>
+              <p className="admin-fs-14-secondary-m-0-0-20px-0-1">
                 Обновлено услуг: {result.updated_count}
               </p>
             </>
           ) : (
             <>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px'
-              }}>
-                <AlertCircle size={32} style={{ color: 'var(--mac-warning)' }} />
+              <div className="admin-w-64-h-64-radius-50pct-bgc-rgba-245-158-11-0-1-d-flex-ai-center-jc-center-m-0-auto-16px">
+                <AlertCircle size={32} className="admin-warning" />
               </div>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 8px 0'
-              }}>
+              <h3 className="admin-fs-18-fw-600-primary-m-0-0-8px-0-1">
                 Частично обновлено
               </h3>
-              <p style={{
-                fontSize: '14px',
-                color: 'var(--mac-text-secondary)',
-                margin: '0 0 20px 0'
-              }}>
+              <p className="admin-fs-14-secondary-m-0-0-20px-0">
                 Успешно: {result.updated_count} | Ошибки: {result.failed_count}
               </p>
               {result.failed_services.length > 0 && (
-                <div style={{
-                  textAlign: 'left',
-                  padding: '12px',
-                  backgroundColor: 'var(--mac-bg-secondary)',
-                  borderRadius: '8px',
-                  marginBottom: '20px'
-                }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                <div className="admin-ta-left-p-12-bgc-bg-secondary-radius-8-mb-20">
+                  <h4 className="admin-fs-13-fw-600-mb-8">
                     Ошибки:
                   </h4>
                   {result.failed_services.map((fail, idx) => (
-                    <div key={idx} style={{ fontSize: '12px', color: 'var(--mac-error)', marginBottom: '4px' }}>
+                    <div key={idx} className="admin-fs-12-error-mb-4">
                       Услуга #{fail.service_id}: {fail.error}
                     </div>
                   ))}
@@ -177,71 +135,35 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
   }
 
   return (
-    <MacOSCard variant="default" style={{ padding: '0' }}>
-      <div style={{
-        padding: '20px 24px',
-        borderBottom: '1px solid var(--mac-border)'
-      }}>
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: 'var(--mac-text-primary)',
-          margin: '0 0 8px 0'
-        }}>
+    <MacOSCard variant="default" className="admin-p-0">
+      <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo">
+        <h3 className="admin-fs-18-fw-600-primary-m-0-0-8px-0">
           Массовое редактирование
         </h3>
-        <p style={{
-          fontSize: '14px',
-          color: 'var(--mac-text-secondary)',
-          margin: 0
-        }}>
+        <p className="admin-fs-14-secondary-m-0">
           Выбрано услуг: <strong>{selectedServices.length}</strong>
         </p>
       </div>
 
-      <div style={{ padding: '24px', maxHeight: '500px', overflowY: 'auto' }}>
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '12px'
-          }}>
+      <div className="admin-p-24-maxh-500-ovy-auto">
+        <div className="admin-mb-20">
+          <label className="admin-d-block-fs-14-fw-600-primary-mb-12">
             Выберите поля для изменения:
           </label>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '8px'
-          }}>
+          <div className="admin-d-grid-gtc-repeat-auto-fill-min-gap-8">
             {availableFields.map(field => {
               const FieldIcon = field.icon;
               return (
                 <button
                   key={field.key}
                   onClick={() => toggleField(field.key)}
-                  style={{
-                    padding: '10px 12px',
-                    border: selectedFields.has(field.key)
+                  className="admin-p-10px-12px-radius-8-cur-pointer-d-flex-ai-center-gap-8-fs-13-primary-tr-all-0-2s-ease-bd-dyn-bgc-dyn" style={{ '--admin-bd0': selectedFields.has(field.key)
                       ? '2px solid var(--mac-accent)'
-                      : '1px solid var(--mac-border)',
-                    borderRadius: '8px',
-                    backgroundColor: selectedFields.has(field.key)
+                      : '1px solid var(--mac-border)', '--admin-bgc1': selectedFields.has(field.key)
                       ? 'rgba(59, 130, 246, 0.05)'
-                      : 'var(--mac-bg-primary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '13px',
-                    color: 'var(--mac-text-primary)',
-                    transition: 'all 0.2s ease'
-                  }}
+                      : 'var(--mac-bg-primary)' }}
                 >
-                  <FieldIcon size={16} style={{
-                    color: selectedFields.has(field.key) ? 'var(--mac-accent)' : 'var(--mac-text-secondary)'
-                  }} />
+                  <FieldIcon size={16} className="admin-col-dyn" style={{ '--admin-col0': selectedFields.has(field.key) ? 'var(--mac-accent)' : 'var(--mac-text-secondary)' }} />
                   {field.label}
                 </button>
               );
@@ -250,21 +172,11 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
         </div>
 
         {selectedFields.size > 0 && (
-          <div style={{
-            padding: '16px',
-            backgroundColor: 'var(--mac-bg-secondary)',
-            borderRadius: '8px',
-            marginBottom: '20px'
-          }}>
-            <h4 style={{
-              fontSize: '14px',
-              fontWeight: '600',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '16px'
-            }}>
+          <div className="admin-p-16-bgc-bg-secondary-radius-8-mb-20">
+            <h4 className="admin-fs-14-fw-600-primary-mb-16">
               Новые значения:
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="admin-flex-col-12">
               {Array.from(selectedFields).map(fieldKey => {
                 const field = availableFields.find(f => f.key === fieldKey);
                 if (!field) return null;
@@ -272,13 +184,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                 if (field.type === 'number') {
                   return (
                     <div key={fieldKey}>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-primary)',
-                        marginBottom: '6px'
-                      }}>
+                      <label className="admin-d-block-fs-13-fw-500-primary-mb-6-2">
                         {field.label}
                       </label>
                       <Input
@@ -298,13 +204,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
 
                   return (
                     <div key={fieldKey}>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-primary)',
-                        marginBottom: '6px'
-                      }}>
+                      <label className="admin-d-block-fs-13-fw-500-primary-mb-6-1">
                         {field.label}
                       </label>
                       <Select
@@ -339,13 +239,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
         )}
 
         <div>
-          <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '6px'
-          }}>
+          <label className="admin-d-block-fs-13-fw-500-primary-mb-6">
             Комментарий (опционально)
           </label>
           <Input
@@ -357,22 +251,16 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
         </div>
       </div>
 
-      <div style={{
-        padding: '16px 24px',
-        borderTop: '1px solid var(--mac-border)',
-        display: 'flex',
-        justifyContent: 'flex-end',
-        gap: '12px'
-      }}>
+      <div className="admin-p-16px-24px-bd-t-1px-solid-var-mac-bo-d-flex-jc-end-gap-12">
         <Button variant="outline" onClick={onCancel} disabled={loading}>
-          <X size={16} style={{ marginRight: '8px' }} />
+          <X size={16} className="admin-mr-8" />
           Отменить
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={loading || selectedFields.size === 0}
         >
-          <Save size={16} style={{ marginRight: '8px' }} />
+          <Save size={16} className="admin-mr-8" />
           {loading ? 'Сохранение...' : `Обновить ${selectedServices.length} услуг`}
         </Button>
       </div>

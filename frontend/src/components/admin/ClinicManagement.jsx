@@ -149,21 +149,11 @@ const ClinicManagement = () => {
 
 
   const renderOverview = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Состояние системы */}
-      <MacOSCard style={{ padding: '16px' }}>
-          <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '16px'
-      }}>
-          <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)',
-          margin: 0
-        }}>
+      <MacOSCard className="admin-p-16">
+          <div className="admin-d-flex-ai-center-jc-between-mb-16">
+          <h3 className="admin-fs-lg-fw-semi-primary-m-0-2">
             Состояние системы
           </h3>
           <Button
@@ -172,53 +162,33 @@ const ClinicManagement = () => {
           disabled={loading}
           title="Refresh system status"
           aria-label="Refresh system status"
-          style={{
-            padding: '6px 12px',
-            minWidth: 'auto'
-          }}>
+          className="admin-p-6px-12px-minw-auto">
           
-            <RefreshCw style={{
-            width: '16px',
-            height: '16px',
-            animation: loading ? 'spin 1s linear infinite' : 'none'
-          }} />
+            <RefreshCw className="admin-w-16-h-16-anim-dyn" style={{ '--admin-anim0': loading ? 'spin 1s linear infinite' : 'none' }} />
           </Button>
         </div>
         
         {systemHealth ?
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="admin-flex-col-16">
+            <div className="admin-flex-center-12">
               <Badge
             variant={systemHealth.status === 'healthy' ? 'success' :
             systemHealth.status === 'warning' ? 'warning' : 'error'}
             text={getHealthLabel(systemHealth.status)} />
           
-              <span style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+              <span className="admin-text-sm admin-text-secondary">
                 Последняя проверка: {new Date().toLocaleString()}
               </span>
             </div>
             
             {systemHealth.warnings && systemHealth.warnings.length > 0 &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <h4 style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="admin-flex-col-8">
+                <h4 className="admin-fs-sm-fw-med-primary-1">
                   Предупреждения:
                 </h4>
                 {systemHealth.warnings.map((warning, index) =>
-          <div key={index} style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-warning)'
-          }}>
-                    <AlertTriangle style={{ width: '16px', height: '16px' }} />
+          <div key={index} className="admin-d-flex-ai-center-gap-8-fs-sm-warning">
+                    <AlertTriangle className="admin-icon-16" />
                     <span>{warning}</span>
                   </div>
           )}
@@ -236,11 +206,7 @@ const ClinicManagement = () => {
 
       {/* Статистика */}
       {stats ?
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '24px'
-    }}>
+    <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
           <MacOSStatCard
         title="Филиалы"
         value={stats.total_branches}
@@ -286,34 +252,14 @@ const ClinicManagement = () => {
     }
 
       {/* Быстрые действия */}
-      <MacOSCard style={{ padding: '16px' }}>
-          <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)',
-        color: 'var(--mac-text-primary)',
-        marginBottom: '16px'
-      }}>
+      <MacOSCard className="admin-p-16">
+          <h3 className="admin-fs-lg-fw-semi-primary-mb-16-1">
             Быстрые действия
           </h3>
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        flexWrap: 'wrap'
-      }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-fw-wrap-1">
           <Button
           onClick={() => setActiveTab('branches')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            height: '64px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            border: 'none',
-            padding: '16px',
-            transition: 'all 0.2s ease',
-            transform: 'scale(1)'
-          }}
+          className="admin-d-flex-ai-center-gap-8-h-64-bgc-blue-bd-none-p-16-tr-all-0-2s-ease-tf-scale-1"
           onMouseEnter={(e) => {
             e.target.style.transform = 'scale(1.02)';
           }}
@@ -321,22 +267,14 @@ const ClinicManagement = () => {
             e.target.style.transform = 'scale(1)';
           }}>
           
-            <Building2 style={{ width: '20px', height: '20px' }} />
+            <Building2 className="admin-icon-20" />
             <span>Управление филиалами</span>
           </Button>
           
           <Button
           onClick={() => setActiveTab('equipment')}
           variant="outline"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            height: '64px',
-            padding: '16px',
-            transition: 'all 0.2s ease',
-            transform: 'scale(1)'
-          }}
+          className="admin-d-flex-ai-center-gap-8-h-64-p-16-tr-all-0-2s-ease-tf-scale-1-2"
           onMouseEnter={(e) => {
             e.target.style.transform = 'scale(1.02)';
           }}
@@ -344,22 +282,14 @@ const ClinicManagement = () => {
             e.target.style.transform = 'scale(1)';
           }}>
           
-            <Wrench style={{ width: '20px', height: '20px' }} />
+            <Wrench className="admin-icon-20" />
             <span>Управление оборудованием</span>
           </Button>
           
           <Button
           onClick={() => setActiveTab('licenses')}
           variant="outline"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            height: '64px',
-            padding: '16px',
-            transition: 'all 0.2s ease',
-            transform: 'scale(1)'
-          }}
+          className="admin-d-flex-ai-center-gap-8-h-64-p-16-tr-all-0-2s-ease-tf-scale-1-1"
           onMouseEnter={(e) => {
             e.target.style.transform = 'scale(1.02)';
           }}
@@ -367,22 +297,14 @@ const ClinicManagement = () => {
             e.target.style.transform = 'scale(1)';
           }}>
           
-            <Key style={{ width: '20px', height: '20px' }} />
+            <Key className="admin-icon-20" />
             <span>Управление лицензиями</span>
           </Button>
           
           <Button
           onClick={() => setActiveTab('backups')}
           variant="outline"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            height: '64px',
-            padding: '16px',
-            transition: 'all 0.2s ease',
-            transform: 'scale(1)'
-          }}
+          className="admin-d-flex-ai-center-gap-8-h-64-p-16-tr-all-0-2s-ease-tf-scale-1"
           onMouseEnter={(e) => {
             e.target.style.transform = 'scale(1.02)';
           }}
@@ -390,97 +312,51 @@ const ClinicManagement = () => {
             e.target.style.transform = 'scale(1)';
           }}>
           
-            <HardDrive style={{ width: '20px', height: '20px' }} />
+            <HardDrive className="admin-icon-20" />
             <span>Резервное копирование</span>
           </Button>
         </div>
       </MacOSCard>
 
       {/* Системная информация */}
-      <MacOSCard style={{ padding: '16px' }}>
-          <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)',
-        color: 'var(--mac-text-primary)',
-        marginBottom: '16px'
-      }}>
+      <MacOSCard className="admin-p-16">
+          <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
             Системная информация
           </h3>
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '16px',
-        flexWrap: 'wrap'
-      }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
-              <span style={{ color: 'var(--mac-text-secondary)' }}>Версия системы:</span>
-              <span style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)'
-            }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-fw-wrap">
+          <div className="admin-flex-col-8">
+            <div className="admin-d-flex-jc-between-fs-sm-5">
+              <span className="admin-text-secondary">Версия системы:</span>
+              <span className="admin-fw-med-primary-3">
                 1.0.0
               </span>
             </div>
-            <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
-              <span style={{ color: 'var(--mac-text-secondary)' }}>База данных:</span>
-              <span style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <div className="admin-d-flex-jc-between-fs-sm-4">
+              <span className="admin-text-secondary">База данных:</span>
+              <span className="admin-fw-med-primary-2">
                 SQLite
               </span>
             </div>
-            <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
-              <span style={{ color: 'var(--mac-text-secondary)' }}>Статус БД:</span>
+            <div className="admin-d-flex-jc-between-fs-sm-3">
+              <span className="admin-text-secondary">Статус БД:</span>
               <Badge variant="success" text="Подключена" />
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
-              <span style={{ color: 'var(--mac-text-secondary)' }}>Последнее обновление:</span>
-              <span style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)'
-            }}>
+          <div className="admin-flex-col-8">
+            <div className="admin-d-flex-jc-between-fs-sm-2">
+              <span className="admin-text-secondary">Последнее обновление:</span>
+              <span className="admin-fw-med-primary-1">
                 {new Date().toLocaleDateString()}
               </span>
             </div>
-            <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
-              <span style={{ color: 'var(--mac-text-secondary)' }}>Время работы:</span>
-              <span style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <div className="admin-d-flex-jc-between-fs-sm-1">
+              <span className="admin-text-secondary">Время работы:</span>
+              <span className="admin-fw-med-primary">
                 24/7
               </span>
             </div>
-            <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
-              <span style={{ color: 'var(--mac-text-secondary)' }}>Безопасность:</span>
+            <div className="admin-d-flex-jc-between-fs-sm">
+              <span className="admin-text-secondary">Безопасность:</span>
               <Badge variant="success" text="Активна" />
             </div>
           </div>
@@ -493,19 +369,11 @@ const ClinicManagement = () => {
   // Состояние загрузки
   if (loading) {
     return (
-      <div style={{
-        padding: 0,
-        backgroundColor: 'var(--mac-bg-primary)'
-      }}>
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-            <Building2 style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
-            <h2 style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+      <div className="admin-p-0-bgc-bg-primary-2">
+        <MacOSCard className="admin-p-24">
+          <div className="admin-d-flex-ai-center-gap-12-mb-24-1">
+            <Building2 className="admin-w-32-h-32-blue" />
+            <h2 className="admin-fs-2xl-fw-semi-primary-m-0-1">
               Управление клиникой
             </h2>
           </div>
@@ -518,19 +386,11 @@ const ClinicManagement = () => {
   // Критическая ошибка загрузки
   if (error && !stats) {
     return (
-      <div style={{
-        padding: 0,
-        backgroundColor: 'var(--mac-bg-primary)'
-      }}>
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-            <Building2 style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
-            <h2 style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+      <div className="admin-p-0-bgc-bg-primary-1">
+        <MacOSCard className="admin-p-24">
+          <div className="admin-d-flex-ai-center-gap-12-mb-24">
+            <Building2 className="admin-w-32-h-32-blue" />
+            <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
               Управление клиникой
             </h2>
           </div>
@@ -540,7 +400,7 @@ const ClinicManagement = () => {
             description="Проверьте подключение к серверу и попробуйте обновить страницу"
             action={
             <Button onClick={loadSystemData} variant="primary">
-                <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                <RefreshCw className="admin-icon-16-mr-8" />
                 Попробовать снова
               </Button>
             } />
@@ -551,35 +411,16 @@ const ClinicManagement = () => {
   }
 
   return (
-    <div style={{
-      padding: 0,
-      backgroundColor: 'var(--mac-bg-primary)'
-    }}>
-      <MacOSCard style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px', overflow: 'hidden' }}>
+    <div className="admin-p-0-bgc-bg-primary">
+      <MacOSCard className="admin-p-0-ov-hidden">
+        <div className="admin-p-16-ov-hidden">
           {/* Заголовок */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '24px',
-            paddingBottom: '24px',
-            borderBottom: '1px solid var(--mac-border)'
-          }}>
+          <div className="admin-d-flex-jc-between-ai-center-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
           <div>
-            <h1 style={{
-                fontSize: 'var(--mac-font-size-3xl)',
-                fontWeight: 'var(--mac-font-weight-bold)',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 8px 0'
-              }}>
+            <h1 className="admin-fs-var-mac-font-size-3x-fw-bold-primary-m-0-0-8px-0">
               Управление клиникой
             </h1>
-            <p style={{
-                color: 'var(--mac-text-secondary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                margin: 0
-              }}>
+            <p className="admin-secondary-fs-sm-m-0-2">
               Централизованное управление всеми аспектами клиники
             </p>
           </div>
@@ -591,7 +432,7 @@ const ClinicManagement = () => {
             type={message.type === 'success' ? 'success' : 'error'}
             title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
             message={message.text}
-            style={{ marginBottom: '24px' }} />
+            className="admin-mb-24" />
 
           }
 
@@ -601,18 +442,12 @@ const ClinicManagement = () => {
             type="warning"
             title="Предупреждение"
             message={error}
-            style={{ marginBottom: '24px' }} />
+            className="admin-mb-24" />
 
           }
 
         {/* Навигация по вкладкам */}
-        <div style={{
-          maxWidth: '100%',
-          overflowX: 'auto',
-          paddingBottom: '6px',
-          marginBottom: '24px',
-          scrollbarWidth: 'thin'
-        }}>
+        <div className="admin-maxw-100pct-ovx-auto-pb-6-mb-24-scrollba-thin">
           <SegmentedControl
             aria-label="Разделы управления клиникой"
             value={activeTab}
@@ -622,7 +457,7 @@ const ClinicManagement = () => {
               return {
                 value: tab.id,
                 label: (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="admin-d-inline-flex-ai-center-gap-8">
                     {IconComponent && <IconComponent size={14} aria-hidden="true" />}
                     {tab.label}
                   </span>
@@ -630,13 +465,7 @@ const ClinicManagement = () => {
               };
             })}
             size="large"
-            style={{
-              minWidth: 'max-content',
-              background: 'var(--mac-gradient-sidebar)',
-              border: '1px solid var(--mac-main-shell-border)',
-              borderRadius: '14px',
-              boxShadow: 'var(--mac-main-shell-shadow)'
-            }} />
+            className="admin-minw-max-content-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-14-bsh-var-mac-main-shell-s" />
         </div>
 
         {/* Содержимое вкладок */}
@@ -655,24 +484,15 @@ const ClinicManagement = () => {
         onClose={() => setShowConfirmModal(false)}
         title="Подтверждение действия"
         size="sm"
-        style={{ zIndex: 9999 }}>
+        className="admin-z-9999">
         
-        <div style={{ padding: '24px' }}>
-          <p style={{
-            fontSize: 'var(--mac-font-size-base)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '24px',
-            lineHeight: '1.5'
-          }}>
+        <div className="admin-p-24">
+          <p className="admin-fs-base-primary-mb-24-lh-1p5">
             Вы уверены, что хотите выполнить это действие? 
             Это может повлиять на работу системы.
           </p>
           
-          <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px'
-          }}>
+          <div className="admin-d-flex-jc-end-gap-12-2">
             <Button
               variant="outline"
               onClick={() => setShowConfirmModal(false)}>
@@ -681,12 +501,9 @@ const ClinicManagement = () => {
             </Button>
             <Button
               onClick={handleConfirmAction}
-              style={{
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none'
-              }}>
+              className="admin-bgc-blue-bd-none">
               
-              <CheckCircle style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <CheckCircle className="admin-icon-16-mr-8" />
               Подтвердить
             </Button>
           </div>

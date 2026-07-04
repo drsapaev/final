@@ -408,7 +408,7 @@ const QRTokenManager = () => {
                   }))
                 ]}
                 size="large"
-                style={{ width: '100%' }}></Select>
+                className="admin-w-full"></Select>
                 </div>
             }
 
@@ -429,7 +429,7 @@ const QRTokenManager = () => {
                   }))
                 ]}
                 size="large"
-                style={{ width: '100%' }}></Select>
+                className="admin-w-full"></Select>
                 </div>
             }
 
@@ -479,8 +479,7 @@ const QRTokenManager = () => {
               <img
               src={selectedToken.qr_code_base64}
               alt="QR Code"
-              className="mx-auto mb-4 border border-gray-200 rounded-lg"
-              style={{ maxWidth: '200px' }} />
+              className="mx-auto mb-4 border border-gray-200 rounded-lg admin-qr-img" />
             
 
               <p className="text-sm text-gray-600 mb-2">

@@ -411,11 +411,6 @@ const GraphQLExplorer = () => {
     boxShadow: 'var(--mac-shadow-sm)'
   };
 
-  const softSurfaceStyle = {
-    background: 'color-mix(in srgb, var(--mac-card-bg), white 5%)',
-    border: '1px solid color-mix(in srgb, var(--mac-card-border), white 10%)'
-  };
-
   const textareaStyle = {
     background: 'color-mix(in srgb, var(--mac-card-bg), white 4%)',
     border: '1px solid color-mix(in srgb, var(--mac-card-border), white 10%)',
@@ -423,7 +418,7 @@ const GraphQLExplorer = () => {
   };
 
   const renderExplorerTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Отображение ошибок */}
       {error &&
     <Alert
@@ -436,29 +431,18 @@ const GraphQLExplorer = () => {
 
       {/* Примеры запросов */}
       <MacOSCard style={sectionCardStyle}>
-        <h3 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+        <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
           <BookOpen size={20} />
           Примеры запросов
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-8">
           {Object.entries(queryExamples).map(([key, example]) =>
         <Button
           key={key}
           onClick={() => loadExample(key)}
           variant={selectedExample === key ? 'primary' : 'outline'}
-          style={{
-            padding: '8px',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          className="admin-p-8-fs-sm">
           
               {example.name}
             </Button>
@@ -467,39 +451,18 @@ const GraphQLExplorer = () => {
       </MacOSCard>
 
       {/* Редактор запроса */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+      <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
         <MacOSCard style={sectionCardStyle}>
-          <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px',
-          gap: '12px'
-        }}>
-            <h3 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+          <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12-1">
+            <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
               <Code size={20} />
               GraphQL Запрос
             </h3>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="admin-d-flex-gap-8">
               <Button
               onClick={copyQuery}
               variant="outline"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
-                fontSize: 'var(--mac-font-size-xs)'
-              }}>
+              className="admin-d-flex-ai-center-gap-4-p-4px-8px-fs-xs">
               
                 <Copy size={14} />
                 Копировать
@@ -508,13 +471,7 @@ const GraphQLExplorer = () => {
               onClick={executeQuery}
               disabled={loading}
               variant="primary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
-                fontSize: 'var(--mac-font-size-xs)'
-              }}>
+              className="admin-d-flex-ai-center-gap-4-p-4px-8px-fs-xs">
               
                 {loading ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
                 {loading ? 'Выполняется...' : 'Выполнить'}
@@ -529,23 +486,11 @@ const GraphQLExplorer = () => {
           minRows={10}
           maxRows={18}
           textareaStyle={textareaStyle}
-          style={{
-            width: '100%',
-            fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-            fontSize: 'var(--mac-font-size-sm)',
-            lineHeight: '1.5',
-            resize: 'vertical'
-          }} />
+          className="admin-w-100pct-ff-Monaco-Consolas-Cour-fs-sm-lh-1p5-rz-vertical-1" />
         
 
-          <div style={{ marginTop: '16px' }}>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>Переменные (JSON)</label>
+          <div className="admin-mt-16">
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">Переменные (JSON)</label>
             <Textarea
             value={variables}
             onChange={(e) => setVariables(e.target.value)}
@@ -553,35 +498,14 @@ const GraphQLExplorer = () => {
             minRows={5}
             maxRows={10}
             textareaStyle={textareaStyle}
-            style={{
-              width: '100%',
-              fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-              fontSize: 'var(--mac-font-size-sm)',
-              lineHeight: '1.5',
-              resize: 'vertical'
-            }} />
+            className="admin-w-100pct-ff-Monaco-Consolas-Cour-fs-sm-lh-1p5-rz-vertical" />
           
           </div>
         </MacOSCard>
 
         <MacOSCard style={sectionCardStyle}>
-          <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px',
-          gap: '12px'
-        }}>
-            <h3 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+          <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12">
+            <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
               <Activity size={20} />
               Результат
             </h3>
@@ -589,13 +513,7 @@ const GraphQLExplorer = () => {
           <Button
             onClick={downloadResult}
             variant="outline"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 8px',
-              fontSize: 'var(--mac-font-size-xs)'
-            }}>
+            className="admin-d-flex-ai-center-gap-4-p-4px-8px-fs-xs">
             
                 <Download size={14} />
                 Скачать
@@ -603,38 +521,19 @@ const GraphQLExplorer = () => {
           }
           </div>
 
-          <div style={{
-          height: '400px',
-          padding: '16px',
-          ...softSurfaceStyle,
-          borderRadius: 'var(--mac-radius-md)',
-          overflow: 'auto',
-          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-          fontSize: 'var(--mac-font-size-sm)',
-          lineHeight: '1.5'
-        }}>
+          <div className="admin-h-400-p-16-bg-color-mix-in-srgb-va-bd-1px-solid-color-mix--radius-var-mac-radius-md-ov-auto-ff-Monaco-Consolas-Cour-fs-sm-lh-1p5">
             {loading ?
           <Skeleton
             type="text"
             count={8}
-            style={{ height: '100%' }} /> :
+            className="admin-h-100pct" /> :
 
           result ?
-          <pre style={{
-            margin: 0,
-            whiteSpace: 'pre-wrap',
-            color: result.errors ? 'var(--mac-error)' : 'var(--mac-text-primary)'
-          }}>
+          <pre className="admin-m-0-ws-pre-wrap-col-dyn" style={{ '--admin-col0': result.errors ? 'var(--mac-error)' : 'var(--mac-text-primary)' }}>
                 {formatJSON(result)}
               </pre> :
 
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            color: 'var(--mac-text-tertiary)'
-          }}>
+          <div className="admin-d-flex-ai-center-jc-center-h-100pct-tertiary">
                 Результат появится здесь после выполнения запроса
               </div>
           }
@@ -645,79 +544,46 @@ const GraphQLExplorer = () => {
 
 
   const renderSchemaTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       <MacOSCard style={sectionCardStyle}>
-        <h3 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+        <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
           <Database size={20} />
           GraphQL Схема
         </h3>
 
         {schema ?
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="admin-d-grid-gap-16">
             {schema.types.
         filter((type) => !type.name.startsWith('__') && type.fields).
         map((type, index) =>
         <div
           key={index}
-          style={{
-            padding: '16px',
-            ...softSurfaceStyle,
-            borderRadius: 'var(--mac-radius-md)',
-          }}>
+          className="admin-p-16-bg-color-mix-in-srgb-va-bd-1px-solid-color-mix--radius-var-mac-radius-md">
           
-                  <h4 style={{
-            margin: '0 0 8px 0',
-            color: 'var(--mac-accent)',
-            fontSize: 'var(--mac-font-size-md)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+                  <h4 className="admin-m-0-0-8px-0-accent-fs-var-mac-font-size-md-fw-semi">
                     {type.name}
                   </h4>
                   {type.description &&
-          <p style={{
-            margin: '0 0 8px 0',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          <p className="admin-m-0-0-8px-0-secondary-fs-sm">
                       {type.description}
                     </p>
           }
-                  <div style={{ display: 'grid', gap: '4px' }}>
+                  <div className="admin-d-grid-gap-4">
                     {type.fields?.slice(0, 10).map((field, fieldIndex) =>
             <div
               key={fieldIndex}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '4px 8px',
-                background: 'color-mix(in srgb, var(--mac-card-bg), white 9%)',
-                borderRadius: 'var(--mac-radius-sm)',
-                fontSize: 'var(--mac-font-size-xs)'
-              }}>
+              className="admin-d-flex-jc-between-p-4px-8px-bg-color-mix-in-srgb-va-radius-var-mac-radius-sm-fs-xs">
               
-                        <span style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+                        <span className="admin-fw-semi-primary">
                           {field.name}
                         </span>
-                        <span style={{ color: 'var(--mac-text-secondary)' }}>
+                        <span className="admin-text-secondary">
                           {field.type?.name || 'Unknown'}
                         </span>
                       </div>
             )}
                     {type.fields?.length > 10 &&
-            <div style={{
-              padding: '4px',
-              textAlign: 'center',
-              color: 'var(--mac-text-tertiary)',
-              fontSize: 'var(--mac-font-size-xs)'
-            }}>
+            <div className="admin-p-4-ta-center-tertiary-fs-xs">
                         ... и еще {type.fields.length - 10} полей
                       </div>
             }
@@ -729,7 +595,7 @@ const GraphQLExplorer = () => {
       <Skeleton
         type="card"
         count={3}
-        style={{ height: '200px' }} />
+        className="admin-h-200" />
 
       }
       </MacOSCard>
@@ -743,57 +609,22 @@ const GraphQLExplorer = () => {
 
   return (
     <div style={shellStyle}>
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-d-flex-fw-wrap-ai-center-gap-16-mb-24">
         <Zap size={24} color="var(--mac-accent)" />
-        <h2 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-xl)',
-          fontWeight: 'var(--mac-font-weight-bold)'
-        }}>
+        <h2 className="admin-m-0-primary-fs-xl-fw-bold">
           GraphQL API Explorer
         </h2>
       </div>
 
       {/* Вкладки */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px',
-        padding: '8px',
-        border: '1px solid color-mix(in srgb, var(--mac-card-border), white 10%)',
-        background: 'color-mix(in srgb, var(--mac-card-bg), transparent 8%)',
-        borderRadius: '18px',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-d-flex-fw-wrap-gap-8-p-8-bd-1px-solid-color-mix--bg-color-mix-in-srgb-va-radius-18-mb-24">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px 18px',
-                border: '1px solid transparent',
-                background: activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-hover-bg), white 8%)' : 'transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                borderRadius: '14px',
-                boxShadow: activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none',
-                borderColor: activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-border), white 12%)' : 'transparent',
-                color: activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-                fontWeight: activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-                fontSize: 'var(--mac-font-size-sm)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}>
+              className="admin-p-12px-18px-bd-1px-solid-transparen-cur-pointer-d-flex-ai-center-gap-8-radius-14-fs-sm-tr-all-var-mac-duration-bg-dyn-bsh-dyn-bd-c-dyn-col-dyn-fw-dyn" style={{ '--admin-bg0': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-hover-bg), white 8%)' : 'transparent', '--admin-bsh1': activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none', '--admin-bd-c2': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-border), white 12%)' : 'transparent', '--admin-col3': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw4': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}>
               
               <Icon size={16} />
               {tab.label}

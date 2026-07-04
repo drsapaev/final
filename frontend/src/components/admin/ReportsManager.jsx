@@ -228,41 +228,17 @@ const ReportsManager = () => {
   };
 
   const renderGenerateTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Форма генерации отчета */}
-      <Card style={{
-      padding: '24px',
-      background: 'var(--mac-card-bg)',
-      border: '1px solid var(--mac-card-border)',
-      borderRadius: '12px'
-    }}>
-        <h3 style={{
-        fontSize: '18px',
-        fontWeight: '600',
-        marginBottom: '20px',
-        display: 'flex',
-        alignItems: 'center',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 20px 0'
-      }}>
-          <BarChart3 style={{ width: '20px', height: '20px', marginRight: '10px', color: 'var(--mac-accent-blue)' }} />
+      <Card className="admin-card-p-24-bg-card-12">
+        <h3 className="admin-h3-18-600-primary-mb-20">
+          <BarChart3 className="admin-icon-20-mr-10-blue" />
           Генерация отчета
         </h3>
 
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)', // 2x2 grid as requested
-        gap: '20px', // Increased gap
-        marginBottom: '24px'
-      }}>
+        <div className="admin-grid-2col-20-mb-24">
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            marginBottom: '8px',
-            color: 'var(--mac-text-secondary)' // Improved contrast
-          }}>Тип отчета</label>
+            <label className="admin-label-block-13-500-secondary-mb-8">Тип отчета</label>
             <Select
             value={reportForm.type}
             onChange={(value) => setReportForm((prev) => ({ ...prev, type: value }))}
@@ -276,13 +252,7 @@ const ReportsManager = () => {
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            marginBottom: '8px',
-            color: 'var(--mac-text-secondary)'
-          }}>Формат</label>
+            <label className="admin-label-block-13-500-secondary-mb-8">Формат</label>
             <Select
             value={reportForm.format}
             onChange={(value) => setReportForm((prev) => ({ ...prev, format: value }))}
@@ -297,13 +267,7 @@ const ReportsManager = () => {
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            marginBottom: '8px',
-            color: 'var(--mac-text-secondary)'
-          }}>Дата начала</label>
+            <label className="admin-label-block-13-500-secondary-mb-8">Дата начала</label>
             <Input
             type="date"
             value={reportForm.start_date}
@@ -312,13 +276,7 @@ const ReportsManager = () => {
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            marginBottom: '8px',
-            color: 'var(--mac-text-secondary)'
-          }}>Дата окончания</label>
+            <label className="admin-label-block-13-500-secondary-mb-8">Дата окончания</label>
             <Input
             type="date"
             value={reportForm.end_date}
@@ -327,33 +285,24 @@ const ReportsManager = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div className="admin-flex-justify-end">
           <Button
           type="button"
           title={loading ? 'Generating report' : 'Generate report'}
           aria-label={loading ? 'Generating report' : 'Generate report'}
           onClick={generateReport}
           disabled={loading || !reportForm.type}
-          style={{
-            width: '100%',
-            height: '44px',
-            background: 'var(--mac-accent-blue)',
-            color: 'white',
-            opacity: loading ? 0.7 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
-          }}>
+          className="admin-btn-blue-w-full-h-44-flex-center admin-opacity-dynamic"
+          style={{ '--admin-opacity': loading ? 0.7 : 1 }}>
 
             {loading ?
           <>
-                <Loader2 aria-hidden="true" style={{ width: '18px', height: '18px', animation: 'spin 1s linear infinite' }} className="animate-spin" />
+                <Loader2 aria-hidden="true" className="admin-icon-18-spin animate-spin" />
                 <span>Генерация...</span>
               </> :
 
           <>
-                <FileText aria-hidden="true" style={{ width: '18px', height: '18px' }} />
+                <FileText aria-hidden="true" className="admin-icon-18" />
                 <span>Сгенерировать отчет</span>
               </>
           }
@@ -362,30 +311,13 @@ const ReportsManager = () => {
       </Card>
 
       {/* Быстрые отчеты */}
-      <Card style={{
-      padding: '24px',
-      background: 'var(--mac-card-bg)',
-      border: '1px solid var(--mac-card-border)',
-      borderRadius: '12px'
-    }}>
-        <h3 style={{
-        fontSize: '18px',
-        fontWeight: '600',
-        marginBottom: '20px',
-        display: 'flex',
-        alignItems: 'center',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 20px 0'
-      }}>
-          <Clock style={{ width: '20px', height: '20px', marginRight: '10px', color: 'var(--mac-accent-blue)' }} />
+      <Card className="admin-card-p-24-bg-card-12">
+        <h3 className="admin-h3-18-600-primary-mb-20">
+          <Clock className="admin-icon-20-mr-10-blue" />
           Быстрые отчеты (сегодня)
         </h3>
 
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '16px'
-      }}>
+        <div className="admin-grid-auto-240-16">
           <MacOSStatCard
           title="Сегодня"
           value={quickReports.daily?.summary?.total_patients_served || 0}
@@ -423,21 +355,15 @@ const ReportsManager = () => {
 
       {/* Последние отчеты */}
       {reports.length > 0 &&
-    <Card style={{ padding: '24px' }}>
-          <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)',
-        marginBottom: '16px',
-        color: 'var(--mac-text-primary)',
-        margin: 0
-      }}>Последние отчеты</h3>
+    <Card className="admin-p-24">
+          <h3 className="admin-h4-lg-semi-primary-mb-16">Последние отчеты</h3>
           <Table
         columns={[
         {
           key: 'type',
           header: 'Тип отчета',
           render: (value) =>
-          <span style={{ fontWeight: '500', color: 'var(--mac-text-primary)' }}>
+          <span className="admin-text-med-primary">
                     {availableReports.find((r) => r.type === value)?.name || value}
                   </span>
 
@@ -446,7 +372,7 @@ const ReportsManager = () => {
           key: 'generated_at',
           header: 'Дата генерации',
           render: (value) =>
-          <span style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+          <span className="admin-span-13-secondary">
                     {new Date(value).toLocaleString()}
                   </span>
 
@@ -463,7 +389,7 @@ const ReportsManager = () => {
             title={`Download report ${row.filename}`}
             aria-label={`Download report ${row.filename}`}
             onClick={() => downloadFile(row.filename)}>
-                    <Download aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                    <Download aria-hidden="true" className="admin-icon-16" />
                   </Button>
 
         }]
@@ -478,50 +404,37 @@ const ReportsManager = () => {
 
 
   const renderFilesTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <Card style={{
-      padding: '24px',
-      background: 'var(--mac-card-bg)',
-      border: '1px solid var(--mac-card-border)',
-      borderRadius: '12px',
-      minHeight: '400px' // Ensure card has some height even when empty
-    }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <h3 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          color: 'var(--mac-text-primary)',
-          margin: 0
-        }}>
-            <FileSpreadsheet style={{ width: '22px', height: '22px', marginRight: '10px', color: 'var(--mac-accent-blue)' }} />
+  <div className="admin-flex-col-24">
+      <Card className="admin-card-p-24-bg-card-12-min-h-400">
+        <div className="admin-flex-between-mb-24">
+          <h3 className="admin-h3-18-600-primary-m0-flex">
+            <FileSpreadsheet className="admin-icon-22-mr-10-blue" />
             Файлы отчетов
           </h3>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="admin-flex-gap-12">
             <Button
             onClick={loadReportFiles}
             variant="outline"
             size="sm"
-            style={{ minWidth: '100px', height: '36px' }}>
+            className="admin-btn-min-w-100-h-36">
 
-              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <RefreshCw className="admin-icon-16-mr-8" />
               Обновить
             </Button>
             <Button
             onClick={cleanupOldReports}
             variant="outline"
             size="sm"
-            style={{ color: 'var(--mac-error)', minWidth: '140px', height: '36px', borderColor: 'var(--mac-error)' }}>
+            className="admin-btn-error-min-w-140-h-36">
 
-              <Trash2 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Trash2 className="admin-icon-16-mr-8" />
               Очистить старые
             </Button>
           </div>
         </div>
 
         {files.length === 0 ?
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
+      <div className="admin-flex-center-justify-h-300">
             <MacOSEmptyState
           icon={FileX}
           title="Файлы отчетов ещё не сформированы"
@@ -535,9 +448,9 @@ const ReportsManager = () => {
           key: 'filename',
           header: 'Файл',
           render: (value) =>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <FileText style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
-                    <span style={{ fontWeight: '500', color: 'var(--mac-text-primary)' }}>
+          <div className="admin-flex-center-gap-10">
+                    <FileText className="admin-icon-18-tertiary" />
+                    <span className="admin-text-med-primary">
                       {value}
                     </span>
                   </div>
@@ -547,7 +460,7 @@ const ReportsManager = () => {
           key: 'size',
           header: 'Размер',
           render: (value) =>
-          <span style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+          <span className="admin-span-13-secondary">
                     {formatFileSize(value)}
                   </span>
 
@@ -556,7 +469,7 @@ const ReportsManager = () => {
           key: 'created_at',
           header: 'Создан',
           render: (value) =>
-          <span style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+          <span className="admin-span-13-secondary">
                     {new Date(value).toLocaleString()}
                   </span>
 
@@ -574,7 +487,7 @@ const ReportsManager = () => {
             aria-label={`Download report file ${row.filename}`}
             onClick={() => downloadFile(row.filename)}>
 
-                    <Download aria-hidden="true" style={{ width: '18px', height: '18px', color: 'var(--mac-text-secondary)' }} />
+                    <Download aria-hidden="true" className="admin-icon-18-secondary" />
                   </Button>
 
         }]
@@ -589,233 +502,107 @@ const ReportsManager = () => {
 
 
   const renderSettingsTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Автоматические отчеты */}
-      <Card style={{
-      padding: '24px',
-      background: 'var(--mac-card-bg)',
-      border: '1px solid var(--mac-card-border)',
-      borderRadius: '12px'
-    }}>
-        <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
-          <div style={{
-          width: '56px', // Increased size
-          height: '56px', // Increased size
-          borderRadius: '14px',
-          background: 'linear-gradient(135deg, var(--mac-accent-blue) 0%, #5856D6 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          boxShadow: '0 4px 12px rgba(0, 122, 255, 0.2)'
-        }}>
-            <Clock style={{ width: '32px', height: '32px', color: 'white' }} />
+      <Card className="admin-card-p-24-bg-card-12">
+        <div className="admin-flex-start-16-mb-24">
+          <div className="admin-icon-box-56-gradient-blue">
+            <Clock className="admin-icon-32-white" />
           </div>
-          <div style={{ flex: 1, paddingTop: '4px' }}>
-            <h3 style={{
-            fontSize: '18px',
-            fontWeight: '600',
-            color: 'var(--mac-text-primary)',
-            margin: '0 0 4px 0'
-          }}>
+          <div className="admin-flex-1-pt-4">
+            <h3 className="admin-h3-18-600-primary-mb-4">
               Автоматические отчеты
             </h3>
-            <p style={{
-            fontSize: '14px',
-            color: 'var(--mac-text-secondary)',
-            margin: 0,
-            lineHeight: 1.5
-          }}>
+            <p className="admin-p-14-secondary-m0-lh-15">
               Настройте автоматическую генерацию и отправку отчетов по расписанию
             </p>
           </div>
         </div>
 
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', // Equal width columns
-        gap: '16px'
-      }}>
+        <div className="admin-grid-2col-min-16">
           <Button
           onClick={() => toast.info('Функция настройки расписания в разработке')}
-          style={{
-            height: '44px',
-            background: 'var(--mac-accent-blue)',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            fontSize: '14px',
-            fontWeight: '500'
-          }}>
+          className="admin-btn-blue-h-44-flex-center">
 
-            <Calendar style={{ width: '18px', height: '18px' }} />
+            <Calendar className="admin-icon-18" />
             Настроить расписание
           </Button>
 
           <Button
           variant="outline"
           onClick={() => toast.info('Настройки уведомлений в разработке')}
-          style={{
-            height: '44px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: 'var(--mac-text-primary)',
-            border: '1px solid var(--mac-border-primary)',
-            background: 'var(--mac-card-bg)'
-          }}>
+          className="admin-btn-outline-h-44-flex-center">
 
-            <Activity style={{ width: '18px', height: '18px' }} />
+            <Activity className="admin-icon-18" />
             Настроить уведомления
           </Button>
         </div>
       </Card>
 
       {/* Хранение и очистка */}
-      <Card style={{
-      padding: '24px',
-      background: 'var(--mac-card-bg)',
-      border: '1px solid var(--mac-card-border)',
-      borderRadius: '12px'
-    }}>
-        <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
-          <div style={{
-          width: '56px',
-          height: '56px',
-          borderRadius: '14px',
-          background: 'linear-gradient(135deg, var(--mac-accent-green) 0%, #34C759 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          boxShadow: '0 4px 12px rgba(52, 199, 89, 0.2)'
-        }}>
-            <FileSpreadsheet style={{ width: '32px', height: '32px', color: 'white' }} />
+      <Card className="admin-card-p-24-bg-card-12">
+        <div className="admin-flex-start-16-mb-24">
+          <div className="admin-icon-box-56-gradient-green">
+            <FileSpreadsheet className="admin-icon-32-white" />
           </div>
-          <div style={{ flex: 1, paddingTop: '4px' }}>
-            <h3 style={{
-            fontSize: '18px',
-            fontWeight: '600',
-            color: 'var(--mac-text-primary)',
-            margin: '0 0 4px 0'
-          }}>
+          <div className="admin-flex-1-pt-4">
+            <h3 className="admin-h3-18-600-primary-mb-4">
               Хранение файлов
             </h3>
-            <p style={{
-            fontSize: '14px',
-            color: 'var(--mac-text-secondary)',
-            margin: 0,
-            lineHeight: 1.5
-          }}>
+            <p className="admin-p-14-secondary-m0-lh-15">
               Управление старыми отчетами и настройка их автоматического удаления
             </p>
           </div>
         </div>
 
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-        gap: '16px'
-      }}>
+        <div className="admin-grid-2col-min-16">
           <Button
           onClick={cleanupOldReports}
-          style={{
-            height: '44px',
-            background: '#FF9500', // Explicit hex for visibility
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            fontSize: '14px',
-            fontWeight: '500',
-            border: 'none'
-          }}>
+          className="admin-btn-orange-h-44-flex-center">
 
-            <Trash2 style={{ width: '18px', height: '18px' }} />
+            <Trash2 className="admin-icon-18" />
             Очистить старые файлы
           </Button>
 
           <Button
           variant="outline"
           onClick={() => toast.info('Функция экспорта в разработке')}
-          style={{
-            height: '44px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: 'var(--mac-text-primary)',
-            border: '1px solid var(--mac-border-primary)',
-            background: 'var(--mac-card-bg)'
-          }}>
+          className="admin-btn-outline-h-44-flex-center">
 
-            <Download style={{ width: '18px', height: '18px' }} />
+            <Download className="admin-icon-18" />
             Экспорт в облако
           </Button>
         </div>
       </Card>
 
       {/* Статистика хранения */}
-      <Card style={{
-      padding: '24px',
-      background: 'var(--mac-card-bg)',
-      border: '1px solid var(--mac-card-border)',
-      borderRadius: '12px'
-    }}>
-        <h3 style={{
-        fontSize: '18px',
-        fontWeight: '600',
-        marginBottom: '20px',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 20px 0'
-      }}>Статистика хранения</h3>
+      <Card className="admin-card-p-24-bg-card-12">
+        <h3 className="admin-h3-18-600-primary-mb-20">Статистика хранения</h3>
 
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '24px'
-      }}>
+        <div className="admin-grid-3col-24">
           <div>
-            <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>
+            <div className="admin-stat-label-13-secondary-mb-4">
               Всего файлов
             </div>
-            <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+            <div className="admin-stat-num-24-600-primary">
               {files.length}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>
+            <div className="admin-stat-label-13-secondary-mb-4">
               Общий размер
             </div>
-            <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+            <div className="admin-stat-num-24-600-primary">
               {formatFileSize(files.reduce((sum, f) => sum + (f.size || 0), 0))}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>
+            <div className="admin-stat-label-13-secondary-mb-4">
               Хранение (дней)
             </div>
-            <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+            <div className="admin-stat-num-24-600-primary">
               30
             </div>
           </div>
@@ -825,29 +612,24 @@ const ReportsManager = () => {
 
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="admin-flex-col-24">
       {error ?
-      <Card style={{ padding: '48px', display: 'flex', justifyContent: 'center' }}>
+      <Card className="admin-card-p-48-flex-justify-center">
           <MacOSEmptyState
           icon={AlertCircle}
           title="Ошибка загрузки данных"
           description="Не удалось загрузить отчеты. Пожалуйста, попробуйте еще раз.">
 
-            <Button onClick={handleRetry} style={{ marginTop: '16px' }}>
-              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <Button onClick={handleRetry} className="admin-mt-16">
+              <RefreshCw className="admin-icon-16-mr-8" />
               Повторить попытку
             </Button>
           </MacOSEmptyState>
         </Card> :
 
       <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>Система отчетов</h2>
+          <div className="admin-flex-between">
+            <h2 className="admin-h2-2xl-bold-primary-m0">Система отчетов</h2>
             <Badge variant="info">
               {files.length} файлов
             </Badge>

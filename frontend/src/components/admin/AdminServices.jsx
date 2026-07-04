@@ -42,13 +42,7 @@ const AdminServices = () => {
 
   return (
     <div>
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '24px',
-        borderBottom: '1px solid var(--mac-border)',
-        paddingBottom: '0',
-      }}>
+      <div className="admin-services-tab-bar">
         {SERVICE_TABS.map((tab) => {
           const TabIcon = tab.icon;
           const isActive = servicesTab === tab.key;
@@ -58,21 +52,7 @@ const AdminServices = () => {
               key={tab.key}
               aria-label={tab.label}
               onClick={() => selectTab(tab.key)}
-              style={{
-                padding: '12px 20px',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
-                color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                fontWeight: isActive ? '600' : '500',
-                transition: 'all 0.2s ease',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              }}
+              className={isActive ? 'admin-services-tab-btn-active' : 'admin-services-tab-btn'}
               onMouseEnter={(event) => {
                 if (!isActive) {
                   event.currentTarget.style.color = 'var(--mac-text-primary)';
@@ -92,12 +72,12 @@ const AdminServices = () => {
       </div>
 
       {servicesTab === 'catalog' && (
-        <React.Suspense fallback={<Skeleton style={{ height: '384px' }} />}>
+        <React.Suspense fallback={<Skeleton className="admin-skeleton-h-384" />}>
           <LazyServiceCatalog />
         </React.Suspense>
       )}
       {servicesTab === 'queue-profiles' && (
-        <React.Suspense fallback={<Skeleton style={{ height: '384px' }} />}>
+        <React.Suspense fallback={<Skeleton className="admin-skeleton-h-384" />}>
           <LazyQueueProfilesManager theme={isDark ? 'dark' : 'light'} />
         </React.Suspense>
       )}

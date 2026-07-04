@@ -181,7 +181,7 @@ const ActivationSystem = () => {
 
   if (loading) {
     return (
-      <Card style={{ padding: '32px' }}>
+      <Card className="admin-card-p-32">
         <AppLoading
           title="Загрузка системы активации"
           description="Получаем список ключей и статус сервера."
@@ -193,7 +193,7 @@ const ActivationSystem = () => {
 
   if (showInitialLoadError) {
     return (
-      <Card style={{ padding: '32px' }}>
+      <Card className="admin-card-p-32">
         <AppError
           title="Не удалось загрузить систему активации"
           description={loadError}
@@ -208,55 +208,40 @@ const ActivationSystem = () => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="admin-flex-col-24">
       {/* Заголовок */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="admin-flex-between">
         <div>
-          <h2 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0,
-            marginBottom: '4px'
-          }}>
+          <h2 className="admin-h2-2xl-semi-primary-mb-4">
             Система активации
           </h2>
-          <p style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)',
-            margin: 0
-          }}>
+          <p className="admin-p-sm-secondary-m0">
             Управление лицензиями и активированными устройствами
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="admin-form-row-gap-12">
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <RefreshCw className="admin-icon-16-mr-8" />
             Обновить
           </Button>
           <Button onClick={() => setShowCreateForm(true)}>
-            <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <Plus className="admin-icon-16-mr-8" />
             Создать ключ
           </Button>
         </div>
       </div>
 
       {serverStatus &&
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '12px 16px',
-        borderRadius: 'var(--mac-radius-md)',
-        backgroundColor: serverStatus.ok ? 'var(--mac-success-bg)' : 'var(--mac-warning-bg)',
-        color: serverStatus.ok ? 'var(--mac-success)' : 'var(--mac-warning)',
-        border: `1px solid ${serverStatus.ok ? 'var(--mac-success-border)' : 'var(--mac-warning-border)'}`
+      <div className="admin-status-banner" style={{
+        '--admin-banner-bg': serverStatus.ok ? 'var(--mac-success-bg)' : 'var(--mac-warning-bg)',
+        '--admin-banner-color': serverStatus.ok ? 'var(--mac-success)' : 'var(--mac-warning)',
+        '--admin-banner-border': serverStatus.ok ? 'var(--mac-success-border)' : 'var(--mac-warning-border)'
       }}>
           <Badge variant={serverStatus.ok ? 'success' : 'warning'}>
             {serverStatus.ok ? 'Сервер активирован' : 'Сервер не активирован'}
           </Badge>
-          <span style={{ fontSize: 'var(--mac-font-size-sm)' }}>
+          <span className="admin-text-sm">
             {serverStatus.ok ?
             `Ключ ${serverStatus.key || 'не указан'}` :
             (serverStatus.reason || 'Статус активации требует проверки')}
@@ -266,110 +251,62 @@ const ActivationSystem = () => {
 
       {/* Сообщения */}
       {message.text &&
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '16px',
-        borderRadius: 'var(--mac-radius-md)',
-        backgroundColor: message.type === 'success' ?
-        'var(--mac-success-bg)' :
-        'var(--mac-error-bg)',
-        color: message.type === 'success' ?
-        'var(--mac-success)' :
-        'var(--mac-error)',
-        border: `1px solid ${message.type === 'success' ?
-        'var(--mac-success-border)' :
-        'var(--mac-error-border)'}`
+      <div className="admin-message-banner" style={{
+        '--admin-banner-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
+        '--admin-banner-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
+        '--admin-banner-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
       }}>
           {message.type === 'success' ?
-        <CheckCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} /> :
+        <CheckCircle className="admin-icon-20-mr-8" /> :
 
-        <AlertCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
+        <AlertCircle className="admin-icon-20-mr-8" />
         }
           {message.text}
         </div>
       }
 
       {/* Статистика */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-        <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-accent-blue)',
-            marginBottom: '8px'
-          }}>
+      <div className="admin-grid-auto-200">
+        <Card className="admin-card-p-24-center">
+          <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-accent-blue)' }}>
             {stats.total_activations || 0}
           </div>
-          <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+          <div className="admin-stat-label-sm-secondary-block-activation">
             Всего активаций
           </div>
         </Card>
-        <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-success)',
-            marginBottom: '8px'
-          }}>
+        <Card className="admin-card-p-24-center">
+          <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-success)' }}>
             {stats.active_activations || 0}
           </div>
-          <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+          <div className="admin-stat-label-sm-secondary-block-activation">
             Активных
           </div>
         </Card>
-        <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-warning)',
-            marginBottom: '8px'
-          }}>
+        <Card className="admin-card-p-24-center">
+          <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>
             {stats.trial_activations || 0}
           </div>
-          <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+          <div className="admin-stat-label-sm-secondary-block-activation">
             Пробных
           </div>
         </Card>
-        <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-error)',
-            marginBottom: '8px'
-          }}>
+        <Card className="admin-card-p-24-center">
+          <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-error)' }}>
             {stats.expired_activations || 0}
           </div>
-          <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+          <div className="admin-stat-label-sm-secondary-block-activation">
             Истекших
           </div>
         </Card>
       </div>
 
       {/* Фильтры */}
-      <Card style={{ padding: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+      <Card className="admin-p-24">
+        <div className="admin-grid-auto-300">
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
-              <Search style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
+            <label className="admin-label-block-sm-med-primary-mb-8">
+              <Search className="admin-icon-16-inline-mr-4" />
               Поиск
             </label>
             <Input
@@ -377,19 +314,12 @@ const ActivationSystem = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Ключ или ID устройства..."
-              style={{ width: '100%' }} />
-            
+              className="admin-w-full" />
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
-              <Filter style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
+            <label className="admin-label-block-sm-med-primary-mb-8">
+              <Filter className="admin-icon-16-inline-mr-4" />
               Статус
             </label>
             <Select
@@ -404,39 +334,32 @@ const ActivationSystem = () => {
               { value: 'revoked', label: 'Отозванные' }]
               }
               size="large"
-              style={{ width: '100%' }} />
-            
+              className="admin-w-full" />
           </div>
         </div>
       </Card>
 
       {/* Таблица активаций */}
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px' }}>
+      <Card className="admin-card-p-0-overflow-hidden">
+        <div className="admin-p-16">
           <Table
             columns={[
             {
               key: 'key',
               title: 'Ключ активации',
               render: (activation) =>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Key style={{ width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
+              <div className="admin-flex-center">
+                    <Key className="admin-icon-16-mr-8-blue" />
                     <div>
-                      <div style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    fontFamily: 'monospace',
-                    color: 'var(--mac-text-primary)'
-                  }}>
+                      <div className="admin-key-field">
                         {(activation || {}).key?.slice(0, 8)}...{(activation || {}).key?.slice(-4)}
                       </div>
                       <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => copyToClipboard((activation || {}).key)}
-                    style={{ fontSize: 'var(--mac-font-size-xs)', marginTop: '4px' }}>
-                    
-                        <Copy style={{ width: '12px', height: '12px', marginRight: '4px' }} />
+                    className="admin-btn-ghost-xs-mt-4">
+                        <Copy className="admin-icon-12-mr-4" />
                         Копировать
                       </Button>
                     </div>
@@ -447,17 +370,13 @@ const ActivationSystem = () => {
               key: 'device',
               title: 'Устройство',
               render: (activation) =>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Smartphone style={{ width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-text-tertiary)' }} />
+              <div className="admin-flex-center">
+                    <Smartphone className="admin-icon-16-mr-8-tertiary" />
                     <div>
-                      <div style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)'
-                  }}>
+                      <div className="admin-device-title">
                         {(activation || {}).machine_hash ? `${(activation || {}).machine_hash.slice(0, 12)}...` : 'Не привязано'}
                       </div>
-                      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                      <div className="admin-device-sub">
                         {parseMeta((activation || {}).meta).description || parseMeta((activation || {}).meta).key_type || 'Без описания'}
                       </div>
                     </div>
@@ -481,14 +400,11 @@ const ActivationSystem = () => {
                 const isExpired = row.expiry_date ? new Date(row.expiry_date) < new Date() : false;
                 return (
                   <div>
-                      <div style={{
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-primary)'
-                    }}>
+                      <div className="admin-expiry-date">
                         {row.expiry_date ? new Date(row.expiry_date).toLocaleDateString('ru-RU') : '—'}
                       </div>
                       {isExpired &&
-                    <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-error)' }}>
+                    <div className="admin-expiry-expired">
                           Истек {Math.floor((new Date() - new Date(row.expiry_date)) / (1000 * 60 * 60 * 24))} дн. назад
                         </div>
                     }
@@ -500,10 +416,7 @@ const ActivationSystem = () => {
               key: 'created',
               title: 'Создан',
               render: (activation) =>
-              <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)'
-              }}>
+              <div className="admin-created-date">
                     {(activation || {}).created_at ? new Date((activation || {}).created_at).toLocaleDateString('ru-RU') : '—'}
                   </div>
 
@@ -512,7 +425,7 @@ const ActivationSystem = () => {
               key: 'actions',
               title: 'Действия',
               render: (_actionValue, activation) =>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="admin-form-row-gap-8">
                     <Button
                   size="sm"
                   variant="outline"
@@ -522,7 +435,7 @@ const ActivationSystem = () => {
                   title="Продлить активацию"
                   aria-label={`Продлить активацию ${(activation || {}).key || ''}`.trim()}>
                   
-                      <Calendar aria-hidden="true" style={{ width: '14px', height: '14px' }} />
+                      <Calendar aria-hidden="true" className="admin-icon-14" />
                     </Button>
                     <Button
                   size="sm"
@@ -533,7 +446,7 @@ const ActivationSystem = () => {
                   title="Отозвать активацию"
                   aria-label={`Отозвать активацию ${(activation || {}).key || ''}`.trim()}>
                   
-                      <Shield aria-hidden="true" style={{ width: '14px', height: '14px' }} />
+                      <Shield aria-hidden="true" className="admin-icon-14" />
                     </Button>
                   </div>
 
@@ -541,25 +454,12 @@ const ActivationSystem = () => {
             }
             data={filteredActivations}
             emptyState={
-            <div style={{
-              textAlign: 'center',
-              padding: '48px 24px',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                <Key style={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)', margin: '0 auto 16px' }} />
-                <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 8px 0'
-              }}>
+            <div className="admin-empty-p-48-24-center-secondary">
+                <Key className="admin-icon-48-mb-16-mx-auto-tertiary" />
+                <h3 className="admin-empty-h3-lg-med-primary-mb-8">
                   Активации не найдены
                 </h3>
-                <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0
-              }}>
+                <p className="admin-empty-p-sm-secondary">
                   {searchTerm || statusFilter !== 'all' ?
                 'Попробуйте изменить критерии поиска' :
                 'Создайте первый ключ активации'
@@ -580,34 +480,17 @@ const ActivationSystem = () => {
       }
 
       {/* Информация */}
-      <Card style={{
-        padding: '24px',
-        backgroundColor: 'var(--mac-info-bg)',
-        border: '1px solid var(--mac-info-border)'
-      }}>
-        <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          marginBottom: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          color: 'var(--mac-info)'
-        }}>
-          <Shield style={{ width: '20px', height: '20px', marginRight: '8px' }} />
+      <Card className="admin-card-info-bg">
+        <h3 className="admin-shield-h3-info">
+          <Shield className="admin-icon-20-mr-8" />
           Как работает система активации
         </h3>
-        <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}>
-          <p style={{ margin: 0 }}>• Каждое устройство требует уникальный ключ активации</p>
-          <p style={{ margin: 0 }}>• Ключи имеют срок действия и могут быть отозваны</p>
-          <p style={{ margin: 0 }}>• Пробные лицензии ограничены по функциональности</p>
-          <p style={{ margin: 0 }}>• Система работает офлайн после успешной активации</p>
-          <p style={{ margin: 0 }}>• Все активации логируются для аудита</p>
+        <div className="admin-info-list-secondary">
+          <p className="admin-p-list-item-m0">• Каждое устройство требует уникальный ключ активации</p>
+          <p className="admin-p-list-item-m0">• Ключи имеют срок действия и могут быть отозваны</p>
+          <p className="admin-p-list-item-m0">• Пробные лицензии ограничены по функциональности</p>
+          <p className="admin-p-list-item-m0">• Система работает офлайн после успешной активации</p>
+          <p className="admin-p-list-item-m0">• Все активации логируются для аудита</p>
         </div>
       </Card>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
@@ -648,27 +531,15 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
   };
 
   return (
-    <Card style={{ padding: '24px' }}>
-      <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        marginBottom: '16px',
-        color: 'var(--mac-text-primary)',
-        margin: 0
-      }}>
+    <Card className="admin-p-24">
+      <h3 className="admin-h3-lg-med-primary-mb-16">
         Создание ключа активации
       </h3>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+      <form onSubmit={handleSubmit} className="admin-flex-col-16">
+        <div className="admin-grid-auto-250">
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-label-block-sm-med-primary-mb-8">
               Тип лицензии
             </label>
             <Select
@@ -680,18 +551,11 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               { value: 'enterprise', label: 'Корпоративная' }]
               }
               size="large"
-              style={{ width: '100%' }} />
-            
+              className="admin-w-full" />
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-label-block-sm-med-primary-mb-8">
               Срок действия (дни)
             </label>
             <Input
@@ -700,18 +564,11 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               max="3650"
               value={formData.duration_days}
               onChange={(e) => handleChange('duration_days', parseInt(e.target.value))}
-              style={{ width: '100%' }} />
-            
+              className="admin-w-full" />
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-label-block-sm-med-primary-mb-8">
               Максимум устройств
             </label>
             <Input
@@ -720,18 +577,11 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               max="100"
               value={formData.max_devices}
               onChange={(e) => handleChange('max_devices', parseInt(e.target.value))}
-              style={{ width: '100%' }} />
-            
+              className="admin-w-full" />
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-label-block-sm-med-primary-mb-8">
               Описание
             </label>
             <Input
@@ -739,67 +589,56 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
               placeholder="Клиника №1, основная лицензия"
-              style={{ width: '100%' }} />
-            
+              className="admin-w-full" />
           </div>
         </div>
 
         {/* Функции */}
         <div>
-          <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '12px'
-          }}>
+          <label className="admin-label-block-sm-med-primary-mb-12">
             Включенные функции:
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-            <label style={{ display: 'flex', alignItems: 'center' }}>
+          <div className="admin-grid-auto-200-12">
+            <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.full_access}
                 onChange={(e) => handleFeatureChange('full_access', e.target.checked)}
-                style={{ marginRight: '8px' }} />
-              
-              <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>Полный доступ</span>
+                className="admin-mr-8" />
+              <span className="admin-span-sm-primary">Полный доступ</span>
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center' }}>
+            <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.ai_features}
                 onChange={(e) => handleFeatureChange('ai_features', e.target.checked)}
-                style={{ marginRight: '8px' }} />
-              
-              <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>AI функции</span>
+                className="admin-mr-8" />
+              <span className="admin-span-sm-primary">AI функции</span>
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center' }}>
+            <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.telegram_integration}
                 onChange={(e) => handleFeatureChange('telegram_integration', e.target.checked)}
-                style={{ marginRight: '8px' }} />
-              
-              <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>Telegram интеграция</span>
+                className="admin-mr-8" />
+              <span className="admin-span-sm-primary">Telegram интеграция</span>
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center' }}>
+            <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.print_system}
                 onChange={(e) => handleFeatureChange('print_system', e.target.checked)}
-                style={{ marginRight: '8px' }} />
-              
-              <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>Система печати</span>
+                className="admin-mr-8" />
+              <span className="admin-span-sm-primary">Система печати</span>
             </label>
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+        <div className="admin-flex-end-12">
           <Button type="button" variant="outline" onClick={onCancel}>
             Отменить
           </Button>
           <Button type="submit">
-            <Key style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <Key className="admin-icon-16-mr-8" />
             Создать ключ
           </Button>
         </div>

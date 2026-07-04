@@ -90,7 +90,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
         role="dialog"
         aria-modal="true"
         aria-label="Предпросмотр изменений услуги"
-        style={{ padding: '24px' }}
+        className="admin-p-24"
       >
         <AppEmpty
           icon={AlertCircle}
@@ -117,44 +117,23 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
       aria-modal="true"
       aria-labelledby={previewTitleId}
       aria-describedby={previewDescriptionId}
-      style={{ padding: '0' }}
+      className="admin-p-0"
     >
       {/* Header */}
-      <div style={{
-        padding: '20px 24px',
-        borderBottom: '1px solid var(--mac-border)',
-        backgroundColor: hasImportantChanges ? 'rgba(245, 158, 11, 0.05)' : 'transparent'
-      }}>
-        <h3 id={previewTitleId} style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: 'var(--mac-text-primary)',
-          margin: '0 0 8px 0'
-        }}>
+      <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': hasImportantChanges ? 'rgba(245, 158, 11, 0.05)' : 'transparent' }}>
+        <h3 id={previewTitleId} className="admin-fs-18-fw-600-primary-m-0-0-8px-0">
           Предпросмотр изменений
         </h3>
-        <p id={previewDescriptionId} style={{
-          fontSize: '14px',
-          color: 'var(--mac-text-secondary)',
-          margin: 0
-        }}>
+        <p id={previewDescriptionId} className="admin-fs-14-secondary-m-0">
           Проверьте изменения перед сохранением
         </p>
         {hasImportantChanges && (
           <div
             role="status"
             aria-live="polite"
-            style={{
-              marginTop: '12px',
-              padding: '8px 12px',
-              backgroundColor: 'rgba(245, 158, 11, 0.1)',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-            <AlertCircle aria-hidden="true" focusable="false" size={16} style={{ color: 'var(--mac-warning)' }} />
-            <span style={{ fontSize: '13px', color: 'var(--mac-warning)', fontWeight: '500' }}>
+            className="admin-mt-12-p-8px-12px-bgc-rgba-245-158-11-0-1-radius-6-d-flex-ai-center-gap-8">
+            <AlertCircle aria-hidden="true" focusable="false" size={16} className="admin-warning" />
+            <span className="admin-fs-13-warning-fw-500">
               Обнаружены важные изменения
             </span>
           </div>
@@ -165,36 +144,21 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
       <div
         role="list"
         aria-label={changesListLabel}
-        style={{ padding: '16px 24px', maxHeight: '400px', overflowY: 'auto' }}
+        className="admin-p-16px-24px-maxh-400-ovy-auto"
       >
         {changes.map((change, index) => (
           <div
             key={change.field}
             role="listitem"
             aria-label={`${formatFieldName(change.field)}: было ${formatValue(change.oldValue, change.field)}, станет ${formatValue(change.newValue, change.field)}`}
-            style={{
-              padding: '16px',
-              marginBottom: index < changes.length - 1 ? '12px' : 0,
-              backgroundColor: change.isImportant
+            className="admin-p-16-radius-8-mb-dyn-bgc-dyn-bd-dyn" style={{ '--admin-mb0': index < changes.length - 1 ? '12px' : 0, '--admin-bgc1': change.isImportant
                 ? 'rgba(245, 158, 11, 0.05)'
-                : 'var(--mac-bg-secondary)',
-              borderRadius: '8px',
-              border: change.isImportant
+                : 'var(--mac-bg-secondary)', '--admin-bd2': change.isImportant
                 ? '1px solid rgba(245, 158, 11, 0.2)'
-                : '1px solid var(--mac-border)'
-            }}
+                : '1px solid var(--mac-border)' }}
           >
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px'
-            }}>
-              <span style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: 'var(--mac-text-primary)'
-              }}>
+            <div className="admin-d-flex-ai-center-gap-8-mb-12">
+              <span className="admin-fs-14-fw-600-primary">
                 {formatFieldName(change.field)}
               </span>
               {change.isImportant && (
@@ -204,65 +168,26 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
               )}
             </div>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto 1fr',
-              gap: '16px',
-              alignItems: 'center'
-            }}>
+            <div className="admin-d-grid-gtc-1fr-auto-1fr-gap-16-ai-center">
               {/* Old Value */}
-              <div aria-label={`Было: ${formatValue(change.oldValue, change.field)}`} style={{
-                padding: '12px',
-                backgroundColor: 'var(--mac-bg-primary)',
-                borderRadius: '6px',
-                border: '1px solid var(--mac-border)'
-              }}>
-                <div style={{
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-tertiary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>
+              <div aria-label={`Было: ${formatValue(change.oldValue, change.field)}`} className="admin-p-12-bgc-bg-primary-radius-6-bd-1px-solid-var-mac-bo">
+                <div className="admin-fs-11-fw-600-tertiary-tt-uppercase-ls-0p5-mb-6">
                   Было
                 </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: 'var(--mac-text-secondary)',
-                  textDecoration: 'line-through',
-                  wordBreak: 'break-word'
-                }}>
+                <div className="admin-fs-14-secondary-td-line-through-wb-break-word">
                   {formatValue(change.oldValue, change.field)}
                 </div>
               </div>
 
               {/* Arrow */}
-              <ArrowRight aria-hidden="true" size={20} style={{ color: 'var(--mac-accent)', flexShrink: 0 }} />
+              <ArrowRight aria-hidden="true" size={20} className="admin-accent-fsk-0" />
 
               {/* New Value */}
-              <div aria-label={`Станет: ${formatValue(change.newValue, change.field)}`} style={{
-                padding: '12px',
-                backgroundColor: 'rgba(16, 185, 129, 0.05)',
-                borderRadius: '6px',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}>
-                <div style={{
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  color: 'var(--mac-success)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>
+              <div aria-label={`Станет: ${formatValue(change.newValue, change.field)}`} className="admin-p-12-bgc-rgba-16-185-129-0-05-radius-6-bd-1px-solid-rgba-16-18">
+                <div className="admin-fs-11-fw-600-success-tt-uppercase-ls-0p5-mb-6">
                   Станет
                 </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: 'var(--mac-success)',
-                  fontWeight: '600',
-                  wordBreak: 'break-word'
-                }}>
+                <div className="admin-fs-14-success-fw-600-wb-break-word">
                   {formatValue(change.newValue, change.field)}
                 </div>
               </div>
@@ -272,30 +197,23 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
       </div>
 
       {/* Footer */}
-      <div style={{
-        padding: '16px 24px',
-        borderTop: '1px solid var(--mac-border)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: 'var(--mac-bg-secondary)'
-      }}>
-        <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+      <div className="admin-p-16px-24px-bd-t-1px-solid-var-mac-bo-d-flex-jc-between-ai-center-bgc-bg-secondary">
+        <div className="admin-fs-13-secondary-1">
           Изменений: <strong>{changes.length}</strong>
           {hasImportantChanges && (
-            <span style={{ color: 'var(--mac-warning)', marginLeft: '8px' }}>
+            <span className="admin-warning-ml-8">
               • Важных: <strong>{importantChangesCount}</strong>
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="admin-d-flex-gap-12">
           <Button
             type="button"
             variant="outline"
             aria-label="Отменить и вернуться к редактированию услуги"
             onClick={onCancel}
           >
-            <X aria-hidden="true" focusable="false" size={16} style={{ marginRight: '8px' }} />
+            <X aria-hidden="true" focusable="false" size={16} className="admin-mr-8" />
             Отменить
           </Button>
           <Button
@@ -303,7 +221,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
             aria-label={`Подтвердить ${changes.length} изменений услуги`}
             onClick={onConfirm}
           >
-            <Check aria-hidden="true" focusable="false" size={16} style={{ marginRight: '8px' }} />
+            <Check aria-hidden="true" focusable="false" size={16} className="admin-mr-8" />
             Подтвердить изменения
           </Button>
         </div>

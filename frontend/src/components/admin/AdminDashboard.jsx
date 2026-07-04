@@ -27,31 +27,9 @@ import AdminRouteSwitcher from './AdminRouteSwitcher';
 import ErrorBoundary from './ErrorBoundary';
 
 const adminSurface = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 72%) 0%, color-mix(in srgb, var(--mac-card-bg), white 64%) 100%)';
-const adminSurfaceStrong = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 78%) 0%, color-mix(in srgb, var(--mac-card-bg), white 70%) 100%)';
 const adminInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 82%)';
 const adminBorder = '1px solid color-mix(in srgb, var(--mac-card-border), white 12%)';
 const adminTextSecondary = 'color-mix(in srgb, var(--mac-text-secondary), black 42%)';
-
-const adminSectionShellStyle = {
-  background: 'var(--mac-gradient-sidebar)',
-  border: '1px solid var(--mac-main-shell-border)',
-  borderRadius: '24px',
-  boxShadow: 'none',
-  backdropFilter: 'var(--mac-blur-light)',
-  WebkitBackdropFilter: 'var(--mac-blur-light)',
-};
-
-const adminKpiGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-  gap: 'var(--mac-spacing-6)',
-};
-
-const adminKpiCardStyle = {
-  minHeight: '112px',
-  background: adminSurfaceStrong,
-  border: adminBorder,
-};
 
 const defaultStats = {
   totalUsers: 0,
@@ -99,11 +77,11 @@ function getStatusIcon(status) {
     default: 'var(--mac-text-tertiary)',
   };
 
-  if (status === 'success') return <CheckCircle style={{ width: '16px', height: '16px', color: colorMap.success }} />;
-  if (status === 'warning') return <AlertTriangle style={{ width: '16px', height: '16px', color: colorMap.warning }} />;
-  if (status === 'error') return <AlertTriangle style={{ width: '16px', height: '16px', color: colorMap.error }} />;
-  if (status === 'info') return <Clock style={{ width: '16px', height: '16px', color: colorMap.info }} />;
-  return <Clock style={{ width: '16px', height: '16px', color: colorMap.default }} />;
+  if (status === 'success') return <CheckCircle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.success }} />;
+  if (status === 'warning') return <AlertTriangle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.warning }} />;
+  if (status === 'error') return <AlertTriangle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.error }} />;
+  if (status === 'info') return <Clock className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.info }} />;
+  return <Clock className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.default }} />;
 }
 
 function buildSystemAlerts(systemAlertsData) {
@@ -210,11 +188,11 @@ const AdminDashboard = () => {
 
   return (
     <ErrorBoundary>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div className="admin-flex-col-24">
         <AdminRouteSwitcher current="dashboard" />
 
         {statsLoading ? (
-          <div style={adminKpiGridStyle} aria-label="Загрузка ключевых показателей администратора" aria-busy="true">
+          <div className="admin-kpi-grid" aria-label="Загрузка ключевых показателей администратора" aria-busy="true">
             <Skeleton type="card" count={6} />
           </div>
         ) : statsError ? (
@@ -230,7 +208,7 @@ const AdminDashboard = () => {
             )}
           />
         ) : (
-          <div style={adminKpiGridStyle} role="list" aria-label="Ключевые показатели администратора">
+          <div className="admin-kpi-grid" role="list" aria-label="Ключевые показатели администратора">
             {dashboardKpis.map((kpi) => (
               <div key={kpi.key} role="listitem">
                 <MacOSStatCard
@@ -239,51 +217,28 @@ const AdminDashboard = () => {
                   icon={kpi.icon}
                   color={kpi.color}
                   loading={statsLoading}
-                  style={adminKpiCardStyle}
+                  className="admin-kpi-card"
                 />
               </div>
             ))}
           </div>
         )}
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '24px',
-        }}>
-          <MacOSCard style={{ ...adminSectionShellStyle, padding: '24px' }}>
-            <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: 0,
-              }}>Активность системы</h3>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
+          <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-24">
+            <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
+              <h3 className="admin-fs-lg-fw-semi-primary-m-0">Активность системы</h3>
               <Button variant="outline" size="sm">
-                <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                <Download className="admin-icon-16-mr-8" />
                 Экспорт
               </Button>
             </div>
             {activityChartLoading ? (
-              <div style={{
-                height: '256px',
-                borderRadius: 'var(--mac-radius-md)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: adminSurface,
-              }}>
+              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
                 <Skeleton type="text" count={3} />
               </div>
             ) : activityChartError ? (
-              <div style={{
-                height: '256px',
-                borderRadius: 'var(--mac-radius-md)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: adminSurface,
-              }}>
+              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
                 <MacOSEmptyState
                   icon={AlertTriangle}
                   title="Ошибка загрузки графика"
@@ -291,106 +246,51 @@ const AdminDashboard = () => {
                 />
               </div>
             ) : activityChartData?.data && activityChartData.data.length > 0 ? (
-              <div style={{
-                height: '256px',
-                borderRadius: 'var(--mac-radius-md)',
-                padding: '16px',
-                background: adminSurface,
-                border: adminBorder,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  justifyContent: 'space-around',
-                  height: '200px',
-                  gap: '4px',
-                }}>
+              <div className="admin-h-256-radius-var-mac-radius-md-p-16-d-flex-fd-column-jc-between-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminSurface, '--admin-bd1': adminBorder }}>
+                <div className="admin-d-flex-ai-end-jc-around-h-200-gap-4">
                   {activityChartData.data.map((item, index) => {
                     const maxValue = Math.max(...activityChartData.data.map((entry) => entry.total || 0));
                     const height = maxValue > 0 ? (item.total / maxValue) * 180 : 0;
                     return (
-                      <div key={`${activityChartData.labels?.[index] || 'activity'}-${index}`} style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}>
-                        <div style={{
-                          width: '100%',
-                          height: `${height}px`,
-                          background: 'linear-gradient(to top, #2563eb, #60a5fa)',
-                          borderRadius: '4px 4px 0 0',
-                          minHeight: '4px',
-                          transition: 'height 0.3s ease',
-                        }} />
-                        <span style={{
-                          fontSize: '10px',
-                          color: 'var(--mac-text-tertiary)',
-                          textAlign: 'center',
-                        }}>
+                      <div key={`${activityChartData.labels?.[index] || 'activity'}-${index}`} className="admin-flex-1-d-flex-fd-column-ai-center-gap-4">
+                        <div className="admin-w-100pct-bg-linear-gradient-to-t-radius-4px-4px-0-0-minh-4-tr-height-0-3s-ease-h-dyn" style={{ '--admin-h0': `${height}px` }} />
+                        <span className="admin-fs-10-tertiary-ta-center">
                           {activityChartData.labels[index]}
                         </span>
                       </div>
                     );
                   })}
                 </div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-around',
-                  marginTop: '8px',
-                  fontSize: '12px',
-                  color: adminTextSecondary,
-                }}>
+                <div className="admin-d-flex-jc-around-mt-8-fs-12-col-dyn" style={{ '--admin-col0': adminTextSecondary }}>
                   <span>Записи: {activityChartData.data.reduce((sum, entry) => sum + (entry.appointments || 0), 0)}</span>
                   <span>Платежи: {activityChartData.data.reduce((sum, entry) => sum + (entry.payments || 0), 0)}</span>
                   <span>Пользователи: {activityChartData.data.reduce((sum, entry) => sum + (entry.users || 0), 0)}</span>
                 </div>
               </div>
             ) : (
-              <div style={{
-                height: '256px',
-                borderRadius: 'var(--mac-radius-md)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: adminSurface,
-              }}>
-                <div style={{ textAlign: 'center' }}>
-                  <Activity style={{
-                    width: '48px',
-                    height: '48px',
-                    margin: '0 auto 16px auto',
-                    color: adminTextSecondary,
-                  }} />
-                  <p style={{ color: adminTextSecondary }}>Нет данных за выбранный период</p>
+              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
+                <div className="admin-text-center">
+                  <Activity className="admin-w-48-h-48-m-0-auto-16px-auto-col-dyn" style={{ '--admin-col0': adminTextSecondary }} />
+                  <p className="admin-col-dyn" style={{ '--admin-col0': adminTextSecondary }}>Нет данных за выбранный период</p>
                 </div>
               </div>
             )}
           </MacOSCard>
 
-          <MacOSCard style={{ ...adminSectionShellStyle, padding: 0 }}>
-            <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: 0,
-              }}>Последние действия</h3>
+          <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0-1">
+            <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
+              <h3 className="admin-fs-lg-fw-semi-primary-m-0">Последние действия</h3>
               <Button variant="outline" size="sm">
-                <Eye style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                <Eye className="admin-icon-16-mr-8" />
                 Все
               </Button>
             </div>
             {recentActivitiesLoading ? (
-              <div style={{ padding: '16px' }}>
+              <div className="admin-p-16">
                 <Skeleton type="text" count={4} />
               </div>
             ) : recentActivitiesError ? (
-              <div style={{ padding: '16px' }}>
+              <div className="admin-p-16">
                 <MacOSEmptyState
                   icon={AlertTriangle}
                   title="Ошибка загрузки"
@@ -398,34 +298,17 @@ const AdminDashboard = () => {
                 />
               </div>
             ) : recentActivities.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--mac-text-secondary)' }}>Нет последних действий</p>
+              <div className="admin-p-16-ta-center">
+                <p className="admin-text-secondary">Нет последних действий</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="admin-flex-col-16">
                 {recentActivities.map((activity) => (
-                  <div key={activity.id} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px',
-                    borderRadius: 'var(--mac-radius-md)',
-                    background: adminInsetSurface,
-                    border: adminBorder,
-                  }}>
+                  <div key={activity.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminInsetSurface, '--admin-bd1': adminBorder }}>
                     {getStatusIcon(activity.status)}
-                    <div style={{ flex: '1' }}>
-                      <p style={{
-                        fontSize: 'var(--mac-font-size-sm)',
-                        fontWeight: 'var(--mac-font-weight-medium)',
-                        color: 'var(--mac-text-primary)',
-                        margin: 0,
-                      }}>{activity.message}</p>
-                      <p style={{
-                        fontSize: 'var(--mac-font-size-xs)',
-                        color: 'var(--mac-text-secondary)',
-                        margin: '4px 0 0 0',
-                      }}>{activity.user} · {activity.time || formatTimeAgo(activity.created_at)}</p>
+                    <div className="admin-flex-1">
+                      <p className="admin-fs-sm-fw-med-primary-m-0">{activity.message}</p>
+                      <p className="admin-fs-xs-secondary-m-4px-0-0-0">{activity.user} · {activity.time || formatTimeAgo(activity.created_at)}</p>
                     </div>
                   </div>
                 ))}
@@ -434,22 +317,17 @@ const AdminDashboard = () => {
           </MacOSCard>
         </div>
 
-        <MacOSCard style={{ ...adminSectionShellStyle, padding: 0, marginTop: '24px' }}>
-          <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0,
-            }}>Системные уведомления</h3>
+        <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0-mt-24">
+          <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
+            <h3 className="admin-fs-lg-fw-semi-primary-m-0">Системные уведомления</h3>
             <Badge variant="warning">{systemAlerts.length}</Badge>
           </div>
           {systemAlertsLoading ? (
-            <div style={{ padding: '16px' }}>
+            <div className="admin-p-16">
               <Skeleton type="text" count={3} />
             </div>
           ) : systemAlertsError ? (
-            <div style={{ padding: '16px' }}>
+            <div className="admin-p-16">
               <MacOSEmptyState
                 icon={AlertTriangle}
                 title="Ошибка загрузки"
@@ -457,34 +335,17 @@ const AdminDashboard = () => {
               />
             </div>
           ) : systemAlerts.length === 0 ? (
-            <div style={{ padding: '16px', textAlign: 'center' }}>
-              <p style={{ color: 'var(--mac-text-secondary)' }}>Нет системных уведомлений</p>
+            <div className="admin-p-16-ta-center">
+              <p className="admin-text-secondary">Нет системных уведомлений</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="admin-flex-col-16">
               {systemAlerts.map((alert) => (
-                <div key={alert.id} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px',
-                  border: adminBorder,
-                  borderRadius: 'var(--mac-radius-md)',
-                  background: adminInsetSurface,
-                }}>
-                  <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
-                  <div style={{ flex: '1' }}>
-                    <p style={{
-                      fontSize: 'var(--mac-font-size-sm)',
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      color: 'var(--mac-text-primary)',
-                      margin: 0,
-                    }}>{alert.message}</p>
-                    <p style={{
-                      fontSize: '12px',
-                      color: 'var(--mac-text-secondary)',
-                      margin: '4px 0 0 0',
-                    }}>{alert.time}</p>
+                <div key={alert.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bd-dyn-bg-dyn" style={{ '--admin-bd0': adminBorder, '--admin-bg1': adminInsetSurface }}>
+                  <AlertTriangle className="admin-w-20-h-20-warning" />
+                  <div className="admin-flex-1">
+                    <p className="admin-fs-sm-fw-med-primary-m-0">{alert.message}</p>
+                    <p className="admin-fs-12-secondary-m-4px-0-0-0">{alert.time}</p>
                   </div>
                   <Badge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
                     {alert.priority}

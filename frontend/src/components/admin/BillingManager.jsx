@@ -265,37 +265,20 @@ const BillingManager = () => {
   };
 
   const renderInvoicesTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Заголовок и кнопки */}
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }}>
+      <div className="admin-d-flex-jc-between-ai-center">
         <div>
-          <h3 style={{
-          margin: '0 0 4px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+          <h3 className="admin-m-0-0-4px-0-primary-fs-lg-fw-semi">
             Счета
           </h3>
-          <p style={{
-          margin: 0,
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+          <p className="admin-m-0-secondary-fs-sm">
             Управление счетами и выставлением
           </p>
         </div>
         <Button
         onClick={() => setShowCreateInvoice(true)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
           <Plus size={16} />
           Создать счет
@@ -303,7 +286,7 @@ const BillingManager = () => {
       </div>
 
       {/* Список счетов */}
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="admin-d-grid-gap-16">
         {invoices.length === 0 ?
       <MacOSEmptyState
         type="invoice"
@@ -311,32 +294,18 @@ const BillingManager = () => {
         description="В системе пока нет созданных счетов"
         action={
         <Button onClick={() => setShowCreateInvoice(true)}>
-                <Plus size={16} style={{ marginRight: '8px' }} />
+                <Plus size={16} className="admin-mr-8" />
                 Создать первый счет
               </Button>
         } /> :
 
 
       invoices.map((invoice) =>
-      <MacOSCard key={invoice.id} style={{ padding: 0 }}>
-              <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start'
-        }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px'
-            }}>
-                    <h4 style={{
-                margin: 0,
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-md)',
-                fontWeight: 'var(--mac-font-weight-semibold)'
-              }}>
+      <MacOSCard key={invoice.id} className="admin-p-0">
+              <div className="admin-d-flex-jc-between-ai-start">
+                <div className="admin-flex-1">
+                  <div className="admin-d-flex-ai-center-gap-8-mb-12">
+                    <h4 className="admin-m-0-primary-fs-var-mac-font-size-md-fw-semi">
                       Счет № {invoice.invoice_number}
                     </h4>
                     {getStatusBadge(invoice.status)}
@@ -345,14 +314,7 @@ const BillingManager = () => {
                     </Badge>
                   </div>
 
-                  <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              marginBottom: '8px'
-            }}>
+                  <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-8-fs-sm-secondary-mb-8">
                     <div>Пациент ID: {invoice.patient_id}</div>
                     <div>Дата: {new Date(invoice.issue_date).toLocaleDateString()}</div>
                     <div>Срок оплаты: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'Не указан'}</div>
@@ -360,28 +322,17 @@ const BillingManager = () => {
                   </div>
 
                   {invoice.balance > 0 &&
-            <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-error)'
-            }}>
+            <div className="admin-fs-sm-error">
                       К доплате: {invoice.balance.toLocaleString()} сум
                     </div>
             }
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="admin-d-flex-gap-8">
                   <Button
               variant="outline"
               onClick={() => handleViewInvoiceHTML(invoice.id)}
-              style={{
-                padding: '6px',
-                minWidth: 'auto',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center-5"
               title="Просмотреть счет"
               type="button"
               aria-label={`Просмотреть счет ${invoice.invoice_number || invoice.id}`}>
@@ -391,15 +342,7 @@ const BillingManager = () => {
                   <Button
               variant="outline"
               onClick={() => handleSendInvoice(invoice.id)}
-              style={{
-                padding: '6px',
-                minWidth: 'auto',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center-4"
               title="Отправить счет"
               type="button"
               aria-label={`Отправить счет ${invoice.invoice_number || invoice.id}`}>
@@ -412,15 +355,7 @@ const BillingManager = () => {
                 setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance });
                 setShowRecordPayment(true);
               }}
-              style={{
-                padding: '6px',
-                minWidth: 'auto',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center-3"
               title="Записать платеж"
               type="button"
               aria-label={`Записать платеж по счету ${invoice.invoice_number || invoice.id}`}>
@@ -436,19 +371,9 @@ const BillingManager = () => {
 
       {/* Форма создания счета */}
       {showCreateInvoice &&
-    <MacOSCard style={{ padding: 0 }}>
-          <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px'
-      }}>
-            <h4 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+    <MacOSCard className="admin-p-0">
+          <div className="admin-d-flex-jc-between-ai-center-mb-16-3">
+            <h4 className="admin-m-0-primary-fs-lg-fw-semi-1">
               Создать счет
             </h4>
             <Button
@@ -457,29 +382,15 @@ const BillingManager = () => {
           type="button"
           title="Закрыть форму создания счета"
           aria-label="Закрыть форму создания счета"
-          style={{
-            padding: '6px',
-            minWidth: 'auto',
-            width: '32px',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+          className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center-2">
           
               <X aria-hidden="true" size={16} />
             </Button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+          <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-mb-16-1">
             <div>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-9">
                 ID пациента
               </label>
               <Input
@@ -491,13 +402,7 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-8">
                 Тип счета
               </label>
               <Select
@@ -509,13 +414,7 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-7">
                 Срок оплаты (дней)
               </label>
               <Input
@@ -526,24 +425,24 @@ const BillingManager = () => {
           
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
+            <div className="admin-d-flex-ai-center-gap-16">
+              <label className="admin-d-flex-ai-center-gap-8-fs-sm-primary-2">
                 <input
               type="checkbox"
               aria-label="Auto send invoice"
               checked={invoiceForm.auto_send}
               onChange={(e) => setInvoiceForm({ ...invoiceForm, auto_send: e.target.checked })}
-              style={{ margin: 0 }} />
+              className="admin-m-0" />
             
                 Автоотправка
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
+              <label className="admin-d-flex-ai-center-gap-8-fs-sm-primary-1">
                 <input
               type="checkbox"
               aria-label="Send payment reminders"
               checked={invoiceForm.send_reminders}
               onChange={(e) => setInvoiceForm({ ...invoiceForm, send_reminders: e.target.checked })}
-              style={{ margin: 0 }} />
+              className="admin-m-0" />
             
                 Напоминания
               </label>
@@ -551,29 +450,14 @@ const BillingManager = () => {
           </div>
 
           {/* Позиции счета */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '8px'
-        }}>
-              <label style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+          <div className="admin-mb-16">
+            <div className="admin-d-flex-jc-between-ai-center-mb-8">
+              <label className="admin-fs-sm-fw-med-primary">
                 Позиции счета
               </label>
               <Button
             onClick={addInvoiceItem}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 8px',
-              fontSize: 'var(--mac-font-size-xs)'
-            }}>
+            className="admin-d-flex-ai-center-gap-4-p-4px-8px-fs-xs">
             
                 <Plus size={14} />
                 Добавить
@@ -581,16 +465,7 @@ const BillingManager = () => {
             </div>
 
             {invoiceForm.items.map((item, index) =>
-        <div key={index} style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 1fr 1fr auto',
-          gap: '8px',
-          marginBottom: '8px',
-          padding: '12px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: 'var(--mac-bg-secondary)'
-        }}>
+        <div key={index} className="admin-d-grid-gtc-2fr-1fr-1fr-auto-gap-8-mb-8-p-12-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-bgc-bg-secondary">
                 <Input
             placeholder="Описание"
             value={item.description}
@@ -615,15 +490,7 @@ const BillingManager = () => {
             title={`Удалить позицию счета ${index + 1}`}
             aria-label={`Удалить позицию счета ${index + 1}`}
             disabled={invoiceForm.items.length === 1}
-            style={{
-              padding: '6px',
-              minWidth: 'auto',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+            className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center-1">
             
                   <Trash2 aria-hidden="true" size={16} />
                 </Button>
@@ -631,15 +498,9 @@ const BillingManager = () => {
         )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginBottom: '16px' }}>
+          <div className="admin-d-grid-gtc-1fr-gap-16-mb-16">
             <div>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-6">
                 Описание
               </label>
               <Textarea
@@ -651,7 +512,7 @@ const BillingManager = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <div className="admin-d-flex-jc-end-gap-8-3">
             <Button
           variant="outline"
           onClick={() => setShowCreateInvoice(false)}>
@@ -660,11 +521,7 @@ const BillingManager = () => {
             </Button>
             <Button
           onClick={handleCreateInvoice}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          className="admin-flex-center-8">
           
               <Save size={16} />
               Создать
@@ -675,19 +532,9 @@ const BillingManager = () => {
 
       {/* Форма записи платежа */}
       {showRecordPayment &&
-    <MacOSCard style={{ padding: 0 }}>
-          <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px'
-      }}>
-            <h4 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+    <MacOSCard className="admin-p-0">
+          <div className="admin-d-flex-jc-between-ai-center-mb-16-2">
+            <h4 className="admin-m-0-primary-fs-lg-fw-semi">
               Записать платеж
             </h4>
             <Button
@@ -696,29 +543,15 @@ const BillingManager = () => {
           type="button"
           title="Закрыть форму записи платежа"
           aria-label="Закрыть форму записи платежа"
-          style={{
-            padding: '6px',
-            minWidth: 'auto',
-            width: '32px',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+          className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center">
           
               <X aria-hidden="true" size={16} />
             </Button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+          <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-mb-16">
             <div>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-5">
                 ID счета
               </label>
               <Input
@@ -730,13 +563,7 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-4">
                 Сумма платежа
               </label>
               <Input
@@ -748,13 +575,7 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-3">
                 Способ оплаты
               </label>
               <Select
@@ -766,13 +587,7 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-2">
                 Номер ссылки
               </label>
               <Input
@@ -782,14 +597,8 @@ const BillingManager = () => {
           
             </div>
 
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <div className="admin-gc-1-1">
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-1">
                 Описание
               </label>
               <Textarea
@@ -801,7 +610,7 @@ const BillingManager = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <div className="admin-d-flex-jc-end-gap-8-2">
             <Button
           variant="outline"
           onClick={() => setShowRecordPayment(false)}>
@@ -810,11 +619,7 @@ const BillingManager = () => {
             </Button>
             <Button
           onClick={handleRecordPayment}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          className="admin-flex-center-8">
           
               <Save size={16} />
               Записать
@@ -940,59 +745,28 @@ const BillingManager = () => {
 
 
   return (
-    <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
+    <div className="admin-p-0-maxw-1400-m-0-auto">
+      <div className="admin-d-flex-ai-center-gap-16-mb-24">
         <DollarSign size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-xl)',
-            fontWeight: 'var(--mac-font-weight-bold)'
-          }}>
+          <h2 className="admin-m-0-primary-fs-xl-fw-bold">
             Управление биллингом
           </h2>
-          <p style={{
-            margin: '4px 0 0 0',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          <p className="admin-m-4px-0-0-0-secondary-fs-sm">
             Автоматическое выставление счетов, управление платежами и аналитика
           </p>
         </div>
       </div>
 
       {/* Табы */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-d-flex-bd-b-1px-solid-var-mac-bo-mb-24">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '16px 24px',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                borderBottom: activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent',
-                color: activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-                fontWeight: activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-                fontSize: 'var(--mac-font-size-sm)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}>
+              className="admin-p-16px-24px-bd-none-bg-none-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-bd-b-dyn-col-dyn-fw-dyn" style={{ '--admin-bd-b0': activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent', '--admin-col1': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw2': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}>
               
               <Icon size={16} />
               {tab.label}
