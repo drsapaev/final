@@ -1572,7 +1572,7 @@ const DentistPanelUnified = () => {
   // Рендер дашборда
   const renderDashboard = () =>
     <DentalDashboardTab
-      appointments={appointments}
+      appointments={appointmentsTableData}
       patients={patients}
       onGoToAppointments={() => handleTabChange('appointments')}
       onGoToPatients={() => handleTabChange('patients')}
@@ -1836,15 +1836,15 @@ const DentistPanelUnified = () => {
   const renderTemplates = () =>
     <DentalTemplatesTab
       onManageTemplates={handleProtocolTemplates}
-      templates={protocolTemplates}
-      onApplyTemplate={handleApplyTemplate}
+      templates={[]}
+      onApplyTemplate={() => notify.info('Шаблоны будут реализованы в следующей версии')}
     />
   const renderReports = () =>
     <DentalReportsTab
       savedVisitProtocols={savedVisitProtocols}
       onReopenProtocol={reopenVisitProtocol}
       patients={patients}
-      diagnoses={diagnoses}
+      diagnoses={[]}
       prosthetics={prosthetics}
     />
   const renderDentalChart = () =>
