@@ -221,3 +221,264 @@
   padding: 48px;
   text-align: center;
 }
+
+/* ─── Batch: Page root + padding wrappers ─── */
+.derma-page-root {
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--mac-gradient-window);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  color: var(--mac-text-primary);
+  transition: background var(--mac-duration-normal) var(--mac-ease);
+}
+.derma-p-0 { padding: 0; }
+.derma-p-24 { padding: 24px; }
+.derma-p-32 { padding: 32px; }
+.derma-p-48 { padding: 48px; }
+
+/* ─── Batch: Card surfaces (composed presets) ─── */
+.derma-card-w-full {
+  padding: 24px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.derma-patient-card {
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  padding: 24px;
+  background-color: var(--mac-bg-primary);
+  transition: box-shadow var(--mac-duration-normal) var(--mac-ease);
+}
+.derma-card-p16-bg2 {
+  border: 1px solid var(--mac-border);
+  border-radius: 8px;
+  padding: 16px;
+  background-color: var(--mac-bg-secondary);
+}
+.derma-card-p12-bg2-13 {
+  border: 1px solid var(--mac-border);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+  background-color: var(--mac-bg-secondary);
+}
+.derma-card-p48-center { padding: 48px; text-align: center; }
+
+/* ─── Batch: Flex utilities (composed) ─── */
+.derma-flex-1 { flex: 1; }
+.derma-flex-gap-16 { display: flex; gap: 16px; }
+.derma-flex-gap-8 { display: flex; gap: 8px; }
+.derma-flex-end-gap12 { display: flex; justify-content: flex-end; gap: 12px; }
+.derma-flex-between-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.derma-flex-col-20 { display: flex; flex-direction: column; gap: 20px; }
+
+/* ─── Batch: Loading state ─── */
+.derma-loading-state {
+  text-align: center;
+  padding: 32px;
+}
+.derma-loading-icon {
+  margin: 0 auto 16px;
+  color: var(--mac-text-secondary);
+  animation: spin 1s linear infinite;
+  display: block;
+}
+.derma-p-14-secondary {
+  color: var(--mac-text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ─── Batch: Icon margin presets for missing tokens ─── */
+.derma-icon-mr-6-green   { margin-right: 6px; color: var(--mac-success); }
+.derma-icon-mr-6-secondary { margin-right: 6px; color: var(--mac-text-secondary); }
+.derma-icon-mr-orange  { margin-right: 8px; color: var(--mac-accent-orange); }
+.derma-icon-mr-pink    { margin-right: 8px; color: var(--mac-accent-purple); }
+.derma-icon-16-mr-8-green { margin-right: 8px; color: var(--mac-success); }
+.derma-icon-16-mr-8-secondary { margin-right: 8px; color: var(--mac-text-secondary); }
+
+/* ─── Batch: Form label presets ─── */
+.derma-label-13-mb6 {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mac-text-secondary);
+  margin-bottom: 6px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-label-13-mb8 {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mac-text-secondary);
+  margin-bottom: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+/* ─── Batch: Heading & text presets ─── */
+.derma-section-heading-mb16 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+}
+.derma-section-heading-display {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  display: block;
+}
+.derma-h4-16-600 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  margin: 0;
+}
+.derma-text-16-600-primary {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-text-16-500-primary {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-text-14-600-primary {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-text-13-600-primary {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-text-18-600-primary {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-patient-info-list {
+  font-size: 13px;
+  color: var(--mac-text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.derma-mt-8-text-14-primary {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-ml-8-text-13-secondary {
+  margin-left: 8px;
+  font-size: 13px;
+  color: var(--mac-text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-text-center { text-align: center; }
+
+/* ─── Batch: Grid utilities (extra presets) ─── */
+.derma-grid-auto-150-16 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+.derma-grid-auto-200-13 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  font-size: 13px;
+  color: var(--mac-accent-blue);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-grid-auto-300 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+.derma-grid-auto-350-24 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 24px;
+}
+
+/* ─── Batch: Services / price info box ─── */
+.derma-price-info-box {
+  background-color: var(--mac-accent-blue-bg);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--mac-accent-border);
+}
+.derma-price-h4 {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--mac-text-primary);
+  margin-bottom: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+/* ─── Batch: Dollar input wrapper ─── */
+.derma-pos-rel-flex-1 { position: relative; flex: 1; }
+.derma-dollar-icon-abs {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mac-text-secondary);
+}
+.derma-input-pl-40 { padding-left: 40px; }
+
+/* ─── Batch: History list scroll ─── */
+.derma-history-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.derma-history-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--mac-text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.derma-history-cost {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--mac-success);
+  margin-top: 4px;
+}
+
+/* ─── Batch: Spin animation (define locally if missing) ─── */
+@keyframes derma-spin {
+  to { transform: rotate(360deg); }
+}
+.derma-spin {
+  animation: derma-spin 1s linear infinite;
+}
