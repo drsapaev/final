@@ -80,3 +80,74 @@
 .patient-search-input:disabled {
   opacity: 0.65;
 }
+
+/* ─── Fix: missing class definitions ─── */
+
+/* ─── Patient component wrapper (root container) ─── */
+.patient-component {
+  padding: var(--mac-spacing-6);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  color: var(--mac-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+.patient-component h2 {
+  margin: 0 0 var(--mac-spacing-4);
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Patient form (vertical stack of inputs + submit button) ─── */
+.patient-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3);
+  margin-bottom: var(--mac-spacing-6);
+}
+
+.patient-form input {
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--mac-duration-normal) var(--mac-ease);
+}
+
+.patient-form input:focus {
+  border-color: var(--mac-accent-blue);
+}
+
+.patient-form input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.patient-form button {
+  align-self: flex-start;
+  padding: var(--mac-spacing-2) var(--mac-spacing-4);
+  background: var(--mac-accent-blue);
+  color: var(--mac-text-on-accent);
+  border: 1px solid var(--mac-accent-blue);
+  border-radius: var(--mac-radius-md);
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-medium);
+  cursor: pointer;
+  transition: background var(--mac-duration-normal) var(--mac-ease);
+}
+
+.patient-form button:hover:not(:disabled) {
+  background: var(--mac-accent-blue-hover);
+  border-color: var(--mac-accent-blue-hover);
+}
+
+.patient-form button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
