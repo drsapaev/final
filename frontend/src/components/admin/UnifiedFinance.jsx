@@ -5,39 +5,9 @@ import BillingManager from './BillingManager';
 import DynamicPricingManager from './DynamicPricingManager';
 import DiscountBenefitsManager from './DiscountBenefitsManager';
 import AdminFinanceOverview from './AdminFinanceOverview';
-import { useTheme } from '../../contexts/ThemeContext';
 import ErrorBoundary from '../common/ErrorBoundary';
+import { MacOSTab } from '../ui/macos';
 
-// Простой компонент вкладок для админки
-const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
-  return (
-    <div className="admin-tab-bar-flex-dyn" style={{ '--admin-bg': 'var(--mac-card-bg)', '--admin-bd': '1px solid var(--mac-card-border)' }}>
-      {tabs.map((tab) =>
-      <button
-        key={tab.id}
-        onClick={() => onTabChange(tab.id)}
-        className="admin-tab-btn-dyn"
-        style={{
-          '--admin-tab-bg': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-accent-blue), transparent 88%)' : 'transparent',
-          '--admin-tab-color': activeTab === tab.id ? 'var(--mac-accent-blue)' : 'var(--mac-text-primary)',
-          '--admin-tab-fw': activeTab === tab.id ? '600' : '400',
-        }}>
-        
-          {tab.label}
-        </button>
-      )}
-    </div>);
-
-};
-
-AdminTabs.propTypes = {
-  tabs: PropTypes.arrayOf(PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    label: PropTypes.string.isRequired
-  })).isRequired,
-  activeTab: PropTypes.string.isRequired,
-  onTabChange: PropTypes.func.isRequired
-};
 
 const UnifiedFinance = ({ renderFinance }) => {
   const [searchParams] = useSearchParams();
@@ -84,7 +54,7 @@ const UnifiedFinance = ({ renderFinance }) => {
 
   return (
     <div className="admin-unified-root-no-color">
-      <AdminTabs
+      <MacOSTab
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={setActiveTab} />
