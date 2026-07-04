@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowRight, AtSign, Eye, EyeOff, LogIn, CircleHelp, Phone, UserPlus, UserRound } from 'lucide-react';
+import { ArrowRight, AtSign, Eye, EyeOff, LogIn, CircleHelp, Phone, UserPlus, UserRound, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api, setToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
 import { useSetupStatus } from '../../hooks/useSetupStatus.js';
+import { useTranslation } from '../../hooks/useTranslation.jsx';
 import { colors } from '../../theme/tokens';
 import { BRAND } from '../../config/brand';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
@@ -35,8 +36,17 @@ const LoginFormStyled = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const setupStatus = useSetupStatus();
+  // UX Audit Stage 2 (Login issue 3.5): передаём language в ForgotPassword.
+  // Раньше ForgotPassword всегда использовал 'RU' по умолчанию, даже если
+  // остальной UI на EN/UZ/KK. Теперь язык пробрасывается из useTranslation.
+  const { language: rawLanguage } = useTranslation();
+  // ForgotPassword ожидает 'RU'/'UZ'/'EN' (upper-case), useTranslation даёт 'ru'/'uz'/'en'.
+  const language = (rawLanguage || 'ru').toUpperCase();
   const from = location.state?.from?.pathname || landingRoute;
   const showSetupCta = setupStatus.initialized === false;
+  // UX Audit Stage 2 (Login issue 3.2): Caps Lock warning.
+  // Detect через keyboard event (getModifierState('CapsLock')).
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const authControlStyles = {
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
     color: '#0f172a',
@@ -276,6 +286,55 @@ const LoginFormStyled = () => {
     }));
   };
 
+  // UX Audit Stage 2 (Login issue 3.2): обработчики Caps Lock detection.
+  // getModifierState('CapsLock') работает в keydown/keyup/keypress.
+  // На keyup сбрасываем, на keydown — обновляем.
+  const handleKeyDown = (e) => {
+    if (typeof e.getModifierState === 'function') {
+      setCapsLockOn(e.getModifierState('CapsLock'));
+    }
+  };
+
+  const handleKeyUp = (e) => {
+    if (typeof e.getModifierState === 'function') {
+      setCapsLockOn(e.getModifierState('CapsLock'));
+    }
+  };
+
+  // UX Audit Stage 2 (Login issue 3.4): 2FA-табы через proper ARIA roles.
+  // Раньше это были 3 обычные <button> без role/aria-selected/aria-controls.
+  // Теперь это proper tablist с keyboard navigation support.
+  const twoFactorTabs = [
+    { id: 'totp', label: 'Приложение' },
+    { id: 'backup', label: 'Backup код' },
+    { id: 'recovery', label: 'Восстановление' },
+  ];
+  const twoFactorTabPanelId = 'twofactor-tabpanel';
+
+  const handle2FATabKeyDown = (e, index) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const next = twoFactorTabs[(index + 1) % twoFactorTabs.length];
+      setTwoFactorMethod(next.id);
+      document.getElementById(`twofactor-tab-${next.id}`)?.focus();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prev = twoFactorTabs[(index - 1 + twoFactorTabs.length) % twoFactorTabs.length];
+      setTwoFactorMethod(prev.id);
+      document.getElementById(`twofactor-tab-${prev.id}`)?.focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      const first = twoFactorTabs[0];
+      setTwoFactorMethod(first.id);
+      document.getElementById(`twofactor-tab-${first.id}`)?.focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const last = twoFactorTabs[twoFactorTabs.length - 1];
+      setTwoFactorMethod(last.id);
+      document.getElementById(`twofactor-tab-${last.id}`)?.focus();
+    }
+  };
+
   // Если требуется 2FA, показываем компонент верификации
   if (requires2FA) {
     return (
@@ -338,65 +397,63 @@ const LoginFormStyled = () => {
             </p>
           </div>
 
-          {/* Переключатель методов 2FA */}
+          {/* UX Audit Stage 2 (Login issue 3.4):
+              Переключатель методов 2FA теперь proper tablist с ARIA roles.
+              Раньше это были 3 обычные <button> без role/aria-selected/aria-controls.
+              Теперь screen reader правильно объявляет это как таб-лист с 3 табами.
+              Keyboard navigation: ArrowLeft/Right, Home, End. */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-              <button
-                type="button"
-                onClick={() => setTwoFactorMethod('totp')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  background: twoFactorMethod === 'totp' ? colors.primary[500] : 'transparent',
-                  color: twoFactorMethod === 'totp' ? 'white' : colors.semantic.text.secondary,
-                  border: '1px solid #e1e5e9',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}>
-
-                Приложение
-              </button>
-              <button
-                type="button"
-                onClick={() => setTwoFactorMethod('backup')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  background: twoFactorMethod === 'backup' ? colors.primary[500] : 'transparent',
-                  color: twoFactorMethod === 'backup' ? 'white' : colors.semantic.text.secondary,
-                  border: '1px solid #e1e5e9',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}>
-
-                Backup код
-              </button>
-              <button
-                type="button"
-                onClick={() => setTwoFactorMethod('recovery')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  background: twoFactorMethod === 'recovery' ? colors.primary[500] : 'transparent',
-                  color: twoFactorMethod === 'recovery' ? 'white' : colors.semantic.text.secondary,
-                  border: '1px solid #e1e5e9',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}>
-
-                Восстановление
-              </button>
+            <div
+              role="tablist"
+              aria-label="Методы двухфакторной аутентификации"
+              style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}
+            >
+              {twoFactorTabs.map((tab, index) => {
+                const isActive = twoFactorMethod === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    id={`twofactor-tab-${tab.id}`}
+                    role="tab"
+                    type="button"
+                    aria-selected={isActive}
+                    aria-controls={twoFactorTabPanelId}
+                    tabIndex={isActive ? 0 : -1}
+                    onClick={() => setTwoFactorMethod(tab.id)}
+                    onKeyDown={(e) => handle2FATabKeyDown(e, index)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      background: isActive ? colors.primary[500] : 'transparent',
+                      color: isActive ? 'white' : colors.semantic.text.secondary,
+                      border: '1px solid #e1e5e9',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      font: 'inherit',
+                      outline: isActive ? `2px solid ${colors.primary[500]}` : 'none',
+                      outlineOffset: '2px',
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <TwoFactorVerify
-            method={twoFactorMethod}
-            pendingToken={pending2FAToken}
-            onSuccess={handle2FASuccess}
-            onCancel={handle2FACancel} />
+          <div
+            id={twoFactorTabPanelId}
+            role="tabpanel"
+            aria-labelledby={`twofactor-tab-${twoFactorMethod}`}
+            tabIndex={-1}
+          >
+            <TwoFactorVerify
+              method={twoFactorMethod}
+              pendingToken={pending2FAToken}
+              onSuccess={handle2FASuccess}
+              onCancel={handle2FACancel} />
+          </div>
 
         </div>
       </div>);
@@ -406,18 +463,26 @@ const LoginFormStyled = () => {
   // Если нажали "Забыли пароль", показываем компонент восстановления
   if (showForgotPassword) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#1d1d1f',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        position: 'relative'
-      }}>
+      <div
+        className="login-forgot-wrap"
+        style={{
+          minHeight: '100vh',
+          // UX Audit Stage 2 (Login issue 3.3): используем --mac-bg-primary
+          // вместо хардкода #1d1d1f. Теперь фон следует за темой приложения.
+          background: 'var(--mac-bg-primary, #1d1d1f)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          position: 'relative'
+        }}
+      >
+        {/* UX Audit Stage 2 (Login issue 3.5): передаём language в ForgotPassword.
+            Раньше ForgotPassword всегда использовал 'RU' по умолчанию. */}
         <ForgotPassword
+          language={language}
           onBack={() => setShowForgotPassword(false)}
           onSuccess={() => setShowForgotPassword(false)} />
 
@@ -426,18 +491,23 @@ const LoginFormStyled = () => {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      // macOS-стиль фона: темно-серый как в macOS Dark Mode
-      background: '#1d1d1f',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
-      position: 'relative'
-    }}>
+    <div
+      className="login-auth-wrap"
+      style={{
+        minHeight: '100vh',
+        // UX Audit Stage 2 (Login issue 3.3): заменён хардкод #1d1d1f на --mac-bg-primary.
+        // Раньше login был всегда тёмный, независимо от темы приложения.
+        // Теперь фон следует за light/dark темой.
+        background: 'var(--mac-bg-primary, #1d1d1f)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        position: 'relative'
+      }}
+    >
 
       <Card className="login-form-auth" style={{
         width: '100%',
@@ -468,15 +538,19 @@ const LoginFormStyled = () => {
             <span style={{
               fontSize: '24px',
               fontWeight: '600',
-              color: '#1d1d1f',
+              // UX Audit Stage 2 (Login issue 3.3): --mac-text-primary вместо #1d1d1f
+              color: 'var(--mac-text-primary, #1d1d1f)',
               letterSpacing: '-0.5px'
             }}>
-              🔐 Вход в систему
+              {/* UX Audit Stage 2 (Login issue 3.5): aria-hidden на эмодзи,
+                  чтобы скринридер не читал «encryption key emoji». */}
+              <span aria-hidden="true">🔐</span>{' '}Вход в систему
             </span>
             <span style={{
               fontSize: '14px',
               fontWeight: '400',
-              color: '#86868b',
+              // UX Audit Stage 2 (Login issue 3.3): --mac-text-secondary вместо #86868b
+              color: 'var(--mac-text-secondary, #86868b)',
               letterSpacing: '0.1px'
             }}>
               {/* UX Audit Stage 1: используем единый BRAND config вместо хардкода */}
@@ -487,7 +561,7 @@ const LoginFormStyled = () => {
         <CardContent style={{ paddingTop: 12, paddingBottom: 14 }}>
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#1d1d1f', fontWeight: 500 }}>Тип входа</label>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 500 }}>Тип входа</label>
               <Select
                 value={formData.loginType}
                 onChange={(val) => setFormData((prev) => ({ ...prev, loginType: val }))}
@@ -500,7 +574,7 @@ const LoginFormStyled = () => {
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#1d1d1f', fontWeight: 500 }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 500 }}>
                 {formData.loginType === 'username' ? 'Имя пользователя' : formData.loginType === 'email' ? 'Email' : 'Телефон'} *
               </label>
               <Input
@@ -516,17 +590,22 @@ const LoginFormStyled = () => {
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#1d1d1f', fontWeight: 500 }}>Пароль *</label>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 500 }}>Пароль *</label>
               <div style={{ position: 'relative' }}>
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
+                  // UX Audit Stage 2 (Login issue 3.2): Caps Lock detection.
+                  onKeyDown={handleKeyDown}
+                  onKeyUp={handleKeyUp}
                   required
                   autoComplete="current-password"
                   placeholder="Введите пароль"
-                  style={authControlStyles} />
+                  style={authControlStyles}
+                  aria-describedby={capsLockOn ? 'capslock-warning' : undefined}
+                />
 
                 <Button type="button" variant="ghost" size="small" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 4, top: 4, ...authGhostButtonStyles, ...authButtonBaseStyles }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -535,6 +614,31 @@ const LoginFormStyled = () => {
                   </span>
                 </Button>
               </div>
+
+              {/* UX Audit Stage 2 (Login issue 3.2): Caps Lock warning. */}
+              {capsLockOn && (
+                <div
+                  id="capslock-warning"
+                  role="alert"
+                  aria-live="polite"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 6,
+                    padding: '6px 10px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: '#b45309',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: 8,
+                  }}
+                >
+                  <AlertTriangle size={14} aria-hidden="true" />
+                  <span>Caps Lock включён — проверьте регистр пароля</span>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', gap: 8 }}>
@@ -578,28 +682,37 @@ const LoginFormStyled = () => {
             <Button type="button" variant="outline" fullWidth size="small" onClick={() => navigate(landingRoute)} style={{ ...authSecondaryButtonStyles, ...authButtonBaseStyles }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <UserRound size={16} />
-                Гость
+                {/* UX Audit Stage 2 (Login issue 3.2): «Гость» вводил в заблуждение —
+                    это не гостевой режим, а просто возврат на лендинг. */}
+                На главную
               </span>
             </Button>
           </div>
         </CardContent>
+        {/*
+          UX Audit Stage 2 (Login issue 3.3):
+          Стили перенесены с хардкодов (#0f172a, #64748b) на design tokens.
+          Теперь поля ввода на login-экране корректно работают в light/dark теме.
+          Раньше login был всегда тёмный, и эти стили форсировали тёмный текст —
+          в light-теме приложения это выглядело инородно.
+        */}
         <style>{`
           .login-form-auth .mac-input,
           .login-form-auth .mac-input-label,
           .login-form-auth .mac-input-hint,
           .login-form-auth .mac-input-error {
-            color: #0f172a !important;
+            color: var(--mac-text-primary, #0f172a) !important;
           }
 
           .login-form-auth .mac-input::placeholder {
-            color: #64748b !important;
+            color: var(--mac-text-secondary, #64748b) !important;
             opacity: 1 !important;
           }
 
           .login-form-auth .mac-select-trigger {
-            background: rgba(255, 255, 255, 0.96) !important;
-            color: #0f172a !important;
-            border-color: rgba(148, 163, 184, 0.7) !important;
+            background: color-mix(in srgb, var(--mac-card-bg, #ffffff) 96%, transparent) !important;
+            color: var(--mac-text-primary, #0f172a) !important;
+            border-color: color-mix(in srgb, var(--mac-card-border, #cbd5e1) 70%, transparent) !important;
           }
 
           .login-form-auth .mac-select-trigger span,
@@ -608,17 +721,18 @@ const LoginFormStyled = () => {
           }
 
           .login-form-auth .mac-select-list {
-            background: rgba(255, 255, 255, 0.98) !important;
-            color: #0f172a !important;
-            border-color: rgba(148, 163, 184, 0.7) !important;
+            background: color-mix(in srgb, var(--mac-card-bg, #ffffff) 98%, transparent) !important;
+            color: var(--mac-text-primary, #0f172a) !important;
+            border-color: color-mix(in srgb, var(--mac-card-border, #cbd5e1) 70%, transparent) !important;
           }
 
           .login-form-auth .mac-select-item {
-            color: #0f172a !important;
+            color: var(--mac-text-primary, #0f172a) !important;
           }
 
           .login-form-auth .mac-select-item:hover {
-            color: #0f172a !important;
+            color: var(--mac-text-primary, #0f172a) !important;
+            background: color-mix(in srgb, var(--mac-accent-blue, #2563eb) 8%, transparent) !important;
           }
 
           .login-form-auth .mac-button {
@@ -633,7 +747,7 @@ const LoginFormStyled = () => {
           }
 
           .login-form-auth .mac-button:hover {
-            box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08) !important;
+            box-shadow: 0 10px 18px color-mix(in srgb, var(--mac-text-primary, #0f172a) 8%, transparent) !important;
             transform: translateY(-1px);
           }
 

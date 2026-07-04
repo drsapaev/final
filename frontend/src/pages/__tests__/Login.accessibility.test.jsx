@@ -23,6 +23,16 @@ vi.mock('../../hooks/useSetupStatus.js', () => ({
   }),
 }));
 
+// UX Audit Stage 2: mock useTranslation чтобы не требовать TranslationProvider
+vi.mock('../../hooks/useTranslation', () => ({
+  useTranslation: () => ({
+    language: 'ru',
+    setLanguage: vi.fn(),
+    availableLanguages: [{ code: 'ru', name: 'Русский', flag: '🇷🇺' }],
+    t: (key) => key,
+  }),
+}));
+
 function renderLogin() {
   return render(
     <MemoryRouter>
