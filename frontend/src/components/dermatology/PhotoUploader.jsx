@@ -143,7 +143,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
           }));
 
           setUploadProgress(0);
-          onDataUpdate && onDataUpdate();
+          onDataUpdate && onDataUpdate(photos);
         };
 
         reader.readAsDataURL(processedFile);

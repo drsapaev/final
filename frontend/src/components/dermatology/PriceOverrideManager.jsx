@@ -10,7 +10,7 @@ import {
 
 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { toast } from 'react-toastify';
+import notify from '../../services/notify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -27,7 +27,7 @@ const PriceOverrideManager = ({
   onPriceOverrideCreated,
   isOpen,
   onClose
-}) => {void
+}) => {
   useTheme();
   const [newPrice, setNewPrice] = useState('');
   const [reason, setReason] = useState('');
@@ -68,13 +68,13 @@ const PriceOverrideManager = ({
     e.preventDefault();
 
     if (!newPrice || !reason) {
-      toast.error('Заполните цену и причину изменения');
+      notify.error('Заполните цену и причину изменения');
       return;
     }
 
     const priceNum = Number(newPrice.replace(/[^0-9.-]/g, ''));
     if (isNaN(priceNum) || priceNum <= 0) {
-      toast.error('Введите корректную цену');
+      notify.error('Введите корректную цену');
       return;
     }
 
@@ -90,7 +90,7 @@ const PriceOverrideManager = ({
 
       if (response.status >= 200 && response.status < 300) {
         const result = response.data;
-        toast.success('Изменение цены отправлено на одобрение');
+        notify.success('Изменение цены отправлено на одобрение');
 
         // Обновляем список изменений
         loadPriceOverrides();
@@ -105,7 +105,7 @@ const PriceOverrideManager = ({
       }
     } catch (error) {
       logger.error('Error creating price override:', error);
-      toast.error(error?.response?.data?.detail || 'Ошибка создания изменения цены');
+      notify.error(error?.response?.data?.detail || 'Ошибка создания изменения цены');
     } finally {
       setIsLoading(false);
     }

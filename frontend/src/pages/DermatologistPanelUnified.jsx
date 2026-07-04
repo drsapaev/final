@@ -234,7 +234,8 @@ const DermatologistPanelUnified = () => {
   const [showCosmeticForm, setShowCosmeticForm] = useState(false);
   const [skinExaminations, setSkinExaminations] = useState([]);
   const [cosmeticProcedures, setCosmeticProcedures] = useState([]);
-  const photoData = useMemo(() => [], []);
+  // D-001 fix: photoData now receives state from PhotoUploader via onDataUpdate callback
+  const [photoData, setPhotoData] = useState({ before: [], after: [] });
 
   // Дополнительные состояния из старого файла
   const [patients, setPatients] = useState([]);
@@ -590,7 +591,7 @@ const DermatologistPanelUnified = () => {
           const queueEntryId = resolveDoctorQueueEntryId(row);
           if (queueEntryId === null) {
             logger.warn('[Dermatology] Cannot start visit without OnlineQueueEntry id', row);
-            notify.error('Cannot start visit without a queue entry id');
+            notify.error('Невозможно начать приём без ID записи в очереди');
             break;
           }
           const token = tokenManager.getAccessToken();
@@ -972,7 +973,7 @@ const DermatologistPanelUnified = () => {
           urlResolutionRef.current.notified = true;
           setSelectedPatient(null);
           setCurrentAppointment(null);
-          setActiveTab('appointments');
+          handleTabChange('appointments');
           notify.info(
             visitIdFromUrl
               ? 'Не удалось найти визит в очереди дерматологии. Выберите запись вручную.'
@@ -1042,30 +1043,6 @@ const DermatologistPanelUnified = () => {
       isMounted = false;
     };
   }, [currentAppointment?.appointment_id, currentAppointment?.id, currentAppointment?.visit_id]);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   const savePrescription = async (prescriptionData) => {
@@ -1190,6 +1167,11 @@ const DermatologistPanelUnified = () => {
       logger.info('[Dermatology] handleSaveVisit: completeVisit OK');
 
       notify.success('Прием завершен успешно');
+
+      // D-004 fix: offer to schedule next visit (was dead code — setScheduleNextModal was never called)
+      if (selectedPatient) {
+        setScheduleNextModal({ open: true, patient: selectedPatient });
+      }
 
       // Очищаем форму и состояние
       setSelectedPatient(null);
@@ -1921,8 +1903,11 @@ const DermatologistPanelUnified = () => {
                 <PhotoUploader
                 visitId={currentAppointment?.visit_id}
                 patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
-                onDataUpdate={() => {
+                onDataUpdate={(updatedPhotos) => {
                   logger.info('Фото обновлены');
+                  if (updatedPhotos) {
+                    setPhotoData(updatedPhotos);
+                  }
                   loadPatientData();
                 }} />
 
@@ -1961,9 +1946,9 @@ const DermatologistPanelUnified = () => {
                 </h3>
                 {/* Сравнение фото до и после */}
                 <PhotoComparison
-                photos={photoData}
-                visitId={currentAppointment?.visit_id}
-                patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
+                beforePhoto={photoData.before?.[0]}
+                afterPhoto={photoData.after?.[0]}
+                metadata={{ visitId: currentAppointment?.visit_id, patientId: currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id }}
                 onComparisonComplete={(result) => {
                   logger.info('Сравнение завершено:', result);
                 }} />
