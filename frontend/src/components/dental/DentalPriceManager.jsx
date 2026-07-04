@@ -11,7 +11,7 @@ import {
   CheckSquare } from
 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { toast } from 'react-toastify';
+import notify from '../../services/notify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -28,7 +28,7 @@ const DentalPriceManager = ({
   onPriceSet,
   isOpen,
   onClose
-}) => {void
+}) => {
   useTheme();
   const [finalPrice, setFinalPrice] = useState('');
   const [reason, setReason] = useState('');
@@ -72,13 +72,13 @@ const DentalPriceManager = ({
     e.preventDefault();
 
     if (!finalPrice || !reason) {
-      toast.error('Заполните цену и причину');
+      notify.error('Заполните цену и причину');
       return;
     }
 
     const priceNum = Number(finalPrice.replace(/[^0-9.-]/g, ''));
     if (isNaN(priceNum) || priceNum <= 0) {
-      toast.error('Введите корректную цену');
+      notify.error('Введите корректную цену');
       return;
     }
 
@@ -95,7 +95,7 @@ const DentalPriceManager = ({
 
       if (response.status >= 200 && response.status < 300) {
         const result = response.data;
-        toast.success('Цена отправлена в регистратуру для подтверждения');
+        notify.success('Цена отправлена в регистратуру для подтверждения');
 
         // Обновляем список изменений
         loadPriceOverrides();
@@ -110,7 +110,7 @@ const DentalPriceManager = ({
       }
     } catch (error) {
       logger.error('Error setting price:', error);
-      toast.error(error?.response?.data?.detail || 'Ошибка указания цены');
+      notify.error(error?.response?.data?.detail || 'Ошибка указания цены');
     } finally {
       setIsLoading(false);
     }

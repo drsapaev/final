@@ -99,8 +99,7 @@ const ReportsAndAnalytics = ({
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('30d');void
-  useState('all');void
-  useState('all');
+    useState('all');
   const analyticsData = initialData || EMPTY_ANALYTICS_DATA;
   const reportHasData = hasAnalyticsData(analyticsData);
 
