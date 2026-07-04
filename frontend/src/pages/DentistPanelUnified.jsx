@@ -1561,109 +1561,45 @@ const DentistPanelUnified = () => {
   const renderDashboard = () =>
   <div className="dental-flex-col dental-gap-32">
       {/* Статистические карточки */}
-      <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-      gap: '24px'
-    }}>
-        <div style={{
-        background: 'var(--mac-bg-primary)',
-        borderRadius: 'var(--mac-radius-xl)',
-        padding: '24px',
-        boxShadow: 'var(--mac-shadow-sm)',
-        border: '1px solid var(--mac-border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-        cursor: 'default'
-      }}>
+      <div className="dental-grid-stat-cards">
+        <div className="dental-stat-card-default">
           <div>
             <p className="dental-text-desc dental-text-secondary">Всего пациентов</p>
             <p className="dental-stat-number dental-text-primary">{stats.totalPatients}</p>
-            <p style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-success)',
-            marginTop: '4px'
-          }}>+12% за месяц</p>
+            <p className="dental-stat-delta dental-text-success">+12% за месяц</p>
           </div>
           <div className="dental-icon-bg dental-icon-bg-blue dental-icon-bg-xl-shadow">
             <Users className="dental-icon-28 dental-text-white" />
           </div>
         </div>
 
-        <div style={{
-        background: 'var(--mac-bg-primary)',
-        borderRadius: 'var(--mac-radius-xl)',
-        padding: '24px',
-        boxShadow: 'var(--mac-shadow-sm)',
-        border: '1px solid var(--mac-border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-        cursor: 'default'
-      }}>
+        <div className="dental-stat-card-default">
           <div>
             <p className="dental-text-desc dental-text-secondary">Записей сегодня</p>
             <p className="dental-stat-number dental-text-primary">{stats.todayAppointments}</p>
-            <p style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-accent-blue)',
-            marginTop: '4px'
-          }}>8 из 12 слотов</p>
+            <p className="dental-stat-delta dental-text-blue">8 из 12 слотов</p>
           </div>
           <div className="dental-icon-bg dental-icon-bg-success dental-icon-bg-xl-shadow">
             <Calendar className="dental-icon-28 dental-text-white" />
           </div>
         </div>
 
-        <div style={{
-        background: 'var(--mac-bg-primary)',
-        borderRadius: 'var(--mac-radius-xl)',
-        padding: '24px',
-        boxShadow: 'var(--mac-shadow-sm)',
-        border: '1px solid var(--mac-border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-        cursor: 'default'
-      }}>
+        <div className="dental-stat-card-default">
           <div>
             <p className="dental-text-desc dental-text-secondary">Активные планы</p>
             <p className="dental-stat-number dental-text-primary">{stats.activeTreatmentPlans}</p>
-            <p style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-accent-purple)',
-            marginTop: '4px'
-          }}>+8% к прошлому месяцу</p>
+            <p className="dental-stat-delta dental-text-purple">+8% к прошлому месяцу</p>
           </div>
           <div className="dental-icon-bg dental-icon-bg-purple dental-icon-bg-xl-shadow">
             <FileText className="dental-icon-28 dental-text-white" />
           </div>
         </div>
 
-        <div style={{
-        background: 'var(--mac-bg-primary)',
-        borderRadius: 'var(--mac-radius-xl)',
-        padding: '24px',
-        boxShadow: 'var(--mac-shadow-sm)',
-        border: '1px solid var(--mac-border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-        cursor: 'default'
-      }}>
+        <div className="dental-stat-card-default">
           <div>
             <p className="dental-text-desc dental-text-secondary">Протезы</p>
             <p className="dental-stat-number dental-text-primary">{stats.completedProsthetics}</p>
-            <p style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-warning)',
-            marginTop: '4px'
-          }}>+15% к прошлому месяцу</p>
+            <p className="dental-stat-delta dental-text-warning">+15% к прошлому месяцу</p>
           </div>
           <div className="dental-icon-bg dental-icon-bg-warning dental-icon-bg-xl-shadow">
             <Smile className="dental-icon-28 dental-text-white" />
@@ -1672,13 +1608,7 @@ const DentistPanelUnified = () => {
       </div>
 
       {/* Быстрые действия */}
-      <div style={{
-      background: 'var(--mac-bg-primary)',
-      borderRadius: 'var(--mac-radius-xl)',
-      padding: '24px',
-      boxShadow: 'var(--mac-shadow-sm)',
-      border: '1px solid var(--mac-border)'
-    }}>
+      <div className="dental-section-card">
         <div class="dental-flex-between-16">
           <h3 className="dental-text-lg-semi dental-text-primary">Быстрые действия</h3>
         </div>
@@ -1702,17 +1632,7 @@ const DentistPanelUnified = () => {
           <Button
           onClick={() => handleTabChange('appointments')}
           variant="outline"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '16px 24px',
-            borderRadius: 'var(--mac-radius-lg)',
-            boxShadow: 'var(--mac-shadow-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            border: '1px solid var(--mac-border)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}
+          className="dental-quick-action-btn"
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
             e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1728,17 +1648,7 @@ const DentistPanelUnified = () => {
           <Button
           onClick={() => handleTabChange('dental-chart')}
           variant="outline"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '16px 24px',
-            borderRadius: 'var(--mac-radius-lg)',
-            boxShadow: 'var(--mac-shadow-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            border: '1px solid var(--mac-border)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}
+          className="dental-quick-action-btn"
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
             e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1755,13 +1665,7 @@ const DentistPanelUnified = () => {
       </div>
 
       {/* Последние записи */}
-      <div style={{
-      background: 'var(--mac-bg-primary)',
-      borderRadius: 'var(--mac-radius-xl)',
-      padding: '24px',
-      boxShadow: 'var(--mac-shadow-sm)',
-      border: '1px solid var(--mac-border)'
-    }}>
+      <div className="dental-section-card">
         <div class="dental-flex-between-16">
           <h3 className="dental-text-lg-semi dental-text-primary">Последние записи</h3>
         </div>
@@ -1769,16 +1673,7 @@ const DentistPanelUnified = () => {
           {appointmentsTableData.slice(0, 5).map((appointment) =>
         <div
           key={appointment.id}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '24px',
-            background: 'var(--mac-bg-secondary)',
-            borderRadius: 'var(--mac-radius-lg)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            cursor: 'default'
-          }}>
+          className="dental-appointment-row">
 
               <div className="dental-flex dental-gap-16">
                 <div className="dental-icon-bg dental-icon-bg-blue dental-icon-bg-lg-shadow">
@@ -1791,14 +1686,9 @@ const DentistPanelUnified = () => {
                   <p className="dental-text-desc dental-text-desc dental-text-secondary">{appointment.date} {appointment.time}</p>
                 </div>
               </div>
-              <div style={{
-            padding: '4px 12px',
-            borderRadius: 'var(--mac-radius-full)',
-            fontSize: 'var(--mac-font-size-xs)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            background: appointment.status === 'confirmed' ? 'var(--mac-success-bg)' : 'var(--mac-warning-bg)',
-            color: appointment.status === 'confirmed' ? 'var(--mac-success)' : 'var(--mac-warning)'
-          }}>
+              <div
+            className="dental-status-badge"
+            data-status={appointment.status === 'confirmed' ? 'confirmed' : 'pending'}>
                 {appointment.status}
               </div>
             </div>
