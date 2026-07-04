@@ -1,3 +1,4 @@
+import logger from '../../utils/logger';
 /**
  * DermaPhotosTab — R-15: extracted from DermatologistPanelUnified.
  * Renders the "Фото" tab: PhotoUploader + SkinAnalysis + PhotoComparison.
@@ -50,7 +51,7 @@ export function DermaPhotosTab({
           visitId={currentAppointment?.visit_id}
           patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
           onAnalysisComplete={(result) => {
-            console.info('AI анализ завершен:', result);
+            logger.info('AI анализ завершен:', result);
           }}
         />
       </MacOSCard>
