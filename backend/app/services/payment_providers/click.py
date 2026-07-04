@@ -62,7 +62,7 @@ class ClickProvider(BasePaymentProvider):
 
             # Генерируем подпись
             sign_string = f"{params['service_id']}{params['merchant_id']}{params['amount']}{params['transaction_param']}{self.secret_key}"
-            params["sign"] = hashlib.md5(sign_string.encode(), usedforsecurity=False).hexdigest()  # nosec B324 — MD5 is required by Click.uz API spec
+            params["sign"] = hashlib.md5(sign_string.encode(), usedforsecurity=False).hexdigest()
 
             # Формируем URL для оплаты
             payment_url = f"{self.base_url}/services/pay"
@@ -107,7 +107,7 @@ class ClickProvider(BasePaymentProvider):
 
             # Генерируем подпись для проверки
             sign_string = f"{params['service_id']}{params['merchant_id']}{params['transaction_param']}{self.secret_key}"
-            params["sign"] = hashlib.md5(sign_string.encode(), usedforsecurity=False).hexdigest()  # nosec B324 — MD5 is required by Click.uz API spec
+            params["sign"] = hashlib.md5(sign_string.encode(), usedforsecurity=False).hexdigest()
 
             response = requests.post(url, json=params, timeout=30)
             response.raise_for_status()
@@ -243,7 +243,7 @@ class ClickProvider(BasePaymentProvider):
         sign_parts.append(self.secret_key)
         sign_string = "".join(sign_parts)
 
-        return hashlib.md5(sign_string.encode(), usedforsecurity=False).hexdigest()  # nosec B324 — MD5 is required by Click.uz API spec
+        return hashlib.md5(sign_string.encode(), usedforsecurity=False).hexdigest()
 
     def validate_webhook_signature(
         self, webhook_data: dict[str, Any], signature: str = None, auth_header: str = None
