@@ -70,50 +70,27 @@ const ClinicManagement = () => {
       api.get('/clinic/health').catch((err) => Promise.reject(err))]
       );
 
+      // P0 fix: removed hardcoded fake-stats fallback. On API failure, set null
+      // so the existing <MacOSEmptyState title="Статистика недоступна" /> renders
+      // instead of fabricated numbers (admin was seeing "3 branches, 8 licenses,
+      // 12 backups" even when the backend was down).
       if (statsResponse.status === 'fulfilled') {
         setStats(statsResponse.value.data);
       } else {
         logger.error('Ошибка загрузки статистики:', statsResponse.reason);
-        // Fallback данные для статистики
-        setStats({
-          total_branches: 3,
-          active_branches: 3,
-          total_equipment: 15,
-          active_equipment: 14,
-          total_licenses: 8,
-          active_licenses: 7,
-          total_backups: 12,
-          recent_backups: 3
-        });
+        setStats(null);
       }
 
       if (healthResponse.status === 'fulfilled') {
         setSystemHealth(healthResponse.value.data);
       } else {
         logger.error('Ошибка загрузки состояния системы:', healthResponse.reason);
-        // Fallback данные для состояния системы
-        setSystemHealth({
-          status: 'healthy',
-          warnings: []
-        });
+        setSystemHealth(null);
       }
     } catch (error) {
       logger.error('Ошибка загрузки данных системы:', error);
-      // Fallback данные при ошибке
-      setStats({
-        total_branches: 3,
-        active_branches: 3,
-        total_equipment: 15,
-        active_equipment: 14,
-        total_licenses: 8,
-        active_licenses: 7,
-        total_backups: 12,
-        recent_backups: 3
-      });
-      setSystemHealth({
-        status: 'healthy',
-        warnings: []
-      });
+      setStats(null);
+      setSystemHealth(null);
       setMessage({ type: 'error', text: 'Ошибка загрузки данных системы' });
     } finally {
       setLoading(false);

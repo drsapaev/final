@@ -54,8 +54,7 @@ const DiscountBenefitsManager = () => {
   const [benefits, setBenefits] = useState([]);
   const [loyaltyPrograms, setLoyaltyPrograms] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);void
-  useState(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [analytics, setAnalytics] = useState(null);
 
   // Формы для создания/редактирования

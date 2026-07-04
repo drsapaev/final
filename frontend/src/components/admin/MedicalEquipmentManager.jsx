@@ -64,30 +64,12 @@ const MedicalEquipmentManager = () => {
       const response = await api.get('/medical-equipment/devices');
       setDevices(response.data.devices || []);
     } catch (error) {
+      // P0 fix: removed mock-device fallback. Was showing fabricated "Тонометр
+      // Omron M3" / "Термометр Braun" devices on API failure — admin could act
+      // on non-existent equipment. Now shows empty list (existing MacOSEmptyState
+      // renders "Нет устройств").
       logger.error('Ошибка загрузки устройств:', error);
-      // Fallback данные для демонстрации
-      setDevices([
-      {
-        id: 1,
-        name: 'Тонометр Omron M3',
-        device_type: 'blood_pressure',
-        manufacturer: 'Omron',
-        model: 'M3',
-        serial_number: 'OMR001',
-        status: 'online',
-        location: 'Кабинет 1'
-      },
-      {
-        id: 2,
-        name: 'Термометр Braun',
-        device_type: 'thermometer',
-        manufacturer: 'Braun',
-        model: 'ThermoScan 7',
-        serial_number: 'BRN002',
-        status: 'offline',
-        location: 'Кабинет 2'
-      }]
-      );
+      setDevices([]);
     } finally {
       setLoading(false);
     }
@@ -98,17 +80,16 @@ const MedicalEquipmentManager = () => {
       const response = await api.get('/medical-equipment/statistics/overview');
       setOverview(response.data.overview);
     } catch (error) {
+      // P0 fix: removed mock-overview fallback. Was showing fabricated stats
+      // (2 devices, 15 measurements) on API failure. Now zeroes — render uses
+      // overview.* directly so null would crash; zero-defaults are safe.
       logger.error('Ошибка загрузки обзора:', error);
-      // Fallback данные при ошибке сети
       setOverview({
-        total_devices: 2,
-        online_devices: 1,
-        offline_devices: 1,
-        total_measurements: 15,
-        device_types: {
-          blood_pressure: 1,
-          thermometer: 1
-        }
+        total_devices: 0,
+        online_devices: 0,
+        offline_devices: 0,
+        total_measurements: 0,
+        device_types: {}
       });
     }
   };
@@ -122,28 +103,10 @@ const MedicalEquipmentManager = () => {
       const response = await api.get('/medical-equipment/measurements', { params });
       setMeasurements(response.data.measurements || []);
     } catch (error) {
+      // P0 fix: removed mock-measurements fallback. Was showing fabricated
+      // blood-pressure/thermometer readings on API failure.
       logger.error('Ошибка загрузки измерений:', error);
-      // Fallback данные при ошибке сети
-      setMeasurements([
-      {
-        id: 1,
-        device_type: 'blood_pressure',
-        patient_id: 'P001',
-        systolic: 120,
-        diastolic: 80,
-        pulse: 72,
-        timestamp: new Date().toISOString(),
-        device_name: 'Тонометр Omron M3'
-      },
-      {
-        id: 2,
-        device_type: 'thermometer',
-        patient_id: 'P002',
-        temperature: 36.6,
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        device_name: 'Термометр Braun'
-      }]
-      );
+      setMeasurements([]);
     } finally {
       setLoading(false);
     }

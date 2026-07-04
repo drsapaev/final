@@ -22,8 +22,8 @@ import {
   Card, Button, Input, Select, Checkbox,
 } from '../ui/macos';
 
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
 
 const DEFAULT_LANGUAGE_OPTIONS = [
   { value: 'ru', label: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439' },
@@ -62,31 +62,22 @@ const TelegramSettings = () => {
       setLoading(true);
 
       // Загружаем настройки, информацию о боте и статистику
-      const [settingsRes, webhookRes, statsRes] = await Promise.all([
-      fetch('/api/v1/admin/telegram/settings', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      }),
-      fetch('/api/v1/admin/telegram/webhook-info', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      }),
-      fetch('/api/v1/admin/telegram/stats?days_back=7', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      })]
-      );
+      const [settingsRes, webhookRes, statsRes] = await Promise.allSettled([
+        api.get('/admin/telegram/settings'),
+        api.get('/admin/telegram/webhook-info'),
+        api.get('/admin/telegram/stats', { params: { days_back: 7 } }),
+      ]);
 
-      if (settingsRes.ok) {
-        const settingsData = await settingsRes.json();
-        setSettings(settingsData);
+      if (settingsRes.status === 'fulfilled') {
+        setSettings(settingsRes.value.data);
       }
 
-      if (webhookRes.ok) {
-        const webhookData = await webhookRes.json();
-        setWebhookInfo(webhookData);
+      if (webhookRes.status === 'fulfilled') {
+        setWebhookInfo(webhookRes.value.data);
       }
 
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
+      if (statsRes.status === 'fulfilled') {
+        setStats(statsRes.value.data);
       }
 
     } catch (error) {
@@ -106,21 +97,8 @@ const TelegramSettings = () => {
       setSaving(true);
       setMessage({ type: '', text: '' });
 
-      const response = await fetch('/api/v1/admin/telegram/settings', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setMessage({ type: 'success', text: result.message });
-      } else {
-        throw new Error('Ошибка сохранения настроек');
-      }
+      const { data: result } = await api.put('/admin/telegram/settings', settings);
+      setMessage({ type: 'success', text: result.message || 'Настройки сохранены' });
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: 'Ошибка сохранения настроек Telegram' });
@@ -133,21 +111,9 @@ const TelegramSettings = () => {
     try {
       setMessage({ type: '', text: '' });
 
-      const response = await fetch('/api/v1/admin/telegram/test-bot', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setBotInfo(result.bot_info);
-        setMessage({ type: 'success', text: result.message });
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail);
-      }
+      const { data: result } = await api.post('/admin/telegram/test-bot');
+      setBotInfo(result.bot_info);
+      setMessage({ type: 'success', text: result.message });
     } catch (error) {
       logger.error('Ошибка тестирования бота:', error);
       setMessage({ type: 'error', text: error.message });
@@ -158,23 +124,9 @@ const TelegramSettings = () => {
     try {
       const webhookUrl = `${window.location.origin}/api/v1/telegram/webhook`;
 
-      const response = await fetch('/api/v1/admin/telegram/set-webhook', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ webhook_url: webhookUrl })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setMessage({ type: 'success', text: result.message });
-        await loadData(); // Перезагружаем данные
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail);
-      }
+      const { data: result } = await api.post('/admin/telegram/set-webhook', { webhook_url: webhookUrl });
+      setMessage({ type: 'success', text: result.message });
+      await loadData(); // Перезагружаем данные
     } catch (error) {
       logger.error('Ошибка установки webhook:', error);
       setMessage({ type: 'error', text: error.message });
@@ -188,25 +140,11 @@ const TelegramSettings = () => {
     }
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/send-test-message', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          chat_id: parseInt(testChatId),
-          message: testMessage
-        })
+      const { data: result } = await api.post('/admin/telegram/send-test-message', {
+        chat_id: parseInt(testChatId),
+        message: testMessage
       });
-
-      if (response.ok) {
-        const result = await response.json();
-        setMessage({ type: 'success', text: result.message });
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail);
-      }
+      setMessage({ type: 'success', text: result.message });
     } catch (error) {
       logger.error('Ошибка отправки:', error);
       setMessage({ type: 'error', text: error.message });

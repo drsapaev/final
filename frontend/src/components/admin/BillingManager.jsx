@@ -96,8 +96,7 @@ const BillingManager = () => {
   const [, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
-  const [showRecordPayment, setShowRecordPayment] = useState(false);void
-  useState(null);
+  const [showRecordPayment, setShowRecordPayment] = useState(false);
 
   // Форма для создания счета
   const [invoiceForm, setInvoiceForm] = useState({

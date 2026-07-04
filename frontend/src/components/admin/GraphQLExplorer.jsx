@@ -21,8 +21,8 @@ import {
 'lucide-react';
 import { toast } from 'react-toastify';
 
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
 
 const GraphQLExplorer = () => {
   const [activeTab, setActiveTab] = useState('explorer');
@@ -278,36 +278,26 @@ const GraphQLExplorer = () => {
 
   const loadSchema = async () => {
     try {
-      const accessToken = tokenManager.getAccessToken();
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
-        },
-        body: JSON.stringify({
-          query: `
-            query IntrospectionQuery {
-              __schema {
-                types {
+      const { data } = await api.post('/graphql', {
+        query: `
+          query IntrospectionQuery {
+            __schema {
+              types {
+                name
+                description
+                fields {
                   name
                   description
-                  fields {
+                  type {
                     name
-                    description
-                    type {
-                      name
-                    }
                   }
                 }
               }
             }
-          `
-        })
+          }
+        `
       });
-
-      if (response.ok) {
-        const data = await response.json();
+      if (data?.data?.__schema) {
         setSchema(data.data.__schema);
       }
     } catch (error) {
@@ -335,19 +325,10 @@ const GraphQLExplorer = () => {
         }
       }
 
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify({
-          query: query,
-          variables: parsedVariables
-        })
+      const { data } = await api.post('/graphql', {
+        query,
+        variables: parsedVariables
       });
-
-      const data = await response.json();
       setResult(data);
 
       if (data.errors) {
