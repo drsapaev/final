@@ -1826,43 +1826,21 @@ const DermatologistPanelUnified = () => {
                 </div>
 
                 {skinExaminations.length > 0 ?
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="derma-flex-col-16">
                     {skinExaminations.map((exam) =>
-                <div key={exam.id} style={{
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  backgroundColor: 'var(--mac-bg-secondary)'
-                }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <h4 style={{
-                      fontWeight: '600',
-                      fontSize: '16px',
-                      color: 'var(--mac-text-primary)',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>Осмотр #{exam.id}</h4>
+                <div key={exam.id} className="derma-card-p16-bg2">
+                        <div className="derma-flex-between-start">
+                          <h4 className="derma-h4-16-600">Осмотр #{exam.id}</h4>
                           <Badge variant="info">{exam.examination_date}</Badge>
                         </div>
-                        <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                    gap: '16px',
-                    fontSize: '14px',
-                    color: 'var(--mac-text-secondary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>
+                        <div className="derma-exam-detail-grid">
                           <div>🧴 Тип кожи: {exam.skin_type}</div>
                           <div>📈 Состояние: {exam.skin_condition}</div>
                           <div>🎯 Поражения: {exam.lesions}</div>
                           <div>📍 Распространение: {exam.distribution}</div>
                         </div>
                         {exam.diagnosis &&
-                  <div style={{
-                    marginTop: '8px',
-                    fontSize: '14px',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>
+                  <div className="derma-mt-8-text-14-primary">
                             <strong>Диагноз:</strong> {exam.diagnosis}
                           </div>
                   }
@@ -1881,24 +1859,11 @@ const DermatologistPanelUnified = () => {
               {/* Форма осмотра кожи */}
               {showSkinForm &&
             <MacOSCard className="derma-p-8">
-                  <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                marginBottom: '16px',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-              }}>Новый осмотр кожи</h3>
-                  <form onSubmit={handleSkinExaminationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                  <h3 className="derma-section-heading-mb16">Новый осмотр кожи</h3>
+                  <form onSubmit={handleSkinExaminationSubmit} className="derma-flex-col-16">
+                    <div className="derma-grid-auto-250">
                       <div>
-                        <label style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--mac-text-secondary)',
-                      marginBottom: '6px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                        <label className="derma-label-13-mb6">
                           Дата осмотра *
                         </label>
                         <Input
@@ -1909,14 +1874,7 @@ const DermatologistPanelUnified = () => {
 
                       </div>
                       <div>
-                        <label style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--mac-text-secondary)',
-                      marginBottom: '6px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                        <label className="derma-label-13-mb6">
                           Тип кожи *
                         </label>
                         <Select
@@ -1934,16 +1892,9 @@ const DermatologistPanelUnified = () => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                    <div className="derma-grid-auto-250">
                       <div>
-                        <label style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--mac-text-secondary)',
-                      marginBottom: '6px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                        <label className="derma-label-13-mb6">
                           Состояние кожи
                         </label>
                         <Input
@@ -1954,14 +1905,7 @@ const DermatologistPanelUnified = () => {
 
                       </div>
                       <div>
-                        <label style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--mac-text-secondary)',
-                      marginBottom: '6px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                        <label className="derma-label-13-mb6">
                           Поражения
                         </label>
                         <Input
@@ -1974,14 +1918,7 @@ const DermatologistPanelUnified = () => {
                     </div>
 
                     <div>
-                      <label style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    color: 'var(--mac-text-secondary)',
-                    marginBottom: '6px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>
+                      <label className="derma-label-13-mb6">
                         Диагноз
                       </label>
                       <Input
@@ -1993,14 +1930,7 @@ const DermatologistPanelUnified = () => {
                     </div>
 
                     <div>
-                      <label style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    color: 'var(--mac-text-secondary)',
-                    marginBottom: '6px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                  }}>
+                      <label className="derma-label-13-mb6">
                         План лечения
                       </label>
                       <Textarea
@@ -2011,7 +1941,7 @@ const DermatologistPanelUnified = () => {
 
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                    <div className="derma-flex-end-gap12">
                       <Button
                     type="button"
                     variant="outline"
@@ -2020,7 +1950,7 @@ const DermatologistPanelUnified = () => {
                         Отмена
                       </Button>
                       <Button type="submit">
-                        <Save size={16} style={{ marginRight: '6px' }} />
+                        <Save size={16} className="derma-mr-6" />
                         Сохранить осмотр
                       </Button>
                     </div>

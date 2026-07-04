@@ -426,6 +426,16 @@
   gap: 24px;
 }
 
+/* ─── Batch: Exam detail grid (skin + cosmetic) ─── */
+.derma-exam-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  font-size: 14px;
+  color: var(--mac-text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
 /* ─── Batch: Services / price info box ─── */
 .derma-price-info-box {
   background-color: var(--mac-accent-blue-bg);
