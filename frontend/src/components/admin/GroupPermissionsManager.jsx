@@ -21,7 +21,7 @@ import {
   User } from
 'lucide-react';
 import {
-  Card, Button, Badge, Input, Select, SegmentedControl, Skeleton,
+  MacOSCard, Button, Badge, Input, Select, SegmentedControl, Skeleton,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
@@ -297,7 +297,7 @@ const GroupPermissionsManager = () => {
   const renderUsersTab = () =>
   <div className="admin-flex admin-gap-24">
       {/* Левая панель - список пользователей */}
-      <Card className="admin-card-sidebar-300">
+      <MacOSCard className="admin-card-sidebar-300">
         <h3 className="admin-list-h3">
           <Users className="admin-icon-20" />
           Пользователи
@@ -348,10 +348,10 @@ const GroupPermissionsManager = () => {
             </div>
         }
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Правая панель - разрешения пользователя */}
-      <Card className="admin-card-main-flex-1">
+      <MacOSCard className="admin-card-main-flex-1">
         {selectedUser ?
       <>
             <div className="admin-flex-between-mb-16">
@@ -466,14 +466,14 @@ const GroupPermissionsManager = () => {
             <p className="admin-m-0">Выберите пользователя из списка слева</p>
           </div>
       }
-      </Card>
+      </MacOSCard>
     </div>;
 
 
   const renderGroupsTab = () =>
   <div className="admin-flex admin-gap-24">
       {/* Левая панель - список групп */}
-      <Card className="admin-card-sidebar-300">
+      <MacOSCard className="admin-card-sidebar-300">
         <h3 className="admin-list-h3">
           <Users className="admin-icon-20" />
           Группы
@@ -521,10 +521,10 @@ const GroupPermissionsManager = () => {
             </div>
         )}
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Правая панель - сводка группы */}
-      <Card className="admin-card-main-flex-1">
+      <MacOSCard className="admin-card-main-flex-1">
         {selectedGroup ?
       <>
             <div className="admin-flex-between-mb-16">
@@ -649,12 +649,12 @@ const GroupPermissionsManager = () => {
             <p className="admin-m-0">Выберите группу из списка слева</p>
           </div>
       }
-      </Card>
+      </MacOSCard>
     </div>;
 
 
   const renderCacheTab = () =>
-  <Card className="admin-p-24">
+  <MacOSCard className="admin-p-24">
       <div className="admin-flex-between-mb-24">
         <h3 className="admin-header-h3-m0">
           <Settings className="admin-icon-20" />
@@ -668,7 +668,7 @@ const GroupPermissionsManager = () => {
 
       {cacheStats &&
     <div className="admin-grid-auto-200">
-          <Card className="admin-stat-banner-info">
+          <MacOSCard className="admin-stat-banner-info">
             <div className="admin-flex-center-12">
               <Clock className="admin-icon-24-info" />
               <div>
@@ -680,9 +680,9 @@ const GroupPermissionsManager = () => {
                 </div>
               </div>
             </div>
-          </Card>
+          </MacOSCard>
 
-          <Card className="admin-stat-banner-success">
+          <MacOSCard className="admin-stat-banner-success">
             <div className="admin-flex-center-12">
               <Users className="admin-icon-24-success" />
               <div>
@@ -694,9 +694,9 @@ const GroupPermissionsManager = () => {
                 </div>
               </div>
             </div>
-          </Card>
+          </MacOSCard>
 
-          <Card className="admin-stat-banner-warning">
+          <MacOSCard className="admin-stat-banner-warning">
             <div className="admin-flex-center-12">
               <Key className="admin-icon-24-warning" />
               <div>
@@ -708,7 +708,7 @@ const GroupPermissionsManager = () => {
                 </div>
               </div>
             </div>
-          </Card>
+          </MacOSCard>
         </div>
     }
 
@@ -724,7 +724,7 @@ const GroupPermissionsManager = () => {
         )}
         </div>
       </div>
-    </Card>;
+    </MacOSCard>;
 
 
   return (

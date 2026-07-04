@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Card, Button, Input, Checkbox, SegmentedControl,
+  MacOSCard, Button, Input, Checkbox, SegmentedControl,
 } from '../ui/macos';
 import { Users, ArrowRight, Search, CheckCircle, XCircle, History, BarChart3 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -237,7 +237,7 @@ const UserDataTransferManager = () => {
   const renderTransferTab = () =>
   <div className="admin-flex-col-24">
       {/* Поиск пользователей */}
-      <Card className="admin-p-24">
+      <MacOSCard className="admin-p-24">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Search className="admin-icon-20" />
           Поиск пользователей
@@ -296,11 +296,11 @@ const UserDataTransferManager = () => {
             </div>
         }
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Выбранные пользователи */}
       <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24">
-        <Card className="admin-p-24">
+        <MacOSCard className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
             Пользователь-источник
           </h3>
@@ -332,9 +332,9 @@ const UserDataTransferManager = () => {
               Выберите пользователя-источника из результатов поиска
             </div>
         }
-        </Card>
+        </MacOSCard>
 
-        <Card className="admin-p-24">
+        <MacOSCard className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
             Пользователь-получатель
           </h3>
@@ -363,12 +363,12 @@ const UserDataTransferManager = () => {
               Выберите пользователя-получателя из результатов поиска
             </div>
         }
-        </Card>
+        </MacOSCard>
       </div>
 
       {/* Сводка данных источника */}
       {userDataSummary &&
-    <Card className="admin-p-24">
+    <MacOSCard className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
             Данные для передачи
           </h3>
@@ -398,11 +398,11 @@ const UserDataTransferManager = () => {
               </div>
             </div>
           </div>
-        </Card>
+        </MacOSCard>
     }
 
       {/* Выбор типов данных */}
-      <Card className="admin-p-24">
+      <MacOSCard className="admin-p-24">
         <h3 className="admin-lg-med-primary-m-0016px0">
           Типы данных для передачи
         </h3>
@@ -433,7 +433,7 @@ const UserDataTransferManager = () => {
             </label>
         )}
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Кнопка передачи */}
       <div className="admin-flex-jc-center">
@@ -461,7 +461,7 @@ const UserDataTransferManager = () => {
 
 
   const renderHistoryTab = () =>
-  <Card className="admin-p-24">
+  <MacOSCard className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-16">
         <h3 className="admin-lg-med-primary-m-0">
           История передач
@@ -502,11 +502,11 @@ const UserDataTransferManager = () => {
       )}
         </div>
     }
-    </Card>;
+    </MacOSCard>;
 
 
   const renderStatisticsTab = () =>
-  <Card className="admin-p-24">
+  <MacOSCard className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-16">
         <h3 className="admin-lg-med-primary-m-0">
           Статистика передач
@@ -549,7 +549,7 @@ const UserDataTransferManager = () => {
           Нажмите «Обновить» для загрузки статистики
         </div>
     }
-    </Card>;
+    </MacOSCard>;
 
 
   return (

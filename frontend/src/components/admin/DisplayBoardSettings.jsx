@@ -24,7 +24,7 @@ import {
   Edit } from
 'lucide-react';
 import {
-  Card, Button, Select,
+  MacOSCard, Button, Select,
 } from '../ui/macos';
 import { api } from '../../api/client';
 
@@ -172,18 +172,18 @@ const DisplayBoardSettings = () => {
 
   if (loading) {
     return (
-      <Card className="p-8">
+      <MacOSCard className="p-8">
         <div className="flex items-center justify-center">
           <RefreshCw className="animate-spin mr-2" size={20} />
           <span>Загрузка настроек табло...</span>
         </div>
-      </Card>);
+      </MacOSCard>);
 
   }
 
   if (!selectedBoard) {
     return (
-      <Card className="p-8">
+      <MacOSCard className="p-8">
         <div className="text-center">
           <Monitor size={48} className="mx-auto text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
@@ -191,7 +191,7 @@ const DisplayBoardSettings = () => {
           </h3>
           <p className="text-gray-500">Создайте первое табло для отображения очереди</p>
         </div>
-      </Card>);
+      </MacOSCard>);
 
   }
 
@@ -241,27 +241,27 @@ const DisplayBoardSettings = () => {
 
       {/* Статистика */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 text-center">
+        <MacOSCard className="p-4 text-center">
           <div className="text-2xl font-bold text-blue-600">{stats.total_boards || 0}</div>
           <div className="text-sm text-gray-600">Всего табло</div>
-        </Card>
-        <Card className="p-4 text-center">
+        </MacOSCard>
+        <MacOSCard className="p-4 text-center">
           <div className="text-2xl font-bold text-green-600">{stats.total_calls_today || 0}</div>
           <div className="text-sm text-gray-600">Вызовов сегодня</div>
-        </Card>
-        <Card className="p-4 text-center">
+        </MacOSCard>
+        <MacOSCard className="p-4 text-center">
           <div className="text-2xl font-bold text-orange-600">{stats.total_announcements || 0}</div>
           <div className="text-sm text-gray-600">Объявлений</div>
-        </Card>
-        <Card className="p-4 text-center">
+        </MacOSCard>
+        <MacOSCard className="p-4 text-center">
           <div className="text-2xl font-bold text-purple-600">{Math.round(stats.uptime_percentage || 0)}%</div>
           <div className="text-sm text-gray-600">Время работы</div>
-        </Card>
+        </MacOSCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Основные настройки */}
-        <Card className="p-6">
+        <MacOSCard className="p-6">
           <h3 className="text-lg font-medium mb-4 flex items-center">
             <Monitor size={20} className="mr-2 text-blue-600" />
             {selectedBoard.display_name}
@@ -382,10 +382,10 @@ const DisplayBoardSettings = () => {
               </label>
             </div>
           </div>
-        </Card>
+        </MacOSCard>
 
         {/* Настройки звука */}
-        <Card className="p-6">
+        <MacOSCard className="p-6">
           <h3 className="text-lg font-medium mb-4 flex items-center">
             <Volume2 size={20} className="mr-2 text-green-600" />
             Звуковые настройки
@@ -465,11 +465,11 @@ const DisplayBoardSettings = () => {
               </>
             }
           </div>
-        </Card>
+        </MacOSCard>
       </div>
 
       {/* Тестирование */}
-      <Card className="p-6">
+      <MacOSCard className="p-6">
         <h3 className="text-lg font-medium mb-4 flex items-center">
           <TestTube size={20} className="mr-2 text-purple-600" />
           Тестирование табло
@@ -531,12 +531,12 @@ const DisplayBoardSettings = () => {
             </div>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Управление контентом */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Баннеры */}
-        <Card className="p-6">
+        <MacOSCard className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium flex items-center">
               <Image size={20} className="mr-2 text-orange-600" />
@@ -592,10 +592,10 @@ const DisplayBoardSettings = () => {
             )
             }
           </div>
-        </Card>
+        </MacOSCard>
 
         {/* Объявления */}
-        <Card className="p-6">
+        <MacOSCard className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium flex items-center">
               <MessageCircle size={20} className="mr-2 text-green-600" />
@@ -613,11 +613,11 @@ const DisplayBoardSettings = () => {
               <p>Объявления не добавлены</p>
             </div>
           </div>
-        </Card>
+        </MacOSCard>
       </div>
 
       {/* Информация */}
-      <Card className="p-6 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700">
+      <MacOSCard className="p-6 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700">
         <h3 className="text-lg font-medium mb-2 flex items-center text-blue-800 dark:text-blue-400">
           <Monitor size={20} className="mr-2" />
           Информация о табло
@@ -629,7 +629,7 @@ const DisplayBoardSettings = () => {
           <p>• Настройки конфиденциальности защищают персональные данные</p>
           <p>• Голосовые объявления поддерживают несколько языков</p>
         </div>
-      </Card>
+      </MacOSCard>
     </div>);
 
 };

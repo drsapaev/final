@@ -22,7 +22,7 @@ import {
 
 'lucide-react';
 import {
-  Card, Button, Badge, Input, Checkbox,
+  MacOSCard, Button, Badge, Input, Checkbox,
 } from '../ui/macos';
 import { api } from '../../api/client';
 
@@ -163,12 +163,12 @@ const AISettings = () => {
 
   if (loading) {
     return (
-      <Card className="admin-p-32">
+      <MacOSCard className="admin-p-32">
         <div className="admin-flex-center-justify">
           <RefreshCw className="admin-icon-20-spin-mr-8" />
           <span className="admin-text-primary">Загрузка AI настроек...</span>
         </div>
-      </Card>);
+      </MacOSCard>);
 
   }
 
@@ -216,38 +216,38 @@ const AISettings = () => {
       {/* Статистика */}
       {stats.total_requests !== undefined &&
       <div className="admin-grid-auto-200">
-          <Card className="admin-loading-p-24-center">
+          <MacOSCard className="admin-loading-p-24-center">
             <div className="admin-stat-number admin-text-blue admin-mb-8">
               {stats.total_requests}
             </div>
             <div className="admin-text-sm-secondary">
               Всего запросов
             </div>
-          </Card>
-          <Card className="admin-loading-p-24-center">
+          </MacOSCard>
+          <MacOSCard className="admin-loading-p-24-center">
             <div className="admin-stat-number admin-text-success admin-mb-8">
               {stats.successful_requests}
             </div>
             <div className="admin-text-sm-secondary">
               Успешных
             </div>
-          </Card>
-          <Card className="admin-loading-p-24-center">
+          </MacOSCard>
+          <MacOSCard className="admin-loading-p-24-center">
             <div className="admin-stat-number admin-text-warning admin-mb-8">
               {Math.round(stats.cache_hit_rate)}%
             </div>
             <div className="admin-text-sm-secondary">
               Кэш
             </div>
-          </Card>
-          <Card className="admin-loading-p-24-center">
+          </MacOSCard>
+          <MacOSCard className="admin-loading-p-24-center">
             <div className="admin-stat-number admin-text-purple admin-mb-8">
               {stats.total_tokens_used}
             </div>
             <div className="admin-text-sm-secondary">
               Токенов
             </div>
-          </Card>
+          </MacOSCard>
         </div>
       }
 
@@ -258,7 +258,7 @@ const AISettings = () => {
           const testResult = testResults[provider.id];
 
           return (
-            <Card key={provider.id} className="admin-p-24">
+            <MacOSCard key={provider.id} className="admin-p-24">
               <div className="admin-flex-between-mb-16">
                 <div className="admin-flex-center">
                   <div className="admin-status-dot-12" style={{ '--admin-dot-bg': provider.active ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
@@ -394,12 +394,12 @@ const AISettings = () => {
                   <TestTube aria-hidden="true" className="admin-icon-14" />
                 </Button>
               </div>
-            </Card>);
+            </MacOSCard>);
 
         })}
 
         {/* Карточка добавления нового провайдера */}
-        <Card className="admin-p-24 admin-text-center admin-card-dashed">
+        <MacOSCard className="admin-p-24 admin-text-center admin-card-dashed">
           <Brain className="admin-icon-48-mx-auto-mb-16-tertiary" />
           <h3 className="admin-heading-lg admin-text-med admin-text-primary admin-m-0 admin-mb-8">
             Добавить AI провайдера
@@ -411,11 +411,11 @@ const AISettings = () => {
             <Plus className="admin-icon-16-mr-8" />
             Добавить
           </Button>
-        </Card>
+        </MacOSCard>
       </div>
 
       {/* Системные настройки */}
-      <Card className="admin-p-24">
+      <MacOSCard className="admin-p-24">
         <h3 className="admin-heading-lg admin-text-med admin-text-primary admin-m-0 admin-mb-16 admin-flex-center">
           <Settings className="admin-icon-20-mr-8-blue" />
           Системные настройки AI
@@ -428,7 +428,7 @@ const AISettings = () => {
             logger.log('Сохранение системных настроек:', settings);
           }} />
         
-      </Card>
+      </MacOSCard>
 
       {/* Форма провайдера */}
       {(showAddForm || editingProvider) &&
@@ -486,7 +486,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
   };
 
   return (
-    <Card className="admin-p-24">
+    <MacOSCard className="admin-p-24">
       <h3 className="admin-heading-lg admin-text-med admin-text-primary admin-m-0 admin-mb-16">
         {provider ? 'Редактирование провайдера' : 'Добавление AI провайдера'}
       </h3>
@@ -630,7 +630,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
           </Button>
         </div>
       </form>
-    </Card>);
+    </MacOSCard>);
 
 };
 

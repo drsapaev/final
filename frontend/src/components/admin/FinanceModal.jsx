@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { X, Save, DollarSign, Calendar, AlertCircle, Receipt } from 'lucide-react';
-import { Card, Button } from '../ui/macos';
+import { MacOSCard, Button } from '../ui/macos';
 import {
   Select,
 } from '../ui/macos';
@@ -228,7 +228,7 @@ const FinanceModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <MacOSCard className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Заголовок */}
           <div className="flex items-center justify-between mb-6">
@@ -584,7 +584,7 @@ const FinanceModal = ({
             </div>
           </form>
         </div>
-      </Card>
+      </MacOSCard>
     </div>
   );
 };

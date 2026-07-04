@@ -22,7 +22,7 @@ import {
 
 'lucide-react';
 import {
-  AppError, AppLoading, Card, Button, Badge, Input, Table, Checkbox, Select,
+  AppError, AppLoading, MacOSCard, Button, Badge, Input, Table, Checkbox, Select,
 } from '../ui/macos';
 
 import logger from '../../utils/logger';
@@ -181,19 +181,19 @@ const ActivationSystem = () => {
 
   if (loading) {
     return (
-      <Card className="admin-card-p-32">
+      <MacOSCard className="admin-card-p-32">
         <AppLoading
           title="Загрузка системы активации"
           description="Получаем список ключей и статус сервера."
           size="sm"
         />
-      </Card>);
+      </MacOSCard>);
 
   }
 
   if (showInitialLoadError) {
     return (
-      <Card className="admin-card-p-32">
+      <MacOSCard className="admin-card-p-32">
         <AppError
           title="Не удалось загрузить систему активации"
           description={loadError}
@@ -203,7 +203,7 @@ const ActivationSystem = () => {
             </Button>
           }
         />
-      </Card>);
+      </MacOSCard>);
 
   }
 
@@ -267,42 +267,42 @@ const ActivationSystem = () => {
 
       {/* Статистика */}
       <div className="admin-grid-auto-200">
-        <Card className="admin-card-p-24-center">
+        <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-accent-blue)' }}>
             {stats.total_activations || 0}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             Всего активаций
           </div>
-        </Card>
-        <Card className="admin-card-p-24-center">
+        </MacOSCard>
+        <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-success)' }}>
             {stats.active_activations || 0}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             Активных
           </div>
-        </Card>
-        <Card className="admin-card-p-24-center">
+        </MacOSCard>
+        <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>
             {stats.trial_activations || 0}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             Пробных
           </div>
-        </Card>
-        <Card className="admin-card-p-24-center">
+        </MacOSCard>
+        <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-error)' }}>
             {stats.expired_activations || 0}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             Истекших
           </div>
-        </Card>
+        </MacOSCard>
       </div>
 
       {/* Фильтры */}
-      <Card className="admin-p-24">
+      <MacOSCard className="admin-p-24">
         <div className="admin-grid-auto-300">
           <div>
             <label className="admin-label-block-sm-med-primary-mb-8">
@@ -337,10 +337,10 @@ const ActivationSystem = () => {
               className="admin-w-full" />
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Таблица активаций */}
-      <Card className="admin-card-p-0-overflow-hidden">
+      <MacOSCard className="admin-card-p-0-overflow-hidden">
         <div className="admin-p-16">
           <Table
             columns={[
@@ -469,7 +469,7 @@ const ActivationSystem = () => {
             } />
           
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Форма создания ключа */}
       {showCreateForm &&
@@ -480,7 +480,7 @@ const ActivationSystem = () => {
       }
 
       {/* Информация */}
-      <Card className="admin-card-info-bg">
+      <MacOSCard className="admin-card-info-bg">
         <h3 className="admin-shield-h3-info">
           <Shield className="admin-icon-20-mr-8" />
           Как работает система активации
@@ -492,7 +492,7 @@ const ActivationSystem = () => {
           <p className="admin-p-list-item-m0">• Система работает офлайн после успешной активации</p>
           <p className="admin-p-list-item-m0">• Все активации логируются для аудита</p>
         </div>
-      </Card>
+      </MacOSCard>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
     </div>);
@@ -531,7 +531,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
   };
 
   return (
-    <Card className="admin-p-24">
+    <MacOSCard className="admin-p-24">
       <h3 className="admin-h3-lg-med-primary-mb-16">
         Создание ключа активации
       </h3>
@@ -643,7 +643,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
           </Button>
         </div>
       </form>
-    </Card>);
+    </MacOSCard>);
 
 };
 
