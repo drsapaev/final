@@ -448,3 +448,8 @@
   padding: 48px;
   text-align: center;
 }
+
+/* ─── Batch 11: Additional utilities ─── */
+.dental-grid-span-2 { grid-column: span 2; margin-bottom: 8px; }
+.dental-mr-4 { margin-right: 4px; }
+.dental-mb { margin-bottom: var(--mac-spacing-4); }
