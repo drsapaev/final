@@ -45,7 +45,6 @@ import VisitTimeline from '../components/VisitTimeline';
 import { printPanelTicket } from '../services/panelPrint';
 import { queueService } from '../services/queue';
 import { printService } from '../services/print';
-import AIChatWidget from '../components/ai/AIChatWidget';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
@@ -440,7 +439,7 @@ const DermatologistPanelUnified = () => {
                     visit_type:
                       entry.discount_mode === 'repeat' ? 'Повторный' :
                       entry.discount_mode === 'benefit' ? 'Льготный' :
-                      entry.discount_mode === 'all_free' ? 'All Free' :
+                      entry.discount_mode === 'all_free' ? 'Бесплатно' :
                       'Платный',
                     discount_mode: entry.discount_mode || 'none',
                     services: entry.services || [],
@@ -1846,11 +1845,7 @@ const DermatologistPanelUnified = () => {
         </div>
       )}
 
-      <AIChatWidget
-          contextType="general"
-          specialty="dermatology"
-          useWebSocket={false}
-          position="bottom-right" />
+      {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}
 
         <RoleNotificationCenter userRole="dermatologist" />
       </div>

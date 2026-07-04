@@ -130,8 +130,8 @@ export const SIDEBAR_PRESETS = {
         items: [
           { id: 'patients', label: 'Пациенты', icon: 'person.2' },
           { id: 'appointments', label: 'Записи', icon: 'calendar' },
-          { id: 'examinations', label: 'Осмотры', icon: 'eye' },
-          { id: 'diagnoses', label: 'Диагнозы', icon: 'stethoscope' },
+          // S-6: merged examinations + diagnoses into visits tab (EMR handles both)
+          { id: 'visits', label: 'Осмотр и диагноз', icon: 'eye' },
           { id: 'visits', label: 'Протоколы визитов', icon: 'doc.text' },
           { id: 'photos', label: 'Фотоархив', icon: 'camera' },
         ],

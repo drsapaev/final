@@ -39,7 +39,7 @@ import {
   Plus,
   Edit,
   XCircle,
-  Stethoscope as Tooth,
+  Smile as ToothIcon,
   Smile,
   BarChart3,
   Users,
@@ -48,7 +48,6 @@ import {
   Save,
   Building } from
 'lucide-react';
-import AIChatWidget from '../components/ai/AIChatWidget';
 import '../styles/animations.css';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
@@ -2542,7 +2541,7 @@ const DentistPanelUnified = () => {
                   onClick={() => {
                     // Открываем менеджер цен для указания итоговой стоимости
                     setSelectedServiceForPrice({
-                      id: 1, // ID услуги - в реальном приложении получать из формы
+                      id: selectedServiceForPrice?.id || null, // S-19: use real service ID
                       name: treatmentForm.procedure_type || 'Стоматологическое лечение',
                       price: Number(treatmentForm.cost) || 50000
                     });
@@ -2779,13 +2778,7 @@ const DentistPanelUnified = () => {
         specialtyFilter="dentistry" />
 
       }
-
-      {/* AI Chat Widget */}
-      <AIChatWidget
-        contextType="general"
-        specialty="dentistry"
-        useWebSocket={false}
-        position="bottom-right" />
+      {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}
 
       <RoleNotificationCenter userRole="dentist" />
 
