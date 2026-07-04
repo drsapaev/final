@@ -51,6 +51,8 @@ import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import notify from '../services/notify';
+import { useConfirm } from '../components/common/ConfirmDialog';
+import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import {
   countAppointmentsByStatuses,
@@ -179,6 +181,21 @@ function buildPatientsFromAppointments(appointments) {
 const DermatologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
   const { isDark, getColor, getSpacing, getFontSize } = useTheme();
+  // QW-5 (UX audit): confirm hook for visit completion
+  const [confirm, confirmDialog] = useConfirm();
+  // QW-6 (UX audit): session timeout warning
+  const [sessionWarning, setSessionWarning] = useState(null);
+
+  useSessionTimeoutWarning({
+    onWarning: () => setSessionWarning({ active: true }),
+    onExpired: () => {
+      setSessionWarning(null);
+      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    },
+  });
   const location = useLocation();
   // P-009: navigate removed — useDoctorPanelState handles tab URL sync
 
@@ -630,7 +647,7 @@ const DermatologistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dermatology] Открытие окна оплаты для:', row.patient_fio);
-        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
+        logger.info('[Dermatology] payment action invoked (disabled for doctor view)', row);
         break;
       case 'print':
         logger.info('[Dermatology] Печать талона для:', row.patient_fio);
@@ -1151,6 +1168,19 @@ const DermatologistPanelUnified = () => {
 
   // Унифицированная обработка сохранения визита
   const handleSaveVisit = async () => {
+    // QW-5 (UX audit): confirm before completing the visit
+    const ok = await confirm({
+      title: 'Завершить приём?',
+      message: 'Приём будет сохранён. Убедитесь, что диагноз и план лечения заполнены.',
+      description: 'После завершения изменения возможны только через поправку EMR.',
+      confirmLabel: 'Завершить приём',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
+    if (!ok) {
+      return;
+    }
+
     // Определяем ID записи: приоритет selectedPatient, потом currentAppointment
     const entryId = resolveDoctorQueueEntryId(selectedPatient) ?? resolveDoctorQueueEntryId(currentAppointment);
     if (!entryId) {
@@ -1925,7 +1955,23 @@ const DermatologistPanelUnified = () => {
         }
 
         {/* AI Chat Widget */}
-        <AIChatWidget
+        {/* QW-5/QW-6 (UX audit): confirm dialog + session timeout warning */}
+      {confirmDialog}
+      {sessionWarning && (
+        <div role="alertdialog" aria-label="Предупреждение об истечении сессии"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+          <div style={{ background: 'var(--mac-surface, white)', border: '1px solid var(--mac-border, #d8dde8)', borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '90%' }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--mac-text-primary, #1a1d29)' }}>Сессия скоро истечёт</h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--mac-text-secondary, #6b7280)', lineHeight: 1.5 }}>Ваша сессия истекает. Несохранённые данные могут быть потеряны.</p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setSessionWarning(null)} style={{ padding: '8px 16px', border: '1px solid var(--mac-border)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontSize: '14px' }}>Позже</button>
+              <button onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', background: 'var(--mac-accent, #dc2626)', color: 'white', cursor: 'pointer', fontSize: '14px' }}>Продлить сессию</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AIChatWidget
           contextType="general"
           specialty="dermatology"
           useWebSocket={false}

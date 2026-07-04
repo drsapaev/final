@@ -38,10 +38,24 @@ export function useEMRKeyboard({
   const handleKeyDown = useCallback((e) => {
     if (!enabled) return;
 
-    // Ignore if typing in input/textarea (unless it's our EMR fields)
-    const target = e.target;void (
-    target.id?.startsWith('emr-') ||
-    target.closest?.('.emr-section'));
+    // QW-2 (UX audit): Ignore hotkeys when typing in input/textarea/select/contenteditable.
+    // The previous code had `void (target.id?.startsWith('emr-') || target.closest?.('.emr-section'))`
+    // which was a no-op — it computed the expression but discarded the result. The check never
+    // actually prevented hotkeys from firing inside form fields.
+    // Now we properly skip hotkeys when the user is typing in ANY input field, UNLESS the target
+    // is inside an EMR section (where Ctrl+S/Z/Enter should work for EMR autosave/undo/sign).
+    const target = e.target;
+    const isTypingInInput = target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT' ||
+      target.isContentEditable;
+    const isInsideEMR = target.closest?.('.emr-section') ||
+      target.id?.startsWith('emr-') ||
+      target.closest?.('[data-emr-field]');
+
+    if (isTypingInInput && !isInsideEMR) {
+      return; // Don't intercept hotkeys in non-EMR form fields
+    }
 
     // Check for Ctrl/Cmd key
     const isCtrl = e.ctrlKey || e.metaKey;
