@@ -23,6 +23,7 @@ import PhotoArchive from '../components/dental/PhotoArchive';
 import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import DentalReportsTab from '../components/dental/DentalReportsTab';
 import DentalTemplatesTab from '../components/dental/DentalTemplatesTab';
+import DentalDashboardTab from '../components/dental/DentalDashboardTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
@@ -1569,146 +1570,12 @@ const DentistPanelUnified = () => {
   // Вкладки
   // Рендер дашборда
   const renderDashboard = () =>
-  <div className="dental-flex-col dental-gap-32">
-      {/* Статистические карточки */}
-      <div className="dental-grid-stat-cards">
-        <div className="dental-stat-card-default">
-          <div>
-            <p className="dental-text-desc dental-text-secondary">Всего пациентов</p>
-            <p className="dental-stat-number dental-text-primary">{stats.totalPatients}</p>
-            <p className="dental-stat-delta dental-text-success">+12% за месяц</p>
-          </div>
-          <div className="dental-icon-bg dental-icon-bg-blue dental-icon-bg-xl-shadow">
-            <Users className="dental-icon-28 dental-text-white" />
-          </div>
-        </div>
-
-        <div className="dental-stat-card-default">
-          <div>
-            <p className="dental-text-desc dental-text-secondary">Записей сегодня</p>
-            <p className="dental-stat-number dental-text-primary">{stats.todayAppointments}</p>
-            <p className="dental-stat-delta dental-text-blue">8 из 12 слотов</p>
-          </div>
-          <div className="dental-icon-bg dental-icon-bg-success dental-icon-bg-xl-shadow">
-            <Calendar className="dental-icon-28 dental-text-white" />
-          </div>
-        </div>
-
-        <div className="dental-stat-card-default">
-          <div>
-            <p className="dental-text-desc dental-text-secondary">Активные планы</p>
-            <p className="dental-stat-number dental-text-primary">{stats.activeTreatmentPlans}</p>
-            <p className="dental-stat-delta dental-text-purple">+8% к прошлому месяцу</p>
-          </div>
-          <div className="dental-icon-bg dental-icon-bg-purple dental-icon-bg-xl-shadow">
-            <FileText className="dental-icon-28 dental-text-white" />
-          </div>
-        </div>
-
-        <div className="dental-stat-card-default">
-          <div>
-            <p className="dental-text-desc dental-text-secondary">Протезы</p>
-            <p className="dental-stat-number dental-text-primary">{stats.completedProsthetics}</p>
-            <p className="dental-stat-delta dental-text-warning">+15% к прошлому месяцу</p>
-          </div>
-          <div className="dental-icon-bg dental-icon-bg-warning dental-icon-bg-xl-shadow">
-            <Smile className="dental-icon-28 dental-text-white" />
-          </div>
-        </div>
-      </div>
-
-      {/* Быстрые действия */}
-      <div className="dental-section-card">
-        <div className="dental-flex-between-16">
-          <h3 className="dental-text-lg-semi dental-text-primary">Быстрые действия</h3>
-        </div>
-        <div className="dental-grid-auto">
-          <Button
-          onClick={() => handleTabChange('patients')}
-          variant="primary"
-          className="dental-text-white"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}>
-
-            <Plus className="dental-icon-20" />
-            <span className="dental-fw-medium">Новый пациент</span>
-          </Button>
-          <Button
-          onClick={() => handleTabChange('appointments')}
-          variant="outline"
-          className="dental-quick-action-btn"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}>
-
-            <Calendar className="dental-icon-20" />
-            <span className="dental-fw-medium">Записать на прием</span>
-          </Button>
-          <Button
-          onClick={() => handleTabChange('dental-chart')}
-          variant="outline"
-          className="dental-quick-action-btn"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}>
-
-            <Tooth className="dental-icon-20" />
-            <span className="dental-fw-medium">Схема зубов</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Последние записи */}
-      <div className="dental-section-card">
-        <div className="dental-flex-between-16">
-          <h3 className="dental-text-lg-semi dental-text-primary">Последние записи</h3>
-        </div>
-        <div className="dental-flex-col dental-gap-16">
-          {appointmentsTableData.slice(0, 5).map((appointment) =>
-        <div
-          key={appointment.id}
-          className="dental-appointment-row">
-
-              <div className="dental-flex dental-gap-16">
-                <div className="dental-icon-bg dental-icon-bg-blue dental-icon-bg-lg-shadow">
-                  <span className="dental-text-value dental-fw-700 dental-text-white">
-                    {appointment.patientName?.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <p className="dental-text-primary">{appointment.patientName}</p>
-                  <p className="dental-text-desc dental-text-secondary">{appointment.date} {appointment.time}</p>
-                </div>
-              </div>
-              <div
-            className="dental-status-badge"
-            data-status={appointment.status === 'confirmed' ? 'confirmed' : 'pending'}>
-                {appointment.status}
-              </div>
-            </div>
-        )}
-        </div>
-      </div>
-    </div>;
-
-
-  // Рендер пациентов
+    <DentalDashboardTab
+      appointments={appointments}
+      patients={patients}
+      onGoToAppointments={() => handleTabChange('appointments')}
+      onGoToPatients={() => handleTabChange('patients')}
+    />
   const renderPatients = () =>
   <div className="dental-flex-col dental-gap-24">
       {/* Поиск и фильтры */}
