@@ -39,6 +39,7 @@ import SkinAnalysis from '../components/dermatology/SkinAnalysis';
 import PriceOverrideManager from '../components/dermatology/PriceOverrideManager';
 import DermaExamsTab from '../components/dermatology/DermaExamsTab';
 import DermaHistoryTab from '../components/dermatology/DermaHistoryTab';
+import DermaPhotosTab from '../components/dermatology/DermaPhotosTab';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import { printPanelTicket } from '../services/panelPrint';
@@ -1730,75 +1731,20 @@ const DermatologistPanelUnified = () => {
             </MacOSCard>
           }
 
-          {activeTab === 'photos' && (currentAppointment || selectedPatient) &&
-          <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
-                <h3 className="derma-section-heading-display">
-                  Загрузить фото
-                </h3>
-                {/* Загрузчик фото с HEIC поддержкой */}
-                <PhotoUploader
-                visitId={currentAppointment?.visit_id}
-                patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
-                onDataUpdate={(updatedPhotos) => {
-                  logger.info('Фото обновлены');
-                  if (updatedPhotos) {
-                    setPhotoData(updatedPhotos);
-                  }
-                  loadPatientData();
-                }} />
-
-              </MacOSCard>
-
-              <MacOSCard className="derma-p-8">
-                <h3 className="derma-section-heading-display">
-                  AI анализ кожи
-                </h3>
-                {/* AI анализ кожи */}
-                <SkinAnalysis
-                photos={photoData}
-                visitId={currentAppointment?.visit_id}
-                patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
-                onAnalysisComplete={(result) => {
-                  logger.info('AI анализ завершен:', result);
-                }} />
-
-              </MacOSCard>
-
-              <MacOSCard className="derma-p-8">
-                <h3 className="derma-section-heading-display">
-                  Сравнение «до» и «после»
-                </h3>
-                {/* Сравнение фото до и после */}
-                <PhotoComparison
-                beforePhoto={photoData.before?.[0]}
-                afterPhoto={photoData.after?.[0]}
-                metadata={{ visitId: currentAppointment?.visit_id, patientId: currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id }}
-                onComparisonComplete={(result) => {
-                  logger.info('Сравнение завершено:', result);
-                }} />
-
-              </MacOSCard>
-            </div>
+          {/* Фото — R-15: extracted to DermaPhotosTab */}
+          {activeTab === 'photos' &&
+            <DermaPhotosTab
+              hasPatient={!!(currentAppointment || selectedPatient)}
+              currentAppointment={currentAppointment}
+              selectedPatient={selectedPatient}
+              photoData={photoData}
+              onPhotoUpdate={(updatedPhotos) => {
+                if (updatedPhotos) setPhotoData(updatedPhotos);
+                loadPatientData();
+              }}
+              onGoToAppointments={() => handleTabChange('appointments')}
+            />
           }
-
-          {activeTab === 'photos' && !currentAppointment && !selectedPatient &&
-          <MacOSCard className="derma-card-p48-center">
-              <MacOSEmptyState
-              type="image"
-              title="Выберите пациента"
-              description="Перейдите на вкладку 'Очередь' и выберите пациента для просмотра фото"
-              action={
-              <Button variant="outline" onClick={() => handleTabChange('queue')} className="derma-p-4 derma-mt-16">
-                    Перейти к очереди
-                  </Button>
-              } />
-
-            </MacOSCard>
-          }
-
-          {/* Осмотр кожи */}
-          {/* Осмотр кожи + Косметология — R-15: extracted to DermaExamsTab */}
           {(activeTab === 'skin' || activeTab === 'cosmetic') &&
             <DermaExamsTab
               activeTab={activeTab}
