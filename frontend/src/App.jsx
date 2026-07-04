@@ -87,6 +87,7 @@ const WebhookManager = lazy(() => import('./components/admin/WebhookManager.jsx'
 const GraphQLExplorer = lazy(() => import('./components/admin/GraphQLExplorer.jsx'));
 const UnifiedReports = lazy(() => import('./components/admin/UnifiedReports.jsx'));
 const UnifiedNotifications = lazy(() => import('./components/admin/UnifiedNotifications.jsx'));
+const UnifiedIntegrations = lazy(() => import('./components/admin/UnifiedIntegrations.jsx'));
 const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
 const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
@@ -156,6 +157,7 @@ const ROUTE_COMPONENTS = {
   GraphQLExplorer,
   UnifiedReports,
   UnifiedNotifications,
+  UnifiedIntegrations,
   UnauthorizedPage,
   ForbiddenPage,
   NotFoundPage,

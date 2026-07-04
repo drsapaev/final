@@ -52,10 +52,8 @@ const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
   'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu', section: 'Обзор' },
   'admin-reports': { path: '/admin/reports', owner: 'admin.reports', component: 'UnifiedReports', entry: 'direct', section: 'Обзор' },
   'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'SystemManagement', entry: 'direct', section: 'Система' },
-  'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'CloudPrintingManager', entry: 'direct', section: 'Интеграции' },
-  'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'MedicalEquipmentManager', entry: 'direct', section: 'Интеграции' },
-  'admin-webhooks': { path: '/admin/webhooks', owner: 'admin.integrations', component: 'WebhookManager', entry: 'direct', section: 'Интеграции' },
-  'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'GraphQLExplorer', entry: 'direct', section: 'Интеграции' },
+  // IA PR-2: 5 integration routes demoted to nav:false (tabs inside UnifiedIntegrations hub)
+  'admin-integrations': { path: '/admin/integrations', owner: 'admin.integrations', component: 'UnifiedIntegrations', entry: 'menu', section: 'Система' },
 };
 
 const ADMIN_ROUTE_CHROME_HEADING_CONTRACT = {
@@ -280,7 +278,7 @@ describe('route contract invariants', () => {
     // P-003 fix: 'Настройки' section added to surface 7 previously orphaned
     // admin-settings routes (benefit-settings, wizard-settings, payment-providers,
     // clinic-settings, queue-settings, telegram-settings, display-settings).
-    expect(sectionTitles).toEqual(['Обзор', 'Пациенты и запись', 'Финансы', 'Клиника и очередь', 'Коммуникации', 'Система', 'Интеграции']);
+    expect(sectionTitles).toEqual(['Обзор', 'Пациенты и запись', 'Финансы', 'Клиника и очередь', 'Коммуникации', 'Система']);
 
     Object.entries(ADMIN_NAV_GROUPING_ROUTE_CONTRACT).forEach(([routeId, expected]) => {
       const route = getRouteById(routeId);
