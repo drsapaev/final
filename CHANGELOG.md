@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-07-04 — Admin panel dead-code removal — Step 2 (chore/admin-remove-dead-partial-step2)
+## 2026-07-04 — Admin panel dead-code removal — Step 2 (chore/admin-remove-dead-partial-step2) — PR #1829
 - **frontend/src/components/admin/** — deleted 6 dead-code files (2 850 lines) with partial live replacements. No runtime behavior change (all 6 were already unreachable in production).
   - `SecurityMonitor.jsx` (906) — DEAD, 100% mock data (`mockData = { totalThreats: 23, ... }`). Real threat-monitoring is a backend gap; this file never had real data. Superseded conceptually by `pages/Audit.jsx` (audit log of user actions — different function).
   - `TelegramBotManager.jsx` (763) — DEAD, only importer was the dead `UnifiedTelegramManagement`. Had 3 broadcast functions (`sendAdminAlert`, `broadcastSystemMessage`, `notificationForm` with `send_to_all_admins`/`send_to_all_users`) hitting backend endpoints `/api/v1/telegram-bot/send-notification` and `/api/v1/telegram-bot/broadcast-system-message` (which still exist). **Feature gap note:** the live `components/TelegramManager.jsx` does NOT have these broadcast features — its "Отправить сообщение" button (`TelegramManager.jsx:1625-1631`) has no `onClick`. Restoring broadcast UI is a separate product decision (re-implement in `TelegramManager.jsx` or wire a new admin tab).
