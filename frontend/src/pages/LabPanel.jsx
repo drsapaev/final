@@ -11,6 +11,7 @@ import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
+import './lab.css';
 
 // P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
 // использует labReportingApi.listQueueToday() с собственным auth-токеном.
@@ -407,79 +408,25 @@ export default function LabPanel() {
   return (
     <main
       aria-labelledby={LAB_PANEL_TITLE_ID}
-      style={{
-        padding: '24px',
-        display: 'grid',
-        gap: '16px',
-        background: 'var(--mac-bg-primary)',
-        minHeight: '100%'
-      }}
+      className="lab-main"
     >
       {/* P-13 fix: skip-to-content link для keyboard-пользователей.
           Скрыт визуально, появляется при фокусе. Позволяет перескочить
           tablist и попасть прямо к содержимому активного таба. */}
       <a
         href={`#${LAB_PANEL_TABLIST_ID}`}
-        style={{
-          position: 'absolute',
-          left: -9999,
-          top: 'auto',
-          width: 1,
-          height: 1,
-          overflow: 'hidden',
-          padding: 0,
-          margin: 0,
-          clip: 'rect(0 0 0 0)',
-          whiteSpace: 'nowrap',
-          border: 0,
-        }}
-        onFocus={(e) => {
-          e.target.style.cssText = [
-            'position:fixed',
-            'top:8px',
-            'left:8px',
-            'width:auto',
-            'height:auto',
-            'overflow:visible',
-            'padding:8px 16px',
-            'margin:0',
-            'clip:auto',
-            'white-space:nowrap',
-            'background:var(--mac-accent)',
-            'color:white',
-            'border-radius:8px',
-            'z-index:9999',
-            'font-weight:600',
-            'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
-          ].join(';');
-        }}
-        onBlur={(e) => {
-          e.target.style.cssText = '';
-        }}
+        className="lab-skip-link"
       >
         Перейти к навигации по табам
       </a>
       <Card variant="filled" padding="none">
         <CardHeader
-          style={{
-            background: 'linear-gradient(135deg, color-mix(in oklab, var(--mac-accent) 12%, var(--mac-bg-tertiary)), var(--mac-bg-tertiary))',
-            borderBottom: '1px solid var(--mac-border)',
-            padding: '18px 20px'
-          }}
+          className="lab-card-header"
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div className="lab-flex-between-wrap">
             <h1
               id={LAB_PANEL_TITLE_ID}
-              style={{
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-xl)',
-                fontWeight: 700,
-                lineHeight: 1.2
-              }}
+              className="lab-panel-title"
             >
               <Icon name="cross.case" size={22} />
               <span>Панель лаборатории</span>
@@ -488,7 +435,7 @@ export default function LabPanel() {
               id={LAB_PANEL_TABLIST_ID}
               role="tablist"
               aria-labelledby={LAB_PANEL_TITLE_ID}
-              style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}
+              className="lab-tablist"
             >
               {tabs.map((tab) => (
                 <Button
@@ -521,7 +468,7 @@ export default function LabPanel() {
           <CardContent
             role={message.type === 'error' ? 'alert' : 'status'}
             aria-live={message.type === 'error' ? 'assertive' : 'polite'}
-            style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}
+            className="lab-card-secondary"
           >
             {/* QW-4 fix: Alert с кнопками «Повторить» (если есть retryAction)
                 и «Закрыть». Раньше Alert только показывал текст — теперь
@@ -529,7 +476,7 @@ export default function LabPanel() {
             <Alert
               severity={message.type === 'error' ? 'error' : 'info'}
               action={(
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="lab-flex-center-8">
                   {message.retryAction && (
                     <Button
                       size="small"
@@ -631,22 +578,11 @@ export default function LabPanel() {
         {/* WF-16 fix: breadcrumb навигация для wayfinding.
             Показывает путь: Очередь → Пациент → Отчёт #N (статус). */}
         {(selectedAppointment || activeInstance) && (
-          <nav aria-label="Навигация" style={{
-            padding: '8px 0',
-            fontSize: '13px',
-            color: 'var(--mac-text-secondary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            flexWrap: 'wrap',
-          }}>
+          <nav aria-label="Навигация" className="lab-breadcrumb-nav">
             <button
               type="button"
               onClick={() => switchTab('queue')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--mac-accent)', font: 'inherit', padding: 0,
-              }}
+              className="lab-breadcrumb-link"
             >
               Очередь
             </button>
@@ -661,7 +597,7 @@ export default function LabPanel() {
                 <span>›</span>
                 <span>
                   Отчёт #{activeInstance.id}
-                  <span style={{ marginLeft: '4px', color: 'var(--mac-text-muted)' }}>
+                  <span className="lab-text-muted-ml">
                     ({formatLabStatus(activeInstance.status)})
                   </span>
                 </span>
