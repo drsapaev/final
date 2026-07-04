@@ -134,6 +134,70 @@ ws_manager = WSManager()
 log.info("WSManager: создан глобальный экземпляр %d", id(ws_manager))
 
 
+# -----------------------------------------------------------------------------
+# UX Audit Stage 3 (Queue WebSocket):
+# Helper для broadcast'а обновлений очереди всем подписчикам room'а.
+#
+# Queue endpoints (qr_queue.py, queue.py) вызывают эту функцию после
+# мутаций (call-next, join, open, cancel, no-show, restore), чтобы
+# admin-панель на /ws/queue мгновенно получила обновление вместо
+# 30-секундного polling'а.
+#
+# Room формат: "{department}::{date}" — совпадает с тем, что использует
+# ws_queue() endpoint при подключении клиента.
+#
+# ВАЖНО: функция синхронная с точки зрения caller'а (HTTP endpoint),
+# но broadcast происходит асинхронно через asyncio.create_task().
+# Это не блокирует HTTP-ответ.
+# -----------------------------------------------------------------------------
+def broadcast_queue_update(
+    department: str,
+    date: str,
+    event_type: str,
+    data: dict | None = None,
+) -> None:
+    """
+    Broadcast queue update to all WS subscribers in the room.
+
+    Args:
+        department: Department/specialist identifier (e.g. "specialist_42")
+        date: Queue date in YYYY-MM-DD format
+        event_type: Event type (e.g. "queue_update", "patient_called", "entry_added")
+        data: Optional additional payload data
+
+    Example:
+        broadcast_queue_update(
+            department=f"specialist_{specialist_id}",
+            date="2026-07-04",
+            event_type="queue_update",
+            data={"action": "call_next", "entry_id": 123}
+        )
+    """
+    import asyncio
+
+    room = f"{department.strip()}::{date.strip()}"
+    message = {
+        "type": event_type,
+        "room": room,
+        "data": data or {},
+    }
+
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(ws_manager.broadcast(room, message))
+        log.info(
+            "broadcast_queue_update: queued broadcast to room %s, event=%s",
+            room,
+            event_type,
+        )
+    except RuntimeError:
+        # No event loop running (e.g., in sync test context) — log and skip.
+        log.warning(
+            "broadcast_queue_update: no event loop, skipping broadcast to %s",
+            room,
+        )
+
+
 def _origin_allowed(origin: str | None) -> bool:
     if os.getenv("CORS_DISABLE", "0") == "1":
         return True

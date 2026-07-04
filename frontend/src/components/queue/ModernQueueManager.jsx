@@ -14,6 +14,9 @@ import {
 } from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
+// UX Audit Stage 3 (Queue issue 7.1):
+// WebSocket подписка для мгновенных обновлений очереди вместо 30s polling.
+import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
 import QueueTable from './QueueTable';
 import logger from '../../utils/logger';
 import './ModernQueueManager.css';
@@ -113,16 +116,31 @@ const ModernQueueManager = ({
     }
   }, [effectiveDoctor, effectiveDate, loadQueue]);
 
-  // Polling для автообновления
+  // Polling для автообновления (fallback для WebSocket)
+  // UX Audit Stage 3 (Queue issue 7.1):
+  // Polling увеличен с 30s до 60s — теперь это fallback для WebSocket.
+  // WebSocket (useQueueWebSocket ниже) даёт мгновенные обновления.
+  // Если WS упал, polling 60s всё ещё обновляет очередь.
   useEffect(() => {
     let interval;
     if (autoRefresh && effectiveDoctor && effectiveDate) {
       interval = setInterval(() => {
         loadQueue();
-      }, 30000); // 30 секунд
+      }, 60000); // 60 секунд (было 30)
     }
     return () => clearInterval(interval);
   }, [autoRefresh, effectiveDoctor, effectiveDate, loadQueue]);
+
+  // UX Audit Stage 3 (Queue issue 7.1):
+  // WebSocket подписка для мгновенных обновлений.
+  // При получении queue_update события — перезагружаем snapshot очереди.
+  // Polling выше остаётся как fallback (60s).
+  const { isConnected: wsConnected, connectionState: wsState } = useQueueWebSocket({
+    specialistId: effectiveDoctor,
+    date: effectiveDate,
+    enabled: Boolean(effectiveDoctor && effectiveDate),
+    onUpdate: loadQueue,
+  });
 
   // Слушатель событий от QueueJoin для мгновенного обновления
   useEffect(() => {
@@ -460,6 +478,52 @@ const ModernQueueManager = ({
                   style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
 
               </button>
+
+              {/* UX Audit Stage 3 (Queue issue 7.1):
+                  WebSocket connection indicator.
+                  Зелёный — подключено (мгновенные обновления).
+                  Жёлтый — переподключение.
+                  Серый — отключено (работает polling 60s). */}
+              {effectiveDoctor && effectiveDate && (
+                <span
+                  className="mqm-ws-indicator"
+                  aria-label={
+                    wsState === 'connected' ? 'WebSocket подключён — мгновенные обновления' :
+                    wsState === 'reconnecting' ? 'WebSocket переподключение...' :
+                    wsState === 'connecting' ? 'WebSocket подключение...' :
+                    'WebSocket отключён — работает polling 60с'
+                  }
+                  title={
+                    wsState === 'connected' ? 'WebSocket: подключён (мгновенные обновления)' :
+                    wsState === 'reconnecting' ? 'WebSocket: переподключение...' :
+                    wsState === 'connecting' ? 'WebSocket: подключение...' :
+                    'WebSocket: отключён (fallback на polling 60с)'
+                  }
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    marginLeft: 8,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: wsState === 'connected' ? 'var(--mac-success)' :
+                           wsState === 'reconnecting' || wsState === 'connecting' ? 'var(--mac-warning)' :
+                           'var(--mac-text-tertiary)',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: 'currentColor',
+                      animation: wsState === 'connecting' || wsState === 'reconnecting' ? 'pulse 1.5s infinite' : 'none',
+                    }}
+                    aria-hidden="true"
+                  />
+                  {wsState === 'connected' ? 'Live' : wsState === 'reconnecting' ? 'Reconnect' : wsState === 'connecting' ? 'Connect' : 'Poll'}
+                </span>
+              )}
             </div>
           </div>
         </div>
