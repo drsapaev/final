@@ -814,8 +814,15 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin'],
-    entry: 'menu',
-    nav: nav({ label: 'Telegram', icon: 'paperplane', section: 'Система', order: 30, sidebar: true }),
+    // P1 architectural fix (Sprint 3): demoted to entry:'direct' + nav:false to
+    // remove duplicate Telegram sidebar entry. The canonical Telegram surface is
+    // admin-telegram-settings (Настройки section) — it covers bot token, webhook,
+    // test messages, and stats. TelegramManager (this route) is a richer bot-
+    // management surface (commands, onboarding requests) that remains reachable
+    // via direct URL /admin/integrations/telegram and via legacy redirect from
+    // /telegram-integration, but no longer clutters the sidebar.
+    entry: 'direct',
+    nav: false,
     title: 'Admin Telegram Integration',
     owner: 'admin.telegram',
     component: 'TelegramManager',
@@ -849,7 +856,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Push-уведомления', icon: 'bell', section: 'Система', order: 45, sidebar: true }),
+    nav: nav({ label: 'Push-уведомления', icon: 'bell', section: 'Интеграции', order: 30, sidebar: true }),
     title: 'Admin Push Notifications',
     owner: 'admin.notifications',
     component: 'UnifiedNotifications',
@@ -865,7 +872,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Верификация телефонов', icon: 'phone', section: 'Система', order: 50, sidebar: true }),
+    nav: nav({ label: 'Верификация телефонов', icon: 'phone', section: 'Интеграции', order: 40, sidebar: true }),
     title: 'Admin Phone Verification',
     owner: 'admin.integrations',
     component: 'PhoneVerificationManager',
@@ -956,23 +963,6 @@ export const ROUTE_REGISTRY = [
     component: 'Audit',
     legacyRedirectFrom: ['/audit'],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-audit', pageTitle: 'Admin Audit' }),
-  },
-  {
-    id: 'admin-advanced-users',
-    path: '/admin/advanced-users',
-    group: 'admin',
-    surface: 'screen',
-    lifecycle: stable,
-    shell: 'app-shell',
-    auth: 'role-scoped',
-    roles: ['Admin'],
-    entry: 'direct',
-    nav: nav({ label: 'Расширенные пользователи', icon: 'users', section: 'Система', order: 110, sidebar: true }),
-    title: 'Admin Advanced Users',
-    owner: 'admin.users',
-    component: 'AdvancedUserManagement',
-    legacyRedirectFrom: ['/advanced-users'],
-    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-advanced-users', pageTitle: 'Admin Advanced Users' }),
   },
   {
     id: 'admin-file-management',

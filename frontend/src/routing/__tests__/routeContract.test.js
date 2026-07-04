@@ -329,10 +329,14 @@ describe('route contract invariants', () => {
     assertRouteSpecificChromeHeadings(ADMIN_CONTEXTUAL_ROUTE_CHROME_HEADING_CONTRACT);
   });
 
-  it('keeps admin user routes split between canonical and advanced ownership', () => {
+  it('keeps admin user management on the canonical UnifiedUserManagement route', () => {
+    // P1 architectural fix (Sprint 3): admin-advanced-users route was removed
+    // (20-line AdvancedUserManagement stub duplicated admin-users which routes
+    // to UnifiedUserManagement that renders UserManagement underneath).
+    // /admin/advanced-users and /advanced-users now 404 — bookmarks should be
+    // updated to /admin/users.
     const adminProfile = { role: 'Admin' };
     const canonicalUsersRoute = getRouteById('admin-users');
-    const advancedUsersRoute = getRouteById('admin-advanced-users');
 
     expect(canonicalUsersRoute).toBeTruthy();
     expect(canonicalUsersRoute.path).toBe('/admin/users');
@@ -341,20 +345,10 @@ describe('route contract invariants', () => {
     expect(canonicalUsersRoute.component).toBe('UnifiedUserManagement');
     expect(canonicalUsersRoute.layout.activeSidebarItem).toBe('admin-users');
     expect(isRouteAccessibleToProfile(canonicalUsersRoute, adminProfile)).toBe(true);
-
-    expect(advancedUsersRoute).toBeTruthy();
-    expect(advancedUsersRoute.path).toBe('/admin/advanced-users');
-    expect(advancedUsersRoute.owner).toBe('admin.users');
-    expect(advancedUsersRoute.entry).toBe('direct');
-    expect(advancedUsersRoute.component).toBe('AdvancedUserManagement');
-    expect(advancedUsersRoute.legacyRedirectFrom).toContain('/advanced-users');
-    expect(advancedUsersRoute.layout.activeSidebarItem).toBe('admin-advanced-users');
-    expect(isRouteAccessibleToProfile(advancedUsersRoute, adminProfile)).toBe(true);
-
-    expect(canonicalUsersRoute.component).not.toBe(advancedUsersRoute.component);
-    expect(canonicalUsersRoute.path).not.toBe(advancedUsersRoute.path);
     expect(getRouteChromeState('/admin/users', '', adminProfile).activeSidebarItem).toBe('admin-users');
-    expect(getRouteChromeState('/admin/advanced-users', '', adminProfile).activeSidebarItem).toBe('admin-advanced-users');
+
+    // admin-advanced-users route no longer exists
+    expect(getRouteById('admin-advanced-users')).toBeUndefined();
   });
 
   it('keeps admin notification channels separated, with UnifiedNotifications routed for push', () => {
@@ -536,7 +530,10 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/clinic-settings', '?section=clinic-settings', adminProfile).pageTitle).toBe('Admin Clinic Settings');
   });
 
-  it('keeps admin Telegram operational and settings surfaces explicit (P-003 fix)', () => {
+  it('keeps admin Telegram settings as the canonical sidebar surface, integration as direct-only', () => {
+    // P1 architectural fix (Sprint 3): admin-telegram-integration demoted to
+    // entry:'direct' + nav:false to remove duplicate Telegram sidebar entry.
+    // admin-telegram-settings (Настройки section) is the canonical surface.
     const adminProfile = { role: 'Admin' };
     const telegramIntegrationRoute = getRouteById('admin-telegram-integration');
     const telegramSettingsRoute = getRouteById('admin-telegram-settings');
@@ -545,7 +542,8 @@ describe('route contract invariants', () => {
     expect(telegramIntegrationRoute).toBeTruthy();
     expect(telegramIntegrationRoute.path).toBe('/admin/integrations/telegram');
     expect(telegramIntegrationRoute.owner).toBe('admin.telegram');
-    expect(telegramIntegrationRoute.entry).toBe('menu');
+    expect(telegramIntegrationRoute.entry).toBe('direct');
+    expect(telegramIntegrationRoute.nav).toBe(false);
     expect(telegramIntegrationRoute.component).toBe('TelegramManager');
     expect(telegramIntegrationRoute.legacyRedirectFrom).toContain('/telegram-integration');
     expect(telegramIntegrationRoute.layout.activeSidebarItem).toBe('admin-telegram-integration');
