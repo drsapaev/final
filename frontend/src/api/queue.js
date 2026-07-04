@@ -81,6 +81,17 @@ export async function openReceptionSlot({ day, specialistId }) {
   return response.data;
 }
 
+// UX Audit Registrar #7: closeReceptionSlot — закрытие приёма.
+export async function closeReceptionSlot({ day, specialistId }) {
+  const response = await api.post('/queue/close', null, {
+    params: {
+      day,
+      specialist_id: specialistId,
+    },
+  });
+  return response.data;
+}
+
 export async function callNextQueuePatient({ specialistId, targetDate }) {
   const response = await api.post(
     `/queue/${Number(specialistId)}/call-next`,

@@ -7,7 +7,7 @@ import PropTypes from 'prop-types';
 // Заменены SF Symbols (Icon) на lucide-react — единая библиотека иконок.
 // Раньше Queue был единственным экраном, использующим SF Symbols.
 import {
-  QrCode, Building2, CheckCircle, Settings, Bell, User, Clock, ArrowDownCircle, RefreshCw,
+  QrCode, Building2, CheckCircle, Settings, Bell, User, Clock, ArrowDownCircle, RefreshCw, X,
 } from 'lucide-react';
 import {
   Button, CardContent, Badge, Select,
@@ -40,6 +40,7 @@ const ModernQueueManager = ({
     generateDoctorQRCode,
     generateClinicQRCode,
     openReceptionForDoctor,
+    closeReceptionForDoctor,
     callNextPatientInQueue
 
   } = useQueueManager();
@@ -238,6 +239,44 @@ const ModernQueueManager = ({
       }
     } catch (error) {
       toast.error(error.message || 'Ошибка открытия приема');
+    }
+  };
+
+  // UX Audit Registrar #7: Закрытие приёма (открывает онлайн-запись обратно).
+  const closeReception = async () => {
+    if (!effectiveDoctor) {
+      toast.error('Выберите врача');
+      return;
+    }
+
+    if (!queueData?.is_open) {
+      toast.info('Приём уже закрыт');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Закрыть приём?\n\n' +
+      'Онлайн-запись через QR будет открыта — новые пациенты смогут записаться онлайн.\n\n' +
+      'Нажмите «ОК» чтобы продолжить, или «Отмена» чтобы вернуться.'
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const result = await closeReceptionForDoctor({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate
+      });
+
+      toast.success(result?.message || 'Приём закрыт. Онлайн-запись открыта.');
+      await loadQueue();
+
+      if (onQueueUpdate) {
+        onQueueUpdate();
+      }
+    } catch (error) {
+      toast.error(error.message || 'Ошибка закрытия приема');
     }
   };
 
@@ -449,6 +488,23 @@ const ModernQueueManager = ({
                 </Button>);
 
             })()}
+
+            {/* UX Audit Registrar #7: «Закрыть приём» кнопка.
+                Раньше не было в UI — только «Открыть».
+                Показывается когда приём открыт (queueData.is_open === true). */}
+            {queueData?.is_open && (
+              <Button
+                variant="outline"
+                size="default"
+                className="mqm-reception-btn"
+                onClick={closeReception}
+                disabled={loading}
+                title="Закрыть приём и открыть онлайн-запись"
+              >
+                <X size={16} aria-hidden="true" />
+                Закрыть приём
+              </Button>
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
               <Button

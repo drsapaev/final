@@ -2072,7 +2072,7 @@ const EnhancedAppointmentsTable = ({
                         }}
                         title="Оплата">
 
-                              💸 Оплата
+                              Оплата
                             </button>
                       }
 
@@ -2093,7 +2093,7 @@ const EnhancedAppointmentsTable = ({
                           padding: '4px 8px',
                           border: 'none',
                           borderRadius: '4px',
-                          backgroundColor: 'var(--mac-success, #34c759)',
+                          backgroundColor: 'var(--mac-accent-blue, #007aff)',
                           color: 'var(--mac-text-primary)',
                           cursor: 'pointer',
                           fontSize: '12px',
@@ -2101,7 +2101,7 @@ const EnhancedAppointmentsTable = ({
                         }}
                         title="Вызвать">
 
-                            📢 Вызвать
+                            Вызвать
                           </button>
                       }
 
@@ -2151,7 +2151,7 @@ const EnhancedAppointmentsTable = ({
                           padding: '4px 8px',
                           border: 'none',
                           borderRadius: '4px',
-                          backgroundColor: 'var(--mac-success, #34c759)',
+                          backgroundColor: 'var(--mac-warning, #f59e0b)',
                           color: 'var(--mac-text-primary)',
                           cursor: 'pointer',
                           fontSize: '12px',
@@ -2159,7 +2159,7 @@ const EnhancedAppointmentsTable = ({
                         }}
                         title="Завершить">
 
-                            ✅ Завершить
+                            Завершить
                           </button>
                       }
 
@@ -2384,7 +2384,7 @@ const EnhancedAppointmentsTable = ({
                         }}
                         title="Назначить следующий визит">
 
-                            📅 Следующий
+                            Следующий
                           </button>
                       }
                       </div>

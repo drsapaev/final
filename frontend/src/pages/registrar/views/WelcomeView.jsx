@@ -122,6 +122,87 @@ const WelcomeView = React.memo(({
         </CardHeader>
 
         <CardContent>
+          {/* UX Audit Registrar #5: Morning checklist — список врачей с
+              информацией о том, открыт ли приём. Раньше регистратору нужно
+              было проверять каждого врача вручную через QueueView. */}
+          {(() => {
+            // Группируем записи по врачам и определяем статус приёма.
+            const doctorMap = new Map();
+            for (const appt of appointments) {
+              const doctorId = appt.doctor_id || appt.specialist_id;
+              const doctorName = appt.doctor_name || appt.specialist_name || `Врач #${doctorId}`;
+              if (!doctorMap.has(doctorId)) {
+                doctorMap.set(doctorId, {
+                  id: doctorId,
+                  name: doctorName,
+                  patientCount: 0,
+                  hasQueue: false,
+                });
+              }
+              const doc = doctorMap.get(doctorId);
+              doc.patientCount++;
+              if (appt.queue_entry_id || appt.queue_number) {
+                doc.hasQueue = true;
+              }
+            }
+            const doctorsList = Array.from(doctorMap.values());
+
+            if (doctorsList.length === 0) return null;
+
+            return (
+              <div style={{
+                marginBottom: 'var(--mac-spacing-6)',
+                padding: 'var(--mac-spacing-4)',
+                borderRadius: 'var(--mac-radius-lg)',
+                border: '1px solid var(--mac-card-border)',
+                background: 'var(--mac-card-bg)',
+              }}>
+                <h3 style={{
+                  margin: '0 0 var(--mac-spacing-3) 0',
+                  fontSize: 'var(--mac-font-size-base)',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  color: textColor,
+                }}>
+                  Утренний статус приёма
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: 'var(--mac-spacing-3)',
+                }}>
+                  {doctorsList.map((doc) => (
+                    <div
+                      key={doc.id}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        padding: '10px 12px',
+                        borderRadius: 'var(--mac-radius-md)',
+                        border: '1px solid var(--mac-card-border)',
+                        background: 'var(--mac-bg-secondary)',
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: textColor,
+                      }}>
+                        {doc.name}
+                      </span>
+                      <span style={{
+                        fontSize: '12px',
+                        color: 'var(--mac-text-secondary)',
+                      }}>
+                        Пациентов: {doc.patientCount}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Современная статистика */}
           <ModernStatistics
           appointments={appointments}

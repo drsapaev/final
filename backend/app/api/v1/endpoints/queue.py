@@ -407,6 +407,47 @@ def open_queue(
     # (exception_handlers.py)
 
 
+# UX Audit Registrar #7: close_queue — закрытие приёма (reopen online QR booking).
+@router.post("/close")
+def close_queue(
+    day: date = Query(..., description="День очереди"),
+    specialist_id: int = Query(..., description="ID специалиста"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Закрытие приёма (открывает онлайн-запись обратно).
+    Доступно только регистраторам и админам.
+    """
+    try:
+        queue_api_service = QueueApiService(db)
+
+        if current_user.role not in ["Admin", "Registrar"]:
+            raise HTTPException(status_code=403, detail="Недостаточно прав")
+
+        daily_queue = queue_api_service.get_daily_queue(
+            day=day,
+            specialist_id=specialist_id,
+        )
+
+        if not daily_queue:
+            raise HTTPException(status_code=404, detail="Очередь не найдена")
+
+        if not daily_queue.opened_at:
+            raise HTTPException(status_code=400, detail="Приём уже закрыт")
+
+        queue_api_service.close_daily_queue(daily_queue)
+
+        return {
+            "success": True,
+            "message": "Приём закрыт. Онлайн-запись открыта",
+        }
+    except HTTPException:
+        raise
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
+
+
 @router.get("/today", response_model=QueueStatusResponse)
 def get_today_queue(
     specialist_id: int = Query(..., description="ID специалиста"),
