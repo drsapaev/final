@@ -301,6 +301,92 @@ def root():
 
 
 # -----------------------------------------------------------------------------
+# Comprehensive health check — for uptime monitoring + load balancer probes
+# -----------------------------------------------------------------------------
+@app.get(f"{API_V1_STR}/health/detailed", tags=["health"])
+def detailed_health():
+    """Comprehensive health check for uptime monitoring (e.g. UptimeRobot, BetterStack).
+
+    Returns status of all subsystems. If any critical subsystem is down,
+    returns HTTP 503 (suitable for load balancer health checks).
+
+    Light check — does NOT hit external services (Sentry, Telegram API).
+    Only checks local DB + Redis connectivity.
+
+    Public endpoint (no auth) — safe to expose to uptime monitors.
+    """
+    import time
+    from datetime import datetime
+
+    checks = {}
+    overall_ok = True
+
+    # 1. Database
+    try:
+        from sqlalchemy import text as sql_text
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        try:
+            db.execute(sql_text("SELECT 1"))
+            checks["database"] = {"status": "ok"}
+        finally:
+            db.close()
+    except Exception as e:
+        checks["database"] = {"status": "down", "error": str(e)[:100]}
+        overall_ok = False
+
+    # 2. Redis (optional — may not be configured in dev)
+    try:
+        import redis
+        from app.core.config import settings
+        redis_url = getattr(settings, "ARQ_REDIS_URL", "redis://localhost:6379/0")
+        r = redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2)
+        r.ping()
+        checks["redis"] = {"status": "ok"}
+    except Exception as e:
+        # Redis is optional in dev — don't fail health check
+        checks["redis"] = {"status": "skipped", "reason": "not configured or unreachable"}
+
+    # 3. Sentry SDK (check if initialized, don't send event)
+    try:
+        import sentry_sdk
+        client = sentry_sdk.Hub.current.client
+        checks["sentry"] = {"status": "ok" if client else "disabled"}
+    except Exception:
+        checks["sentry"] = {"status": "disabled"}
+
+    # 4. App version + environment
+    checks["app"] = {
+        "version": os.getenv("APP_VERSION", "0.9.0"),
+        "env": os.getenv("ENV", "dev"),
+        "python": sys.version.split()[0] if 'sys' in dir() else "?",
+    }
+
+    # 5. Uptime (approximate — process start time)
+    checks["uptime_seconds"] = int(time.time() - _app_start_time) if _app_start_time else 0
+
+    response = {
+        "status": "ok" if overall_ok else "degraded",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "checks": checks,
+    }
+
+    from fastapi import Response
+    if not overall_ok:
+        return Response(
+            content=json.dumps(response),
+            status_code=503,
+            media_type="application/json",
+        )
+    return response
+
+
+# Track app start time for uptime calculation
+import time as _time
+_app_start_time = _time.time()
+
+
+# -----------------------------------------------------------------------------
 # Диагностика подключённых маршрутов (called from lifespan)
 # -----------------------------------------------------------------------------
 async def _startup_tasks() -> None:
