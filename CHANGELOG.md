@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-07-04 — Admin panel dead-code removal — Step 1 (chore/admin-remove-dead-helpers-step1)
+## 2026-07-04 — Admin panel dead-code removal — Step 1 (chore/admin-remove-dead-helpers-step1) — PR #1827
 - **frontend/src/components/admin/** — deleted 9 dead-code helper/section files (2 179 lines total) that had full live replacements in the macOS design system or shared/common layer. No behavior change.
   - `AnalyticsDashboard.jsx` (773) — superseded by `pages/AnalyticsPage.jsx` (the active `/admin/analytics` route). File was a phantom with two `void useState(...)` codemod artifacts (non-functional).
   - `MobileOptimization.jsx` (368) — superseded by `AppShell` (sidebar preset system in `App.jsx`).
