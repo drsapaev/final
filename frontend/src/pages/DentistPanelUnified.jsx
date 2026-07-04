@@ -1559,7 +1559,7 @@ const DentistPanelUnified = () => {
   // Вкладки
   // Рендер дашборда
   const renderDashboard = () =>
-  <div className="dental-flex-col" style={{ gap: '32px' }}>
+  <div className="dental-flex-col dental-gap-32">
       {/* Статистические карточки */}
       <div style={{
       display: 'grid',
@@ -1579,7 +1579,7 @@ const DentistPanelUnified = () => {
         cursor: 'default'
       }}>
           <div>
-            <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Всего пациентов</p>
+            <p className="dental-text-desc dental-text-secondary">Всего пациентов</p>
             <p className="dental-stat-number dental-text-primary">{stats.totalPatients}</p>
             <p style={{
             fontSize: 'var(--mac-font-size-xs)',
@@ -1587,7 +1587,7 @@ const DentistPanelUnified = () => {
             marginTop: '4px'
           }}>+12% за месяц</p>
           </div>
-          <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue)', borderRadius: 'var(--mac-radius-xl)', boxShadow: 'var(--mac-shadow-lg)' }}>
+          <div className="dental-icon-bg dental-icon-bg-blue dental-icon-bg-xl-shadow">
             <Users className="dental-icon-28 dental-text-white" />
           </div>
         </div>
@@ -1605,7 +1605,7 @@ const DentistPanelUnified = () => {
         cursor: 'default'
       }}>
           <div>
-            <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Записей сегодня</p>
+            <p className="dental-text-desc dental-text-secondary">Записей сегодня</p>
             <p className="dental-stat-number dental-text-primary">{stats.todayAppointments}</p>
             <p style={{
             fontSize: 'var(--mac-font-size-xs)',
@@ -1613,7 +1613,7 @@ const DentistPanelUnified = () => {
             marginTop: '4px'
           }}>8 из 12 слотов</p>
           </div>
-          <div className="dental-icon-bg" style={{ background: 'var(--mac-success)', borderRadius: 'var(--mac-radius-xl)', boxShadow: 'var(--mac-shadow-lg)' }}>
+          <div className="dental-icon-bg dental-icon-bg-success dental-icon-bg-xl-shadow">
             <Calendar className="dental-icon-28 dental-text-white" />
           </div>
         </div>
@@ -1631,7 +1631,7 @@ const DentistPanelUnified = () => {
         cursor: 'default'
       }}>
           <div>
-            <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Активные планы</p>
+            <p className="dental-text-desc dental-text-secondary">Активные планы</p>
             <p className="dental-stat-number dental-text-primary">{stats.activeTreatmentPlans}</p>
             <p style={{
             fontSize: 'var(--mac-font-size-xs)',
@@ -1639,7 +1639,7 @@ const DentistPanelUnified = () => {
             marginTop: '4px'
           }}>+8% к прошлому месяцу</p>
           </div>
-          <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-purple)', borderRadius: 'var(--mac-radius-xl)', boxShadow: 'var(--mac-shadow-lg)' }}>
+          <div className="dental-icon-bg dental-icon-bg-purple dental-icon-bg-xl-shadow">
             <FileText className="dental-icon-28 dental-text-white" />
           </div>
         </div>
@@ -1657,7 +1657,7 @@ const DentistPanelUnified = () => {
         cursor: 'default'
       }}>
           <div>
-            <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Протезы</p>
+            <p className="dental-text-desc dental-text-secondary">Протезы</p>
             <p className="dental-stat-number dental-text-primary">{stats.completedProsthetics}</p>
             <p style={{
             fontSize: 'var(--mac-font-size-xs)',
@@ -1665,7 +1665,7 @@ const DentistPanelUnified = () => {
             marginTop: '4px'
           }}>+15% к прошлому месяцу</p>
           </div>
-          <div className="dental-icon-bg" style={{ background: 'var(--mac-warning)', borderRadius: 'var(--mac-radius-xl)', boxShadow: 'var(--mac-shadow-lg)' }}>
+          <div className="dental-icon-bg dental-icon-bg-warning dental-icon-bg-xl-shadow">
             <Smile className="dental-icon-28 dental-text-white" />
           </div>
         </div>
@@ -1706,7 +1706,7 @@ const DentistPanelUnified = () => {
           }}>
 
             <Plus className="dental-icon-20" />
-            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Новый пациент</span>
+            <span className="dental-fw-medium">Новый пациент</span>
           </Button>
           <Button
           onClick={() => handleTabChange('appointments')}
@@ -1732,7 +1732,7 @@ const DentistPanelUnified = () => {
           }}>
 
             <Calendar className="dental-icon-20" />
-            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Записать на прием</span>
+            <span className="dental-fw-medium">Записать на прием</span>
           </Button>
           <Button
           onClick={() => handleTabChange('dental-chart')}
@@ -1758,7 +1758,7 @@ const DentistPanelUnified = () => {
           }}>
 
             <Tooth className="dental-icon-20" />
-            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Схема зубов</span>
+            <span className="dental-fw-medium">Схема зубов</span>
           </Button>
         </div>
       </div>
@@ -1779,7 +1779,7 @@ const DentistPanelUnified = () => {
       }}>
           <h3 className="dental-text-lg-semi dental-text-primary">Последние записи</h3>
         </div>
-        <div className="dental-flex-col" style={{ gap: '16px' }}>
+        <div className="dental-flex-col dental-gap-16">
           {appointmentsTableData.slice(0, 5).map((appointment) =>
         <div
           key={appointment.id}
@@ -1794,15 +1794,15 @@ const DentistPanelUnified = () => {
             cursor: 'default'
           }}>
 
-              <div className="dental-flex" style={{ gap: '16px' }}>
-                <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue)', borderRadius: 'var(--mac-radius-lg)', boxShadow: 'var(--mac-shadow-sm)' }}>
+              <div className="dental-flex dental-gap-16">
+                <div className="dental-icon-bg dental-icon-bg-blue dental-icon-bg-lg-shadow">
                   <span className="dental-text-value dental-fw-700 dental-text-white">
                     {appointment.patientName?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p className="dental-text-primary">{appointment.patientName}</p>
-                  <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>{appointment.date} {appointment.time}</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-secondary">{appointment.date} {appointment.time}</p>
                 </div>
               </div>
               <div style={{
@@ -1824,7 +1824,7 @@ const DentistPanelUnified = () => {
 
   // Рендер пациентов
   const renderPatients = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       {/* Поиск и фильтры */}
       <Card padding="lg">
         <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', flexWrap: 'wrap' }}>
@@ -1903,7 +1903,7 @@ const DentistPanelUnified = () => {
         }}>
 
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div className="dental-flex" style={{ gap: '12px' }}>
+              <div className="dental-flex dental-gap-12">
                 <div className="dental-avatar" style={{ background: 'var(--mac-accent-blue)' }}>
                   <span className="dental-text-value dental-heading dental-text-white">
                     {patient.name?.charAt(0)}
@@ -1911,7 +1911,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <h3 className="dental-text-primary">{patient.name}</h3>
-                  <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>{patient.phone}</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">{patient.phone}</p>
                 </div>
               </div>
               <Badge variant={patient.status === 'active' ? 'success' : 'warning'}>
@@ -1920,10 +1920,10 @@ const DentistPanelUnified = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-              <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+              <p className="dental-text-desc dental-text-desc dental-text-secondary">
                 <strong style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Возраст:</strong> {patient.age} лет
               </p>
-              <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+              <p className="dental-text-desc dental-text-desc dental-text-secondary">
                 <strong style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Последний визит:</strong> {patient.lastVisit || 'Не было'}
               </p>
             </div>
@@ -2061,10 +2061,10 @@ const DentistPanelUnified = () => {
 
   // Рендер осмотров
   const renderExaminations = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <h3 className="dental-text-primary">Объективные осмотры</h3>
-        <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+        <p className="dental-text-desc dental-text-secondary">
           Выберите пациента для проведения или просмотра объективного осмотра
         </p>
 
@@ -2089,15 +2089,15 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div className="dental-flex" style={{ gap: '12px' }}>
-                <div className="dental-icon-bg" style={{ background: 'var(--mac-success)', borderRadius: 'var(--mac-radius-full)' }}>
+              <div className="dental-flex dental-gap-12">
+                <div className="dental-icon-bg dental-icon-bg-success dental-icon-bg-full">
                   <span className="dental-text-value dental-text-white">
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Провести осмотр</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Провести осмотр</p>
                 </div>
               </div>
             </div>
@@ -2109,10 +2109,10 @@ const DentistPanelUnified = () => {
 
   // Рендер диагнозов
   const renderDiagnoses = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <h3 className="dental-text-primary">Диагнозы и назначения</h3>
-        <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+        <p className="dental-text-desc dental-text-secondary">
           Выберите пациента для постановки диагнозов и назначений
         </p>
 
@@ -2137,15 +2137,15 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div className="dental-flex" style={{ gap: '12px' }}>
-                <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue)', borderRadius: 'var(--mac-radius-full)' }}>
+              <div className="dental-flex dental-gap-12">
+                <div className="dental-icon-bg dental-icon-bg-blue dental-icon-bg-full">
                   <span className="dental-text-value dental-text-white">
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Поставить диагноз</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Поставить диагноз</p>
                 </div>
               </div>
             </div>
@@ -2160,7 +2160,7 @@ const DentistPanelUnified = () => {
     // Если выбран пациент из очереди - показываем EMR
     if (selectedPatient) {
       return (
-        <div className="dental-flex-col" style={{ gap: '24px' }}>
+        <div className="dental-flex-col dental-gap-24">
           <Card padding="lg">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 className="dental-text-primary">
@@ -2191,10 +2191,10 @@ const DentistPanelUnified = () => {
 
     // Иначе показываем список пациентов для выбора протокола
     return (
-      <div className="dental-flex-col" style={{ gap: '24px' }}>
+      <div className="dental-flex-col dental-gap-24">
         <Card padding="lg">
           <h3 className="dental-text-primary">Протоколы визитов</h3>
-          <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+          <p className="dental-text-desc dental-text-secondary">
             Выберите пациента из очереди или выберите из списка для создания протокола визита
           </p>
 
@@ -2219,7 +2219,7 @@ const DentistPanelUnified = () => {
                 e.currentTarget.style.background = 'transparent';
               }}>
 
-                <div className="dental-flex" style={{ gap: '12px' }}>
+                <div className="dental-flex dental-gap-12">
                   <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-purple)', borderRadius: 'var(--mac-radius-full)' }}>
                     <span className="dental-text-value dental-text-white">
                       {patient.name?.charAt(0)}
@@ -2227,7 +2227,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <p className="dental-text-primary">{patient.name}</p>
-                    <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Создать протокол</p>
+                    <p className="dental-text-desc dental-text-desc dental-text-secondary">Создать протокол</p>
                   </div>
                 </div>
               </div>
@@ -2240,10 +2240,10 @@ const DentistPanelUnified = () => {
 
   // Рендер фото архива
   const renderPhotos = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <h3 className="dental-text-primary">Фото и рентген архив</h3>
-        <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+        <p className="dental-text-desc dental-text-secondary">
           Выберите пациента для просмотра и управления фото и рентгеновскими снимками
         </p>
 
@@ -2268,15 +2268,15 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div className="dental-flex" style={{ gap: '12px' }}>
-                <div className="dental-icon-bg" style={{ background: 'var(--mac-warning)', borderRadius: 'var(--mac-radius-full)' }}>
+              <div className="dental-flex dental-gap-12">
+                <div className="dental-icon-bg dental-icon-bg-warning dental-icon-bg-full">
                   <span className="dental-text-value dental-text-white">
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Открыть архив</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Открыть архив</p>
                 </div>
               </div>
             </div>
@@ -2288,7 +2288,7 @@ const DentistPanelUnified = () => {
 
   // Рендер шаблонов
   const renderTemplates = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <div style={{
         display: 'flex',
@@ -2298,13 +2298,13 @@ const DentistPanelUnified = () => {
       }}>
           <div>
             <h3 className="dental-text-primary">Шаблоны протоколов</h3>
-            <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+            <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
               Стандартные протоколы для быстрого создания протоколов визитов
             </p>
           </div>
           <Button
           onClick={handleProtocolTemplates}
-          className="dental-flex" style={{ gap: '8px' }}>
+          className="dental-flex dental-gap-8">
 
             <FileText className="dental-icon-16" />
             Управление шаблонами
@@ -2336,7 +2336,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">Лечение кариеса</h4>
-                <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>60 мин</p>
+                <p className="dental-text-desc dental-text-desc dental-text-secondary">60 мин</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2377,7 +2377,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">Эндодонтическое лечение</h4>
-                <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>120 мин</p>
+                <p className="dental-text-desc dental-text-desc dental-text-secondary">120 мин</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2418,7 +2418,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">Профессиональная гигиена</h4>
-                <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>75 мин</p>
+                <p className="dental-text-desc dental-text-desc dental-text-secondary">75 мин</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2445,7 +2445,7 @@ const DentistPanelUnified = () => {
 
   // Рендер отчетов
   const renderReports = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       {savedVisitProtocols.length > 0 &&
       <Card padding="lg">
           <div style={{
@@ -2456,7 +2456,7 @@ const DentistPanelUnified = () => {
         }}>
             <div>
               <h3 className="dental-text-primary">Сохранённые протоколы визитов</h3>
-              <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+              <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
                 Последние протоколы доступны для повторного открытия без ручной пересборки
               </p>
             </div>
@@ -2480,7 +2480,7 @@ const DentistPanelUnified = () => {
             }}>
                 <div>
                   <div className="dental-text-primary">{protocol.patient_name}</div>
-                  <div className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+                  <div className="dental-text-desc dental-text-desc dental-text-secondary">
                     Визит #{protocol.visit_id} • {new Date(protocol.saved_at).toLocaleString('ru-RU')}
                   </div>
                 </div>
@@ -2509,13 +2509,13 @@ const DentistPanelUnified = () => {
       }}>
           <div>
             <h3 className="dental-text-primary">Отчеты и аналитика</h3>
-            <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+            <p className="dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-desc dental-text-secondary">
               Статистика по пациентам, врачам, процедурам и клинике
             </p>
           </div>
           <Button
           onClick={handleReports}
-          className="dental-flex" style={{ gap: '8px' }}>
+          className="dental-flex dental-gap-8">
 
             <BarChart3 className="dental-icon-16" />
             Открыть отчеты
@@ -2551,7 +2551,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">Общий обзор</h4>
-                <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Основные показатели</p>
+                <p className="dental-text-desc dental-text-desc dental-text-secondary">Основные показатели</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2583,7 +2583,7 @@ const DentistPanelUnified = () => {
               </div>
               <div>
                 <h4 className="dental-text-primary">По пациентам</h4>
-                <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Демография и активность</p>
+                <p className="dental-text-desc dental-text-desc dental-text-secondary">Демография и активность</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2610,12 +2610,12 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-purple-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
-                <Stethoscope className="dental-icon-20" style={{ color: 'var(--mac-accent-purple)'  }} />
+              <div className="dental-icon-bg dental-icon-bg-purple-bg dental-icon-bg-lg-shadow">
+                <Stethoscope className="dental-icon-20 dental-text-purple" />
               </div>
               <div>
                 <h4 className="dental-text-primary">По врачам</h4>
-                <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Производительность</p>
+                <p className="dental-text-desc dental-text-desc dental-text-secondary">Производительность</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2642,12 +2642,12 @@ const DentistPanelUnified = () => {
             gap: '12px',
             marginBottom: '12px'
           }}>
-              <div className="dental-icon-bg" style={{ background: 'var(--mac-warning-bg)', borderRadius: 'var(--mac-radius-lg)' }}>
-                <Building className="dental-icon-20" style={{ color: 'var(--mac-warning)'  }} />
+              <div className="dental-icon-bg dental-icon-bg-warning-bg dental-icon-bg-lg-shadow">
+                <Building className="dental-icon-20 dental-text-warning" />
               </div>
               <div>
                 <h4 className="dental-text-primary">По клинике</h4>
-                <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Оборудование и загруженность</p>
+                <p className="dental-text-desc dental-text-desc dental-text-secondary">Оборудование и загруженность</p>
               </div>
             </div>
             <p className="dental-text-value dental-text-primary">
@@ -2661,10 +2661,10 @@ const DentistPanelUnified = () => {
 
   // Рендер схем зубов
   const renderDentalChart = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <h3 className="dental-text-primary">Схемы зубов</h3>
-        <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+        <p className="dental-text-desc dental-text-secondary">
           Выберите пациента для просмотра и редактирования схемы зубов
         </p>
 
@@ -2689,15 +2689,15 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div className="dental-flex" style={{ gap: '12px' }}>
-                <div className="dental-icon-bg" style={{ background: 'var(--mac-accent-blue)', borderRadius: 'var(--mac-radius-full)' }}>
+              <div className="dental-flex dental-gap-12">
+                <div className="dental-icon-bg dental-icon-bg-blue dental-icon-bg-full">
                   <span className="dental-text-value dental-text-white">
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Открыть схему</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Открыть схему</p>
                 </div>
               </div>
             </div>
@@ -2709,10 +2709,10 @@ const DentistPanelUnified = () => {
 
   // Рендер планов лечения
   const renderTreatmentPlans = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <h3 className="dental-text-primary">Планы лечения</h3>
-        <p className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>
+        <p className="dental-text-desc dental-text-secondary">
           Выберите пациента для создания или редактирования плана лечения
         </p>
 
@@ -2737,15 +2737,15 @@ const DentistPanelUnified = () => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
-              <div className="dental-flex" style={{ gap: '12px' }}>
-                <div className="dental-icon-bg" style={{ background: 'var(--mac-success)', borderRadius: 'var(--mac-radius-full)' }}>
+              <div className="dental-flex dental-gap-12">
+                <div className="dental-icon-bg dental-icon-bg-success dental-icon-bg-full">
                   <span className="dental-text-value dental-text-white">
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>Открыть план</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-secondary">Открыть план</p>
                 </div>
               </div>
             </div>
@@ -2757,10 +2757,10 @@ const DentistPanelUnified = () => {
 
   // Рендер протезирования
   const renderProsthetics = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <h3 className="dental-text-primary">Протезирование</h3>
-        <div className="dental-flex-col" style={{ gap: '12px' }}>
+        <div className="dental-flex-col dental-gap-12">
           {prosthetics.map((prosthetic) =>
         <div
           key={prosthetic.id}
@@ -2774,13 +2774,13 @@ const DentistPanelUnified = () => {
             transition: 'all var(--mac-duration-normal) var(--mac-ease)'
           }}>
 
-              <div className="dental-flex" style={{ gap: '16px' }}>
+              <div className="dental-flex dental-gap-16">
                 <div className="dental-icon-bg-40" style={{ background: 'var(--mac-warning)'  }}>
                   <Smile className="dental-icon-20 dental-text-white" />
                 </div>
                 <div>
                   <p className="dental-text-primary">{prosthetic.patientName}</p>
-                  <p className="dental-text-desc dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}>{prosthetic.type}</p>
+                  <p className="dental-text-desc dental-text-desc dental-text-secondary">{prosthetic.type}</p>
                 </div>
               </div>
               <Badge variant={prosthetic.status === 'completed' ? 'success' : 'warning'}>
@@ -2795,7 +2795,7 @@ const DentistPanelUnified = () => {
 
   // Рендер AI помощника
   const renderAIAssistant = () =>
-  <div className="dental-flex-col" style={{ gap: '24px' }}>
+  <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <h3 className="dental-text-primary">AI Помощник</h3>
         <AIAssistant
@@ -2862,7 +2862,7 @@ const DentistPanelUnified = () => {
   if (loading) {
     return (
       <div className="dental-p-8">
-        <div className="dental-flex-col" style={{ gap: '24px' }}>
+        <div className="dental-flex-col dental-gap-24">
           <div style={{
             height: '32px',
             background: 'var(--mac-bg-secondary)',
@@ -3030,7 +3030,7 @@ const DentistPanelUnified = () => {
               <button
               onClick={() => setShowDentalChart(false)}
               aria-label={`Закрыть схему зубов пациента ${selectedPatientDisplayName}`}
-              className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}
+              className="dental-text-desc dental-text-secondary"
               onMouseEnter={(e) => {
                 e.target.style.color = 'var(--mac-text-primary)';
                 e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
@@ -3092,7 +3092,7 @@ const DentistPanelUnified = () => {
               <button
               onClick={() => setShowTreatmentPlanner(false)}
               aria-label={`Закрыть план лечения пациента ${selectedPatientDisplayName}`}
-              className="dental-text-desc" style={{ color: 'var(--mac-text-secondary)' }}
+              className="dental-text-desc dental-text-secondary"
               onMouseEnter={(e) => {
                 e.target.style.color = 'var(--mac-text-primary)';
                 e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
