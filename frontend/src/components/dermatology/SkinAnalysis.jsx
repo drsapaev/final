@@ -36,7 +36,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);void
+  const [analysisResult, setAnalysisResult] = useState(null);
   useState(null);
   const [compareMode, setCompareMode] = useState(false);
 
