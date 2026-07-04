@@ -22,6 +22,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import logger from '../utils/logger';
 import PropTypes from 'prop-types';
 import { formatRegistrarTime } from '../utils/dateUtils';
+import './displayboard.css';
 
 const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
 
@@ -466,17 +467,9 @@ export default function DisplayBoardUnified({
     }
   }
 
-  // Получение цвета статуса (новое)
-  const getStatusColor = (status) => {
-    const colors = {
-      'waiting': '#f59e0b',
-      'called': '#dc3545',
-      'serving': '#10b981',
-      'completed': 'var(--mac-accent-blue, #3b82f6)',
-      'cancelled': '#6c757d'
-    };
-    return colors[status] || '#6c757d';
-  };
+  // Получение цвета статуса (новое) — цвета теперь декларированы в displayboard.css
+  // через [data-status="..."] селекторы на .displayboard-queue-card. Эта обертка
+  // оставлена для возможных будущих потребителей и тестов.
 
   // Получение текста статуса (новое)
   const getStatusText = (status) => {
@@ -523,153 +516,67 @@ export default function DisplayBoardUnified({
 
   const currentTheme = themes[boardSettings.theme] || themes.light;
 
-  // Стили (объединенные)
-  const containerStyle = {
-    minHeight: '100vh',
-    background: board.bg_color || currentTheme.background,
-    color: board.text_color || currentTheme.textPrimary,
-    fontSize: `calc(1rem * ${boardSettings.fontScale})`,
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    padding: '20px',
-    ...(boardSettings.contrastMode ? {
-      background: '#000000',
-      color: '#ffffff',
-      filter: 'contrast(150%)'
-    } : {}),
-    ...(boardSettings.kioskMode ? {
-      cursor: 'none',
-      userSelect: 'none'
-    } : {})
-  };
+  // Стили (объединенные) — см. displayboard.css. Тема инжектируется как
+  // CSS custom properties на корневом контейнере, чтобы классы могли ссылаться
+  // на var(--board-*). Контраст/киоск переключаются модификаторами класса.
 
-  const headerStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px',
-    background: currentTheme.cardBg,
-    borderRadius: '12px',
-    marginBottom: '20px',
-    border: `1px solid ${currentTheme.border}`,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-  };
+  const rootClassName = [
+    'displayboard-root',
+    boardSettings.contrastMode ? 'displayboard-root--contrast' : '',
+    boardSettings.kioskMode ? 'displayboard-root--kiosk' : ''
+  ].filter(Boolean).join(' ');
 
-  const currentCallStyle = {
-    background: currentCall ? 'linear-gradient(135deg, #dc3545 0%, #e74c3c 100%)' : currentTheme.cardBg,
-    color: currentCall ? '#ffffff' : currentTheme.textPrimary,
-    padding: '40px',
-    borderRadius: '16px',
-    marginBottom: '30px',
-    textAlign: 'center',
-    border: currentCall ? 'none' : `1px solid ${currentTheme.border}`,
-    boxShadow: currentCall ? '0 8px 16px rgba(220, 53, 69, 0.3)' : '0 4px 6px rgba(0, 0, 0, 0.1)',
-    transform: currentCall ? 'scale(1.02)' : 'scale(1)',
-    transition: 'all 0.3s ease',
-    animation: currentCall ? 'pulse 2s infinite' : 'none'
-  };
-
-  const statsGridStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '20px',
-    marginBottom: '30px'
-  };
-
-  const statCardStyle = {
-    background: currentTheme.cardBg,
-    padding: '20px',
-    borderRadius: '12px',
-    textAlign: 'center',
-    border: `1px solid ${currentTheme.border}`,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-  };
-
-  const queueGridStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-    gap: '15px',
-    marginBottom: '30px'
-  };
-
-  const queueCardStyle = {
-    background: currentTheme.cardBg,
-    padding: '20px',
-    borderRadius: '12px',
-    textAlign: 'center',
-    border: `2px solid ${getStatusColor('waiting')}`,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    transition: 'all 0.3s ease'
-  };
-
-  const announcementStyle = {
-    background: 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
-    color: '#ffffff',
-    padding: '15px',
-    borderRadius: '8px',
-    marginBottom: '10px',
-    textAlign: 'center',
-    animation: 'slideIn 0.5s ease'
+  const rootCssVars = {
+    '--board-bg': board.bg_color || currentTheme.background,
+    '--board-text-primary': board.text_color || currentTheme.textPrimary,
+    '--board-text-secondary': currentTheme.textSecondary,
+    '--board-card-bg': currentTheme.cardBg,
+    '--board-border': currentTheme.border,
+    '--board-font-scale': String(boardSettings.fontScale)
   };
 
   return (
-    <div style={containerStyle}>
+    <div className={rootClassName} style={rootCssVars}>
       {/* Заголовок */}
-      <div style={headerStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+      <div className="displayboard-header">
+        <div className="displayboard-flex-center-20">
           {board.logo ?
-          <img src={board.logo} alt={board.brand} style={{ height: '50px' }} /> :
+          <img src={board.logo} alt={board.brand} className="displayboard-logo" /> :
 
-          <div style={{ fontSize: '2rem' }}>🏥</div>
+          <div className="displayboard-emoji-2rem">🏥</div>
           }
           <div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0, color: currentTheme.textPrimary }}>
+            <h1 className="displayboard-brand-title">
               {board.brand}
             </h1>
-            <p style={{ margin: 0, color: currentTheme.textSecondary }}>
+            <p className="displayboard-brand-subtitle">
               {department} • {dateStr}
             </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div className="displayboard-flex-center-20">
           {/* Статус соединения */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="displayboard-flex-center-8">
             {connected ? <Wifi size={20} color="#10b981" /> : <WifiOff size={20} color="#dc3545" />}
-            <span style={{
-              fontSize: '0.9rem',
-              color: currentTheme.textSecondary
-            }}>
+            <span className="displayboard-conn-status">
               {connected ? 'Подключено' : 'Отключено'}
             </span>
           </div>
 
           {/* Время */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="displayboard-flex-center-8">
             <Clock size={20} color={currentTheme.textSecondary} />
-            <span style={{
-              fontSize: '1.2rem',
-              fontWeight: 'bold',
-              color: currentTheme.textPrimary
-            }}>
+            <span className="displayboard-clock">
               {nowStr}
             </span>
           </div>
 
           {/* Кнопки управления */}
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="displayboard-flex-gap-10">
             <button
               onClick={toggleFullscreen}
-              style={{
-                background: 'transparent',
-                border: '1px solid ' + currentTheme.border,
-                borderRadius: '8px',
-                padding: '8px',
-                cursor: 'pointer',
-                color: currentTheme.textSecondary,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className="displayboard-btn"
               title="Полноэкранный режим"
               aria-label={document.fullscreenElement ? 'Выйти из полноэкранного режима' : 'Включить полноэкранный режим'}>
               
@@ -678,17 +585,7 @@ export default function DisplayBoardUnified({
 
             <button
               onClick={toggleSound}
-              style={{
-                background: 'transparent',
-                border: '1px solid ' + currentTheme.border,
-                borderRadius: '8px',
-                padding: '8px',
-                cursor: 'pointer',
-                color: currentTheme.textSecondary,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className="displayboard-btn"
               title={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}
               aria-label={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}>
               
@@ -697,17 +594,7 @@ export default function DisplayBoardUnified({
 
             <button
               onClick={toggleContrast}
-              style={{
-                background: 'transparent',
-                border: '1px solid ' + currentTheme.border,
-                borderRadius: '8px',
-                padding: '8px',
-                cursor: 'pointer',
-                color: currentTheme.textSecondary,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className="displayboard-btn"
               title="Контрастный режим"
               aria-label={boardSettings.contrastMode ? 'Выключить контрастный режим' : 'Включить контрастный режим'}>
               
@@ -716,17 +603,7 @@ export default function DisplayBoardUnified({
 
             <button
               onClick={toggleLanguage}
-              style={{
-                background: 'transparent',
-                border: '1px solid ' + currentTheme.border,
-                borderRadius: '8px',
-                padding: '8px',
-                cursor: 'pointer',
-                color: currentTheme.textSecondary,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className="displayboard-btn"
               title="Переключить язык">
               
               <Globe size={16} />
@@ -738,73 +615,49 @@ export default function DisplayBoardUnified({
 
       {/* Статусные баннеры */}
       {!online &&
-      <div style={{
-        background: 'rgba(59,130,246,0.25)',
-        border: '1px solid rgba(59,130,246,0.5)',
-        padding: '15px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        textAlign: 'center',
-        color: '#1e40af'
-      }}>
+      <div className="displayboard-banner displayboard-banner--info">
           Нет соединения. Показаны данные из кэша.
         </div>
       }
 
       {board.is_closed &&
-      <div style={{
-        background: 'rgba(239,68,68,0.25)',
-        border: '1px solid rgba(239,68,68,0.5)',
-        padding: '15px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        textAlign: 'center',
-        color: '#dc2626'
-      }}>
+      <div className="displayboard-banner displayboard-banner--danger">
           {t('closed', boardSettings.language)}
         </div>
       }
 
       {!board.is_closed && board.is_paused &&
-      <div style={{
-        background: 'rgba(245,158,11,0.25)',
-        border: '1px solid rgba(245,158,11,0.5)',
-        padding: '15px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        textAlign: 'center',
-        color: '#d97706'
-      }}>
+      <div className="displayboard-banner displayboard-banner--warning">
           {t('paused', boardSettings.language)}
         </div>
       }
 
       {/* Текущий вызов */}
-      <div style={currentCallStyle}>
+      <div className={`displayboard-current-call${currentCall ? ' displayboard-current-call--active' : ''}`}>
         {currentCall ?
         <div>
-            <div style={{ fontSize: '4rem', fontWeight: 'bold', marginBottom: '20px' }}>
+            <div className="displayboard-call-number">
               № {currentCall.queue_number}
             </div>
-            <div style={{ fontSize: '1.5rem', marginBottom: '10px' }}>
+            <div className="displayboard-call-patient">
               {currentCall.patient_name}
             </div>
-            <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
+            <div className="displayboard-call-doctor">
               👨‍⚕️ {currentCall.doctor_name}
             </div>
             {currentCall.cabinet &&
-          <div style={{ fontSize: '1.1rem' }}>
+          <div className="displayboard-call-cabinet">
                 🚪 {currentCall.cabinet}
               </div>
           }
           </div> :
 
         <div>
-            <Monitor size={64} style={{ color: currentTheme.textSecondary, marginBottom: '20px' }} />
-            <div style={{ fontSize: '1.5rem', color: currentTheme.textSecondary }}>
+            <Monitor size={64} className="displayboard-no-call-icon" />
+            <div className="displayboard-no-call-title">
               {t('now_serving', boardSettings.language)}
             </div>
-            <div style={{ fontSize: '3rem', fontWeight: 'bold', marginTop: '20px' }}>
+            <div className="displayboard-no-call-ticket">
               {stats.last_ticket || 0}
             </div>
           </div>
@@ -813,23 +666,12 @@ export default function DisplayBoardUnified({
 
       {/* Объявления */}
       {announcements.length > 0 &&
-      <div style={{ marginBottom: '30px' }}>
+      <div className="displayboard-announcements-wrap">
           {announcements.map((announcement) =>
         <div
           key={announcement.created_at}
-          style={{
-            ...announcementStyle,
-            background: announcement.announcement_type === 'emergency' ?
-            'linear-gradient(135deg, #dc3545 0%, #c82333 100%)' :
-            announcement.announcement_type === 'warning' ?
-            'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)' :
-            'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
-            marginBottom: '10px',
-            padding: '15px',
-            borderRadius: '8px',
-            textAlign: 'center',
-            animation: 'slideIn 0.5s ease'
-          }}>
+          className="displayboard-announcement"
+          data-announcement-type={announcement.announcement_type}>
           
               📢 {announcement.text}
             </div>
@@ -838,52 +680,28 @@ export default function DisplayBoardUnified({
       }
 
       {/* Очередь */}
-      <div style={queueGridStyle}>
+      <div className="displayboard-queue-grid">
         {queueData.slice(0, boardSettings.displayCount).map((entry) =>
         <div
           key={entry.number}
-          style={{
-            ...queueCardStyle,
-            borderColor: getStatusColor(entry.status),
-            background: entry.status === 'called' ? 'rgba(220, 53, 69, 0.1)' : currentTheme.cardBg
-          }}>
+          className="displayboard-queue-card"
+          data-status={entry.status}>
           
-            <div style={{
-            fontSize: '2rem',
-            fontWeight: 'bold',
-            color: getStatusColor(entry.status),
-            marginBottom: '10px'
-          }}>
+            <div className="displayboard-queue-number">
               {entry.number}
             </div>
             
             {boardSettings.showPatientNames !== 'none' &&
-          <div style={{
-            fontSize: '1rem',
-            color: currentTheme.textPrimary,
-            marginBottom: '10px'
-          }}>
+          <div className="displayboard-queue-patient">
                 {entry.patient_name}
               </div>
           }
 
-            <div style={{
-            background: getStatusColor(entry.status),
-            color: '#ffffff',
-            padding: '5px 10px',
-            borderRadius: '20px',
-            fontSize: '0.9rem',
-            fontWeight: 'bold',
-            marginBottom: '10px'
-          }}>
+            <div className="displayboard-queue-badge">
               {getStatusText(entry.status)}
             </div>
 
-            <div style={{
-            fontSize: '0.8rem',
-            color: currentTheme.textSecondary,
-            marginBottom: '5px'
-          }}>
+            <div className="displayboard-queue-time">
               {entry.status === 'called' && entry.called_at ?
             `Вызван: ${formatTime(entry.called_at)}` :
 
@@ -891,14 +709,7 @@ export default function DisplayBoardUnified({
             }
             </div>
 
-            <div style={{
-            fontSize: '0.8rem',
-            color: currentTheme.textSecondary,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '5px'
-          }}>
+            <div className="displayboard-queue-source">
               {entry.source === 'online' ? '📱 Онлайн' : '🏥 Регистратура'}
             </div>
           </div>
@@ -907,32 +718,21 @@ export default function DisplayBoardUnified({
 
       {/* Окна/кабинеты */}
       {windows && windows.length > 0 &&
-      <div style={{ marginBottom: '30px' }}>
-          <h3 style={{ fontSize: '1.5rem', marginBottom: '20px', color: currentTheme.textPrimary }}>
+      <div className="displayboard-windows-wrap">
+          <h3 className="displayboard-windows-title">
             Окна
           </h3>
-          <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '15px'
-        }}>
+          <div className="displayboard-windows-grid">
             {windows.map((w, i) =>
-          <div key={i} style={{
-            background: currentTheme.cardBg,
-            padding: '20px',
-            borderRadius: '12px',
-            textAlign: 'center',
-            border: `1px solid ${currentTheme.border}`,
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-          }}>
-                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '10px', color: currentTheme.textPrimary }}>
+          <div key={i} className="displayboard-window-card">
+                <div className="displayboard-window-label">
                   Окно {w.window}
                 </div>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: getStatusColor('serving') }}>
+                <div className="displayboard-window-ticket">
                   {w.ticket || '—'}
                 </div>
                 {w.label &&
-            <div style={{ fontSize: '0.9rem', color: currentTheme.textSecondary, marginTop: '5px' }}>
+            <div className="displayboard-window-sub">
                     {w.label}
                   </div>
             }
@@ -943,65 +743,54 @@ export default function DisplayBoardUnified({
       }
 
       {/* Статистика */}
-      <div style={statsGridStyle}>
-        <div style={statCardStyle}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+      <div className="displayboard-stats-grid">
+        <div className="displayboard-stat-card">
+          <div className="displayboard-stat-value-lg">
             {queueData.length}
           </div>
-          <div style={{ color: currentTheme.textSecondary }}>Всего в очереди</div>
+          <div className="displayboard-stat-label">Всего в очереди</div>
         </div>
 
-        <div style={statCardStyle}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+        <div className="displayboard-stat-card">
+          <div className="displayboard-stat-value-lg">
             {queueData.filter((e) => e.status === 'waiting').length}
           </div>
-          <div style={{ color: currentTheme.textSecondary }}>Ожидают</div>
+          <div className="displayboard-stat-label">Ожидают</div>
         </div>
 
-        <div style={statCardStyle}>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+        <div className="displayboard-stat-card">
+          <div className="displayboard-stat-value-md">
             {formatRegistrarTime(new Date().toISOString())}
           </div>
-          <div style={{ color: currentTheme.textSecondary }}>Текущее время</div>
+          <div className="displayboard-stat-label">Текущее время</div>
         </div>
 
-        <div style={statCardStyle}>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+        <div className="displayboard-stat-card">
+          <div className="displayboard-stat-value-md">
             {stats.waiting}
           </div>
-          <div style={{ color: currentTheme.textSecondary }}>Ожидают (старая)</div>
+          <div className="displayboard-stat-label">Ожидают (старая)</div>
         </div>
 
-        <div style={statCardStyle}>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+        <div className="displayboard-stat-card">
+          <div className="displayboard-stat-value-md">
             {stats.serving}
           </div>
-          <div style={{ color: currentTheme.textSecondary }}>Принимаются</div>
+          <div className="displayboard-stat-label">Принимаются</div>
         </div>
 
-        <div style={statCardStyle}>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+        <div className="displayboard-stat-card">
+          <div className="displayboard-stat-value-md">
             {stats.done}
           </div>
-          <div style={{ color: currentTheme.textSecondary }}>Готово</div>
+          <div className="displayboard-stat-label">Готово</div>
         </div>
       </div>
 
       {/* Объявление внизу */}
       {(getAnnouncement(board, boardSettings.language) || announcement) &&
-      <div style={{
-        background: currentTheme.cardBg,
-        padding: '20px',
-        borderRadius: '12px',
-        textAlign: 'center',
-        border: `1px solid ${currentTheme.border}`,
-        marginTop: '30px'
-      }}>
-          <div style={{
-          fontSize: '1.1rem',
-          color: currentTheme.textPrimary,
-          animation: 'scroll 20s linear infinite'
-        }}>
+      <div className="displayboard-bottom-announcement">
+          <div className="displayboard-bottom-announcement-text">
             {getAnnouncement(board, boardSettings.language) || announcement || 'Добро пожаловать! Пожалуйста, ожидайте своей очереди.'}
           </div>
         </div>
@@ -1009,36 +798,10 @@ export default function DisplayBoardUnified({
 
       {/* Ошибки */}
       {err &&
-      <div style={{
-        background: 'rgba(239,68,68,0.1)',
-        border: '1px solid rgba(239,68,68,0.3)',
-        color: '#dc2626',
-        padding: '15px',
-        borderRadius: '8px',
-        marginTop: '20px',
-        textAlign: 'center'
-      }}>
+      <div className="displayboard-error">
           {err}
         </div>
       }
-
-      {/* CSS анимации */}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-        
-        @keyframes slideIn {
-          from { transform: translateY(-20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        
-        @keyframes scroll {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-      `}</style>
     </div>);
 
 }
