@@ -7,6 +7,7 @@ import {
   Select,
   Textarea,
   Modal,
+  Alert,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
@@ -42,6 +43,7 @@ const PatientModal = ({
   const [errors, setErrors] = useState({});
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
 
   // Инициализация формы при открытии
@@ -87,6 +89,7 @@ const PatientModal = ({
         });
       }
       setErrors({});
+      setSubmitError(null);
       setIsDirty(false);
     }
   }, [isOpen, patient]);
@@ -166,6 +169,7 @@ const PatientModal = ({
       onClose();
     } catch (error) {
       logger.error('Ошибка сохранения пациента:', error);
+      setSubmitError(error?.response?.data?.detail || error?.message || 'Ошибка сохранения пациента');
     } finally {
       setIsSubmitting(false);
     }
@@ -225,6 +229,9 @@ const PatientModal = ({
 
 
       {/* Форма */}
+      {submitError ? (
+        <Alert type="error" className="admin-mb-12">{submitError}</Alert>
+      ) : null}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Личная информация */}
         <div className="space-y-4">

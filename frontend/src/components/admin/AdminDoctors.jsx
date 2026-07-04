@@ -23,7 +23,6 @@ const departmentOptions = [
   { value: 'cardiology', label: 'Кардиология' },
   { value: 'dermatology', label: 'Дерматология' },
   { value: 'dentistry', label: 'Стоматология' },
-  { value: 'stomatology', label: 'Стоматология' },
   { value: 'laboratory', label: 'Лаборатория' },
   { value: 'cosmetology', label: 'Косметология' },
   { value: 'procedures', label: 'Процедуры' },

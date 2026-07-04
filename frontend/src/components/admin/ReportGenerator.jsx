@@ -42,6 +42,12 @@ const REPORT_ENDPOINTS = {
   analytics: 'financial'
 };
 
+// P1 note: controlled-mode props (onGenerateReport, onReportTypeChange,
+// onDateRangeChange, loading, reportTypes, dateRange, selectedReportType) are
+// dead — UnifiedReports renders <ReportGenerator /> with no props. The
+// component always runs in internal-mode (fallback branches with undefined
+// guards). Props kept for backward compat; PropTypes removed to avoid
+// suggesting they are a live API.
 const ReportGenerator = ({
   onGenerateReport,
   loading = false,
@@ -578,9 +584,7 @@ ReportGenerator.propTypes = {
   ...(ReportGenerator.propTypes || {}),
   dateRange: PropTypes.any,
   loading: PropTypes.any,
-  onDateRangeChange: PropTypes.any,
-  onGenerateReport: PropTypes.any,
-  onReportTypeChange: PropTypes.any,
+  // onDateRangeChange, onGenerateReport, onReportTypeChange: removed (dead controlled-mode props, never passed by any caller)
   reportTypes: PropTypes.any,
   selectedReportType: PropTypes.any,
 };

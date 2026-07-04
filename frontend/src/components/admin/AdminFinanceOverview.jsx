@@ -119,6 +119,7 @@ const AdminFinanceOverview = () => {
     updateTransaction,
     deleteTransaction,
     getFinancialStats,
+    refresh: refreshFinance,
   } = useFinance();
 
   const { patients } = usePatients();
@@ -305,7 +306,7 @@ const AdminFinanceOverview = () => {
               title="Ошибка загрузки транзакций"
               description="Не удалось загрузить список транзакций"
               action={(
-                <Button onClick={() => window.location.reload()}>
+                <Button onClick={refreshFinance}>
                   <RefreshCw className="admin-icon-16-mr-8" />
                   Обновить
                 </Button>

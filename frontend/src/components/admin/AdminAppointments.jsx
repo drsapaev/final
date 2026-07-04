@@ -22,7 +22,7 @@ import { useConfirm } from '../common/ConfirmDialog';
 
 const statusOptions = [
   { value: '', label: 'Все статусы' },
-  { value: 'pending', label: 'Ожидает' },
+  { value: 'pending', label: 'Ожидает оплаты' },
   { value: 'confirmed', label: 'Подтверждена' },
   { value: 'paid', label: 'Оплачена' },
   { value: 'in_visit', label: 'На приеме' },
