@@ -32,7 +32,6 @@ import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
 import QueueIntegration from '../components/QueueIntegration';
 import { getApiBaseUrl } from '../api/runtime';
-import AIChatWidget from '../components/ai/AIChatWidget';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
@@ -1860,13 +1859,7 @@ const MacOSCardiologistPanelUnified = () => {
             </div>
           </MacOSCard>
         }
-
-        {/* AI Chat Widget */}
-        <AIChatWidget
-          contextType="general"
-          specialty="cardiology"
-          useWebSocket={false}
-          position="bottom-right" />
+      {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}
 
         <RoleNotificationCenter userRole="cardiologist" />
       </div>

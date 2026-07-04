@@ -48,7 +48,7 @@ export function VisitTab({
       <MacOSCard className="cardio-card-padded">
         <h3 className="cardio-section-heading">
           <User size={20} className="cardio-icon-mr cardio-icon-blue" />
-          Пациент #{selectedPatient.number}
+          Пациент: {selectedPatient.patient_name || selectedPatient.patient?.full_name || `№${selectedPatient.number}`}
         </h3>
 
         <div className="cardio-grid-auto">
