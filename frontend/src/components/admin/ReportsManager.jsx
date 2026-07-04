@@ -55,11 +55,7 @@ const ReportsManager = () => {
   });
 
   // Состояние для быстрых отчетов
-  const [quickReports, setQuickReports] = useState({
-    daily: null,
-    weekly: null,
-    monthly: null
-  });
+  const [quickReports, setQuickReports] = useState({ daily: null });
 
   useEffect(() => {
     loadAvailableReports();
@@ -97,14 +93,16 @@ const ReportsManager = () => {
 
   const loadQuickReports = async () => {
     try {
-      // Загружаем ежедневную сводку
+      // P1 fix: only daily-summary endpoint exists in backend. Weekly/monthly
+      // endpoints do not exist (verified via backend/openapi.json), so the
+      // weekly/monthly KPI cards showed a perpetual loading spinner. Removed
+      // those cards; this loader now only fetches daily.
       const response = await api.get('/reports/daily-summary');
       setQuickReports((prev) => ({ ...prev, daily: response.data }));
     } catch (error) {
       logger.error('Ошибка загрузки быстрых отчетов:', error);
-      setError('Не удалось загрузить статистику'); // Set error state
-      // Set mock data if API fails
-      setQuickReports({ daily: null, weekly: null, monthly: null });
+      setError('Не удалось загрузить статистику');
+      setQuickReports({ daily: null });
     }
   };
 
@@ -327,28 +325,6 @@ const ReportsManager = () => {
           trend={quickReports.daily ? `+${quickReports.daily.summary?.new_patients || 0}` : undefined}
           trendType={quickReports.daily ? 'positive' : 'neutral'}
           loading={!quickReports.daily} />
-
-
-          <MacOSStatCard
-          title="Эта неделя"
-          value={quickReports.weekly?.summary?.total_patients_served || 0}
-          subtitle={`${quickReports.weekly?.summary?.total_revenue || 0} сум`}
-          icon={Calendar}
-          color="green"
-          trend={quickReports.weekly ? `+${quickReports.weekly.summary?.new_patients || 0}` : undefined}
-          trendType={quickReports.weekly ? 'positive' : 'neutral'}
-          loading={!quickReports.weekly} />
-
-
-          <MacOSStatCard
-          title="Этот месяц"
-          value={quickReports.monthly?.summary?.total_patients_served || 0}
-          subtitle={`${quickReports.monthly?.summary?.total_revenue || 0} сум`}
-          icon={BarChart3}
-          color="purple"
-          trend={quickReports.monthly ? `+${quickReports.monthly.summary?.new_patients || 0}` : undefined}
-          trendType={quickReports.monthly ? 'positive' : 'neutral'}
-          loading={!quickReports.monthly} />
 
         </div>
       </Card>

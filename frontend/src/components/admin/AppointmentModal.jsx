@@ -8,6 +8,7 @@ import {
   Select,
   Textarea,
   Modal,
+  Alert,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 
@@ -34,6 +35,7 @@ const AppointmentModal = ({
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   const selectedDoctor = useMemo(
     () => doctors.find((doctor) => doctor.id === parseInt(formData.doctorId, 10)) || null,
     [doctors, formData.doctorId]
@@ -70,6 +72,7 @@ const AppointmentModal = ({
         });
       }
       setErrors({});
+    setSubmitError(null);
     }
   }, [isOpen, appointment]);
 
@@ -138,6 +141,7 @@ const AppointmentModal = ({
       onClose();
     } catch (error) {
       logger.error('Ошибка сохранения записи:', error);
+      setSubmitError(error?.response?.data?.detail || error?.message || 'Ошибка сохранения записи');
     } finally {
       setIsSubmitting(false);
     }
@@ -185,6 +189,11 @@ const AppointmentModal = ({
       title={appointment ? 'Редактировать запись' : 'Создать запись на прием'}
       size="lg">
       
+          {/* Submit error (P1 fix: show save errors instead of swallowing) */}
+          {submitError ? (
+            <Alert type="error" className="admin-mb-12">{submitError}</Alert>
+          ) : null}
+
           {/* Форма */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Основная информация */}

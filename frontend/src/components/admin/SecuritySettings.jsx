@@ -577,7 +577,11 @@ const SecuritySettings = ({
           <div className="admin-flex-center-12">
             <Button
               variant="outline"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                // P1 fix: was window.location.reload() — killed SPA state.
+                // Now resets the form to the last-loaded settings.
+                setFormData(settings || {});
+              }}
               disabled={isSubmitting}>
               
               <RefreshCw className="admin-icon-16-mr-8" />

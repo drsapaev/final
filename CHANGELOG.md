@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-07-04 — Admin Sprint 2: P1 functional fixes (fix/admin-sprint2-p1-functional)
+
+### P1-1: `ReportsManager.jsx` — perpetual spinner for weekly/monthly KPI cards
+Weekly and monthly KPI cards showed a perpetual loading spinner because `loadQuickReports` only called `/reports/daily-summary` (the only endpoint that exists in backend — verified via `backend/openapi.json`). Removed the weekly/monthly cards and state; kept only the daily card. Adding weekly/monthly backend endpoints is a separate feature request.
+
+### P1-2: `AdminDoctors.jsx:25–26` — duplicate "Стоматология" filter option
+Two `<option>` elements with the same label "Стоматология" but different values (`dentistry` vs `stomatology`). Removed `stomatology`; kept `dentistry` (canonical `SPECIALTY_KEYS.DENTISTRY` per `utils/doctorPanelShared.js`).
+
+### P1-3: `AdminAppointments.jsx` — label inconsistency for `pending` status
+Filter dropdown said "Ожидает" (L25) while the table badge said "Ожидает оплаты" (L91). Aligned both to "Ожидает оплаты".
+
+### P1-4: CRUD modals swallowed save errors
+- `AppointmentModal.jsx` — `catch { logger.error(...) }` silently swallowed errors. Added `submitError` state + `<Alert type="error">` render before the form (matching `DoctorModal` pattern). Catch now extracts `error.response.data.detail || error.message`.
+- `PatientModal.jsx` — same fix applied.
+
+### P1-5: `window.location.reload()` killed SPA state (2 of 3 places)
+- `AdminFinanceOverview.jsx:308` — retry button on finance error. Replaced with `refreshFinance()` callback from `useFinance` hook (`refresh: loadTransactions`).
+- `SecuritySettings.jsx:580` — "Сбросить" button. Replaced with `setFormData(settings || {})` (resets form to last-loaded settings).
+- `ErrorBoundary.jsx:68` — kept as-is; error-boundary fallback for a crashed subtree, full reload is acceptable there.
+
+### P1-6: `ReportGenerator.jsx` — dead controlled-mode props
+`UnifiedReports` renders `<ReportGenerator />` with no props, but the component accepted `onGenerateReport`, `onReportTypeChange`, `onDateRangeChange`, `loading`, `reportTypes`, `dateRange`, `selectedReportType` with always-undefined guards. Added deprecation comment; removed dead PropTypes. Kept the props in the signature for backward compat (no other caller exists — verified via `rg "<ReportGenerator\s+[^/]"`).
+
+Verification:
+- `vite build` → ✓ built in ~25s, exit 0, all chunks emitted.
+- `vitest run` → ✓ 515/515 tests pass across 105 test files.
+- `eslint` on 8 modified files → 0 errors (1 pre-existing warning unchanged).
+
 ## 2026-07-04 — Admin Sprint 1: P0 silent regressions & data-integrity fixes (fix/admin-sprint1-p0-silent-regressions)
 
 ### Void codemod damage — phantom `useState` / `useTheme` (3 files)
