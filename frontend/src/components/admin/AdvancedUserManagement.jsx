@@ -5,7 +5,7 @@ import {
 
 const AdvancedUserManagement = () => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="admin-flex-col-16">
       <Alert
         type="info"
         title="Расширенное управление пользователями"

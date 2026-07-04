@@ -155,13 +155,7 @@ const IconButton = ({ label, tone = 'default', onClick, children }) => (
     onClick={onClick}
     aria-label={label}
     title={label}
-    style={{
-      width: '32px',
-      height: '32px',
-      padding: 0,
-      borderRadius: 'var(--mac-radius-sm)',
-      color: tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)',
-    }}
+    className="admin-w-32-h-32-p-0-radius-var-mac-radius-sm-col-dyn" style={{ '--admin-col0': tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)' }}
   >
     {children}
   </Button>
@@ -175,31 +169,21 @@ IconButton.propTypes = {
 };
 
 const StatCard = ({ label, value, icon: Icon, color }) => (
-  <MacOSCard style={{ padding: '24px' }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+  <MacOSCard className="admin-p-24">
+    <div className="admin-d-flex-ai-center-jc-between-gap-16">
       <div>
         <p
-          style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-secondary)',
-            margin: 0,
-          }}
+          className="admin-fs-sm-fw-med-secondary-m-0"
         >
           {label}
         </p>
         <p
-          style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)',
-            margin: '4px 0 0',
-          }}
+          className="admin-fs-2xl-fw-bold-primary-m-4px-0-0"
         >
           {value}
         </p>
       </div>
-      <Icon aria-hidden="true" size={32} style={{ color }} />
+      <Icon aria-hidden="true" size={32} className="admin-col-dyn" style={{ '--admin-col0': color }} />
     </div>
   </MacOSCard>
 );
@@ -301,13 +285,9 @@ const AdminAppointments = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="admin-flex-col-24">
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-        }}
+        className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16"
       >
         <StatCard label="Всего записей" value={appointments.length} icon={Calendar} color="var(--mac-accent)" />
         <StatCard label="На сегодня" value={todayAppointments.length} icon={Clock} color="var(--mac-success)" />
@@ -318,39 +298,19 @@ const AdminAppointments = () => {
       <MacOSCard
         variant="default"
         shadow="none"
-        style={{
-          background: 'var(--mac-bg-primary)',
-          border: '1px solid var(--mac-border)',
-          padding: '24px',
-        }}
+        className="admin-bg-bg-primary-bd-1px-solid-var-mac-bo-p-24"
       >
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            marginBottom: '24px',
-            flexWrap: 'wrap',
-          }}
+          className="admin-d-flex-ai-center-jc-between-gap-16-mb-24-fw-wrap"
         >
           <div>
             <h2
-              style={{
-                fontSize: 'var(--mac-font-size-xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: 0,
-              }}
+              className="admin-fs-xl-fw-semi-primary-m-0"
             >
               Управление записями
             </h2>
             <p
-              style={{
-                margin: '6px 0 0',
-                color: 'var(--mac-text-secondary)',
-                fontSize: 'var(--mac-font-size-sm)',
-              }}
+              className="admin-m-6px-0-0-secondary-fs-sm"
             >
               Административный обзор записей, врачей, кабинетов и статусов.
             </p>
@@ -361,12 +321,7 @@ const AdminAppointments = () => {
         </div>
 
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 1fr) minmax(150px, 190px) minmax(150px, 190px) minmax(180px, 240px)',
-            gap: '12px',
-            marginBottom: '24px',
-          }}
+          className="admin-d-grid-gtc-minmax-220px-1fr-min-gap-12-mb-24"
         >
           <Input
             type="text"
@@ -399,7 +354,7 @@ const AdminAppointments = () => {
           />
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="admin-ovx-auto">
           {loading ? (
             <Skeleton type="table" count={5} />
           ) : error ? (
@@ -429,13 +384,10 @@ const AdminAppointments = () => {
               }
             />
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }} aria-label="Таблица записей">
+            <table className="admin-w-100pct-bc-collapse" aria-label="Таблица записей">
               <thead>
                 <tr
-                  style={{
-                    backgroundColor: 'var(--mac-bg-secondary)',
-                    borderBottom: '1px solid var(--mac-border)',
-                  }}
+                  className="admin-bgc-bg-secondary-bd-b-1px-solid-var-mac-bo"
                 >
                   <th scope="col" style={tableHeaderStyle}>Пациент</th>
                   <th scope="col" style={tableHeaderStyle}>Врач</th>
@@ -457,10 +409,7 @@ const AdminAppointments = () => {
                   return (
                     <tr
                       key={appointment.id}
-                      style={{
-                        borderBottom: '1px solid var(--mac-border)',
-                        transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
-                      }}
+                      className="admin-bd-b-1px-solid-var-mac-bo-tr-background-color-var"
                       onMouseEnter={(event) => {
                         event.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
                       }}
@@ -468,42 +417,23 @@ const AdminAppointments = () => {
                         event.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      <td aria-label={`Пациент ${patientName}`} style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <td aria-label={`Пациент ${patientName}`} className="admin-p-12-16">
+                        <div className="admin-flex-center-12">
                           <div
                             aria-hidden="true"
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: 'var(--mac-accent-blue)',
-                              color: 'var(--mac-text-on-accent)',
-                              fontSize: 'var(--mac-font-size-sm)',
-                              fontWeight: 'var(--mac-font-weight-medium)',
-                            }}
+                            className="admin-w-32-h-32-radius-50pct-d-flex-ai-center-jc-center-bg-blue-on-accent-fs-sm-fw-med"
                           >
                             {getInitials(patientName, 'П')}
                           </div>
                           <div>
                             <p
-                              style={{
-                                fontWeight: 'var(--mac-font-weight-medium)',
-                                color: 'var(--mac-text-primary)',
-                                margin: 0,
-                              }}
+                              className="admin-fw-med-primary-m-0"
                             >
                               {patientName}
                             </p>
                             {appointment.phone ? (
                               <p
-                                style={{
-                                  fontSize: 'var(--mac-font-size-sm)',
-                                  color: 'var(--mac-text-secondary)',
-                                  margin: '4px 0 0',
-                                }}
+                                className="admin-fs-sm-secondary-m-4px-0-0-1"
                               >
                                 {appointment.phone}
                               </p>
@@ -511,26 +441,18 @@ const AdminAppointments = () => {
                           </div>
                         </div>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
+                      <td className="admin-p-12-16">
                         <p
-                          style={{
-                            fontWeight: 'var(--mac-font-weight-medium)',
-                            color: 'var(--mac-text-primary)',
-                            margin: 0,
-                          }}
+                          className="admin-fw-med-primary-m-0"
                         >
                           {doctorName}
                         </p>
                         <p
-                          style={{
-                            fontSize: 'var(--mac-font-size-sm)',
-                            color: 'var(--mac-text-secondary)',
-                            margin: '4px 0 0',
-                          }}
+                          className="admin-fs-sm-secondary-m-4px-0-0"
                         >
                           {doctorSpecialization || '—'}
                         </p>
-                        <div style={{ marginTop: '4px' }}>
+                        <div className="admin-mt-4">
                           <Badge
                             variant={
                               appointment.doctor?.active === false || appointment.doctor?.user_active === false
@@ -547,22 +469,14 @@ const AdminAppointments = () => {
                           </Badge>
                         </div>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
+                      <td className="admin-p-12-16">
                         <p
-                          style={{
-                            fontWeight: 'var(--mac-font-weight-medium)',
-                            color: 'var(--mac-text-primary)',
-                            margin: 0,
-                          }}
+                          className="admin-fw-med-primary-m-0"
                         >
                           {appointment.effectiveCabinet || '—'}
                         </p>
                         <p
-                          style={{
-                            fontSize: 'var(--mac-font-size-xs)',
-                            color: 'var(--mac-text-secondary)',
-                            margin: '4px 0 0',
-                          }}
+                          className="admin-fs-xs-secondary-m-4px-0-0"
                         >
                           {appointment.queueCabinet
                             ? `Очередь: ${appointment.queueCabinet}`
@@ -572,28 +486,24 @@ const AdminAppointments = () => {
                         </p>
                       </td>
                       <td style={textCellStyle}>
-                        <p style={{ margin: 0, fontWeight: 'var(--mac-font-weight-medium)' }}>
+                        <p className="admin-m-0-fw-med">
                           {formatAppointmentDate(appointment.appointmentDate)}
                         </p>
-                        <p style={{ margin: '4px 0 0' }}>
+                        <p className="admin-m-4px-0-0">
                           {appointment.appointmentTime || 'Время не указано'} ({appointment.duration || 30} мин)
                         </p>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
+                      <td className="admin-p-12-16">
                         <Badge variant={getAppointmentStatusVariant(appointment.status)}>
                           {getAppointmentStatusLabel(appointment.status)}
                         </Badge>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
+                      <td className="admin-p-12-16">
                         {appointment.hasIntegrityWarnings ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div className="admin-d-flex-fd-column-gap-4">
                             <Badge variant="warning">Требует проверки</Badge>
                             <p
-                              style={{
-                                fontSize: 'var(--mac-font-size-xs)',
-                                color: 'var(--mac-text-secondary)',
-                                margin: 0,
-                              }}
+                              className="admin-fs-xs-secondary-m-0"
                             >
                               {(appointment.integrityWarnings || []).join(', ')}
                             </p>
@@ -605,8 +515,8 @@ const AdminAppointments = () => {
                       <td style={textCellStyle}>
                         {reason.length > 50 ? `${reason.substring(0, 50)}...` : reason || 'Не указана'}
                       </td>
-                      <td aria-label={`Действия для записи ${patientName} - ${doctorName}`} style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <td aria-label={`Действия для записи ${patientName} - ${doctorName}`} className="admin-p-12-16">
+                        <div className="admin-flex-center-8">
                           <IconButton label="Редактировать запись" onClick={() => handleEditAppointment(appointment)}>
                             <Edit size={16} />
                           </IconButton>

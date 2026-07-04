@@ -157,55 +157,28 @@ const FCMManager = () => {
   };
 
   const renderOverview = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Статус FCM */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Activity style={{ width: '20px', height: '20px' }} />
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-3">
+          <Activity className="admin-icon-20" />
           Статус FCM сервиса
         </h3>
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
-          <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: 'var(--mac-bg-secondary)'
-        }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-3">
+          <div className="admin-d-flex-ai-center-jc-between-p-16-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-bgc-bg-secondary-2">
             <div>
-              <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '0 0 8px 0'
-            }}>
+              <p className="admin-fs-sm-secondary-m-0-0-8px-0-2">
                 Статус сервиса
               </p>
-              <p style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              margin: 0
-            }}>
+              <p className="admin-fw-med-m-0-1">
                 {fcmStatus?.active ?
-              <Badge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <CheckCircle style={{ width: '12px', height: '12px' }} />
+              <Badge variant="success" className="admin-flex-center admin-gap-4">
+                    <CheckCircle className="admin-w-12-h-12" />
                     Активен
                   </Badge> :
 
-              <Badge variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <AlertTriangle style={{ width: '12px', height: '12px' }} />
+              <Badge variant="secondary" className="admin-flex-center admin-gap-4">
+                    <AlertTriangle className="admin-w-12-h-12" />
                     Неактивен
                   </Badge>
               }
@@ -213,27 +186,12 @@ const FCMManager = () => {
             </div>
           </div>
 
-          <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: 'var(--mac-bg-secondary)'
-        }}>
+          <div className="admin-d-flex-ai-center-jc-between-p-16-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-bgc-bg-secondary-1">
             <div>
-              <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '0 0 8px 0'
-            }}>
+              <p className="admin-fs-sm-secondary-m-0-0-8px-0-1">
                 Server Key
               </p>
-              <p style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              margin: 0
-            }}>
+              <p className="admin-fw-med-m-0">
                 {fcmStatus?.server_key_configured ?
               <Badge variant="success">Настроен</Badge> :
 
@@ -243,62 +201,33 @@ const FCMManager = () => {
             </div>
           </div>
 
-          <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: 'var(--mac-bg-secondary)'
-        }}>
+          <div className="admin-d-flex-ai-center-jc-between-p-16-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-bgc-bg-secondary">
             <div>
-              <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '0 0 8px 0'
-            }}>
+              <p className="admin-fs-sm-secondary-m-0-0-8px-0">
                 Пользователей с токенами
               </p>
-              <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+              <p className="admin-fs-2xl-fw-bold-primary-m-0">
                 {usersWithTokens.length}
               </p>
             </div>
-            <Smartphone style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
+            <Smartphone className="admin-w-24-h-24-blue" />
           </div>
         </div>
       </MacOSCard>
 
       {/* Быстрые действия */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Zap style={{ width: '20px', height: '20px' }} />
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-2">
+          <Zap className="admin-icon-20" />
           Быстрые действия
         </h3>
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-2">
           <Button
           onClick={testFCMNotification}
           disabled={loading || !fcmStatus?.active}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          className="admin-flex-center-8">
           
-            <TestTube style={{ width: '16px', height: '16px' }} />
+            <TestTube className="admin-icon-16" />
             Тест FCM
           </Button>
 
@@ -306,18 +235,18 @@ const FCMManager = () => {
           onClick={loadData}
           disabled={loading}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          className="admin-flex-center-8">
           
-            <RefreshCw style={{ width: '16px', height: '16px' }} />
+            <RefreshCw className="admin-icon-16" />
             Обновить данные
           </Button>
 
           <Button
           onClick={() => setActiveTab('notifications')}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          className="admin-flex-center-8">
           
-            <Send style={{ width: '16px', height: '16px' }} />
+            <Send className="admin-icon-16" />
             Отправить уведомление
           </Button>
         </div>
@@ -326,29 +255,15 @@ const FCMManager = () => {
 
 
   const renderNotifications = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Send style={{ width: '20px', height: '20px' }} />
+  <div className="admin-flex-col-24">
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-1">
+          <Send className="admin-icon-20" />
           Отправка FCM уведомлений
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="admin-flex-col-16">
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-14">
               Заголовок
             </label>
             <Input
@@ -356,36 +271,24 @@ const FCMManager = () => {
             value={notificationForm.title}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, title: e.target.value }))}
             placeholder="Заголовок уведомления"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
           
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-13">
               Текст сообщения
             </label>
             <Textarea
             value={notificationForm.body}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, body: e.target.value }))}
             placeholder="Текст уведомления..."
-            style={{ width: '100%', minHeight: '100px' }} />
+            className="admin-w-100pct-minh-100" />
           
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-12">
               Изображение (URL)
             </label>
             <Input
@@ -393,18 +296,12 @@ const FCMManager = () => {
             value={notificationForm.image}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, image: e.target.value }))}
             placeholder="https://example.com/image.jpg"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
           
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-11">
               Звук
             </label>
             <Select
@@ -417,47 +314,22 @@ const FCMManager = () => {
             { value: 'chime', label: 'Звонок' }]
             }
             size="large"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
           
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-10">
               Получатели
             </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
+            <div className="admin-flex-col-8">
+              <p className="admin-fs-xs-secondary-m-0">
                 Если не выбрать пользователей, уведомление будет отправлено всем активным пользователям
               </p>
               
-              <div style={{
-              maxHeight: '160px',
-              overflowY: 'auto',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-md)',
-              padding: '8px',
-              backgroundColor: 'var(--mac-bg-secondary)'
-            }}>
+              <div className="admin-maxh-160-ovy-auto-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-p-8-bgc-bg-secondary">
                 {usersWithTokens.map((user) =>
-              <label key={user.user_id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px',
-                borderRadius: 'var(--mac-radius-sm)',
-                cursor: 'pointer',
-                transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
-              }}
+              <label key={user.user_id} className="admin-d-flex-ai-center-gap-8-p-8-radius-var-mac-radius-sm-cur-pointer-tr-background-color-var"
               onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-tertiary)'}
               onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
                 
@@ -477,13 +349,10 @@ const FCMManager = () => {
                     }
                   }} />
                 
-                    <span style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-primary)'
-                }}>
+                    <span className="admin-fs-sm-primary">
                       {user.full_name || user.username}
                     </span>
-                    <Badge variant={user.push_enabled ? 'success' : 'secondary'} style={{ marginLeft: 'auto' }}>
+                    <Badge variant={user.push_enabled ? 'success' : 'secondary'} className="admin-ml-auto">
                       {user.device_type}
                     </Badge>
                   </label>
@@ -495,7 +364,7 @@ const FCMManager = () => {
           <Button
           onClick={sendNotification}
           disabled={loading || !fcmStatus?.active || !notificationForm.title.trim() || !notificationForm.body.trim()}
-          style={{ width: '100%' }}>
+          className="admin-w-full">
           
             {loading ? 'Отправка...' : 'Отправить FCM уведомление'}
           </Button>
@@ -505,32 +374,15 @@ const FCMManager = () => {
 
 
   const renderUsers = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Users style={{ width: '20px', height: '20px' }} />
+  <div className="admin-flex-col-24">
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8">
+          <Users className="admin-icon-20" />
           Пользователи с FCM токенами ({usersWithTokens.length})
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="admin-flex-col-16">
           {usersWithTokens.map((user) =>
-        <div key={user.user_id} style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: 'var(--mac-bg-secondary)',
-          transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-        }}
+        <div key={user.user_id} className="admin-d-flex-ai-center-jc-between-p-16-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-bgc-bg-secondary-tr-all-var-mac-duration"
         onPointerEnter={(e) => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
         }}
@@ -538,37 +390,24 @@ const FCMManager = () => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
         }}>
           
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Smartphone style={{ width: '20px', height: '20px', color: 'var(--mac-text-tertiary)' }} />
+              <div className="admin-flex-center-12">
+                <Smartphone className="admin-w-20-h-20-tertiary" />
                 <div>
-                  <p style={{
-                fontWeight: 'var(--mac-font-weight-medium)',
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 4px 0'
-              }}>
+                  <p className="admin-fw-med-fs-sm-primary-m-0-0-4px-0">
                     {user.full_name || user.username}
                   </p>
-                  <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-text-secondary)',
-                margin: '0 0 4px 0'
-              }}>
+                  <p className="admin-fs-xs-secondary-m-0-0-4px-0">
                     FCM токен: {formatFcmTokenStatus(user)}
                   </p>
                   {user.last_login &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-text-tertiary)',
-                margin: 0
-              }}>
+              <p className="admin-fs-xs-tertiary-m-0">
                       Последний вход: {new Date(user.last_login).toLocaleString()}
                     </p>
               }
                 </div>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="admin-flex-center-8">
                 <Badge variant={user.push_enabled ? 'success' : 'secondary'}>
                   {user.push_enabled ? 'Push включен' : 'Push отключен'}
                 </Badge>
@@ -581,12 +420,7 @@ const FCMManager = () => {
         )}
           
           {usersWithTokens.length === 0 &&
-        <div style={{
-          textAlign: 'center',
-          padding: '32px 0',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <div className="admin-ta-center-p-32px-0-secondary-fs-sm">
               Нет пользователей с зарегистрированными FCM токенами
             </div>
         }
@@ -602,43 +436,30 @@ const FCMManager = () => {
 
 
   return (
-    <div style={{
-      padding: '24px',
-      backgroundColor: 'var(--mac-bg-primary)',
-      minHeight: '100vh'
-    }}>
+    <div className="admin-p-24-bgc-bg-primary-minh-100vh">
       {/* Заголовок */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Bell style={{ width: '32px', height: '32px', color: 'var(--mac-warning)' }} />
+      <div className="admin-d-flex-ai-center-jc-between-mb-24">
+        <div className="admin-flex-center-12">
+          <Bell className="admin-w-32-h-32-warning" />
           <div>
-            <h1 style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+            <h1 className="admin-fs-2xl-fw-semi-primary-m-0-2">
               Firebase Cloud Messaging
             </h1>
-            <p style={{
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)',
-              margin: 0
-            }}>
+            <p className="admin-secondary-fs-sm-m-0-3">
               Управление push-уведомлениями
             </p>
           </div>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="admin-flex-center-8">
           {fcmStatus?.active ?
-          <Badge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <CheckCircle style={{ width: '12px', height: '12px' }} />
+          <Badge variant="success" className="admin-flex-center admin-gap-4">
+              <CheckCircle className="admin-w-12-h-12" />
               FCM активен
             </Badge> :
 
-          <Badge variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <AlertTriangle style={{ width: '12px', height: '12px' }} />
+          <Badge variant="secondary" className="admin-flex-center admin-gap-4">
+              <AlertTriangle className="admin-w-12-h-12" />
               FCM неактивен
             </Badge>
           }
@@ -646,10 +467,7 @@ const FCMManager = () => {
       </div>
 
       {/* Вкладки */}
-      <div style={{
-        display: 'flex',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-d-flex-mb-24">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -658,21 +476,7 @@ const FCMManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px 20px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-                fontSize: 'var(--mac-font-size-sm)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-                position: 'relative',
-                marginBottom: '-1px'
-              }}
+              className="admin-p-12px-20px-bd-none-bg-transparent-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-pos-relative-mb-n1-col-dyn-fw-dyn" style={{ '--admin-col0': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fw1': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}
               onMouseEnter={(e) => {
                 if (!isActive) {
                   e.target.style.color = 'var(--mac-text-primary)';
@@ -684,22 +488,10 @@ const FCMManager = () => {
                 }
               }}>
               
-              <Icon style={{
-                width: '16px',
-                height: '16px',
-                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
-              }} />
+              <Icon className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
               {tab.label}
               {isActive &&
-              <div style={{
-                position: 'absolute',
-                bottom: '0',
-                left: '0',
-                right: '0',
-                height: '3px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                borderRadius: '2px 2px 0 0'
-              }} />
+              <div className="admin-pos-absolute-bottom-0-left-0-right-0-h-3-bgc-blue-radius-2px-2px-0-0" />
               }
             </button>);
 
@@ -707,16 +499,13 @@ const FCMManager = () => {
       </div>
       
       {/* Разделительная линия */}
-      <div style={{
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }} />
+      <div className="admin-bd-b-1px-solid-var-mac-bo-mb-24" />
 
       {/* Контент вкладок */}
       {loading && !fcmStatus ?
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <Skeleton height="128px" style={{ width: '100%' }} />
-          <Skeleton height="256px" style={{ width: '100%' }} />
+      <div className="admin-flex-col-16">
+          <Skeleton height="128px" className="admin-w-full" />
+          <Skeleton height="256px" className="admin-w-full" />
         </div> :
 
       <>

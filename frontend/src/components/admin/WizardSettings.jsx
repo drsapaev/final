@@ -89,28 +89,10 @@ const WizardSettings = () => {
 
   if (loading) {
     return (
-      <MacOSCard style={{
-        padding: '24px',
-        backgroundColor: 'var(--mac-bg-primary)',
-        minHeight: '100vh'
-      }}>
-          <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '24px'
-        }}>
-            <Settings style={{
-            width: '32px',
-            height: '32px',
-            color: 'var(--mac-accent-blue)'
-          }} />
-            <h2 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+      <MacOSCard className="admin-p-24-bgc-bg-primary-minh-100vh">
+          <div className="admin-d-flex-ai-center-gap-8-mb-24">
+            <Settings className="admin-w-32-h-32-blue" />
+            <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
               Настройки мастера регистрации
             </h2>
           </div>
@@ -122,28 +104,10 @@ const WizardSettings = () => {
   // Критическая ошибка загрузки
   if (error && !settings.updated_at) {
     return (
-      <MacOSCard style={{
-        padding: '24px',
-        backgroundColor: 'var(--mac-bg-primary)',
-        minHeight: '100vh'
-      }}>
-          <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '24px'
-        }}>
-            <Settings style={{
-            width: '32px',
-            height: '32px',
-            color: 'var(--mac-accent-blue)'
-          }} />
-            <h2 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+      <MacOSCard className="admin-p-24-bgc-bg-primary-minh-100vh">
+          <div className="admin-d-flex-ai-center-gap-8-mb-24">
+            <Settings className="admin-w-32-h-32-blue" />
+            <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
               Настройки мастера регистрации
             </h2>
           </div>
@@ -153,11 +117,7 @@ const WizardSettings = () => {
           description="Проверьте подключение к серверу и попробуйте обновить страницу"
           action={
           <Button onClick={fetchSettings} variant="primary">
-                <RefreshCw style={{
-              width: '16px',
-              height: '16px',
-              marginRight: '4px'
-            }} />
+                <RefreshCw className="admin-w-16-h-16-mr-4" />
                 Попробовать снова
               </Button>
           } />
@@ -167,35 +127,14 @@ const WizardSettings = () => {
   }
 
   return (
-    <MacOSCard style={{
-      padding: '24px',
-      backgroundColor: 'var(--mac-bg-primary)',
-      minHeight: '100vh'
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        marginBottom: '24px',
-        flexWrap: 'wrap'
-      }}>
-          <Settings style={{
-          width: '32px',
-          height: '32px',
-          color: 'var(--mac-accent-blue)'
-        }} />
-          <h2 style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)',
-          margin: 0,
-          flex: 1,
-          minWidth: '200px'
-        }}>
+    <MacOSCard className="admin-p-24-bgc-bg-primary-minh-100vh">
+      <div className="admin-d-flex-ai-center-gap-8-mb-24-fw-wrap">
+          <Settings className="admin-w-32-h-32-blue" />
+          <h2 className="admin-fs-2xl-fw-semi-primary-m-0-flex-1-minw-200">
             Настройки мастера регистрации
           </h2>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="admin-flex-col-24">
           {/* Критическая ошибка */}
           {error &&
           <Alert
@@ -207,31 +146,13 @@ const WizardSettings = () => {
           }
 
           {/* A/B Переключатель */}
-          <MacOSCard style={{
-            padding: '24px',
-            backgroundColor: 'var(--mac-bg-secondary)',
-            border: '1px solid var(--mac-border)'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '16px'
-            }}>
-              <div style={{ flex: 1 }}>
-                <h3 style={{
-                  fontSize: 'var(--mac-font-size-lg)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-primary)',
-                  margin: '0 0 4px 0'
-                }}>
+          <MacOSCard className="admin-p-24-bgc-bg-secondary-bd-1px-solid-var-mac-bo">
+            <div className="admin-d-flex-ai-center-jc-between-mb-16">
+              <div className="admin-flex-1">
+                <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0">
                   Версия мастера регистрации
                 </h3>
-                <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)',
-                  margin: 0
-                }}>
+                <p className="admin-fs-sm-secondary-m-0">
                   {settings.use_new_wizard ?
                   'Используется новый мастер с улучшенным дизайном, корзиной и онлайн-оплатой' :
                   'Используется классический мастер регистрации'
@@ -239,16 +160,12 @@ const WizardSettings = () => {
                 </p>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="admin-flex-center-8">
                 <Checkbox
                   checked={settings.use_new_wizard}
                   onChange={handleToggleWizard} />
 
-                <span style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: settings.use_new_wizard ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
-                }}>
+                <span className="admin-fs-sm-fw-med-col-dyn" style={{ '--admin-col0': settings.use_new_wizard ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }}>
                   {settings.use_new_wizard ? 'Новый мастер' : 'Старый мастер'}
                 </span>
               </div>
@@ -256,11 +173,7 @@ const WizardSettings = () => {
           </MacOSCard>
 
           {/* Статистика использования */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px'
-          }}>
+          <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
             <MacOSStatCard
               title="Использование нового мастера"
               value={settings.use_new_wizard ? '100%' : '0%'}
@@ -281,30 +194,10 @@ const WizardSettings = () => {
           </div>
 
           {/* Информация о версиях */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '16px'
-          }}>
-            <MacOSCard style={{
-              padding: '24px',
-              border: !settings.use_new_wizard ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
-              backgroundColor: !settings.use_new_wizard ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-              transform: !settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginBottom: '8px'
-              }}>
-                <h4 style={{
-                  fontSize: 'var(--mac-font-size-lg)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-primary)',
-                  margin: 0
-                }}>
+          <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
+            <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': !settings.use_new_wizard ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-bgc1': !settings.use_new_wizard ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': !settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' }}>
+              <div className="admin-d-flex-ai-center-gap-4-mb-8">
+                <h4 className="admin-fs-lg-fw-semi-primary-m-0">
                   Классический мастер
                 </h4>
                 <Badge
@@ -314,15 +207,7 @@ const WizardSettings = () => {
                   {!settings.use_new_wizard ? 'Активен' : 'Неактивен'}
                 </Badge>
               </div>
-              <ul style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0,
-                paddingLeft: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px'
-              }}>
+              <ul className="admin-fs-sm-secondary-m-0-pl-16-d-flex-fd-column-gap-4">
                 <li>• Проверенная стабильность</li>
                 <li>• Привычный интерфейс</li>
                 <li>• Базовая функциональность</li>
@@ -330,25 +215,9 @@ const WizardSettings = () => {
               </ul>
             </MacOSCard>
 
-            <MacOSCard style={{
-              padding: '24px',
-              border: settings.use_new_wizard ? '2px solid var(--mac-success)' : '1px solid var(--mac-border)',
-              backgroundColor: settings.use_new_wizard ? 'var(--mac-success-bg)' : 'var(--mac-bg-primary)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-              transform: settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginBottom: '8px'
-              }}>
-                <h4 style={{
-                  fontSize: 'var(--mac-font-size-lg)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-primary)',
-                  margin: 0
-                }}>
+            <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': settings.use_new_wizard ? '2px solid var(--mac-success)' : '1px solid var(--mac-border)', '--admin-bgc1': settings.use_new_wizard ? 'var(--mac-success-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' }}>
+              <div className="admin-d-flex-ai-center-gap-4-mb-8">
+                <h4 className="admin-fs-lg-fw-semi-primary-m-0">
                   Новый мастер
                 </h4>
                 <Badge
@@ -358,15 +227,7 @@ const WizardSettings = () => {
                   {settings.use_new_wizard ? 'Активен' : 'Неактивен'}
                 </Badge>
               </div>
-              <ul style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0,
-                paddingLeft: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px'
-              }}>
+              <ul className="admin-fs-sm-secondary-m-0-pl-16-d-flex-fd-column-gap-4">
                 <li>• macOS дизайн</li>
                 <li>• Корзина услуг</li>
                 <li>• Онлайн-оплата (Click)</li>
@@ -379,28 +240,10 @@ const WizardSettings = () => {
 
           {/* Предупреждение */}
           {hasChanges &&
-          <MacOSCard style={{
-            padding: '16px',
-            backgroundColor: 'var(--mac-warning-bg)',
-            border: '1px solid var(--mac-warning-border)'
-          }}>
-              <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-                <AlertCircle style={{
-                width: '20px',
-                height: '20px',
-                color: 'var(--mac-warning)',
-                flexShrink: 0
-              }} />
-                <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-warning)',
-                margin: 0,
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+          <MacOSCard className="admin-p-16-bgc-var-mac-warning-bg-bd-1px-solid-var-mac-wa">
+              <div className="admin-flex-center-8">
+                <AlertCircle className="admin-w-20-h-20-warning-fsk-0" />
+                <p className="admin-fs-sm-warning-m-0-fw-med">
                   Изменения не сохранены. Нажмите «Сохранить» для применения настроек.
                 </p>
               </div>
@@ -409,36 +252,18 @@ const WizardSettings = () => {
 
           {/* Информация об обновлении */}
           {settings.updated_at &&
-          <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-tertiary)',
-            textAlign: 'center',
-            padding: '8px 0'
-          }}>
+          <div className="admin-fs-xs-tertiary-ta-center-p-8px-0">
               Последнее обновление: {new Date(settings.updated_at).toLocaleString('ru-RU')}
             </div>
           }
 
           {/* Кнопки действий */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            paddingTop: '16px',
-            borderTop: '1px solid var(--mac-border)',
-            flexWrap: 'wrap'
-          }}>
+          <div className="admin-d-flex-jc-end-gap-8-pt-16-bd-t-1px-solid-var-mac-bo-fw-wrap">
             <Button
               variant="outline"
               onClick={fetchSettings}
               disabled={saving}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 16px',
-                minWidth: '120px'
-              }}>
+              className="admin-d-flex-ai-center-gap-4-p-4px-16px-minw-120">
 
               Отменить
             </Button>
@@ -449,28 +274,16 @@ const WizardSettings = () => {
               aria-label={saving ? 'Saving wizard settings' : 'Save wizard settings'}
               onClick={handleSave}
               disabled={!hasChanges || saving}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none',
-                padding: '4px 16px',
-                minWidth: '120px'
-              }}>
+              className="admin-d-flex-ai-center-gap-4-bgc-blue-bd-none-p-4px-16px-minw-120">
 
               {saving ?
               <>
-                  <RefreshCw aria-hidden="true" style={{
-                  width: '16px',
-                  height: '16px',
-                  animation: 'spin 1s linear infinite'
-                }} />
+                  <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin" />
                   Сохранение...
                 </> :
 
               <>
-                  <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Save aria-hidden="true" className="admin-icon-16" />
                   Сохранить
                 </>
               }
@@ -486,22 +299,13 @@ const WizardSettings = () => {
         title="Подтверждение изменений"
         size="sm">
 
-        <div style={{ padding: '24px' }}>
-          <p style={{
-            fontSize: 'var(--mac-font-size-base)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '24px',
-            lineHeight: 'var(--mac-line-height-relaxed)'
-          }}>
+        <div className="admin-p-24">
+          <p className="admin-fs-base-primary-mb-24-lh-var-mac-line-height">
             Вы собираетесь {settings.use_new_wizard ? 'включить' : 'отключить'} новый мастер регистрации. 
             Это изменение повлияет на всех пользователей системы.
           </p>
           
-          <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 'var(--mac-spacing-sm)'
-          }}>
+          <div className="admin-d-flex-jc-end-gap-var-mac-spacing-sm">
             <Button
               variant="outline"
               onClick={() => setShowConfirmModal(false)}
@@ -515,28 +319,16 @@ const WizardSettings = () => {
               aria-label={saving ? 'Saving wizard settings' : 'Confirm wizard settings save'}
               onClick={confirmSave}
               disabled={saving}
-              style={{
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none'
-              }}>
+              className="admin-bgc-blue-bd-none">
 
               {saving ?
               <>
-                  <RefreshCw aria-hidden="true" style={{
-                  width: '16px',
-                  height: '16px',
-                  animation: 'spin 1s linear infinite',
-                  marginRight: '4px'
-                }} />
+                  <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin-mr-4" />
                   Сохранение...
                 </> :
 
               <>
-                  <Save aria-hidden="true" style={{
-                  width: '16px',
-                  height: '16px',
-                  marginRight: '4px'
-                }} />
+                  <Save aria-hidden="true" className="admin-w-16-h-16-mr-4" />
                   Подтвердить
                 </>
               }

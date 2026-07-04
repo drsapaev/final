@@ -201,7 +201,7 @@ const SecuritySettings = ({
 
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="admin-flex-col-24">
       {/* Вкладки */}
       <SegmentedControl
         value={activeTab}
@@ -209,207 +209,112 @@ const SecuritySettings = ({
         options={tabs.map(({ id, label, icon: TabIcon }) => ({
           value: id,
           label: (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <TabIcon style={{ width: '14px', height: '14px' }} />
+            <span className="admin-inline-flex-ai-center-gap-6">
+              <TabIcon className="admin-icon-14" />
               {label}
             </span>
           )
         }))}
         size="large"
-        style={{ flexWrap: 'wrap', rowGap: '4px' }} />
+        className="admin-wrap-rgap-4" />
       
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <form onSubmit={handleSubmit} className="admin-flex-col-24">
         {/* Смена пароля */}
         {activeTab === 'password' &&
-        <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            marginBottom: '20px',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <MacOSCard className="admin-p-24">
+            <h3 className="admin-lg-semi-mb-20-primary">
               Смена пароля
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="admin-flex-col-16">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <label className="admin-block-sm-med-mb-8-primary">
                   Текущий пароль *
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.current ? 'text' : 'password'}
                   value={formData.currentPassword}
                   onChange={(e) => handleChange('currentPassword', e.target.value)}
                   placeholder="Введите текущий пароль"
                   autoComplete="current-password"
-                  style={{ paddingLeft: '40px', paddingRight: '40px' }} />
+                  className="admin-pl-40-pr-40" />
                 
-                  <Lock style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '16px',
-                  height: '16px',
-                  color: 'var(--mac-text-tertiary)'
-                }} />
+                  <Lock className="admin-pos-absolute-left-12-top-50pct-transform-translateY-50-w-16-h-16-tertiary" />
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('current')}
                   aria-label={showPasswords.current ? 'Скрыть текущий пароль' : 'Показать текущий пароль'}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--mac-text-tertiary)'
-                  }}>
+                  className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
-                    {showPasswords.current ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
+                    {showPasswords.current ? <EyeOff className="admin-icon-16" /> : <Eye className="admin-icon-16" />}
                   </button>
                 </div>
                 {errors.currentPassword &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-danger)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                    <AlertCircle style={{ width: '16px', height: '16px' }} />
+              <p className="admin-sm-danger-mt-4-flex-ai-center-gap-4">
+                    <AlertCircle className="admin-icon-16" />
                     {errors.currentPassword}
                   </p>
               }
               </div>
 
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <label className="admin-block-sm-med-mb-8-primary">
                   Новый пароль *
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.new ? 'text' : 'password'}
                   value={formData.newPassword}
                   onChange={(e) => handleChange('newPassword', e.target.value)}
                   placeholder="Введите новый пароль"
                   autoComplete="new-password"
-                  style={{ paddingLeft: '40px', paddingRight: '40px' }} />
+                  className="admin-pl-40-pr-40" />
                 
-                  <Key style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '16px',
-                  height: '16px',
-                  color: 'var(--mac-text-tertiary)'
-                }} />
+                  <Key className="admin-pos-absolute-left-12-top-50pct-transform-translateY-50-w-16-h-16-tertiary" />
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('new')}
                   aria-label={showPasswords.new ? 'Скрыть новый пароль' : 'Показать новый пароль'}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--mac-text-tertiary)'
-                  }}>
+                  className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
-                    {showPasswords.new ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
+                    {showPasswords.new ? <EyeOff className="admin-icon-16" /> : <Eye className="admin-icon-16" />}
                   </button>
                 </div>
                 {errors.newPassword &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-danger)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                    <AlertCircle style={{ width: '16px', height: '16px' }} />
+              <p className="admin-sm-danger-mt-4-flex-ai-center-gap-4">
+                    <AlertCircle className="admin-icon-16" />
                     {errors.newPassword}
                   </p>
               }
               </div>
 
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <label className="admin-block-sm-med-mb-8-primary">
                   Подтвердите новый пароль *
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.confirm ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => handleChange('confirmPassword', e.target.value)}
                   placeholder="Подтвердите новый пароль"
                   autoComplete="new-password"
-                  style={{ paddingLeft: '40px', paddingRight: '40px' }} />
+                  className="admin-pl-40-pr-40" />
                 
-                  <Key style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '16px',
-                  height: '16px',
-                  color: 'var(--mac-text-tertiary)'
-                }} />
+                  <Key className="admin-pos-absolute-left-12-top-50pct-transform-translateY-50-w-16-h-16-tertiary" />
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('confirm')}
                   aria-label={showPasswords.confirm ? 'Скрыть подтверждение пароля' : 'Показать подтверждение пароля'}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--mac-text-tertiary)'
-                  }}>
+                  className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
-                    {showPasswords.confirm ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
+                    {showPasswords.confirm ? <EyeOff className="admin-icon-16" /> : <Eye className="admin-icon-16" />}
                   </button>
                 </div>
                 {errors.confirmPassword &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-danger)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                    <AlertCircle style={{ width: '16px', height: '16px' }} />
+              <p className="admin-sm-danger-mt-4-flex-ai-center-gap-4">
+                    <AlertCircle className="admin-icon-16" />
                     {errors.confirmPassword}
                   </p>
               }
@@ -420,39 +325,17 @@ const SecuritySettings = ({
 
         {/* Двухфакторная аутентификация */}
         {activeTab === 'two-factor' &&
-        <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            marginBottom: '20px',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <MacOSCard className="admin-p-24">
+            <h3 className="admin-lg-semi-mb-20-primary">
               Двухфакторная аутентификация
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px',
-              borderRadius: 'var(--mac-radius-md)',
-              border: '1px solid var(--mac-border)',
-              backgroundColor: 'var(--mac-bg-secondary)'
-            }}>
+            <div className="admin-flex-col-16">
+              <div className="admin-flex-ai-center-jc-between-p-16-radius-var--mac-radius-md-bd-1solidvar-mac--d38da58b">
                 <div>
-                  <h4 style={{
-                  fontSize: 'var(--mac-font-size-base)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '4px'
-                }}>
+                  <h4 className="admin-base-med-primary-mb-4">
                     Включить 2FA
                   </h4>
-                  <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)',
-                  margin: 0
-                }}>
+                  <p className="admin-sm-secondary-m-0">
                     Дополнительная защита вашего аккаунта
                   </p>
                 </div>
@@ -464,13 +347,7 @@ const SecuritySettings = ({
 
               {formData.twoFactorEnabled &&
             <div>
-                  <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                  <label className="admin-block-sm-med-mb-8-primary">
                     Метод аутентификации
                   </label>
                   <Select
@@ -491,14 +368,9 @@ const SecuritySettings = ({
 
         {/* Активные сессии */}
         {activeTab === 'sessions' &&
-        <MacOSCard style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+        <MacOSCard className="admin-p-24">
+            <div className="admin-flex-ai-center-jc-between-mb-20">
+              <h3 className="admin-lg-semi-primary-m-0">
                 Активные сессии
               </h3>
               <Button
@@ -507,70 +379,34 @@ const SecuritySettings = ({
               disabled={activeSessions.length === 0}
               size="sm">
               
-                <Trash2 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                <Trash2 className="admin-icon-16-mr-8" />
                 Завершить все остальные
               </Button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="admin-flex-col-12">
               {activeSessions.length === 0 &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0
-              }}>
+              <p className="admin-sm-secondary-m-0">
                 Нет backend-данных об активных сессиях.
               </p>
               }
               {activeSessions.map((session) =>
-            <div key={session.id} style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px',
-              borderRadius: 'var(--mac-radius-md)',
-              border: '1px solid var(--mac-border)',
-              backgroundColor: 'var(--mac-bg-secondary)'
-            }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'var(--mac-accent-blue)'
-                }}>
-                      <User style={{ width: '20px', height: '20px', color: 'white' }} />
+            <div key={session.id} className="admin-flex-ai-center-jc-between-p-16-radius-var--mac-radius-md-bd-1solidvar-mac--d38da58b">
+                  <div className="admin-flex-ai-center-gap-16">
+                    <div className="admin-w-40-h-40-radius-50pct-flex-ai-center-jc-center-bg-blue">
+                      <User className="admin-w-20-h-20-white" />
                     </div>
                     <div>
-                      <p style={{
-                    fontSize: 'var(--mac-font-size-base)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
+                      <p className="admin-base-med-primary-m-0-flex-ai-center-gap-8">
                         {session.device}
                         {session.current &&
                     <Badge variant="success" size="sm">Текущая</Badge>
                     }
                       </p>
-                      <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)',
-                    margin: '4px 0 0 0'
-                  }}>
+                      <p className="admin-sm-secondary-m-4px000">
                         {session.location} • {session.ip}
                       </p>
-                      <p style={{
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-tertiary)',
-                    margin: '4px 0 0 0'
-                  }}>
+                      <p className="admin-xs-tertiary-m-4px000">
                         Последняя активность: {formatDateTime(session.lastActive)}
                       </p>
                     </div>
@@ -583,9 +419,9 @@ const SecuritySettings = ({
                 onClick={() => terminateSession(session.id)}
                 title="Terminate this session"
                 aria-label="Terminate this session"
-                style={{ color: 'var(--mac-danger)', borderColor: 'var(--mac-danger)' }}>
+                className="admin-danger-bd-danger">
                 
-                      <Trash2 style={{ width: '16px', height: '16px' }} />
+                      <Trash2 className="admin-icon-16" />
                     </Button>
               }
                 </div>
@@ -596,29 +432,13 @@ const SecuritySettings = ({
 
         {/* Настройки безопасности */}
         {activeTab === 'security' &&
-        <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            marginBottom: '20px',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <MacOSCard className="admin-p-24">
+            <h3 className="admin-lg-semi-mb-20-primary">
               Настройки безопасности
             </h3>
-            <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px',
-            marginBottom: '24px'
-          }}>
+            <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16-mb-24">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <label className="admin-block-sm-med-mb-8-primary">
                   Минимальная длина пароля
                 </label>
                 <Input
@@ -631,13 +451,7 @@ const SecuritySettings = ({
               </div>
 
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <label className="admin-block-sm-med-mb-8-primary">
                   Срок действия пароля (дни)
                 </label>
                 <Input
@@ -650,13 +464,7 @@ const SecuritySettings = ({
               </div>
 
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <label className="admin-block-sm-med-mb-8-primary">
                   Максимум попыток входа
                 </label>
                 <Input
@@ -669,13 +477,7 @@ const SecuritySettings = ({
               </div>
 
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <label className="admin-block-sm-med-mb-8-primary">
                   Время блокировки (минуты)
                 </label>
                 <Input
@@ -688,7 +490,7 @@ const SecuritySettings = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="admin-flex-col-16">
               <Checkbox
               checked={formData.passwordRequireUppercase}
               onChange={(checked) => handleChange('passwordRequireUppercase', checked)}
@@ -718,77 +520,44 @@ const SecuritySettings = ({
 
         {/* Логи безопасности */}
         {activeTab === 'audit' &&
-        <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            marginBottom: '20px',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <MacOSCard className="admin-p-24">
+            <h3 className="admin-lg-semi-mb-20-primary">
               Логи безопасности
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="admin-flex-col-12">
               {securityLogs.length === 0 &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0
-              }}>
+              <p className="admin-sm-secondary-m-0">
                 Нет backend-данных о событиях безопасности.
               </p>
               }
               {securityLogs.map((log) => {
               const StatusIcon = getStatusIcon(log.status);
               return (
-                <div key={log.id} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  borderRadius: 'var(--mac-radius-md)',
-                  border: '1px solid var(--mac-border)',
-                  backgroundColor: 'var(--mac-bg-secondary)'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <StatusIcon style={{ width: '20px', height: '20px', color: getStatusColor(log.status) }} />
+                <div key={log.id} className="admin-flex-ai-center-jc-between-p-16-radius-var--mac-radius-md-bd-1solidvar-mac--d38da58b">
+                    <div className="admin-flex-ai-center-gap-16">
+                      <StatusIcon className="admin-w-20-h-20" style={{ '--admin-color': getStatusColor(log.status) }} />
                       <div>
-                        <p style={{
-                        fontSize: 'var(--mac-font-size-base)',
-                        fontWeight: 'var(--mac-font-weight-medium)',
-                        color: 'var(--mac-text-primary)',
-                        margin: 0
-                      }}>
+                        <p className="admin-base-med-primary-m-0">
                           {log.action}
                         </p>
-                        <p style={{
-                        fontSize: 'var(--mac-font-size-sm)',
-                        color: 'var(--mac-text-secondary)',
-                        margin: '4px 0 0 0'
-                      }}>
+                        <p className="admin-sm-secondary-m-4px000">
                           {log.user} • {log.ip}
                         </p>
-                        <p style={{
-                        fontSize: 'var(--mac-font-size-xs)',
-                        color: 'var(--mac-text-tertiary)',
-                        margin: '4px 0 0 0'
-                      }}>
+                        <p className="admin-xs-tertiary-m-4px000">
                           {formatDateTime(log.timestamp)}
                         </p>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="admin-flex-center-8">
                       <Badge
                       variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}
                       size="sm">
                       
                         {getStatusLabel(log.status)}
                       </Badge>
-                      <span style={{
-                      fontSize: 'var(--mac-font-size-xs)',
-                      color: 'var(--mac-text-tertiary)'
-                    }}>
+                      <span className="admin-xs-tertiary">
                         {log.details}
                       </span>
                     </div>
@@ -800,27 +569,18 @@ const SecuritySettings = ({
         }
 
         {/* Кнопки действий */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingTop: '24px',
-          borderTop: '1px solid var(--mac-border)'
-        }}>
-          <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-secondary)'
-          }}>
+        <div className="admin-flex-ai-center-jc-between-pt-24-bordertop-6787ca">
+          <div className="admin-text-sm admin-text-secondary">
             Настройки безопасности сохраняются после нажатия «Сохранить»
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="admin-flex-center-12">
             <Button
               variant="outline"
               onClick={() => window.location.reload()}
               disabled={isSubmitting}>
               
-              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <RefreshCw className="admin-icon-16-mr-8" />
               Сбросить
             </Button>
 
@@ -829,7 +589,7 @@ const SecuritySettings = ({
               disabled={isSubmitting || loading}
               loading={isSubmitting}>
               
-              <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Save className="admin-icon-16-mr-8" />
               Сохранить настройки
             </Button>
           </div>

@@ -192,11 +192,11 @@ const UserExportManager = () => {
 
 
   const getFileIcon = (filename) => {
-    if (filename.endsWith('.csv')) return <FileText style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />;
-    if (filename.endsWith('.xlsx')) return <FileSpreadsheet style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />;
-    if (filename.endsWith('.json')) return <FileJson style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />;
-    if (filename.endsWith('.pdf')) return <FilePdf style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />;
-    return <File style={{ width: '20px', height: '20px', color: 'var(--mac-text-tertiary)' }} />;
+    if (filename.endsWith('.csv')) return <FileText className="admin-w-20-h-20-success" />;
+    if (filename.endsWith('.xlsx')) return <FileSpreadsheet className="admin-w-20-h-20-blue" />;
+    if (filename.endsWith('.json')) return <FileJson className="admin-w-20-h-20-warning" />;
+    if (filename.endsWith('.pdf')) return <FilePdf className="admin-w-20-h-20-error" />;
+    return <File className="admin-w-20-h-20-tertiary" />;
   };
 
   const formatFileSize = (bytes) => {
@@ -230,31 +230,17 @@ const UserExportManager = () => {
 
 
   const renderExportTab = () =>
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+  <div className="admin-d-grid-gtc-1fr-1fr-gap-24">
       {/* Левая панель - настройки экспорта */}
-      <Card style={{ padding: '24px' }}>
-        <h3 style={{
-        margin: '0 0 24px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)'
-      }}>
-          <Settings style={{ width: '20px', height: '20px' }} />
+      <Card className="admin-p-24">
+        <h3 className="admin-m-0-0-24px-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
+          <Settings className="admin-icon-20" />
           Настройки экспорта
         </h3>
 
         {/* Формат экспорта */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-          display: 'block',
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
-        }}>
+        <div className="admin-mb-16">
+          <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
             Формат файла:
           </label>
           <Select
@@ -267,42 +253,18 @@ const UserExportManager = () => {
           { value: 'pdf', label: 'PDF' }]
           }
           size="large"
-          style={{ width: '100%' }} />
+          className="admin-w-full" />
 
         </div>
 
         {/* Поля для экспорта */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-          display: 'block',
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
-        }}>
+        <div className="admin-mb-16">
+          <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
             Поля для экспорта (оставьте пустым для всех полей):
           </label>
-          <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '8px',
-          marginTop: '8px',
-          maxHeight: '200px',
-          overflowY: 'auto',
-          padding: '12px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-sm)',
-          backgroundColor: 'var(--mac-bg-secondary)'
-        }}>
+          <div className="admin-d-grid-gtc-repeat-auto-fill-min-gap-8-mt-8-maxh-200-ovy-auto-p-12-bd-1px-solid-var-mac-bo-radius-var-mac-radius-sm-bgc-bg-secondary">
             {availableFields.map((field) =>
-          <label key={field.value} style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+          <label key={field.value} className="admin-d-flex-ai-center-gap-8-cur-pointer-fs-sm-primary">
                 <Checkbox
               checked={exportForm.fields.includes(field.value)}
               onChange={(checked) => {
@@ -312,7 +274,7 @@ const UserExportManager = () => {
                   setExportForm((prev) => ({ ...prev, fields: prev.fields.filter((f) => f !== field.value) }));
                 }
               }}
-              style={{ marginRight: '8px' }} />
+              className="admin-mr-8" />
 
                 <span>{field.label}</span>
               </label>
@@ -321,59 +283,32 @@ const UserExportManager = () => {
         </div>
 
         {/* Дополнительные данные */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-          display: 'block',
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
-        }}>
+        <div className="admin-mb-16">
+          <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
             Дополнительные данные:
           </label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-            <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+          <div className="admin-d-flex-fd-column-gap-8-mt-8">
+            <label className="admin-d-flex-ai-center-gap-8-cur-pointer-fs-sm-primary">
               <Checkbox
               checked={exportForm.include_profile}
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_profile: checked }))}
-              style={{ marginRight: '8px' }} />
+              className="admin-mr-8" />
 
               <span>Включить профили пользователей</span>
             </label>
-            <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+            <label className="admin-d-flex-ai-center-gap-8-cur-pointer-fs-sm-primary">
               <Checkbox
               checked={exportForm.include_preferences}
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_preferences: checked }))}
-              style={{ marginRight: '8px' }} />
+              className="admin-mr-8" />
 
               <span>Включить настройки пользователей</span>
             </label>
-            <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-primary)'
-          }}>
+            <label className="admin-d-flex-ai-center-gap-8-cur-pointer-fs-sm-primary">
               <Checkbox
               checked={exportForm.include_audit_logs}
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_audit_logs: checked }))}
-              style={{ marginRight: '8px' }} />
+              className="admin-mr-8" />
 
               <span>Включить журнал аудита</span>
             </label>
@@ -382,29 +317,15 @@ const UserExportManager = () => {
       </Card>
 
       {/* Правая панель - фильтры */}
-      <Card style={{ padding: '24px' }}>
-        <h3 style={{
-        margin: '0 0 24px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)'
-      }}>
-          <Filter style={{ width: '20px', height: '20px' }} />
+      <Card className="admin-p-24">
+        <h3 className="admin-m-0-0-24px-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
+          <Filter className="admin-icon-20" />
           Фильтры
         </h3>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="admin-flex-col-16">
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Имя пользователя:
             </label>
             <Input
@@ -414,18 +335,12 @@ const UserExportManager = () => {
               ...prev,
               filters: { ...prev.filters, username: e.target.value }
             }))}
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
 
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Email:
             </label>
             <Input
@@ -435,18 +350,12 @@ const UserExportManager = () => {
               ...prev,
               filters: { ...prev.filters, email: e.target.value }
             }))}
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
 
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Роль:
             </label>
             <Select
@@ -457,18 +366,12 @@ const UserExportManager = () => {
             }))}
             options={userRoles}
             size="large"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
 
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Статус:
             </label>
             <Select
@@ -486,18 +389,12 @@ const UserExportManager = () => {
             { value: 'false', label: 'Только неактивные' }]
             }
             size="large"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
 
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Дата создания (от):
             </label>
             <Input
@@ -507,18 +404,12 @@ const UserExportManager = () => {
               ...prev,
               filters: { ...prev.filters, created_from: e.target.value }
             }))}
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
 
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Дата создания (до):
             </label>
             <Input
@@ -528,28 +419,28 @@ const UserExportManager = () => {
               ...prev,
               filters: { ...prev.filters, created_to: e.target.value }
             }))}
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
 
           </div>
         </div>
 
         {/* Кнопка экспорта */}
-        <div style={{ marginTop: '24px' }}>
+        <div className="admin-mt-24">
           <Button
           type="button"
           onClick={handleExport}
           disabled={loading}
           aria-label="Start user data export"
-          style={{ width: '100%' }}>
+          className="admin-w-full">
 
             {loading ?
           <>
-                <RefreshCw style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
+                <RefreshCw className="admin-w-16-h-16-anim-spin-1s-linear-infin" />
                 Экспорт...
               </> :
 
           <>
-                <Download style={{ width: '16px', height: '16px' }} />
+                <Download className="admin-icon-16" />
                 Запустить экспорт
               </>
           }
@@ -560,84 +451,56 @@ const UserExportManager = () => {
 
 
   const renderFilesTab = () =>
-  <Card style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h3 style={{
-        margin: 0,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)'
-      }}>
-          <FileText style={{ width: '20px', height: '20px' }} />
+  <Card className="admin-p-24">
+      <div className="admin-d-flex-jc-between-ai-center-mb-24">
+        <h3 className="admin-m-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
+          <FileText className="admin-icon-20" />
           Файлы экспорта
         </h3>
         <Button onClick={loadExportFiles} disabled={loading}>
-          <RefreshCw style={{ width: '16px', height: '16px' }} />
+          <RefreshCw className="admin-icon-16" />
           Обновить
         </Button>
       </div>
 
       {loading ?
     <div>
-          <Skeleton height="60px" style={{ marginBottom: '8px' }} />
-          <Skeleton height="60px" style={{ marginBottom: '8px' }} />
+          <Skeleton height="60px" className="admin-mb-8" />
+          <Skeleton height="60px" className="admin-mb-8" />
           <Skeleton height="60px" />
         </div> :
     exportFiles.length === 0 ?
-    <div style={{
-      textAlign: 'center',
-      padding: '32px',
-      color: 'var(--mac-text-secondary)',
-      fontSize: 'var(--mac-font-size-sm)'
-    }}>
-          <FileText style={{ width: '48px', height: '48px', marginBottom: '16px', color: 'var(--mac-text-tertiary)' }} />
-          <p style={{ margin: 0 }}>Нет файлов экспорта</p>
-          <p style={{ margin: '8px 0 0 0' }}>Создайте экспорт на вкладке «Экспорт»</p>
+    <div className="admin-ta-center-p-32-secondary-fs-sm">
+          <FileText className="admin-w-48-h-48-mb-16-tertiary" />
+          <p className="admin-m-0">Нет файлов экспорта</p>
+          <p className="admin-m-8px-0-0-0">Создайте экспорт на вкладке «Экспорт»</p>
         </div> :
 
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div className="admin-flex-col-8">
           {exportFiles.map((file, index) =>
       <div
         key={index}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px',
-          backgroundColor: 'var(--mac-bg-secondary)',
-          borderRadius: 'var(--mac-radius-md)',
-          border: '1px solid var(--mac-border)'
-        }}>
+        className="admin-d-flex-ai-center-jc-between-p-16-bgc-bg-secondary-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo">
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div className="admin-d-flex-ai-center-gap-16">
                 {getFileIcon(file.filename)}
                 <div>
-                  <div style={{
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+                  <div className="admin-fw-semi-fs-sm-primary">
                     {file.filename}
                   </div>
-                  <div style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+                  <div className="admin-fs-xs-secondary">
                     Размер: {formatFileSize(file.size)} | 
                     Создан: {new Date(file.created_at).toLocaleString('ru-RU')}
                   </div>
                 </div>
               </div>
               
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="admin-d-flex-gap-8">
                 <Button
             size="sm"
             onClick={() => handleDownload(file.filename)}>
 
-                  <Download style={{ width: '14px', height: '14px' }} />
+                  <Download className="admin-icon-14" />
                   Скачать
                 </Button>
                 <Button
@@ -645,7 +508,7 @@ const UserExportManager = () => {
             variant="danger"
             onClick={() => handleDeleteFile(file.filename)}>
 
-                  <Trash2 style={{ width: '14px', height: '14px' }} />
+                  <Trash2 className="admin-icon-14" />
                   Удалить
                 </Button>
               </div>
@@ -658,36 +521,18 @@ const UserExportManager = () => {
 
   return (
     <div style={containerStyle}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{
-          margin: 0,
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          color: 'var(--mac-text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
-          <Users style={{ width: '32px', height: '32px' }} />
+      <div className="admin-mb-24">
+        <h1 className="admin-m-0-fs-2xl-fw-semi-primary-d-flex-ai-center-gap-12">
+          <Users className="admin-w-32-h-32" />
           Экспорт пользователей
         </h1>
-        <p style={{
-          margin: '8px 0 0 0',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <p className="admin-m-8px-0-0-0-secondary-fs-sm">
           Экспорт данных пользователей в различных форматах
         </p>
       </div>
 
       {/* Табы */}
-      <div style={{
-        maxWidth: '100%',
-        overflowX: 'auto',
-        paddingBottom: '6px',
-        marginBottom: '24px',
-        scrollbarWidth: 'thin'
-      }}>
+      <div className="admin-maxw-100pct-ovx-auto-pb-6-mb-24-scrollba-thin">
         <SegmentedControl
           aria-label="Разделы экспорта пользователей"
           value={activeTab}
@@ -696,7 +541,7 @@ const UserExportManager = () => {
             {
               value: 'export',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-d-inline-flex-ai-center-gap-8">
                   <Download size={14} aria-hidden="true" />
                   Экспорт
                 </span>
@@ -705,7 +550,7 @@ const UserExportManager = () => {
             {
               value: 'files',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-d-inline-flex-ai-center-gap-8">
                   <FileText size={14} aria-hidden="true" />
                   Файлы ({exportFiles.length})
                 </span>
@@ -713,13 +558,7 @@ const UserExportManager = () => {
             }
           ]}
           size="large"
-          style={{
-            minWidth: 'max-content',
-            background: 'var(--mac-gradient-sidebar)',
-            border: '1px solid var(--mac-main-shell-border)',
-            borderRadius: '14px',
-            boxShadow: 'var(--mac-main-shell-shadow)'
-          }} />
+          className="admin-minw-max-content-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-14-bsh-var-mac-main-shell-s" />
       </div>
 
       {/* Содержимое табов */}

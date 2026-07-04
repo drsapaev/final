@@ -43,17 +43,17 @@ class ErrorBoundary extends React.Component {
           aria-labelledby={this.titleId}
           aria-describedby={this.descriptionId}>
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center admin-error-icon-bg"
             aria-hidden="true"
-            style={{ background: 'var(--danger-color)', opacity: 0.1 }}>
-              <AlertTriangle className="w-8 h-8" focusable="false" style={{ color: 'var(--danger-color)' }} />
+            >
+              <AlertTriangle className="w-8 h-8 admin-text-error" focusable="false" />
             </div>
             
-            <h2 id={this.titleId} className="text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+            <h2 id={this.titleId} className="text-xl font-semibold mb-2 admin-text-primary">
               Что-то пошло не так
             </h2>
             
-            <p id={this.descriptionId} className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+            <p id={this.descriptionId} className="text-sm mb-4 admin-text-secondary">
               Произошла ошибка при загрузке этого раздела. Попробуйте обновить страницу.
             </p>
             
@@ -74,16 +74,10 @@ class ErrorBoundary extends React.Component {
             
             {process.env.NODE_ENV === 'development' && this.state.error &&
             <details className="mt-4 text-left">
-                <summary className="cursor-pointer text-sm font-medium mb-2"
-              style={{ color: 'var(--text-secondary)' }}>
+                <summary className="cursor-pointer text-sm font-medium mb-2 admin-text-secondary">
                   Детали ошибки (только для разработки)
                 </summary>
-                <pre className="text-xs p-3 rounded bg-gray-100 overflow-auto"
-              style={{
-                background: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)'
-              }}>
+                <pre className="text-xs p-3 rounded bg-gray-100 overflow-auto admin-error-pre">
                   {this.state.error && this.state.error.toString()}
                   {this.state.errorInfo.componentStack}
                 </pre>

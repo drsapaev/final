@@ -225,83 +225,40 @@ const BackupManagement = () => {
   'Создайте первую резервную копию, чтобы зафиксировать состояние системы.';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflow: 'hidden' }}>
+    <div className="admin-d-flex-fd-column-gap-24-ov-hidden-2">
       {/* Заголовок и статистика */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '16px'
-      }}>
+      <div className="admin-d-flex-jc-between-ai-center-fw-wrap-gap-16-2">
         <div>
-          <h2 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)',
-            margin: '0 0 8px 0'
-          }}>
+          <h2 className="admin-fs-2xl-fw-bold-primary-m-0-0-8px-0-2">
             Управление резервными копиями
           </h2>
-          <p style={{
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            margin: 0
-          }}>
+          <p className="admin-secondary-fs-sm-m-0-4">
             Создание и управление резервными копиями системы
           </p>
         </div>
         {stats &&
-        <div style={{
-          display: 'flex',
-          gap: '24px',
-          flexWrap: 'wrap'
-        }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-accent-blue)',
-              marginBottom: '4px'
-            }}>
+        <div className="admin-d-flex-gap-24-fw-wrap-2">
+            <div className="admin-text-center">
+              <div className="admin-fs-2xl-fw-bold-blue-mb-4-2">
                 {stats.total_backups}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Всего копий
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-success)',
-              marginBottom: '4px'
-            }}>
+            <div className="admin-text-center">
+              <div className="admin-fs-2xl-fw-bold-success-mb-4-2">
                 {stats.completed_backups}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Завершено
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-warning)',
-              marginBottom: '4px'
-            }}>
+            <div className="admin-text-center">
+              <div className="admin-fs-2xl-fw-bold-warning-mb-4">
                 {formatFileSize(stats.total_size)}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Общий размер
               </div>
             </div>
@@ -319,33 +276,20 @@ const BackupManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ flex: 1, position: 'relative' }}>
+      <MacOSCard className="admin-p-24">
+        <div className="admin-d-flex-fd-column-gap-16-fw-wrap-2">
+          <div className="admin-flex-1-pos-relative">
             <Input
               type="text"
               aria-label="Поиск резервных копий по названию или описанию"
               placeholder="Поиск по названию или описанию..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '40px' }} />
+              className="admin-pl-40" />
             
-            <Search aria-hidden="true" style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--mac-text-tertiary)',
-              width: '16px',
-              height: '16px'
-            }} />
+            <Search aria-hidden="true" className="admin-pos-absolute-left-12-top-50pct-tf-translateY-50-tertiary-w-16-h-16-2" />
           </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="admin-d-flex-gap-12-fw-wrap-2">
             <Select
               aria-label="Фильтр резервных копий по статусу"
               value={statusFilter}
@@ -355,7 +299,7 @@ const BackupManagement = () => {
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
-              style={{ minWidth: '150px' }} />
+              className="admin-minw-150" />
             <Select
               aria-label="Фильтр резервных копий по типу"
               value={typeFilter}
@@ -365,19 +309,12 @@ const BackupManagement = () => {
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
-              style={{ minWidth: '150px' }} />
+              className="admin-minw-150" />
             <Button
               onClick={() => setShowAddForm(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none',
-                padding: '8px 16px'
-              }}>
+              className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px-2">
               
-              <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <Plus aria-hidden="true" className="admin-icon-16" />
               <span>Создать копию</span>
             </Button>
             <Button
@@ -385,12 +322,8 @@ const BackupManagement = () => {
               aria-label="Очистить просроченные резервные копии"
               onClick={handleCleanupExpired}
               variant="outline"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-              <RefreshCw aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              className="admin-flex-center-8">
+              <RefreshCw aria-hidden="true" className="admin-icon-16" />
               <span>Очистить просроченные</span>
             </Button>
           </div>
@@ -399,19 +332,9 @@ const BackupManagement = () => {
 
       {/* Форма создания/редактирования */}
       {showAddForm &&
-      <MacOSCard style={{ padding: '24px', overflow: 'hidden' }}>
-          <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+      <MacOSCard className="admin-p-24-ov-hidden-2">
+          <div className="admin-d-flex-jc-between-ai-center-mb-16-4">
+            <h3 className="admin-fs-lg-fw-semi-primary-m-0-3">
               {editingBackup ? 'Редактировать резервную копию' : 'Создать резервную копию'}
             </h3>
             <Button
@@ -423,26 +346,16 @@ const BackupManagement = () => {
               setEditingBackup(null);
               resetForm();
             }}
-            style={{ padding: '8px' }}>
+            className="admin-p-8">
             
-              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <X aria-hidden="true" className="admin-icon-16" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '16px'
-          }}>
+          <form onSubmit={handleSubmit} className="admin-flex-col-16">
+            <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-4">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-21">
                   Название *
                 </label>
                 <Input
@@ -454,13 +367,7 @@ const BackupManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-20">
                   Тип копии *
                 </label>
                 <Select
@@ -471,13 +378,7 @@ const BackupManagement = () => {
                 size="large" />
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-19">
                   Расписание
                 </label>
                 <Select
@@ -488,13 +389,7 @@ const BackupManagement = () => {
                 size="large" />
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-18">
                   Хранение (дни)
                 </label>
                 <Input
@@ -508,13 +403,7 @@ const BackupManagement = () => {
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-15">
                 Описание
               </label>
               <Textarea
@@ -525,50 +414,28 @@ const BackupManagement = () => {
             
             </div>
 
-            <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-              <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
+            <div className="admin-flex-col-12">
+              <div className="admin-flex-center-12">
                 <Checkbox
                 checked={formData.compression}
                 onChange={(checked) => setFormData({ ...formData, compression: checked })} />
               
-                <span style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <span className="admin-fs-sm-primary-2">
                   Сжатие архива
                 </span>
               </div>
-              <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
+              <div className="admin-flex-center-12">
                 <Checkbox
                 checked={formData.encryption}
                 onChange={(checked) => setFormData({ ...formData, encryption: checked })} />
               
-                <span style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)'
-              }}>
+                <span className="admin-fs-sm-primary-1">
                   Шифрование архива
                 </span>
               </div>
             </div>
 
-            <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px'
-          }}>
+            <div className="admin-d-flex-jc-end-gap-12-3">
               <Button
               type="button"
               variant="outline"
@@ -585,26 +452,16 @@ const BackupManagement = () => {
               type="submit"
               disabled={saving}
               aria-label={editingBackup ? 'Update backup configuration' : 'Create backup configuration'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none'
-              }}>
+              className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-2">
               
                 {saving ?
               <>
-                    <RefreshCw aria-hidden="true" style={{
-                  width: '16px',
-                  height: '16px',
-                  animation: 'spin 1s linear infinite'
-                }} />
+                    <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin-2" />
                     Сохранение...
                   </> :
 
               <>
-                    <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                    <Save aria-hidden="true" className="admin-icon-16" />
                     {editingBackup ? 'Обновить' : 'Создать'}
                   </>
               }
@@ -616,14 +473,9 @@ const BackupManagement = () => {
 
       {/* Список резервных копий */}
       {loading ?
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px',
-        overflow: 'hidden'
-      }}>
+      <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-5">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} style={{ padding: '24px' }}>
+        <MacOSCard key={i} className="admin-p-24">
               <Skeleton height="200px" />
             </MacOSCard>
         )}
@@ -635,40 +487,21 @@ const BackupManagement = () => {
         description={backupEmptyDescription}
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" focusable="false" className="admin-icon-16-mr-8" />
               Создать копию
             </Button>
         } /> :
 
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px',
-        overflow: 'hidden'
-      }}>
+      <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-4">
           {filteredBackups.map((backup) =>
-        <MacOSCard key={backup.id} style={{ padding: '24px' }}>
-              <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '16px'
-          }}>
+        <MacOSCard key={backup.id} className="admin-p-24">
+              <div className="admin-d-flex-jc-between-ai-start-mb-16-2">
                 <div>
-                  <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 4px 0'
-              }}>
+                  <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0-2">
                     {backup.name}
                   </h3>
-                  <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0
-              }}>
+                  <p className="admin-fs-sm-secondary-m-0-2">
                     {getTypeLabel(backup.backup_type)} • Хранение {backup.retention_days} дней
                   </p>
                 </div>
@@ -678,89 +511,52 @@ const BackupManagement = () => {
             
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                  <HardDrive aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <div className="admin-d-flex-fd-column-gap-8-mb-16-2">
+                <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-11">
+                  <HardDrive aria-hidden="true" className="admin-icon-16" />
                   <span>{formatFileSize(backup.file_size)}</span>
                 </div>
-                <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                  <Calendar aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-10">
+                  <Calendar aria-hidden="true" className="admin-icon-16" />
                   <span>{new Date(backup.created_at).toLocaleString()}</span>
                 </div>
-                <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                  <Clock aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-9">
+                  <Clock aria-hidden="true" className="admin-icon-16" />
                   <span>Хранение: {backup.retention_days} дней</span>
                 </div>
                 {backup.file_path &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                    <span style={{ fontFamily: 'monospace' }}>{backup.file_path}</span>
+            <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-8">
+                    <span className="admin-ff-mono">{backup.file_path}</span>
                   </div>
             }
               </div>
 
               {backup.notes &&
-          <div style={{ marginBottom: '16px' }}>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0,
-              lineHeight: '1.4'
-            }}>
+          <div className="admin-mb-16">
+                  <p className="admin-fs-sm-secondary-m-0-lh-1p4-1">
                     {backup.notes}
                   </p>
                 </div>
           }
 
-              <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px'
-          }}>
+              <div className="admin-d-flex-jc-end-gap-8-4">
                 <Button
               type="button"
               variant="outline"
               aria-label={`Редактировать резервную копию ${backup.name}`}
               onClick={() => handleEdit(backup)}
-              style={{ padding: '6px 12px' }}>
+              className="admin-p-6px-12px-2">
               
-                  <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Edit aria-hidden="true" className="admin-icon-16" />
                 </Button>
                 <Button
               type="button"
               variant="outline"
               aria-label={`Удалить резервную копию ${backup.name}`}
               onClick={() => handleDelete(backup.id)}
-              style={{
-                padding: '6px 12px',
-                color: 'var(--mac-error)',
-                borderColor: 'var(--mac-error)'
-              }}>
+              className="admin-p-6px-12px-error-bd-c-error-2">
               
-                  <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Trash2 aria-hidden="true" className="admin-icon-16" />
                 </Button>
               </div>
             </MacOSCard>

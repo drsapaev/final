@@ -145,14 +145,7 @@ const DoctorModal = ({
   const renderFieldError = (field) =>
     errors[field] ? (
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          marginTop: '4px',
-          fontSize: '12px',
-          color: 'var(--mac-error)',
-        }}
+        className="admin-field-error"
       >
         <AlertCircle size={14} />
         {errors[field]}
@@ -168,16 +161,16 @@ const DoctorModal = ({
     >
       <form
         onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+        className="admin-flex-col-20"
       >
         {submitError ? (
-          <Alert type="error" style={{ marginBottom: '12px' }}>
+          <Alert type="error" className="admin-mb-12">
             {submitError}
           </Alert>
         ) : null}
 
         <div>
-          <Label required style={{ display: 'block', marginBottom: '8px' }}>
+          <Label required className="admin-label-block-mb-8">
             Пользователь
           </Label>
           <Select
@@ -191,31 +184,27 @@ const DoctorModal = ({
         </div>
 
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '16px',
-          }}
+          className="admin-grid-autofit-220-16"
         >
           <div>
-            <Label style={{ display: 'block', marginBottom: '8px' }}>ФИО</Label>
+            <Label className="admin-label-block-mb-8">ФИО</Label>
             <Input value={selectedUser?.full_name || ''} readOnly icon={User} />
           </div>
           <div>
-            <Label style={{ display: 'block', marginBottom: '8px' }}>Email</Label>
+            <Label className="admin-label-block-mb-8">Email</Label>
             <Input value={selectedUser?.email || ''} readOnly icon={Mail} />
           </div>
           <div>
-            <Label style={{ display: 'block', marginBottom: '8px' }}>Телефон</Label>
+            <Label className="admin-label-block-mb-8">Телефон</Label>
             <Input value={selectedUser?.phone || ''} readOnly icon={Phone} />
           </div>
           <div>
-            <Label style={{ display: 'block', marginBottom: '8px' }}>Роль</Label>
+            <Label className="admin-label-block-mb-8">Роль</Label>
             <Input value={selectedUser?.role || ''} readOnly />
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        <div className="admin-flex-wrap-8">
           <Badge variant={selectedUserStatus.variant}>
             {selectedUserStatus.label}
           </Badge>
@@ -225,14 +214,10 @@ const DoctorModal = ({
         </div>
 
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '16px',
-          }}
+          className="admin-grid-autofit-220-16"
         >
           <div>
-            <Label required style={{ display: 'block', marginBottom: '8px' }}>
+            <Label required className="admin-label-block-mb-8">
               Специальность
             </Label>
             <Input
@@ -244,7 +229,7 @@ const DoctorModal = ({
           </div>
 
           <div>
-            <Label style={{ display: 'block', marginBottom: '8px' }}>Кабинет</Label>
+            <Label className="admin-label-block-mb-8">Кабинет</Label>
             <Input
               value={formData.cabinet}
               onChange={(event) => handleChange('cabinet', event.target.value)}
@@ -254,7 +239,7 @@ const DoctorModal = ({
           </div>
 
           <div>
-            <Label style={{ display: 'block', marginBottom: '8px' }}>
+            <Label className="admin-label-block-mb-8">
               Цена по умолчанию
             </Label>
             <Input
@@ -267,7 +252,7 @@ const DoctorModal = ({
           </div>
 
           <div>
-            <Label style={{ display: 'block', marginBottom: '8px' }}>
+            <Label className="admin-label-block-mb-8">
               Стартовый номер онлайн
             </Label>
             <Input
@@ -280,7 +265,7 @@ const DoctorModal = ({
           </div>
 
           <div>
-            <Label style={{ display: 'block', marginBottom: '8px' }}>
+            <Label className="admin-label-block-mb-8">
               Онлайн записей в день
             </Label>
             <Input
@@ -303,13 +288,7 @@ const DoctorModal = ({
         </div>
 
         <div
-          style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'flex-end',
-            paddingTop: '16px',
-            borderTop: '1px solid var(--mac-separator)',
-          }}
+          className="admin-modal-actions-footer"
         >
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             Отмена

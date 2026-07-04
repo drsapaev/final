@@ -291,23 +291,13 @@ const ReportGenerator = ({
     reportTypes.length > 0 ? reportTypes.map(normalizeReportType).filter(Boolean) : availableReportTypes;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="admin-flex-col-24">
       {/* Выбор типа отчета */}
       <MacOSCard padding="large">
-        <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)',
-          margin: 0
-        }}>
+        <h3 className="admin-fs-lg-fw-semi-mb-16-primary-m-0-3">
           Тип отчета
         </h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
-        }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
           {currentReportTypes.length > 0 ? currentReportTypes.map((type) => {
             const typeValue = type.type || type.value || type.id;
             if (!typeValue) {
@@ -322,30 +312,15 @@ const ReportGenerator = ({
                 key={typeValue}
                 onClick={() => updateSelectedReportType(typeValue)}
                 variant={isSelected ? 'primary' : 'outline'}
-                style={{
-                  padding: '16px',
-                  textAlign: 'left',
-                  justifyContent: 'flex-start',
-                  height: 'auto',
-                  minHeight: '80px'
-                }}>
+                className="admin-p-16-ta-left-jc-start-h-auto-minh-80">
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Icon style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
+                <div className="admin-flex-center-12">
+                  <Icon className="admin-w-24-h-24-blue" />
                   <div>
-                    <h4 style={{
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      fontSize: 'var(--mac-font-size-base)',
-                      color: 'var(--mac-text-primary)',
-                      margin: 0
-                    }}>
+                    <h4 className="admin-fw-med-fs-base-primary-m-0">
                       {type.label || getReportTypeLabel(typeValue)}
                     </h4>
-                    <p style={{
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)',
-                      margin: '4px 0 0 0'
-                    }}>
+                    <p className="admin-fs-sm-secondary-m-4px-0-0-0">
                       {type.description || getReportTypeDescription(typeValue)}
                     </p>
                   </div>
@@ -353,7 +328,7 @@ const ReportGenerator = ({
               </Button>);
 
           }) : (
-            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+            <div className="admin-secondary-fs-sm">
               Загрузка доступных отчетов...
             </div>
           )}
@@ -362,28 +337,12 @@ const ReportGenerator = ({
 
       {/* Период отчета */}
       <MacOSCard padding="large">
-        <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)',
-          margin: 0
-        }}>
+        <h3 className="admin-fs-lg-fw-semi-mb-16-primary-m-0-2">
           Период отчета
         </h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
-        }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              marginBottom: '8px',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-mb-8-primary-5">
               Дата начала
             </label>
             <Input
@@ -392,29 +351,11 @@ const ReportGenerator = ({
               onChange={(e) => updateDateRange({ ...effectiveDateRange, start: e.target.value })}
               icon={Calendar}
               iconPosition="left"
-              style={{
-                width: '100%',
-                paddingLeft: '40px',
-                paddingRight: '12px',
-                paddingTop: '8px',
-                paddingBottom: '8px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-base)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }} />
+              className="admin-w-100pct-pl-40-pr-12-pt-8-pb-8-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo-bg-bg-primary-primary-fs-base-tr-all-var-mac-duration-1" />
             
           </div>
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              marginBottom: '8px',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-mb-8-primary-4">
               Дата окончания
             </label>
             <Input
@@ -423,34 +364,17 @@ const ReportGenerator = ({
               onChange={(e) => updateDateRange({ ...effectiveDateRange, end: e.target.value })}
               icon={Calendar}
               iconPosition="left"
-              style={{
-                width: '100%',
-                paddingLeft: '40px',
-                paddingRight: '12px',
-                paddingTop: '8px',
-                paddingBottom: '8px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-base)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }} />
+              className="admin-w-100pct-pl-40-pr-12-pt-8-pb-8-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo-bg-bg-primary-primary-fs-base-tr-all-var-mac-duration" />
             
           </div>
         </div>
         
         {/* Быстрый выбор периода */}
-        <div style={{ marginTop: '16px' }}>
-          <p style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            marginBottom: '8px',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="admin-mt-16">
+          <p className="admin-fs-sm-fw-med-mb-8-primary">
             Быстрый выбор:
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div className="admin-d-flex-fw-wrap-gap-8">
             {[
             { label: 'Сегодня', days: 0 },
             { label: 'Неделя', days: 7 },
@@ -471,15 +395,7 @@ const ReportGenerator = ({
                   })}
                   variant="outline"
                   size="sm"
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)',
-                    background: 'var(--mac-bg-primary)',
-                    border: '1px solid var(--mac-border)',
-                    borderRadius: 'var(--mac-radius-md)',
-                    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                  }}>
+                  className="admin-p-4px-12px-fs-sm-secondary-bg-bg-primary-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-tr-all-var-mac-duration">
                   
                   {label}
                 </Button>);
@@ -491,28 +407,12 @@ const ReportGenerator = ({
 
       {/* Фильтры */}
       <MacOSCard padding="large">
-        <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)',
-          margin: 0
-        }}>
+        <h3 className="admin-fs-lg-fw-semi-mb-16-primary-m-0-1">
           Дополнительные фильтры
         </h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
-        }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              marginBottom: '8px',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-mb-8-primary-3">
               Отделение
             </label>
             <Select
@@ -527,18 +427,12 @@ const ReportGenerator = ({
               { value: 'surgery', label: 'Хирургия' }]
               }
               size="large"
-              style={{ width: '100%' }} />
+              className="admin-w-full" />
             
           </div>
           
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              marginBottom: '8px',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-mb-8-primary-2">
               Статус
             </label>
             <Select
@@ -551,18 +445,12 @@ const ReportGenerator = ({
               { value: 'cancelled', label: 'Отменено' }]
               }
               size="large"
-              style={{ width: '100%' }} />
+              className="admin-w-full" />
             
           </div>
           
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              marginBottom: '8px',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-mb-8-primary-1">
               Способ оплаты
             </label>
             <Select
@@ -576,7 +464,7 @@ const ReportGenerator = ({
               { value: 'mobile', label: 'Мобильный' }]
               }
               size="large"
-              style={{ width: '100%' }} />
+              className="admin-w-full" />
             
           </div>
         </div>
@@ -584,31 +472,15 @@ const ReportGenerator = ({
 
       {/* Настройки отчета */}
       <MacOSCard padding="large">
-        <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)',
-          margin: 0
-        }}>
+        <h3 className="admin-fs-lg-fw-semi-mb-16-primary-m-0">
           Настройки отчета
         </h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '24px'
-        }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              marginBottom: '8px',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-mb-8-primary">
               Формат файла
             </label>
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div className="admin-d-flex-gap-16">
               {[
               { value: 'pdf', label: 'PDF', icon: FileText },
               { value: 'excel', label: 'Excel', icon: BarChart3 },
@@ -618,60 +490,36 @@ const ReportGenerator = ({
                 key={value}
                 onClick={() => setReportFormat(value)}
                 variant={reportFormat === value ? 'primary' : 'outline'}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  borderRadius: 'var(--mac-radius-md)',
-                  border: reportFormat === value ? '1px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
-                  background: reportFormat === value ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)',
-                  color: reportFormat === value ? 'white' : 'var(--mac-text-primary)',
-                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                }}>
+                className="admin-d-flex-ai-center-gap-8-p-8px-16px-radius-var-mac-radius-md-tr-all-var-mac-duration-bd-dyn-bg-dyn-col-dyn" style={{ '--admin-bd0': reportFormat === value ? '1px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-bg1': reportFormat === value ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)', '--admin-col2': reportFormat === value ? 'white' : 'var(--mac-text-primary)' }}>
                 
-                  <Icon style={{ width: '16px', height: '16px' }} />
+                  <Icon className="admin-icon-16" />
                   {label}
                 </Button>
               )}
             </div>
           </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="admin-flex-col-16">
+            <div className="admin-flex-center-12">
               <Checkbox
                 id="includeCharts"
                 checked={includeCharts}
                 onChange={(e) => setIncludeCharts(e.target.checked)}
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  accentColor: 'var(--mac-accent-blue)'
-                }} />
+                className="admin-w-16-h-16-accentco-blue-1" />
               
-              <label htmlFor="includeCharts" style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)'
-              }}>
+              <label htmlFor="includeCharts" className="admin-fs-sm-primary">
                 Включить графики и диаграммы
               </label>
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="admin-flex-center-12">
               <Checkbox
                 id="includeDetails"
                 checked={includeDetails}
                 onChange={(e) => setIncludeDetails(e.target.checked)}
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  accentColor: 'var(--mac-accent-blue)'
-                }} />
+                className="admin-w-16-h-16-accentco-blue" />
               
-              <label htmlFor="includeDetails" style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)'
-              }}>
+              <label htmlFor="includeDetails" className="admin-fs-sm-primary">
                 Включить детальную информацию
               </label>
             </div>
@@ -680,29 +528,23 @@ const ReportGenerator = ({
       </MacOSCard>
 
       {/* Кнопки действий */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="admin-flex-between">
+        <div className="admin-d-flex-ai-center-gap-16">
           <Button
             onClick={() => handleGenerate(reportFormat)}
             disabled={!effectiveSelectedReportType || effectiveLoading}
             variant="primary"
             aria-label={`Generate selected report as ${String(reportFormat).toUpperCase()}`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'var(--mac-accent-blue)',
-              color: 'white'
-            }}>
+            className="admin-d-flex-ai-center-gap-8-bg-blue-white">
             
             {effectiveLoading ?
             <>
-                <RefreshCw style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
+                <RefreshCw className="admin-w-16-h-16-anim-spin-1s-linear-infin" />
                 <span>Генерация...</span>
               </> :
 
             <>
-                <Download style={{ width: '16px', height: '16px' }} />
+                <Download className="admin-icon-16" />
                 <span>Сгенерировать отчет</span>
               </>
             }
@@ -712,21 +554,14 @@ const ReportGenerator = ({
             variant="outline"
             onClick={() => handleGenerate('pdf')}
             disabled={!effectiveSelectedReportType || effectiveLoading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
+            className="admin-flex-center-8">
             
-            <Printer style={{ width: '16px', height: '16px' }} />
+            <Printer className="admin-icon-16" />
             <span>Печать</span>
           </Button>
         </div>
         
-        <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+        <div className="admin-text-sm admin-text-secondary">
           {effectiveSelectedReportType &&
           <span>
               Будет сгенерирован: <strong>{getReportTypeLabel(effectiveSelectedReportType)}</strong>

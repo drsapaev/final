@@ -163,12 +163,12 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         role="region"
         aria-label={historyRegionLabel}
         aria-busy={true}
-        style={{ padding: '24px' }}
+        className="admin-p-24"
       >
         <AppLoading
           title="Загрузка истории изменений..."
           ariaLabel={historyRegionLabel}
-          style={{ minHeight: 200 }}
+          className="admin-minh-200"
         />
       </MacOSCard>
     );
@@ -180,7 +180,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         variant="default"
         role="region"
         aria-label={historyRegionLabel}
-        style={{ padding: '24px' }}
+        className="admin-p-24"
       >
         <AppError
           title="Не удалось загрузить историю изменений"
@@ -192,7 +192,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
               aria-label={`Повторить загрузку. ${refreshHistoryLabel}`}
               onClick={loadHistory}
             >
-              <RefreshCw size={14} style={{ marginRight: '6px' }} />
+              <RefreshCw size={14} className="admin-mr-6" />
               Повторить
             </Button>
           }
@@ -207,7 +207,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         variant="default"
         role="region"
         aria-label={historyRegionLabel}
-        style={{ padding: '24px' }}
+        className="admin-p-24"
       >
         <AppEmpty
           icon={History}
@@ -223,32 +223,17 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
       variant="default"
       role="region"
       aria-labelledby={historyTitleId}
-      style={{ padding: '0' }}
+      className="admin-p-0"
     >
-      <div style={{
-        padding: '20px 24px',
-        borderBottom: '1px solid var(--mac-border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <History size={20} style={{ color: 'var(--mac-accent)' }} />
+      <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo-d-flex-ai-center-jc-between">
+        <div className="admin-flex-center-12">
+          <History size={20} className="admin-accent" />
           <div>
-            <h3 id={historyTitleId} style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+            <h3 id={historyTitleId} className="admin-fs-16-fw-600-primary-m-0">
               История изменений
             </h3>
             {serviceName && (
-              <p style={{
-                fontSize: '13px',
-                color: 'var(--mac-text-secondary)',
-                margin: '2px 0 0 0'
-              }}>
+              <p className="admin-fs-13-secondary-m-2px-0-0-0">
                 {serviceName}
               </p>
             )}
@@ -260,7 +245,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
           aria-label={refreshHistoryLabel}
           onClick={loadHistory}
         >
-          <RefreshCw size={14} style={{ marginRight: '6px' }} />
+          <RefreshCw size={14} className="admin-mr-6" />
           Обновить
         </Button>
       </div>
@@ -268,7 +253,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
       <div
         role="list"
         aria-label={historyRegionLabel}
-        style={{ maxHeight: '600px', overflowY: 'auto' }}
+        className="admin-maxh-600-ovy-auto"
       >
         {history.map((item, index) => {
           const ActionIcon = getActionIcon(item.action);
@@ -284,35 +269,18 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
             <div
               key={item.id}
               role="listitem"
-              style={{
-                padding: '16px 24px',
-                borderBottom: index < history.length - 1 ? '1px solid var(--mac-border)' : 'none',
-                transition: 'background-color 0.2s ease'
-              }}
+              className="admin-p-16px-24px-tr-background-color-0-2-bd-b-dyn" style={{ '--admin-bd-b0': index < history.length - 1 ? '1px solid var(--mac-border)' : 'none' }}
             >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div className="admin-d-flex-ai-start-gap-12">
                 <div
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: `${getActionColor(item.action)}15`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}
+                  className="admin-w-32-h-32-radius-8-d-flex-ai-center-jc-center-fsk-0-bgc-dyn" style={{ '--admin-bgc0': `${getActionColor(item.action)}15` }}
                 >
-                  <ActionIcon size={16} style={{ color: getActionColor(item.action) }} />
+                  <ActionIcon size={16} className="admin-col-dyn" style={{ '--admin-col0': getActionColor(item.action) }} />
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: 'var(--mac-text-primary)'
-                    }}>
+                <div className="admin-flex-1-minw-0">
+                  <div className="admin-d-flex-ai-center-gap-8-mb-4">
+                    <span className="admin-fs-14-fw-600-primary-1">
                       {getActionLabel(item.action)}
                     </span>
                     <Badge variant="outline" size="sm">
@@ -320,31 +288,19 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                     </Badge>
                   </div>
 
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    fontSize: '13px',
-                    color: 'var(--mac-text-secondary)',
-                    marginBottom: hasChanges ? '8px' : '0'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div className="admin-d-flex-ai-center-gap-12-fs-13-secondary-mb-dyn" style={{ '--admin-mb0': hasChanges ? '8px' : '0' }}>
+                    <div className="admin-flex-center admin-gap-4">
                       <User size={12} />
                       <span>{item.user_name || 'Система'}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div className="admin-flex-center admin-gap-4">
                       <Clock size={12} />
                       <span>{formatDate(item.created_at)}</span>
                     </div>
                   </div>
 
                   {item.comment && (
-                    <div style={{
-                      fontSize: '13px',
-                      color: 'var(--mac-text-secondary)',
-                      fontStyle: 'italic',
-                      marginBottom: hasChanges ? '8px' : '0'
-                    }}>
+                    <div className="admin-fs-13-secondary-fst-italic-mb-dyn" style={{ '--admin-mb0': hasChanges ? '8px' : '0' }}>
                       {item.comment}
                     </div>
                   )}
@@ -357,18 +313,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                         aria-expanded={isExpanded}
                         aria-controls={isExpanded ? changesPanelId : undefined}
                         aria-label={changesToggleLabel}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: '4px 0',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '13px',
-                          color: 'var(--mac-accent)',
-                          fontWeight: '500'
-                        }}
+                        className="admin-bg-none-bd-none-p-4px-0-cur-pointer-d-flex-ai-center-gap-4-fs-13-accent-fw-500"
                       >
                         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         {isExpanded ? 'Скрыть изменения' : `Показать изменения (${changesCount})`}
@@ -379,41 +324,20 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                           id={changesPanelId}
                           role="region"
                           aria-label={changesToggleLabel}
-                          style={{
-                            marginTop: '8px',
-                            padding: '12px',
-                            backgroundColor: 'var(--mac-bg-secondary)',
-                            borderRadius: '8px'
-                          }}
+                          className="admin-mt-8-p-12-bgc-bg-secondary-radius-8"
                         >
                           {Object.entries(item.changes).map(([field, change]) => (
                             <div
                               key={field}
-                              style={{
-                                display: 'grid',
-                                gridTemplateColumns: '140px 1fr 1fr',
-                                gap: '12px',
-                                padding: '8px 0',
-                                borderBottom: '1px solid var(--mac-border)',
-                                fontSize: '13px'
-                              }}
+                              className="admin-d-grid-gtc-140px-1fr-1fr-gap-12-p-8px-0-bd-b-1px-solid-var-mac-bo-fs-13"
                             >
-                              <div style={{
-                                fontWeight: '600',
-                                color: 'var(--mac-text-primary)'
-                              }}>
+                              <div className="admin-fw-600-primary">
                                 {formatFieldName(field)}
                               </div>
-                              <div style={{
-                                color: 'var(--mac-error)',
-                                textDecoration: 'line-through'
-                              }}>
+                              <div className="admin-error-td-line-through">
                                 {formatValue(change.old)}
                               </div>
-                              <div style={{
-                                color: 'var(--mac-success)',
-                                fontWeight: '500'
-                              }}>
+                              <div className="admin-success-fw-500">
                                 {formatValue(change.new)}
                               </div>
                             </div>

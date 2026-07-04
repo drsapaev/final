@@ -154,38 +154,24 @@ const UnifiedSettings = () => {
       case 'settings':
       default:
         return (
-          <div style={{ display: 'grid', gap: '20px' }}>
+          <div className="admin-settings-grid-20">
             <ColorSchemeSelector />
-            <div style={{
-              padding: '20px',
-              borderRadius: 'var(--mac-radius-lg)',
-              background: 'var(--mac-bg-primary)',
-              border: '1px solid var(--mac-border)',
-              boxShadow: 'var(--mac-shadow-sm)',
-            }}>
-              <div style={{ fontWeight: 700, marginBottom: 12, color: 'var(--mac-text-primary)' }}>
+            <div className="admin-settings-card-accent">
+              <div className="admin-settings-section-title">
                 Accent color
               </div>
-              <div style={{ display: 'grid', gap: '10px' }}>
+              <div className="admin-settings-grid-10">
                 <AccentPicker />
-                <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>
+                <div className="admin-settings-hint-12">
                   Accent color влияет на кнопки, focus states и primary states в админ-панели. Он хранится локально в текущем браузере.
                 </div>
               </div>
             </div>
-            <div style={{
-              padding: '20px',
-              borderRadius: 'var(--mac-radius-lg)',
-              background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
-              border: '1px solid var(--mac-border)',
-              boxShadow: 'var(--mac-shadow-sm)',
-              display: 'grid',
-              gap: '10px',
-            }}>
-              <div style={{ fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            <div className="admin-settings-card-gradient">
+              <div className="admin-settings-section-title-mb-0">
                 Логика применения
               </div>
-              <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)', lineHeight: 1.55 }}>
+              <div className="admin-settings-hint-13">
                 Цветовая схема задаёт пространство интерфейса: фон, поверхности, header и sidebar. Accent управляет цветом действий и выделений. Theme preference синхронизируется через профиль пользователя, accent остаётся локальной настройкой рабочего места.
               </div>
             </div>
@@ -195,7 +181,7 @@ const UnifiedSettings = () => {
   };
 
   return (
-    <div style={{ height: '100%', overflow: 'auto' }}>
+    <div className="admin-settings-root">
       {renderSettings()}
     </div>);
 

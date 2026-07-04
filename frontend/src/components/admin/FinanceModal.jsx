@@ -232,13 +232,12 @@ const FinanceModal = ({
         <div className="p-6">
           {/* Заголовок */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="text-xl font-semibold admin-text-primary">
               {transaction ? 'Редактировать транзакцию' : 'Добавить транзакцию'}
             </h2>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              style={{ color: 'var(--text-secondary)' }}
+              className="p-1 hover:bg-gray-100 rounded-lg transition-colors admin-text-secondary"
               aria-label="Close finance transaction modal"
             >
               <X className="w-5 h-5" />
@@ -249,13 +248,13 @@ const FinanceModal = ({
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Основная информация */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+              <h3 className="text-lg font-medium admin-text-primary">
                 Основная информация
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Тип операции */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Тип операции *
                   </label>
                   <Select
@@ -263,7 +262,7 @@ const FinanceModal = ({
                     onChange={(value) => handleChange('type', value)}
                     options={TRANSACTION_TYPE_OPTIONS}
                     size="large"
-                    style={{ width: '100%' }} />
+                    className="admin-w-full" />
                   {errors.type && (
                     <p className="text-sm text-red-500 mt-1 flex items-center">
                       <AlertCircle className="w-4 h-4 mr-1" />
@@ -274,7 +273,7 @@ const FinanceModal = ({
 
                 {/* Категория */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Категория *
                   </label>
                   <Select
@@ -288,7 +287,7 @@ const FinanceModal = ({
                       }))
                     ]}
                     size="large"
-                    style={{ width: '100%' }} />
+                    className="admin-w-full" />
                   {errors.category && (
                     <p className="text-sm text-red-500 mt-1 flex items-center">
                       <AlertCircle className="w-4 h-4 mr-1" />
@@ -301,25 +300,20 @@ const FinanceModal = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Сумма */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Сумма (UZS) *
                   </label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                                style={{ color: 'var(--text-tertiary)' }} />
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
                     <input
                       type="number"
                       aria-label="Finance transaction amount"
                       value={formData.amount}
                       onChange={(e) => handleChange('amount', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.amount ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.amount ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
+                      style={{ '--admin-bd': errors.amount ? 'var(--mac-danger)' : 'var(--mac-border)' }}
                       placeholder="100000"
                       min="1"
                       step="1"
@@ -327,7 +321,7 @@ const FinanceModal = ({
                       aria-describedby="finance-amount-help"
                     />
                   </div>
-                  <p id="finance-amount-help" className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                  <p id="finance-amount-help" className="text-xs mt-1 admin-text-tertiary">
                     Введите сумму целым числом в UZS. Например: 12500.
                   </p>
                   {errors.amount && (
@@ -340,25 +334,20 @@ const FinanceModal = ({
 
                 {/* Дата операции */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Дата операции *
                   </label>
                   <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                              style={{ color: 'var(--text-tertiary)' }} />
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
                     <input
                       type="date"
                       aria-label="Finance transaction date"
                       value={formData.transactionDate}
                       onChange={(e) => handleChange('transactionDate', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.transactionDate ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.transactionDate ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
+                      style={{ '--admin-bd': errors.transactionDate ? 'var(--mac-danger)' : 'var(--mac-border)' }}
                     />
                   </div>
                   {errors.transactionDate && (
@@ -372,21 +361,17 @@ const FinanceModal = ({
 
               {/* Описание */}
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                <label className="block text-sm font-medium mb-1 admin-text-primary">
                   Описание *
                 </label>
                 <textarea
                   aria-label="Finance transaction description"
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                     errors.description ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: errors.description ? 'var(--danger-color)' : 'var(--border-color)'
-                  }}
+                  style={{ '--admin-bd': errors.description ? 'var(--mac-danger)' : 'var(--mac-border)' }}
                   rows="2"
                   placeholder="Опишите суть операции..."
                 />
@@ -401,13 +386,13 @@ const FinanceModal = ({
 
             {/* Связанные данные */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+              <h3 className="text-lg font-medium admin-text-primary">
                 Связанные данные
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Пациент */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Пациент
                   </label>
                   <Select
@@ -423,12 +408,12 @@ const FinanceModal = ({
                       }))
                     ]}
                     size="large"
-                    style={{ width: '100%' }} />
+                    className="admin-w-full" />
                 </div>
 
                 {/* Врач */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Врач
                   </label>
                   <Select
@@ -442,20 +427,20 @@ const FinanceModal = ({
                       }))
                     ]}
                     size="large"
-                    style={{ width: '100%' }} />
+                    className="admin-w-full" />
                 </div>
               </div>
             </div>
 
             {/* Платежная информация */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+              <h3 className="text-lg font-medium admin-text-primary">
                 Платежная информация
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Способ оплаты */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Способ оплаты
                   </label>
                   <Select
@@ -463,12 +448,12 @@ const FinanceModal = ({
                     onChange={(value) => handleChange('paymentMethod', value)}
                     options={PAYMENT_METHOD_OPTIONS}
                     size="large"
-                    style={{ width: '100%' }} />
+                    className="admin-w-full" />
                 </div>
 
                 {/* Статус */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Статус
                   </label>
                   <Select
@@ -476,32 +461,27 @@ const FinanceModal = ({
                     onChange={(value) => handleChange('status', value)}
                     options={STATUS_OPTIONS}
                     size="large"
-                    style={{ width: '100%' }} />
+                    className="admin-w-full" />
                 </div>
               </div>
 
               {/* Номер карты/ссылка */}
               {formData.paymentMethod === 'card' && (
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label className="block text-sm font-medium mb-1 admin-text-primary">
                     Номер карты/Транзакции *
                   </label>
                   <div className="relative">
-                    <Receipt className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                              style={{ color: 'var(--text-tertiary)' }} />
+                    <Receipt className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
                     <input
                       type="text"
                       aria-label="Finance card or transaction reference"
                       value={formData.reference}
                       onChange={(e) => handleChange('reference', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.reference ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.reference ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
+                      style={{ '--admin-bd': errors.reference ? 'var(--mac-danger)' : 'var(--mac-border)' }}
                       placeholder="**** **** **** 1234"
                     />
                   </div>
@@ -517,23 +497,18 @@ const FinanceModal = ({
 
             {/* Дополнительная информация */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+              <h3 className="text-lg font-medium admin-text-primary">
                 Дополнительная информация
               </h3>
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                <label className="block text-sm font-medium mb-1 admin-text-primary">
                   Заметки
                 </label>
                 <textarea
                   aria-label="Finance transaction notes"
                   value={formData.notes}
                   onChange={(e) => handleChange('notes', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: 'var(--border-color)'
-                  }}
+                  className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-form-control"
                   rows="3"
                   placeholder="Дополнительная информация о транзакции..."
                 />
@@ -543,33 +518,33 @@ const FinanceModal = ({
             {/* Предварительный просмотр */}
             {(formData.amount && formData.description) && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+                <h3 className="text-lg font-medium admin-text-primary">
                   Предварительный просмотр
                 </h3>
-                <div className="p-4 rounded-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                <div className="p-4 rounded-lg admin-modal-preview-box">
                   <div className="space-y-2">
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <p className="text-sm admin-text-secondary">
                       <strong>Тип:</strong> {formData.type === 'income' ? 'Доход' : 'Расход'}
                     </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <p className="text-sm admin-text-secondary">
                       <strong>Категория:</strong> {formData.category}
                     </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <p className="text-sm admin-text-secondary">
                       <strong>Сумма:</strong> {formData.amount ? `${parseInt(formData.amount).toLocaleString('ru-RU')} UZS` : ''}
                     </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <p className="text-sm admin-text-secondary">
                       <strong>Описание:</strong> {formData.description}
                     </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <p className="text-sm admin-text-secondary">
                       <strong>Дата:</strong> {formData.transactionDate}
                     </p>
                     {formData.patientId && (
-                      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <p className="text-sm admin-text-secondary">
                         <strong>Пациент:</strong> {getPatientName(formData.patientId)}
                       </p>
                     )}
                     {formData.doctorId && (
-                      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <p className="text-sm admin-text-secondary">
                         <strong>Врач:</strong> {getDoctorName(formData.doctorId)}
                       </p>
                     )}
@@ -584,11 +559,7 @@ const FinanceModal = ({
                 type="submit"
                 disabled={isSubmitting || loading}
                 aria-label={transaction ? 'Save transaction changes' : 'Add transaction'}
-                className="flex-1"
-                style={{ 
-                  background: 'var(--accent-color)',
-                  color: 'white'
-                }}
+                className="flex-1 admin-modal-submit-btn"
               >
                 {isSubmitting ? (
                   <>

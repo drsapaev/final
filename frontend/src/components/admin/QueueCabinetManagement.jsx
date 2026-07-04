@@ -177,76 +177,65 @@ const QueueCabinetManagement = () => {
       queues.map((queue) => {
         return {
           day: (
-            <span style={{ color: 'var(--mac-text-primary)', fontSize: 'var(--mac-font-size-sm)' }}>
+            <span className="admin-primary-fs-sm">
               {formatDate(queue.day)}
             </span>
           ),
           specialist_name: (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="admin-d-flex-ai-center-gap-10">
               <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: 'var(--mac-radius-full)',
-                  backgroundColor: 'var(--mac-bg-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <Users style={{ width: '16px', height: '16px', color: 'var(--mac-accent-blue)' }} />
+                className="admin-w-32-h-32-radius-var-mac-radius-full-bgc-bg-secondary-d-flex-ai-center-jc-center">
+                <Users className="admin-w-16-h-16-blue" />
               </div>
               <div>
-                <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                <div className="admin-fw-600-primary">
                   {queue.specialist_name || `Специалист #${queue.specialist_id}`}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                <div className="admin-fs-xs-tertiary-3">
                   ID {queue.specialist_id}
                 </div>
               </div>
             </div>
           ),
           queue_tag: (
-            <span style={{ color: 'var(--mac-text-primary)' }}>
+            <span className="admin-text-primary">
               {queue.queue_tag || '—'}
             </span>
           ),
           cabinet_number: (
             <div>
-              <div style={{ color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+              <div className="admin-primary-fw-600-1">
                 {queue.effective_cabinet || 'Не указан'}
               </div>
-              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+              <div className="admin-fs-xs-tertiary-2">
                 Очередь: {queue.cabinet_number || '—'} · Врач: {queue.doctor_cabinet || '—'}
               </div>
             </div>
           ),
           cabinet_floor: (
-            <span style={{ color: 'var(--mac-text-primary)' }}>
+            <span className="admin-text-primary">
               {queue.cabinet_floor ?? '—'}
             </span>
           ),
           cabinet_building: (
-            <span style={{ color: 'var(--mac-text-primary)' }}>
+            <span className="admin-text-primary">
               {queue.cabinet_building || '—'}
             </span>
           ),
           entries_count: (
-            <span style={{ color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+            <span className="admin-primary-fw-600">
               {queue.entries_count}
             </span>
           ),
           active: (
             <Badge
               variant={queue.active ? 'success' : 'secondary'}
-              style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                padding: '4px 10px',
-              }}>
+              className="admin-fs-xs-p-4px-10px">
               {queue.active ? 'Активна' : 'Неактивна'}
             </Badge>
           ),
           sync_state: (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="admin-d-flex-fd-column-gap-6">
               <Badge
                 variant={
                   queue.sync_status === 'synced'
@@ -264,26 +253,26 @@ const QueueCabinetManagement = () => {
                       ? 'Нет врача'
                       : 'Нет кабинета врача'}
               </Badge>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              <div className="admin-d-flex-fw-wrap-gap-6">
                 <Badge
                   variant={queue.linked_doctor_found ? 'success' : 'warning'}
-                  style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                  className="admin-fs-xs"
                 >
                   {queue.linked_doctor_found ? 'Врач найден' : 'Врач не найден'}
                 </Badge>
                 <Badge
                   variant={queue.doctor_has_cabinet ? 'success' : 'warning'}
-                  style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                  className="admin-fs-xs"
                 >
                   {queue.doctor_has_cabinet ? 'Кабинет врача задан' : 'Кабинет врача пуст'}
                 </Badge>
               </div>
-              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+              <div className="admin-fs-xs-tertiary-1">
                 Канонический кабинет берётся из карточки врача. Здесь можно только проверить и
                 синхронизировать очередь.
               </div>
               {Array.isArray(queue.integrity_warnings) && queue.integrity_warnings.length > 0 ? (
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                <div className="admin-fs-xs-tertiary">
                   {queue.integrity_warnings.join(', ')}
                 </div>
               ) : null}
@@ -295,79 +284,43 @@ const QueueCabinetManagement = () => {
   );
 
   return (
-    <div style={{ padding: 0, backgroundColor: 'var(--mac-bg-primary)' }}>
-      <MacOSCard style={{ padding: 0 }}>
-        <div style={{ padding: '24px' }}>
+    <div className="admin-p-0-bgc-bg-primary">
+      <MacOSCard className="admin-p-0">
+        <div className="admin-p-24">
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: '16px',
-              marginBottom: '24px',
-              paddingBottom: '24px',
-              borderBottom: '1px solid var(--mac-border)',
-            }}>
+            className="admin-d-flex-ai-start-jc-between-gap-16-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
             <div>
               <h2
-                style={{
-                  fontSize: 'var(--mac-font-size-2xl)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-primary)',
-                  margin: '0 0 8px 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                }}>
-                <Building2 style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+                className="admin-fs-2xl-fw-semi-primary-m-0-0-8px-0-d-flex-ai-center-gap-12">
+                <Building2 className="admin-w-32-h-32-blue" />
                 Кабинеты очередей
               </h2>
               <p
-                style={{
-                  color: 'var(--mac-text-secondary)',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  margin: 0,
-                  lineHeight: 1.5,
-                }}>
+                className="admin-secondary-fs-sm-m-0-lh-1p5">
                 SSOT-панель для просмотра и синхронизации кабинетов очередей с данными врачей.
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div className="admin-d-flex-gap-12-fw-wrap">
               <Button
                 onClick={() => loadData(appliedFilters)}
                 variant="outline"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}>
-                <RefreshCw style={{ width: '16px', height: '16px' }} />
+                className="admin-d-inline-flex-ai-center-gap-8">
+                <RefreshCw className="admin-icon-16" />
                 Обновить
               </Button>
               <Button
                 onClick={syncFromDoctors}
                 disabled={syncing}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: 'var(--mac-accent-blue)',
-                  border: 'none',
-                }}>
-                <Sparkles style={{ width: '16px', height: '16px' }} />
+                className="admin-d-inline-flex-ai-center-gap-8-bgc-blue-bd-none-1">
+                <Sparkles className="admin-icon-16" />
                 {syncing ? 'Синхронизация...' : 'Синхронизировать из врачей'}
               </Button>
             </div>
           </div>
 
           <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '16px',
-              marginBottom: '24px',
-            }}>
+            className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-mb-24">
             <MacOSStatCard
               title="Очередей"
               value={summary.totalQueues}
@@ -399,28 +352,13 @@ const QueueCabinetManagement = () => {
           </div>
 
           <MacOSCard
-            style={{
-              padding: '20px',
-              marginBottom: '24px',
-              backgroundColor: 'var(--mac-bg-secondary)',
-            }}>
+            className="admin-p-20-mb-24-bgc-bg-secondary">
             <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '12px',
-                alignItems: 'end',
-              }}>
+              className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-12-ai-end">
               <div>
                 <label
                   htmlFor="queue-cabinet-day"
-                  style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 600,
-                  }}>
+                  className="admin-d-block-mb-8-secondary-fs-sm-fw-600-2">
                   Дата
                 </label>
                 <Input
@@ -436,13 +374,7 @@ const QueueCabinetManagement = () => {
               <div>
                 <label
                   htmlFor="queue-cabinet-specialist"
-                  style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 600,
-                  }}>
+                  className="admin-d-block-mb-8-secondary-fs-sm-fw-600-1">
                   Specialist ID
                 </label>
                 <Input
@@ -459,13 +391,7 @@ const QueueCabinetManagement = () => {
               <div>
                 <label
                   htmlFor="queue-cabinet-number"
-                  style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 600,
-                  }}>
+                  className="admin-d-block-mb-8-secondary-fs-sm-fw-600">
                   Номер кабинета
                 </label>
                 <Input
@@ -478,24 +404,18 @@ const QueueCabinetManagement = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div className="admin-d-flex-gap-8-fw-wrap">
                 <Button
                   onClick={applyFilters}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    backgroundColor: 'var(--mac-accent-blue)',
-                    border: 'none',
-                  }}>
-                  <Search style={{ width: '16px', height: '16px' }} />
+                  className="admin-d-inline-flex-ai-center-gap-8-bgc-blue-bd-none">
+                  <Search className="admin-icon-16" />
                   Применить
                 </Button>
                 <Button
                   onClick={resetFilters}
                   variant="outline"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <X style={{ width: '16px', height: '16px' }} />
+                  className="admin-d-inline-flex-ai-center-gap-8">
+                  <X className="admin-icon-16" />
                   Сбросить
                 </Button>
               </div>
@@ -510,8 +430,8 @@ const QueueCabinetManagement = () => {
               action={
                 <Button
                   onClick={() => loadData(appliedFilters)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <RefreshCw style={{ width: '16px', height: '16px' }} />
+                  className="admin-d-inline-flex-ai-center-gap-8">
+                  <RefreshCw className="admin-icon-16" />
                   Повторить загрузку
                 </Button>
               }
@@ -538,11 +458,7 @@ const QueueCabinetManagement = () => {
                 <tr>
                   <td
                     colSpan={9}
-                    style={{
-                      padding: '40px 16px',
-                      textAlign: 'center',
-                      color: 'var(--mac-text-secondary)',
-                    }}>
+                    className="admin-p-40px-16px-ta-center-secondary">
                     Нет данных для отображения
                   </td>
                 </tr>

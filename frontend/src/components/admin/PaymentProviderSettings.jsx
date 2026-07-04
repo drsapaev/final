@@ -164,34 +164,19 @@ const PaymentProviderSettings = () => {
     const testResult = testResults[providerName];
 
     return (
-      <MacOSCard key={providerName} style={{ padding: '20px', border: '1px solid var(--mac-border)' }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px',
-          paddingBottom: '16px',
-          borderBottom: '1px solid var(--mac-border)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <CreditCard style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+      <MacOSCard key={providerName} className="admin-p-20-bd-1px-solid-var-mac-bo">
+        <div className="admin-d-flex-jc-between-ai-center-mb-16-pb-16-bd-b-1px-solid-var-mac-bo">
+          <div className="admin-flex-center-12">
+            <CreditCard className="admin-w-24-h-24-blue" />
+            <h3 className="admin-fs-lg-fw-semi-primary-m-0">
               {providerName.toUpperCase()}
             </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="admin-flex-center-8">
               <Checkbox
                 checked={providerConfig.enabled}
                 onChange={() => toggleProviderEnabled(providerName)}
               />
-              <span style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>
+              <span className="admin-text-sm admin-text-secondary">
                 {providerConfig.enabled ? 'Включён' : 'Отключён'}
               </span>
             </div>
@@ -201,43 +186,25 @@ const PaymentProviderSettings = () => {
             variant="outline"
             onClick={() => testProvider(providerName)}
             disabled={!providerConfig.enabled || loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 12px'
-            }}
+            className="admin-d-flex-ai-center-gap-8-p-6px-12px"
           >
-            <RefreshCw style={{ width: '16px', height: '16px' }} />
+            <RefreshCw className="admin-icon-16" />
             Тест
           </Button>
         </div>
 
         {testResult && (
-          <MacOSCard style={{
-            padding: '12px',
-            marginBottom: '16px',
-            backgroundColor: testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
-            border: testResult.success ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <MacOSCard className="admin-p-12-mb-16-bgc-dyn-bd-dyn" style={{ '--admin-bgc0': testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-bd1': testResult.success ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' }}>
+            <div className="admin-flex-center-8">
               {testResult.success ? (
-                <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-success)' }} />
+                <CheckCircle className="admin-w-16-h-16-success" />
               ) : (
-                <XCircle style={{ width: '16px', height: '16px', color: 'var(--mac-error)' }} />
+                <XCircle className="admin-w-16-h-16-error" />
               )}
-              <span style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: testResult.success ? 'var(--mac-success)' : 'var(--mac-error)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+              <span className="admin-fs-sm-fw-med-col-dyn" style={{ '--admin-col0': testResult.success ? 'var(--mac-success)' : 'var(--mac-error)' }}>
                 {testResult.message}
               </span>
-              <small style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-text-tertiary)',
-                marginLeft: 'auto'
-              }}>
+              <small className="admin-fs-xs-tertiary-ml-auto">
                 {testResult.timestamp}
               </small>
             </div>
@@ -245,16 +212,13 @@ const PaymentProviderSettings = () => {
         )}
 
         {providerConfig.enabled && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="admin-flex-col-16">
+            <div className="admin-flex-center-8">
               <Checkbox
                 checked={providerConfig.test_mode}
                 onChange={(checked) => updateProviderSetting(providerName, 'test_mode', checked)}
               />
-              <span style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-primary)'
-              }}>
+              <span className="admin-fs-sm-primary">
                 Тестовый режим
               </span>
             </div>
@@ -262,13 +226,7 @@ const PaymentProviderSettings = () => {
             {providerName === 'click' && (
               <>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '8px'
-                  }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Service ID
                   </label>
                   <Input
@@ -276,18 +234,12 @@ const PaymentProviderSettings = () => {
                     value={providerConfig.service_id}
                     onChange={(e) => updateProviderSetting(providerName, 'service_id', e.target.value)}
                     placeholder="Введите Service ID"
-                    style={{ width: '100%' }}
+                    className="admin-w-full"
                   />
                 </div>
 
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '8px'
-                  }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Merchant ID
                   </label>
                   <Input
@@ -295,27 +247,21 @@ const PaymentProviderSettings = () => {
                     value={providerConfig.merchant_id}
                     onChange={(e) => updateProviderSetting(providerName, 'merchant_id', e.target.value)}
                     placeholder="Введите Merchant ID"
-                    style={{ width: '100%' }}
+                    className="admin-w-full"
                   />
                 </div>
 
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '8px'
-                  }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Secret Key
                   </label>
-                  <div style={{ position: 'relative' }}>
+                  <div className="admin-pos-relative">
                     <Input
                       type={showSecrets.click ? 'text' : 'password'}
                       value={providerConfig.secret_key}
                       onChange={(e) => updateProviderSetting(providerName, 'secret_key', e.target.value)}
                       placeholder="Введите Secret Key"
-                      style={{ width: '100%', paddingRight: '40px' }}
+                      className="admin-w-100pct-pr-40"
                     />
                     <Button
                       type="button"
@@ -323,34 +269,19 @@ const PaymentProviderSettings = () => {
                       title={showSecrets.click ? 'Hide Click secret key' : 'Show Click secret key'}
                       aria-label={showSecrets.click ? 'Hide Click secret key' : 'Show Click secret key'}
                       onClick={() => toggleShowSecret('click')}
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        padding: '4px',
-                        minWidth: 'auto',
-                        width: '32px',
-                        height: '32px'
-                      }}
+                      className="admin-pos-absolute-right-8-top-50pct-tf-translateY-50-p-4-minw-auto-w-32-h-32"
                     >
                       {showSecrets.click ? (
-                        <EyeOff aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                        <EyeOff aria-hidden="true" className="admin-icon-16" />
                       ) : (
-                        <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                        <Eye aria-hidden="true" className="admin-icon-16" />
                       )}
                     </Button>
                   </div>
                 </div>
 
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '8px'
-                  }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Base URL
                   </label>
                   <Input
@@ -358,7 +289,7 @@ const PaymentProviderSettings = () => {
                     value={providerConfig.base_url}
                     onChange={(e) => updateProviderSetting(providerName, 'base_url', e.target.value)}
                     placeholder="https://api.click.uz/v2"
-                    style={{ width: '100%' }}
+                    className="admin-w-full"
                   />
                 </div>
               </>
@@ -367,13 +298,7 @@ const PaymentProviderSettings = () => {
             {providerName === 'payme' && (
               <>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '8px'
-                  }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Merchant ID
                   </label>
                   <Input
@@ -381,27 +306,21 @@ const PaymentProviderSettings = () => {
                     value={providerConfig.merchant_id}
                     onChange={(e) => updateProviderSetting(providerName, 'merchant_id', e.target.value)}
                     placeholder="Введите Merchant ID"
-                    style={{ width: '100%' }}
+                    className="admin-w-full"
                   />
                 </div>
 
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '8px'
-                  }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Secret Key
                   </label>
-                  <div style={{ position: 'relative' }}>
+                  <div className="admin-pos-relative">
                     <Input
                       type={showSecrets.payme ? 'text' : 'password'}
                       value={providerConfig.secret_key}
                       onChange={(e) => updateProviderSetting(providerName, 'secret_key', e.target.value)}
                       placeholder="Введите Secret Key"
-                      style={{ width: '100%', paddingRight: '40px' }}
+                      className="admin-w-100pct-pr-40"
                     />
                     <Button
                       type="button"
@@ -409,34 +328,19 @@ const PaymentProviderSettings = () => {
                       title={showSecrets.payme ? 'Hide Payme secret key' : 'Show Payme secret key'}
                       aria-label={showSecrets.payme ? 'Hide Payme secret key' : 'Show Payme secret key'}
                       onClick={() => toggleShowSecret('payme')}
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        padding: '4px',
-                        minWidth: 'auto',
-                        width: '32px',
-                        height: '32px'
-                      }}
+                      className="admin-pos-absolute-right-8-top-50pct-tf-translateY-50-p-4-minw-auto-w-32-h-32"
                     >
                       {showSecrets.payme ? (
-                        <EyeOff aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                        <EyeOff aria-hidden="true" className="admin-icon-16" />
                       ) : (
-                        <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                        <Eye aria-hidden="true" className="admin-icon-16" />
                       )}
                     </Button>
                   </div>
                 </div>
 
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '8px'
-                  }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Base URL
                   </label>
                   <Input
@@ -444,18 +348,12 @@ const PaymentProviderSettings = () => {
                     value={providerConfig.base_url}
                     onChange={(e) => updateProviderSetting(providerName, 'base_url', e.target.value)}
                     placeholder="https://checkout.paycom.uz"
-                    style={{ width: '100%' }}
+                    className="admin-w-full"
                   />
                 </div>
 
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '8px'
-                  }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     API URL
                   </label>
                   <Input
@@ -463,7 +361,7 @@ const PaymentProviderSettings = () => {
                     value={providerConfig.api_url}
                     onChange={(e) => updateProviderSetting(providerName, 'api_url', e.target.value)}
                     placeholder="https://api.paycom.uz"
-                    style={{ width: '100%' }}
+                    className="admin-w-full"
                   />
                 </div>
               </>
@@ -475,29 +373,13 @@ const PaymentProviderSettings = () => {
   };
 
   return (
-    <div style={{
-      padding: 0,
-      backgroundColor: 'var(--mac-bg-primary)',
-      minHeight: '100vh'
-    }}>
-      <MacOSCard style={{ padding: '24px' }}>
+    <div className="admin-p-0-bgc-bg-primary-minh-100vh">
+      <MacOSCard className="admin-p-24">
         {/* Заголовок */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px',
-          paddingBottom: '24px',
-          borderBottom: '1px solid var(--mac-border)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Settings style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
-            <h2 style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+        <div className="admin-d-flex-jc-between-ai-center-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
+          <div className="admin-flex-center-12">
+            <Settings className="admin-w-32-h-32-blue" />
+            <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
               Настройки платежных провайдеров
             </h2>
           </div>
@@ -505,41 +387,23 @@ const PaymentProviderSettings = () => {
           <Button
             onClick={saveSettings}
             disabled={loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: 'var(--mac-accent-blue)',
-              border: 'none',
-              padding: '8px 16px'
-            }}
+            className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px"
           >
-            <Save style={{ width: '16px', height: '16px' }} />
+            <Save className="admin-icon-16" />
             Сохранить
           </Button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="admin-flex-col-24">
           {/* Общие настройки */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '16px'
-            }}>
+          <MacOSCard className="admin-p-24">
+            <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
               Общие настройки
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="admin-flex-col-16">
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px'
-                }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                   Провайдер по умолчанию
                 </label>
                 <Select
@@ -550,38 +414,18 @@ const PaymentProviderSettings = () => {
                     label: provider.toUpperCase()
                   }))}
                   size="large"
-                  style={{ width: '100%' }}
+                  className="admin-w-full"
                 />
               </div>
 
-              <MacOSCard style={{
-                padding: '16px',
-                backgroundColor: 'var(--mac-warning-bg)',
-                border: '1px solid var(--mac-warning-border)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <AlertTriangle style={{
-                    width: '20px',
-                    height: '20px',
-                    color: 'var(--mac-warning)',
-                    marginTop: '2px',
-                    flexShrink: 0
-                  }} />
+              <MacOSCard className="admin-p-16-bgc-var-mac-warning-bg-bd-1px-solid-var-mac-wa">
+                <div className="admin-d-flex-ai-start-gap-12">
+                  <AlertTriangle className="admin-w-20-h-20-warning-mt-2-fsk-0" />
                   <div>
-                    <p style={{
-                      fontSize: 'var(--mac-font-size-sm)',
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      color: 'var(--mac-warning)',
-                      margin: '0 0 8px 0'
-                    }}>
+                    <p className="admin-fs-sm-fw-med-warning-m-0-0-8px-0">
                       <strong>Важно:</strong>
                     </p>
-                    <ul style={{
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-warning)',
-                      margin: 0,
-                      paddingLeft: '16px'
-                    }}>
+                    <ul className="admin-fs-sm-warning-m-0-pl-16">
                       <li>Провайдер по умолчанию будет предложен пользователям первым</li>
                       <li>Тестовый режим использует sandbox окружение провайдеров</li>
                       <li>Обязательно протестируйте настройки перед использованием</li>
@@ -594,17 +438,12 @@ const PaymentProviderSettings = () => {
           </MacOSCard>
 
           {/* Настройки провайдеров */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '16px'
-            }}>
+          <MacOSCard className="admin-p-24">
+            <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
               Конфигурация провайдеров
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="admin-flex-col-24">
               {Object.entries(settings).map(([key, value]) => {
                 if (key === 'click' || key === 'payme') {
                   return renderProviderConfig(key, value);

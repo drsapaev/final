@@ -42,25 +42,6 @@ const departmentLabels = Object.fromEntries(
   departmentOptions.filter((item) => item.value).map((item) => [item.value, item.label])
 );
 
-const shellStyle = {
-  background: 'var(--mac-bg-primary)',
-  border: '1px solid var(--mac-border)',
-};
-
-const tableHeaderStyle = {
-  textAlign: 'left',
-  padding: '12px 16px',
-  color: 'var(--mac-text-secondary)',
-  fontWeight: 'var(--mac-font-weight-semibold)',
-  fontSize: 'var(--mac-font-size-sm)',
-};
-
-const textCellStyle = {
-  padding: '12px 16px',
-  fontSize: 'var(--mac-font-size-sm)',
-  color: 'var(--mac-text-secondary)',
-};
-
 const getDoctorName = (doctor) =>
   doctor.user?.full_name || doctor.name || doctor.user?.username || 'Неизвестно';
 
@@ -83,13 +64,7 @@ const IconButton = ({ label, tone = 'default', onClick, children }) => (
     onClick={onClick}
     aria-label={label}
     title={label}
-    style={{
-      width: '32px',
-      height: '32px',
-      padding: 0,
-      borderRadius: 'var(--mac-radius-sm)',
-      color: tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)',
-    }}
+    className="admin-w-32-h-32-p-0-radius-var-mac-radius-sm-col-dyn" style={{ '--admin-col0': tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)' }}
   >
     {children}
   </Button>
@@ -181,35 +156,19 @@ const AdminDoctors = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard variant="default" shadow="none" style={{ ...shellStyle, padding: '24px' }}>
+    <div className="admin-flex-col-24">
+      <MacOSCard variant="default" shadow="none" className="admin-patients-header-card">
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            marginBottom: '24px',
-            flexWrap: 'wrap',
-          }}
+          className="admin-patients-header-row"
         >
           <div>
             <h2
-              style={{
-                fontSize: 'var(--mac-font-size-xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: 0,
-              }}
+              className="admin-title-20"
             >
               Управление врачами
             </h2>
             <p
-              style={{
-                margin: '6px 0 0',
-                color: 'var(--mac-text-secondary)',
-                fontSize: 'var(--mac-font-size-sm)',
-              }}
+              className="admin-patients-subtitle"
             >
               Аккаунты врачей, специализации, кабинеты и онлайн-лимиты.
             </p>
@@ -220,12 +179,7 @@ const AdminDoctors = () => {
         </div>
 
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 1fr) minmax(180px, 240px) minmax(180px, 240px) minmax(160px, 200px)',
-            gap: '12px',
-            marginBottom: '24px',
-          }}
+          className="admin-doctors-filters-grid"
         >
           <Input
             type="text"
@@ -259,7 +213,7 @@ const AdminDoctors = () => {
           />
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="admin-overflow-x-auto">
           {loading ? (
             <Skeleton type="table" count={5} />
           ) : error ? (
@@ -289,31 +243,25 @@ const AdminDoctors = () => {
               }
             />
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }} aria-label="Таблица врачей">
+            <table className="admin-w-100pct-bc-collapse" aria-label="Таблица врачей">
               <thead>
                 <tr
-                  style={{
-                    backgroundColor: 'var(--mac-bg-secondary)',
-                    borderBottom: '1px solid var(--mac-border)',
-                  }}
+                  className="admin-patients-thead-row"
                 >
-                  <th scope="col" style={tableHeaderStyle}>Врач</th>
-                  <th scope="col" style={tableHeaderStyle}>Специализация</th>
-                  <th scope="col" style={tableHeaderStyle}>Отделение</th>
-                  <th scope="col" style={tableHeaderStyle}>Опыт</th>
-                  <th scope="col" style={tableHeaderStyle}>Статус</th>
-                  <th scope="col" style={tableHeaderStyle}>Пациенты</th>
-                  <th scope="col" style={tableHeaderStyle}>Действия</th>
+                  <th scope="col" className="admin-patients-th">Врач</th>
+                  <th scope="col" className="admin-patients-th">Специализация</th>
+                  <th scope="col" className="admin-patients-th">Отделение</th>
+                  <th scope="col" className="admin-patients-th">Опыт</th>
+                  <th scope="col" className="admin-patients-th">Статус</th>
+                  <th scope="col" className="admin-patients-th">Пациенты</th>
+                  <th scope="col" className="admin-patients-th">Действия</th>
                 </tr>
               </thead>
               <tbody>
                 {doctors.map((doctor) => (
                   <tr
                     key={doctor.id}
-                    style={{
-                      borderBottom: '1px solid var(--mac-border)',
-                      transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
-                    }}
+                    className="admin-patients-tbody-row"
                     onMouseEnter={(event) => {
                       event.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
                     }}
@@ -323,58 +271,34 @@ const AdminDoctors = () => {
                   >
                     <td
                       aria-label={`Врач ${getDoctorName(doctor)}`}
-                      style={{ padding: '12px 16px' }}
+                      className="admin-p-12-16"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="admin-flex-center-12">
                         <div
                           aria-hidden="true"
-                          style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            backgroundColor: 'var(--mac-accent)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--mac-text-on-accent)',
-                            fontSize: 'var(--mac-font-size-sm)',
-                            fontWeight: 'var(--mac-font-weight-medium)',
-                          }}
+                          className="admin-patients-avatar"
                         >
                           {getDoctorInitials(doctor)}
                         </div>
                         <div>
                           <p
-                            style={{
-                              fontWeight: 'var(--mac-font-weight-medium)',
-                              color: 'var(--mac-text-primary)',
-                              fontSize: 'var(--mac-font-size-sm)',
-                              margin: 0,
-                            }}
+                            className="admin-patients-name"
                           >
                             {getDoctorName(doctor)}
                           </p>
                           <p
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--mac-text-secondary)',
-                              margin: '4px 0 0',
-                            }}
+                            className="admin-patients-email"
                           >
                             {doctor.user?.email || doctor.email || 'Нет email'}
                           </p>
                           {doctor.user?.phone ? (
                             <p
-                              style={{
-                                fontSize: '11px',
-                                color: 'var(--mac-text-tertiary)',
-                                margin: '2px 0 0',
-                              }}
+                              className="admin-patients-address"
                             >
                               {doctor.user.phone}
                             </p>
                           ) : null}
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                          <div className="admin-doctors-badges-row">
                             <Badge variant={doctor.user?.is_active === false ? 'warning' : 'success'}>
                               {doctor.user?.is_active === false ? 'Аккаунт неактивен' : 'Аккаунт активен'}
                             </Badge>
@@ -385,30 +309,30 @@ const AdminDoctors = () => {
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td className="admin-p-12-16">
                       <Badge variant="info">
                         {doctor.specialty || doctor.specialization || 'Не указано'}
                       </Badge>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td className="admin-p-12-16">
                       <Badge variant="success">
                         {getDepartmentLabel(doctor.specialty || doctor.department)}
                       </Badge>
                     </td>
-                    <td style={textCellStyle}>
+                    <td className="admin-patients-td">
                       {doctor.experience ? `${doctor.experience} лет` : 'Не указано'}
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td className="admin-p-12-16">
                       <Badge variant={doctor.active ? 'success' : 'warning'}>
                         {doctor.active ? 'Активен' : 'Неактивен'}
                       </Badge>
                     </td>
-                    <td style={textCellStyle}>{doctor.patientsCount || 0} пациентов</td>
+                    <td className="admin-patients-td">{doctor.patientsCount || 0} пациентов</td>
                     <td
                       aria-label={`Действия для врача ${getDoctorName(doctor)}`}
-                      style={{ padding: '12px 16px' }}
+                      className="admin-p-12-16"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div className="admin-flex-center-8">
                         <IconButton label="Редактировать врача" onClick={() => handleEditDoctor(doctor)}>
                           <Edit size={16} />
                         </IconButton>

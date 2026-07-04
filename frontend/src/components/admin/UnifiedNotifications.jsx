@@ -19,15 +19,7 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
   };
 
   return (
-    <div role="tablist" aria-label="Notification sections" style={{
-      display: 'flex',
-      gap: '4px',
-      padding: '8px',
-      background: colors.bg,
-      borderRadius: '8px',
-      border: `1px solid ${colors.border}`,
-      marginBottom: '20px'
-    }}>
+    <div role="tablist" aria-label="Notification sections" className="admin-tab-bar-flex-dyn" style={{ '--admin-bg': colors.bg, '--admin-bd': `1px solid ${colors.border}` }}>
       {tabs.map((tab) =>
       <button
         key={tab.id}
@@ -37,19 +29,11 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
         aria-selected={activeTab === tab.id}
         aria-controls={`notifications-panel-${tab.id}`}
         onClick={() => onTabChange(tab.id)}
+        className="admin-tab-btn-dyn"
         style={{
-          padding: '8px 16px',
-          border: 'none',
-          borderRadius: '6px',
-          background: activeTab === tab.id ? colors.active : 'transparent',
-          color: activeTab === tab.id ? colors.activeText : colors.text,
-          fontSize: '14px',
-          fontWeight: activeTab === tab.id ? '600' : '400',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
+          '--admin-tab-bg': activeTab === tab.id ? colors.active : 'transparent',
+          '--admin-tab-color': activeTab === tab.id ? colors.activeText : colors.text,
+          '--admin-tab-fw': activeTab === tab.id ? '600' : '400',
         }}>
         
           {tab.label}
@@ -101,7 +85,7 @@ const UnifiedNotifications = () => {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="admin-unified-root-no-color">
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}
@@ -111,7 +95,7 @@ const UnifiedNotifications = () => {
         id={`notifications-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`notifications-tab-${activeTab}`}
-        style={{ flex: 1, overflow: 'auto' }}
+        className="admin-unified-content"
       >
         <ErrorBoundary>
           {/* P-025 fix: catch runtime errors in child panels */}

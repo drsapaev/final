@@ -213,23 +213,11 @@ const ClinicSettings = () => {
 
   if (loading) {
     return (
-      <div style={{
-        padding: 0,
-        backgroundColor: 'var(--mac-bg-primary)'
-      }}>
-        <MacOSCard style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-            <RefreshCw style={{
-              width: '32px',
-              height: '32px',
-              color: 'var(--mac-accent-blue)',
-              animation: 'spin 1s linear infinite'
-            }} />
-            <span style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              color: 'var(--mac-text-secondary)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}>
+      <div className="admin-p-0-bg-bg-primary">
+        <MacOSCard className="admin-p-24-ta-center">
+          <div className="admin-flex-ai-center-jc-center-gap-12">
+            <RefreshCw className="admin-w-32-h-32-blue-anim-spin1slinearinfinite" />
+            <span className="admin-lg-secondary-med">
               Загрузка настроек...
             </span>
           </div>
@@ -239,77 +227,39 @@ const ClinicSettings = () => {
   }
 
   return (
-    <div style={{
-      padding: 0,
-      backgroundColor: 'var(--mac-bg-primary)'
-    }}>
-      <MacOSCard style={{ padding: '24px' }}>
+    <div className="admin-p-0-bg-bg-primary">
+      <MacOSCard className="admin-p-24">
         {/* Заголовок */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '24px',
-          paddingBottom: '24px',
-          borderBottom: '1px solid var(--mac-border)'
-        }}>
+        <div className="admin-flex-ai-center-jc-between-mb-24-pb-24-borderbottom-0a48a6">
           <div>
-            <h2 style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: '0 0 8px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
-              <Building2 style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+            <h2 className="admin-2xl-semi-primary-m-008px0-flex-ai-center-gap-12">
+              <Building2 className="admin-w-32-h-32-blue" />
               Настройки клиники
             </h2>
-            <p style={{
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)',
-              margin: 0
-            }}>
+            <p className="admin-secondary-sm-m-0">
               Основная информация о медицинском учреждении
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="admin-flex-gap-12">
             <Button
               variant="outline"
               onClick={loadSettings}
               disabled={loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px'
-              }}
+              className="admin-flex-ai-center-gap-8-p-8px16"
             >
-              <RefreshCw style={{ width: '16px', height: '16px' }} />
+              <RefreshCw className="admin-icon-16" />
               Обновить
             </Button>
             <Button
               onClick={saveSettings}
               disabled={saving}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none',
-                padding: '8px 16px'
-              }}
+              className="admin-flex-ai-center-gap-8-bg-blue-bd-none-p-8px16"
             >
               {saving ? (
-                <RefreshCw style={{
-                  width: '16px',
-                  height: '16px',
-                  animation: 'spin 1s linear infinite'
-                }} />
+                <RefreshCw className="admin-w-16-h-16-anim-spin1slinearinfinite" />
               ) : (
-                <Save style={{ width: '16px', height: '16px' }} />
+                <Save className="admin-icon-16" />
               )}
               Сохранить
             </Button>
@@ -318,59 +268,31 @@ const ClinicSettings = () => {
 
         {/* Сообщения */}
         {message.text && (
-          <MacOSCard style={{
-            padding: '16px',
-            marginBottom: '24px',
-            backgroundColor: message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
-            border: message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <MacOSCard className="admin-p-16-mb-24" style={{ '--admin-backgroundColor': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' }}>
+            <div className="admin-flex-center-8">
               {message.type === 'success' ? (
-                <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
+                <CheckCircle className="admin-w-20-h-20-success" />
               ) : (
-                <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+                <AlertCircle className="admin-w-20-h-20-error" />
               )}
-              <span style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+              <span className="admin-sm-med" style={{ '--admin-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)' }}>
                 {message.text}
               </span>
             </div>
           </MacOSCard>
         )}
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px',
-          marginBottom: '24px'
-        }}>
+        <div className="admin-grid-gtc-rauto-fitcminmax400pxc1fr-gap-24-mb-24">
           {/* Основная информация */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <Building2 style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+          <MacOSCard className="admin-p-24">
+            <h3 className="admin-lg-semi-primary-mb-16-flex-ai-center-gap-8">
+              <Building2 className="admin-w-20-h-20-blue" />
               Основная информация
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="admin-flex-col-16">
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px'
-                }}>
+                <label className="admin-block-sm-med-primary-mb-8">
                   Название клиники
                 </label>
                 <Input
@@ -378,21 +300,13 @@ const ClinicSettings = () => {
                   value={settings.clinic_name || ''}
                   onChange={(e) => handleInputChange('clinic_name', e.target.value)}
                   placeholder="Название медицинского учреждения"
-                  style={{ width: '100%' }}
+                  className="admin-w-full"
                 />
               </div>
 
               <div>
-                <label style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <MapPin style={{ width: '16px', height: '16px' }} />
+                <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
+                  <MapPin className="admin-icon-16" />
                   Адрес
                 </label>
                 <Textarea
@@ -400,21 +314,13 @@ const ClinicSettings = () => {
                   onChange={(e) => handleInputChange('address', e.target.value)}
                   rows={2}
                   placeholder="Полный адрес клиники"
-                  style={{ width: '100%' }}
+                  className="admin-w-full"
                 />
               </div>
 
               <div>
-                <label style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Phone style={{ width: '16px', height: '16px' }} />
+                <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
+                  <Phone className="admin-icon-16" />
                   Телефон
                 </label>
                 <Input
@@ -422,21 +328,13 @@ const ClinicSettings = () => {
                   value={settings.phone || ''}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   placeholder="+998 (90) 123-45-67"
-                  style={{ width: '100%' }}
+                  className="admin-w-full"
                 />
               </div>
 
               <div>
-                <label style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Mail style={{ width: '16px', height: '16px' }} />
+                <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
+                  <Mail className="admin-icon-16" />
                   Email
                 </label>
                 <Input
@@ -444,39 +342,23 @@ const ClinicSettings = () => {
                   value={settings.email || ''}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="info@clinic.com"
-                  style={{ width: '100%' }}
+                  className="admin-w-full"
                 />
               </div>
             </div>
           </MacOSCard>
 
           {/* Системные настройки */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <Globe style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
+          <MacOSCard className="admin-p-24">
+            <h3 className="admin-lg-semi-primary-mb-16-flex-ai-center-gap-8">
+              <Globe className="admin-w-20-h-20-success" />
               Системные настройки
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="admin-flex-col-16">
               <div>
-                <label style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Clock style={{ width: '16px', height: '16px' }} />
+                <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
+                  <Clock className="admin-icon-16" />
                   Часовой пояс
                 </label>
                 <Select
@@ -485,66 +367,35 @@ const ClinicSettings = () => {
                   onChange={(value) => handleInputChange('timezone', value)}
                   options={timezones}
                   size="large"
-                  style={{ width: '100%' }}
+                  className="admin-w-full"
                 />
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-tertiary)',
-                  marginTop: '4px',
-                  margin: '4px 0 0 0'
-                }}>
+                <p className="admin-xs-tertiary-mt-4-m-4px000">
                   Используется для расписания и онлайн-очереди
                 </p>
               </div>
 
               {/* Логотип */}
               <div>
-                <label style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Image style={{ width: '16px', height: '16px' }} />
+                <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
+                  <Image className="admin-icon-16" />
                   Логотип клиники
                 </label>
 
                 {/* Текущий логотип */}
                 {(settings.logo_url || logoPreview) && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{
-                      width: '128px',
-                      height: '80px',
-                      border: '2px dashed var(--mac-border)',
-                      borderRadius: 'var(--mac-radius-md)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'var(--mac-bg-secondary)',
-                      padding: '8px'
-                    }}>
+                  <div className="admin-mb-12">
+                    <div className="admin-w-128-h-80-bd-2dashedvar-mac-border-radius-var--mac-radius-md-flex-ai-cent-5f1cf18b">
                       <img
                         src={logoPreview || settings.logo_url}
                         alt="Логотип клиники"
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          objectFit: 'contain'
-                        }}
+                        className="admin-maxw-100pct-maxh-100pct-of-contain"
                       />
                     </div>
                     {logoPreview && (
                       <Button
                         variant="outline"
                         onClick={resetLogo}
-                        style={{
-                          marginTop: '8px',
-                          padding: '4px 8px',
-                          fontSize: 'var(--mac-font-size-xs)'
-                        }}
+                        className="admin-mt-8-p-4px8-xs"
                       >
                         Отменить
                       </Button>
@@ -553,30 +404,18 @@ const ClinicSettings = () => {
                 )}
 
                 {/* Загрузка логотипа */}
-                <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="admin-flex-ai-center">
                   <input
                     type="file"
                     aria-label="Загрузить логотип клиники"
                     accept="image/*"
                     onChange={handleLogoSelect}
-                    style={{ display: 'none' }}
+                    className="admin-none"
                     id="logo-upload"
                   />
                   <label
                     htmlFor="logo-upload"
-                    style={{
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      padding: '8px 16px',
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: 'var(--mac-radius-md)',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      color: 'var(--mac-text-primary)',
-                      backgroundColor: 'var(--mac-bg-secondary)',
-                      transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                    }}
+                    className="admin-cursor-pointer-inline-flex-ai-center-p-8px16-bd-1solidvar-mac-border-radiu-832d1430"
                     onMouseEnter={(e) => {
                       e.target.style.backgroundColor = 'var(--mac-accent-bg)';
                       e.target.style.borderColor = 'var(--mac-accent-blue)';
@@ -586,16 +425,11 @@ const ClinicSettings = () => {
                       e.target.style.borderColor = 'var(--mac-border)';
                     }}
                   >
-                    <Upload style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                    <Upload className="admin-icon-16-mr-8" />
                     Выбрать файл
                   </label>
                 </div>
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-tertiary)',
-                  marginTop: '4px',
-                  margin: '4px 0 0 0'
-                }}>
+                <p className="admin-xs-tertiary-mt-4-m-4px000">
                   Поддерживаются форматы: JPG, PNG, GIF. Максимальный размер: 5MB
                 </p>
               </div>
@@ -603,82 +437,40 @@ const ClinicSettings = () => {
           </MacOSCard>
         </div>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            marginBottom: '20px',
-            paddingBottom: '20px',
-            borderBottom: '1px solid var(--mac-border)'
-          }}>
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-ai-center-jc-between-gap-16-mb-20-pb-20-borderbottom-0a48a6">
             <div>
-              <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 8px 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <Printer style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+              <h3 className="admin-lg-semi-primary-m-008px0-flex-ai-center-gap-8">
+                <Printer className="admin-w-20-h-20-blue" />
                 Печать талонов
               </h3>
-              <p style={{
-                color: 'var(--mac-text-secondary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                margin: 0,
-                maxWidth: '720px'
-              }}>
+              <p className="admin-secondary-sm-m-0-maxw-720">
                 Настройте, какие поля будут видны на печатном талоне. Эти параметры применяются и к регистратуре, и к панелям специалистов.
               </p>
-              <p style={{
-                color: 'var(--mac-text-tertiary)',
-                fontSize: 'var(--mac-font-size-xs)',
-                margin: '8px 0 0 0',
-                maxWidth: '720px'
-              }}>
+              <p className="admin-tertiary-xs-m-8px000-maxw-720">
                 Поле «Кабинет» управляет только видимостью. Само значение берётся из связанного врача и сегодняшней очереди, а не задаётся в настройках печати.
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <div className="admin-flex-gap-12-wrap-jc-end">
               <Button
                 variant="outline"
                 onClick={loadTicketPrintSettings}
                 disabled={ticketPrintLoading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px'
-                }}
+                className="admin-flex-ai-center-gap-8-p-8px16"
               >
-                <RefreshCw style={{ width: '16px', height: '16px' }} />
+                <RefreshCw className="admin-icon-16" />
                 Обновить
               </Button>
               <Button
                 onClick={saveTicketPrintSettingsHandler}
                 disabled={ticketPrintSaving || ticketPrintLoading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: 'var(--mac-accent-blue)',
-                  border: 'none',
-                  padding: '8px 16px'
-                }}
+                className="admin-flex-ai-center-gap-8-bg-blue-bd-none-p-8px16"
               >
                 {ticketPrintSaving ? (
-                  <RefreshCw style={{
-                    width: '16px',
-                    height: '16px',
-                    animation: 'spin 1s linear infinite'
-                  }} />
+                  <RefreshCw className="admin-w-16-h-16-anim-spin1slinearinfinite" />
                 ) : (
-                  <Save style={{ width: '16px', height: '16px' }} />
+                  <Save className="admin-icon-16" />
                 )}
                 Сохранить
               </Button>
@@ -686,23 +478,14 @@ const ClinicSettings = () => {
           </div>
 
           {ticketPrintMessage.text && (
-            <MacOSCard style={{
-              padding: '16px',
-              marginBottom: '20px',
-              backgroundColor: ticketPrintMessage.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
-              border: ticketPrintMessage.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MacOSCard className="admin-p-16-mb-20" style={{ '--admin-backgroundColor': ticketPrintMessage.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': ticketPrintMessage.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' }}>
+              <div className="admin-flex-center-8">
                 {ticketPrintMessage.type === 'success' ? (
-                  <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
+                  <CheckCircle className="admin-w-20-h-20-success" />
                 ) : (
-                  <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+                  <AlertCircle className="admin-w-20-h-20-error" />
                 )}
-                <span style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: ticketPrintMessage.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
-                  fontWeight: 'var(--mac-font-weight-medium)'
-                }}>
+                <span className="admin-sm-med" style={{ '--admin-color': ticketPrintMessage.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)' }}>
                   {ticketPrintMessage.text}
                 </span>
               </div>
@@ -710,36 +493,16 @@ const ClinicSettings = () => {
           )}
 
           {ticketPrintLoading ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              padding: '24px 0',
-              color: 'var(--mac-text-secondary)'
-            }}>
-              <RefreshCw style={{
-                width: '24px',
-                height: '24px',
-                animation: 'spin 1s linear infinite'
-              }} />
+            <div className="admin-flex-ai-center-jc-center-gap-12-p-24px0-secondary">
+              <RefreshCw className="admin-w-24-h-24-anim-spin1slinearinfinite" />
               <span>Загрузка настроек печати талонов...</span>
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '12px'
-            }}>
+            <div className="admin-grid-gtc-rauto-fitcminmax280pxc1fr-gap-12">
               {TICKET_PRINT_SETTINGS_DEFINITIONS.map((item) => (
                 <div
                   key={item.key}
-                  style={{
-                    padding: '14px',
-                    borderRadius: 'var(--mac-radius-md)',
-                    border: '1px solid var(--mac-border)',
-                    backgroundColor: 'var(--mac-bg-secondary)'
-                  }}
+                  className="admin-p-14-radius-var--mac-radius-md-bd-1solidvar-mac-border-bg-bg-secondary"
                 >
                   <Checkbox
                     checked={Boolean(ticketPrintSettings[item.key])}

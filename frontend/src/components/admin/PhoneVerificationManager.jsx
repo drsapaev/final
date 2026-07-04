@@ -106,150 +106,80 @@ const PhoneVerificationManager = () => {
   };
 
   const renderOverview = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div className="admin-flex-col-24">
       {/* Основная статистика */}
-      <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '16px'
-    }}>
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-between">
             <div>
-              <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '0 0 8px 0'
-            }}>
+              <p className="admin-sm-secondary-m-008px0">
                 Активные коды
               </p>
-              <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+              <p className="admin-2xl-bold-primary-m-0">
                 {statistics?.total_active_codes || 0}
               </p>
             </div>
-            <Shield style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
+            <Shield className="admin-w-24-h-24-blue" />
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-between">
             <div>
-              <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '0 0 8px 0'
-            }}>
+              <p className="admin-sm-secondary-m-008px0">
                 Подтверждено
               </p>
-              <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-success)',
-              margin: 0
-            }}>
+              <p className="admin-2xl-bold-success-m-0">
                 {statistics?.verified_codes || 0}
               </p>
             </div>
-            <CheckCircle style={{ width: '24px', height: '24px', color: 'var(--mac-success)' }} />
+            <CheckCircle className="admin-w-24-h-24-success" />
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-between">
             <div>
-              <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '0 0 8px 0'
-            }}>
+              <p className="admin-sm-secondary-m-008px0">
                 Ожидают
               </p>
-              <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-warning)',
-              margin: 0
-            }}>
+              <p className="admin-2xl-bold-warning-m-0">
                 {statistics?.pending_codes || 0}
               </p>
             </div>
-            <Clock style={{ width: '24px', height: '24px', color: 'var(--mac-warning)' }} />
+            <Clock className="admin-w-24-h-24-warning" />
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-between">
             <div>
-              <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: '0 0 8px 0'
-            }}>
+              <p className="admin-sm-secondary-m-008px0">
                 Истекают скоро
               </p>
-              <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-error)',
-              margin: 0
-            }}>
+              <p className="admin-2xl-bold-error-m-0">
                 {statistics?.expiring_soon || 0}
               </p>
             </div>
-            <AlertTriangle style={{ width: '24px', height: '24px', color: 'var(--mac-error)' }} />
+            <AlertTriangle className="admin-w-24-h-24-error" />
           </div>
         </MacOSCard>
       </div>
 
       {/* Статистика по целям */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <BarChart3 style={{ width: '20px', height: '20px' }} />
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
+          <BarChart3 className="admin-icon-20" />
           Статистика по целям верификации
         </h3>
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '16px'
-      }}>
+        <div className="admin-grid-gtc-rauto-fitcminmax250pxc1fr-gap-16">
           {statistics?.by_purpose && Object.entries(statistics.by_purpose).map(([purpose, count]) =>
-        <div key={purpose} style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: 'var(--mac-bg-secondary)'
-        }}>
+        <div key={purpose} className="admin-flex-ai-center-jc-between-p-12-bd-1solidvar-mac-border-radius-var--mac-rad-77bc24ad">
               <div>
-                <p style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              margin: '0 0 4px 0',
-              textTransform: 'capitalize'
-            }}>
+                <p className="admin-med-sm-primary-m-004px0-texttransform-aab31f">
                   {purpose}
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
+                <p className="admin-xs-secondary-m-0">
                   {purpose === 'verification' && 'Подтверждение номера'}
                   {purpose === 'password_reset' && 'Сброс пароля'}
                   {purpose === 'phone_change' && 'Смена номера'}
@@ -263,42 +193,16 @@ const PhoneVerificationManager = () => {
       </MacOSCard>
 
       {/* Статистика по провайдерам */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Send style={{ width: '20px', height: '20px' }} />
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
+          <Send className="admin-icon-20" />
           Статистика по SMS провайдерам
         </h3>
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
+        <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
           {statistics?.by_provider && Object.entries(statistics.by_provider).map(([provider, count]) =>
-        <div key={provider} style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: 'var(--mac-bg-secondary)'
-        }}>
+        <div key={provider} className="admin-flex-ai-center-jc-between-p-12-bd-1solidvar-mac-border-radius-var--mac-rad-77bc24ad">
               <div>
-                <p style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              margin: 0,
-              textTransform: 'capitalize'
-            }}>
+                <p className="admin-med-sm-primary-m-0-texttransform-aab31f">
                   {provider}
                 </p>
               </div>
@@ -311,29 +215,15 @@ const PhoneVerificationManager = () => {
 
 
   const renderAdminTools = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Send style={{ width: '20px', height: '20px' }} />
+  <div className="admin-flex-col-24">
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
+          <Send className="admin-icon-20" />
           Отправка кода администратором
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="admin-flex-col-16">
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-block-sm-med-primary-mb-8">
               Номер телефона
             </label>
             <Input
@@ -341,18 +231,12 @@ const PhoneVerificationManager = () => {
             value={adminForm.phone}
             onChange={(e) => setAdminForm((prev) => ({ ...prev, phone: formatPhone(e.target.value) }))}
             placeholder="+998XXXXXXXXX"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
           
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-block-sm-med-primary-mb-8">
               Цель верификации
             </label>
             <Select
@@ -365,18 +249,12 @@ const PhoneVerificationManager = () => {
             { value: 'registration', label: 'Регистрация' }]
             }
             size="large"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
           
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-block-sm-med-primary-mb-8">
               SMS провайдер (опционально)
             </label>
             <Select
@@ -389,31 +267,21 @@ const PhoneVerificationManager = () => {
             { value: 'mock', label: 'Mock (тест)' }]
             }
             size="large"
-            style={{ width: '100%' }} />
+            className="admin-w-full" />
           
           </div>
 
           <div>
-            <label style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+            <label className="admin-block-sm-med-primary-mb-8">
               Кастомное сообщение (опционально)
             </label>
             <Textarea
             value={adminForm.message}
             onChange={(e) => setAdminForm((prev) => ({ ...prev, message: e.target.value }))}
             placeholder="Ваш код подтверждения: {code}. Код действителен 5 минут."
-            style={{ minHeight: '80px', width: '100%' }} />
+            className="admin-minh-80-w-100pct" />
           
-            <p style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-secondary)',
-            margin: '4px 0 0 0'
-          }}>
+            <p className="admin-xs-secondary-m-4px000">
               Используйте {'{code}'} для вставки кода верификации
             </p>
           </div>
@@ -422,21 +290,16 @@ const PhoneVerificationManager = () => {
           onClick={sendAdminCode}
           disabled={loading || !adminForm.phone.trim()}
           aria-label="Send admin verification code"
-          style={{ width: '100%' }}>
+          className="admin-w-full">
           
             {loading ?
           <>
-                <RefreshCw style={{
-              width: '16px',
-              height: '16px',
-              marginRight: '8px',
-              animation: 'spin 1s linear infinite'
-            }} />
+                <RefreshCw className="admin-w-16-h-16-mr-8-anim-spin1slinearinfinite" />
                 Отправка...
               </> :
 
           <>
-                <Send style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                <Send className="admin-icon-16-mr-8" />
                 Отправить код
               </>
           }
@@ -447,176 +310,70 @@ const PhoneVerificationManager = () => {
 
 
   const renderSettings = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--mac-text-primary)',
-        margin: '0 0 16px 0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-          <Settings style={{ width: '20px', height: '20px' }} />
+  <div className="admin-flex-col-24">
+      <MacOSCard className="admin-p-24">
+        <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
+          <Settings className="admin-icon-20" />
           Настройки верификации
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="admin-flex-col-16">
           {statistics?.settings &&
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
-        }}>
-              <div style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            backgroundColor: 'var(--mac-bg-secondary)'
-          }}>
-                <p style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              margin: '0 0 8px 0'
-            }}>
+        <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
+              <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
+                <p className="admin-med-sm-primary-m-008px0">
                   Длина кода
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-accent-blue)',
-              margin: '0 0 4px 0'
-            }}>
+                <p className="admin-2xl-bold-blue-m-004px0">
                   {statistics.settings.code_length}
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
+                <p className="admin-xs-secondary-m-0">
                   цифр
                 </p>
               </div>
 
-              <div style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            backgroundColor: 'var(--mac-bg-secondary)'
-          }}>
-                <p style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              margin: '0 0 8px 0'
-            }}>
+              <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
+                <p className="admin-med-sm-primary-m-008px0">
                   Время жизни кода
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-success)',
-              margin: '0 0 4px 0'
-            }}>
+                <p className="admin-2xl-bold-success-m-004px0">
                   {statistics.settings.ttl_minutes}
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
+                <p className="admin-xs-secondary-m-0">
                   минут
                 </p>
               </div>
 
-              <div style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            backgroundColor: 'var(--mac-bg-secondary)'
-          }}>
-                <p style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              margin: '0 0 8px 0'
-            }}>
+              <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
+                <p className="admin-med-sm-primary-m-008px0">
                   Максимум попыток
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-warning)',
-              margin: '0 0 4px 0'
-            }}>
+                <p className="admin-2xl-bold-warning-m-004px0">
                   {statistics.settings.max_attempts}
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
+                <p className="admin-xs-secondary-m-0">
                   попыток
                 </p>
               </div>
 
-              <div style={{
-            padding: '16px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            backgroundColor: 'var(--mac-bg-secondary)'
-          }}>
-                <p style={{
-              fontWeight: 'var(--mac-font-weight-medium)',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              margin: '0 0 8px 0'
-            }}>
+              <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
+                <p className="admin-med-sm-primary-m-008px0">
                   Лимит частоты
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-error)',
-              margin: '0 0 4px 0'
-            }}>
+                <p className="admin-2xl-bold-error-m-004px0">
                   {statistics.settings.rate_limit_minutes}
                 </p>
-                <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
+                <p className="admin-xs-secondary-m-0">
                   минут
                 </p>
               </div>
             </div>
         }
 
-          <div style={{
-          padding: '16px',
-          backgroundColor: 'var(--mac-info-bg)',
-          border: '1px solid var(--mac-info-border)',
-          borderRadius: 'var(--mac-radius-md)'
-        }}>
-            <h4 style={{
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-info)',
-            fontSize: 'var(--mac-font-size-sm)',
-            margin: '0 0 8px 0'
-          }}>
+          <div className="admin-p-16-bg-info-bg-bd-1solidvar-mac-info-border-radius-var--mac-radius-md">
+            <h4 className="admin-med-info-sm-m-008px0">
               Информация
             </h4>
-            <ul style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-info)',
-            margin: 0,
-            paddingLeft: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px'
-          }}>
+            <ul className="admin-xs-info-m-0-pl-16-flex-col-gap-4">
               <li>• Коды верификации хранятся в памяти сервера</li>
               <li>• Для production рекомендуется использовать Redis</li>
               <li>• Истекшие коды автоматически удаляются</li>
@@ -635,50 +392,29 @@ const PhoneVerificationManager = () => {
 
 
   return (
-    <div style={{
-      padding: '24px',
-      backgroundColor: 'var(--mac-bg-primary)',
-      minHeight: '100vh'
-    }}>
+    <div className="admin-p-24-bg-bg-primary-minh-100vh">
       {/* Заголовок */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Phone style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+      <div className="admin-flex-ai-center-jc-between-mb-24">
+        <div className="admin-flex-center-12">
+          <Phone className="admin-w-32-h-32-blue" />
           <div>
-            <h1 style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+            <h1 className="admin-2xl-semi-primary-m-0">
               Верификация телефонов
             </h1>
-            <p style={{
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)',
-              margin: 0
-            }}>
+            <p className="admin-secondary-sm-m-0">
               Управление SMS верификацией
             </p>
           </div>
         </div>
         
         <Button onClick={loadStatistics} disabled={loading} variant="outline">
-          <RefreshCw style={{
-            width: '16px',
-            height: '16px',
-            marginRight: '8px',
-            animation: loading ? 'spin 1s linear infinite' : 'none'
-          }} />
+          <RefreshCw className="admin-w-16-h-16-mr-8" style={{ '--admin-animation': loading ? 'spin 1s linear infinite' : 'none' }} />
           Обновить
         </Button>
       </div>
 
       {/* Вкладки */}
-      <div style={{
-        display: 'flex',
-        marginBottom: '24px'
-      }}>
+      <div className="admin-flex-mb-24">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -687,21 +423,7 @@ const PhoneVerificationManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px 20px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-                fontSize: 'var(--mac-font-size-sm)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-                position: 'relative',
-                marginBottom: '-1px'
-              }}
+              className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}
               onMouseEnter={(e) => {
                 if (!isActive) {
                   e.target.style.color = 'var(--mac-text-primary)';
@@ -713,22 +435,10 @@ const PhoneVerificationManager = () => {
                 }
               }}>
               
-              <Icon style={{
-                width: '16px',
-                height: '16px',
-                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
-              }} />
+              <Icon className="admin-w-16-h-16" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
               {tab.label}
               {isActive &&
-              <div style={{
-                position: 'absolute',
-                bottom: '0',
-                left: '0',
-                right: '0',
-                height: '3px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                borderRadius: '2px 2px 0 0'
-              }} />
+              <div className="admin-pos-absolute-bottom-0-left-0-right-0-h-3-bg-blue-radius-2px2px00" />
               }
             </button>);
 
@@ -736,16 +446,13 @@ const PhoneVerificationManager = () => {
       </div>
       
       {/* Разделительная линия */}
-      <div style={{
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }} />
+      <div className="admin-borderbottom-0a48a6-mb-24" />
 
       {/* Контент вкладок */}
       {loading && !statistics ?
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <Skeleton height="128px" style={{ width: '100%' }} />
-          <Skeleton height="256px" style={{ width: '100%' }} />
+      <div className="admin-flex-col-16">
+          <Skeleton height="128px" className="admin-w-full" />
+          <Skeleton height="256px" className="admin-w-full" />
         </div> :
 
       <>

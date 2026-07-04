@@ -397,200 +397,12 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             event.target.value = '';
         }
     };
-
-    // Styles
-    const styles = {
-        container: {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-        },
-        statsGrid: {
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '16px',
-        },
-        statCard: {
-            padding: '16px',
-            backgroundColor: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
-            borderRadius: '12px',
-            border: '1px solid var(--mac-border)',
-            textAlign: 'center',
-        },
-        statValue: {
-            fontSize: '28px',
-            fontWeight: 'bold',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '4px',
-        },
-        statLabel: {
-            fontSize: '13px',
-            color: 'var(--mac-text-secondary)',
-        },
-        mainCard: {
-            padding: '24px',
-            backgroundColor: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
-            borderRadius: '12px',
-            border: '1px solid var(--mac-border)',
-        },
-        header: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '20px',
-            flexWrap: 'wrap',
-            gap: '12px',
-        },
-        title: {
-            fontSize: '20px',
-            fontWeight: '600',
-            color: 'var(--mac-text-primary)',
-            margin: 0,
-        },
-        toolbar: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            flexWrap: 'wrap',
-        },
-        searchInput: {
-            padding: '8px 12px 8px 36px',
-            borderRadius: '8px',
-            border: '1px solid var(--mac-border)',
-            backgroundColor: isDark ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-secondary)',
-            color: 'var(--mac-text-primary)',
-            fontSize: '14px',
-            width: '200px',
-        },
-        select: {
-            padding: '8px 12px',
-            borderRadius: '8px',
-            border: '1px solid var(--mac-border)',
-            backgroundColor: isDark ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-secondary)',
-            color: 'var(--mac-text-primary)',
-            fontSize: '14px',
-        },
-        button: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 14px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: '8px',
-            backgroundColor: 'transparent',
-            color: 'var(--mac-text-primary)',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '500',
-        },
-        primaryButton: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 14px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '500',
-        },
-        dangerButton: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 14px',
-            backgroundColor: '#EF4444',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '500',
-        },
-        bulkActions: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 16px',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderRadius: '8px',
-            marginBottom: '16px',
-        },
-        table: {
-            width: '100%',
-            borderCollapse: 'collapse',
-        },
-        th: {
-            textAlign: 'left',
-            padding: '12px 8px',
-            borderBottom: '2px solid var(--mac-border)',
-            fontSize: '12px',
-            fontWeight: '600',
-            color: 'var(--mac-text-secondary)',
-            textTransform: 'uppercase',
-        },
-        td: {
-            padding: '12px 8px',
-            borderBottom: '1px solid var(--mac-border)',
-            fontSize: '14px',
-            color: 'var(--mac-text-primary)',
-        },
-        iconButton: {
-            padding: '6px',
-            border: 'none',
-            borderRadius: '6px',
-            backgroundColor: 'transparent',
-            cursor: 'pointer',
-            color: 'var(--mac-text-secondary)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        badge: {
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '2px 8px',
-            borderRadius: '12px',
-            fontSize: '11px',
-            fontWeight: '500',
-        },
-        colorDot: {
-            width: '16px',
-            height: '16px',
-            borderRadius: '50%',
-            border: '2px solid var(--mac-border)',
-        },
-        error: {
-            padding: '12px 16px',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            color: '#EF4444',
-            borderRadius: '8px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-        },
-        searchWrapper: {
-            position: 'relative',
-        },
-        searchIcon: {
-            position: 'absolute',
-            left: '10px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: 'var(--mac-text-secondary)',
-        },
-    };
-
     if (loading) {
         return (
-            <div style={styles.container}>
-                <div style={{ ...styles.mainCard, textAlign: 'center', padding: '40px' }}>
-                    <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite' }} />
-                    <p style={{ color: 'var(--mac-text-secondary)', marginTop: '12px' }}>
+            <div className="admin-qp-container">
+                <div className="admin-p-24-radius-12-bd-1px-solid-var-mac-bo-ta-center-p-40-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                    <RefreshCw size={24} className="admin-anim-spin-1s-linear-infin" />
+                    <p className="admin-secondary-mt-12">
                         Загрузка профилей...
                     </p>
                 </div>
@@ -602,38 +414,38 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
         filteredProfiles.every(p => selectedProfiles.includes(p.key));
 
     return (
-        <div style={styles.container}>
+        <div className="admin-qp-container">
             {/* Statistics Cards */}
-            <div style={styles.statsGrid}>
-                <div style={styles.statCard}>
-                    <div style={styles.statValue}>{stats.total}</div>
-                    <div style={styles.statLabel}>Всего вкладок</div>
+            <div className="admin-qp-stats-grid">
+                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                    <div className="admin-qp-stat-value">{stats.total}</div>
+                    <div className="admin-qp-stat-label">Всего вкладок</div>
                 </div>
-                <div style={{ ...styles.statCard }}>
-                    <div style={{ ...styles.statValue, color: 'var(--mac-success, #10B981)' }}>{stats.active}</div>
-                    <div style={styles.statLabel}>Активных</div>
+                <div className="admin-p-16-radius-12-bd-1px-solid-var-mac-bo-ta-center-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                    <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-success-10B9">{stats.active}</div>
+                    <div className="admin-qp-stat-label">Активных</div>
                 </div>
-                <div style={styles.statCard}>
-                    <div style={{ ...styles.statValue, color: 'var(--mac-warning, #F59E0B)' }}>{stats.inactive}</div>
-                    <div style={styles.statLabel}>Скрытых</div>
+                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                    <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-warning-F59E">{stats.inactive}</div>
+                    <div className="admin-qp-stat-label">Скрытых</div>
                 </div>
-                <div style={styles.statCard}>
-                    <div style={{ ...styles.statValue, color: 'var(--mac-info, #3B82F6)' }}>{stats.totalTags}</div>
-                    <div style={styles.statLabel}>Queue Tags</div>
+                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                    <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-info-3B82F6">{stats.totalTags}</div>
+                    <div className="admin-qp-stat-label">Queue Tags</div>
                 </div>
             </div>
 
             {/* Main Card */}
-            <div style={styles.mainCard}>
+            <div className="admin-qp-main-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
                 {/* Header */}
-                <div style={styles.header}>
-                    <h2 style={styles.title}>Вкладки регистратуры</h2>
-                    <div style={styles.toolbar}>
+                <div className="admin-qp-header">
+                    <h2 className="admin-qp-title">Вкладки регистратуры</h2>
+                    <div className="admin-qp-toolbar">
                         {/* Search */}
-                        <div style={styles.searchWrapper}>
-                            <Search size={16} style={styles.searchIcon} />
+                        <div className="admin-qp-search-wrapper">
+                            <Search size={16} className="admin-qp-search-icon" />
                             <input
-                                style={styles.searchInput}
+                                className="admin-qp-search-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-secondary)' }}
                                 aria-label="Поиск профилей очереди"
                                 placeholder="Поиск..."
                                 value={searchTerm}
@@ -647,16 +459,16 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             onChange={setStatusFilter}
                             options={STATUS_FILTER_OPTIONS}
                             size="large"
-                            style={{ width: '160px' }}/>
+                            className="admin-w-160"/>
 
                         {/* Export */}
-                        <button style={styles.button} onClick={handleExport} disabled={saving}>
+                        <button className="admin-qp-button" onClick={handleExport} disabled={saving}>
                             <Download size={16} />
                             Экспорт
                         </button>
 
                         {/* Import */}
-                        <label style={{ ...styles.button, cursor: 'pointer' }}>
+                        <label className="admin-d-flex-ai-center-gap-6-p-8px-14px-bd-1px-solid-var-mac-bo-radius-8-bgc-transparent-primary-cur-pointer-fs-13-fw-500-cur-pointer">
                             <Upload size={16} />
                             Импорт
                             <input
@@ -664,14 +476,14 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                 aria-label="Импортировать профили очереди из CSV"
                                 accept=".csv"
                                 onChange={handleImport}
-                                style={{ display: 'none' }}
+                                className="admin-d-none"
                                 disabled={saving}
                             />
                         </label>
 
                         {/* Refresh */}
                         <button
-                            style={styles.button}
+                            className="admin-qp-button"
                             onClick={loadProfiles}
                             disabled={saving}
                             aria-label="Обновить профили очереди"
@@ -681,7 +493,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
                         {/* Add */}
                         <button
-                            style={styles.primaryButton}
+                            className="admin-qp-primary-button"
                             onClick={() => setShowCreateForm(true)}
                             disabled={saving}
                         >
@@ -693,11 +505,11 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
                 {/* Error message */}
                 {error && (
-                    <div style={styles.error}>
+                    <div className="admin-qp-error">
                         <AlertCircle size={16} />
                         {error}
                         <button
-                            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer' }}
+                            className="admin-ml-auto-bg-none-bd-none-cur-pointer"
                             onClick={() => setError(null)}
                             aria-label="Скрыть сообщение об ошибке"
                         >
@@ -708,12 +520,12 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
                 {/* Bulk actions bar */}
                 {selectedProfiles.length > 0 && (
-                    <div style={styles.bulkActions}>
-                        <span style={{ fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+                    <div className="admin-qp-bulk-actions">
+                        <span className="admin-fs-14-primary">
                             Выбрано: {selectedProfiles.length}
                         </span>
                         <button
-                            style={{ ...styles.button, marginLeft: 'auto' }}
+                            className="admin-d-flex-ai-center-gap-6-p-8px-14px-bd-1px-solid-var-mac-bo-radius-8-bgc-transparent-primary-cur-pointer-fs-13-fw-500-ml-auto"
                             onClick={() => handleBulkActivate(true)}
                             disabled={saving}
                         >
@@ -721,7 +533,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             Активировать
                         </button>
                         <button
-                            style={styles.button}
+                            className="admin-qp-button"
                             onClick={() => handleBulkActivate(false)}
                             disabled={saving}
                         >
@@ -729,7 +541,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             Скрыть
                         </button>
                         <button
-                            style={styles.dangerButton}
+                            className="admin-qp-danger-button"
                             onClick={handleBulkDelete}
                             disabled={saving}
                         >
@@ -750,34 +562,34 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                 )}
 
                 {/* Profiles table */}
-                <table style={styles.table}>
+                <table className="admin-qp-table">
                     <thead>
                         <tr>
-                            <th style={{ ...styles.th, width: '40px' }}>
+                            <th className="admin-ta-left-p-12px-8px-bd-b-2px-solid-var-mac-bo-fs-12-fw-600-secondary-tt-uppercase-w-40">
                                 <button
-                                    style={styles.iconButton}
+                                    className="admin-qp-icon-button"
                                     onClick={() => handleSelectAll(!isAllSelected)}
                                     aria-label={isAllSelected ? 'Снять выбор со всех вкладок очереди' : 'Выбрать все вкладки очереди'}
                                 >
                                     {isAllSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                                 </button>
                             </th>
-                            <th style={styles.th}>Порядок</th>
-                            <th style={styles.th}>Ключ</th>
-                            <th style={styles.th}>Название</th>
-                            <th style={styles.th}>Queue Tags</th>
-                            <th style={styles.th}>Иконка</th>
-                            <th style={styles.th}>Цвет</th>
-                            <th style={styles.th}>Статус</th>
-                            <th style={styles.th}>Действия</th>
+                            <th className="admin-qp-th">Порядок</th>
+                            <th className="admin-qp-th">Ключ</th>
+                            <th className="admin-qp-th">Название</th>
+                            <th className="admin-qp-th">Queue Tags</th>
+                            <th className="admin-qp-th">Иконка</th>
+                            <th className="admin-qp-th">Цвет</th>
+                            <th className="admin-qp-th">Статус</th>
+                            <th className="admin-qp-th">Действия</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredProfiles.map((profile) => (
                             <tr key={profile.key}>
-                                <td style={styles.td}>
+                                <td className="admin-qp-td">
                                     <button
-                                        style={styles.iconButton}
+                                        className="admin-qp-icon-button"
                                         onClick={() => handleSelectProfile(
                                             profile.key,
                                             !selectedProfiles.includes(profile.key)
@@ -785,84 +597,68 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                         aria-label={selectedProfiles.includes(profile.key) ? `Снять выбор вкладки ${profile.name}` : `Выбрать вкладку ${profile.name}`}
                                     >
                                         {selectedProfiles.includes(profile.key)
-                                            ? <CheckSquare size={18} style={{ color: 'var(--mac-accent-blue)' }} />
+                                            ? <CheckSquare size={18} className="admin-blue" />
                                             : <Square size={18} />
                                         }
                                     </button>
                                 </td>
-                                <td style={styles.td}>
-                                    <span style={{ color: 'var(--mac-text-secondary)' }}>
+                                <td className="admin-qp-td">
+                                    <span className="admin-text-secondary">
                                         {profile.order}
                                     </span>
                                 </td>
-                                <td style={styles.td}>
-                                    <code style={{
-                                        backgroundColor: 'var(--mac-bg-tertiary)',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        fontSize: '12px'
-                                    }}>
+                                <td className="admin-qp-td">
+                                    <code className="admin-bgc-bg-tertiary-p-2px-6px-radius-4-fs-12">
                                         {profile.key}
                                     </code>
                                 </td>
-                                <td style={styles.td}>
+                                <td className="admin-qp-td">
                                     <div>{profile.title_ru || profile.title}</div>
                                     {profile.title_ru && (
-                                        <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+                                        <div className="admin-fs-12-secondary">
                                             {profile.title}
                                         </div>
                                     )}
                                 </td>
-                                <td style={styles.td}>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                <td className="admin-qp-td">
+                                    <div className="admin-d-flex-fw-wrap-gap-4">
                                         {(profile.queue_tags || []).map((tag, idx) => (
                                             <span
                                                 key={idx}
-                                                style={{
-                                                    ...styles.badge,
-                                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                                    color: '#3B82F6',
-                                                }}
+                                                className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-rgba-59-130-246-0-1-3B82F6"
                                             >
                                                 {tag}
                                             </span>
                                         ))}
                                     </div>
                                 </td>
-                                <td style={styles.td}>
+                                <td className="admin-qp-td">
                                     {(() => {
                                         const IconComponent = AVAILABLE_ICONS.find(i => i.name === profile.icon)?.component || Package;
-                                        return <IconComponent size={20} style={{ color: profile.color || 'var(--mac-text-secondary)' }} />;
+                                        return <IconComponent size={20} className="admin-col-dyn" style={{ '--admin-col0': profile.color || 'var(--mac-text-secondary)' }} />;
                                     })()}
                                 </td>
-                                <td style={styles.td}>
+                                <td className="admin-qp-td">
                                     <div
                                         role="img"
                                         aria-label={`Цвет вкладки ${profile.name}: ${profile.color || 'не задан'}`}
-                                        style={{
-                                            ...styles.colorDot,
-                                            backgroundColor: profile.color || '#718096'
-                                        }}
+                                        className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || '#718096' }}
                                         title={profile.color}
                                     />
                                 </td>
-                                <td style={styles.td}>
+                                <td className="admin-qp-td">
                                     <span
-                                        style={{
-                                            ...styles.badge,
-                                            backgroundColor: profile.is_active !== false
+                                        className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn" style={{ '--admin-bgc0': profile.is_active !== false
                                                 ? 'rgba(16, 185, 129, 0.1)'
-                                                : 'rgba(239, 68, 68, 0.1)',
-                                            color: profile.is_active !== false ? '#10B981' : '#EF4444',
-                                        }}
+                                                : 'rgba(239, 68, 68, 0.1)', '--admin-col1': profile.is_active !== false ? '#10B981' : '#EF4444' }}
                                     >
                                         {profile.is_active !== false ? 'Активен' : 'Скрыт'}
                                     </span>
                                 </td>
-                                <td style={styles.td}>
-                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                <td className="admin-qp-td">
+                                    <div className="admin-d-flex-gap-4">
                                         <button
-                                            style={styles.iconButton}
+                                            className="admin-qp-icon-button"
                                             onClick={() => handleToggleActive(profile)}
                                             aria-label={profile.is_active !== false ? `Скрыть вкладку ${profile.name}` : `Показать вкладку ${profile.name}`}
                                             title={profile.is_active !== false ? 'Скрыть' : 'Показать'}
@@ -871,7 +667,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                             {profile.is_active !== false ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                         <button
-                                            style={styles.iconButton}
+                                            className="admin-qp-icon-button"
                                             onClick={() => setEditingProfile(profile)}
                                             aria-label={`Редактировать вкладку ${profile.name}`}
                                             title="Редактировать"
@@ -880,7 +676,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                             <Edit2 size={16} />
                                         </button>
                                         <button
-                                            style={{ ...styles.iconButton, color: '#EF4444' }}
+                                            className="admin-p-6-bd-none-radius-6-bgc-transparent-cur-pointer-secondary-d-inline-flex-ai-center-jc-center-EF4444"
                                             onClick={() => handleDelete(profile.key)}
                                             aria-label={`Удалить вкладку ${profile.name}`}
                                             title="Удалить"
@@ -896,7 +692,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                 </table>
 
                 {filteredProfiles.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--mac-text-secondary)' }}>
+                    <div className="admin-ta-center-p-40-secondary">
                         {profiles.length === 0
                             ? 'Нет профилей. Нажмите "Добавить" для создания.'
                             : 'Нет профилей, соответствующих фильтрам.'
@@ -951,155 +747,21 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
         }
     };
 
-    const styles = {
-        overlay: {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-        },
-        modal: {
-            backgroundColor: isDark ? 'var(--mac-bg-primary)' : 'white',
-            borderRadius: '16px',
-            padding: '24px',
-            width: '500px',
-            maxWidth: '90vw',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        },
-        header: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '24px',
-        },
-        title: {
-            fontSize: '18px',
-            fontWeight: '600',
-            color: 'var(--mac-text-primary)',
-            margin: 0,
-        },
-        closeButton: {
-            padding: '6px',
-            border: 'none',
-            borderRadius: '6px',
-            backgroundColor: 'transparent',
-            cursor: 'pointer',
-            color: 'var(--mac-text-secondary)',
-        },
-        field: {
-            marginBottom: '16px',
-        },
-        label: {
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '6px',
-        },
-        input: {
-            width: '100%',
-            padding: '10px 12px',
-            borderRadius: '8px',
-            border: '1px solid var(--mac-border)',
-            backgroundColor: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
-            color: 'var(--mac-text-primary)',
-            fontSize: '14px',
-            boxSizing: 'border-box',
-        },
-        hint: {
-            fontSize: '12px',
-            color: 'var(--mac-text-secondary)',
-            marginTop: '4px',
-        },
-        row: {
-            display: 'flex',
-            gap: '16px',
-        },
-        iconGrid: {
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '8px',
-            marginTop: '8px',
-        },
-        iconOption: {
-            padding: '12px',
-            border: '2px solid var(--mac-border)',
-            borderRadius: '8px',
-            backgroundColor: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-            transition: 'all 0.2s',
-        },
-        colorGrid: {
-            display: 'flex',
-            gap: '8px',
-            flexWrap: 'wrap',
-            marginTop: '8px',
-        },
-        colorOption: {
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            border: '3px solid transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-        },
-        actions: {
-            display: 'flex',
-            gap: '12px',
-            marginTop: '24px',
-            justifyContent: 'flex-end',
-        },
-        cancelButton: {
-            padding: '10px 20px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: '8px',
-            backgroundColor: 'transparent',
-            color: 'var(--mac-text-primary)',
-            cursor: 'pointer',
-            fontSize: '14px',
-        },
-        submitButton: {
-            padding: '10px 20px',
-            border: 'none',
-            borderRadius: '8px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            color: 'white',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-        },
-    };
-
     return (
         <div
-            style={styles.overlay}
+            className="admin-qp-overlay"
             role="button"
             tabIndex={0}
             aria-label="Закрыть форму вкладки очереди"
             onClick={onCancel}
             onKeyDown={(event) => handleActivationKeyDown(event, onCancel)}>
-            <div style={styles.modal} onClickCapture={e => e.stopPropagation()}>
-                <div style={styles.header}>
-                    <h3 style={styles.title}>
+            <div className="admin-qp-modal" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-primary)' : 'white' }} onClickCapture={e => e.stopPropagation()}>
+                <div className="admin-qp-modal-header">
+                    <h3 className="admin-qp-modal-title">
                         {isEdit ? 'Редактирование вкладки' : 'Новая вкладка'}
                     </h3>
                     <button
-                        style={styles.closeButton}
+                        className="admin-qp-close-button"
                         onClick={onCancel}
                         aria-label="Закрыть форму вкладки очереди"
                     >
@@ -1110,10 +772,10 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                 <form onSubmit={handleSubmit}>
                     {/* Key (only for create) */}
                     {!isEdit && (
-                        <div style={styles.field}>
-                            <label style={styles.label}>Уникальный ключ *</label>
+                        <div className="admin-qp-field">
+                            <label className="admin-qp-label">Уникальный ключ *</label>
                             <input
-                                style={styles.input}
+                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                                 aria-label="Уникальный ключ вкладки очереди"
                                 value={formData.key}
                                 onChange={e => setFormData({ ...formData, key: e.target.value })}
@@ -1121,16 +783,16 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                 required
                                 pattern="[a-z_]+"
                             />
-                            <div style={styles.hint}>Только латинские буквы и подчеркивания</div>
+                            <div className="admin-qp-hint">Только латинские буквы и подчеркивания</div>
                         </div>
                     )}
 
                     {/* Titles */}
-                    <div style={styles.row}>
-                        <div style={{ ...styles.field, flex: 1 }}>
-                            <label style={styles.label}>Название (EN) *</label>
+                    <div className="admin-qp-row">
+                        <div className="admin-mb-16-flex-1-1">
+                            <label className="admin-qp-label">Название (EN) *</label>
                             <input
-                                style={styles.input}
+                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                                 aria-label="Название вкладки очереди на английском"
                                 value={formData.title}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
@@ -1138,10 +800,10 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                 required
                             />
                         </div>
-                        <div style={{ ...styles.field, flex: 1 }}>
-                            <label style={styles.label}>Название (RU)</label>
+                        <div className="admin-mb-16-flex-1">
+                            <label className="admin-qp-label">Название (RU)</label>
                             <input
-                                style={styles.input}
+                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                                 aria-label="Название вкладки очереди на русском"
                                 value={formData.title_ru}
                                 onChange={e => setFormData({ ...formData, title_ru: e.target.value })}
@@ -1151,23 +813,23 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     </div>
 
                     {/* Queue Tags */}
-                    <div style={styles.field}>
-                        <label style={styles.label}>Queue Tags</label>
+                    <div className="admin-qp-field">
+                        <label className="admin-qp-label">Queue Tags</label>
                         <input
-                            style={styles.input}
+                            className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                             aria-label="Queue Tags"
                             value={formData.queue_tags}
                             onChange={e => setFormData({ ...formData, queue_tags: e.target.value })}
                             placeholder="cardio, cardiology, cardiology_common"
                         />
-                        <div style={styles.hint}>Разделяйте запятыми. Записи с этими тегами появятся на вкладке.</div>
+                        <div className="admin-qp-hint">Разделяйте запятыми. Записи с этими тегами появятся на вкладке.</div>
                     </div>
 
                     {/* Order */}
-                    <div style={styles.field}>
-                        <label style={styles.label}>Порядок отображения</label>
+                    <div className="admin-qp-field">
+                        <label className="admin-qp-label">Порядок отображения</label>
                         <input
-                            style={{ ...styles.input, width: '100px' }}
+                            className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                             type="number"
                             aria-label="Порядок отображения вкладки очереди"
                             min="0"
@@ -1177,9 +839,9 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     </div>
 
                     {/* Icon */}
-                    <div style={styles.field}>
-                        <label style={styles.label}>Иконка</label>
-                        <div style={styles.iconGrid}>
+                    <div className="admin-qp-field">
+                        <label className="admin-qp-label">Иконка</label>
+                        <div className="admin-qp-icon-grid">
                             {AVAILABLE_ICONS.map(icon => {
                                 const IconComponent = icon.component;
                                 const isSelected = formData.icon === icon.name;
@@ -1187,15 +849,11 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                     <button
                                         key={icon.name}
                                         type="button"
-                                        style={{
-                                            ...styles.iconOption,
-                                            borderColor: isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)',
-                                            backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                                        }}
+                                        className="admin-p-12-bd-2px-solid-var-mac-bo-radius-8-bgc-transparent-cur-pointer-d-flex-fd-column-ai-center-gap-4-tr-all-0-2s-bd-c-dyn-bgc-dyn" style={{ '--admin-bd-c0': isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)', '--admin-bgc1': isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent' }}
                                         onClick={() => setFormData({ ...formData, icon: icon.name })}
                                     >
-                                        <IconComponent size={24} style={{ color: formData.color }} />
-                                        <span style={{ fontSize: '10px', color: 'var(--mac-text-secondary)' }}>
+                                        <IconComponent size={24} className="admin-col-dyn" style={{ '--admin-col0': formData.color }} />
+                                        <span className="admin-fs-10-secondary">
                                             {icon.label}
                                         </span>
                                     </button>
@@ -1205,19 +863,14 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     </div>
 
                     {/* Color */}
-                    <div style={styles.field}>
-                        <label style={styles.label}>Цвет</label>
-                        <div style={styles.colorGrid}>
+                    <div className="admin-qp-field">
+                        <label className="admin-qp-label">Цвет</label>
+                        <div className="admin-qp-color-grid">
                             {PRESET_COLORS.map(color => (
                                 <button
                                     key={color}
                                     type="button"
-                                    style={{
-                                        ...styles.colorOption,
-                                        backgroundColor: color,
-                                        borderColor: formData.color === color ? 'white' : 'transparent',
-                                        boxShadow: formData.color === color ? `0 0 0 2px ${color}` : 'none',
-                                    }}
+                                    className="admin-w-32-h-32-radius-50pct-bd-3px-solid-transparen-cur-pointer-tr-all-0-2s-bgc-dyn-bd-c-dyn-bsh-dyn" style={{ '--admin-bgc0': color, '--admin-bd-c1': formData.color === color ? 'white' : 'transparent', '--admin-bsh2': formData.color === color ? `0 0 0 2px ${color}` : 'none' }}
                                     onClick={() => setFormData({ ...formData, color })}
                                     aria-label={`Выбрать цвет ${color}`}
                                     title={color}
@@ -1228,48 +881,48 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                 aria-label="Пользовательский цвет вкладки очереди"
                                 value={formData.color}
                                 onChange={e => setFormData({ ...formData, color: e.target.value })}
-                                style={{ width: '32px', height: '32px', border: 'none', cursor: 'pointer' }}
+                                className="admin-w-32-h-32-bd-none-cur-pointer"
                             />
                         </div>
                     </div>
 
                     {/* Active */}
-                    <div style={styles.field}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <div className="admin-qp-field">
+                        <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
                             <input
                                 type="checkbox"
                                 aria-label="Активная вкладка очереди"
                                 checked={formData.is_active}
                                 onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                             />
-                            <span style={styles.label}>Активная вкладка (видна пользователям)</span>
+                            <span className="admin-qp-label">Активная вкладка (видна пользователям)</span>
                         </label>
                     </div>
 
                     {/* ⭐ NEW: Show on QR Page */}
-                    <div style={styles.field}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <div className="admin-qp-field">
+                        <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
                             <input
                                 type="checkbox"
                                 aria-label="Показывать вкладку на QR-странице"
                                 checked={formData.show_on_qr_page}
                                 onChange={e => setFormData({ ...formData, show_on_qr_page: e.target.checked })}
                             />
-                            <span style={styles.label}>Показывать на QR-странице (самозапись пациентов)</span>
+                            <span className="admin-qp-label">Показывать на QR-странице (самозапись пациентов)</span>
                         </label>
-                        <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px', marginLeft: '24px' }}>
+                        <div className="admin-fs-12-secondary-mt-4-ml-24">
                             Если включено, пациенты смогут выбрать эту специальность при сканировании QR-кода
                         </div>
                     </div>
 
                     {/* Actions */}
-                    <div style={styles.actions}>
-                        <button type="button" style={styles.cancelButton} onClick={onCancel}>
+                    <div className="admin-qp-actions">
+                        <button type="button" className="admin-qp-cancel-button" onClick={onCancel}>
                             Отмена
                         </button>
                         <button
                             type="submit"
-                            style={styles.submitButton}
+                            className="admin-qp-submit-button"
                             disabled={saving}
                             aria-label={isEdit ? 'Сохранить вкладку очереди' : 'Создать вкладку очереди'}
                         >

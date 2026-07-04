@@ -11,32 +11,16 @@ import ErrorBoundary from '../common/ErrorBoundary';
 // Простой компонент вкладок для админки
 const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
   return (
-    <div style={{
-      display: 'flex',
-      gap: '4px',
-      padding: '8px',
-      background: 'var(--mac-card-bg)',
-      borderRadius: '8px',
-      border: '1px solid var(--mac-card-border)',
-      marginBottom: '20px'
-    }}>
+    <div className="admin-tab-bar-flex-dyn" style={{ '--admin-bg': 'var(--mac-card-bg)', '--admin-bd': '1px solid var(--mac-card-border)' }}>
       {tabs.map((tab) =>
       <button
         key={tab.id}
         onClick={() => onTabChange(tab.id)}
+        className="admin-tab-btn-dyn"
         style={{
-          padding: '8px 16px',
-          border: 'none',
-          borderRadius: '6px',
-          background: activeTab === tab.id ? 'color-mix(in srgb, var(--mac-accent-blue), transparent 88%)' : 'transparent',
-          color: activeTab === tab.id ? 'var(--mac-accent-blue)' : 'var(--mac-text-primary)',
-          fontSize: '14px',
-          fontWeight: activeTab === tab.id ? '600' : '400',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
+          '--admin-tab-bg': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-accent-blue), transparent 88%)' : 'transparent',
+          '--admin-tab-color': activeTab === tab.id ? 'var(--mac-accent-blue)' : 'var(--mac-text-primary)',
+          '--admin-tab-fw': activeTab === tab.id ? '600' : '400',
         }}>
         
           {tab.label}
@@ -100,13 +84,13 @@ const UnifiedFinance = ({ renderFinance }) => {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="admin-unified-root-no-color">
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={setActiveTab} />
       
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div className="admin-unified-content">
         <ErrorBoundary>
           {/* P-025 fix: catch runtime errors in child panels */}
           {renderContent()}

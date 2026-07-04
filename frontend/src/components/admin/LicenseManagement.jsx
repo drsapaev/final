@@ -226,67 +226,32 @@ const LicenseManagement = () => {
   'Добавьте первую лицензию, чтобы контролировать доступы и сроки действия программ.';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflow: 'hidden' }}>
+    <div className="admin-flex-col-gap-24-overflow-hidden">
       {/* Заголовок и статистика */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '16px'
-      }}>
+      <div className="admin-flex-jc-between-ai-center-wrap-gap-16">
         <div>
-          <h2 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)',
-            margin: '0 0 8px 0'
-          }}>
+          <h2 className="admin-2xl-bold-primary-m-008px0">
             Управление лицензиями
           </h2>
-          <p style={{
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            margin: 0
-          }}>
+          <p className="admin-secondary-sm-m-0">
             Учет и управление программными лицензиями
           </p>
         </div>
         {stats &&
-        <div style={{
-          display: 'flex',
-          gap: '24px',
-          flexWrap: 'wrap'
-        }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-accent-blue)',
-              marginBottom: '4px'
-            }}>
+        <div className="admin-flex-gap-24-wrap">
+            <div className="admin-text-center">
+              <div className="admin-2xl-bold-blue-mb-4">
                 {stats.total_licenses}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Всего лицензий
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-success)',
-              marginBottom: '4px'
-            }}>
+            <div className="admin-text-center">
+              <div className="admin-2xl-bold-success-mb-4">
                 {stats.active_licenses}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Активных
               </div>
             </div>
@@ -304,33 +269,20 @@ const LicenseManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ flex: 1, position: 'relative' }}>
+      <MacOSCard className="admin-p-24">
+        <div className="admin-flex-col-gap-16-wrap">
+          <div className="admin-flex-1-pos-relative">
             <Input
               type="text"
               aria-label="Поиск лицензий по названию, поставщику или ключу"
               placeholder="Поиск по названию, поставщику или ключу..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '40px' }} />
+              className="admin-pl-40" />
             
-            <Search aria-hidden="true" style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--mac-text-tertiary)',
-              width: '16px',
-              height: '16px'
-            }} />
+            <Search aria-hidden="true" className="admin-pos-absolute-left-12-top-50pct-transform-translateY-50-tertiary-w-16-h-16" />
           </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="admin-flex-gap-12-wrap">
             <Select
               aria-label="Фильтр лицензий по статусу"
               value={statusFilter}
@@ -340,7 +292,7 @@ const LicenseManagement = () => {
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
-              style={{ minWidth: '150px' }} />
+              className="admin-minw-150" />
             <Select
               aria-label="Фильтр лицензий по типу"
               value={typeFilter}
@@ -350,19 +302,12 @@ const LicenseManagement = () => {
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
-              style={{ minWidth: '150px' }} />
+              className="admin-minw-150" />
             <Button
               onClick={() => setShowAddForm(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none',
-                padding: '8px 16px'
-              }}>
+              className="admin-flex-ai-center-gap-8-bg-blue-bd-none-p-8px16">
               
-              <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <Plus aria-hidden="true" className="admin-icon-16" />
               <span>Добавить лицензию</span>
             </Button>
           </div>
@@ -371,19 +316,9 @@ const LicenseManagement = () => {
 
       {/* Форма добавления/редактирования */}
       {showAddForm &&
-      <MacOSCard style={{ padding: '24px', overflow: 'hidden' }}>
-          <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+      <MacOSCard className="admin-p-24-overflow-hidden">
+          <div className="admin-flex-jc-between-ai-center-mb-16">
+            <h3 className="admin-lg-semi-primary-m-0">
               {editingLicense ? 'Редактировать лицензию' : 'Добавить лицензию'}
             </h3>
             <Button
@@ -395,26 +330,16 @@ const LicenseManagement = () => {
               setEditingLicense(null);
               resetForm();
             }}
-            style={{ padding: '8px' }}>
+            className="admin-p-8">
             
-              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <X aria-hidden="true" className="admin-icon-16" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '16px'
-          }}>
+          <form onSubmit={handleSubmit} className="admin-flex-col-16">
+            <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-16">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Название *
                 </label>
                 <Input
@@ -426,13 +351,7 @@ const LicenseManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Тип *
                 </label>
                 <Select
@@ -446,13 +365,7 @@ const LicenseManagement = () => {
                 size="large" />
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Лицензионный ключ *
                 </label>
                 <Input
@@ -464,13 +377,7 @@ const LicenseManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Поставщик
                 </label>
                 <Input
@@ -481,13 +388,7 @@ const LicenseManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Статус
                 </label>
                 <Select
@@ -498,13 +399,7 @@ const LicenseManagement = () => {
                 size="large" />
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Дата покупки
                 </label>
                 <Input
@@ -514,13 +409,7 @@ const LicenseManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Дата истечения
                 </label>
                 <Input
@@ -530,13 +419,7 @@ const LicenseManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Стоимость (сум)
                 </label>
                 <Input
@@ -547,13 +430,7 @@ const LicenseManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Количество мест
                 </label>
                 <Input
@@ -567,13 +444,7 @@ const LicenseManagement = () => {
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
-            }}>
+              <label className="admin-block-sm-med-primary-mb-4">
                 Описание
               </label>
               <Textarea
@@ -584,11 +455,7 @@ const LicenseManagement = () => {
             
             </div>
 
-            <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px'
-          }}>
+            <div className="admin-flex-jc-end-gap-12">
               <Button
               type="button"
               variant="outline"
@@ -605,26 +472,16 @@ const LicenseManagement = () => {
               type="submit"
               disabled={saving}
               aria-label={editingLicense ? 'Update license' : 'Add license'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none'
-              }}>
+              className="admin-flex-ai-center-gap-8-bg-blue-bd-none">
               
                 {saving ?
               <>
-                    <RefreshCw aria-hidden="true" style={{
-                  width: '16px',
-                  height: '16px',
-                  animation: 'spin 1s linear infinite'
-                }} />
+                    <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin1slinearinfinite" />
                     Сохранение...
                   </> :
 
               <>
-                    <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                    <Save aria-hidden="true" className="admin-icon-16" />
                     {editingLicense ? 'Обновить' : 'Добавить'}
                   </>
               }
@@ -636,14 +493,9 @@ const LicenseManagement = () => {
 
       {/* Список лицензий */}
       {loading ?
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px',
-        overflow: 'hidden'
-      }}>
+      <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24-overflow-hidden">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} style={{ padding: '24px' }}>
+        <MacOSCard key={i} className="admin-p-24">
               <Skeleton height="200px" />
             </MacOSCard>
         )}
@@ -655,40 +507,21 @@ const LicenseManagement = () => {
         description={licenseEmptyDescription}
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" focusable="false" className="admin-icon-16-mr-8" />
               Добавить лицензию
             </Button>
         } /> :
 
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px',
-        overflow: 'hidden'
-      }}>
+      <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24-overflow-hidden">
           {filteredLicenses.map((license) =>
-        <MacOSCard key={license.id} style={{ padding: '24px' }}>
-              <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '16px'
-          }}>
+        <MacOSCard key={license.id} className="admin-p-24">
+              <div className="admin-flex-jc-between-ai-start-mb-16">
                 <div>
-                  <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 4px 0'
-              }}>
+                  <h3 className="admin-lg-semi-primary-m-004px0">
                     {license.name}
                   </h3>
-                  <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0
-              }}>
+                  <p className="admin-sm-secondary-m-0">
                     {license.vendor} • {getTypeLabel(license.type)}
                   </p>
                 </div>
@@ -698,22 +531,10 @@ const LicenseManagement = () => {
             
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                  <Key aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                  <span style={{
-                fontFamily: 'monospace',
-                backgroundColor: 'var(--mac-bg-secondary)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontSize: 'var(--mac-font-size-xs)'
-              }}>
+              <div className="admin-flex-col-gap-8-mb-16">
+                <div className="admin-flex-ai-center-gap-8-sm-secondary">
+                  <Key aria-hidden="true" className="admin-icon-16" />
+                  <span className="admin-fontfamily-e89ae9-bg-bg-secondary-p-2px6-radius-4-xs">
                     {showKeys[license.id] ? license.license_key : '••••••••••••••••'}
                   </span>
                   <Button
@@ -721,12 +542,12 @@ const LicenseManagement = () => {
                 variant="outline"
                 aria-label={showKeys[license.id] ? `Скрыть ключ лицензии ${license.name}` : `Показать ключ лицензии ${license.name}`}
                 onClick={() => toggleKeyVisibility(license.id)}
-                style={{ padding: '2px 6px', minWidth: 'auto' }}>
+                className="admin-p-2px6-minw-auto">
                 
                     {showKeys[license.id] ?
-                <EyeOff aria-hidden="true" style={{ width: '12px', height: '12px' }} /> :
+                <EyeOff aria-hidden="true" className="admin-w-12-h-12" /> :
 
-                <Eye aria-hidden="true" style={{ width: '12px', height: '12px' }} />
+                <Eye aria-hidden="true" className="admin-w-12-h-12" />
                 }
                   </Button>
                   <Button
@@ -734,89 +555,58 @@ const LicenseManagement = () => {
                 variant="outline"
                 aria-label={`Скопировать ключ лицензии ${license.name}`}
                 onClick={() => copyKey(license.license_key)}
-                style={{ padding: '2px 6px', minWidth: 'auto' }}>
+                className="admin-p-2px6-minw-auto">
                 
-                    <Copy aria-hidden="true" style={{ width: '12px', height: '12px' }} />
+                    <Copy aria-hidden="true" className="admin-w-12-h-12" />
                   </Button>
                 </div>
                 {license.cost > 0 &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                    <DollarSign aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+            <div className="admin-flex-ai-center-gap-8-sm-secondary">
+                    <DollarSign aria-hidden="true" className="admin-icon-16" />
                     <span>{license.cost.toLocaleString()} сум</span>
                   </div>
             }
-                <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                  <Shield aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                <div className="admin-flex-ai-center-gap-8-sm-secondary">
+                  <Shield aria-hidden="true" className="admin-icon-16" />
                   <span>{license.seats} мест</span>
                 </div>
                 {license.expiry_date &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: isExpiringSoon(license.expiry_date) ? 'var(--mac-warning)' : 'var(--mac-text-secondary)'
-            }}>
-                    <Calendar aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+            <div className="admin-flex-ai-center-gap-8-sm" style={{ '--admin-color': isExpiringSoon(license.expiry_date) ? 'var(--mac-warning)' : 'var(--mac-text-secondary)' }}>
+                    <Calendar aria-hidden="true" className="admin-icon-16" />
                     <span>Истекает: {new Date(license.expiry_date).toLocaleDateString()}</span>
                     {isExpiringSoon(license.expiry_date) &&
-              <AlertTriangle aria-hidden="true" style={{ width: '14px', height: '14px' }} />
+              <AlertTriangle aria-hidden="true" className="admin-icon-14" />
               }
                   </div>
             }
               </div>
 
               {license.description &&
-          <div style={{ marginBottom: '16px' }}>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0,
-              lineHeight: '1.4'
-            }}>
+          <div className="admin-mb-16">
+                  <p className="admin-sm-secondary-m-0-lh-14">
                     {license.description}
                   </p>
                 </div>
           }
 
-              <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px'
-          }}>
+              <div className="admin-flex-jc-end-gap-8">
                 <Button
               type="button"
               variant="outline"
               aria-label={`Редактировать лицензию ${license.name}`}
               onClick={() => handleEdit(license)}
-              style={{ padding: '6px 12px' }}>
+              className="admin-p-6px12">
               
-                  <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Edit aria-hidden="true" className="admin-icon-16" />
                 </Button>
                 <Button
               type="button"
               variant="outline"
               aria-label={`Удалить лицензию ${license.name}`}
               onClick={() => handleDelete(license.id)}
-              style={{
-                padding: '6px 12px',
-                color: 'var(--mac-error)',
-                borderColor: 'var(--mac-error)'
-              }}>
+              className="admin-p-6px12-error-bd-error">
               
-                  <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Trash2 aria-hidden="true" className="admin-icon-16" />
                 </Button>
               </div>
             </MacOSCard>

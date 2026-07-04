@@ -178,40 +178,28 @@ const AllFreeApproval = () => {void
       variant="default"
       padding="default">
       
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div className="admin-flex-col-24">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="admin-flex-between">
           <div>
-            <h2 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: 'var(--mac-text-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              margin: 0
-            }}>
-              <Bell size={24} style={{ color: 'var(--mac-warning)' }} />
+            <h2 className="admin-fs-24-fw-700-primary-d-flex-ai-center-gap-8-m-0">
+              <Bell size={24} className="admin-warning" />
               Заявки All Free
               {pendingCount > 0 &&
-              <Badge variant="warning" style={{ marginLeft: '8px' }}>
+              <Badge variant="warning" className="admin-ml-8">
                   {pendingCount} новых
                 </Badge>
               }
             </h2>
-            <p style={{
-              color: 'var(--mac-text-secondary)',
-              marginTop: '4px',
-              margin: '4px 0 0 0'
-            }}>
+            <p className="admin-secondary-mt-4-m-4px-0-0-0">
               Одобрение и отклонение заявок на бесплатные услуги
             </p>
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="admin-flex-center-12">
             {/* Фильтр по статусу */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Filter size={16} style={{ color: 'var(--mac-text-tertiary)' }} />
+            <div className="admin-flex-center-8">
+              <Filter size={16} className="admin-tertiary" />
               <Select
                 aria-label="Фильтр заявок All Free по статусу"
                 value={statusFilter}
@@ -223,7 +211,7 @@ const AllFreeApproval = () => {void
                   { value: 'all', label: 'Все' }
                 ]}
                 size="large"
-                style={{ minWidth: '200px' }} />
+                className="admin-minw-200" />
             </div>
             
             {/* Кнопка обновления */}
@@ -232,47 +220,27 @@ const AllFreeApproval = () => {void
               disabled={loading}
               variant="outline">
               
-              <RefreshCw size={16} style={{
-                animation: loading ? 'spin 1s linear infinite' : 'none',
-                marginRight: '8px'
-              }} />
+              <RefreshCw size={16} className="admin-mr-8-anim-dyn" style={{ '--admin-anim0': loading ? 'spin 1s linear infinite' : 'none' }} />
               Обновить
             </Button>
           </div>
         </div>
 
         {/* Статистика */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
-        }}>
+        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
           <Card
             variant="default"
             padding="default">
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                padding: '8px',
-                backgroundColor: 'var(--mac-warning-bg)',
-                borderRadius: 'var(--mac-radius-md)'
-              }}>
-                <Clock size={20} style={{ color: 'var(--mac-warning)' }} />
+            <div className="admin-flex-center-12">
+              <div className="admin-p-8-bgc-var-mac-warning-bg-radius-var-mac-radius-md">
+                <Clock size={20} className="admin-warning" />
               </div>
               <div>
-                <p style={{
-                  fontSize: '14px',
-                  color: 'var(--mac-text-secondary)',
-                  margin: 0
-                }}>
+                <p className="admin-fs-14-secondary-m-0">
                   Ожидают
                 </p>
-                <p style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-primary)',
-                  margin: '4px 0 0 0'
-                }}>
+                <p className="admin-fs-20-fw-600-primary-m-4px-0-0-0-3">
                   {pendingCount}
                 </p>
               </div>
@@ -283,28 +251,15 @@ const AllFreeApproval = () => {void
             variant="default"
             padding="default">
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                padding: '8px',
-                backgroundColor: 'var(--mac-success-bg)',
-                borderRadius: 'var(--mac-radius-md)'
-              }}>
-                <CheckCircle size={20} style={{ color: 'var(--mac-success)' }} />
+            <div className="admin-flex-center-12">
+              <div className="admin-p-8-bgc-var-mac-success-bg-radius-var-mac-radius-md">
+                <CheckCircle size={20} className="admin-success" />
               </div>
               <div>
-                <p style={{
-                  fontSize: '14px',
-                  color: 'var(--mac-text-secondary)',
-                  margin: 0
-                }}>
+                <p className="admin-fs-14-secondary-m-0">
                   Одобрено
                 </p>
-                <p style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-primary)',
-                  margin: '4px 0 0 0'
-                }}>
+                <p className="admin-fs-20-fw-600-primary-m-4px-0-0-0-2">
                   {approvedCount}
                 </p>
               </div>
@@ -315,28 +270,15 @@ const AllFreeApproval = () => {void
             variant="default"
             padding="default">
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                padding: '8px',
-                backgroundColor: 'var(--mac-error-bg)',
-                borderRadius: 'var(--mac-radius-md)'
-              }}>
-                <XCircle size={20} style={{ color: 'var(--mac-error)' }} />
+            <div className="admin-flex-center-12">
+              <div className="admin-p-8-bgc-var-mac-error-bg-radius-var-mac-radius-md">
+                <XCircle size={20} className="admin-error" />
               </div>
               <div>
-                <p style={{
-                  fontSize: '14px',
-                  color: 'var(--mac-text-secondary)',
-                  margin: 0
-                }}>
+                <p className="admin-fs-14-secondary-m-0">
                   Отклонено
                 </p>
-                <p style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-primary)',
-                  margin: '4px 0 0 0'
-                }}>
+                <p className="admin-fs-20-fw-600-primary-m-4px-0-0-0-1">
                   {rejectedCount}
                 </p>
               </div>
@@ -347,28 +289,15 @@ const AllFreeApproval = () => {void
             variant="default"
             padding="default">
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                padding: '8px',
-                backgroundColor: 'var(--mac-info-bg)',
-                borderRadius: 'var(--mac-radius-md)'
-              }}>
-                <DollarSign size={20} style={{ color: 'var(--mac-info)' }} />
+            <div className="admin-flex-center-12">
+              <div className="admin-p-8-bgc-var-mac-info-bg-radius-var-mac-radius-md">
+                <DollarSign size={20} className="admin-info" />
               </div>
               <div>
-                <p style={{
-                  fontSize: '14px',
-                  color: 'var(--mac-text-secondary)',
-                  margin: 0
-                }}>
+                <p className="admin-fs-14-secondary-m-0">
                   Общая сумма
                 </p>
-                <p style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-primary)',
-                  margin: '4px 0 0 0'
-                }}>
+                <p className="admin-fs-20-fw-600-primary-m-4px-0-0-0">
                   {formatPrice(totalAmount)}
                 </p>
               </div>

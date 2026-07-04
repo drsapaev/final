@@ -212,52 +212,35 @@ const WebhookManager = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <Skeleton style={{ height: '32px', width: '256px' }} />
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
-        }}>
-          <Skeleton style={{ height: '128px' }} />
-          <Skeleton style={{ height: '128px' }} />
-          <Skeleton style={{ height: '128px' }} />
+      <div className="admin-flex-col-16">
+        <Skeleton className="admin-h-32-w-256" />
+        <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
+          <Skeleton className="admin-h-128" />
+          <Skeleton className="admin-h-128" />
+          <Skeleton className="admin-h-128" />
         </div>
-        <Skeleton style={{ height: '384px' }} />
+        <Skeleton className="admin-h-384" />
       </div>);
 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="admin-flex-col-24">
       {/* Заголовок */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="admin-flex-jc-between-ai-center">
         <div>
-          <h1 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>Управление webhook-ами</h1>
-          <p style={{
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-base)',
-            margin: '4px 0 0 0'
-          }}>Настройка и мониторинг внешних интеграций</p>
+          <h1 className="admin-2xl-bold-primary-m-0">Управление webhook-ами</h1>
+          <p className="admin-secondary-base-m-4px000">Настройка и мониторинг внешних интеграций</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Plus style={{ width: '16px', height: '16px' }} />
+        <Button onClick={() => setShowCreateModal(true)} className="admin-flex-center-8">
+          <Plus className="admin-icon-16" />
           Создать Webhook
         </Button>
       </div>
 
       {/* Статистика */}
       {stats &&
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
+      <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
           <MacOSStatCard
           title="Всего Webhook'ов"
           value={stats.total_webhooks}
@@ -293,32 +276,22 @@ const WebhookManager = () => {
         value={activeTab}
         onChange={setActiveTab}
         options={[
-        { value: 'webhooks', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Globe style={{ width: '14px', height: '14px' }} />Webhook&apos;{'\u0438'}</span> },
-        { value: 'calls', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Activity style={{ width: '14px', height: '14px' }} />{'\u0412\u044b\u0437\u043e\u0432\u044b'}</span> },
-        { value: 'events', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Clock style={{ width: '14px', height: '14px' }} />{'\u0421\u043e\u0431\u044b\u0442\u0438\u044f'}</span> }]
+        { value: 'webhooks', label: <span className="admin-inline-flex-ai-center-gap-6"><Globe className="admin-icon-14" />Webhook&apos;{'\u0438'}</span> },
+        { value: 'calls', label: <span className="admin-inline-flex-ai-center-gap-6"><Activity className="admin-icon-14" />{'\u0412\u044b\u0437\u043e\u0432\u044b'}</span> },
+        { value: 'events', label: <span className="admin-inline-flex-ai-center-gap-6"><Clock className="admin-icon-14" />{'\u0421\u043e\u0431\u044b\u0442\u0438\u044f'}</span> }]
         }
         size="large"
-        style={{ flexWrap: 'wrap', rowGap: '4px' }} />
+        className="admin-wrap-rgap-4" />
 
 
       {/* Контент табов */}
       {activeTab === 'webhooks' &&
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="admin-flex-col-16">
           {/* Фильтры */}
-          <MacOSCard style={{ padding: '16px' }}>
-            <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px'
-          }}>
+          <MacOSCard className="admin-p-16">
+            <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Поиск
                 </label>
                 <Input
@@ -332,13 +305,7 @@ const WebhookManager = () => {
               </div>
               
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Статус
                 </label>
                 <Select
@@ -355,13 +322,7 @@ const WebhookManager = () => {
               </div>
               
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Тип события
                 </label>
                 <Select
@@ -377,11 +338,11 @@ const WebhookManager = () => {
 
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'end' }}>
+              <div className="admin-flex-ai-end">
                 <Button
                 onClick={() => setFilters({ status: '', event_type: '', search: '' })}
                 variant="outline"
-                style={{ width: '100%' }}>
+                className="admin-w-full">
 
                   Сбросить
                 </Button>
@@ -390,58 +351,49 @@ const WebhookManager = () => {
           </MacOSCard>
 
           {/* Список webhook'ов */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="admin-flex-col-16">
             {filteredWebhooks.map((webhook) =>
-          <MacOSCard key={webhook.id} style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  <div style={{ flex: '1' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                      <h3 style={{
-                    fontSize: 'var(--mac-font-size-lg)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    color: 'var(--mac-text-primary)',
-                    margin: 0
-                  }}>
+          <MacOSCard key={webhook.id} className="admin-p-24">
+                <div className="admin-flex-ai-start-jc-between">
+                  <div className="admin-flex-1">
+                    <div className="admin-flex-ai-center-gap-12-mb-8">
+                      <h3 className="admin-lg-semi-primary-m-0">
                         {webhook.name}
                       </h3>
                       {getStatusBadge(webhook.status, webhook.is_active)}
                     </div>
                     
                     {webhook.description &&
-                <p style={{
-                  color: 'var(--mac-text-secondary)',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  marginBottom: '8px'
-                }}>
+                <p className="admin-secondary-sm-mb-8">
                         {webhook.description}
                       </p>
                 }
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-tertiary)', marginBottom: '12px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Globe style={{ width: '16px', height: '16px' }} />
+                    <div className="admin-flex-ai-center-gap-16-sm-tertiary-mb-12">
+                      <span className="admin-flex-center admin-gap-4">
+                        <Globe className="admin-icon-16" />
                         {webhook.url}
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Activity style={{ width: '16px', height: '16px' }} />
+                      <span className="admin-flex-center admin-gap-4">
+                        <Activity className="admin-icon-16" />
                         {webhook.total_calls} вызовов
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle style={{ width: '16px', height: '16px' }} />
+                      <span className="admin-flex-center admin-gap-4">
+                        <CheckCircle className="admin-icon-16" />
                         {(webhook.successful_calls / webhook.total_calls * 100 || 0).toFixed(1)}% успешных
                       </span>
                     </div>
                     
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    <div className="admin-flex-wrap-gap-4">
                       {webhook.events.map((event, index) =>
-                  <Badge key={index} variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                  <Badge key={index} variant="outline" className="admin-xs">
                           {event}
                         </Badge>
                   )}
                     </div>
                   </div>
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '16px' }}>
+                  <div className="admin-flex-ai-center-gap-8-ml-16">
                     <Button
                   size="sm"
                   variant="outline"
@@ -453,7 +405,7 @@ const WebhookManager = () => {
                     loadWebhookCalls(webhook.id);
                   }}>
 
-                      <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                      <Eye aria-hidden="true" className="admin-icon-16" />
                     </Button>
                     
                     <Button
@@ -467,7 +419,7 @@ const WebhookManager = () => {
                     setShowTestModal(true);
                   }}>
 
-                      <TestTube aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                      <TestTube aria-hidden="true" className="admin-icon-16" />
                     </Button>
                     
                     <Button
@@ -481,7 +433,7 @@ const WebhookManager = () => {
                     setShowEditModal(true);
                   }}>
 
-                      <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                      <Edit aria-hidden="true" className="admin-icon-16" />
                     </Button>
                     
                     {webhook.is_active ?
@@ -493,7 +445,7 @@ const WebhookManager = () => {
                   aria-label={`Приостановить webhook ${webhook.name || webhook.id}`}
                   onClick={() => handleDeactivateWebhook(webhook.id)}>
 
-                        <Pause aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                        <Pause aria-hidden="true" className="admin-icon-16" />
                       </Button> :
 
                 <Button
@@ -504,7 +456,7 @@ const WebhookManager = () => {
                   aria-label={`Активировать webhook ${webhook.name || webhook.id}`}
                   onClick={() => handleActivateWebhook(webhook.id)}>
 
-                        <Play aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                        <Play aria-hidden="true" className="admin-icon-16" />
                       </Button>
                 }
                     
@@ -515,9 +467,9 @@ const WebhookManager = () => {
                   title="Удалить webhook"
                   aria-label={`Удалить webhook ${webhook.name || webhook.id}`}
                   onClick={() => handleDeleteWebhook(webhook.id)}
-                  style={{ color: 'var(--mac-error)' }}>
+                  className="admin-error">
 
-                      <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                      <Trash2 aria-hidden="true" className="admin-icon-16" />
                     </Button>
                   </div>
                 </div>
@@ -548,14 +500,9 @@ const WebhookManager = () => {
       }
 
       {activeTab === 'calls' &&
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+      <div className="admin-flex-col-16">
+          <div className="admin-flex-between">
+            <h2 className="admin-lg-semi-primary-m-0">
               Все вызовы webhook-ов
             </h2>
             <Button
@@ -566,26 +513,16 @@ const WebhookManager = () => {
             variant="outline"
             size="sm">
 
-              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <RefreshCw className="admin-icon-16-mr-8" />
               Обновить
             </Button>
           </div>
 
           {/* Фильтры для вызовов */}
-          <MacOSCard style={{ padding: '16px' }}>
-            <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px'
-          }}>
+          <MacOSCard className="admin-p-16">
+            <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Webhook
                 </label>
                 <Select
@@ -603,13 +540,7 @@ const WebhookManager = () => {
               </div>
               
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-block-sm-med-primary-mb-4">
                   Статус вызова
                 </label>
                 <Select
@@ -628,16 +559,13 @@ const WebhookManager = () => {
           </MacOSCard>
 
           {/* Список вызовов */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="admin-flex-col-8">
             {calls.map((call) =>
-          <MacOSCard key={call.id} style={{ padding: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ flex: '1' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                      <span style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)'
-                  }}>
+          <MacOSCard key={call.id} className="admin-p-16">
+                <div className="admin-flex-between">
+                  <div className="admin-flex-1">
+                    <div className="admin-flex-ai-center-gap-12-mb-8">
+                      <span className="admin-med-primary">
                         {call.event_type}
                       </span>
                       {getCallStatusBadge(call.status)}
@@ -647,15 +575,15 @@ const WebhookManager = () => {
                         </Badge>
                   }
                       {selectedWebhook &&
-                  <Badge variant="secondary" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                  <Badge variant="secondary" className="admin-xs">
                           {selectedWebhook.name}
                         </Badge>
                   }
                     </div>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-tertiary)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Clock style={{ width: '16px', height: '16px' }} />
+                    <div className="admin-flex-ai-center-gap-16-sm-tertiary">
+                      <span className="admin-flex-center admin-gap-4">
+                        <Clock className="admin-icon-16" />
                         {new Date(call.created_at).toLocaleString()}
                       </span>
                       {call.duration_ms &&
@@ -665,15 +593,7 @@ const WebhookManager = () => {
                     </div>
                     
                     {call.error_message &&
-                <div style={{
-                  marginTop: '8px',
-                  padding: '8px',
-                  backgroundColor: 'var(--mac-error-bg)',
-                  border: '1px solid var(--mac-error-border)',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-error)'
-                }}>
+                <div className="admin-mt-8-p-8-bg-error-bg-bd-1solidvar-mac-error-border-radius-var--mac-radius--78435787">
                         {call.error_message}
                       </div>
                 }
@@ -695,14 +615,9 @@ const WebhookManager = () => {
       }
 
       {activeTab === 'events' &&
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+      <div className="admin-flex-col-16">
+          <div className="admin-flex-between">
+            <h2 className="admin-lg-semi-primary-m-0">
               Типы событий
             </h2>
             <Button
@@ -713,17 +628,13 @@ const WebhookManager = () => {
             variant="outline"
             size="sm">
 
-              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <RefreshCw className="admin-icon-16-mr-8" />
               Обновить
             </Button>
           </div>
 
           {/* Статистика событий */}
-          <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
-        }}>
+          <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
             <MacOSStatCard
             title="Всего типов событий"
             value={new Set(webhooks.flatMap((w) => w.events)).size}
@@ -754,17 +665,12 @@ const WebhookManager = () => {
           </div>
 
           {/* Список типов событий */}
-          <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: '0 0 16px 0'
-          }}>
+          <MacOSCard className="admin-p-24">
+            <h3 className="admin-lg-semi-primary-m-0016px0">
               Доступные типы событий
             </h3>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+            <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-16">
               {[
             {
               type: 'patient.created',
@@ -827,44 +733,27 @@ const WebhookManager = () => {
               const webhookCount = webhooks.filter((w) => w.events.includes(event.type)).length;
 
               return (
-                <div key={event.type} style={{
-                  padding: '16px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-md)',
-                  backgroundColor: 'var(--mac-bg-secondary)'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                      <IconComponent style={{ width: '20px', height: '20px', color: event.color }} />
-                      <h4 style={{
-                      fontSize: 'var(--mac-font-size-base)',
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      color: 'var(--mac-text-primary)',
-                      margin: 0
-                    }}>
+                <div key={event.type} className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
+                    <div className="admin-flex-ai-center-gap-12-mb-8">
+                      <IconComponent className="admin-w-20-h-20" style={{ '--admin-color': event.color }} />
+                      <h4 className="admin-base-semi-primary-m-0">
                         {event.name}
                       </h4>
-                      <Badge variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                      <Badge variant="outline" className="admin-xs">
                         {event.type}
                       </Badge>
                     </div>
                     
-                    <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)',
-                    margin: '0 0 8px 0'
-                  }}>
+                    <p className="admin-sm-secondary-m-008px0">
                       {event.description}
                     </p>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{
-                      fontSize: 'var(--mac-font-size-xs)',
-                      color: 'var(--mac-text-tertiary)'
-                    }}>
+                    <div className="admin-flex-between">
+                      <span className="admin-xs-tertiary">
                         {webhookCount} webhook{webhookCount === 1 ? '' : webhookCount < 5 ? 'а' : 'ов'} используют это событие
                       </span>
                       {webhookCount > 0 &&
-                    <Badge variant="success" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                    <Badge variant="success" className="admin-xs">
                           Активно
                         </Badge>
                     }
@@ -885,15 +774,11 @@ const WebhookManager = () => {
         title="Создать Webhook"
         size="lg">
 
-          <div style={{ padding: '24px' }}>
-            <p style={{
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            marginBottom: '16px'
-          }}>
+          <div className="admin-p-24">
+            <p className="admin-secondary-sm-mb-16">
               Функционал создания webhook-а будет добавлен в следующей итерации
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <div className="admin-flex-jc-end-gap-8">
               <Button onClick={() => setShowCreateModal(false)}>
               Закрыть
               </Button>

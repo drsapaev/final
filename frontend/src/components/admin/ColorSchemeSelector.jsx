@@ -49,97 +49,43 @@ function ThemePreviewCard({ scheme, isActive, onSelect }) {
       onClick={() => onSelect(scheme.id)}
       aria-pressed={isActive}
       aria-label={buttonLabel}
-      style={{
-        cursor: 'pointer',
-        borderRadius: '18px',
-        padding: '16px',
-        border: isActive ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
-        background: preview.background,
-        color: preview.text,
-        boxShadow: isActive ? '0 10px 28px rgba(15, 23, 42, 0.26)' : '0 8px 20px rgba(15, 23, 42, 0.12)',
-        textAlign: 'left',
-        display: 'grid',
-        gap: '14px',
-        minHeight: '196px',
-      }}
+      className="admin-cursor-pointer-radius-18-p-16-ta-left-grid-gap-14-minh-196" style={{ '--admin-border': isActive ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-background': preview.background, '--admin-color': preview.text, '--admin-boxShadow': isActive ? '0 10px 28px rgba(15, 23, 42, 0.26)' : '0 8px 20px rgba(15, 23, 42, 0.12)' }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-        <div style={{ display: 'grid', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Icon aria-hidden="true" focusable="false" style={{ width: '18px', height: '18px' }} />
-            <span style={{ fontSize: '15px', fontWeight: 700 }}>
+      <div className="admin-flex-ai-start-jc-between-gap-12">
+        <div className="admin-grid-gap-6">
+          <div className="admin-flex-center-8">
+            <Icon aria-hidden="true" focusable="false" className="admin-icon-18" />
+            <span className="admin-fontsize-3dd9b4-bold">
               {scheme.name}
             </span>
           </div>
-          <span style={{ fontSize: '12px', opacity: 0.84 }}>
+          <span className="admin-fontsize-6b9c17-opacity-0p84">
             {scheme.mood} атмосфера
           </span>
         </div>
         {isActive ?
-          <span style={{ fontSize: '12px', padding: '4px 8px', borderRadius: '999px', background: 'rgba(255,255,255,0.18)' }}>
+          <span className="admin-fontsize-6b9c17-p-4px8-radius-999-background-c1d2e5">
             Активна
           </span> :
           null}
       </div>
 
-      <div style={{
-        borderRadius: '14px',
-        border: `1px solid ${preview.border}`,
-        background: preview.surface,
-        padding: '12px',
-        display: 'grid',
-        gap: '10px',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr', gap: '10px', alignItems: 'stretch' }}>
-          <div style={{
-            borderRadius: '10px',
-            background: preview.surfaceAlt,
-            border: `1px solid ${preview.border}`,
-          }} />
-          <div style={{ display: 'grid', gap: '8px' }}>
-            <div style={{
-              height: '12px',
-              width: '72%',
-              borderRadius: '999px',
-              background: preview.text,
-              opacity: 0.22,
-            }} />
-            <div style={{
-              height: '10px',
-              width: '48%',
-              borderRadius: '999px',
-              background: preview.text,
-              opacity: 0.12,
-            }} />
-            <div style={{
-              height: '24px',
-              width: '42%',
-              borderRadius: '10px',
-              background: preview.accent,
-            }} />
+      <div className="admin-radius-14-p-12-grid-gap-10-bd-filter-blur12px-wbd-filter-blur12px" style={{ '--admin-border': `1px solid ${preview.border}`, '--admin-background': preview.surface }}>
+        <div className="admin-grid-gtc-56px1fr-gap-10-ai-stretch">
+          <div className="admin-radius-10" style={{ '--admin-background': preview.surfaceAlt, '--admin-border': `1px solid ${preview.border}` }} />
+          <div className="admin-grid-gap-8">
+            <div className="admin-h-12-w-72pct-radius-999-opacity-0p22" style={{ '--admin-background': preview.text }} />
+            <div className="admin-h-10-w-48pct-radius-999-opacity-0p12" style={{ '--admin-background': preview.text }} />
+            <div className="admin-h-24-w-42pct-radius-10" style={{ '--admin-background': preview.accent }} />
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-        <span style={{
-          fontSize: '11px',
-          padding: '4px 8px',
-          borderRadius: '999px',
-          background: 'rgba(255,255,255,0.14)',
-          border: `1px solid ${preview.border}`,
-        }}>
+      <div className="admin-flex-wrap-gap-8">
+        <span className="admin-fontsize-8b6852-p-4px8-radius-999-background-5d083b" style={{ '--admin-border': `1px solid ${preview.border}` }}>
           {scheme.surfaces}
         </span>
-        <span style={{
-          fontSize: '11px',
-          padding: '4px 8px',
-          borderRadius: '999px',
-          background: 'rgba(255,255,255,0.14)',
-          border: `1px solid ${preview.border}`,
-        }}>
+        <span className="admin-fontsize-8b6852-p-4px8-radius-999-background-5d083b" style={{ '--admin-border': `1px solid ${preview.border}` }}>
           {scheme.contrast}
         </span>
       </div>
@@ -191,25 +137,16 @@ export default function ColorSchemeSelector() {
       role="region"
       aria-labelledby={selectorTitleId}
       aria-describedby={selectorDescriptionId}
-      style={{ padding: '24px', display: 'grid', gap: '20px' }}
+      className="admin-p-24-grid-gap-20"
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Palette aria-hidden="true" focusable="false" style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
-          <div style={{ display: 'grid', gap: '4px' }}>
-            <h3 id={selectorTitleId} style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0,
-            }}>
+      <div className="admin-flex-ai-center-gap-10-jc-between-wrap">
+        <div className="admin-flex-ai-center-gap-10">
+          <Palette aria-hidden="true" focusable="false" className="admin-w-20-h-20-blue" />
+          <div className="admin-grid-gap-4">
+            <h3 id={selectorTitleId} className="admin-lg-semi-primary-m-0">
               Цветовая схема интерфейса
             </h3>
-            <p id={selectorDescriptionId} style={{
-              margin: 0,
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-            }}>
+            <p id={selectorDescriptionId} className="admin-m-0-sm-secondary">
               Тема управляет фоном, карточками, header и sidebar. Accent отдельно задаёт цвет интерактивных элементов.
             </p>
           </div>
@@ -218,50 +155,28 @@ export default function ColorSchemeSelector() {
         <div
           role="status"
           aria-label={`Accent сейчас: ${currentAccentLabel}`}
-          style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '10px 12px',
-          borderRadius: '14px',
-          background: 'var(--mac-bg-secondary)',
-          border: '1px solid var(--mac-border)',
-          color: 'var(--mac-text-secondary)',
-          fontSize: '12px',
-        }}
+          className="admin-inline-flex-ai-center-gap-8-p-10px12-radius-14-bg-bg-secondary-bd-1solidva-9204ee03"
         >
-          <SwatchBook aria-hidden="true" focusable="false" style={{ width: '14px', height: '14px', color: 'var(--mac-accent-blue)' }} />
-          Accent сейчас: <strong style={{ color: 'var(--mac-text-primary)' }}>{currentAccentLabel}</strong>
+          <SwatchBook aria-hidden="true" focusable="false" className="admin-w-14-h-14-blue" />
+          Accent сейчас: <strong className="admin-text-primary">{currentAccentLabel}</strong>
         </div>
       </div>
 
       <div
         id={helpTextId}
-        style={{
-        padding: '14px 16px',
-        borderRadius: '16px',
-        background: 'linear-gradient(135deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
-        border: '1px solid var(--mac-border)',
-        display: 'grid',
-        gap: '8px',
-      }}
+        className="admin-p-14px16-radius-16-background-41d8fc-bd-1solidvar-mac-border-grid-gap-8"
       >
-        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+        <div className="admin-fontsize-3044b6-bold-primary">
           Что именно меняет настройка
         </div>
-        <div style={{ display: 'grid', gap: '6px', fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+        <div className="admin-grid-gap-6-fontsize-6b9c17-secondary">
           <div>Цветовая схема сохраняется в профиле пользователя и подтягивается после входа.</div>
           <div>Accent color хранится локально в браузере и перекрашивает primary buttons, focus states и status chips.</div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: '10px' }}>
-        <label htmlFor={quickSelectId} style={{
-          display: 'block',
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)',
-        }}>
+      <div className="admin-grid-gap-10">
+        <label htmlFor={quickSelectId} className="admin-block-sm-med-primary">
           Быстрый выбор схемы
         </label>
         <Select
@@ -281,11 +196,7 @@ export default function ColorSchemeSelector() {
       <div
         role="group"
         aria-label="Карточки выбора цветовой схемы"
-        style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '16px',
-      }}
+        className="admin-grid-gtc-rauto-fitcminmax220pxc1fr-gap-16"
       >
         {colorSchemes.map((scheme) => (
           <ThemePreviewCard
@@ -297,143 +208,70 @@ export default function ColorSchemeSelector() {
         ))}
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(240px, 1.15fr) minmax(260px, 1fr)',
-        gap: '18px',
-      }}>
+      <div className="admin-grid-gtc-minmax240pxc115frminmax260pxc1fr-gap-18">
         <div
           role="img"
           aria-label={currentPreviewLabel}
-          style={{
-          padding: '18px',
-          borderRadius: '18px',
-          border: '1px solid var(--mac-border)',
-          background: currentScheme.preview.background,
-          color: currentScheme.preview.text,
-          display: 'grid',
-          gap: '16px',
-          minHeight: '220px',
-        }}
+          className="admin-p-18-radius-18-bd-1solidvar-mac-border-grid-gap-16-minh-220" style={{ '--admin-background': currentScheme.preview.background, '--admin-color': currentScheme.preview.text }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ActiveIcon aria-hidden="true" focusable="false" style={{ width: '18px', height: '18px' }} />
-              <div style={{ display: 'grid', gap: '2px' }}>
+          <div className="admin-flex-ai-center-gap-10-jc-between">
+            <div className="admin-flex-ai-center-gap-10">
+              <ActiveIcon aria-hidden="true" focusable="false" className="admin-icon-18" />
+              <div className="admin-grid-gap-2">
                 <strong>{currentScheme.name}</strong>
-                <span style={{ fontSize: '12px', opacity: 0.84 }}>{currentScheme.description}</span>
+                <span className="admin-fontsize-6b9c17-opacity-0p84">{currentScheme.description}</span>
               </div>
             </div>
           </div>
 
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '72px 1fr',
-            gap: '14px',
-            flex: 1,
-          }}>
-            <div style={{
-              borderRadius: '14px',
-              background: currentScheme.preview.surfaceAlt,
-              border: `1px solid ${currentScheme.preview.border}`,
-              display: 'grid',
-              gap: '8px',
-              padding: '10px',
-            }}>
-              <div style={{ height: '10px', borderRadius: '999px', background: 'rgba(255,255,255,0.16)' }} />
-              <div style={{ height: '10px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)' }} />
-              <div style={{ marginTop: 'auto', height: '28px', borderRadius: '10px', background: currentScheme.preview.accent }} />
+          <div className="admin-grid-gtc-72px1fr-gap-14-flex-1">
+            <div className="admin-radius-14-grid-gap-8-p-10" style={{ '--admin-background': currentScheme.preview.surfaceAlt, '--admin-border': `1px solid ${currentScheme.preview.border}` }}>
+              <div className="admin-h-10-radius-999-background-022358" />
+              <div className="admin-h-10-radius-999-background-4443b0" />
+              <div className="admin-mt-auto-h-28-radius-10" style={{ '--admin-background': currentScheme.preview.accent }} />
             </div>
 
-            <div style={{
-              borderRadius: '16px',
-              border: `1px solid ${currentScheme.preview.border}`,
-              background: currentScheme.preview.surface,
-              padding: '14px',
-              display: 'grid',
-              gap: '12px',
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-            }}>
-              <div style={{
-                height: '36px',
-                borderRadius: '12px',
-                border: `1px solid ${currentScheme.preview.border}`,
-                background: 'rgba(255,255,255,0.08)',
-              }} />
-              <div style={{ display: 'grid', gap: '8px' }}>
-                <div style={{ height: '12px', width: '76%', borderRadius: '999px', background: currentScheme.preview.text, opacity: 0.22 }} />
-                <div style={{ height: '10px', width: '58%', borderRadius: '999px', background: currentScheme.preview.text, opacity: 0.12 }} />
+            <div className="admin-radius-16-p-14-grid-gap-12-bd-filter-blur14px-wbd-filter-blur14px" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}`, '--admin-background': currentScheme.preview.surface }}>
+              <div className="admin-h-36-radius-12-background-4443b0" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}` }} />
+              <div className="admin-grid-gap-8">
+                <div className="admin-h-12-w-76pct-radius-999-opacity-0p22" style={{ '--admin-background': currentScheme.preview.text }} />
+                <div className="admin-h-10-w-58pct-radius-999-opacity-0p12" style={{ '--admin-background': currentScheme.preview.text }} />
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{
-                  flex: 1,
-                  height: '36px',
-                  borderRadius: '12px',
-                  background: 'var(--mac-accent-blue)',
-                }} />
-                <div style={{
-                  width: '38%',
-                  height: '36px',
-                  borderRadius: '12px',
-                  border: `1px solid ${currentScheme.preview.border}`,
-                  background: 'rgba(255,255,255,0.08)',
-                }} />
+              <div className="admin-flex-gap-10">
+                <div className="admin-flex-1-h-36-radius-12-bg-blue" />
+                <div className="admin-w-38pct-h-36-radius-12-background-4443b0" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}` }} />
               </div>
             </div>
           </div>
         </div>
 
-        <div style={{
-          padding: '18px',
-          borderRadius: '18px',
-          border: '1px solid var(--mac-border)',
-          background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
-          display: 'grid',
-          gap: '14px',
-          alignContent: 'start',
-        }}>
-          <div style={{ display: 'grid', gap: '6px' }}>
-            <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <div className="admin-p-18-radius-18-bd-1solidvar-mac-border-background-9a770f-grid-gap-14-align-28f14aec">
+          <div className="admin-grid-gap-6">
+            <div className="admin-fontsize-6b9c17-secondary-texttransform-5f7abe-ls-008em">
               Активная схема
             </div>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            <div className="admin-fontsize-e5e6f8-bold-primary">
               {currentScheme.name}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gap: '10px' }}>
+          <div className="admin-grid-gap-10">
             {METRICS.map((metric) => (
               <div
                 key={metric.key}
-                style={{
-                  display: 'grid',
-                  gap: '6px',
-                  padding: '12px 14px',
-                  borderRadius: '14px',
-                  background: 'var(--mac-bg-tertiary)',
-                  border: '1px solid var(--mac-border)',
-                }}
+                className="admin-grid-gap-6-p-12px14-radius-14-bg-bg-tertiary-bd-1solidvar-mac-border"
               >
-                <span style={{ fontSize: '11px', color: 'var(--mac-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <span className="admin-fontsize-8b6852-secondary-texttransform-5f7abe-ls-008em">
                   {metric.label}
                 </span>
-                <span style={{ fontSize: '14px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                <span className="admin-fontsize-0cf08e-primary-semi">
                   {currentScheme[metric.key]}
                 </span>
               </div>
             ))}
           </div>
 
-          <div style={{
-            padding: '12px 14px',
-            borderRadius: '14px',
-            background: 'var(--mac-accent-bg)',
-            border: '1px solid var(--mac-accent-border)',
-            color: 'var(--mac-text-primary)',
-            fontSize: '12px',
-            lineHeight: 1.5,
-          }}>
+          <div className="admin-p-12px14-radius-14-background-13d6cf-bd-1solidvar-mac-accent-border-primar-b92dd425">
             Для полной смены характера интерфейса сначала выберите цветовую схему, затем при необходимости подстройте Accent ниже.
           </div>
         </div>

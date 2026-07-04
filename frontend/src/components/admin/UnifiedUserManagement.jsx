@@ -26,7 +26,7 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
     return {
       value: tab.id,
       label: (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        <span className="admin-inline-flex-center-8-span">
           {Icon ? <Icon size={14} aria-hidden="true" /> : null}
           {tab.label}
         </span>
@@ -35,26 +35,14 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
   });
 
   return (
-    <div style={{
-      maxWidth: '100%',
-      overflowX: 'auto',
-      paddingBottom: '6px',
-      marginBottom: '20px',
-      scrollbarWidth: 'thin'
-    }}>
+    <div className="admin-tabs-scroll">
       <SegmentedControl
         aria-label="Разделы управления пользователями"
         value={activeTab}
         onChange={onTabChange}
         options={options}
         size="large"
-        style={{
-          minWidth: 'max-content',
-          background: 'var(--mac-gradient-sidebar)',
-          border: '1px solid var(--mac-main-shell-border)',
-          borderRadius: '14px',
-          boxShadow: 'var(--mac-main-shell-shadow)'
-        }} />
+        className="admin-tabs-segmented" />
     </div>);
 
 };
@@ -113,13 +101,13 @@ const UnifiedUserManagement = () => {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: 'var(--mac-text-primary)' }}>
+    <div className="admin-unified-root">
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={setActiveTab} />
       
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div className="admin-unified-content">
         {/* P-025 fix: ErrorBoundary catches runtime errors in child panels
             (UserManagement, UserDataTransferManager, etc.) so the user sees
             a recovery UI instead of a blank screen. */}

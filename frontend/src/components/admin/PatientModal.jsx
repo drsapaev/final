@@ -228,19 +228,13 @@ const PatientModal = ({
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Личная информация */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="text-lg font-medium admin-text-primary">
             Личная информация
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Фамилия */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Фамилия *
               </label>
               <Input
@@ -252,15 +246,8 @@ const PatientModal = ({
                 icon={User} />
 
               {errors.lastName &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-12">
+                  <AlertCircle className="admin-icon-14" />
                   {errors.lastName}
                 </p>
               }
@@ -268,13 +255,7 @@ const PatientModal = ({
 
             {/* Имя */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Имя *
               </label>
               <Input
@@ -285,15 +266,8 @@ const PatientModal = ({
                 error={errors.firstName} />
 
               {errors.firstName &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-11">
+                  <AlertCircle className="admin-icon-14" />
                   {errors.firstName}
                 </p>
               }
@@ -301,13 +275,7 @@ const PatientModal = ({
 
             {/* Отчество */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Отчество
               </label>
               <Input
@@ -322,13 +290,7 @@ const PatientModal = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Дата рождения */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Дата рождения *
               </label>
               <Input
@@ -339,25 +301,13 @@ const PatientModal = ({
                 icon={Calendar} />
 
               {formData.birthDate &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-text-secondary)',
-                marginTop: '4px',
-                marginLeft: '2px'
-              }}>
+              <p className="admin-fs-xs-secondary-mt-4-ml-2">
                   Возраст: {new Date().getFullYear() - new Date(formData.birthDate).getFullYear()} лет
                 </p>
               }
               {errors.birthDate &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-10">
+                  <AlertCircle className="admin-icon-14" />
                   {errors.birthDate}
                 </p>
               }
@@ -365,13 +315,7 @@ const PatientModal = ({
 
             {/* Пол */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Пол *
               </label>
               <Select
@@ -386,15 +330,8 @@ const PatientModal = ({
                 size="large" />
 
               {errors.gender &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-9">
+                  <AlertCircle className="admin-icon-14" />
                   {errors.gender}
                 </p>
               }
@@ -404,19 +341,13 @@ const PatientModal = ({
 
         {/* Контактная информация */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="text-lg font-medium admin-text-primary">
             Контактная информация
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Телефон */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Телефон *
               </label>
               <Input
@@ -428,15 +359,8 @@ const PatientModal = ({
                 icon={Phone} />
 
               {errors.phone &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-8">
+                  <AlertCircle className="admin-icon-14" />
                   {errors.phone}
                 </p>
               }
@@ -444,13 +368,7 @@ const PatientModal = ({
 
             {/* Email */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Email
               </label>
               <Input
@@ -462,15 +380,8 @@ const PatientModal = ({
                 icon={Mail} />
 
               {errors.email &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-7">
+                  <AlertCircle className="admin-icon-14" />
                   {errors.email}
                 </p>
               }
@@ -479,13 +390,7 @@ const PatientModal = ({
 
           {/* Адрес */}
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Адрес
             </label>
             <Input
@@ -500,19 +405,13 @@ const PatientModal = ({
 
         {/* Документы */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="text-lg font-medium admin-text-primary">
             Документы
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Паспорт */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Номер паспорта
               </label>
               <Input
@@ -524,24 +423,13 @@ const PatientModal = ({
                 icon={IdCard} />
 
               {errors.passport &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-6">
+                  <AlertCircle className="admin-icon-14" />
                   {errors.passport}
                 </p>
               }
               {!errors.passport &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-text-secondary)',
-                marginTop: '4px'
-              }}>
+              <p className="admin-fs-xs-secondary-mt-4">
                   Если поле заполнено, документ будет сохранён как passport.
                 </p>
               }
@@ -549,13 +437,7 @@ const PatientModal = ({
 
             {/* Страховой номер */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Страховой номер
               </label>
               <Input
@@ -570,18 +452,12 @@ const PatientModal = ({
 
         {/* Экстренный контакт */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="text-lg font-medium admin-text-primary">
             Экстренный контакт
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Контактное лицо
               </label>
               <Input
@@ -592,13 +468,7 @@ const PatientModal = ({
 
             </div>
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Телефон экстренного контакта
               </label>
               <Input
@@ -614,18 +484,12 @@ const PatientModal = ({
 
         {/* Медицинская информация */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="text-lg font-medium admin-text-primary">
             Медицинская информация
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Группа крови
               </label>
               <Select
@@ -646,13 +510,7 @@ const PatientModal = ({
 
             </div>
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                 Аллергии
               </label>
               <Input
@@ -664,13 +522,7 @@ const PatientModal = ({
             </div>
           </div>
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Хронические заболевания
             </label>
             <Textarea
@@ -684,17 +536,11 @@ const PatientModal = ({
 
         {/* Дополнительная информация */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="text-lg font-medium admin-text-primary">
             Дополнительная информация
           </h3>
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
               Заметки
             </label>
             <Textarea
@@ -707,29 +553,21 @@ const PatientModal = ({
         </div>
 
         {/* Кнопки */}
-        <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
+        <div className="admin-d-flex-gap-12-pt-16-1">
           <Button
             type="submit"
             disabled={isSubmitting || loading}
             aria-label={patient ? 'Save patient changes' : 'Add patient'}
-            style={{ flex: 1 }}>
+            className="admin-flex-1">
 
             {isSubmitting ?
             <>
-                <div style={{
-                width: '16px',
-                height: '16px',
-                border: '2px solid transparent',
-                borderTop: '2px solid currentColor',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                marginRight: '8px'
-              }} />
+                <div className="admin-w-16-h-16-bd-2px-solid-transparen-bd-t-2px-solid-currentCol-radius-50pct-anim-spin-1s-linear-infin-mr-8" />
                 Сохранение...
               </> :
 
             <>
-                <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                <Save className="admin-icon-16-mr-8" />
                 {patient ? 'Сохранить изменения' : 'Добавить пациента'}
               </>
             }
@@ -740,7 +578,7 @@ const PatientModal = ({
 
             onClick={handleClose}
             disabled={isSubmitting}
-            style={{ flex: 1 }}>
+            className="admin-flex-1">
 
             Отмена
           </Button>

@@ -188,25 +188,14 @@ const AppointmentModal = ({
           {/* Форма */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Основная информация */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '16px'
-          }}>
+            <div className="admin-mb-24">
+              <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
                 Основная информация
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+              <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
                 {/* Пациент */}
                 <div>
-                  <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Пациент *
                   </label>
                   <Select
@@ -223,15 +212,8 @@ const AppointmentModal = ({
                 size="large" />
               
                   {errors.patientId &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                      <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-5">
+                      <AlertCircle className="admin-icon-14" />
                       {errors.patientId}
                     </p>
               }
@@ -239,13 +221,7 @@ const AppointmentModal = ({
 
                 {/* Врач */}
                 <div>
-                  <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Врач *
                   </label>
                   <Select
@@ -262,31 +238,18 @@ const AppointmentModal = ({
                 size="large" />
               
                   {errors.doctorId &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                      <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-4">
+                      <AlertCircle className="admin-icon-14" />
                       {errors.doctorId}
                     </p>
               }
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
                 {/* Дата записи */}
                 <div>
-                  <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Дата записи *
                   </label>
                   <Input
@@ -297,15 +260,8 @@ const AppointmentModal = ({
                 icon={Calendar} />
               
                   {errors.appointmentDate &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                      <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-3">
+                      <AlertCircle className="admin-icon-14" />
                       {errors.appointmentDate}
                     </p>
               }
@@ -313,13 +269,7 @@ const AppointmentModal = ({
 
                 {/* Время записи */}
                 <div>
-                  <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Время записи *
                   </label>
                   <Input
@@ -330,15 +280,8 @@ const AppointmentModal = ({
                 icon={Clock} />
               
                   {errors.appointmentTime &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                      <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-2">
+                      <AlertCircle className="admin-icon-14" />
                       {errors.appointmentTime}
                     </p>
               }
@@ -346,13 +289,7 @@ const AppointmentModal = ({
 
                 {/* Длительность */}
                 <div>
-                  <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Длительность (мин)
                   </label>
                   <Input
@@ -365,15 +302,8 @@ const AppointmentModal = ({
                 step="15" />
               
                   {errors.duration &&
-              <p style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                      <AlertCircle style={{ width: '14px', height: '14px' }} />
+              <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-1">
+                      <AlertCircle className="admin-icon-14" />
                       {errors.duration}
                     </p>
               }
@@ -382,13 +312,7 @@ const AppointmentModal = ({
 
               {/* Статус */}
               <div>
-                <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                   Статус записи
                 </label>
                 <Select
@@ -410,23 +334,12 @@ const AppointmentModal = ({
             </div>
 
             {/* Детали записи */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '16px'
-          }}>
+            <div className="admin-mb-24">
+              <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
                 Детали записи
               </h3>
               <div>
-                <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                   Причина обращения *
                 </label>
                 <Textarea
@@ -437,28 +350,15 @@ const AppointmentModal = ({
               placeholder="Опишите причину обращения к врачу" />
             
                 {errors.reason &&
-            <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-error)',
-              marginTop: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-                    <AlertCircle style={{ width: '14px', height: '14px' }} />
+            <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4">
+                    <AlertCircle className="admin-icon-14" />
                     {errors.reason}
                   </p>
             }
               </div>
 
               <div>
-                <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                   Дополнительные заметки
                 </label>
                 <Textarea
@@ -471,24 +371,13 @@ const AppointmentModal = ({
             </div>
 
             {/* Контактная информация */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '16px'
-          }}>
+            <div className="admin-mb-24">
+              <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
                 Контактная информация
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+              <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
                 <div>
-                  <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Телефон для связи
                   </label>
                   <Input
@@ -500,13 +389,7 @@ const AppointmentModal = ({
               
                 </div>
                 <div>
-                  <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>
+                  <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                     Email для уведомлений
                   </label>
                   <Input
@@ -522,39 +405,18 @@ const AppointmentModal = ({
 
             {/* Предварительный просмотр */}
             {formData.patientId && formData.doctorId &&
-        <div style={{ marginBottom: '24px' }}>
-                <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '16px'
-          }}>
+        <div className="admin-mb-24">
+                <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
                   Предварительный просмотр
                 </h3>
-                <div style={{
-            padding: '16px',
-            borderRadius: 'var(--mac-border-radius-lg)',
-            background: 'var(--mac-bg-secondary)',
-            border: '1px solid var(--mac-border)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
-                    <strong style={{ color: 'var(--mac-text-primary)' }}>Пациент:</strong> {getPatientName(formData.patientId)}
+                <div className="admin-p-16-radius-var-mac-border-radiu-bg-bg-secondary-bd-1px-solid-var-mac-bo-d-flex-fd-column-gap-8">
+                  <p className="admin-fs-sm-secondary-m-0">
+                    <strong className="admin-text-primary">Пациент:</strong> {getPatientName(formData.patientId)}
                   </p>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
-                    <strong style={{ color: 'var(--mac-text-primary)' }}>Врач:</strong> {getDoctorName(formData.doctorId)}
+                  <p className="admin-fs-sm-secondary-m-0">
+                    <strong className="admin-text-primary">Врач:</strong> {getDoctorName(formData.doctorId)}
                   </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                  <div className="admin-d-flex-fw-wrap-gap-8-mt-8">
                     <Badge
                       variant={
                         selectedDoctor?.active === false || selectedDoctor?.user?.is_active === false
@@ -572,26 +434,14 @@ const AppointmentModal = ({
                       {selectedDoctor?.cabinet ? `Кабинет ${selectedDoctor.cabinet}` : 'Кабинет не задан'}
                     </Badge>
                   </div>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
-                    <strong style={{ color: 'var(--mac-text-primary)' }}>Дата и время:</strong> {formData.appointmentDate} в {formData.appointmentTime}
+                  <p className="admin-fs-sm-secondary-m-0">
+                    <strong className="admin-text-primary">Дата и время:</strong> {formData.appointmentDate} в {formData.appointmentTime}
                   </p>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
-                    <strong style={{ color: 'var(--mac-text-primary)' }}>Длительность:</strong> {formData.duration} минут
+                  <p className="admin-fs-sm-secondary-m-0">
+                    <strong className="admin-text-primary">Длительность:</strong> {formData.duration} минут
                   </p>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0
-            }}>
-                    <strong style={{ color: 'var(--mac-text-primary)' }}>Статус:</strong> {formData.status === 'pending' ? 'Ожидает' :
+                  <p className="admin-fs-sm-secondary-m-0">
+                    <strong className="admin-text-primary">Статус:</strong> {formData.status === 'pending' ? 'Ожидает' :
               formData.status === 'confirmed' ? 'Подтверждена' :
               formData.status === 'paid' ? 'Оплачена' :
               formData.status === 'in_visit' ? 'На приеме' :
@@ -603,16 +453,13 @@ const AppointmentModal = ({
         }
 
             {/* Кнопки */}
-            <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
+            <div className="admin-d-flex-gap-12-pt-16">
               <Button
             type="submit"
             disabled={isSubmitting || loading}
             aria-label={appointment ? 'Save appointment changes' : 'Create appointment'}
-            className="flex-1"
-            style={{
-              background: 'var(--accent-color)',
-              color: 'white'
-            }}>
+            className="flex-1 admin-bg-var-accent-color-white"
+            >
             
                 {isSubmitting ?
             <>

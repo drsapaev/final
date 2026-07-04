@@ -29,15 +29,6 @@ import FinanceModal from './FinanceModal';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
-const adminSectionShellStyle = {
-  background: 'var(--mac-gradient-sidebar)',
-  border: '1px solid var(--mac-main-shell-border)',
-  borderRadius: '24px',
-  boxShadow: 'none',
-  backdropFilter: 'var(--mac-blur-light)',
-  WebkitBackdropFilter: 'var(--mac-blur-light)',
-};
-
 const categoryOptions = [
   { value: '', label: 'Все категории' },
   { value: 'Консультация врача', label: 'Консультация врача' },
@@ -186,91 +177,78 @@ const AdminFinanceOverview = () => {
   const activeDoctors = allDoctors?.length ? allDoctors : doctors;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-      }}>
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div className="admin-flex-col-24">
+      <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-between">
             <div>
-              <p style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-secondary)', margin: 0 }}>
+              <p className="admin-fs-sm-fw-med-secondary-m-0">
                 Общий доход
               </p>
-              <p style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)', margin: '4px 0 0 0' }}>
+              <p className="admin-fs-2xl-fw-bold-success-m-4px-0-0-0">
                 {formatCurrency(financialStats.totalIncome)}
               </p>
             </div>
-            <DollarSign style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
+            <DollarSign className="admin-w-32-h-32-success" />
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-between">
             <div>
-              <p style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-secondary)', margin: 0 }}>
+              <p className="admin-fs-sm-fw-med-secondary-m-0">
                 Общие расходы
               </p>
-              <p style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-error)', margin: '4px 0 0 0' }}>
+              <p className="admin-fs-2xl-fw-bold-error-m-4px-0-0-0">
                 {formatCurrency(financialStats.totalExpense)}
               </p>
             </div>
-            <CreditCard style={{ width: '32px', height: '32px', color: 'var(--mac-error)' }} />
+            <CreditCard className="admin-w-32-h-32-error" />
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-between">
             <div>
-              <p style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-secondary)', margin: 0 }}>
+              <p className="admin-fs-sm-fw-med-secondary-m-0">
                 Чистая прибыль
               </p>
-              <p style={{
-                fontSize: 'var(--mac-font-size-2xl)',
-                fontWeight: 'var(--mac-font-weight-bold)',
-                color: financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)',
-                margin: '4px 0 0 0',
-              }}>
+              <p className="admin-fs-2xl-fw-bold-m-4px-0-0-0-col-dyn" style={{ '--admin-col0': financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' }}>
                 {formatCurrency(financialStats.netProfit)}
               </p>
             </div>
-            <Calendar style={{
-              width: '32px',
-              height: '32px',
-              color: financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)',
-            }} />
+            <Calendar className="admin-w-32-h-32-col-dyn" style={{ '--admin-col0': financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' }} />
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <MacOSCard className="admin-p-24">
+          <div className="admin-flex-between">
             <div>
-              <p style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-secondary)', margin: 0 }}>
+              <p className="admin-fs-sm-fw-med-secondary-m-0">
                 Всего транзакций
               </p>
-              <p style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-text-primary)', margin: '4px 0 0 0' }}>
+              <p className="admin-fs-2xl-fw-bold-primary-m-4px-0-0-0">
                 {financialStats.transactionCount}
               </p>
             </div>
-            <Receipt style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
+            <Receipt className="admin-w-32-h-32-accent" />
           </div>
         </MacOSCard>
       </div>
 
-      <MacOSCard variant="default" style={{ ...adminSectionShellStyle, padding: 0 }}>
-        <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--mac-text-primary)', margin: 0 }}>
+      <MacOSCard variant="default" className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0">
+        <div className="admin-p-16-d-flex-ai-center-jc-between-mb-24">
+          <h2 className="admin-fs-20-fw-600-primary-m-0">
             Финансовый учет
           </h2>
           <Button onClick={handleCreateTransaction}>
-            <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <Plus className="admin-icon-16-mr-8" />
             Добавить транзакцию
           </Button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 260px' }}>
+        <div className="admin-d-flex-ai-center-gap-16-mb-24-fw-wrap">
+          <div className="admin-flex-1-1-260px">
             <Input
               type="text"
               placeholder="Поиск транзакций..."
@@ -318,7 +296,7 @@ const AdminFinanceOverview = () => {
           />
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="admin-ovx-auto">
           {financeLoading ? (
             <Skeleton type="table" count={5} />
           ) : financeError ? (
@@ -328,7 +306,7 @@ const AdminFinanceOverview = () => {
               description="Не удалось загрузить список транзакций"
               action={(
                 <Button onClick={() => window.location.reload()}>
-                  <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                  <RefreshCw className="admin-icon-16-mr-8" />
                   Обновить
                 </Button>
               )}
@@ -342,20 +320,20 @@ const AdminFinanceOverview = () => {
                 : 'В системе пока нет транзакций'}
               action={(
                 <Button onClick={handleCreateTransaction}>
-                  <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                  <Plus className="admin-icon-16-mr-8" />
                   Добавить первую транзакцию
                 </Button>
               )}
             />
           ) : (
-            <table style={{ width: '100%' }} aria-label="Таблица транзакций">
+            <table className="admin-w-full" aria-label="Таблица транзакций">
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--mac-separator)' }}>
+                <tr className="admin-bd-b-1px-solid-var-mac-se">
                   {['Тип', 'Категория', 'Сумма', 'Описание', 'Дата', 'Статус', 'Действия'].map((heading) => (
                     <th
                       key={heading}
                       scope="col"
-                      style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-table-header-text)' }}
+                      className="admin-ta-left-p-var-mac-spacing-3-va-fw-semi-fs-sm-var-mac-table-header"
                     >
                       {heading}
                     </th>
@@ -366,7 +344,7 @@ const AdminFinanceOverview = () => {
                 {transactions.map((transaction) => (
                   <tr
                     key={transaction.id}
-                    style={{ borderBottom: '1px solid var(--mac-separator)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
+                    className="admin-bd-b-1px-solid-var-mac-se-tr-all-var-mac-duration"
                     onMouseEnter={(event) => {
                       event.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
                     }}
@@ -374,55 +352,55 @@ const AdminFinanceOverview = () => {
                       event.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                    <td className="admin-p-var-mac-spacing-3-va">
                       <Badge variant={transaction.type === 'income' ? 'success' : 'error'}>
                         {getTransactionTypeLabel(transaction.type)}
                       </Badge>
                     </td>
-                    <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                    <td className="admin-p-var-mac-spacing-3-va">
                       <div>
-                        <p style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', margin: 0 }}>
+                        <p className="admin-fw-med-primary-m-0">
                           {transaction.category}
                         </p>
                         {transaction.patientName && (
-                          <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: '4px 0 0 0' }}>
+                          <p className="admin-fs-sm-secondary-m-4px-0-0-0">
                             {transaction.patientName}
                           </p>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                      <p style={{ fontWeight: 'var(--mac-font-weight-medium)', color: transaction.type === 'income' ? 'var(--mac-success)' : 'var(--mac-danger)', margin: 0 }}>
+                    <td className="admin-p-var-mac-spacing-3-va">
+                      <p className="admin-fw-med-m-0-col-dyn" style={{ '--admin-col0': transaction.type === 'income' ? 'var(--mac-success)' : 'var(--mac-danger)' }}>
                         {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </p>
-                      <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: '4px 0 0 0' }}>
+                      <p className="admin-fs-sm-secondary-m-4px-0-0-0">
                         {getPaymentMethodLabel(transaction.paymentMethod)}
                       </p>
                     </td>
-                    <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                      <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: 0 }}>
+                    <td className="admin-p-var-mac-spacing-3-va">
+                      <p className="admin-fs-sm-secondary-m-0">
                         {truncateDescription(transaction.description)}
                       </p>
                       {transaction.reference && (
-                        <p style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', margin: '4px 0 0 0' }}>
+                        <p className="admin-fs-xs-tertiary-m-4px-0-0-0">
                           {transaction.reference}
                         </p>
                       )}
                     </td>
-                    <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                    <td className="admin-p-var-mac-spacing-3-va-fs-sm-secondary">
                       {formatTransactionDate(transaction.transactionDate)}
                     </td>
-                    <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                    <td className="admin-p-var-mac-spacing-3-va">
                       <Badge variant={getTransactionStatusVariant(transaction.status)}>
                         {getTransactionStatusLabel(transaction.status)}
                       </Badge>
                     </td>
-                    <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                    <td className="admin-p-var-mac-spacing-3-va">
+                      <div className="admin-d-flex-ai-center-gap-var-mac-spacing-2">
                         <button
                           type="button"
                           onClick={() => handleEditTransaction(transaction)}
-                          style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-text-secondary)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
+                          className="admin-p-var-mac-spacing-2-radius-var-mac-radius-sm-bgc-transparent-bd-none-cur-pointer-secondary-tr-all-var-mac-duration"
                           onMouseEnter={(event) => {
                             event.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
                           }}
@@ -432,12 +410,12 @@ const AdminFinanceOverview = () => {
                           aria-label="Редактировать транзакцию"
                           title="Редактировать"
                         >
-                          <Edit style={{ width: '16px', height: '16px' }} />
+                          <Edit className="admin-icon-16" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteTransaction(transaction)}
-                          style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-danger)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
+                          className="admin-p-var-mac-spacing-2-radius-var-mac-radius-sm-bgc-transparent-bd-none-cur-pointer-error-tr-all-var-mac-duration"
                           onMouseEnter={(event) => {
                             event.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
                           }}
@@ -447,7 +425,7 @@ const AdminFinanceOverview = () => {
                           aria-label="Удалить транзакцию"
                           title="Удалить"
                         >
-                          <Trash2 style={{ width: '16px', height: '16px' }} />
+                          <Trash2 className="admin-icon-16" />
                         </button>
                       </div>
                     </td>

@@ -229,67 +229,32 @@ const EquipmentManagement = () => {
   'Добавьте первую единицу оборудования, чтобы вести учет техники по филиалам.';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflow: 'hidden' }}>
+    <div className="admin-d-flex-fd-column-gap-24-ov-hidden">
       {/* Заголовок и статистика */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '16px'
-      }}>
+      <div className="admin-d-flex-jc-between-ai-center-fw-wrap-gap-16">
         <div>
-          <h2 style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: 'var(--mac-text-primary)',
-            margin: '0 0 8px 0'
-          }}>
+          <h2 className="admin-fs-2xl-fw-bold-primary-m-0-0-8px-0">
             Управление оборудованием
           </h2>
-          <p style={{
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            margin: 0
-          }}>
+          <p className="admin-secondary-fs-sm-m-0">
             Учет и управление медицинским оборудованием
           </p>
         </div>
         {stats &&
-        <div style={{
-          display: 'flex',
-          gap: '24px',
-          flexWrap: 'wrap'
-        }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-accent-blue)',
-              marginBottom: '4px'
-            }}>
+        <div className="admin-d-flex-gap-24-fw-wrap">
+            <div className="admin-text-center">
+              <div className="admin-fs-2xl-fw-bold-blue-mb-4">
                 {stats.total_equipment}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Всего единиц
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-success)',
-              marginBottom: '4px'
-            }}>
+            <div className="admin-text-center">
+              <div className="admin-fs-2xl-fw-bold-success-mb-4">
                 {stats.active_equipment}
               </div>
-              <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+              <div className="admin-text-sm admin-text-secondary">
                 Активных
               </div>
             </div>
@@ -307,33 +272,20 @@ const EquipmentManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ flex: 1, position: 'relative' }}>
+      <MacOSCard className="admin-p-24">
+        <div className="admin-d-flex-fd-column-gap-16-fw-wrap">
+          <div className="admin-flex-1-pos-relative">
             <Input
               type="text"
               aria-label="Поиск оборудования по названию, модели или серийному номеру"
               placeholder="Поиск по названию, модели или серийному номеру..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '40px' }} />
+              className="admin-pl-40" />
             
-            <Search aria-hidden="true" style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--mac-text-tertiary)',
-              width: '16px',
-              height: '16px'
-            }} />
+            <Search aria-hidden="true" className="admin-pos-absolute-left-12-top-50pct-tf-translateY-50-tertiary-w-16-h-16" />
           </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="admin-d-flex-gap-12-fw-wrap">
             <Select
               aria-label="Фильтр оборудования по статусу"
               value={statusFilter}
@@ -343,7 +295,7 @@ const EquipmentManagement = () => {
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
-              style={{ minWidth: '150px' }} />
+              className="admin-minw-150" />
             <Select
               aria-label="Фильтр оборудования по типу"
               value={typeFilter}
@@ -353,7 +305,7 @@ const EquipmentManagement = () => {
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
-              style={{ minWidth: '150px' }} />
+              className="admin-minw-150" />
             <Select
               aria-label="Фильтр оборудования по филиалу"
               value={branchFilter}
@@ -363,19 +315,12 @@ const EquipmentManagement = () => {
                 ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))
               ]}
               size="large"
-              style={{ minWidth: '150px' }} />
+              className="admin-minw-150" />
             <Button
               onClick={() => setShowAddForm(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none',
-                padding: '8px 16px'
-              }}>
+              className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px">
               
-              <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <Plus aria-hidden="true" className="admin-icon-16" />
               <span>Добавить оборудование</span>
             </Button>
           </div>
@@ -384,19 +329,9 @@ const EquipmentManagement = () => {
 
       {/* Форма добавления/редактирования */}
       {showAddForm &&
-      <MacOSCard style={{ padding: '24px', overflow: 'hidden' }}>
-          <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}>
-            <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
+      <MacOSCard className="admin-p-24-ov-hidden">
+          <div className="admin-d-flex-jc-between-ai-center-mb-16">
+            <h3 className="admin-fs-lg-fw-semi-primary-m-0">
               {editingEquipment ? 'Редактировать оборудование' : 'Добавить оборудование'}
             </h3>
             <Button
@@ -408,26 +343,16 @@ const EquipmentManagement = () => {
               setEditingEquipment(null);
               resetForm();
             }}
-            style={{ padding: '8px' }}>
+            className="admin-p-8">
             
-              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <X aria-hidden="true" className="admin-icon-16" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '16px'
-          }}>
+          <form onSubmit={handleSubmit} className="admin-flex-col-16">
+            <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-10">
                   Название *
                 </label>
                 <Input
@@ -439,13 +364,7 @@ const EquipmentManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-9">
                   Тип *
                 </label>
                 <Select
@@ -459,13 +378,7 @@ const EquipmentManagement = () => {
                 size="large" />
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-8">
                   Модель
                 </label>
                 <Input
@@ -476,13 +389,7 @@ const EquipmentManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-7">
                   Серийный номер
                 </label>
                 <Input
@@ -493,13 +400,7 @@ const EquipmentManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-6">
                   Филиал *
                 </label>
                 <Select
@@ -513,13 +414,7 @@ const EquipmentManagement = () => {
                 size="large" />
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-5">
                   Статус
                 </label>
                 <Select
@@ -530,13 +425,7 @@ const EquipmentManagement = () => {
                 size="large" />
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-4">
                   Дата покупки
                 </label>
                 <Input
@@ -546,13 +435,7 @@ const EquipmentManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-3">
                   Окончание гарантии
                 </label>
                 <Input
@@ -562,13 +445,7 @@ const EquipmentManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-2">
                   Последнее обслуживание
                 </label>
                 <Input
@@ -578,13 +455,7 @@ const EquipmentManagement = () => {
               
               </div>
               <div>
-                <label style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
-              }}>
+                <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-1">
                   Стоимость (сум)
                 </label>
                 <Input
@@ -597,13 +468,7 @@ const EquipmentManagement = () => {
             </div>
 
             <div>
-              <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
-            }}>
+              <label className="admin-d-block-fs-sm-fw-med-primary-mb-4">
                 Описание
               </label>
               <Textarea
@@ -614,11 +479,7 @@ const EquipmentManagement = () => {
             
             </div>
 
-            <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px'
-          }}>
+            <div className="admin-d-flex-jc-end-gap-12">
               <Button
               type="button"
               variant="outline"
@@ -635,26 +496,16 @@ const EquipmentManagement = () => {
               type="submit"
               disabled={saving}
               aria-label={editingEquipment ? 'Update equipment' : 'Add equipment'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'var(--mac-accent-blue)',
-                border: 'none'
-              }}>
+              className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none">
               
                 {saving ?
               <>
-                    <RefreshCw aria-hidden="true" style={{
-                  width: '16px',
-                  height: '16px',
-                  animation: 'spin 1s linear infinite'
-                }} />
+                    <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin" />
                     Сохранение...
                   </> :
 
               <>
-                    <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                    <Save aria-hidden="true" className="admin-icon-16" />
                     {editingEquipment ? 'Обновить' : 'Добавить'}
                   </>
               }
@@ -666,14 +517,9 @@ const EquipmentManagement = () => {
 
       {/* Список оборудования */}
       {loading ?
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px',
-        overflow: 'hidden'
-      }}>
+      <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-1">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} style={{ padding: '24px' }}>
+        <MacOSCard key={i} className="admin-p-24">
               <Skeleton height="200px" />
             </MacOSCard>
         )}
@@ -685,40 +531,21 @@ const EquipmentManagement = () => {
         description={equipmentEmptyDescription}
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" focusable="false" className="admin-icon-16-mr-8" />
               Добавить оборудование
             </Button>
         } /> :
 
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px',
-        overflow: 'hidden'
-      }}>
+      <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden">
           {filteredEquipment.map((item) =>
-        <MacOSCard key={item.id} style={{ padding: '24px' }}>
-              <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '16px'
-          }}>
+        <MacOSCard key={item.id} className="admin-p-24">
+              <div className="admin-d-flex-jc-between-ai-start-mb-16">
                 <div>
-                  <h3 style={{
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 4px 0'
-              }}>
+                  <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0">
                     {item.name}
                   </h3>
-                  <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)',
-                margin: 0
-              }}>
+                  <p className="admin-fs-sm-secondary-m-0">
                     {item.model} • {item.serial_number}
                   </p>
                 </div>
@@ -728,92 +555,55 @@ const EquipmentManagement = () => {
             
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                  <Building2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+              <div className="admin-d-flex-fd-column-gap-8-mb-16">
+                <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-3">
+                  <Building2 aria-hidden="true" className="admin-icon-16" />
                   <span>{getBranchName(item.branch_id)}</span>
                 </div>
-                <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                  <Wrench aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-2">
+                  <Wrench aria-hidden="true" className="admin-icon-16" />
                   <span>{getTypeLabel(item.type)}</span>
                 </div>
                 {item.cost > 0 &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                    <DollarSign aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+            <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-1">
+                    <DollarSign aria-hidden="true" className="admin-icon-16" />
                     <span>{item.cost.toLocaleString()} сум</span>
                   </div>
             }
                 {item.warranty_expiry &&
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-                    <Calendar aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+            <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary">
+                    <Calendar aria-hidden="true" className="admin-icon-16" />
                     <span>Гарантия до: {new Date(item.warranty_expiry).toLocaleDateString()}</span>
                   </div>
             }
               </div>
 
               {item.description &&
-          <div style={{ marginBottom: '16px' }}>
-                  <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              margin: 0,
-              lineHeight: '1.4'
-            }}>
+          <div className="admin-mb-16">
+                  <p className="admin-fs-sm-secondary-m-0-lh-1p4">
                     {item.description}
                   </p>
                 </div>
           }
 
-              <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px'
-          }}>
+              <div className="admin-d-flex-jc-end-gap-8">
                 <Button
               type="button"
               variant="outline"
               aria-label={`Редактировать оборудование ${item.name}`}
               onClick={() => handleEdit(item)}
-              style={{ padding: '6px 12px' }}>
+              className="admin-p-6px-12px">
               
-                  <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Edit aria-hidden="true" className="admin-icon-16" />
                 </Button>
                 <Button
               type="button"
               variant="outline"
               aria-label={`Удалить оборудование ${item.name}`}
               onClick={() => handleDelete(item.id)}
-              style={{
-                padding: '6px 12px',
-                color: 'var(--mac-error)',
-                borderColor: 'var(--mac-error)'
-              }}>
+              className="admin-p-6px-12px-error-bd-c-error">
               
-                  <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  <Trash2 aria-hidden="true" className="admin-icon-16" />
                 </Button>
               </div>
             </MacOSCard>

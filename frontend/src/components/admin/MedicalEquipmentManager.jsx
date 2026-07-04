@@ -304,28 +304,15 @@ const MedicalEquipmentManager = () => {
   'Добавьте первое медицинское устройство, чтобы отслеживать его статус и измерения.';
 
   const renderOverviewTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="admin-flex-col-24">
+      <div className="admin-flex-between">
+        <h3 className="admin-section-h3-m0">
           Обзор оборудования
         </h3>
         <Button
         onClick={() => {loadDevices();loadOverview();}}
         disabled={loading}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        className="admin-flex-center-8">
         
           <RefreshCw size={16} />
           {loading ? 'Загрузка...' : 'Обновить'}
@@ -333,68 +320,36 @@ const MedicalEquipmentManager = () => {
       </div>
 
       {overview ?
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          <MacOSCard style={{ padding: 0 }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-accent)',
-          marginBottom: '8px'
-        }}>
+    <div className="admin-grid-auto-200-mb-24">
+          <MacOSCard className="admin-p-0">
+            <div className="admin-stat-number-accent-mb-8">
               {overview.total_devices}
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <div className="admin-text-sm-secondary">
               Всего устройств
             </div>
           </MacOSCard>
-          <MacOSCard style={{ padding: 0 }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-success)',
-          marginBottom: '8px'
-        }}>
+          <MacOSCard className="admin-p-0">
+            <div className="admin-stat-number-success-mb-8">
               {overview.online_devices}
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <div className="admin-text-sm-secondary">
               В сети
             </div>
           </MacOSCard>
-          <MacOSCard style={{ padding: 0 }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-error)',
-          marginBottom: '8px'
-        }}>
+          <MacOSCard className="admin-p-0">
+            <div className="admin-stat-number-error-mb-8">
               {overview.offline_devices}
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <div className="admin-text-sm-secondary">
               Не в сети
             </div>
           </MacOSCard>
-          <MacOSCard style={{ padding: 0 }}>
-            <div style={{
-          fontSize: 'var(--mac-font-size-2xl)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          color: 'var(--mac-purple)',
-          marginBottom: '8px'
-        }}>
+          <MacOSCard className="admin-p-0">
+            <div className="admin-stat-number-purple-mb-8">
               {overview.total_measurements}
             </div>
-            <div style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+            <div className="admin-text-sm-secondary">
               Всего измерений
             </div>
           </MacOSCard>
@@ -403,32 +358,18 @@ const MedicalEquipmentManager = () => {
     <Skeleton type="card" count={4} />
     }
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-        <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-md)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <div className="admin-grid-auto-300-24">
+        <MacOSCard className="admin-p-0">
+          <h4 className="admin-rule-header admin-mb-16">
             Статистика по типам устройств
           </h4>
           {overview?.device_types ?
         Object.entries(overview.device_types).map(([type, stats]) =>
-        <div key={type} style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px 0',
-          borderBottom: '1px solid var(--mac-border)'
-        }}>
-                <span style={{
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+        <div key={type} className="admin-stat-row-border">
+                <span className="admin-text-sm-primary">
                   {getDeviceTypeName(type)}
                 </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="admin-flex-center-8">
                   <Badge variant="outline">{stats.total}</Badge>
                   <Badge variant="success">{stats.online}</Badge>
                 </div>
@@ -439,38 +380,33 @@ const MedicalEquipmentManager = () => {
         }
         </MacOSCard>
 
-        <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-md)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+        <MacOSCard className="admin-p-0">
+          <h4 className="admin-rule-header admin-mb-16">
             Быстрые действия
           </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="admin-flex-col-12">
             <Button
             onClick={() => setActiveTab('devices')}
             variant="outline"
-            style={{ justifyContent: 'flex-start' }}>
+            className="admin-btn-justify-start">
             
-              <Settings size={16} style={{ marginRight: '8px' }} />
+              <Settings size={16} className="admin-mr-8" />
               Управление устройствами
             </Button>
             <Button
             onClick={() => setActiveTab('measurements')}
             variant="outline"
-            style={{ justifyContent: 'flex-start' }}>
+            className="admin-btn-justify-start">
             
-              <BarChart3 size={16} style={{ marginRight: '8px' }} />
+              <BarChart3 size={16} className="admin-mr-8" />
               Просмотр измерений
             </Button>
             <Button
             onClick={() => setActiveTab('measurement')}
             variant="outline"
-            style={{ justifyContent: 'flex-start' }}>
+            className="admin-btn-justify-start">
             
-              <Activity size={16} style={{ marginRight: '8px' }} />
+              <Activity size={16} className="admin-mr-8" />
               Выполнить измерение
             </Button>
           </div>
@@ -480,31 +416,20 @@ const MedicalEquipmentManager = () => {
 
 
   const renderDevicesTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)',
-        color: 'var(--mac-text-primary)',
-        margin: 0
-      }}>Устройства</h3>
+  <div className="admin-flex-col-24">
+      <div className="admin-flex-between">
+        <h3 className="admin-section-h3-m0">Устройства</h3>
         <Button onClick={loadDevices} disabled={loading}>
-          <RefreshCw size={16} style={{ marginRight: '8px' }} />
+          <RefreshCw size={16} className="admin-mr-8" />
           {loading ? 'Загрузка...' : 'Обновить'}
         </Button>
       </div>
 
       {/* Фильтры */}
-      <MacOSCard style={{ padding: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      <MacOSCard className="admin-p-0">
+        <div className="admin-grid-auto-200">
           <div>
-            <label htmlFor="device-type-filter" style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>Тип устройства</label>
+            <label htmlFor="device-type-filter" className="admin-form-label">Тип устройства</label>
             <Select
             id="device-type-filter"
             value={filters.device_type}
@@ -522,13 +447,7 @@ const MedicalEquipmentManager = () => {
           
           </div>
           <div>
-            <label htmlFor="status-filter" style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>Статус</label>
+            <label htmlFor="status-filter" className="admin-form-label">Статус</label>
             <Select
             id="status-filter"
             value={filters.status}
@@ -544,13 +463,7 @@ const MedicalEquipmentManager = () => {
           
           </div>
           <div>
-            <label htmlFor="location-filter" style={{
-            display: 'block',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>Местоположение</label>
+            <label htmlFor="location-filter" className="admin-form-label">Местоположение</label>
             <Input
             id="location-filter"
             value={filters.location}
@@ -562,26 +475,17 @@ const MedicalEquipmentManager = () => {
       </MacOSCard>
 
       {/* Список устройств */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+      <div className="admin-grid-auto-300">
         {filteredDevices.map((device) => {
         const DeviceIcon = getDeviceIcon(device.device_type);
         return (
-          <MacOSCard key={device.id} style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <DeviceIcon size={20} style={{ color: 'var(--mac-blue)' }} />
+          <MacOSCard key={device.id} className="admin-p-16">
+              <div className="admin-flex-between-flex-start-mb-12">
+                <div className="admin-flex-center-8">
+                  <DeviceIcon size={20} className="admin-icon-blue" />
                   <div>
-                    <h4 style={{
-                    fontSize: 'var(--mac-font-size-base)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    color: 'var(--mac-text-primary)',
-                    margin: 0
-                  }}>{device.name}</h4>
-                    <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)',
-                    margin: 0
-                  }}>{getDeviceTypeName(device.device_type)}</p>
+                    <h4 className="admin-device-h4">{device.name}</h4>
+                    <p className="admin-setting-desc">{getDeviceTypeName(device.device_type)}</p>
                   </div>
                 </div>
                 <Badge variant={getStatusBadgeVariant(device.status)}>
@@ -589,21 +493,21 @@ const MedicalEquipmentManager = () => {
                 </Badge>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--mac-font-size-sm)', marginBottom: '16px' }}>
+              <div className="admin-flex-col-8-sm admin-mb-16">
                 <div><strong>Производитель:</strong> {device.manufacturer}</div>
                 <div><strong>Модель:</strong> {device.model}</div>
                 <div><strong>Местоположение:</strong> {device.location || 'Не указано'}</div>
                 <div><strong>Серийный номер:</strong> {device.serial_number}</div>
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div className="admin-flex-wrap-8">
                 {device.status === 'offline' ?
               <Button
                 size="sm"
                 onClick={() => connectDevice(device.id)}
-                style={{ display: 'flex', alignItems: 'center' }}>
+                className="admin-flex-center">
                 
-                    <Wifi size={16} style={{ marginRight: '4px' }} />
+                    <Wifi size={16} className="admin-mr-4" />
                     Подключить
                   </Button> :
 
@@ -611,9 +515,9 @@ const MedicalEquipmentManager = () => {
                 size="sm"
                 variant="outline"
                 onClick={() => disconnectDevice(device.id)}
-                style={{ display: 'flex', alignItems: 'center' }}>
+                className="admin-flex-center">
                 
-                    <WifiOff size={16} style={{ marginRight: '4px' }} />
+                    <WifiOff size={16} className="admin-mr-4" />
                     Отключить
                   </Button>
               }
@@ -624,7 +528,7 @@ const MedicalEquipmentManager = () => {
                 onClick={() => calibrateDevice(device.id)}
                 disabled={device.status !== 'online'}>
                 
-                  <Wrench size={16} style={{ marginRight: '4px' }} />
+                  <Wrench size={16} className="admin-mr-4" />
                   Калибровка
                 </Button>
 
@@ -633,7 +537,7 @@ const MedicalEquipmentManager = () => {
                 variant="outline"
                 onClick={() => setSelectedDevice(device)}>
                 
-                  <Settings size={16} style={{ marginRight: '4px' }} />
+                  <Settings size={16} className="admin-mr-4" />
                   Подробнее
                 </Button>
               </div>
@@ -653,25 +557,14 @@ const MedicalEquipmentManager = () => {
 
 
   const renderMeasurementTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <h3 style={{
-      fontSize: 'var(--mac-font-size-lg)',
-      fontWeight: 'var(--mac-font-weight-semibold)',
-      color: 'var(--mac-text-primary)',
-      margin: 0
-    }}>Выполнить измерение</h3>
+  <div className="admin-flex-col-24">
+      <h3 className="admin-section-h3-m0">Выполнить измерение</h3>
 
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <MacOSCard className="admin-p-24">
+        <div className="admin-grid-auto-300-24">
+          <div className="admin-flex-col-16">
             <div>
-              <label htmlFor="measurement-device" style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>Устройство</label>
+              <label htmlFor="measurement-device" className="admin-form-label">Устройство</label>
               <Select
               id="measurement-device"
               value={measurementForm.device_id}
@@ -690,13 +583,7 @@ const MedicalEquipmentManager = () => {
             </div>
 
             <div>
-              <label htmlFor="measurement-patient" style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>ID пациента (опционально)</label>
+              <label htmlFor="measurement-patient" className="admin-form-label">ID пациента (опционально)</label>
               <Input
               id="measurement-patient"
               value={measurementForm.patient_id}
@@ -708,38 +595,25 @@ const MedicalEquipmentManager = () => {
             <Button
             onClick={takeMeasurement}
             disabled={!measurementForm.device_id}
-            style={{ width: '100%' }}>
+            className="admin-w-full">
             
-              <Activity size={16} style={{ marginRight: '8px' }} />
+              <Activity size={16} className="admin-mr-8" />
               Выполнить измерение
             </Button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{
-            fontSize: 'var(--mac-font-size-base)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>Доступные устройства</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="admin-flex-col-16">
+            <h4 className="admin-device-h4-base-med">Доступные устройства</h4>
+            <div className="admin-flex-col-8">
               {devices.
             filter((d) => d.status === 'online').
             map((device) => {
               const DeviceIcon = getDeviceIcon(device.device_type);
               return (
-                <div key={device.id} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-border-radius)',
-                  backgroundColor: 'var(--mac-bg-secondary)'
-                }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <DeviceIcon size={16} style={{ color: 'var(--mac-blue)' }} />
-                        <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>{device.name}</span>
+                <div key={device.id} className="admin-measurement-device-row">
+                      <div className="admin-flex-center-8">
+                        <DeviceIcon size={16} className="admin-icon-blue" />
+                        <span className="admin-text-sm-primary">{device.name}</span>
                       </div>
                       <Badge variant="success">Готов</Badge>
                     </div>);
@@ -762,37 +636,26 @@ const MedicalEquipmentManager = () => {
 
   const renderMeasurementsTab = () => {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>История измерений</h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
+      <div className="admin-flex-col-24">
+        <div className="admin-flex-between">
+          <h3 className="admin-section-h3-m0">История измерений</h3>
+          <div className="admin-flex-gap-8">
             <Button onClick={loadMeasurements} disabled={loading}>
-              <RefreshCw size={16} style={{ marginRight: '8px' }} />
+              <RefreshCw size={16} className="admin-mr-8" />
               Обновить
             </Button>
             <Button variant="outline">
-              <Download size={16} style={{ marginRight: '8px' }} />
+              <Download size={16} className="admin-mr-8" />
               Экспорт
             </Button>
           </div>
         </div>
 
         {/* Фильтры для измерений */}
-        <MacOSCard style={{ padding: 0 }}>
+        <MacOSCard className="admin-p-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="measurements-device-type" style={{
-                display: 'block',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: '8px'
-              }}>Тип устройства</label>
+              <label htmlFor="measurements-device-type" className="admin-form-label">Тип устройства</label>
               <Select
                 id="measurements-device-type"
                 value={filters.device_type}
@@ -808,7 +671,7 @@ const MedicalEquipmentManager = () => {
                 size="large" />
               
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <div className="admin-flex admin-flex-start-end">
               <Button onClick={loadMeasurements}>
                 Применить фильтры
               </Button>
@@ -817,14 +680,14 @@ const MedicalEquipmentManager = () => {
         </MacOSCard>
 
         {/* Список измерений */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="admin-flex-col-16">
           {measurements.map((measurement, index) =>
-          <MacOSCard key={index} style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <MacOSCard key={index} className="admin-p-16">
+              <div className="admin-flex-between-flex-start">
+                <div className="admin-flex-1">
+                  <div className="admin-flex-center-8-mb-8">
                     <Badge variant="outline">{getDeviceTypeName(measurement.device_type)}</Badge>
-                    <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                    <span className="admin-text-sm-secondary">
                       {new Date(measurement.timestamp).toLocaleString()}
                     </span>
                     {measurement.quality_score &&
@@ -834,7 +697,7 @@ const MedicalEquipmentManager = () => {
                   }
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  <div className="admin-grid-auto-200">
                     <div>
                       <strong>Устройство:</strong> {measurement.device_id}
                     </div>
@@ -845,14 +708,14 @@ const MedicalEquipmentManager = () => {
                   }
                     <div>
                       <strong>Данные:</strong>
-                      <div style={{ fontSize: 'var(--mac-font-size-sm)', marginTop: '4px' }}>
+                      <div className="admin-text-sm admin-mt-4">
                         {measurement.measurements && Object.entries(measurement.measurements).map(([key, value]) =>
                       <div key={key}>
                             {key}: {typeof value === 'number' ? value.toFixed(1) : value}
                           </div>
                       )}
                         {!measurement.measurements &&
-                      <div style={{ color: 'var(--mac-text-secondary)', fontStyle: 'italic' }}>
+                      <div className="admin-italic-secondary">
                             Данные недоступны
                           </div>
                       }
@@ -875,40 +738,20 @@ const MedicalEquipmentManager = () => {
   };
 
   return (
-    <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
+    <div className="admin-p-0-max-1400">
+      <div className="admin-page-header-flex-16-mb-24">
         <Stethoscope size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-xl)',
-            fontWeight: 'var(--mac-font-weight-bold)'
-          }}>
+          <h2 className="admin-page-title">
             Медицинское оборудование
           </h2>
-          <p style={{
-            margin: '4px 0 0 0',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          <p className="admin-page-subtitle">
             Управление медицинскими устройствами и измерениями
           </p>
         </div>
       </div>
 
-      <div style={{
-        maxWidth: '100%',
-        overflowX: 'auto',
-        paddingBottom: '6px',
-        marginBottom: '24px',
-        scrollbarWidth: 'thin'
-      }}>
+      <div className="admin-tabs-scroll">
         <SegmentedControl
           aria-label="Разделы медицинского оборудования"
           value={activeTab}
@@ -917,7 +760,7 @@ const MedicalEquipmentManager = () => {
             {
               value: 'overview',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-center-8">
                   <BarChart3 size={14} aria-hidden="true" />
                   Обзор
                 </span>
@@ -926,7 +769,7 @@ const MedicalEquipmentManager = () => {
             {
               value: 'devices',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-center-8">
                   <Stethoscope size={14} aria-hidden="true" />
                   Устройства
                 </span>
@@ -935,7 +778,7 @@ const MedicalEquipmentManager = () => {
             {
               value: 'measurement',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-center-8">
                   <Activity size={14} aria-hidden="true" />
                   Измерение
                 </span>
@@ -944,7 +787,7 @@ const MedicalEquipmentManager = () => {
             {
               value: 'measurements',
               label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="admin-inline-flex-center-8">
                   <History size={14} aria-hidden="true" />
                   История
                 </span>
@@ -952,13 +795,7 @@ const MedicalEquipmentManager = () => {
             }
           ]}
           size="large"
-          style={{
-            minWidth: 'max-content',
-            background: 'var(--mac-gradient-sidebar)',
-            border: '1px solid var(--mac-main-shell-border)',
-            borderRadius: '14px',
-            boxShadow: 'var(--mac-main-shell-shadow)'
-          }} />
+          className="admin-tabs-segmented" />
       </div>
 
       {activeTab === 'overview' && renderOverviewTab()}
@@ -982,10 +819,10 @@ const MedicalEquipmentManager = () => {
                 <div><strong>Версия ПО:</strong> {selectedDevice.firmware_version}</div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div className="admin-flex-col-12">
+                <div className="admin-flex-center">
                   <strong>Статус:</strong>
-                  <Badge variant={getStatusBadgeVariant(selectedDevice.status)} style={{ marginLeft: '8px' }}>
+                  <Badge variant={getStatusBadgeVariant(selectedDevice.status)} className="admin-ml-8">
                     {getStatusText(selectedDevice.status)}
                   </Badge>
                 </div>
@@ -1016,12 +853,12 @@ const MedicalEquipmentManager = () => {
               </div>
           }
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="admin-flex-gap-8">
               <Button
               onClick={() => runDiagnostics(selectedDevice.id)}
               disabled={selectedDevice.status !== 'online'}>
               
-                <AlertTriangle size={16} style={{ marginRight: '8px' }} />
+                <AlertTriangle size={16} className="admin-mr-8" />
                 Диагностика
               </Button>
               <Button
@@ -1029,7 +866,7 @@ const MedicalEquipmentManager = () => {
               disabled={selectedDevice.status !== 'online'}
               variant="outline">
               
-                <Wrench size={16} style={{ marginRight: '8px' }} />
+                <Wrench size={16} className="admin-mr-8" />
                 Калибровка
               </Button>
               <Button

@@ -45,20 +45,6 @@ const bloodTypeOptions = [
   { value: 'O-', label: 'O-' },
 ];
 
-const tableHeaderStyle = {
-  textAlign: 'left',
-  padding: '12px 16px',
-  color: 'var(--mac-text-secondary)',
-  fontWeight: 'var(--mac-font-weight-semibold)',
-  fontSize: 'var(--mac-font-size-sm)',
-};
-
-const textCellStyle = {
-  padding: '12px 16px',
-  fontSize: 'var(--mac-font-size-sm)',
-  color: 'var(--mac-text-secondary)',
-};
-
 const getPatientName = (patient) =>
   [patient.lastName, patient.firstName, patient.middleName].filter(Boolean).join(' ') || 'Пациент без имени';
 
@@ -108,13 +94,7 @@ const IconButton = ({ label, tone = 'default', onClick, children }) => (
     onClick={onClick}
     aria-label={label}
     title={label}
-    style={{
-      width: '32px',
-      height: '32px',
-      padding: 0,
-      borderRadius: 'var(--mac-radius-sm)',
-      color: tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)',
-    }}
+    className="admin-w-32-h-32-p-0-radius-var-mac-radius-sm-col-dyn" style={{ '--admin-col0': tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)' }}
   >
     {children}
   </Button>
@@ -202,43 +182,23 @@ const AdminPatients = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="admin-flex-col-24">
       <MacOSCard
         variant="default"
         shadow="none"
-        style={{
-          background: 'var(--mac-bg-primary)',
-          border: '1px solid var(--mac-border)',
-          padding: '24px',
-        }}
+        className="admin-patients-header-card"
       >
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            marginBottom: '24px',
-            flexWrap: 'wrap',
-          }}
+          className="admin-patients-header-row"
         >
           <div>
             <h2
-              style={{
-                fontSize: 'var(--mac-font-size-xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                margin: 0,
-              }}
+              className="admin-title-20"
             >
               Управление пациентами
             </h2>
             <p
-              style={{
-                margin: '6px 0 0',
-                color: 'var(--mac-text-secondary)',
-                fontSize: 'var(--mac-font-size-sm)',
-              }}
+              className="admin-patients-subtitle"
             >
               Карточки пациентов, контакты и базовые демографические данные.
             </p>
@@ -249,12 +209,7 @@ const AdminPatients = () => {
         </div>
 
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 1fr) minmax(150px, 190px) minmax(150px, 190px) minmax(150px, 190px)',
-            gap: '12px',
-            marginBottom: '24px',
-          }}
+          className="admin-patients-filters-grid"
         >
           <Input
             type="text"
@@ -288,7 +243,7 @@ const AdminPatients = () => {
           />
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="admin-overflow-x-auto">
           {loading ? (
             <Skeleton type="table" count={5} />
           ) : error ? (
@@ -318,32 +273,26 @@ const AdminPatients = () => {
               }
             />
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }} aria-label="Таблица пациентов">
+            <table className="admin-w-100pct-bc-collapse" aria-label="Таблица пациентов">
               <thead>
                 <tr
-                  style={{
-                    backgroundColor: 'var(--mac-bg-secondary)',
-                    borderBottom: '1px solid var(--mac-border)',
-                  }}
+                  className="admin-patients-thead-row"
                 >
-                  <th scope="col" style={tableHeaderStyle}>Пациент</th>
-                  <th scope="col" style={tableHeaderStyle}>Возраст</th>
-                  <th scope="col" style={tableHeaderStyle}>Пол</th>
-                  <th scope="col" style={tableHeaderStyle}>Телефон</th>
-                  <th scope="col" style={tableHeaderStyle}>Группа крови</th>
-                  <th scope="col" style={tableHeaderStyle}>Последний визит</th>
-                  <th scope="col" style={tableHeaderStyle}>Визиты</th>
-                  <th scope="col" style={tableHeaderStyle}>Действия</th>
+                  <th scope="col" className="admin-patients-th">Пациент</th>
+                  <th scope="col" className="admin-patients-th">Возраст</th>
+                  <th scope="col" className="admin-patients-th">Пол</th>
+                  <th scope="col" className="admin-patients-th">Телефон</th>
+                  <th scope="col" className="admin-patients-th">Группа крови</th>
+                  <th scope="col" className="admin-patients-th">Последний визит</th>
+                  <th scope="col" className="admin-patients-th">Визиты</th>
+                  <th scope="col" className="admin-patients-th">Действия</th>
                 </tr>
               </thead>
               <tbody>
                 {patients.map((patient) => (
                   <tr
                     key={patient.id}
-                    style={{
-                      borderBottom: '1px solid var(--mac-border)',
-                      transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
-                    }}
+                    className="admin-patients-tbody-row"
                     onMouseEnter={(event) => {
                       event.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
                     }}
@@ -353,53 +302,29 @@ const AdminPatients = () => {
                   >
                     <td
                       aria-label={`Пациент ${getPatientName(patient)}`}
-                      style={{ padding: '12px 16px' }}
+                      className="admin-p-12-16"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="admin-flex-center-12">
                         <div
                           aria-hidden="true"
-                          style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            backgroundColor: 'var(--mac-accent)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--mac-text-on-accent)',
-                            fontSize: 'var(--mac-font-size-sm)',
-                            fontWeight: 'var(--mac-font-weight-medium)',
-                          }}
+                          className="admin-patients-avatar"
                         >
                           {getPatientInitials(patient)}
                         </div>
                         <div>
                           <p
-                            style={{
-                              fontWeight: 'var(--mac-font-weight-medium)',
-                              color: 'var(--mac-text-primary)',
-                              fontSize: 'var(--mac-font-size-sm)',
-                              margin: 0,
-                            }}
+                            className="admin-patients-name"
                           >
                             {getPatientName(patient)}
                           </p>
                           <p
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--mac-text-secondary)',
-                              margin: '4px 0 0',
-                            }}
+                            className="admin-patients-email"
                           >
                             {patient.email || 'Email не указан'}
                           </p>
                           {patient.address ? (
                             <p
-                              style={{
-                                fontSize: '11px',
-                                color: 'var(--mac-text-tertiary)',
-                                margin: '2px 0 0',
-                              }}
+                              className="admin-patients-address"
                             >
                               {patient.address}
                             </p>
@@ -407,29 +332,29 @@ const AdminPatients = () => {
                         </div>
                       </div>
                     </td>
-                    <td style={textCellStyle}>{formatAge(patient, calculateAge)}</td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td className="admin-patients-td">{formatAge(patient, calculateAge)}</td>
+                    <td className="admin-p-12-16">
                       <Badge variant={patient.gender === 'male' ? 'info' : 'success'}>
                         {getGenderLabel(patient.gender)}
                       </Badge>
                     </td>
-                    <td style={textCellStyle}>{patient.phone || 'Не указан'}</td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td className="admin-patients-td">{patient.phone || 'Не указан'}</td>
+                    <td className="admin-p-12-16">
                       {patient.bloodType ? (
                         <Badge variant="warning">{patient.bloodType}</Badge>
                       ) : (
-                        <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-tertiary)' }}>
+                        <span className="admin-text-sm-tertiary">
                           Не указано
                         </span>
                       )}
                     </td>
-                    <td style={textCellStyle}>{formatDate(patient.lastVisit)}</td>
-                    <td style={textCellStyle}>{patient.visitsCount || 0} визитов</td>
+                    <td className="admin-patients-td">{formatDate(patient.lastVisit)}</td>
+                    <td className="admin-patients-td">{patient.visitsCount || 0} визитов</td>
                     <td
                       aria-label={`Действия для пациента ${getPatientName(patient)}`}
-                      style={{ padding: '12px 16px' }}
+                      className="admin-p-12-16"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div className="admin-flex-center-8">
                         <IconButton label="Редактировать пациента" onClick={() => handleEditPatient(patient)}>
                           <Edit size={16} />
                         </IconButton>
