@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-07-04 — Admin Sprint 3: P1 architectural cleanup (fix/admin-sprint3-p1-architectural)
+
+### A-1: Removed `admin-advanced-users` route + `AdvancedUserManagement` stub + dead `UserManagement` ROUTE_COMPONENTS entry
+- **`AdvancedUserManagement.jsx`** (20 lines) deleted — was a stub wrapping `<UserManagement />` with an Alert banner, duplicating `/admin/users` (which routes to `UnifiedUserManagement` that renders `UserManagement` underneath).
+- **`routeRegistry.js`**: removed `admin-advanced-users` route block entirely. `/admin/advanced-users` and legacy `/advanced-users` now 404 — bookmarks should be updated to `/admin/users`.
+- **`App.jsx`**: removed `AdvancedUserManagement` lazy import + `ROUTE_COMPONENTS` entry. Also removed `UserManagement` lazy import + `ROUTE_COMPONENTS` entry (dead — no route uses `component: 'UserManagement'`; the file stays as it's imported by `UnifiedUserManagement`).
+- **`routeContract.test.js`**: replaced "keeps admin user routes split between canonical and advanced ownership" test with "keeps admin user management on the canonical UnifiedUserManagement route" (asserts `admin-advanced-users` is undefined).
+
+### A-2: Consolidated Telegram sidebar entries (2 → 1)
+Two routes had overlapping semantics and both appeared in the sidebar:
+- `admin-telegram-settings` → `TelegramSettings` (Настройки section) — bot token, webhook, test messages, stats.
+- `admin-telegram-integration` → `TelegramManager` (Система section) — richer bot management (commands, onboarding requests).
+
+Demoted `admin-telegram-integration` to `entry: 'direct'` + `nav: false` — route stays reachable via direct URL `/admin/integrations/telegram` and legacy redirect from `/telegram-integration` (bookmark-compatible), but no longer clutters the sidebar. `admin-telegram-settings` is the canonical Telegram surface. Updated `routeContract.test.js` accordingly.
+
+### A-3: Migrated `admin/ErrorBoundary` → `common/ErrorBoundary`
+- **`admin/ErrorBoundary.jsx`** (107 lines) deleted — duplicated `common/ErrorBoundary.jsx` (216 lines, more featureful: supports `onError` callback, `ErrorFallback` component, theme prop). Only consumer was `AdminDashboard.jsx:27`.
+- **`AdminDashboard.jsx:27`**: import migrated to `../common/ErrorBoundary`.
+
+### A-4: Rebalanced admin sidebar sections (Система 9 → 7, Miller's 7±2)
+After A-2 (telegram-integration demoted), Система had 8 items. Moved 2 more to Интеграции:
+- `admin-push-notifications`: Система → Интеграции (order 30).
+- `admin-phone-verification`: Система → Интеграции (order 40).
+
+Final sidebar distribution (all sections ≤ 7):
+- Обзор (2), Управление (7), Операции (3), Интеграции (4), Система (7), Настройки (7).
+
+Verification:
+- `vite build` → ✓ built in ~25s, exit 0, all chunks emitted.
+- `vitest run` → ✓ 515/515 tests pass across 105 test files (includes updated routeContract tests).
+- `eslint` on 4 modified files → 0 errors.
+
 ## 2026-07-04 — Admin Sprint 2: P1 functional fixes (fix/admin-sprint2-p1-functional)
 
 ### P1-1: `ReportsManager.jsx` — perpetual spinner for weekly/monthly KPI cards

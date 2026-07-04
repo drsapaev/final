@@ -24,7 +24,7 @@ import {
 } from '../ui/macos';
 import useAdminData from '../../hooks/useAdminData';
 import AdminRouteSwitcher from './AdminRouteSwitcher';
-import ErrorBoundary from './ErrorBoundary';
+import ErrorBoundary from '../common/ErrorBoundary';
 
 const adminSurface = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 72%) 0%, color-mix(in srgb, var(--mac-card-bg), white 64%) 100%)';
 const adminInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 82%)';
