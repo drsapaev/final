@@ -66,7 +66,7 @@ function resolveDoctorQueueEntryId(row) {
  */
 const MacOSCardiologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
-  const { isDark, getColor, getSpacing, getFontSize, getShadow } = useTheme();
+  const { isDark, getColor, getSpacing, getFontSize } = useTheme();
   const location = useLocation();
   // P-009: navigate removed — useDoctorPanelState handles tab URL sync
 
@@ -1443,15 +1443,6 @@ const MacOSCardiologistPanelUnified = () => {
     }
   };
 
-  // Используем дизайн-систему вместо инлайновых стилей
-  const pageStyle = {
-    padding: getSpacing('lg'),
-    width: '100%',
-    minHeight: 'calc(100vh - 60px)',
-    background: getColor('background'),
-    color: getColor('text'),
-    overflow: 'visible'
-  };
 
   const getHistoryTimestampValue = (value) => {
     if (!value) {
@@ -1619,23 +1610,14 @@ const MacOSCardiologistPanelUnified = () => {
   ];
 
   return (
-    <div className="cardio-root-container" style={{ ...pageStyle }}>
+    <div className="cardio-root-container">
 
-      <div className="cardio-card-padded" style={{ padding: 0 }}> {/* Убираем padding, так как он уже есть в main контейнере */}
+      <div className="cardio-card-padded cardio-p-0"> {/* Убираем padding, так как он уже есть в main контейнере */}
 
         {/* Навигация по вкладкам удалена — управление через сайдбар и URL */}
 
         {/* Контент вкладок */}
-        <div style={{
-          width: '100%',
-          maxWidth: 'none',
-          overflow: 'visible',
-          boxSizing: 'border-box',
-          position: 'relative',
-          zIndex: 1,
-          display: 'block',
-          gap: getSpacing('lg')
-        }}>
+        <div className="cardio-tab-content">
           {/* Записи кардиолога */}
           {/* Записи кардиолога — R-15: extracted to AppointmentsTab component */}
           {activeTab === 'appointments' &&
@@ -1769,38 +1751,19 @@ const MacOSCardiologistPanelUnified = () => {
           <div
             role="alertdialog"
             aria-label="Предупреждение об истечении сессии"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10000,
-            }}
+            className="cardio-modal-overlay"
           >
             <div
-              style={{
-                background: getColor('surface'),
-                border: `1px solid ${getColor('border')}`,
-                borderRadius: '12px',
-                padding: '24px',
-                maxWidth: '420px',
-                width: '90%',
-                boxShadow: getShadow('xl'),
-              }}
+              className="cardio-modal-card"
             >
-              <h3 style={{ margin: '0 0 12px 0', fontSize: getFontSize('lg'), color: getColor('text') }}>
+              <h3 className="cardio-modal-heading">
                 Сессия скоро истечёт
               </h3>
-              <p style={{ margin: '0 0 16px 0', fontSize: getFontSize('base'), color: getColor('textSecondary'), lineHeight: 1.5 }}>
+              <p className="cardio-modal-text">
                 Ваша сессия истекает. Несохранённые данные (жалобы, диагноз, лечение)
                 могут быть потеряны. Сохраните текущий приём или продлите сессию.
               </p>
-              <div style={{ display: 'flex', gap: getSpacing('sm'), justifyContent: 'flex-end' }}>
+              <div className="cardio-modal-actions">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -1831,43 +1794,16 @@ const MacOSCardiologistPanelUnified = () => {
         {/* Настройки кардиолога: плавающая кнопка и панель */}
         <button
           onClick={() => setSettingsOpen(true)}
-          style={{
-            position: 'fixed',
-            right: 16,
-            bottom: 16,
-            background: getColor('surface'),
-            border: `1px solid ${getColor('border')}`,
-            borderRadius: '9999px',
-            padding: getSpacing('md'),
-            boxShadow: getShadow('lg')
-          }}
+          className="cardio-settings-fab"
           aria-label="Открыть настройки">
 
           <Settings size={18} />
         </button>
         {settingsOpen &&
-        <MacOSCard style={{
-          padding: '24px',
-          position: 'fixed',
-          right: 16,
-          bottom: 80,
-          width: 360,
-          backgroundColor: getColor('surface'),
-          border: `1px solid ${getColor('border')}`,
-          boxShadow: getShadow('xl')
-        }}>
-            <h3 style={{
-            fontSize: getFontSize('lg'),
-            fontWeight: '500',
-            marginBottom: getSpacing('md'),
-            color: getColor('text')
-          }}>Настройки кардиолога</h3>
+        <MacOSCard className="cardio-settings-card">
+            <h3 className="cardio-settings-title">Настройки кардиолога</h3>
             <div className="cardio-flex-col">
-              <label className="flex items-center" style={{
-              gap: '8px',
-              color: 'var(--mac-text-primary)',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-            }}>
+              <label className="flex items-center cardio-settings-label">
                 <Checkbox
                 checked={settings.showEcgEchoTogether}
                 onChange={(e) => setSettings({ ...settings, showEcgEchoTogether: e.target.checked })} />
@@ -1875,32 +1811,17 @@ const MacOSCardiologistPanelUnified = () => {
                 Показывать ЭКГ и ЭхоКГ вместе
               </label>
               <div>
-                <div className="text-sm" style={{
-                color: getColor('textSecondary'),
-                marginBottom: getSpacing('xs')
-              }}>Порог LDL (мг/дл)</div>
+                <div className="text-sm cardio-ldl-label">Порог LDL (мг/дл)</div>
                 <input
                 type="number"
                 aria-label="LDL threshold"
                 value={settings.ldlThreshold}
                 onChange={(e) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
-                style={{
-                  width: '100%',
-                  padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                  border: `1px solid ${getColor('border')}`,
-                  borderRadius: '6px',
-                  backgroundColor: getColor('surface'),
-                  color: getColor('text'),
-                  fontSize: getFontSize('base'),
-                  outline: 'none'
-                }} />
+                className="cardio-settings-input" />
 
               </div>
             </div>
-            <div className="flex justify-end" style={{
-            gap: getSpacing('sm'),
-            marginTop: getSpacing('lg')
-          }}>
+            <div className="flex justify-end cardio-settings-actions">
               <Button variant="outline" onClick={() => setSettingsOpen(false)}>Закрыть</Button>
               <Button onClick={() => {
                 // P-016 (UX audit): settings are already persisted to
