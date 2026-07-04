@@ -55,44 +55,13 @@ export const REGISTRAR_RECORD_KINDS = new Set(['visit', 'online_queue', 'appoint
  * Workflow header styles (shared between welcome and worklist views).
  * Using macOS design system tokens (canonical).
  */
-export const registrarWorkflowHeaderStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 'var(--mac-spacing-4)',
-  flexWrap: 'wrap',
-  padding: 'var(--mac-spacing-4)',
-  marginBottom: 'var(--mac-spacing-4)',
-  background: 'var(--mac-bg-primary)',
-  border: '1px solid var(--mac-separator)',
-  borderRadius: 'var(--mac-radius-lg)',
-  boxShadow: 'var(--mac-shadow-xs)',
-  minWidth: 0,
-};
+// Phase 3: registrarWorkflowHeaderStyle, registrarWorkflowTitleStyle,
+// registrarWorkflowMetaStyle constants removed — replaced by
+// .registrar-workflow-header, .registrar-workflow-title, .registrar-workflow-meta
+// CSS classes in registrar.css.
 
-export const registrarWorkflowTitleStyle = {
-  margin: 0,
-  color: 'var(--mac-text-primary)',
-  fontSize: 'var(--mac-font-size-xl)',
-  fontWeight: 'var(--mac-font-weight-semibold)',
-  lineHeight: 1.25,
-};
-
-export const registrarWorkflowMetaStyle = {
-  margin: 'var(--mac-spacing-1) 0 0',
-  color: 'var(--mac-text-secondary)',
-  fontSize: 'var(--mac-font-size-sm)',
-  lineHeight: 1.5,
-};
-
-export const registrarWorkflowActionsStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: 'var(--mac-spacing-2)',
-  flexWrap: 'wrap',
-  minWidth: 0,
-};
+// Phase 3: registrarWorkflowActionsStyle removed — replaced by
+// .registrar-workflow-actions CSS class in registrar.css.
 
 // ───────────────────────────────────────────────────────────
 // Contract normalization helpers

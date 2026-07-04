@@ -5,9 +5,9 @@ import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointments
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
 import {
-  Button, Card, CardHeader, CardContent, Badge, Icon, Input,
+  Button, Badge, Icon,
 } from '../components/ui/macos';
-import { AnimatedTransition, AnimatedLoader } from '../components/ui';
+import { AnimatedLoader } from '../components/ui';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
 import '../components/ui/animations.css';
@@ -35,6 +35,8 @@ import { useRegistrarData } from './registrar/useRegistrarData';
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
 import QueueView from './registrar/views/QueueView';
+// Decomp 6b: WelcomeView extracted to component
+import WelcomeView from './registrar/views/WelcomeView';
 // Strategic Direction 3: navigation helpers for canonical nested routes
 import { getViewFromPath } from './registrar/registrarNavigation';
 
@@ -43,10 +45,6 @@ import {
   API_BASE,
   REGISTRAR_TAB_LABEL_KEYS,
   REGISTRAR_STATUS_LABEL_KEYS,
-  registrarWorkflowHeaderStyle,
-  registrarWorkflowTitleStyle,
-  registrarWorkflowMetaStyle,
-  registrarWorkflowActionsStyle,
   normalizePatientGender,
   formatPreviewList,
   buildPostWizardPaymentRow,
@@ -66,18 +64,15 @@ import { printPanelTicketInBrowserAsync } from '../services/panelPrint';
 import AppointmentWizardV2 from '../components/wizard/AppointmentWizardV2';
 import PaymentManager from '../components/payment/PaymentManager';
 
-// Современная очередь
-import ModernQueueManager from '../components/queue/ModernQueueManager';
-
-// Современная статистика
-import ModernStatistics from '../components/statistics/ModernStatistics';
+// Modern queue manager — extracted to QueueView component (Decomp 6a)
+// Modern statistics — extracted to WelcomeView component (Decomp 7a)
 
 // Модальное окно редактирования пациента
 // ✨ ЗАКОММЕНТИРОВАНО: Теперь используется AppointmentWizardV2 для редактирования
 // import EditPatientModal from '../components/common/EditPatientModal';
 
 // Утилиты для работы с датами
-import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
+import { getLocalDateString } from '../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
 // Note: formatNetworkErrorMessage + isNetworkFetchError moved to useRegistrarData.js (Decomp 4)
 import { getErrorMessage } from '../utils/errorHandler';
@@ -123,24 +118,33 @@ const RegistrarPanel = () => {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
   const currentView = useMemo(() => {
-    // Strategic Direction 3: prefer canonical path-derived view
-    // (/registrar/welcome, /registrar/queue) over legacy ?view= query param.
-    const pathView = getViewFromPath(location.pathname);
-    if (pathView) return pathView;
+    // Phase 3: rely solely on canonical path-derived view.
+    // Legacy ?view= and ?tab= params are auto-redirected to canonical paths
+    // by the Phase 2 redirect useEffect below, so they never need to be
+    // parsed here. The redirect preserves all other query params.
+    return getViewFromPath(location.pathname);
+  }, [location.pathname]);
 
-    // Backward compatibility: legacy ?view= query param
-    const explicitView = searchParams.get('view');
-    if (explicitView === 'welcome' || explicitView === 'queue') {
-      return explicitView;
-    }
+  // ✅ Phase 2: redirect legacy ?view=welcome|queue to canonical paths
+  // /registrar?view=welcome → /registrar/welcome
+  // /registrar?view=queue   → /registrar/queue
+  // Preserves all other query params (q, status, date, patientId, dept).
+  // The redirect is replace-only (no history pollution) and runs once per
+  // legacy-view occurrence.
+  useEffect(() => {
+    const legacyView = searchParams.get('view');
+    if (legacyView !== 'welcome' && legacyView !== 'queue') return;
+    // Only redirect when on the bare /registrar path (not already on a sub-path)
+    if (location.pathname !== '/registrar') return;
 
-    const legacyTab = searchParams.get('tab');
-    if (legacyTab === 'welcome' || legacyTab === 'queue') {
-      return legacyTab;
-    }
+    const params = new URLSearchParams(searchParams);
+    params.delete('view');
+    params.delete('tab');
+    const qs = params.toString();
+    const target = qs ? `/registrar/${legacyView}?${qs}` : `/registrar/${legacyView}`;
+    navigate(target, { replace: true });
+  }, [searchParams, location.pathname, navigate]);
 
-    return explicitView;
-  }, [searchParams, location.pathname]);
   const searchQuery = useMemo(() => (searchParams.get('q') || '').toLowerCase(), [searchParams]);
   const statusFilter = useMemo(() => searchParams.get('status'), [searchParams]);
   const todayStr = getLocalDateString();
@@ -257,61 +261,15 @@ const RegistrarPanel = () => {
   const t = useMemo(() => getRegistrarTranslator(language), [language]);
   const currentWorklistLabel = t(REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments');
   const statusFilterLabel = statusFilter ? t(REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter) : null;
-  const { theme, isDark, getSpacing, getFontSize, getColor } = useTheme();
+  const { theme, getSpacing, getFontSize, getColor } = useTheme();
   // Адаптивные цвета из централизованной системы темизации
   // DS-2 fix: replaced --color-* variables with --mac-* canonical tokens
-  const cardBg = isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)';
   const textColor = 'var(--mac-text-primary)';
-  const borderColor = isDark ? 'var(--mac-border)' : 'var(--mac-border-secondary)';
-  const accentColor = 'var(--mac-accent-blue)';
 
-  // Используем централизованную типографику и отступы
-  // Используем CSS переменные вместо getSpacing и getColor
-
-  const pageStyle = {
-    padding: '0',
-    maxWidth: 'none',
-    margin: '0',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-    fontSize: isMobile ? 'var(--mac-font-size-sm)' : isTablet ? 'var(--mac-font-size-base)' : 'var(--mac-font-size-lg)',
-    fontWeight: 400,
-    lineHeight: 1.5,
-    background: 'var(--mac-gradient-window)',
-    color: 'var(--mac-text-primary)',
-    minHeight: '100vh',
-    position: 'relative',
-    transition: 'background var(--mac-duration-normal) var(--mac-ease)'
-  };
-
-  // Контейнер таблицы, визуально "сливается" с вкладками
-  const tableContainerStyle = {
-    background: theme === 'light' ?
-    'rgba(255, 255, 255, 0.98)' :
-    'rgba(15, 23, 42, 0.8)',
-    backdropFilter: 'blur(20px)',
-    color: textColor,
-    borderLeft: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderRight: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderBottom: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderTop: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.05)'}`,
-    borderRadius: '0 0 20px 20px',
-    margin: '0 20px 20px 20px',
-    boxShadow: theme === 'light' ?
-    '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' :
-    '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-    overflow: 'hidden'
-  };
-
-  // Содержимое контейнера таблицы без верхнего внутреннего отступа
-  const tableContentStyle = {
-    padding: '0',
-    color: textColor
-  };
-
-  // QW-01 cleanup: buttonStyle and buttonSecondaryStyle removed (were unused
-  // dead code — 32 lines of inline styles that bypassed the macOS design
-  // system canonical Button component). See audit §5.5, §5.6.
-
+  // Phase 3: pageStyle, tableContainerStyle, tableContentStyle constants
+  // removed — replaced by .registrar-page-root, .registrar-table-container,
+  // .registrar-table-content CSS classes with data-breakpoint attribute
+  // for responsive font-size / padding / border-radius variants.
 
   // Decomp 4: data-loading functions extracted to useRegistrarData hook.
   // loadAppointments and loadMoreAppointments remain inline due to complex
@@ -1484,7 +1442,11 @@ const RegistrarPanel = () => {
   }, [updateAppointmentStatus, handleStartVisit, openRecordPreview, openRecordEditor]);
 
   return (
-    <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
+    <div
+      className="registrar-page-root"
+      data-breakpoint={isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop'}
+      role="main"
+      aria-label="Панель регистратора">
       {/* Skip to content link for screen readers */}
       <a
         href="#main-content"
@@ -1505,11 +1467,14 @@ const RegistrarPanel = () => {
         <button
           type="button"
           onClick={() => {
+            // Phase 2: navigate to canonical path (replaces legacy ?view=welcome)
             const p = new URLSearchParams(searchParams);
-            p.set('view', 'welcome');
             p.delete('q');
             p.delete('status');
-            setSearchParams(p, { replace: true });
+            p.delete('view');
+            p.delete('tab');
+            const qs = p.toString();
+            navigate(qs ? `/registrar/welcome?${qs}` : '/registrar/welcome', { replace: true });
           }}
           className="registrar-breadcrumb-link"
         >
@@ -1537,11 +1502,7 @@ const RegistrarPanel = () => {
 
       {/* Современные вкладки */}
       {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
-      <div style={{
-        margin: `0 ${'1rem'}`,
-        maxWidth: 'none',
-        width: 'calc(100vw - 32px)'
-      }}>
+      <div className="registrar-tabs-wrapper">
           <ModernTabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -1558,442 +1519,45 @@ const RegistrarPanel = () => {
 
       {/* Основной контент без отступа сверху */}
       <div className="registrar-overflow-hidden">
-        {/* Экран приветствия по параметру view=welcome (с историей: календарь + поиск) */}
-        {currentView === 'welcome' &&
-        <AnimatedTransition type="fade" delay={100}>
-            <Card variant="default" className="registrar-card-surface">
-              <CardHeader className="registrar-card-header">
-                {/* QW-08 fix: reduced AnimatedTransition from 10 to 3 (100/200/300ms). */}
-                {/* Previous delays 400/800/900/1000/1100/1350/1400/1500 blocked first */}
-                {/* user intent until 1.5s after page load. */}
-                <AnimatedTransition type="slide" direction="up" delay={200}>
-                  <h1 className="registrar-hero-title">
-                    {t('welcome')} в панель регистратора!
-                    <Icon name="person" size="default" className="registrar-text-accent" />
-                  </h1>
-                </AnimatedTransition>
-                <AnimatedTransition type="fade" delay={300}>
-                  <div className="registrar-date-subtitle">
-                    {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                  </div>
-                </AnimatedTransition>
-              </CardHeader>
-
-              <CardContent>
-                {/* Современная статистика */}
-                <ModernStatistics
-                appointments={appointments}
-                departmentStats={departmentStats}
-                language={language}
-                selectedDate={showCalendar && historyDate ? historyDate : getLocalDateString()}
-                onExport={() => {
-                  logger.info('Экспорт статистики');
-                }}
-                onRefresh={() => {
-                  loadAppointments({ source: 'statistics_refresh' });
-                }} />
-
-
-                {/* Панель управления и фильтров */}
-                {/* QW-08 fix: unwrapped nested AnimatedTransition (was delays 800-1500). */}
-                  <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
-                      <h2 className="registrar-section-heading">
-                        <Icon name="gear" size="default" className="registrar-text-accent" />
-                        Панель управления
-                      </h2>
-
-                    {/* Быстрые действия */}
-                      <div className="registrar-grid-auto" style={{ marginBottom: 'var(--mac-spacing-6)' }}>
-                          <Button
-                          variant="primary"
-                          size="default"
-                          onClick={() => {
-                            logger.info('Кнопка "Новая запись" нажата');
-                            setWizardEditMode(false); // ✅ Сброс режима
-                            setWizardInitialData(null); // ✅ Сброс данных
-                            setShowWizard(true);
-                          }}
-                          aria-label="Create new appointment"
-                          className="registrar-flex" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
-
-                            <Icon name="plus" size="small" className="registrar-text-white" />
-                            {t('new_appointment')}
-                          </Button>
-
-                        {/* Кнопка модуля оплаты */}
-                          <Button
-                          variant="secondary"
-                          size="default"
-                          onClick={() => setShowPaymentManager(true)}
-                          aria-label="Open payment module"
-                          className="registrar-flex">
-
-                            <Icon name="creditcard" size="small" />
-                            Модуль оплаты
-                          </Button>
-
-                          <Button
-                          variant="outline"
-                          size="default"
-                          onClick={() => {
-                            logger.info('Кнопка "Экспорт CSV" нажата');
-                            const csvContent = generateCSV(appointments);
-                            const filename = `appointments_${getLocalDateString()}.csv`;
-                            downloadCSV(csvContent, filename);
-                            notify.success(`Экспортировано ${appointments.length} записей`);
-                          }}
-                          className="registrar-flex">
-
-                            <Icon name="square.and.arrow.up" size="small" />
-                            {t('export_csv')}
-                          </Button>
-                      </div>
-
-                    {/* Фильтры и навигация */}
-                      <div className="registrar-surface-toolbar">
-                        <h3 className="registrar-subsection-heading">
-                          <Icon name="magnifyingglass" size="default" className="registrar-text-accent" />
-                          Фильтры и навигация
-                        </h3>
-
-                        <div className="registrar-grid-auto">
-                          <Button
-                          variant={showCalendar ? 'warning' : 'outline'}
-                          size="default"
-                          onClick={() => {
-                            logger.info('Кнопка "Календарь" нажата');
-                            setShowCalendar(!showCalendar);
-                          }}
-                          className="registrar-flex">
-
-                            <Icon name="magnifyingglass" size="small" style={{ color: showCalendar ? 'white' : 'var(--mac-text-primary)' }} />
-                            Календарь
-                          </Button>
-
-                          <Button
-                          variant="success"
-                          size="default"
-                          onClick={() => setSearchParams({ status: 'queued' })}
-                          className="registrar-flex">
-
-                            <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
-                            Активная очередь
-                          </Button>
-
-                          <Button
-                          variant="primary"
-                          size="default"
-                          onClick={() => setSearchParams({ status: 'paid_pending' })}
-                          className="registrar-flex">
-
-                            <Icon name="creditcard" size="small" className="registrar-text-white" />
-                            Ожидают оплаты
-                          </Button>
-
-                          <Button
-                          variant="outline"
-                          size="default"
-                          onClick={() => setSearchParams({})}
-                          className="registrar-flex">
-
-                            <Icon name="eye" size="small" />
-                            Все записи
-                          </Button>
-
-                          <Button
-                          variant="outline"
-                          size="default"
-                          onClick={() => navigate('/registrar/queue')}
-                          className="registrar-flex">
-
-                            <Icon name="bell" size="small" />
-                            Онлайн-очередь
-                          </Button>
-
-                          <Button
-                          variant="outline"
-                          size="default"
-                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
-                          className="registrar-flex">
-
-                            <Icon name="gear" size="small" />
-                            Обновить данные
-                          </Button>
-                        </div>
-
-                        {/* Календарный виджет */}
-                        {showCalendar &&
-                      <div className="registrar-info-card" style={{ padding: 'var(--mac-spacing-5)', boxShadow: 'var(--mac-shadow-sm)' }}>
-                            <div className="registrar-flex-col">
-                              <label className="registrar-picker-label">
-                                <Icon name="magnifyingglass" size="small" className="registrar-text-secondary" />
-                                Выберите дату для просмотра истории:
-                              </label>
-                              <Input
-                            type="date"
-                            label=""
-                            value={tempDateInput}
-                            onChange={(e) => {
-                              setTempDateInput(e.target.value);
-                              logger.info('Введена дата (debounced):', e.target.value);
-                            }}
-                            onBlur={(e) => {
-                              if (e.target.value && e.target.value !== historyDate) {
-                                logger.info('📅 Date input blur - applying immediately:', e.target.value);
-                                setHistoryDate(e.target.value);
-                              }
-                            }} />
-
-                              <div className="registrar-flex-wrap" style={{ gap: '8px' }}>
-                                <button
-                              type="button"
-                              onClick={() => {
-                                const today = getLocalDateString();
-                                setTempDateInput(today);
-                                setHistoryDate(today);
-                              }}
-                              className="registrar-date-btn"
-                              style={{
-                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor
-                              }}>
-
-                                  Сегодня
-                                </button>
-                                <button
-                              type="button"
-                              onClick={() => {
-                                const yesterdayStr = getYesterdayDateString();
-                                setTempDateInput(yesterdayStr);
-                                setHistoryDate(yesterdayStr);
-                              }}
-                              className="registrar-date-btn"
-                              style={{
-                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor
-                              }}>
-
-                                  Вчера
-                                </button>
-                                <button
-                              type="button"
-                              onClick={() => {
-                                const weekAgo = new Date();
-                                weekAgo.setDate(weekAgo.getDate() - 7);
-                                const weekAgoStr = getLocalDateString(weekAgo);
-                                setTempDateInput(weekAgoStr);
-                                setHistoryDate(weekAgoStr);
-                              }}
-                              className="registrar-date-btn"
-                              style={{
-                                background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor
-                              }}>
-
-                                  Неделю назад
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                      }
-                      </div>
-                  </div>
-
-                {/* История записей */}
-                <div>
-                  <div className="registrar-flex-between" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-                    <h3 className="registrar-history-heading">
-                      <Icon name="eye" size="default" className="registrar-text-accent" />
-                      История записей
-                    </h3>
-                    {showCalendar &&
-                  <Badge variant="secondary" className="registrar-badge-date">
-                        <Icon name="magnifyingglass" size="small" />
-                        {new Date(historyDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </Badge>
-                  }
-                  </div>
-                  <div className="registrar-surface-toolbar">
-                    {/* Индикатор источника данных */}
-                    {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
-
-                    {/* ✅ ДОБАВЛЕНО: Сообщение при пустой очереди */}
-                    {(() => {
-                    const token = tokenManager.getAccessToken();
-                    const isNoToken = !token;
-                    const isEmptyQueue = !appointmentsLoading && dataSource === 'api' && filteredAppointments.length === 0;
-
-                    logger.info('🎯 Empty state render check:', {
-                      appointmentsLoading,
-                      dataSource,
-                      filteredLength: filteredAppointments.length,
-                      appointmentsLength: appointments.length,
-                      hasToken: !!token,
-                      isNoToken,
-                      isEmptyQueue,
-                      shouldShow: isEmptyQueue
-                    });
-
-                    return isEmptyQueue;
-                  })() &&
-                  <div className="registrar-empty-state">
-                          {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
-                    {/* Full unification deferred — requires EmptyState.jsx migration */}
-                    {/* from Tailwind/native to macOS design system first. */}
-                    <div className="registrar-empty-icon-lg">
-                            {!tokenManager.hasToken() ?
-                      <Icon name="lock" size="large" /> :
-                      <Icon name="doc.text" size="large" />}
-                          </div>
-                          <h3 className="registrar-empty-heading" style={{ color: textColor }}>
-                            {!tokenManager.hasToken() ? 'Сессия истекла' : 'Очередь пуста'}
-                          </h3>
-                          <p className="registrar-empty-desc-text" style={{ fontSize: '16px', color: textColor }}>
-                            {!tokenManager.hasToken() ?
-                      'Нажмите "Войти снова", чтобы обновить данные.' :
-                      'На сегодня нет записей в очереди.'}
-                          </p>
-
-                          {/* Кнопки действий */}
-                          {!tokenManager.hasToken() &&
-                    <div className="registrar-flex-wrap">
-                              <button
-                        onClick={() => {
-                          // Перенаправляем на страницу входа
-                          window.location.href = '/login';
-                        }}
-                        className="registrar-btn-lg registrar-btn-accent"
-                        onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
-                        onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue)'}>
-
-                                <Icon name="key" size="small" className="registrar-icon-mr" />Войти снова
-                              </button>
-
-                              <button
-                        onClick={() => {
-                          // Обновляем данные
-                          loadAppointments({ source: 'manual_refresh_button' });
-                        }}
-                        className="registrar-btn-lg registrar-btn-success"
-                        onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-green-hover)'}
-                        onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-green)'}>
-
-                                <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Обновить данные
-                              </button>
-
-                              <button
-                        onClick={() => {
-                          // Перезапускаем приложение
-                          window.location.reload();
-                        }}
-                        className="registrar-btn-lg registrar-btn-neutral"
-                        onMouseOver={(e) => e.target.style.background = 'var(--mac-text-secondary)'}
-                        onMouseOut={(e) => e.target.style.background = 'var(--mac-text-tertiary)'}>
-
-                                <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Перезапустить приложение
-                              </button>
-                            </div>
-                    }
-                          <p style={{
-                      fontSize: '14px',
-                      color: textColor,
-                      marginBottom: '24px'
-                    }}>
-                            {activeTab ?
-                      `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :
-                      'Сегодня пока нет записей'}
-                          </p>
-                          {/* QW-04: empty state 3 of 3 (welcome no-records). */}
-                    {/* See empty state 1 above for unification plan. */}
-                    <Button
-                      variant="primary"
-                      onClick={() => {
-                        setWizardEditMode(false); // ✅ Сброс режима
-                        setWizardInitialData(null); // ✅ Сброс данных
-                        setShowWizard(true);
-                      }}
-                      className="registrar-btn-cta">
-
-                            <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
-                          </Button>
-                        </div>
-                  }
-
-                    {/* Таблица отображается только если есть данные */}
-                    {(appointmentsLoading || filteredAppointments.length > 0) &&
-                  <EnhancedAppointmentsTable
-                    data={filteredAppointments}
-                    rawEntries={appointments} // ⭐ SSOT FIX: Сырые данные для полного Tooltip
-                    loading={appointmentsLoading}
-                    theme={theme}
-                    language={language}
-                    outerBorder={true}
-                    services={services}
-                    showCheckboxes={false} // ✅ Отключаем чекбоксы для регистратуры
-                    onRowClick={(row) => {
-                      logger.info('Открыть детали записи:', row);
-                      // Здесь можно открыть модальное окно с деталями записи
-                    }}
-                    onActionClick={(action, row, event) => {
-                      switch (action) {
-                        case 'view':
-                          logger.info('Просмотр записи:', row);
-                          openRecordPreview(row);
-                          break;
-                        case 'edit':
-                          logger.info('[RegistrarPanel] Открытие мастера редактирования для:', row.patient_fio || row.patient_name);
-                          openRecordEditor(row);
-                          break;
-                        case 'payment':
-                          logger.info('Открытие модального окна оплаты для записи (welcome):', row);
-                          setPaymentDialog({ open: true, row, paid: false, source: 'welcome' });
-                          break;
-                        case 'in_cabinet':
-                          logger.info('Отправка пациента в кабинет (welcome):', row);
-                          updateAppointmentStatus(row.id, 'in_cabinet', '', row);
-                          break;
-                        case 'call':
-                          logger.info('Вызов пациента (welcome):', row);
-                          handleStartVisit(row);
-                          break;
-                        case 'complete':
-                          logger.info('Завершение приёма (welcome):', row);
-                          updateAppointmentStatus(row.id, 'done', '', row);
-                          break;
-                        case 'print':
-                          logger.info('Печать талона (welcome):', row);
-                          setPrintDialog({ open: true, type: 'ticket', data: row });
-                          break;
-                        case 'more':{
-                            // Показать контекстное меню с дополнительными действиями
-                            const rect = event?.target?.getBoundingClientRect();
-                            setContextMenu({
-                              open: true,
-                              row,
-                              position: {
-                                x: rect?.right || event?.clientX || 0,
-                                y: rect?.top || event?.clientY || 0
-                              }
-                            });
-                            break;
-                          }
-                        default:
-                          break;
-                      }
-                    }} />
-
-                  }
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </AnimatedTransition>
-        }
+        {/* Экран приветствия — extracted to WelcomeView component (Decomp 6b) */}
+        {currentView === 'welcome' && (
+          <WelcomeView
+            t={t}
+            language={language}
+            theme={theme}
+            textColor={textColor}
+            appointments={appointments}
+            departmentStats={departmentStats}
+            dataSource={dataSource}
+            appointmentsLoading={appointmentsLoading}
+            filteredAppointments={filteredAppointments}
+            services={services}
+            activeTab={activeTab}
+            historyDate={historyDate}
+            showCalendar={showCalendar}
+            tempDateInput={tempDateInput}
+            loadAppointments={loadAppointments}
+            setShowWizard={setShowWizard}
+            setWizardEditMode={setWizardEditMode}
+            setWizardInitialData={setWizardInitialData}
+            setShowPaymentManager={setShowPaymentManager}
+            setHistoryDate={setHistoryDate}
+            setShowCalendar={setShowCalendar}
+            setTempDateInput={setTempDateInput}
+            setSearchParams={setSearchParams}
+            navigate={navigate}
+            setPaymentDialog={setPaymentDialog}
+            setPrintDialog={setPrintDialog}
+            setContextMenu={setContextMenu}
+            openRecordPreview={openRecordPreview}
+            openRecordEditor={openRecordEditor}
+            updateAppointmentStatus={updateAppointmentStatus}
+            handleStartVisit={handleStartVisit}
+            generateCSV={generateCSV}
+            downloadCSV={downloadCSV}
+            DataSourceIndicator={DataSourceIndicator}
+          />
+        )}
 
         {/* Онлайн-очередь — extracted to QueueView component (Decomp 6a) */}
         {currentView === 'queue' &&
@@ -2017,37 +1581,30 @@ const RegistrarPanel = () => {
           id="main-content"
           role="tabpanel"
           aria-labelledby={activeTab ? `${activeTab}-tab` : undefined}
-          style={{
-            ...tableContainerStyle,
-            // Убираем отрицательный отступ для идеальной стыковки с вкладками
-            margin: `0 ${isMobile ? '1rem' : '1rem'} ${'2rem'} ${isMobile ? '1rem' : '1rem'}`,
-            borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px',
-            maxWidth: 'none',
-            width: 'calc(100vw - 32px)'
-          }}>
-            <div style={{
-            ...tableContentStyle,
-            padding: isMobile ? '0.5rem' : '1rem'
-          }}>
+          className="registrar-table-container"
+          data-breakpoint={isMobile ? 'mobile' : 'desktop'}>
+            <div
+            className="registrar-table-content"
+            data-breakpoint={isMobile ? 'mobile' : 'desktop'}>
 
               <div
-                style={registrarWorkflowHeaderStyle}
+                className="registrar-workflow-header"
                 aria-label="Сводка рабочего списка регистратуры">
                 <div className="registrar-worklist-container">
                   <div className="registrar-worklist-meta">
                     Регистратура
                   </div>
-                  <h2 style={registrarWorkflowTitleStyle}>
+                  <h2 className="registrar-workflow-title">
                     Рабочий список: {currentWorklistLabel}
                   </h2>
-                  <p style={registrarWorkflowMetaStyle}>
+                  <p className="registrar-workflow-meta">
                     {showCalendar ?
                     new Date(historyDate).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' }) :
                     t('today')} · {filteredAppointments.length} {t('tabs_appointments')}
                   </p>
                 </div>
 
-                <div style={registrarWorkflowActionsStyle}>
+                <div className="registrar-workflow-actions">
                   {statusFilterLabel &&
                   <Badge variant="warning" className="registrar-inline-flex-tight">
                       <Icon name="magnifyingglass" size="small" />
@@ -2066,8 +1623,7 @@ const RegistrarPanel = () => {
                     setShowWizard(true);
                   }}
                   aria-label="Создать новую запись из рабочего списка регистратора"
-                  className="registrar-inline-flex"
-                  style={{ flexShrink: 0 }}>
+                  className="registrar-inline-flex registrar-inline-flex-shrink">
                     <Icon name="plus" size="small" className="registrar-text-white" />
                     {t('new_appointment')}
                   </Button>
@@ -2085,10 +1641,10 @@ const RegistrarPanel = () => {
                     {/* QW-04: empty state 2 of 3 (worklist empty). */}
                     <Icon name="doc.text" size="large" />
                   </div>
-                  <h3 className="registrar-empty-heading" style={{ color: textColor }}>
+                  <h3 className="registrar-empty-heading registrar-empty-heading-text">
                     Очередь пуста
                   </h3>
-                  <p className="registrar-empty-desc-text" style={{ fontSize: '14px', color: textColor }}>
+                  <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
                     {activeTab ?
                 `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :
                 'Сегодня пока нет записей'}
@@ -2175,11 +1731,8 @@ const RegistrarPanel = () => {
                 onClick={loadMoreAppointments}
                 disabled={paginationInfo.loadingMore}
                 aria-label={paginationInfo.loadingMore ? 'Loading more appointments' : 'Load more appointments'}
-                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'} registrar-flex`}
-                  style={{
-                    cursor: paginationInfo.loadingMore ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-                  }}>
+                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'} registrar-flex registrar-load-more-btn`}
+                aria-disabled={paginationInfo.loadingMore}>
 
                     {paginationInfo.loadingMore ?
                 <>
@@ -2244,15 +1797,9 @@ const RegistrarPanel = () => {
             ].filter(([, value]) => value !== null && value !== undefined && value !== '').map(([label, value]) => (
               <div
                 key={label}
-                className="registrar-surface"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(120px, 0.36fr) minmax(0, 1fr)',
-                  gap: '12px',
-                  alignItems: 'start'
-                }}>
-                <span className="registrar-text-secondary" style={{ fontSize: '13px' }}>{label}</span>
-                <span style={{ minWidth: 0, overflowWrap: 'anywhere', fontWeight: 500 }}>
+                className="registrar-surface registrar-preview-row">
+                <span className="registrar-text-secondary registrar-preview-label">{label}</span>
+                <span className="registrar-preview-value">
                   {String(value)}
                 </span>
               </div>
@@ -2558,23 +2105,16 @@ const RegistrarPanel = () => {
           }
         ]}>
         <div className="registrar-grid-gap-lg">
-          <div className="registrar-reschedule-card"
-            style={{
-              border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.14)'}`,
-              backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.06)'
-            }}>
+          <div className="registrar-reschedule-card registrar-reschedule-card-accent">
             <div className="registrar-flex-start">
-              <div className="registrar-reschedule-icon registrar-text-accent"
-                style={{
-                  backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.14)'
-                }}>
+              <div className="registrar-reschedule-icon registrar-text-accent registrar-reschedule-icon-bg">
                 📅
               </div>
               <div>
-                <div className="registrar-reschedule-title" style={{ color: getColor('textPrimary') }}>
+                <div className="registrar-reschedule-title registrar-reschedule-title-text">
                   Перенос записи
                 </div>
-                <div className="registrar-reschedule-desc" style={{ color: getColor('textSecondary') }}>
+                <div className="registrar-reschedule-desc registrar-reschedule-desc-text">
                   Выберите быстрый перенос на завтра или укажите другую дату.
                 </div>
               </div>
@@ -2583,12 +2123,8 @@ const RegistrarPanel = () => {
 
           {/* QW-02 fix: inline date picker replacing window.prompt().
               min=today prevents selecting past dates natively in the picker. */}
-          <div className="registrar-reschedule-card"
-            style={{
-              border: `1px solid ${theme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'}`,
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
-            }}>
-            <label htmlFor="reschedule-custom-date" className="registrar-reschedule-label" style={{ color: getColor('textPrimary') }}>
+          <div className="registrar-reschedule-card registrar-reschedule-card-neutral">
+            <label htmlFor="reschedule-custom-date" className="registrar-reschedule-label registrar-reschedule-label-text">
               Дата переноса
             </label>
             <input
@@ -2598,15 +2134,10 @@ const RegistrarPanel = () => {
               min={getLocalDateString()}
               aria-label="Дата переноса записи"
               onChange={(e) => setCustomRescheduleDate(e.target.value)}
-              className="registrar-reschedule-input"
-                style={{
-                  border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
-                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'var(--mac-bg-primary)',
-                  color: getColor('textPrimary')
-                }}
+              className="registrar-reschedule-input registrar-reschedule-input-themed"
             />
             {/* R-27 fix: optional time picker (HH:MM) */}
-            <label htmlFor="reschedule-custom-time" className="registrar-reschedule-label" style={{ color: getColor('textPrimary'), marginTop: '12px' }}>
+            <label htmlFor="reschedule-custom-time" className="registrar-reschedule-label registrar-reschedule-label-block">
               Время переноса (необязательно)
             </label>
             <input
@@ -2615,14 +2146,9 @@ const RegistrarPanel = () => {
               value={customRescheduleTime}
               aria-label="Время переноса записи"
               onChange={(e) => setCustomRescheduleTime(e.target.value)}
-              className="registrar-reschedule-input"
-              style={{
-                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'var(--mac-bg-primary)',
-                color: getColor('textPrimary')
-              }}
+              className="registrar-reschedule-input registrar-reschedule-input-themed"
             />
-            <div className="registrar-reschedule-hint" style={{ color: getColor('textSecondary') }}>
+            <div className="registrar-reschedule-hint registrar-reschedule-hint-text">
               Выберите дату и нажмите «{t('select_date')}». Время необязательно — если не указано, сохранится текущее.
             </div>
           </div>

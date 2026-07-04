@@ -321,3 +321,27 @@
 .doctor-reports-grid-1 { grid-template-columns: 1fr; }
 .doctor-reports-grid-2 { grid-template-columns: repeat(2, 1fr); }
 .doctor-reports-grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+/* ─── Phase 3: dynamic gradient + state colors via CSS custom properties ─── */
+/* Stat-icon and avatar gradients: parent sets --doctor-gradient-color and --doctor-gradient-color-2,
+   CSS class computes the gradient. Keeps the dynamic color value (no hex in CSS) but
+   removes the inline `style={{}}` block from JSX. */
+.doctor-stat-icon,
+.doctor-avatar-sm {
+  background: linear-gradient(135deg, var(--doctor-gradient-from) 0%, var(--doctor-gradient-to) 100%);
+}
+
+/* Empty-state tone: parent sets data-tone attribute, CSS picks color. */
+.doctor-empty { color: var(--mac-text-secondary); }
+.doctor-empty[data-tone="error"] { color: var(--mac-danger); }
+
+/* Queue row state: parent sets class, CSS handles background + borderLeft.
+   Uses CSS color-mix for accent tint (no JS interpolation needed). */
+.doctor-queue-row-current {
+  background: color-mix(in srgb, var(--mac-accent), transparent 92%);
+  border-left: 3px solid var(--mac-accent);
+}
+.doctor-queue-row-priority {
+  background: color-mix(in srgb, var(--mac-accent-orange), transparent 94%);
+  border-left: 3px solid var(--mac-accent-orange);
+}

@@ -619,3 +619,144 @@
   gap: 8px;
   flex-shrink: 0;
 }
+
+/* ─── Phase 3: page + table container styles ─── */
+.registrar-page-root {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1.5;
+  background: var(--mac-gradient-window);
+  color: var(--mac-text-primary);
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  transition: background var(--mac-duration-normal) var(--mac-ease);
+}
+.registrar-page-root[data-breakpoint="mobile"]  { font-size: var(--mac-font-size-sm); }
+.registrar-page-root[data-breakpoint="tablet"]  { font-size: var(--mac-font-size-base); }
+.registrar-page-root[data-breakpoint="desktop"] { font-size: var(--mac-font-size-lg); }
+
+.registrar-tabs-wrapper {
+  margin: 0 1rem;
+  max-width: none;
+  width: calc(100vw - 32px);
+}
+
+/* Table container — visually merges with tabs above.
+   Background + borders + shadow are theme-aware via data-theme attribute
+   (set automatically by ThemeContext on <html>). */
+.registrar-table-container {
+  backdrop-filter: blur(20px);
+  color: var(--mac-text-primary);
+  border-left: 1px solid var(--mac-separator);
+  border-right: 1px solid var(--mac-separator);
+  border-bottom: 1px solid var(--mac-separator);
+  border-top: 1px solid var(--mac-separator-subtle, var(--mac-separator));
+  background: var(--mac-card-bg);
+  border-radius: 0 0 20px 20px;
+  margin: 0 1rem 2rem 1rem;
+  box-shadow: var(--mac-shadow-lg);
+  max-width: none;
+  width: calc(100vw - 32px);
+  overflow: hidden;
+}
+.registrar-table-container[data-breakpoint="mobile"] {
+  border-radius: 0 0 12px 12px;
+}
+
+.registrar-table-content { padding: 0; color: var(--mac-text-primary); }
+.registrar-table-content[data-breakpoint="mobile"]  { padding: 0.5rem; }
+.registrar-table-content[data-breakpoint="desktop"] { padding: 1rem; }
+
+/* ─── Empty state + load-more button (Phase 3) ─── */
+.registrar-empty-heading-text { color: var(--mac-text-primary); }
+.registrar-empty-desc-fixed { font-size: 14px; color: var(--mac-text-primary); }
+
+.registrar-load-more-btn {
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+.registrar-load-more-btn:disabled,
+.registrar-load-more-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* ─── Record preview dialog grid (Phase 3) ─── */
+.registrar-preview-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.36fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.registrar-preview-label { font-size: 13px; }
+.registrar-preview-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+
+/* ─── Reschedule dialog (Phase 3) ─── */
+.registrar-reschedule-card-accent {
+  border: 1px solid color-mix(in srgb, var(--mac-accent) 18%, transparent);
+  background-color: color-mix(in srgb, var(--mac-accent) 7%, transparent);
+}
+.registrar-reschedule-card-neutral {
+  border: 1px solid var(--mac-separator);
+  background-color: var(--mac-fill-quaternary, rgba(0, 0, 0, 0.02));
+}
+.registrar-reschedule-icon-bg {
+  background-color: color-mix(in srgb, var(--mac-accent) 16%, transparent);
+}
+.registrar-reschedule-title-text { color: var(--mac-text-primary); }
+.registrar-reschedule-desc-text  { color: var(--mac-text-secondary); }
+.registrar-reschedule-label-text { color: var(--mac-text-primary); }
+.registrar-reschedule-label-block {
+  color: var(--mac-text-primary);
+  margin-top: 12px;
+  display: block;
+}
+.registrar-reschedule-input-themed {
+  border: 1px solid var(--mac-border);
+  background-color: var(--mac-input-bg, var(--mac-bg-primary));
+  color: var(--mac-text-primary);
+}
+.registrar-reschedule-hint-text { color: var(--mac-text-secondary); }
+
+/* ─── Workflow header (Phase 3 — extracted from registrarHelpers.js) ─── */
+.registrar-workflow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mac-spacing-4);
+  flex-wrap: wrap;
+  padding: var(--mac-spacing-4);
+  margin-bottom: var(--mac-spacing-4);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-lg);
+  box-shadow: var(--mac-shadow-xs);
+  min-width: 0;
+}
+.registrar-workflow-title {
+  margin: 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  line-height: 1.25;
+}
+.registrar-workflow-meta {
+  margin: var(--mac-spacing-1) 0 0;
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+  line-height: 1.5;
+}
+.registrar-workflow-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--mac-spacing-2);
+  flex-wrap: wrap;
+}
