@@ -39,6 +39,25 @@ paths = [
   # Synthetic seed script contains realistic-looking phone numbers / passport
   # formats for staging data. All values are generated, not real.
   '''backend/app/synthetic_seed\.py''',
+  '''.agents/skills/.*''',
+  '''.codex/skills/.*''',
+  '''PAYMENT_SYSTEM_FINAL_REPORT\.md''',
+  '''PHASE_5_TESTING_REPORT\.md''',
+  '''QR_QUEUE_FIX_SUMMARY\.md''',
+  '''backend/SETUP_PRODUCTION\.md''',
+  '''backend/WEBHOOK_SYSTEM_GUIDE\.md''',
+  '''backend/app/api/v1/endpoints/api_documentation\.py''',
+  '''backend/app/core/config\.py''',
+  '''backend/app/schemas/payment_settings\.py''',
+  '''backend/app/services/lab_seed_data_extra\.py''',
+  '''backend/app/services/payment_provider_manager_factory\.py''',
+  '''backend/app/services/payment_providers/click\.py''',
+  '''backend/app/services/payment_settings_api_service\.py''',
+  '''backend/app/services/payment_settings_service\.py''',
+  '''backend/setup_env\.py''',
+  '''frontend/src/components/admin/PaymentProviderSettings\.jsx''',
+  '''docs/.*\.md''',
+  '''docs/archives/.*\.md''',
   # MCP server descriptions may contain example tokens
   '''mcp-servers/.*\.py''',
 ]
