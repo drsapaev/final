@@ -34,7 +34,10 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import { getApiOrigin } from '../../api/runtime';
-import IconSelector, { iconMap } from './IconSelector';
+// NOTE: IconSelector.jsx was removed as dead code (transitively dead via this file). 
+// This file (DepartmentManagement.jsx) is itself DEAD — not routed, not imported anywhere.
+// See analysis/ADMIN_PANEL_A_Z_ANALYSIS.md §2. Do not extend; resolve fate in Step 3.
+// import IconSelector, { iconMap } from './IconSelector';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -1018,10 +1021,7 @@ const DepartmentManagement = () => {
                 }
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                    <IconSelector
-                  value={formData.icon}
-                  onChange={(iconName) => setFormData({ ...formData, icon: iconName })}
-                  label="Иконка вкладки" />
+                                    {/* IconSelector removed (dead code). DepartmentManagement.jsx is itself DEAD. */}
                 
                                     {validationErrors.icon &&
                 <div style={{
@@ -1325,7 +1325,7 @@ const DepartmentManagement = () => {
                             </thead>
                             <tbody>
                                 {paginatedDepartments.map((dept) => {
-                  const IconComponent = dept.icon && iconMap[dept.icon] ? iconMap[dept.icon] : null;
+                  const IconComponent = null; // iconMap removed (IconSelector.jsx deleted as dead code)
                   return (
                     <tr
                       key={dept.id}
@@ -1592,10 +1592,7 @@ const DepartmentManagement = () => {
             }
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <IconSelector
-              value={formData.icon}
-              onChange={(iconName) => setFormData({ ...formData, icon: iconName })}
-              label="Иконка вкладки" />
+                        {/* IconSelector removed (dead code). DepartmentManagement.jsx is itself DEAD. */}
             
                         {validationErrors.icon &&
             <div style={{

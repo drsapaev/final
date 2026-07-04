@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-04 — Admin panel dead-code removal — Step 1 (chore/admin-remove-dead-helpers-step1)
+- **frontend/src/components/admin/** — deleted 9 dead-code helper/section files (2 179 lines total) that had full live replacements in the macOS design system or shared/common layer. No behavior change.
+  - `AnalyticsDashboard.jsx` (773) — superseded by `pages/AnalyticsPage.jsx` (the active `/admin/analytics` route). File was a phantom with two `void useState(...)` codemod artifacts (non-functional).
+  - `MobileOptimization.jsx` (368) — superseded by `AppShell` (sidebar preset system in `App.jsx`).
+  - `IconSelector.jsx` (247) — superseded by `Icon` (`components/ui/macos/Icon.jsx`, full icon system, 18 KB).
+  - `HelpTooltip.jsx` (204) — superseded by `Tooltip` (`components/ui/macos/`).
+  - `LoadingSkeleton.jsx` (144) — superseded by `Skeleton` (`components/ui/macos/`).
+  - `KPICard.jsx` (132) — superseded by `MacOSStatCard` / `MacOSMetricCard` (`components/ui/macos/`).
+  - `EmptyState.jsx` (123) — superseded by `MacOSEmptyState` / `AppEmpty` (`components/ui/macos/`).
+  - `AdminSection.jsx` (105) — superseded by `StateWrapper` (`components/common/StateWrapper.jsx`).
+  - `AdminNavigation.jsx` (83) — superseded by the data-driven sidebar (`getAdminNavRoutes` + `SIDEBAR_PRESETS.admin` in `routing/routeSelectors.js`).
+- **frontend/src/components/admin/DepartmentManagement.jsx** — commented out the dangling `import IconSelector, { iconMap } from './IconSelector'` (IconSelector was deleted above). Replaced 2 `<IconSelector/>` JSX usages and the `iconMap[dept.icon]` lookup with placeholders/null. NOTE: `DepartmentManagement.jsx` is itself dead code (not routed, not imported anywhere — 1 774 lines). Its fate (wire-in vs delete) is deferred to Step 3 pending product-owner decision; the file is not bundled by Vite.
+- **frontend/src/hooks/uiAnimations.js** — updated stale JSDoc comment that referenced the deleted `admin/KPICard` and `admin/AdminNavigation` as consumers.
+- **frontend/src/pages/registrar/views/WelcomeView.jsx** — updated a code comment that referenced the deleted `EmptyState.jsx`; now points to `MacOSEmptyState` from the macOS design system.
+
+Verification:
+- `vite build` → ✓ built in ~27s, exit 0, all chunks emitted.
+- `eslint` on the 3 modified files → 0 errors (pre-existing warnings unchanged).
+- `grep` for imports of the 9 deleted files across `frontend/src/**/*.{jsx,js}` → 0 matches in live code.
+- `components/admin/` file count: 76 → 67 (-9).
+
+Context: see `analysis/ADMIN_PANEL_A_Z_ANALYSIS.md` (full A-Z audit) and `analysis/DEAD_CODE_REPLACEMENTS.md` (replacement map). Step 1 of a 3-step cleanup; Step 2 (6 files, partial replacements) and Step 3 (5 gap candidates, ~4 411 lines) follow in separate PRs.
+
 ## 2026-07-04 — Doctor panels workflow refactor (fix/workflow-panels-refactor)
 - **frontend/src/pages/DentistPanelUnified.jsx** — restored `handleCompleteVisit` (the section was empty, leaving the dentist unable to close an encounter and the queue unable to advance). Follows the same SSOT contract as Cardiologist and Dermatologist: `resolveDoctorQueueEntryId` → `queueService.completeVisit` → reset state → `callNextWaiting('dentistry')`.
 - **frontend/src/components/dental/VisitProtocol.jsx** — added optional `onComplete` prop that, when provided, renders a "Завершить приём" button next to "Сохранить" and wires it to `handleCompleteVisit` in DentistPanelUnified.

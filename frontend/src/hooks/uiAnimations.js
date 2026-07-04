@@ -8,8 +8,10 @@
  * have no equivalent in macos/, so they are moved here to a single
  * canonical location under hooks/.
  *
- * Used by: admin/KPICard, admin/AdminNavigation, and a handful of other
- * admin/analytics components for enter/exit transitions. The hooks are
+ * Used by: a handful of admin/analytics components for enter/exit transitions
+ * (note: the former admin/KPICard and admin/AdminNavigation consumers were
+ * removed as dead code — replaced by MacOSStatCard and the data-driven sidebar
+ * respectively). The hooks are
  * intentionally lightweight (no animation library) — they toggle inline
  * styles via state, which is enough for the current usage. If richer
  * animations are needed later, migrate to framer-motion or CSS @keyframes.
