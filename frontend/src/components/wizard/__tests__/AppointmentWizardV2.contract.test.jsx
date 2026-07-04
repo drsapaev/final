@@ -7,14 +7,23 @@ import { describe, expect, it } from 'vitest';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.jsx');
 const wizardUtilsPath = path.resolve(__dirname, '../wizardUtils.js');
+const patientStepPath = path.resolve(__dirname, '../PatientStepV2.jsx');
+const cartStepPath = path.resolve(__dirname, '../CartStepV2.jsx');
 const serviceResolverPath = path.resolve(__dirname, '../../../utils/serviceCodeResolver.js');
 
 // UX Audit Stage 3 (Wizard issue 5.2):
-// Helper-функции вынесены в wizardUtils.js, поэтому читаем оба файла.
+// Helper-функции вынесены в wizardUtils.js, а step-компоненты — в
+// PatientStepV2.jsx и CartStepV2.jsx. Поэтому читаем все 4 файла.
 const readWizardSource = () => fs.readFileSync(wizardPath, 'utf8');
 const readWizardUtilsSource = () => fs.readFileSync(wizardUtilsPath, 'utf8');
-// Combined source: основной файл + утилиты — для contract-проверок паттернов.
-const readCombinedWizardSource = () => readWizardSource() + '\n\n// === wizardUtils.js ===\n\n' + readWizardUtilsSource();
+const readPatientStepSource = () => fs.readFileSync(patientStepPath, 'utf8');
+const readCartStepSource = () => fs.readFileSync(cartStepPath, 'utf8');
+// Combined source: основной файл + утилиты + step-компоненты — для contract-проверок.
+const readCombinedWizardSource = () =>
+  readWizardSource() +
+  '\n\n// === wizardUtils.js ===\n\n' + readWizardUtilsSource() +
+  '\n\n// === PatientStepV2.jsx ===\n\n' + readPatientStepSource() +
+  '\n\n// === CartStepV2.jsx ===\n\n' + readCartStepSource();
 const readServiceResolverSource = () => fs.readFileSync(serviceResolverPath, 'utf8');
 
 const extractSourceBlock = (source, startMarker, endMarker) => {
