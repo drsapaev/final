@@ -99,13 +99,13 @@ describe('LabReportWorkbench', () => {
 
     // P-04 fix: hasLabReportAction вынесена в utils/labReportActions.js.
     // Проверяем, что основной файл импортирует её оттуда и использует.
-    expect(source).toContain("hasLabReportAction");
-    expect(source).toContain("from './utils/labReportActions'");
-    expect(source).toContain("const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit')");
-    expect(source).toContain("const canFinalize = hasLabReportAction(activeInstance, 'finalize')");
-    expect(source).toContain("const canRevise = hasLabReportAction(activeInstance, 'revise')");
-    expect(source).not.toContain("activeInstance.status !== 'FINALIZED' && activeInstance.status !== 'PRINTED'");
-    expect(source).not.toContain("activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'");
+    expect(source).toContain('hasLabReportAction');
+    expect(source).toContain('from \'./utils/labReportActions\'');
+    expect(source).toContain('const canEditActiveInstance = hasLabReportAction(activeInstance, \'edit\')');
+    expect(source).toContain('const canFinalize = hasLabReportAction(activeInstance, \'finalize\')');
+    expect(source).toContain('const canRevise = hasLabReportAction(activeInstance, \'revise\')');
+    expect(source).not.toContain('activeInstance.status !== \'FINALIZED\' && activeInstance.status !== \'PRINTED\'');
+    expect(source).not.toContain('activeInstance.status === \'FINALIZED\' || activeInstance.status === \'PRINTED\'');
   });
 
   it('does not invent draft status in the print payload when backend status is missing', () => {
@@ -115,7 +115,7 @@ describe('LabReportWorkbench', () => {
     const source = fs.readFileSync(normalizePath, 'utf8');
 
     expect(source).toContain('status: instance?.status || null');
-    expect(source).not.toContain("status: instance?.status || 'DRAFT'");
+    expect(source).not.toContain('status: instance?.status || \'DRAFT\'');
   });
 
   it('does not auto-create or auto-open a report when exactly one template is allowed', async () => {

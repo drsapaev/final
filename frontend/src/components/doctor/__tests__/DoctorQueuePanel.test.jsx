@@ -270,11 +270,11 @@ describe('DoctorQueuePanel', () => {
       'utf8',
     );
 
-    expect(source).toContain("hasBackendQueueAction(entry, 'call', 'can_call')");
-    expect(source).toContain("hasBackendQueueAction(entry, 'start_visit', 'can_start_visit')");
-    expect(source).toContain("hasBackendQueueAction(entry, 'complete', 'can_complete')");
-    expect(source).not.toContain("entry.status === 'waiting' &&");
-    expect(source).not.toContain("entry.status === 'called' &&");
-    expect(source).not.toContain("entry.status === 'in_progress' &&");
+    expect(source).toContain('hasBackendQueueAction(entry, \'call\', \'can_call\')');
+    expect(source).toContain('hasBackendQueueAction(entry, \'start_visit\', \'can_start_visit\')');
+    expect(source).toContain('hasBackendQueueAction(entry, \'complete\', \'can_complete\')');
+    expect(source).not.toContain('entry.status === \'waiting\' &&');
+    expect(source).not.toContain('entry.status === \'called\' &&');
+    expect(source).not.toContain('entry.status === \'in_progress\' &&');
   });
 });

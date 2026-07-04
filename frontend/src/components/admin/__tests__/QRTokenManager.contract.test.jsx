@@ -13,8 +13,8 @@ describe('QRTokenManager API contract', () => {
   it('uses the canonical QR queue admin paths mounted under /queue', () => {
     const source = readSource();
 
-    expect(source).toContain("fetch('/api/v1/queue/admin/qr-tokens/active'");
-    expect(source).toContain("fetch('/api/v1/queue/admin/qr-tokens/generate'");
+    expect(source).toContain('fetch(\'/api/v1/queue/admin/qr-tokens/active\'');
+    expect(source).toContain('fetch(\'/api/v1/queue/admin/qr-tokens/generate\'');
     expect(source).toContain('fetch(`/api/v1/queue/admin/qr-tokens/${token}`');
   });
 

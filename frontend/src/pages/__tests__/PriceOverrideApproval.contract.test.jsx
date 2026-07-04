@@ -32,12 +32,12 @@ describe('PriceOverrideApproval action contract', () => {
 
     const actionRendering = sourceSlice(
       source,
-      "{(hasBackendPriceOverrideAction(override, 'approve')",
+      '{(hasBackendPriceOverrideAction(override, \'approve\')',
       '{showApprovalModal && selectedOverride &&'
     );
 
-    expect(actionRendering).toContain("hasBackendPriceOverrideAction(override, 'approve')");
-    expect(actionRendering).toContain("hasBackendPriceOverrideAction(override, 'reject')");
-    expect(actionRendering).not.toContain("override.status === 'pending'");
+    expect(actionRendering).toContain('hasBackendPriceOverrideAction(override, \'approve\')');
+    expect(actionRendering).toContain('hasBackendPriceOverrideAction(override, \'reject\')');
+    expect(actionRendering).not.toContain('override.status === \'pending\'');
   });
 });

@@ -12,7 +12,7 @@ describe('routing anti-regression enforcement', () => {
 
     expect(read('src/components/layout/Nav.jsx')).not.toContain('const routes = [');
     expect(read('src/constants/routes.js')).not.toContain('const routeMap =');
-    expect(routeRegistry).not.toContain("component: 'AdminPanel'");
+    expect(routeRegistry).not.toContain('component: \'AdminPanel\'');
   });
 
   it('uses the routing subsystem as the route source of truth', () => {

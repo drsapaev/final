@@ -13,8 +13,8 @@ describe('UserExportManager API contract', () => {
   it('uses the canonical user-management router paths mounted under /users', () => {
     const source = readSource();
 
-    expect(source).toContain("api.get('/users/users/export/files')");
-    expect(source).toContain("api.post('/users/users/export', exportData)");
+    expect(source).toContain('api.get(\'/users/users/export/files\')');
+    expect(source).toContain('api.post(\'/users/users/export\', exportData)');
     expect(source).toContain('api.get(`/users/users/export/download/${filename}`,');
     expect(source).toContain('api.delete(`/users/users/export/files/${filename}`)');
   });

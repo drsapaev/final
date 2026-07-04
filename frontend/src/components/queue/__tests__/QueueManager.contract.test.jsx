@@ -19,7 +19,7 @@ describe('Queue manager command contract', () => {
     expect(tableSource).not.toContain('Button');
     expect(tableSource).not.toContain('{false && (');
     expect(tableSource).not.toContain('onCallPatient(entry)');
-    expect(tableSource).not.toContain("entry.status === 'waiting' && (");
+    expect(tableSource).not.toContain('entry.status === \'waiting\' && (');
   });
 
   it('uses backend-provided available specialists for queue doctor options', () => {
@@ -28,7 +28,7 @@ describe('Queue manager command contract', () => {
     expect(managerSource).toContain('specialists,');
     expect(managerSource).toContain('if (!Array.isArray(specialists) || specialists.length === 0) return []');
     expect(managerSource).toContain('d.specialty_display || d.specialty');
-    expect(managerSource).not.toContain("fetch('/api/v1/queues/profiles/public')");
+    expect(managerSource).not.toContain('fetch(\'/api/v1/queues/profiles/public\')');
     expect(managerSource).not.toContain('allowedSpecialties');
     expect(managerSource).not.toContain('normalizeSpecialty');
   });
@@ -41,15 +41,15 @@ describe('Queue manager command contract', () => {
 
     expect(registrarSource).toContain('Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди');
     // Decomp 6a: selectedDoctor prop moved to QueueView.jsx
-    expect(queueViewSource).toContain("selectedDoctor={searchParams.get('doctor') || ''}");
+    expect(queueViewSource).toContain('selectedDoctor={searchParams.get(\'doctor\') || \'\'}');
 
-    expect(managerSource).toContain("const [internalDoctor, setInternalDoctor] = useState('')");
-    expect(managerSource).toContain("const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== '' ? selectedDoctor : internalDoctor");
+    expect(managerSource).toContain('const [internalDoctor, setInternalDoctor] = useState(\'\')');
+    expect(managerSource).toContain('const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== \'\' ? selectedDoctor : internalDoctor');
     expect(managerSource).toContain('if (!effectiveDoctor) {');
     expect(managerSource).not.toContain('setInternalDoctor(doctorOptions[0]');
     expect(managerSource).not.toContain('setInternalDoctor(specialists[0]');
 
     expect(tableSource).toContain('if (!effectiveDoctor) {');
-    expect(tableSource).toContain("t?.selectDoctor || 'Выберите специалиста'");
+    expect(tableSource).toContain('t?.selectDoctor || \'Выберите специалиста\'');
   });
 });

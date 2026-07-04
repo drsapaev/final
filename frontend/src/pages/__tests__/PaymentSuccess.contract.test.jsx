@@ -12,8 +12,8 @@ describe('PaymentSuccess receipt route contract', () => {
     const source = fs.readFileSync(paymentSuccessPath, 'utf8');
 
     expect(source).toContain('apiClient.get(`/payments/${paymentId}/receipt`');
-    expect(source).toContain("params: { format_type: 'pdf' }");
+    expect(source).toContain('params: { format_type: \'pdf\' }');
     expect(source).not.toContain('apiClient.post(`/payments/${paymentId}/receipt`');
-    expect(source).not.toContain("format: 'pdf'");
+    expect(source).not.toContain('format: \'pdf\'');
   });
 });
