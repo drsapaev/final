@@ -60,7 +60,13 @@ export function StateWrapper({
   // First load: show skeleton
   if (isLoading && !hasHadDataRef.current) {
     return (
-      <div style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        aria-label="Загрузка данных"
+        style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '12px' }}
+      >
         {Array.from({ length: skeletonRows }).map((_, i) => (
           <Skeleton
             key={i}

@@ -42,11 +42,11 @@ const Skeleton = ({
 
   const renderTextSkeleton = () => {
     if (lines === 1) {
-      return <div className={className} style={textStyle} />;
+      return <div className={className} style={textStyle} aria-hidden="true" />;
     }
 
     return (
-      <div className={className} style={containerStyle}>
+      <div className={className} style={containerStyle} aria-hidden="true">
         {Array.from({ length: lines }, (_, index) => (
           <div
             key={index}
@@ -61,15 +61,15 @@ const Skeleton = ({
   };
 
   const renderCircleSkeleton = () => (
-    <div className={className} style={circleStyle} />
+    <div className={className} style={circleStyle} aria-hidden="true" />
   );
 
   const renderRectSkeleton = () => (
-    <div className={className} style={rectStyle} />
+    <div className={className} style={rectStyle} aria-hidden="true" />
   );
 
   const renderCardSkeleton = () => (
-    <div className={className} style={containerStyle}>
+    <div className={className} style={containerStyle} aria-hidden="true">
       <div style={{ ...rectStyle, height: '16px', width: '60%' }} />
       <div style={{ ...rectStyle, height: '24px', width: '80%' }} />
       <div style={{ ...rectStyle, height: '14px', width: '40%' }} />
@@ -77,7 +77,7 @@ const Skeleton = ({
   );
 
   const renderTableSkeleton = () => (
-    <div className={className} style={containerStyle}>
+    <div className={className} style={containerStyle} aria-hidden="true">
       {/* Header */}
       <div style={{ display: 'flex', gap: spacing }}>
         {Array.from({ length: 4 }, (_, index) => (
@@ -102,7 +102,7 @@ const Skeleton = ({
   );
 
   const renderListSkeleton = () => (
-    <div className={className} style={containerStyle}>
+    <div className={className} style={containerStyle} aria-hidden="true">
       {Array.from({ length: lines }, (_, index) => (
         <div
           key={index}
