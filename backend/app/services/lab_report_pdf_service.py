@@ -28,7 +28,6 @@ class LabReportPDFService:
             loader=FileSystemLoader(self.templates_dir),
             trim_blocks=True,
             lstrip_blocks=True,
-            autoescape=True,
         )
 
     def render_report(self, context: dict[str, Any]) -> bytes:
