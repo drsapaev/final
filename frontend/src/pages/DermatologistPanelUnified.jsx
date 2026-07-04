@@ -37,6 +37,7 @@ import PhotoComparison from '../components/dermatology/PhotoComparison';
 import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
 import SkinAnalysis from '../components/dermatology/SkinAnalysis';
 import PriceOverrideManager from '../components/dermatology/PriceOverrideManager';
+import DermaExamsTab from '../components/dermatology/DermaExamsTab';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import { printPanelTicket } from '../services/panelPrint';
@@ -1796,306 +1797,29 @@ const DermatologistPanelUnified = () => {
           }
 
           {/* Осмотр кожи */}
-          {activeTab === 'skin' &&
-          <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
-                <div className="derma-flex-center">
-                  <h3 className="derma-flex-center">
-                    <Activity size={20} className="derma-icon-mr-green" />
-                    Осмотры кожи
-                  </h3>
-                  <Button onClick={openSkinExaminationForm}>
-                    <Plus size={16} className="derma-mr-6" />
-                    Новый осмотр
-                  </Button>
-                </div>
-
-                {skinExaminations.length > 0 ?
-              <div className="derma-flex-col-16">
-                    {skinExaminations.map((exam) =>
-                <div key={exam.id} className="derma-card-p16-bg2">
-                        <div className="derma-flex-between-start">
-                          <h4 className="derma-h4-16-600">Осмотр #{exam.id}</h4>
-                          <Badge variant="info">{exam.examination_date}</Badge>
-                        </div>
-                        <div className="derma-exam-detail-grid">
-                          <div>Тип кожи: {exam.skin_type}</div>
-                          <div>Состояние: {exam.skin_condition}</div>
-                          <div>Поражения: {exam.lesions}</div>
-                          <div>Распространение: {exam.distribution}</div>
-                        </div>
-                        {exam.diagnosis &&
-                  <div className="derma-mt-8-text-14-primary">
-                            <strong>Диагноз:</strong> {exam.diagnosis}
-                          </div>
-                  }
-                      </div>
-                )}
-                  </div> :
-
-              <MacOSEmptyState
-                type="doc"
-                title="Нет данных осмотров кожи"
-                description="Добавьте новый осмотр кожи для пациента" />
-
-              }
-              </MacOSCard>
-
-              {/* Форма осмотра кожи */}
-              {showSkinForm &&
-            <MacOSCard className="derma-p-8">
-                  <h3 className="derma-section-heading-mb16">Новый осмотр кожи</h3>
-                  <form onSubmit={handleSkinExaminationSubmit} className="derma-flex-col-16">
-                    <div className="derma-grid-auto-250">
-                      <div>
-                        <label className="derma-label-13-mb6">
-                          Дата осмотра *
-                        </label>
-                        <Input
-                      type="date"
-                      value={skinExamination.examination_date}
-                      onChange={(e) => setSkinExamination({ ...skinExamination, examination_date: e.target.value })}
-                      required />
-
-                      </div>
-                      <div>
-                        <label className="derma-label-13-mb6">
-                          Тип кожи *
-                        </label>
-                        <Select
-                      value={skinExamination.skin_type}
-                      onChange={(e) => setSkinExamination({ ...skinExamination, skin_type: e.target.value })}
-                      required>
-
-                          <option value="">Выберите тип кожи</option>
-                          <option value="normal">Нормальная</option>
-                          <option value="dry">Сухая</option>
-                          <option value="oily">Жирная</option>
-                          <option value="combination">Комбинированная</option>
-                          <option value="sensitive">Чувствительная</option>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="derma-grid-auto-250">
-                      <div>
-                        <label className="derma-label-13-mb6">
-                          Состояние кожи
-                        </label>
-                        <Input
-                      type="text"
-                      value={skinExamination.skin_condition}
-                      onChange={(e) => setSkinExamination({ ...skinExamination, skin_condition: e.target.value })}
-                      placeholder="Хорошее, удовлетворительное, проблемное" />
-
-                      </div>
-                      <div>
-                        <label className="derma-label-13-mb6">
-                          Поражения
-                        </label>
-                        <Input
-                      type="text"
-                      value={skinExamination.lesions}
-                      onChange={(e) => setSkinExamination({ ...skinExamination, lesions: e.target.value })}
-                      placeholder="Акне, пигментация, родинки" />
-
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="derma-label-13-mb6">
-                        Диагноз
-                      </label>
-                      <Input
-                    type="text"
-                    value={skinExamination.diagnosis}
-                    onChange={(e) => setSkinExamination({ ...skinExamination, diagnosis: e.target.value })}
-                    placeholder="Диагноз" />
-
-                    </div>
-
-                    <div>
-                      <label className="derma-label-13-mb6">
-                        План лечения
-                      </label>
-                      <Textarea
-                    value={skinExamination.treatment_plan}
-                    onChange={(e) => setSkinExamination({ ...skinExamination, treatment_plan: e.target.value })}
-                    rows={4}
-                    placeholder="План лечения и рекомендации" />
-
-                    </div>
-
-                    <div className="derma-flex-end-gap12">
-                      <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowSkinForm(false)}>
-
-                        Отмена
-                      </Button>
-                      <Button type="submit">
-                        <Save size={16} className="derma-mr-6" />
-                        Сохранить осмотр
-                      </Button>
-                    </div>
-                  </form>
-                </MacOSCard>
-            }
-            </div>
+          {/* Осмотр кожи + Косметология — R-15: extracted to DermaExamsTab */}
+          {(activeTab === 'skin' || activeTab === 'cosmetic') &&
+            <DermaExamsTab
+              activeTab={activeTab}
+              skinExamination={skinExamination}
+              setSkinExamination={setSkinExamination}
+              showSkinForm={showSkinForm}
+              skinExaminations={skinExaminations}
+              onSkinSubmit={handleSkinExaminationSubmit}
+              onOpenSkinForm={openSkinExaminationForm}
+              onCancelSkinForm={() => setShowSkinForm(false)}
+              cosmeticProcedure={cosmeticProcedure}
+              setCosmeticProcedure={setCosmeticProcedure}
+              showCosmeticForm={showCosmeticForm}
+              cosmeticProcedures={cosmeticProcedures}
+              onCosmeticSubmit={handleCosmeticProcedureSubmit}
+              onOpenCosmeticForm={openCosmeticProcedureForm}
+              onCancelCosmeticForm={() => setShowCosmeticForm(false)}
+              getColor={getColor}
+              getFontSize={getFontSize}
+              getSpacing={getSpacing}
+            />
           }
-
-          {/* Косметология */}
-          {activeTab === 'cosmetic' &&
-          <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
-                <div className="derma-flex-center">
-                  <h3 className="derma-flex-center">
-                    <Sparkles size={20} className="derma-icon-mr-pink" />
-                    Косметические процедуры
-                  </h3>
-                  <Button onClick={openCosmeticProcedureForm}>
-                    <Plus size={16} className="derma-mr-6" />
-                    Новая процедура
-                  </Button>
-                </div>
-
-                {cosmeticProcedures.length > 0 ?
-              <div className="derma-flex-col-16">
-                    {cosmeticProcedures.map((procedure) =>
-                <div key={procedure.id} className="derma-card-p16-bg2">
-                        <div className="derma-flex-between-start">
-                          <h4 className="derma-h4-16-600">Процедура #{procedure.id}</h4>
-                          <Badge variant="info">{procedure.procedure_date}</Badge>
-                        </div>
-                        <div className="derma-exam-detail-grid">
-                          <div>Тип: {procedure.procedure_type}</div>
-                          <div>Область: {procedure.area_treated}</div>
-                          <div>Продукты: {procedure.products_used}</div>
-                        </div>
-                        {procedure.results &&
-                  <div className="derma-mt-8-text-14-primary">
-                            <strong>Результаты:</strong> {procedure.results}
-                          </div>
-                  }
-                      </div>
-                )}
-                  </div> :
-
-              <MacOSEmptyState
-                type="doc"
-                title="Нет данных косметических процедур"
-                description="Добавьте новую косметическую процедуру для пациента" />
-
-              }
-              </MacOSCard>
-
-              {/* Форма косметической процедуры */}
-              {showCosmeticForm &&
-            <MacOSCard className="derma-p-8">
-                  <h3 className="derma-section-heading-mb16">Новая косметическая процедура</h3>
-                  <form onSubmit={handleCosmeticProcedureSubmit} className="derma-flex-col-16">
-                    <div className="derma-grid-auto-250">
-                      <div>
-                        <label className="derma-label-13-mb6">
-                          Дата процедуры *
-                        </label>
-                        <Input
-                      type="date"
-                      value={cosmeticProcedure.procedure_date}
-                      onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_date: e.target.value })}
-                      required />
-
-                      </div>
-                      <div>
-                        <label className="derma-label-13-mb6">
-                          Тип процедуры *
-                        </label>
-                        <Select
-                      value={cosmeticProcedure.procedure_type}
-                      onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_type: e.target.value })}
-                      required>
-
-                          <option value="">Выберите процедуру</option>
-                          <option value="cleaning">Чистка лица</option>
-                          <option value="peeling">Пилинг</option>
-                          <option value="botox">Ботокс</option>
-                          <option value="filler">Филлеры</option>
-                          <option value="laser">Лазерная терапия</option>
-                          <option value="mesotherapy">Мезотерапия</option>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="derma-grid-auto-250">
-                      <div>
-                        <label className="derma-label-13-mb6">
-                          Область обработки
-                        </label>
-                        <Input
-                      type="text"
-                      value={cosmeticProcedure.area_treated}
-                      onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, area_treated: e.target.value })}
-                      placeholder="Лицо, шея, декольте" />
-
-                      </div>
-                      <div>
-                        <label className="derma-label-13-mb6">
-                          Использованные продукты
-                        </label>
-                        <Input
-                      type="text"
-                      value={cosmeticProcedure.products_used}
-                      onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, products_used: e.target.value })}
-                      placeholder="Названия препаратов" />
-
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="derma-label-13-mb6">
-                        Результаты
-                      </label>
-                      <Textarea
-                    value={cosmeticProcedure.results}
-                    onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, results: e.target.value })}
-                    rows={4}
-                    placeholder="Описание результатов процедуры" />
-
-                    </div>
-
-                    <div>
-                      <label className="derma-label-13-mb6">
-                        Рекомендации по уходу
-                      </label>
-                      <Textarea
-                    value={cosmeticProcedure.follow_up}
-                    onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, follow_up: e.target.value })}
-                    rows={3}
-                    placeholder="Рекомендации по уходу после процедуры" />
-
-                    </div>
-
-                    <div className="derma-flex-end-gap12">
-                      <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowCosmeticForm(false)}>
-
-                        Отмена
-                      </Button>
-                      <Button type="submit">
-                        <Save size={16} className="derma-mr-6" />
-                        Сохранить процедуру
-                      </Button>
-                    </div>
-                  </form>
-                </MacOSCard>
-            }
-            </div>
-          }
-
-          {/* AI Помощник */}
           {activeTab === 'ai' &&
           <AIAssistant
             specialty="dermatology"
