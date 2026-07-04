@@ -62,7 +62,7 @@ jobs:
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
-        npm ci
+        npm ci --legacy-peer-deps
     
     - name: 🔍 Отчет frontend lint
       run: |
