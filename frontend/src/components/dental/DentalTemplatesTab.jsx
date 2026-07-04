@@ -52,7 +52,7 @@ export function DentalTemplatesTab({
           </div>
         ) : (
           <div className="dental-text-center dental-p-48 dental-text-secondary">
-            Нет сохранённых шаблонов
+            Шаблоны протоколов будут доступны в следующей версии. Используйте вкладку «Протоколы визитов» для создания протокола вручную.
           </div>
         )}
       </Card>
