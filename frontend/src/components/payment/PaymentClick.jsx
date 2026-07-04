@@ -33,7 +33,7 @@ const PaymentClick = ({
   const [paymentState, setPaymentState] = useState('init'); // init|processing|polling|success|failed
   const [paymentUrl, setPaymentUrl] = useState(null);
   const [, setProviderPaymentId] = useState(null);
-  const [error, setError] = useState(null);void
+  const [error, setError] = useState(null);
   useState(null);
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [printTickets, setPrintTickets] = useState([]);
