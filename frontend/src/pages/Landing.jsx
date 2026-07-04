@@ -27,6 +27,7 @@ import {
   Users
 } from 'lucide-react';
 import { LANDING_COPY, buildGlassStyle } from './landingContent';
+import { BRAND } from '../config/brand';
 import './Landing.css';
 import PropTypes from 'prop-types';
 
@@ -261,7 +262,8 @@ export default function Landing() {
 
       <main className="landing-page">
         <header className="landing-topbar">
-          <a className="landing-brand" href="#hero" aria-label="MediClinic Pro">
+          {/* UX Audit Stage 1: используем единый BRAND config вместо хардкода */}
+          <a className="landing-brand" href="#hero" aria-label={BRAND.name}>
             <div className="landing-brand-mark" aria-hidden="true">
               <Stethoscope size={18} />
             </div>

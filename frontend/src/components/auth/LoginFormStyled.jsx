@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight, AtSign, Eye, EyeOff, LogIn, CircleHelp, Phone, UserPlus, UserRound } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { api, buildApiUrl, setToken } from '../../api/client';
+import { api, setToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
-import auth from '../../stores/auth.js';
 import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
 import { useSetupStatus } from '../../hooks/useSetupStatus.js';
 import { colors } from '../../theme/tokens';
+import { BRAND } from '../../config/brand';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
@@ -22,22 +22,15 @@ const loginRoute = getCanonicalRouteById('login')?.path || '/login';
 const changePasswordRequiredRoute = getCanonicalRouteById('change-password-required')?.path || '/change-password-required';
 const setupRoute = getCanonicalRouteById('setup')?.path || '/setup';
 
-// macOS-стиль анимации для декоративных элементов
-const floatingAnimation = `
-  @keyframes float {
-    0%, 100% { transform: translateY(0px) rotate(0deg); }
-    50% { transform: translateY(-20px) rotate(180deg); }
-  }
-`;
+// UX Audit Stage 1 (Login issue 3.6):
+// Удалён мёртвый floatingAnimation + вставка <style> в document.head.
+// Анимация `float` нигде не использовалась — был только побочный эффект
+// утечки стилей в глобальный DOM.
 
-// Добавляем стили в head
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = floatingAnimation;
-  document.head.appendChild(style);
-}
-
-const LoginFormStyled = () => {void
+// UX Audit Stage 1 (Login issue 3.6):
+// `void useTheme();` заменён на нормальный вызов — мы подписываемся
+// на смену темы, чтобы карточка логина перерисовывалась.
+const LoginFormStyled = () => {
   useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -124,36 +117,27 @@ const LoginFormStyled = () => {void
         rememberMe,
       });
 
-      // 2FA-aware canonical login endpoint; keep current-origin API resolution for smoke stability.
-      const response = await fetch(buildApiUrl('/authentication/login'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(credentials)
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text();
-        let errorData = null;
-
-        if (responseText) {
-          try {
-            errorData = JSON.parse(responseText);
-          } catch {
-            errorData = { detail: responseText };
-          }
-        }
-
-        throw new Error(formatLoginErrorMessage({
-          responseStatus: response.status,
-          responseDetail: errorData?.detail,
-          responseMessage: errorData?.message,
+      // UX Audit Stage 1 (Login issue 3.1.3 + 3.7):
+      // Заменён raw fetch() на api.post() из api/client.
+      // axios-клиент сам добавит Authorization-хедер на следующие запросы,
+      // обрабатывает CSRF, refresh-token и rate-limit — всё в одном месте.
+      let data;
+      try {
+        const response = await api.post('/authentication/login', credentials);
+        data = response.data;
+      } catch (apiErr) {
+        // Нормализуем ошибку axios и пробрасываем дальше.
+        const normalizedError = new Error(formatLoginErrorMessage({
+          responseStatus: apiErr?.response?.status,
+          responseDetail: apiErr?.response?.data?.detail,
+          responseMessage: apiErr?.response?.data?.message,
+          rawMessage: apiErr?.message,
           fallbackMessage: 'Ошибка авторизации',
         }));
+        normalizedError.response = apiErr?.response;
+        normalizedError.rawMessage = apiErr?.message;
+        throw normalizedError;
       }
-
-      const data = await response.json();
 
       // Проверяем, требуется ли 2FA (в простом сервере 2FA отключено)
       if (data.requires_2fa && data.pending_2fa_token) {
@@ -169,8 +153,8 @@ const LoginFormStyled = () => {void
         const accessToken = typeof data.access_token === 'string' ? data.access_token.trim() : data.access_token;
         // Проверяем, требуется ли смена пароля
         if (data.must_change_password) {
+          // UX Audit Stage 1: setToken() уже пишет в localStorage через tokenManager
           setToken(accessToken);
-          localStorage.setItem('auth_token', accessToken);
           navigate(changePasswordRequiredRoute, {
             state: { currentPassword: formData.password },
             replace: true
@@ -179,17 +163,15 @@ const LoginFormStyled = () => {void
         }
 
         // Сохраняем токен единообразно для всех клиентов
+        // UX Audit Stage 1 (issue 3.1.3): удалён дублирующий localStorage.setItem
         setToken(accessToken);
-        localStorage.setItem('auth_token', accessToken);
 
         try {
-          // Используем данные пользователя из ответа авторизации
+          // UX Audit Stage 1 (Login issue 3.7):
+          // Удалён 100-мс setTimeout + auth.getState() race-condition workaround.
+          // Теперь используем data.user напрямую из ответа сервера.
           setProfile(data.user);
-
-          // Расширенная логика перенаправления
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          const state = auth.getState ? auth.getState() : { profile: null };
-          const profile = state?.profile || null;
+          const profile = data.user || null;
           const computedRoute = getRouteForProfile(profile);
           const fromClean = from || landingRoute;
 
@@ -266,9 +248,9 @@ const LoginFormStyled = () => {void
         const profileResponse = await api.get('/auth/me');
         setProfile(profileResponse.data);
 
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        const state = auth.getState ? auth.getState() : { profile: null };
-        const profile = state?.profile || null;
+        // UX Audit Stage 1 (Login issue 3.7):
+        // Удалён 100-мс setTimeout + auth.getState() — используем profileResponse.data.
+        const profile = profileResponse.data || null;
         const computedRoute = getRouteForProfile(profile);
         const target = computedRoute || from || landingRoute;
 
@@ -497,7 +479,8 @@ const LoginFormStyled = () => {void
               color: '#86868b',
               letterSpacing: '0.1px'
             }}>
-              Система управления клиникой
+              {/* UX Audit Stage 1: используем единый BRAND config вместо хардкода */}
+              {BRAND.name}
             </span>
           </CardTitle>
         </CardHeader>
@@ -570,7 +553,11 @@ const LoginFormStyled = () => {void
             <Alert variant="danger" style={{ marginBottom: 12 }}>{error}</Alert>
             }
 
-            <Button type="button" variant="primary" fullWidth disabled={loading} onClick={handleSubmit} size="large" style={{ ...authPrimaryButtonStyles, ...authButtonBaseStyles }}>
+            {/* UX Audit Stage 1 (Login issue 3.1.2):
+                Раньше было type='button' + onClick={handleSubmit} — двойной путь сабмита
+                с формой. Теперь type='submit' — единственный путь, форма сама вызовет
+                handleSubmit через onSubmit. */}
+            <Button type="submit" variant="primary" fullWidth disabled={loading} size="large" style={{ ...authPrimaryButtonStyles, ...authButtonBaseStyles }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <LogIn size={16} />
                 {loading ? 'Вход...' : 'ВОЙТИ'}
