@@ -197,7 +197,7 @@ const DentalPriceManager = ({
                 <input
                   id="dental-final-price"
                   type="text"
-                  aria-label="Dental final price"
+                  aria-label="Итоговая цена"
                   value={finalPrice}
                   onChange={(e) => setFinalPrice(e.target.value)}
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -213,7 +213,7 @@ const DentalPriceManager = ({
               </label>
               <select
                 id="dental-price-reason"
-                aria-label="Dental price reason"
+                aria-label="Причина изменения цены"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white mb-2">
@@ -229,7 +229,7 @@ const DentalPriceManager = ({
               <input
                 id="dental-custom-price-reason"
                 type="text"
-                aria-label="Custom dental price reason"
+                aria-label="Другая причина изменения цены"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -244,7 +244,7 @@ const DentalPriceManager = ({
               </label>
               <textarea
                 id="dental-treatment-details"
-                aria-label="Dental treatment details"
+                aria-label="Детали лечения"
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 rows={3}

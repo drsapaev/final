@@ -2239,7 +2239,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата осмотра *</label>
                     <input
                     type="date"
-                    aria-label="Examination date"
+                    aria-label="Дата осмотра"
                     value={examinationForm.examination_date}
                     onChange={(e) => setExaminationForm({ ...examinationForm, examination_date: e.target.value })}
                     required
@@ -2314,7 +2314,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Отсутствующие зубы</label>
                     <input
                     type="text"
-                    aria-label="Missing teeth"
+                    aria-label="Отсутствующие зубы"
                     value={examinationForm.missing_teeth}
                     onChange={(e) => setExaminationForm({ ...examinationForm, missing_teeth: e.target.value })}
                     placeholder="Номера отсутствующих зубов"
@@ -2357,7 +2357,7 @@ const DentistPanelUnified = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Диагноз</label>
                   <textarea
-                  aria-label="Examination diagnosis"
+                  aria-label="Диагноз осмотра"
                   value={examinationForm.diagnosis}
                   onChange={(e) => setExaminationForm({ ...examinationForm, diagnosis: e.target.value })}
                   placeholder="Стоматологический диагноз"
@@ -2369,7 +2369,7 @@ const DentistPanelUnified = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Рекомендации</label>
                   <textarea
-                  aria-label="Examination recommendations"
+                  aria-label="Рекомендации по осмотру"
                   value={examinationForm.recommendations}
                   onChange={(e) => setExaminationForm({ ...examinationForm, recommendations: e.target.value })}
                   placeholder="Рекомендации по лечению и уходу"
@@ -2413,7 +2413,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата лечения *</label>
                     <input
                     type="date"
-                    aria-label="Treatment date"
+                    aria-label="Дата лечения"
                     value={treatmentForm.treatment_date}
                     onChange={(e) => setTreatmentForm({ ...treatmentForm, treatment_date: e.target.value })}
                     required
@@ -2444,7 +2444,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Вовлеченные зубы</label>
                     <input
                     type="text"
-                    aria-label="Treatment teeth involved"
+                    aria-label="Зубы в лечении"
                     value={treatmentForm.teeth_involved}
                     onChange={(e) => setTreatmentForm({ ...treatmentForm, teeth_involved: e.target.value })}
                     placeholder="Номера зубов"
@@ -2455,7 +2455,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
                     <input
                     type="number"
-                    aria-label="Treatment cost"
+                    aria-label="Стоимость лечения"
                     value={treatmentForm.cost}
                     onChange={(e) => setTreatmentForm({ ...treatmentForm, cost: e.target.value })}
                     placeholder="Сумма"
@@ -2467,7 +2467,7 @@ const DentistPanelUnified = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Описание процедуры</label>
                   <textarea
-                  aria-label="Treatment procedure description"
+                  aria-label="Описание процедуры лечения"
                   value={treatmentForm.procedure_description}
                   onChange={(e) => setTreatmentForm({ ...treatmentForm, procedure_description: e.target.value })}
                   placeholder="Подробное описание"
@@ -2481,7 +2481,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Материалы</label>
                     <input
                     type="text"
-                    aria-label="Treatment materials used"
+                    aria-label="Использованные материалы"
                     value={treatmentForm.materials_used}
                     onChange={(e) => setTreatmentForm({ ...treatmentForm, materials_used: e.target.value })}
                     placeholder="Названия материалов"
@@ -2509,7 +2509,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Осложнения</label>
                     <input
                     type="text"
-                    aria-label="Treatment complications"
+                    aria-label="Осложнения лечения"
                     value={treatmentForm.complications}
                     onChange={(e) => setTreatmentForm({ ...treatmentForm, complications: e.target.value })}
                     placeholder="Описание осложнений"
@@ -2520,7 +2520,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата контроля</label>
                     <input
                     type="date"
-                    aria-label="Treatment follow-up date"
+                    aria-label="Дата повторного приёма"
                     value={treatmentForm.follow_up_date}
                     onChange={(e) => setTreatmentForm({ ...treatmentForm, follow_up_date: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
@@ -2580,7 +2580,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата протезирования *</label>
                     <input
                     type="date"
-                    aria-label="Prosthetic date"
+                    aria-label="Дата протезирования"
                     value={prostheticForm.prosthetic_date}
                     onChange={(e) => setProstheticForm({ ...prostheticForm, prosthetic_date: e.target.value })}
                     required
@@ -2611,7 +2611,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Заменяемые зубы</label>
                     <input
                     type="text"
-                    aria-label="Prosthetic teeth replaced"
+                    aria-label="Замещённые зубы"
                     value={prostheticForm.teeth_replaced}
                     onChange={(e) => setProstheticForm({ ...prostheticForm, teeth_replaced: e.target.value })}
                     placeholder="Номера зубов"
@@ -2640,7 +2640,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Оттенок</label>
                     <input
                     type="text"
-                    aria-label="Prosthetic shade"
+                    aria-label="Оттенок протеза"
                     value={prostheticForm.shade}
                     onChange={(e) => setProstheticForm({ ...prostheticForm, shade: e.target.value })}
                     placeholder="A1, B2, C3 и т.д."
@@ -2651,7 +2651,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
                     <input
                     type="number"
-                    aria-label="Prosthetic cost"
+                    aria-label="Стоимость протеза"
                     value={prostheticForm.cost}
                     onChange={(e) => setProstheticForm({ ...prostheticForm, cost: e.target.value })}
                     placeholder="Сумма"
@@ -2696,7 +2696,7 @@ const DentistPanelUnified = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Гарантийный период</label>
                   <input
                   type="text"
-                  aria-label="Prosthetic warranty period"
+                  aria-label="Гарантийный срок"
                   value={prostheticForm.warranty_period}
                   onChange={(e) => setProstheticForm({ ...prostheticForm, warranty_period: e.target.value })}
                   placeholder="Например: 2 года"

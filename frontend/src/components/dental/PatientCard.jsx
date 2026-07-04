@@ -194,7 +194,7 @@ const PatientCard = ({
           </label>
           <input
           type="text"
-          aria-label="Patient surname"
+          aria-label="Фамилия пациента"
           value={formData.surname || ''}
           onChange={(e) => handleInputChange('surname', e.target.value)}
           disabled={!isEditing}
@@ -209,7 +209,7 @@ const PatientCard = ({
           </label>
           <input
           type="text"
-          aria-label="Patient first name"
+          aria-label="Имя пациента"
           value={formData.name || ''}
           onChange={(e) => handleInputChange('name', e.target.value)}
           disabled={!isEditing}
@@ -224,7 +224,7 @@ const PatientCard = ({
           </label>
           <input
           type="text"
-          aria-label="Patient patronymic"
+          aria-label="Отчество пациента"
           value={formData.patronymic || ''}
           onChange={(e) => handleInputChange('patronymic', e.target.value)}
           disabled={!isEditing}
@@ -238,7 +238,7 @@ const PatientCard = ({
           </label>
           <input
           type="date"
-          aria-label="Patient birth date"
+          aria-label="Дата рождения"
           value={formData.birthDate || ''}
           onChange={(e) => handleInputChange('birthDate', e.target.value)}
           disabled={!isEditing}
@@ -270,7 +270,7 @@ const PatientCard = ({
           </label>
           <input
           type="text"
-          aria-label="Patient age"
+          aria-label="Возраст"
           value={formData.birthDate ?
           Math.floor((new Date() - new Date(formData.birthDate)) / (365.25 * 24 * 60 * 60 * 1000)) : ''
           }
@@ -292,7 +292,7 @@ const PatientCard = ({
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
               type="tel"
-              aria-label="Patient phone"
+              aria-label="Телефон пациента"
               value={formData.phone || ''}
               onChange={(e) => handleInputChange('phone', e.target.value)}
               disabled={!isEditing}
@@ -310,7 +310,7 @@ const PatientCard = ({
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
               type="email"
-              aria-label="Patient email"
+              aria-label="Email пациента"
               value={formData.email || ''}
               onChange={(e) => handleInputChange('email', e.target.value)}
               disabled={!isEditing}
@@ -326,7 +326,7 @@ const PatientCard = ({
             <div className="relative">
               <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <textarea
-              aria-label="Patient address"
+              aria-label="Адрес пациента"
               value={formData.address || ''}
               onChange={(e) => handleInputChange('address', e.target.value)}
               disabled={!isEditing}
@@ -357,7 +357,7 @@ const PatientCard = ({
             </label>
             <input
             type="text"
-            aria-label="Passport series"
+            aria-label="Серия паспорта"
             value={formData.passport.series || ''}
             onChange={(e) => handleInputChange('passport.series', e.target.value)}
             disabled={!isEditing}
@@ -372,7 +372,7 @@ const PatientCard = ({
             </label>
             <input
             type="text"
-            aria-label="Passport number"
+            aria-label="Номер паспорта"
             value={formData.passport.number || ''}
             onChange={(e) => handleInputChange('passport.number', e.target.value)}
             disabled={!isEditing}
@@ -387,7 +387,7 @@ const PatientCard = ({
             </label>
             <input
             type="text"
-            aria-label="Passport issued by"
+            aria-label="Кем выдан паспорт"
             value={formData.passport.issuedBy || ''}
             onChange={(e) => handleInputChange('passport.issuedBy', e.target.value)}
             disabled={!isEditing}
@@ -402,7 +402,7 @@ const PatientCard = ({
             </label>
             <input
             type="date"
-            aria-label="Passport issue date"
+            aria-label="Дата выдачи паспорта"
             value={formData.passport.issueDate || ''}
             onChange={(e) => handleInputChange('passport.issueDate', e.target.value)}
             disabled={!isEditing}
@@ -425,7 +425,7 @@ const PatientCard = ({
             </label>
             <input
             type="text"
-            aria-label="Insurance policy number"
+            aria-label="Номер страхового полиса"
             value={formData.insurance.policyNumber || ''}
             onChange={(e) => handleInputChange('insurance.policyNumber', e.target.value)}
             disabled={!isEditing}
@@ -440,7 +440,7 @@ const PatientCard = ({
             </label>
             <input
             type="text"
-            aria-label="Insurance company"
+            aria-label="Страховая компания"
             value={formData.insurance.company || ''}
             onChange={(e) => handleInputChange('insurance.company', e.target.value)}
             disabled={!isEditing}
@@ -455,7 +455,7 @@ const PatientCard = ({
             </label>
             <input
             type="date"
-            aria-label="Insurance valid until"
+            aria-label="Действителен до"
             value={formData.insurance.validUntil || ''}
             onChange={(e) => handleInputChange('insurance.validUntil', e.target.value)}
             disabled={!isEditing}
@@ -491,7 +491,7 @@ const PatientCard = ({
           Жалобы на момент обращения
         </label>
         <textarea
-        aria-label="Current complaints"
+        aria-label="Текущие жалобы"
         value={formData.medicalHistory.complaints || ''}
         onChange={(e) => handleInputChange('medicalHistory.complaints', e.target.value)}
         disabled={!isEditing}
@@ -686,7 +686,7 @@ const PatientCard = ({
           Стоматологический анамнез
         </label>
         <textarea
-        aria-label="Dental history"
+        aria-label="Стоматологический анамнез"
         value={formData.medicalHistory.dentalHistory || ''}
         onChange={(e) => handleInputChange('medicalHistory.dentalHistory', e.target.value)}
         disabled={!isEditing}
@@ -713,7 +713,7 @@ const PatientCard = ({
             </label>
             <input
             type="text"
-            aria-label="Emergency contact name"
+            aria-label="Имя контактного лица"
             value={formData.emergencyContact.name || ''}
             onChange={(e) => handleInputChange('emergencyContact.name', e.target.value)}
             disabled={!isEditing}
@@ -749,7 +749,7 @@ const PatientCard = ({
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
               type="tel"
-              aria-label="Emergency contact phone"
+              aria-label="Телефон контактного лица"
               value={formData.emergencyContact.phone || ''}
               onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
               disabled={!isEditing}
@@ -765,7 +765,7 @@ const PatientCard = ({
             </label>
             <input
             type="text"
-            aria-label="Emergency contact address"
+            aria-label="Адрес контактного лица"
             value={formData.emergencyContact.address || ''}
             onChange={(e) => handleInputChange('emergencyContact.address', e.target.value)}
             disabled={!isEditing}

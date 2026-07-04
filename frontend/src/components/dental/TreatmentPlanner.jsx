@@ -419,7 +419,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
             />
           </div>
 
-          <div style={styles.metrics} aria-label="Treatment plan summary">
+          <div style={styles.metrics} aria-label="Сводка плана лечения">
             <div style={styles.metric}>
               <span style={styles.metricValue}>{treatmentPlan.stages.length}</span>
               <span style={styles.metricLabel}>{COPY.metricStages}</span>
