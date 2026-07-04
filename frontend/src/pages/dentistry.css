@@ -275,3 +275,387 @@
   grid-template-columns: repeat(3, 1fr);
   gap: var(--mac-spacing-3);
 }
+
+/* ─── Batch 9: Text color helpers ─── */
+.dental-text-secondary { color: var(--mac-text-secondary); }
+.dental-text-tertiary  { color: var(--mac-text-tertiary); }
+.dental-text-accent    { color: var(--mac-accent); }
+.dental-text-success   { color: var(--mac-success); }
+.dental-text-warning   { color: var(--mac-warning); }
+.dental-text-danger    { color: var(--mac-danger); }
+.dental-text-blue      { color: var(--mac-accent-blue); }
+.dental-text-purple    { color: var(--mac-accent-purple); }
+.dental-text-orange    { color: var(--mac-accent-orange); }
+.dental-text-on-accent { color: var(--mac-text-on-accent); }
+
+/* ─── Batch 9: Gap utilities ─── */
+.dental-gap-4  { gap: var(--mac-spacing-1); }  /* 4px */
+.dental-gap-8  { gap: var(--mac-spacing-2); }  /* 8px */
+.dental-gap-12 { gap: 12px; }
+.dental-gap-16 { gap: var(--mac-spacing-4); }  /* 16px */
+.dental-gap-24 { gap: 24px; }
+.dental-gap-32 { gap: 32px; }
+
+/* ─── Batch 9: Flex helpers (with explicit gap) ─── */
+.dental-flex-center-12 { display: flex; align-items: center; gap: 12px; }
+.dental-flex-center-16 { display: flex; align-items: center; gap: var(--mac-spacing-4); }
+.dental-flex-between-12 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dental-flex-between-16 { display: flex; align-items: center; justify-content: space-between; gap: var(--mac-spacing-4); }
+.dental-flex-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mac-spacing-2); }
+.dental-flex-row-wrap { display: flex; flex-direction: row; gap: 16px; flex-wrap: wrap; }
+.dental-flex-1 { flex: 1; }
+.dental-min-w-200 { min-width: 200px; }
+
+/* ─── Batch 9: Icon background color variants ─── */
+.dental-icon-bg-blue    { background: var(--mac-accent-blue); }
+.dental-icon-bg-success { background: var(--mac-success); }
+.dental-icon-bg-purple  { background: var(--mac-accent-purple); }
+.dental-icon-bg-warning { background: var(--mac-warning); }
+.dental-icon-bg-danger  { background: var(--mac-danger); }
+.dental-icon-bg-accent  { background: var(--mac-accent); }
+.dental-icon-bg-blue-light { background: var(--mac-accent-blue-bg, rgba(0, 122, 255, 0.12)); }
+.dental-icon-bg-purple-bg { background: var(--mac-accent-purple-bg, rgba(88, 86, 214, 0.12)); }
+.dental-icon-bg-warning-bg { background: var(--mac-warning-bg, rgba(255, 149, 0, 0.12)); }
+.dental-icon-bg-success-bg { background: var(--mac-success-bg, rgba(52, 199, 89, 0.12)); }
+
+/* Icon background with radius + shadow (stat card icons) */
+.dental-icon-bg-xl-shadow {
+  border-radius: var(--mac-radius-xl);
+  box-shadow: var(--mac-shadow-lg);
+}
+.dental-icon-bg-lg-shadow {
+  border-radius: var(--mac-radius-lg);
+  box-shadow: var(--mac-shadow-sm);
+}
+.dental-icon-bg-full { border-radius: var(--mac-radius-full); }
+
+/* ─── Batch 9: Grid utilities ─── */
+.dental-grid-auto-fill-250 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+.dental-grid-auto-fill-200 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--mac-spacing-3);
+}
+
+/* ─── Batch 9: Padding helpers ─── */
+.dental-p-8px  { padding: 8px; }
+.dental-p-16px { padding: 16px; }
+
+/* ─── Batch 9: Font weight medium ─── */
+.dental-fw-medium { font-weight: var(--mac-font-weight-medium); }
+
+/* ─── Batch 9: Stat card layout ─── */
+.dental-stat-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dental-stat-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ─── Batch 9: Quick action button (with icon + label) ─── */
+.dental-quick-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* ─── Batch 9: Appointment item ─── */
+.dental-appointment-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+}
+
+/* ─── Batch 9: Search wrapper ─── */
+.dental-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+.dental-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mac-text-tertiary);
+  pointer-events: none;
+}
+
+/* ─── Batch 9: Modal / overlay ─── */
+.dental-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: color-mix(in srgb, var(--mac-bg-primary), black 42%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.dental-modal-card {
+  background-color: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  margin: 16px;
+  box-shadow: var(--mac-shadow-xl);
+}
+
+/* ─── Batch 9: Section description paragraph ─── */
+.dental-section-desc {
+  color: var(--mac-text-secondary);
+  margin: 0;
+}
+
+/* ─── Batch 9: List item with icon ─── */
+.dental-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.dental-list-item:hover {
+  background: var(--mac-fill-quaternary);
+}
+
+/* ─── Batch 9: Error/empty state ─── */
+.dental-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px;
+  text-align: center;
+}
+
+/* ─── Batch 11: Additional utilities ─── */
+.dental-grid-span-2 { grid-column: span 2; margin-bottom: 8px; }
+.dental-mr-4 { margin-right: 4px; }
+.dental-mb { margin-bottom: var(--mac-spacing-4); }
+
+/* ─── Batch 12: Dashboard stat cards ─── */
+.dental-grid-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+/* Full stat card with flex space-between layout (dashboard cards) */
+.dental-stat-card-default {
+  background: var(--mac-bg-primary);
+  border-radius: var(--mac-radius-xl);
+  padding: 24px;
+  box-shadow: var(--mac-shadow-sm);
+  border: 1px solid var(--mac-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+  cursor: default;
+}
+
+/* Stat delta text (xs + small top margin; pair with .dental-text-<color>) */
+.dental-stat-delta {
+  font-size: var(--mac-font-size-xs);
+  margin-top: 4px;
+}
+
+/* ─── Batch 13: Section card + quick action button + appointment row + status badge ─── */
+.dental-section-card {
+  background: var(--mac-bg-primary);
+  border-radius: var(--mac-radius-xl);
+  padding: 24px;
+  box-shadow: var(--mac-shadow-sm);
+  border: 1px solid var(--mac-border);
+}
+
+/* Outline quick-action button (pairs with variant="outline" Button) */
+.dental-quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-radius: var(--mac-radius-lg);
+  box-shadow: var(--mac-shadow-sm);
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+  border: 1px solid var(--mac-border);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* Appointment row in "Recent appointments" list */
+.dental-appointment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-lg);
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+  cursor: default;
+}
+
+/* Status badge — pair with data-status attribute */
+.dental-status-badge {
+  padding: 4px 12px;
+  border-radius: var(--mac-radius-full);
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-medium);
+}
+.dental-status-badge[data-status="confirmed"] {
+  background: var(--mac-success-bg);
+  color: var(--mac-success);
+}
+.dental-status-badge[data-status="pending"] {
+  background: var(--mac-warning-bg);
+  color: var(--mac-warning);
+}
+
+/* ─── Batch 14: Appointments root + table card + appointments header/title + lazy fallback ─── */
+.dental-appointments-root {
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.dental-appointments-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.dental-appointments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--mac-spacing-4);
+  margin-bottom: var(--mac-spacing-4);
+  flex-wrap: wrap;
+}
+.dental-appointments-title {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-medium);
+  display: flex;
+  align-items: center;
+  color: var(--mac-text-primary);
+  margin: 0;
+  min-width: min(100%, 260px);
+}
+.dental-lazy-fallback {
+  margin: var(--mac-spacing-4);
+  padding: var(--mac-spacing-4);
+  color: var(--mac-text-secondary);
+  text-align: center;
+}
+
+/* Margin-right 8px (used by inline calendar icon next to title) */
+.dental-mr-8 { margin-right: 8px; }
+
+/* ─── Batch 15: Template cards + protocol cards + reports grid + prosthetic items ─── */
+.dental-grid-auto-fill-280 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.dental-grid-auto-fill-240-16 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+/* Template card (cursor: default, hover transition) */
+.dental-template-card {
+  padding: 16px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  cursor: default;
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+}
+
+/* Saved protocol card (flex column with gap) */
+.dental-protocol-card-flex {
+  padding: 16px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dental-align-self-start { align-self: flex-start; }
+
+/* Prosthetic row (flex space-between, bg secondary) */
+.dental-prosthetic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-lg);
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+}
+
+/* Icon background with danger-bg fill + large radius */
+.dental-icon-bg-danger-bg { background: var(--mac-danger-bg); }
+.dental-icon-radius-lg { border-radius: var(--mac-radius-lg); }
+
+/* ─── Batch 16: Loading skeleton + modal cards ─── */
+@keyframes dental-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.dental-skeleton-bar {
+  height: 32px;
+  background: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-md);
+  width: 25%;
+  animation: dental-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.dental-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+.dental-skeleton-card {
+  height: 96px;
+  background: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-md);
+  animation: dental-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Large modal card for dental chart / treatment planner (1152px max width) */
+.dental-modal-card-xl {
+  background: var(--mac-bg-primary);
+  border-radius: var(--mac-radius-xl);
+  padding: 24px;
+  width: 100%;
+  max-width: 1152px;
+  height: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: var(--mac-shadow-xl);
+  border: 1px solid var(--mac-border);
+}
