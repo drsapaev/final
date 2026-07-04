@@ -350,7 +350,7 @@ const hasBackendPaymentAction = (paymentRow, action) => {
   return false;
 };
 
-const CashierPanel = () => {void
+const CashierPanel = () => {
   useBreakpoint();
   // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
   // The hook returns [confirm, dialogNode]; dialogNode must be rendered once
@@ -392,7 +392,7 @@ const CashierPanel = () => {void
             const patientData = await response.json();
             const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
             setQuery(patientName);
-            logger.info('[Cashier] Загружен пациент из URL:', patientName);
+            logger.info('[Cashier] Загружен пациент из URL:', { patientId: patientData?.id });
           }
         } catch (error) {
           logger.error('[Cashier] Не удалось загрузить пациента:', error);
@@ -476,7 +476,7 @@ const CashierPanel = () => {void
   useEffect(() => {
     const loadStats = async () => {
       const { date_from, date_to } = getDateParams();
-      logger.log('📊 Loading stats with params:', { date_from, date_to });
+      logger.log('Loading stats with params:', { date_from, date_to });
 
       setStatsLoading(true);
       try {
@@ -509,7 +509,7 @@ const CashierPanel = () => {void
   useEffect(() => {
     const loadPending = async () => {
       const { date_from, date_to } = getDateParams();
-      logger.log('📋 Loading pending payments:', { date_from, date_to, page: pendingPage });
+      logger.info(' Loading pending payments:', { date_from, date_to, page: pendingPage });
 
       setPendingLoading(true);
       try {
@@ -547,7 +547,7 @@ const CashierPanel = () => {void
   useEffect(() => {
     const loadHistory = async () => {
       const { date_from, date_to } = getDateParams();
-      logger.log('📜 Loading payment history:', { date_from, date_to, page: currentPage, status });
+      logger.info(' Loading payment history:', { date_from, date_to, page: currentPage, status });
 
       setHistoryLoading(true);
       try {
@@ -645,7 +645,7 @@ const CashierPanel = () => {void
 
   const openPaymentWidget = (appointment) => {
     if (!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)) {
-      const message = 'Cannot start online payment: grouped cashier rows must use the backend grouped payment contract.';
+      const message = 'Невозможно начать онлайн-оплату: групповые платежи должны использовать бэкенд-контракт.';
       setPaymentError(message);
       notify.error(message);
       return;
@@ -998,7 +998,7 @@ const CashierPanel = () => {void
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="cashier-text-sm cashier-text-primary"
-                  placeholder="Поиск по пациенту (Server Search)" />
+                  placeholder="Поиск по пациенту " />
 
               </div>
 
@@ -1144,7 +1144,7 @@ const CashierPanel = () => {void
                   onClick={handleRefresh}
                   title="Обновить данные">
 
-                  🔄 Обновить
+                  Обновить
                 </Button>
                 <Button
                   size="sm"
@@ -1152,7 +1152,7 @@ const CashierPanel = () => {void
                   onClick={exportToCSV}
                   title="Экспорт в CSV">
 
-                  📥 Экспорт
+                  Экспорт
                 </Button>
                 <Button
                   size="sm"
@@ -1160,7 +1160,7 @@ const CashierPanel = () => {void
                   onClick={loadHourlyStats}
                   title="Почасовая статистика">
 
-                  📊 Аналитика
+                  Аналитика
                 </Button>
               </div>
             </div>
@@ -1266,7 +1266,7 @@ const CashierPanel = () => {void
                             disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}
                             aria-label={`Start online payment for ${getAppointmentPaymentActionContext(appointment)}`}>
 
-                                  💳 Онлайн
+                                  Онлайн
                                 </Button>
                                 <Button
                             size="sm"
@@ -1276,7 +1276,7 @@ const CashierPanel = () => {void
                             disabled={!canCreateCashierPayment(appointment)}
                             aria-label={`Take cash payment for ${getAppointmentPaymentActionContext(appointment)}`}>
 
-                                  💵 Касса
+                                  Касса
                                 </Button>
                               </div>
                             </td>
@@ -1589,7 +1589,7 @@ const CashierPanel = () => {void
           <Dialog open={refundDialogOpen} onClose={() => setRefundDialogOpen(false)}>
             <DialogTitle>
               <Box display="flex" alignItems="center">
-                💸 Возврат средств
+                Возврат средств
               </Box>
             </DialogTitle>
             <DialogContent>
@@ -1635,7 +1635,7 @@ const CashierPanel = () => {void
           {/* ✅ v2.0: Диалог почасовой статистики */}
           <Dialog open={showHourlyChart} onClose={() => setShowHourlyChart(false)}>
             <DialogTitle>
-              📊 Почасовая статистика за {selectedDate}
+              Почасовая статистика за {selectedDate}
             </DialogTitle>
             <DialogContent>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

@@ -21,6 +21,7 @@ import {
 import {
   AppEmpty, AppError, AppLoading, Badge, Button, Table, Select,
 } from '../ui/macos';
+import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
@@ -180,7 +181,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Process error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
     } finally {
       setProcessingId(null);
     }
