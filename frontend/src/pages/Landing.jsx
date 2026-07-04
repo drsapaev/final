@@ -1,4 +1,4 @@
-import React, { startTransition, useEffect, useMemo } from 'react';
+import React, { startTransition, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -51,8 +51,7 @@ function SurfaceLabel({ children }) {
 
 
 SurfaceLabel.propTypes = {
-  ...(SurfaceLabel.propTypes || {}),
-  children: PropTypes.any,
+  children: PropTypes.node,
 };
 
 function SectionHeading({ eyebrow, title, description, align = 'left' }) {
@@ -67,11 +66,10 @@ function SectionHeading({ eyebrow, title, description, align = 'left' }) {
 
 
 SectionHeading.propTypes = {
-  ...(SectionHeading.propTypes || {}),
-  align: PropTypes.any,
-  description: PropTypes.any,
-  eyebrow: PropTypes.any,
-  title: PropTypes.any,
+  align: PropTypes.oneOf(['left', 'center']),
+  description: PropTypes.string,
+  eyebrow: PropTypes.string,
+  title: PropTypes.string,
 };
 
 function MetricCard({ value, label, detail, style }) {
@@ -86,11 +84,10 @@ function MetricCard({ value, label, detail, style }) {
 
 
 MetricCard.propTypes = {
-  ...(MetricCard.propTypes || {}),
-  detail: PropTypes.any,
-  label: PropTypes.any,
-  style: PropTypes.any,
-  value: PropTypes.any,
+  detail: PropTypes.string,
+  label: PropTypes.string,
+  style: PropTypes.object,
+  value: PropTypes.node,
 };
 
 function FeatureCard({ accent, icon: Icon, badge, title, description }) {
@@ -108,12 +105,11 @@ function FeatureCard({ accent, icon: Icon, badge, title, description }) {
 
 
 FeatureCard.propTypes = {
-  ...(FeatureCard.propTypes || {}),
-  accent: PropTypes.any,
-  badge: PropTypes.any,
-  description: PropTypes.any,
-  icon: PropTypes.any,
-  title: PropTypes.any,
+  accent: PropTypes.string,
+  badge: PropTypes.string,
+  description: PropTypes.string,
+  icon: PropTypes.elementType,
+  title: PropTypes.string,
 };
 
 function ShowcaseCard({ icon: Icon, label, title, description, style }) {
@@ -138,12 +134,11 @@ function ShowcaseCard({ icon: Icon, label, title, description, style }) {
 
 
 ShowcaseCard.propTypes = {
-  ...(ShowcaseCard.propTypes || {}),
-  description: PropTypes.any,
-  icon: PropTypes.any,
-  label: PropTypes.any,
-  style: PropTypes.any,
-  title: PropTypes.any,
+  description: PropTypes.string,
+  icon: PropTypes.elementType,
+  label: PropTypes.string,
+  style: PropTypes.object,
+  title: PropTypes.string,
 };
 
 function WorkflowStep({ title, description }) {
@@ -160,9 +155,8 @@ function WorkflowStep({ title, description }) {
 
 
 WorkflowStep.propTypes = {
-  ...(WorkflowStep.propTypes || {}),
-  description: PropTypes.any,
-  title: PropTypes.any,
+  description: PropTypes.string,
+  title: PropTypes.string,
 };
 
 function ContactRow({ icon: Icon, label, value, href }) {
@@ -189,13 +183,14 @@ function ContactRow({ icon: Icon, label, value, href }) {
 }
 
 
+// UX Audit Stage 2 (Landing issue 1.5): почищены propTypes-артефакты.
+// Удалён `...(ContactRow.propTypes || {})` (бессмысленный spread из codemod)
+// и удалён несуществующий prop `startsWith: PropTypes.any`.
 ContactRow.propTypes = {
-  ...(ContactRow.propTypes || {}),
-  href: PropTypes.any,
-  icon: PropTypes.any,
-  label: PropTypes.any,
-  startsWith: PropTypes.any,
-  value: PropTypes.any,
+  href: PropTypes.string,
+  icon: PropTypes.elementType,
+  label: PropTypes.string,
+  value: PropTypes.string,
 };
 
 function toTelegramUrl(handle) {
@@ -219,8 +214,13 @@ export default function Landing() {
 
   const currentLanguageIndex = availableLanguages.findIndex((item) => item.code === language);
   const currentLanguage = availableLanguages[currentLanguageIndex] || availableLanguages[0];
-  const nextLanguage =
-    availableLanguages[(currentLanguageIndex + 1) % availableLanguages.length] || availableLanguages[0];
+  // UX Audit Stage 2: nextLanguage удалён — был нужен только для cycle-переключателя,
+  // сейчас используется dropdown и прямое handleLanguageSelect(code).
+
+  // UX Audit Stage 2 (Landing issue 1.2): свитчер языков → dropdown вместо cycle.
+  // Раньше было 4 языка (RU→UZ→EN→KZ→RU) и чтобы попасть в EN из RU нужно 2 клика.
+  // Теперь dropdown открывается одним кликом и сразу показывает все варианты.
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
   useEffect(() => {
     const root = document.getElementById('root');
@@ -237,21 +237,82 @@ export default function Landing() {
     };
   }, []);
 
-  const handleLanguageCycle = () => {
-    if (!nextLanguage?.code) {
+  // UX Audit Stage 2 (Landing issue 1.2): заменили cycle на dropdown select.
+  // handleLanguageCycle удалён, вместо него — handleLanguageSelect(code).
+  const handleLanguageSelect = (code) => {
+    if (!code) {
       return;
     }
 
     startTransition(() => {
-      setLanguage(nextLanguage.code);
+      setLanguage(code);
     });
+    setShowLangDropdown(false);
   };
+
+  // UX Audit Stage 2 (Landing issue 1.2): close dropdown on outside click / Escape.
+  useEffect(() => {
+    if (!showLangDropdown) {
+      return undefined;
+    }
+
+    const handleClickOutside = (event) => {
+      const trigger = document.getElementById('landing-lang-trigger');
+      const dropdown = document.getElementById('landing-lang-dropdown');
+      if (
+        trigger && !trigger.contains(event.target) &&
+        dropdown && !dropdown.contains(event.target)
+      ) {
+        setShowLangDropdown(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setShowLangDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showLangDropdown]);
 
   const scrollToSection = (sectionId) => {
     document.getElementById(sectionId)?.scrollIntoView({
       behavior: 'smooth',
       block: 'start'
     });
+  };
+
+  // UX Audit Stage 2 (Landing issue 1.2): smooth-scroll для футер-якорей.
+  // Раньше клик на якорь в футере (#product, #workflow и т.д.) делал резкий
+  // browser-jump, потому что это были <a href="#..."> без обработчика.
+  // Теперь перехватываем клик и используем тот же scrollToSection.
+  const handleFooterLinkClick = (event, href) => {
+    if (!href || !href.startsWith('#')) {
+      return;
+    }
+    event.preventDefault();
+    const sectionId = href.slice(1);
+    scrollToSection(sectionId);
+  };
+
+  // UX Audit Stage 2 (Landing issue 1.1): унификация CTA.
+  // Раньше 7 кнопок с 5 разными текстами вели на /login.
+  // Теперь 2 цели: «Войти в систему» (→ /login) и «Связаться с продажами» (→ telegram).
+  // Кнопка «Связаться с продажами» открывает Telegram-чат с поддержкой.
+  const handleSalesContact = () => {
+    const telegramUrl = toTelegramUrl(t('telegram'));
+    if (telegramUrl) {
+      window.open(telegramUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      // Fallback: скроллим к секции контактов
+      scrollToSection('contact');
+    }
   };
 
   return (
@@ -293,17 +354,61 @@ export default function Landing() {
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLanguageCycle}
-              className="landing-toolbar-button landing-language-button"
-              aria-label={`${copy.languageSwitchLabel}: ${currentLanguage?.name || language} -> ${nextLanguage?.name || language}`}
-              title={`${copy.languageSwitchLabel}: ${nextLanguage?.name || language}`}
-            >
-              <span className="landing-language-flag">{currentLanguage?.flag || '🌐'}</span>
-              <span>{language.toUpperCase()}</span>
-            </Button>
+            {/* UX Audit Stage 2 (Landing issue 1.2):
+                Свитчер языков теперь dropdown вместо cycle.
+                Раньше было 4 клика чтобы вернуться к исходному языку, теперь — 1 клик. */}
+            <div className="landing-language-wrap">
+              <Button
+                id="landing-lang-trigger"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowLangDropdown((v) => !v)}
+                className="landing-toolbar-button landing-language-button"
+                aria-label={copy.languageSwitchLabel}
+                title={copy.languageSwitchLabel}
+                aria-expanded={showLangDropdown}
+                aria-haspopup="listbox"
+              >
+                <span className="landing-language-flag">{currentLanguage?.flag || '🌐'}</span>
+                <span>{language.toUpperCase()}</span>
+                <ChevronRight
+                  size={12}
+                  aria-hidden="true"
+                  style={{
+                    transform: showLangDropdown ? 'rotate(90deg)' : 'rotate(0deg)',
+                    transition: 'transform 150ms ease',
+                    marginLeft: 2,
+                  }}
+                />
+              </Button>
+
+              {showLangDropdown && (
+                <ul
+                  id="landing-lang-dropdown"
+                  role="listbox"
+                  aria-label={copy.languageSwitchLabel}
+                  className="landing-language-dropdown"
+                >
+                  {availableLanguages.map((lang) => {
+                    const isActive = lang.code === language;
+                    return (
+                      <li key={lang.code} role="option" aria-selected={isActive}>
+                        <button
+                          type="button"
+                          className={`landing-language-option ${isActive ? 'landing-language-option--active' : ''}`}
+                          onClick={() => handleLanguageSelect(lang.code)}
+                        >
+                          <span className="landing-language-flag" aria-hidden="true">{lang.flag || '🌐'}</span>
+                          <span>{lang.name}</span>
+                          <span className="landing-language-code">{lang.code.toUpperCase()}</span>
+                          {isActive && <CheckCircle size={14} aria-hidden="true" />}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
 
             <Button variant="primary" size="sm" onClick={() => navigate('/login')} className="landing-header-login">
               <User size={16} />
@@ -324,9 +429,16 @@ export default function Landing() {
             <p className="landing-hero-description">{copy.hero.description}</p>
 
             <div className="landing-cta-row">
+              {/* UX Audit Stage 2 (Landing issue 1.1):
+                  Унификация CTA. Раньше 7 кнопок с 5 текстами вели на /login.
+                  Теперь 2 цели:
+                    - «Войти в систему» (primary) → /login
+                    - «Связаться с продажами» (outline) → Telegram-чат
+                  Hero secondary («Смотреть 2-минутный обзор») оставлен как scroll-to-section,
+                  но переименован в «Посмотреть интерфейс» в landingContent.js. */}
               <Button variant="primary" size="lg" onClick={() => navigate('/login')} className="landing-primary-cta">
                 <User size={18} />
-                {copy.hero.primaryCta}
+                {copy.headerLogin}
               </Button>
 
               <Button variant="outline" size="lg" onClick={() => scrollToSection('screens')} className="landing-secondary-cta">
@@ -574,11 +686,19 @@ export default function Landing() {
                   ))}
                 </ul>
 
+                {/* UX Audit Stage 2 (Landing issue 1.1):
+                    Pricing 3 кнопки раньше все вели на /login с разными текстами
+                    («Запросить демо», «Выбрать Professional», «Обсудить Enterprise»).
+                    Теперь: featured plan → /login (trial start),
+                    остальные 2 → sales contact (Telegram) для персональной консультации. */}
                 <Button
                   variant={plan.featured ? 'primary' : 'outline'}
                   size="lg"
-                  onClick={() => navigate('/login')}
+                  onClick={plan.featured ? () => navigate('/login') : handleSalesContact}
                   className="landing-plan-button"
+                  title={plan.featured
+                    ? 'Открыть демо-режим системы'
+                    : 'Связаться с продажами для персонального предложения'}
                 >
                   {plan.cta}
                 </Button>
@@ -623,11 +743,15 @@ export default function Landing() {
             </div>
 
             <div className="landing-final-actions">
+              {/* UX Audit Stage 2 (Landing issue 1.1):
+                  Final CTA 2 кнопки раньше обе вели на /login.
+                  Теперь: primary «Запросить демо» → /login (trial),
+                  secondary «Активировать лицензию» → sales contact (Telegram). */}
               <Button variant="primary" size="lg" onClick={() => navigate('/login')}>
                 <User size={18} />
                 {copy.finalCta.primaryCta}
               </Button>
-              <Button variant="outline" size="lg" onClick={() => navigate('/login')}>
+              <Button variant="outline" size="lg" onClick={handleSalesContact}>
                 <Key size={18} />
                 {copy.finalCta.secondaryCta}
               </Button>
@@ -664,7 +788,15 @@ export default function Landing() {
                 <strong>{group.title}</strong>
                 <div className="landing-footer-links">
                   {group.links.map((link) => (
-                    <a key={link.label} href={link.href} className="landing-footer-link">
+                    // UX Audit Stage 2 (Landing issue 1.2):
+                    // Smooth-scroll для футер-якорей через handleFooterLinkClick.
+                    // Раньше это был резкий browser-jump.
+                    <a
+                      key={link.label}
+                      href={link.href}
+                      className="landing-footer-link"
+                      onClick={(e) => handleFooterLinkClick(e, link.href)}
+                    >
                       {link.label}
                     </a>
                   ))}

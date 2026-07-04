@@ -16,7 +16,7 @@ const BASE_COPY = {
     description:
       'MediClinic Pro собирает регистратуру, врача, QR-очередь, платежи, Telegram и отчеты в один workflow без ручных разрывов между командами.',
     primaryCta: 'Открыть демо',
-    secondaryCta: 'Смотреть 2-минутный обзор',
+    secondaryCta: 'Посмотреть интерфейс',
     proofChips: ['EMR врача', 'QR-очередь', 'Telegram-уведомления', 'Платежи и отчеты'],
     quickStats: [
       { value: '4', label: 'ключевые роли', detail: 'регистратура, врач, касса, руководитель' },
@@ -357,7 +357,7 @@ const EN_OVERRIDES = {
     description:
       'MediClinic Pro brings reception, doctors, QR queue, payments, Telegram and reporting into one workflow with no manual gaps between teams.',
     primaryCta: 'Open demo',
-    secondaryCta: 'Watch the 2-minute walkthrough',
+    secondaryCta: 'View interface',
     proofChips: ['Doctor EMR', 'QR queue', 'Telegram alerts', 'Payments and reports'],
     quickStats: [
       { value: '4', label: 'core roles', detail: 'reception, doctor, cashier, leadership' },
@@ -678,7 +678,7 @@ const UZ_OVERRIDES = {
     description:
       'MediClinic Pro registratura, shifokor, QR-navbat, tolovlar, Telegram va hisobotlarni bitta workflow ichida birlashtiradi, jamoalar orasida qol mehnatisiz.',
     primaryCta: 'Demo ochish',
-    secondaryCta: '2 daqiqalik korib chiqishni korish',
+    secondaryCta: "Interfeysni ko'rish",
     proofChips: ['Shifokor EMR', 'QR-navbat', 'Telegram signal', 'Tolovlar va hisobotlar'],
     quickStats: [
       { value: '4', label: 'asosiy rol', detail: 'registratura, shifokor, kassa, rahbar' },
@@ -999,7 +999,7 @@ const KK_OVERRIDES = {
     description:
       'MediClinic Pro тіркеуді, дәрігерді, QR-кезекті, төлемдерді, Telegram және есептерді бір workflow ішінде біріктіреді, командалар арасындағы қол еңбегін азайтады.',
     primaryCta: 'Демоны ашу',
-    secondaryCta: '2 минуттық шолуды көру',
+    secondaryCta: 'Интерфейсті қарау',
     proofChips: ['Дәрігер EMR', 'QR-кезек', 'Telegram сигналдары', 'Төлемдер мен есептер'],
     quickStats: [
       { value: '4', label: 'негізгі рөл', detail: 'тіркеу, дәрігер, касса, басшылық' },

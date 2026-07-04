@@ -201,6 +201,94 @@ body.landing-body {
   font-size: 16px;
 }
 
+/* ===========================================================================
+   UX Audit Stage 2 (Landing issue 1.2): Language dropdown
+   Заменил cycle-переключатель на полноценный dropdown с 4 языками.
+   =========================================================================== */
+.landing-language-wrap {
+  position: relative;
+}
+
+.landing-language-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  min-width: 200px;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  border-radius: 16px;
+  background: var(--landing-surface, rgba(255, 255, 255, 0.95));
+  border: 1px solid var(--landing-border, rgba(148, 163, 184, 0.2));
+  box-shadow: var(--landing-shadow, 0 24px 80px rgba(15, 23, 42, 0.12));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.landing-shell--dark .landing-language-dropdown {
+  background: rgba(15, 23, 42, 0.96);
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+.landing-language-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--mac-text-primary, inherit);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background-color 150ms ease;
+}
+
+.landing-language-option:hover,
+.landing-language-option:focus-visible {
+  background: rgba(14, 165, 233, 0.1);
+  outline: none;
+}
+
+.landing-language-option--active {
+  background: rgba(14, 165, 233, 0.14);
+  color: var(--mac-accent-blue, #0ea5e9);
+}
+
+.landing-language-option .landing-language-code {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--mac-text-secondary, #64748b);
+  text-transform: uppercase;
+}
+
+.landing-language-option--active .landing-language-code {
+  color: var(--mac-accent-blue, #0ea5e9);
+}
+
+.landing-language-option svg {
+  color: var(--mac-accent-blue, #0ea5e9);
+  flex: 0 0 auto;
+}
+
+/* Dropdown: на мобиле — на всю ширину toolbar */
+@media (max-width: 520px) {
+  .landing-language-dropdown {
+    right: auto;
+    left: 0;
+    min-width: 180px;
+  }
+}
+
 .landing-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.88fr);
