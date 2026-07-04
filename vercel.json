@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm --prefix frontend run build",
-  "installCommand": "npm --prefix frontend ci",
+  "installCommand": "npm --prefix frontend ci --legacy-peer-deps",
   "framework": "vite",
   "outputDirectory": "frontend/dist",
   "git": {
