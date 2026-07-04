@@ -173,6 +173,8 @@ export default [
       'src/api/runtime.js',
       'src/api/setup.js',
       'src/api/mcpClient.js',
+      'src/api/patients.js',
+      'src/api/payments.js',
       'src/utils/tokenManager.js',
       'src/utils/navigation.js',
       'src/utils/navigationReact.js',

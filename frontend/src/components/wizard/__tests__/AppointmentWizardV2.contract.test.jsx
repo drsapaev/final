@@ -105,7 +105,10 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(source).not.toContain('gender: wizardData.patient.gender');
     expect(patientIdBlock).toContain('const initialPatientId = resolveInitialPatientId(initialData);');
     expect(patientIdBlock).toContain('patientId = initialPatientId;');
-    expect(source).toContain('body: JSON.stringify({ sex: selectedPatientSex })');
+    // UX Audit Stage 3: raw fetch replaced with updatePatient() from api/patients.
+    // Old: body: JSON.stringify({ sex: selectedPatientSex })
+    // New: updatePatient(patientId, { sex: selectedPatientSex })
+    expect(source).toContain('updatePatient(patientId, { sex: selectedPatientSex })');
   });
 
   it('filters services only for real department tabs, not registrar view tabs', () => {

@@ -3,8 +3,14 @@ import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
+// UX Audit Stage 3 (Queue issue 7.3):
+// Заменены SF Symbols (Icon) на lucide-react — единая библиотека иконок.
+// Раньше Queue был единственным экраном, использующим SF Symbols.
 import {
-  Button, CardContent, Badge, Icon, Select,
+  QrCode, Building2, CheckCircle, Settings, Bell, User, Clock, ArrowDownCircle,
+} from 'lucide-react';
+import {
+  Button, CardContent, Badge, Select,
 } from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
@@ -58,6 +64,9 @@ const ModernQueueManager = ({
       completed: 'Завершено',
       available: 'Свободно',
       selectDoctor: 'Выберите врача',
+      // UX Audit Stage 3 (Queue issue 7.1): добавлен перевод для loading-состояния.
+      // Раньше был хардкод в unicode-escape: '\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...'
+      loadingDoctors: 'Загрузка специалистов...',
       queueEmpty: 'Очередь пуста',
       queueNotFound: 'Очередь не найдена',
       patient: 'Пациент',
@@ -268,7 +277,7 @@ const ModernQueueManager = ({
       <div className="mqm-stats-grid">
           <div className="mqm-card mqm-stat-card">
             <div className="mqm-stat-icon primary">
-              <Icon name="person" size="large" color="white" />
+              <User size={20} color="white" aria-hidden="true" />
             </div>
             <div>
               <div className="mqm-stat-value">{statistics.total_entries}</div>
@@ -278,7 +287,7 @@ const ModernQueueManager = ({
 
           <div className="mqm-card mqm-stat-card">
             <div className="mqm-stat-icon warning">
-              <Icon name="magnifyingglass" size="large" style={{ color: 'white' }} />
+              <QrCode size={20} color="white" aria-hidden="true" />
             </div>
             <div>
               <div className="mqm-stat-value">{statistics.waiting}</div>
@@ -288,7 +297,7 @@ const ModernQueueManager = ({
 
           <div className="mqm-card mqm-stat-card">
             <div className="mqm-stat-icon success">
-              <Icon name="checkmark.circle" size="large" style={{ color: 'white' }} />
+              <CheckCircle size={20} color="white" aria-hidden="true" />
             </div>
             <div>
               <div className="mqm-stat-value">{statistics.completed}</div>
@@ -315,7 +324,11 @@ const ModernQueueManager = ({
                 type="date"
                 aria-label="Дата очереди"
                 value={effectiveDate}
-                // Min удален, чтобы можно было смотреть историю и текущий день в любое время
+                // UX Audit Stage 3 (Queue issue 7.1):
+                // Min удален, чтобы можно было смотреть историю и текущий день в любое время.
+                // Max добавлен — без него можно создать очередь на 2030 год.
+                // Раньше: только комментарий, без max.
+                max={getLocalDateString()}
                 onChange={(e) => {
                   const newDate = e.target.value;
                   setInternalDate(newDate);
@@ -333,7 +346,7 @@ const ModernQueueManager = ({
               </label>
               <Select
                 id="modern-queue-doctor"
-                aria-label={'\u0412\u0440\u0430\u0447 \u043e\u0447\u0435\u0440\u0435\u0434\u0438'}
+                aria-label={t.selectDoctor}
                 value={effectiveDoctor === '' ? '' : String(effectiveDoctor)}
                 onChange={(newDoctor) => {
                   setInternalDoctor(newDoctor);
@@ -342,7 +355,10 @@ const ModernQueueManager = ({
                   }
                 }}
                 options={[
-                  { value: '', label: doctorOptions.length > 0 ? '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442\u0430' : '\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442\u043e\u0432...' },
+                  // UX Audit Stage 3 (Queue issue 7.1):
+                  // Заменены unicode-escape '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435...'
+                  // на читаемые t.selectDoctor / t.loadingDoctors.
+                  { value: '', label: doctorOptions.length > 0 ? t.selectDoctor : t.loadingDoctors },
                   ...doctorOptions.map((opt) => ({
                     value: String(opt.id),
                     label: opt.label
@@ -361,7 +377,7 @@ const ModernQueueManager = ({
                 className="mqm-button-icon"
                 title="Генерировать QR для выбранного специалиста">
 
-                <Icon name="magnifyingglass" size="small" style={{ color: 'white' }} />
+                <QrCode size={16} color="white" aria-hidden="true" />
                 {t.doctorQr}
               </Button>
 
@@ -373,7 +389,7 @@ const ModernQueueManager = ({
                 className="mqm-button-icon"
                 title="Генерировать общий QR код для всех специалистов клиники">
 
-                <Icon name="square.grid.2x2" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+                <Building2 size={16} style={{ color: 'var(--mac-text-primary)' }} aria-hidden="true" />
                 {t.clinicQr}
               </Button>
             </div>
@@ -395,7 +411,7 @@ const ModernQueueManager = ({
                   'Открыть прием и закрыть онлайн-запись'
                   }>
 
-                  <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
+                  <CheckCircle size={16} color="white" aria-hidden="true" />
                   {t.openReception}
                 </Button>);
 
@@ -409,7 +425,7 @@ const ModernQueueManager = ({
                 disabled={!effectiveDoctor || loading}
                 className="mqm-button-icon">
 
-                <Icon name="gear" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+                <Settings size={16} style={{ color: 'var(--mac-text-primary)' }} aria-hidden="true" />
                 {t.refreshQueue}
               </Button>
 
@@ -420,7 +436,7 @@ const ModernQueueManager = ({
                 disabled={!effectiveDoctor || loading}
                 className="mqm-button-icon"
                 title="Backend call-next command">
-                <Icon name="bell.fill" size="small" style={{ color: 'white' }} />
+                <Bell size={16} color="white" aria-hidden="true" />
                 {t.call}
               </Button>
 
@@ -490,12 +506,12 @@ const ModernQueueManager = ({
           <div className="mqm-qr-badge-container">
             {qrData?.is_clinic_wide ?
             <Badge variant="primary" className="mqm-qr-badge">
-                <Icon name="building.2.fill" size="small" style={{ marginRight: '6px' }} />
+                <Building2 size={14} style={{ marginRight: '6px' }} aria-hidden="true" />
                 Общий QR код клиники
               </Badge> :
 
             <Badge variant="success" className="mqm-qr-badge">
-                <Icon name="person.fill" size="small" style={{ marginRight: '6px' }} />
+                <User size={14} style={{ marginRight: '6px' }} aria-hidden="true" />
                 QR код специалиста
               </Badge>
             }
@@ -559,7 +575,7 @@ const ModernQueueManager = ({
               Отсканируйте камеру телефона для записи в очередь
             </p>
             <p className="mqm-qr-expiry">
-              <Icon name="clock" size="small" style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+              <Clock size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} aria-hidden="true" />
               Действует до: {qrData?.expires_at ? new Date(qrData.expires_at).toLocaleString('ru-RU', {
                 day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
               }) : '—'}
@@ -573,7 +589,7 @@ const ModernQueueManager = ({
               onClick={downloadQR}
               className="mqm-qr-action-btn">
 
-              <Icon name="arrow.down.circle" size="small" style={{ marginRight: '8px' }} />
+              <ArrowDownCircle size={14} style={{ marginRight: '8px' }} aria-hidden="true" />
               {t.download}
             </Button>
             <Button
