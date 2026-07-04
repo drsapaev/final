@@ -68,8 +68,8 @@ const UnifiedNotifications = () => {
   }, [section]);
 
   const tabs = [
-  { id: 'fcm', label: 'FCM Notifications', icon: 'Bell' },
-  { id: 'registrar', label: 'Registrar Notifications', icon: 'Users' }];
+  { id: 'fcm', label: 'Push (FCM)', icon: 'Bell' },
+  { id: 'registrar', label: 'Регистратор', icon: 'Users' }];
 
 
   const renderContent = () => {

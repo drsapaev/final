@@ -79,10 +79,10 @@ const UnifiedUserManagement = () => {
   }, [section]);
 
   const tabs = [
-  { id: 'management', label: 'User Management', icon: 'Users' },
-  { id: 'transfer', label: 'Data Transfer', icon: 'Database' },
-  { id: 'export', label: 'Export Users', icon: 'Download' },
-  { id: 'permissions', label: 'Group Permissions', icon: 'Shield' }];
+  { id: 'management', label: 'Пользователи', icon: 'Users' },
+  { id: 'transfer', label: 'Передача данных', icon: 'Database' },
+  { id: 'export', label: 'Экспорт', icon: 'Download' },
+  { id: 'permissions', label: 'Разрешения', icon: 'Shield' }];
 
 
   const renderContent = () => {
