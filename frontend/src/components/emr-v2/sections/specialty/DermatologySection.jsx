@@ -125,7 +125,7 @@ export function DermatologySection({
   return (
     <EMRSection
       title="Дерматологические данные"
-      icon="🧴"
+      icon=""
       disabled={disabled}
       defaultOpen={true}>
       

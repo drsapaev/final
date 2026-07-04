@@ -1590,7 +1590,7 @@ const DermatologistPanelUnified = () => {
 
               {/* Жалобы и диагноз */}
               <MacOSCard className="derma-p-8">
-                <h3 className="derma-section-heading-display">📝 Жалобы и диагноз</h3>
+                <h3 className="derma-section-heading-display">Жалобы и диагноз</h3>
 
                 <div className="derma-flex-col-20">
                   <div>
@@ -1819,10 +1819,10 @@ const DermatologistPanelUnified = () => {
                           <Badge variant="info">{exam.examination_date}</Badge>
                         </div>
                         <div className="derma-exam-detail-grid">
-                          <div>🧴 Тип кожи: {exam.skin_type}</div>
-                          <div>📈 Состояние: {exam.skin_condition}</div>
-                          <div>🎯 Поражения: {exam.lesions}</div>
-                          <div>📍 Распространение: {exam.distribution}</div>
+                          <div>Тип кожи: {exam.skin_type}</div>
+                          <div>Состояние: {exam.skin_condition}</div>
+                          <div>Поражения: {exam.lesions}</div>
+                          <div>Распространение: {exam.distribution}</div>
                         </div>
                         {exam.diagnosis &&
                   <div className="derma-mt-8-text-14-primary">
@@ -1969,9 +1969,9 @@ const DermatologistPanelUnified = () => {
                           <Badge variant="info">{procedure.procedure_date}</Badge>
                         </div>
                         <div className="derma-exam-detail-grid">
-                          <div>✨ Тип: {procedure.procedure_type}</div>
-                          <div>📍 Область: {procedure.area_treated}</div>
-                          <div>🧴 Продукты: {procedure.products_used}</div>
+                          <div>Тип: {procedure.procedure_type}</div>
+                          <div>Область: {procedure.area_treated}</div>
+                          <div>Продукты: {procedure.products_used}</div>
                         </div>
                         {procedure.results &&
                   <div className="derma-mt-8-text-14-primary">
@@ -2199,7 +2199,7 @@ const DermatologistPanelUnified = () => {
 
                   <div className="derma-price-info-box">
                     <h4 className="derma-price-h4">
-                      💡 Справочник цен
+                      Справочник цен
                     </h4>
                     <div className="derma-grid-auto-200-13">
                       <div>• Консультация: 50,000 UZS</div>
@@ -2239,9 +2239,9 @@ const DermatologistPanelUnified = () => {
                             <Badge variant="info">{exam.examination_date}</Badge>
                           </div>
                           <div className="derma-history-detail-list">
-                            <div>🧴 {exam.skin_type} • {exam.skin_condition}</div>
-                            <div>🎯 {exam.lesions}</div>
-                            {exam.diagnosis && <div>📋 {exam.diagnosis}</div>}
+                            <div>{exam.skin_type} • {exam.skin_condition}</div>
+                            <div>{exam.lesions}</div>
+                            {exam.diagnosis && <div>{exam.diagnosis}</div>}
                           </div>
                         </div>
                     )}
@@ -2262,12 +2262,12 @@ const DermatologistPanelUnified = () => {
                             <Badge variant="info">{procedure.procedure_date}</Badge>
                           </div>
                           <div className="derma-history-detail-list">
-                            <div>✨ {procedure.procedure_type}</div>
-                            <div>📍 {procedure.area_treated}</div>
+                            <div>{procedure.procedure_type}</div>
+                            <div>{procedure.area_treated}</div>
                             {procedure.results && <div>📊 {procedure.results}</div>}
                             {procedure.total_cost &&
                         <div className="derma-history-cost">
-                                💰 {Number(procedure.total_cost).toLocaleString()} UZS
+                                {Number(procedure.total_cost).toLocaleString()} UZS
                               </div>
                         }
                           </div>
