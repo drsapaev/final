@@ -176,7 +176,7 @@ const DentistPanelUnified = () => {
     setSelectedPatient,
   } = useDoctorPanelState({
     defaultTab: 'appointments',
-    visitDeepLinkTab: 'visits',
+    visitDeepLinkTab: 'visit',
     patientDeepLinkTab: 'appointments',
   });
 
@@ -700,7 +700,7 @@ const DentistPanelUnified = () => {
         source: 'appointments'
       };
       setSelectedPatient(patientData);
-      handleTabChange('examinations');
+      handleTabChange('visits');
     }
   };
 
@@ -776,7 +776,7 @@ const DentistPanelUnified = () => {
           };
           logger.info('[Dentist] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
-          handleTabChange('examinations');
+          handleTabChange('visits');
         } catch (error) {
           logger.error('[Dentist] Ошибка при завершении приёма:', error);
         }

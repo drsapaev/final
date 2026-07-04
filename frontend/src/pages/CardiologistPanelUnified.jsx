@@ -950,7 +950,7 @@ const MacOSCardiologistPanelUnified = () => {
           const queueEntryId = resolveDoctorQueueEntryId(row);
           if (queueEntryId === null) {
             logger.warn('[Cardiology] Cannot start visit without OnlineQueueEntry id', row);
-            notify.error('Cannot start visit without a queue entry id');
+            notify.error('Невозможно начать приём без ID записи в очереди');
             break;
           }
           const token = tokenManager.getAccessToken();
@@ -1160,7 +1160,7 @@ const MacOSCardiologistPanelUnified = () => {
       setLoading(true);
       const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
       if (queueEntryId === null) {
-        notify.error('Cannot complete visit without a queue entry id');
+        notify.error('Невозможно завершить приём без ID записи в очереди');
         return;
       }
 
@@ -1799,7 +1799,7 @@ const MacOSCardiologistPanelUnified = () => {
 
           <Settings size={18} />
         </button>
-        {settingsOpen &&
+        {(activeTab === 'visit' || activeTab === 'blood') && settingsOpen &&
         <MacOSCard className="cardio-settings-card">
             <h3 className="cardio-settings-title">Настройки кардиолога</h3>
             <div className="cardio-flex-col">
