@@ -19,7 +19,7 @@ import {
 
 'lucide-react';
 import {
-  Card, Button, Input, Select, Checkbox,
+  MacOSCard, Button, Input, Select, Checkbox,
 } from '../ui/macos';
 
 import { api } from '../../api/client';
@@ -153,12 +153,12 @@ const TelegramSettings = () => {
 
   if (loading) {
     return (
-      <Card className="admin-p-32">
+      <MacOSCard className="admin-p-32">
         <div className="admin-flex-ai-center-jc-center">
           <RefreshCw className="admin-w-20-h-20-mr-8-anim-spin1slinearinfinite" />
           <span className="admin-text-primary">Загрузка Telegram настроек...</span>
         </div>
-      </Card>);
+      </MacOSCard>);
 
   }
 
@@ -211,43 +211,43 @@ const TelegramSettings = () => {
 
       {/* Статистика */}
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-        <Card className="admin-p-24-ta-center">
+        <MacOSCard className="admin-p-24-ta-center">
           <div className="admin-2xl-bold-blue-mb-8">
             {stats.total_users || 0}
           </div>
           <div className="admin-text-sm admin-text-secondary">
             Всего пользователей
           </div>
-        </Card>
-        <Card className="admin-p-24-ta-center">
+        </MacOSCard>
+        <MacOSCard className="admin-p-24-ta-center">
           <div className="admin-2xl-bold-success-mb-8">
             {stats.messages_sent || 0}
           </div>
           <div className="admin-text-sm admin-text-secondary">
             Сообщений отправлено
           </div>
-        </Card>
-        <Card className="admin-p-24-ta-center">
+        </MacOSCard>
+        <MacOSCard className="admin-p-24-ta-center">
           <div className="admin-2xl-bold-warning-mb-8">
             {stats.messages_delivered || 0}
           </div>
           <div className="admin-text-sm admin-text-secondary">
             Доставлено
           </div>
-        </Card>
-        <Card className="admin-p-24-ta-center">
+        </MacOSCard>
+        <MacOSCard className="admin-p-24-ta-center">
           <div className="admin-2xl-bold-error-mb-8">
             {stats.messages_failed || 0}
           </div>
           <div className="admin-text-sm admin-text-secondary">
             Ошибок
           </div>
-        </Card>
+        </MacOSCard>
       </div>
 
       <div className="admin-grid-gtc-rauto-fitcminmax400pxc1fr-gap-24">
         {/* Основные настройки */}
-        <Card className="admin-p-24">
+        <MacOSCard className="admin-p-24">
           <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
             <Bot className="admin-w-20-h-20-mr-8-blue" />
             Настройки бота
@@ -324,10 +324,10 @@ const TelegramSettings = () => {
               </Button>
             </div>
           </div>
-        </Card>
+        </MacOSCard>
 
         {/* Настройки уведомлений */}
-        <Card className="admin-p-24">
+        <MacOSCard className="admin-p-24">
           <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
             <Bell className="admin-w-20-h-20-mr-8-success" />
             Уведомления
@@ -408,11 +408,11 @@ const TelegramSettings = () => {
               </div>
             }
           </div>
-        </Card>
+        </MacOSCard>
       </div>
 
       {/* Тестирование */}
-      <Card className="admin-p-24">
+      <MacOSCard className="admin-p-24">
         <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
           <Send className="admin-w-20-h-20-mr-8-purple" />
           Тестирование отправки сообщений
@@ -457,10 +457,10 @@ const TelegramSettings = () => {
             Отправить тест
           </Button>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Инструкция */}
-      <Card className="admin-p-24-bg-info-bg-bd-1solidvar-mac-info-border">
+      <MacOSCard className="admin-p-24-bg-info-bg-bd-1solidvar-mac-info-border">
         <h3 className="admin-lg-med-mb-8-flex-ai-center-info-m-0">
           <MessageSquare className="admin-w-20-h-20-mr-8" />
           Настройка Telegram бота
@@ -472,7 +472,7 @@ const TelegramSettings = () => {
           <p className="admin-m-0">4. Установите webhook для получения сообщений</p>
           <p className="admin-m-0">5. Добавьте ID чатов администраторов для служебных уведомлений</p>
         </div>
-      </Card>
+      </MacOSCard>
     </div>);
 
 };

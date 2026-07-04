@@ -19,7 +19,7 @@ import {
   FileX,
   Loader2 } from
 'lucide-react';
-import { Card, Button, Badge } from '../ui/macos';
+import { MacOSCard, Button, Badge } from '../ui/macos';
 import {
   MacOSStatCard,
   Table,
@@ -219,7 +219,7 @@ const ReportsManager = () => {
   const renderGenerateTab = () =>
   <div className="admin-flex-col-24">
       {/* Форма генерации отчета */}
-      <Card className="admin-card-p-24-bg-card-12">
+      <MacOSCard className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">
           <BarChart3 className="admin-icon-20-mr-10-blue" />
           Генерация отчета
@@ -297,10 +297,10 @@ const ReportsManager = () => {
           }
           </Button>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Быстрые отчеты */}
-      <Card className="admin-card-p-24-bg-card-12">
+      <MacOSCard className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">
           <Clock className="admin-icon-20-mr-10-blue" />
           Быстрые отчеты (сегодня)
@@ -318,11 +318,11 @@ const ReportsManager = () => {
           loading={!quickReports.daily} />
 
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Последние отчеты */}
       {reports.length > 0 &&
-    <Card className="admin-p-24">
+    <MacOSCard className="admin-p-24">
           <h3 className="admin-h4-lg-semi-primary-mb-16">Последние отчеты</h3>
           <Table
         columns={[
@@ -365,14 +365,14 @@ const ReportsManager = () => {
         hoverable={true}
         striped={true} />
 
-        </Card>
+        </MacOSCard>
     }
     </div>;
 
 
   const renderFilesTab = () =>
   <div className="admin-flex-col-24">
-      <Card className="admin-card-p-24-bg-card-12-min-h-400">
+      <MacOSCard className="admin-card-p-24-bg-card-12-min-h-400">
         <div className="admin-flex-between-mb-24">
           <h3 className="admin-h3-18-600-primary-m0-flex">
             <FileSpreadsheet className="admin-icon-22-mr-10-blue" />
@@ -464,14 +464,14 @@ const ReportsManager = () => {
         striped={true} />
 
       }
-      </Card>
+      </MacOSCard>
     </div>;
 
 
   const renderSettingsTab = () =>
   <div className="admin-flex-col-24">
       {/* Автоматические отчеты */}
-      <Card className="admin-card-p-24-bg-card-12">
+      <MacOSCard className="admin-card-p-24-bg-card-12">
         <div className="admin-flex-start-16-mb-24">
           <div className="admin-icon-box-56-gradient-blue">
             <Clock className="admin-icon-32-white" />
@@ -504,10 +504,10 @@ const ReportsManager = () => {
             Настроить уведомления
           </Button>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Хранение и очистка */}
-      <Card className="admin-card-p-24-bg-card-12">
+      <MacOSCard className="admin-card-p-24-bg-card-12">
         <div className="admin-flex-start-16-mb-24">
           <div className="admin-icon-box-56-gradient-green">
             <FileSpreadsheet className="admin-icon-32-white" />
@@ -540,10 +540,10 @@ const ReportsManager = () => {
             Экспорт в облако
           </Button>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Статистика хранения */}
-      <Card className="admin-card-p-24-bg-card-12">
+      <MacOSCard className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">Статистика хранения</h3>
 
         <div className="admin-grid-3col-24">
@@ -574,14 +574,14 @@ const ReportsManager = () => {
             </div>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
     </div>;
 
 
   return (
     <div className="admin-flex-col-24">
       {error ?
-      <Card className="admin-card-p-48-flex-justify-center">
+      <MacOSCard className="admin-card-p-48-flex-justify-center">
           <MacOSEmptyState
           icon={AlertCircle}
           title="Ошибка загрузки данных"
@@ -592,7 +592,7 @@ const ReportsManager = () => {
               Повторить попытку
             </Button>
           </MacOSEmptyState>
-        </Card> :
+        </MacOSCard> :
 
       <>
           <div className="admin-flex-between">

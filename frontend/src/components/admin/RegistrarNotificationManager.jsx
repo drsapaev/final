@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Card, Button, Badge, Input, Select, Textarea,
+  MacOSCard, Button, Badge, Input, Select, Textarea,
 } from '../ui/macos';
 import {
   Bell,
@@ -145,7 +145,7 @@ const RegistrarNotificationManager = () => {
   const renderSendTab = () =>
   <div className="admin-flex-col-24">
       {/* Форма отправки уведомления */}
-      <Card className="admin-p-24">
+      <MacOSCard className="admin-p-24">
         <h3 className="admin-m-0016px0-primary-flex-ai-center-gap-8-lg-med">
           <Send className="admin-icon-20" />
           Отправить уведомление
@@ -223,10 +223,10 @@ const RegistrarNotificationManager = () => {
           {loading ? <RefreshCw className="admin-w-16-h-16-anim-spin1slinearinfinite" /> : <Send className="admin-icon-16" />}
           Отправить уведомление
         </Button>
-      </Card>
+      </MacOSCard>
 
       {/* Быстрые действия */}
-      <Card className="admin-p-24">
+      <MacOSCard className="admin-p-24">
         <h3 className="admin-m-0016px0-primary-flex-ai-center-gap-8-lg-med">
           <Activity className="admin-icon-20" />
           Быстрые действия
@@ -259,12 +259,12 @@ const RegistrarNotificationManager = () => {
             </Button>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
     </div>;
 
 
   const renderRegistrarsTab = () =>
-  <Card className="admin-p-24">
+  <MacOSCard className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-24">
         <h3 className="admin-m-0-primary-flex-ai-center-gap-8-lg-med">
           <Users className="admin-icon-20" />
@@ -325,11 +325,11 @@ const RegistrarNotificationManager = () => {
           Нет активных регистраторов
         </div>
     }
-    </Card>;
+    </MacOSCard>;
 
 
   const renderStatsTab = () =>
-  <Card className="admin-p-24">
+  <MacOSCard className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-24">
         <h3 className="admin-m-0-primary-flex-ai-center-gap-8-lg-med">
           <BarChart3 className="admin-icon-20" />
@@ -402,7 +402,7 @@ const RegistrarNotificationManager = () => {
           </div>
         </div>
     }
-    </Card>;
+    </MacOSCard>;
 
 
   const tabs = [
