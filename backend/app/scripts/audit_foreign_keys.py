@@ -83,7 +83,6 @@ def check_orphaned_records(
 ) -> int:
     """Return the orphaned-row count for one FK relationship."""
     try:
-        query = text(
         query = text(  # nosec B608 — FK audit script with hardcoded table names, no user input
             f"""
             SELECT COUNT(*) as count

@@ -1,0 +1,93 @@
+name: 📦 Sentry Release + Source Maps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/src/**'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - 'frontend/vite.config.js'
+      - '.github/workflows/sentry-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sentry-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sentry-release:
+    name: 📦 Build + upload source maps to Sentry
+    runs-on: ubuntu-latest
+    # Only run if SENTRY_AUTH_TOKEN secret is set (skip otherwise — no-op)
+    if: ${{ vars.ENABLE_SENTRY_RELEASE == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install @sentry/vite-plugin (if not in package.json)
+        run: |
+          cd frontend
+          if ! npm ls @sentry/vite-plugin >/dev/null 2>&1; then
+            echo "Installing @sentry/vite-plugin (dev dependency)..."
+            npm install --save-dev @sentry/vite-plugin@^5.3.0
+          else
+            echo "@sentry/vite-plugin already installed."
+          fi
+
+      - name: Build with Sentry source map upload
+        env:
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENV: production
+          VITE_APP_VERSION: ${{ github.sha }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Create Sentry release
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          # Install sentry CLI
+          curl -sL https://sentry.io/get-cli/ | bash
+
+          # Create a new release
+          VERSION="clinic-frontend@${GITHUB_SHA::7}"
+          sentry-cli releases new "$VERSION" --project "$SENTRY_PROJECT"
+
+          # Finalize the release
+          sentry-cli releases finalize "$VERSION"
+
+          # Set commits for the release (links git commits to Sentry issues)
+          sentry-cli releases set-commits "$VERSION" --auto
+
+          echo "✅ Sentry release $VERSION created and finalized."
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            console.log('Sentry release failed. Check if SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT secrets are set.');
+            console.log('To enable: Settings → Secrets and variables → Actions → add the 3 secrets.');
+            console.log('Then set repository variable ENABLE_SENTRY_RELEASE=true to activate this workflow.');

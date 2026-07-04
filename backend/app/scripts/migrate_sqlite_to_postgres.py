@@ -611,7 +611,6 @@ def migrate_sqlite_to_postgres(
 
                 if not dry_run and plan.primary_keys == ("id",):
                     target_connection.execute(
-                        text(
                         text(  # nosec B608 — one-shot SQLite→PG migration script, hardcoded queries
                             f"""
                             SELECT setval(
