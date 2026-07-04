@@ -196,7 +196,7 @@ const SecuritySettings = ({
   { id: 'password', label: 'Пароль', icon: Lock },
   { id: 'two-factor', label: '2FA', icon: Shield },
   { id: 'sessions', label: 'Сессии', icon: User },
-  { id: 'security', label: 'Безопасность', icon: Key },
+  { id: 'security', label: 'Политики', icon: Key }, // Sprint 5: was 'Безопасность' (tautology inside SecuritySettings)
   { id: 'audit', label: 'Аудит', icon: Clock }];
 
 

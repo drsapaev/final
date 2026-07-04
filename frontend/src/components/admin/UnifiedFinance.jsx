@@ -61,10 +61,10 @@ const UnifiedFinance = ({ renderFinance }) => {
   }, [section]);
 
   const tabs = [
-  { id: 'overview', label: 'Finance Overview', icon: 'DollarSign' },
-  { id: 'billing', label: 'Billing', icon: 'Receipt' },
-  { id: 'pricing', label: 'Dynamic Pricing', icon: 'TrendingUp' },
-  { id: 'discounts', label: 'Discount Benefits', icon: 'Percent' }];
+  { id: 'overview', label: 'Обзор', icon: 'DollarSign' },
+  { id: 'billing', label: 'Счета', icon: 'Receipt' },
+  { id: 'pricing', label: 'Ценообразование', icon: 'TrendingUp' },
+  { id: 'discounts', label: 'Скидки и льготы', icon: 'Percent' }];
 
 
   const renderContent = () => {
