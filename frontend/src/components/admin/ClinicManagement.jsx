@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import {
   Building2,
+  Layers,
   Wrench,
   Key,
   HardDrive,
@@ -30,6 +31,7 @@ import BranchManagement from './BranchManagement';
 import EquipmentManagement from './EquipmentManagement';
 import LicenseManagement from './LicenseManagement';
 import BackupManagement from './BackupManagement';
+import DepartmentManagement from './DepartmentManagement';
 import ClinicSettings from './ClinicSettings';
 
 import logger from '../../utils/logger';
@@ -46,6 +48,7 @@ const ClinicManagement = () => {
   const tabs = [
   { id: 'overview', label: 'Обзор', icon: BarChart3 },
   { id: 'branches', label: 'Филиалы', icon: Building2 },
+  { id: 'departments', label: 'Отделения', icon: Layers },
   { id: 'equipment', label: 'Оборудование', icon: Wrench },
   { id: 'licenses', label: 'Лицензии', icon: Key },
   { id: 'backups', label: 'Резервные копии', icon: HardDrive },
@@ -471,6 +474,7 @@ const ClinicManagement = () => {
         {/* Содержимое вкладок */}
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'branches' && <BranchManagement />}
+        {activeTab === 'departments' && <DepartmentManagement />}
         {activeTab === 'equipment' && <EquipmentManagement />}
         {activeTab === 'licenses' && <LicenseManagement />}
         {activeTab === 'backups' && <BackupManagement />}

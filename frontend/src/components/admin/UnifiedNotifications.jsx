@@ -54,8 +54,7 @@ AdminTabs.propTypes = {
 
 const UnifiedNotifications = () => {
   const [searchParams] = useSearchParams();
-  const section = searchParams.get('section') || 'fcm';void
-  useTheme();
+  const section = searchParams.get('section') || 'fcm';
 
   const getActiveTab = (section) => {
     return section === 'registrar-notifications' ? 'registrar' : 'fcm';

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-04 — Admin panel dead-code cleanup — Step 3 (chore/admin-step3-wire-and-delete)
+- **Wire-in: `UnifiedNotifications` → `/admin/push-notifications`** (new route). Restores 2 admin functions that had live backend endpoints but dead frontend UI:
+  - **FCM push notifications** (`FCMManager.jsx`, 521 lines) — `/fcm/status`, `/fcm/user-tokens`, `/fcm/send-test-notification`, `/fcm/send-notification` endpoints.
+  - **Registrar notifications** (`RegistrarNotificationManager.jsx`, 466 lines) — `/registrar/notifications/registrars`, `/stats`, `/system-alert`, `/daily-summary` endpoints.
+  - New sidebar entry "Push-уведомления" in "Система" section. Email/SMS (`/admin/notifications` → `EmailSMSManager`) stays separate.
+  - Fixed `void useTheme()` codemod bug in `UnifiedNotifications.jsx:57`.
+  - Updated `routeContract.test.js:360` — flipped `UnifiedNotifications` assertion from `false` to `true`, added new route assertions.
+- **Wire-in: `DepartmentManagement` → tab in `ClinicManagement`**. Restores department CRUD admin UI (1 454 lines) that had live backend (`/admin/departments`) but dead frontend. New "Отделения" tab (Layers icon) alongside existing Филиалы/Оборудование/Лицензии/Резервные копии. Replaced 2 dead IconSelector placeholders with plain text Input for icon name.
+- **Delete: `QRTokenManager.jsx` (522 lines) + `__tests__/QRTokenManager.contract.test.jsx`**. QR-token admin generation was not used end-to-end: `api/queue.js` has `qrTokens.*` functions but no live component imports them. If needed later, can be rebuilt via the existing `api/queue.js` API layer.
+- **`StateWrapper.jsx`** — updated JSDoc comment: `UnifiedNotifications` no longer "pending Step 3 decision" (now wired).
+
+Verification:
+- `vite build` → ✓ built in ~25s, exit 0, all chunks emitted (including new `UnifiedNotifications` chunk).
+- `vitest run` → ✓ 515/515 tests pass across 105 test files (was 517/106 — 2 QRTokenManager contract tests removed with the file). Includes updated `routeContract.test.js` (40/40 — `UnifiedNotifications` now asserted as routed).
+- `eslint` on 7 modified files → 0 errors (12 pre-existing prop-types warnings unchanged).
+- `components/admin/` file count: 61 → 60 (-1: QRTokenManager deleted; UnifiedNotifications, FCMManager, RegistrarNotificationManager, DepartmentManagement stay — now wired).
+- 3 admin functions restored: department CRUD, FCM push, registrar notifications.
+
+Context: final step of 3-step admin dead-code cleanup. Step 1 (PR #1827, 9 files, -2 179 LOC) + Step 2 (PR #1829, 6 files, -2 850 LOC) + CSS migration (PR #1828) all merged. This Step 3 PR wires in 4 dead files (restoring 3 functions) and deletes 1 truly-unused file.
+
 ## 2026-07-04 — Admin panel dead-code removal — Step 2 (chore/admin-remove-dead-partial-step2) — PR #1829
 - **frontend/src/components/admin/** — deleted 6 dead-code files (2 850 lines) with partial live replacements. No runtime behavior change (all 6 were already unreachable in production).
   - `SecurityMonitor.jsx` (906) — DEAD, 100% mock data (`mockData = { totalThreats: 23, ... }`). Real threat-monitoring is a backend gap; this file never had real data. Superseded conceptually by `pages/Audit.jsx` (audit log of user actions — different function).

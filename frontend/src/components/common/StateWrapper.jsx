@@ -6,7 +6,7 @@
  * all delegated loading/error/empty handling to their child components, with no
  * fallback — if a child failed or returned no data, the user saw a blank panel.
  * (Note: UnifiedAITools, UnifiedTelegramManagement were removed as dead code in
- * Step 2; UnifiedNotifications remains pending Step 3 decision.)
+ * Step 2; UnifiedNotifications was wired to /admin/push-notifications in Step 3.)
  *
  * Usage:
  *   <StateWrapper
