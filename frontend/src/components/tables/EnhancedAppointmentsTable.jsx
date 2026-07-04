@@ -1060,6 +1060,7 @@ const EnhancedAppointmentsTable = ({
         const config = statusConfig[queueStatus] || statusConfig.unknown;
 
         return (
+          <>
           <span
             style={{
               padding: '4px 8px',
@@ -1076,8 +1077,29 @@ const EnhancedAppointmentsTable = ({
             title={`№${row.queue_number}`}>
 
             {row.queue_number}
-          </span>);
+          </span>
 
+          {/* UX Audit Registrar #8: показываем дополнительные queue numbers
+              если у пациента несколько талонов (multi-service запись).
+              Раньше показывался только первый номер — остальные игнорировались. */}
+          {Array.isArray(row.queue_numbers) && row.queue_numbers.length > 1 && (
+            <span
+              style={{
+                marginLeft: '4px',
+                padding: '2px 6px',
+                backgroundColor: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 85%)',
+                color: 'var(--mac-accent-blue, #007aff)',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: '600',
+              }}
+              title={row.queue_numbers.map((q) => `${q.queue_name || 'Очередь'}: №${q.number}`).join('\n')}
+            >
+              +{row.queue_numbers.length - 1}
+            </span>
+          )}
+          </>
+      );
       }
 
       // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
@@ -1120,6 +1142,7 @@ const EnhancedAppointmentsTable = ({
         const config = statusConfig[queueStatus] || statusConfig.unknown;
 
         return (
+          <>
           <span
             style={{
               padding: '4px 8px',
@@ -1136,8 +1159,27 @@ const EnhancedAppointmentsTable = ({
             title={`${firstQueue.queue_name || 'Очередь'}: №${firstQueue.number}`}>
 
             {firstQueue.number}
-          </span>);
+          </span>
 
+          {/* UX Audit Registrar #8: multi-badge в fallback тоже. */}
+          {row.queue_numbers.length > 1 && (
+            <span
+              style={{
+                marginLeft: '4px',
+                padding: '2px 6px',
+                backgroundColor: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 85%)',
+                color: 'var(--mac-accent-blue, #007aff)',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: '600',
+              }}
+              title={row.queue_numbers.map((q) => `${q.queue_name || 'Очередь'}: №${q.number}`).join('\n')}
+            >
+              +{row.queue_numbers.length - 1}
+            </span>
+          )}
+          </>
+      );
       }
 
       // Если нет номеров очередей, но запись на сегодня - показываем порядковый номер

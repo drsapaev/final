@@ -1669,7 +1669,7 @@ const RegistrarPanel = () => {
               language={language}
               outerBorder={false}
               services={services}
-              showCheckboxes={false} // ✅ Отключаем чекбоксы для регистратуры
+              showCheckboxes={true} // UX Audit Registrar #13: включаем чекбоксы для bulk print
               onRowClick={(row) => {
                 logger.info('Открыть детали записи:', row);
                 // Здесь можно открыть модальное окно с деталями записи
