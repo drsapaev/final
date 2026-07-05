@@ -1,21 +1,19 @@
 import { useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { colors } from '../theme/tokens';
 import PropTypes from 'prop-types';
 
 const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
-  const { isDark, toggleTheme, getSpacing } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const [isHovered, setIsHovered] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
 
   const sizes = {
-    sm: { size: 16, padding: getSpacing('xs') },
-    md: { size: 20, padding: getSpacing('sm') },
-    lg: { size: 24, padding: getSpacing('md') }
+    sm: { iconSize: 16, padding: 'var(--mac-spacing-1)' },
+    md: { iconSize: 20, padding: 'var(--mac-spacing-2)' },
+    lg: { iconSize: 24, padding: 'var(--mac-spacing-3)' }
   };
 
-  const { size: iconSize, padding } = sizes[size] || sizes.md;
+  const { iconSize, padding } = sizes[size] || sizes.md;
 
   const buttonStyle = {
     display: 'inline-flex',
@@ -23,11 +21,9 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
     justifyContent: 'center',
     padding,
     borderRadius: '50%',
-    border: `1px solid ${isDark ? colors.border.medium : colors.border.light}`,
-    background: isDark ?
-    colors.semantic.surface.card :
-    colors.semantic.surface.card,
-    color: isDark ? colors.semantic.text.primary : colors.semantic.text.primary,
+    border: '1px solid var(--mac-border)',
+    background: 'var(--mac-bg-primary)',
+    color: 'var(--mac-text-primary)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     backdropFilter: 'blur(10px)',
@@ -36,14 +32,14 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
 
   const hoverStyle = {
     transform: 'scale(1.05)',
-    background: isDark ?
-    colors.semantic.surface.hover :
-    colors.semantic.surface.hover,
-    boxShadow: isDark ?
-    `0 4px 20px ${colors.semantic.surface.overlay}` :
-    `0 4px 20px ${colors.semantic.surface.overlay}`
+    background: 'var(--mac-bg-secondary)',
+    boxShadow: 'var(--mac-shadow-md)',
   };
-  const activeStyle = isHovered || isFocused ? { ...buttonStyle, ...hoverStyle } : buttonStyle;
+
+  const activeStyle = {
+    ...buttonStyle,
+    ...(isHovered ? hoverStyle : {})
+  };
 
   return (
     <button
@@ -52,22 +48,17 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
       style={activeStyle}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onFocus={() => setIsFocused(true)}
-      onBlur={() => setIsFocused(false)}
       title={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}
       aria-label={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}>
-      
       {isDark ? <Sun size={iconSize} /> : <Moon size={iconSize} />}
-    </button>);
-
+    </button>
+  );
 };
 
-
 ThemeToggle.propTypes = {
-  ...(ThemeToggle.propTypes || {}),
-  className: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
+  className: PropTypes.string,
+  size: PropTypes.oneOf(['sm', 'md', 'lg']),
+  style: PropTypes.object,
 };
 
 export default ThemeToggle;
