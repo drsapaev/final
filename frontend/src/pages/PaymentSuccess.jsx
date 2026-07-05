@@ -97,7 +97,7 @@ const spinnerStyle = {
   width: '48px',
   height: '48px',
   borderRadius: '50%',
-  border: '4px solid rgba(52, 199, 89, 0.18)',
+  border: '4px solid var(--mac-success-bg)',
   borderTopColor: 'var(--mac-success)',
   animation: 'payment-success-spin 0.9s linear infinite',
   margin: '0 auto 16px',
@@ -353,8 +353,8 @@ const PaymentSuccess = () => {
               style={{
                 ...statusIconWrapStyle,
                 color: 'var(--mac-success)',
-                background: 'rgba(52, 199, 89, 0.12)',
-                border: '1px solid rgba(52, 199, 89, 0.28)',
+                background: 'var(--mac-success-bg)',
+                border: '1px solid var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 72%))',
               }}
               aria-hidden="true"
             >
@@ -373,8 +373,8 @@ const PaymentSuccess = () => {
               style={{
                 ...statusIconWrapStyle,
                 color: 'var(--mac-warning)',
-                background: 'rgba(255, 149, 0, 0.12)',
-                border: '1px solid rgba(255, 149, 0, 0.28)',
+                background: 'var(--mac-warning-bg)',
+                border: '1px solid var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 72%))',
               }}
               aria-hidden="true"
             >

@@ -2406,7 +2406,7 @@ const miniAppGridStyle = {
 
 const miniAppSelectedSectionStyle = {
   marginBottom: '12px',
-  borderColor: 'rgba(23, 92, 211, 0.28)',
+  borderColor: 'var(--mac-accent-border)',
 };
 
 const miniAppSelectedSectionContentStyle = {
@@ -2435,12 +2435,12 @@ const miniAppSelectedSectionStatusStyle = {
 
 const miniAppAppointmentPreviewStyle = {
   marginBottom: '12px',
-  borderColor: 'rgba(52, 199, 89, 0.26)',
+  borderColor: 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 74%))',
 };
 
 const miniAppOnboardingBlockedStyle = {
   marginBottom: '12px',
-  borderColor: 'rgba(255, 149, 0, 0.28)',
+  borderColor: 'var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 72%))',
 };
 
 const miniAppAppointmentPreviewContentStyle = {
@@ -2480,9 +2480,9 @@ const miniAppAppointmentPreviewResultStyle = {
   alignItems: 'center',
   gap: '12px',
   padding: '12px',
-  border: '1px solid rgba(52, 199, 89, 0.24)',
+  border: '1px solid var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 76%))',
   borderRadius: '8px',
-  background: 'rgba(52, 199, 89, 0.08)',
+  background: 'var(--mac-success-bg)',
   fontSize: '13px',
   color: 'var(--mac-text-primary, #111827)',
 };
@@ -2569,7 +2569,7 @@ const miniAppCapabilityStyle = {
 };
 
 const miniAppCapabilitySelectedStyle = {
-  outline: '2px solid rgba(23, 92, 211, 0.18)',
+  outline: '2px solid var(--mac-accent-border)',
   outlineOffset: '-2px',
 };
 
