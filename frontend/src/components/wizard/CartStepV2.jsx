@@ -399,6 +399,39 @@ const CartStepV2 = ({
           </div>
         }
 
+        {/* UX Audit Registrar #10: Группировка корзины по специалистам.
+            Показывает сколько визитов будет создано, когда услуги у разных врачей.
+            Раньше был плоский список без визуальной группировки. */}
+        {cart?.items?.length > 0 && (() => {
+          const doctorGroups = new Map();
+          cart.items.forEach((item) => {
+            const docId = item.doctor_id || 'no_doctor';
+            const docName = item.doctor_name || (item.doctor_id ? `Врач #${item.doctor_id}` : 'Без врача');
+            if (!doctorGroups.has(docId)) {
+              doctorGroups.set(docId, { id: docId, name: docName, items: [] });
+            }
+            doctorGroups.get(docId).items.push(item);
+          });
+          const groupCount = doctorGroups.size;
+          if (groupCount > 1) {
+            return (
+              <div style={{
+                marginBottom: '8px',
+                padding: '6px 10px',
+                background: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 88%)',
+                border: '1px solid color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 75%)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--mac-accent-blue, #007aff)',
+              }}>
+                Будет создано визитов: {groupCount} · Услуг: {cart.items.length}
+              </div>
+            );
+          }
+          return null;
+        })()}
+
         {/* Горизонтальный скролл корзины */}
         {cart?.items?.length > 0 ?
         <div style={{

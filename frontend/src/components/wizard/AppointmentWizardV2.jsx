@@ -145,8 +145,9 @@ const AppointmentWizardV2 = ({
   const [patientSuggestions, setPatientSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const [isSearchingPatients, setIsSearchingPatients] = useState(false); // UX Audit Registrar #11
   const [phoneCheckTimeout, setPhoneCheckTimeout] = useState(null); // ✅ Timeout для проверки телефона
-  const [, setPhoneError] = useState(null); // ✅ Ошибка уникальности телефона
+  const [phoneError, setPhoneError] = useState(null); // ✅ Ошибка уникальности телефона
   const [servicesData, setServicesData] = useState([]);
   const [doctorsData, setDoctorsData] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
@@ -445,6 +446,9 @@ const AppointmentWizardV2 = ({
       return;
     }
 
+    // UX Audit Registrar #11: loading indicator во время поиска.
+    setIsSearchingPatients(true);
+
     try {
       // UX Audit Stage 3 (Wizard issue 5.1):
       // Заменён raw fetch() на searchPatientsApi() из api/patients.
@@ -495,6 +499,8 @@ const AppointmentWizardV2 = ({
       setShowSuggestions(true);
     } catch (error) {
       logger.error('Ошибка поиска пациентов:', error);
+    } finally {
+      setIsSearchingPatients(false);
     }
   }, []);
 
@@ -2828,6 +2834,7 @@ const AppointmentWizardV2 = ({
               errors={errors}
               suggestions={patientSuggestions}
               showSuggestions={showSuggestions}
+              isSearching={isSearchingPatients}
               onSearch={handlePatientSearch}
               onSelectPatient={selectPatient}
               onUpdate={(field, value) =>
@@ -2848,8 +2855,7 @@ const AppointmentWizardV2 = ({
                 cart: { ...prev.cart, [field]: value }
               }))
               }
-              phoneError={errors.phone} />
-
+              phoneError={phoneError} />
             }
 
             {currentStep === STEP_CART &&
