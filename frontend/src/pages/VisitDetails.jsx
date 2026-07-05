@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 
 import { getVisit, rescheduleVisit } from '../api';
 import RescheduleDialog from '../components/RescheduleDialog';
+import { Button, MacOSCard, Badge } from '../components/ui/macos';
+import MacOSEmptyState from '../components/ui/macos/MacOSEmptyState';
 
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
@@ -39,9 +41,30 @@ function resolveDoctorName(visit) {
 function resolveVisitSchedule(visit) {
   return visit?.scheduled_at || visit?.planned_date || visit?.visit_date || null;
 }
+
+function resolveStatusLabel(status) {
+  const labels = {
+    pending: 'Ожидает',
+    confirmed: 'Подтверждена',
+    paid: 'Оплачена',
+    in_visit: 'На приёме',
+    completed: 'Завершена',
+    cancelled: 'Отменена',
+    no_show: 'Неявка',
+  };
+  return labels[status] || status || '—';
+}
+
+function resolveStatusVariant(status) {
+  if (status === 'completed' || status === 'paid') return 'success';
+  if (status === 'cancelled' || status === 'no_show') return 'error';
+  if (status === 'in_visit' || status === 'confirmed') return 'warning';
+  return 'default';
+}
+
 /**
- * VisitDetails page
- * - Shows visit information
+ * VisitDetails page — macOS native redesign
+ * - Shows visit information in MacOSCard layout
  * - Allows opening RescheduleDialog
  * - Quick actions: reschedule to tomorrow (one-click)
  *
@@ -78,7 +101,6 @@ function VisitDetails() {
   }, [id]);
 
   const handleRescheduled = (updated) => {
-    // updated may include new fields from backend
     setVisit((prev) => ({ ...(prev || {}), ...(updated || {}) }));
   };
 
@@ -104,92 +126,141 @@ function VisitDetails() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div>Загрузка приёма...</div>
-      </div>);
-
+      <div style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
+          Загрузка приёма...
+        </div>
+      </div>
+    );
   }
 
   if (!visit) {
     return (
-      <div className="p-6">
-        <div className="text-red-600 mb-4">{error || 'Приём не найден.'}</div>
-        <Link to="/" className="text-blue-600 underline">Вернуться на главную</Link>
-      </div>);
-
+      <div style={{ padding: 'var(--mac-spacing-6)' }}>
+        <MacOSEmptyState
+          icon="alert.circle"
+          title="Приём не найден"
+          description={error || 'Запись не найдена или была удалена.'}
+          action={
+            <Link to="/">
+              <Button variant="outline" size="small">Вернуться на главную</Button>
+            </Link>
+          }
+        />
+      </div>
+    );
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Детали приёма #{visit.id}</h1>
-        <div className="space-x-2">
-          <button
-            onClick={() => setDialogOpen(true)}
-            className="px-3 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
-            
+    <div style={{ padding: 'var(--mac-spacing-6)', maxWidth: '48rem', margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ marginBottom: 'var(--mac-spacing-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)', margin: 0 }}>
+          Детали приёма #{visit.id}
+        </h1>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => setDialogOpen(true)}>
             Перенести
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            size="small"
             onClick={rescheduleTomorrow}
-            className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
             disabled={loading}>
-            
             На завтра
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="bg-white shadow rounded p-4 mb-4">
-        <div className="grid grid-cols-2 gap-4">
+      {/* Visit info card */}
+      <MacOSCard style={{ padding: 'var(--mac-spacing-5)', marginBottom: 'var(--mac-spacing-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--mac-spacing-4)' }}>
           <div>
-            <div className="text-sm text-gray-500">Пациент</div>
-            <div className="font-medium">{resolvePatientName(visit)}</div>
+            <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>
+              Пациент
+            </div>
+            <div style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+              {resolvePatientName(visit)}
+            </div>
           </div>
           <div>
-            <div className="text-sm text-gray-500">Статус</div>
-            <div className="font-medium">{visit.status || '—'}</div>
+            <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>
+              Статус
+            </div>
+            <Badge variant={resolveStatusVariant(visit.status)}>
+              {resolveStatusLabel(visit.status)}
+            </Badge>
           </div>
           <div>
-            <div className="text-sm text-gray-500">Запланировано</div>
-            <div className="font-medium">{resolveVisitSchedule(visit) ? new Date(resolveVisitSchedule(visit)).toLocaleString() : '—'}</div>
+            <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>
+              Запланировано
+            </div>
+            <div style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+              {resolveVisitSchedule(visit) ? new Date(resolveVisitSchedule(visit)).toLocaleString() : '—'}
+            </div>
           </div>
           <div>
-            <div className="text-sm text-gray-500">Врач / кабинет</div>
-            <div className="font-medium">{resolveDoctorName(visit)}</div>
+            <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>
+              Врач / кабинет
+            </div>
+            <div style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+              {resolveDoctorName(visit)}
+            </div>
           </div>
         </div>
 
-        {visit.notes &&
-        <div className="mt-4">
-            <div className="text-sm text-gray-500">Примечание</div>
-            <div className="mt-1">{visit.notes}</div>
+        {visit.notes && (
+          <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
+            <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>
+              Примечание
+            </div>
+            <div style={{ color: 'var(--mac-text-primary)' }}>
+              {visit.notes}
+            </div>
           </div>
-        }
-      </div>
+        )}
 
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={() => navigate(-1)}
-          className="px-3 py-2 border rounded bg-white hover:bg-gray-50">
-          
+        {visit.services && visit.services.length > 0 && (
+          <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
+            <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>
+              Услуги
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--mac-spacing-2)' }}>
+              {visit.services.map((service, idx) => (
+                <Badge key={idx} variant="default">
+                  {service.name || service.service_name || `Услуга #${service.id || idx}`}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </MacOSCard>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
+        <Button
+          variant="outline"
+          size="small"
+          onClick={() => navigate(-1)}>
           Назад
-        </button>
-        <Link to={clinicalAppointmentsPath} className="px-3 py-2 border rounded bg-white hover:bg-gray-50">Список приёмов</Link>
+        </Button>
+        <Link to={clinicalAppointmentsPath}>
+          <Button variant="outline" size="small">
+            Список приёмов
+          </Button>
+        </Link>
       </div>
 
       <RescheduleDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         visit={visit}
-        onRescheduled={(u) => {handleRescheduled(u);setDialogOpen(false);}} />
-      
-    </div>);
-
+        onRescheduled={(u) => { handleRescheduled(u); setDialogOpen(false); }} />
+    </div>
+  );
 }
 
-VisitDetails.propTypes = {
-
-  // routed component — no props expected
-};
 export default VisitDetails;
