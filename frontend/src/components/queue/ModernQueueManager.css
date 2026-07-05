@@ -403,3 +403,83 @@
 [data-theme="dark"] .mqm-qr-svg {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
+
+/* ============================================================
+ * UX Audit Registrar #3: inline-стили → CSS-классы
+ * ============================================================ */
+
+/* Select full-width */
+.mqm-select-full {
+    width: 100%;
+}
+
+/* Icon color = primary text */
+.mqm-icon-primary {
+    color: var(--mac-text-primary);
+}
+
+/* Inline label container (icon + text) */
+.mqm-inline-label {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-2);
+}
+
+/* Settings icon container in modal header */
+.mqm-modal-header-icon {
+    color: var(--mac-text-primary);
+}
+
+/* Auto-refresh toggle icon color states */
+.mqm-auto-refresh-icon-on {
+    color: var(--mac-success);
+}
+
+.mqm-auto-refresh-icon-off {
+    color: var(--mac-text-tertiary);
+}
+
+/* Icon margin for inline icons */
+.mqm-icon-margin-right-1 {
+    margin-right: var(--mac-spacing-1);
+    vertical-align: text-bottom;
+}
+
+.mqm-icon-margin-right-2 {
+    margin-right: var(--mac-spacing-2);
+}
+
+.mqm-icon-margin-right-6px {
+    margin-right: 6px;
+}
+
+/* Card content padding */
+.mqm-card-content-padded {
+    padding: var(--mac-spacing-5);
+}
+
+/* QR dialog action button container */
+.mqm-qr-actions {
+    display: flex;
+    gap: var(--mac-spacing-2);
+    margin-top: var(--mac-spacing-4);
+}
+
+/* QR dialog action button */
+.mqm-qr-action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--mac-spacing-1);
+}
+
+/* Auto-refresh toggle button (icon-only) */
+.mqm-auto-refresh-toggle {
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
