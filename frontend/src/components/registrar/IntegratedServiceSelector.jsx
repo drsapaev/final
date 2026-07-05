@@ -1,4 +1,3 @@
-import { api } from '../../api/client';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Heart,
@@ -14,8 +13,11 @@ import {
   AlertCircle } from
 'lucide-react';
 import { Card } from '../ui/macos';
-import { getApiOrigin } from '../../api/runtime';
-import { tokenManager } from '../../utils/tokenManager';
+// UX Audit Registrar #1: миграция raw fetch() → централизованный api-клиент.
+// Раньше здесь был 1 raw fetch() к /registrar/services с ручным
+// Authorization-хедером и токеном.
+// Теперь auth/CSRF/refresh обрабатываются axios-interceptor'ом в api/client.js.
+import { fetchRegistrarServices } from '../../api/registrar';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 /**
@@ -118,61 +120,50 @@ const IntegratedServiceSelector = ({
       setCategories(DEMO_CATEGORIES);
       setLoading(false);
 
-      // Проверяем наличие токена
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        logger.warn('Токен не найден, используем демо-данные');
-        return;
-      }
-
       // Пытаемся загрузить с API, но не заменяем fallback данные если API пустой
       try {
-        const params = new URLSearchParams();
-        // Исключаем фильтрацию по specialty, чтобы не терять группы
-        const API_BASE = getApiOrigin();
-        const response = await fetch(`registrar/services?${params}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+        // UX Audit Registrar #1: raw fetch() с ручным токеном и Content-Type
+        // заменён на fetchRegistrarServices() из api/registrar.
+        // Auth-token добавляется автоматически axios-interceptor'ом.
+        const data = await fetchRegistrarServices();
+        logger.log('IntegratedServiceSelector: API response:', data);
+
+        // Проверяем структуру ответа более детально
+        if (data.services_by_group) {
+          const groupKeys = Object.keys(data.services_by_group);
+          logger.log('IntegratedServiceSelector: Groups in API response:', groupKeys);
+
+          // Проверяем, есть ли реальные услуги в группах
+          let hasServices = false;
+          for (const group of groupKeys) {
+            const groupServices = data.services_by_group[group];
+            if (Array.isArray(groupServices) && groupServices.length > 0) {
+              hasServices = true;
+              logger.log(`IntegratedServiceSelector: Group ${group} has ${groupServices.length} services`);
+            }
           }
-        });
 
-        if (response.ok) {
-          const data = await response.json();
-          logger.log('IntegratedServiceSelector: API response:', data);
-
-          // Проверяем структуру ответа более детально
-          if (data.services_by_group) {
-            const groupKeys = Object.keys(data.services_by_group);
-            logger.log('IntegratedServiceSelector: Groups in API response:', groupKeys);
-
-            // Проверяем, есть ли реальные услуги в группах
-            let hasServices = false;
-            for (const group of groupKeys) {
-              const groupServices = data.services_by_group[group];
-              if (Array.isArray(groupServices) && groupServices.length > 0) {
-                hasServices = true;
-                logger.log(`IntegratedServiceSelector: Group ${group} has ${groupServices.length} services`);
-              }
-            }
-
-            if (hasServices) {
-              setServices(data.services_by_group);
-              setCategories(data.categories || DEMO_CATEGORIES);
-              logger.log('IntegratedServiceSelector: Loaded data from API with services');
-            } else {
-              logger.log('IntegratedServiceSelector: API groups are empty, keeping fallback');
-              // Не перезаписываем fallback пустыми данными
-            }
+          if (hasServices) {
+            setServices(data.services_by_group);
+            setCategories(data.categories || DEMO_CATEGORIES);
+            logger.log('IntegratedServiceSelector: Loaded data from API with services');
           } else {
-            logger.log('IntegratedServiceSelector: No services_by_group in API response, keeping fallback');
+            logger.log('IntegratedServiceSelector: API groups are empty, keeping fallback');
+            // Не перезаписываем fallback пустыми данными
           }
-          setRetryCount(0);
         } else {
-          logger.warn('IntegratedServiceSelector: API request failed, keeping fallback data');
+          logger.log('IntegratedServiceSelector: No services_by_group in API response, keeping fallback');
         }
+        setRetryCount(0);
       } catch (apiError) {
-        logger.warn('IntegratedServiceSelector: API error, keeping fallback data:', apiError);
+        // 401/403 — пользователь не авторизован, axios-interceptor сам решит,
+        // что делать (показать login или refresh-token). Здесь просто лог.
+        const status = apiError?.response?.status;
+        if (status === 401 || status === 403) {
+          logger.warn('IntegratedServiceSelector: not authenticated, keeping fallback data');
+        } else {
+          logger.warn('IntegratedServiceSelector: API error, keeping fallback data:', apiError);
+        }
       }
     } catch (err) {
       logger.error('IntegratedServiceSelector: Critical error:', err);

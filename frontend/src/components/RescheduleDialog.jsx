@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { rescheduleVisit, rescheduleTomorrow } from '../api/visits';
 import PropTypes from 'prop-types';
-import { Input } from 'ui/macos';
+import { Input } from './ui/macos';
 
 /**
  * Диалог переноса визита.

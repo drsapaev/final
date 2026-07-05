@@ -2,7 +2,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   Select, Button,
-} from 'ui/macos';
+} from './ui/macos';
 
 /**
  * Тестовый компонент для проверки работы селектора языка

@@ -4,7 +4,10 @@ import {
   Alert,
   Paper,
 } from '../ui/macos';
-import { Divider } from '../ui/macos';
+// UX Audit Registrar #1: P6 codemod в PR #1898 случайно заменил
+// `from '../ui/macos/List'` на `from '../ui/macos'`. Но `Divider`
+// экспортируется только из ./List, не из barrel-export. Возвращаем прямой путь.
+import { Divider } from '../ui/macos/List';
 import {
   Hospital,
   Info,

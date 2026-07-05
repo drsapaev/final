@@ -1,4 +1,3 @@
-import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
 import {
   Heart,
@@ -13,7 +12,14 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { Card, Badge } from '../ui/macos';
-import { tokenManager } from '../../utils/tokenManager';
+// UX Audit Registrar #1: миграция raw fetch() → централизованный api-клиент.
+// Раньше здесь было 2 raw fetch() к /registrar/doctors и /registrar/queue-settings
+// с ручным формированием Authorization-хедера и токена.
+// Теперь auth/CSRF/refresh обрабатываются axios-interceptor'ом в api/client.js.
+import {
+  fetchRegistrarDoctors,
+  fetchRegistrarQueueSettings,
+} from '../../api/registrar';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 /**
@@ -62,27 +68,20 @@ const IntegratedDoctorSelector = ({
       setLoading(true);
       setError('');
 
-      // Загружаем врачей и настройки очередей
-      const token = tokenManager.getAccessToken();
-      const [doctorsRes, queueRes] = await Promise.all([
-        fetch('/api/v1/registrar/doctors', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/v1/registrar/queue-settings', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+      // UX Audit Registrar #1: raw fetch() с ручным Authorization-хедером
+      // заменён на Promise.all двух вызовов через api/registrar.
+      // Auth-token добавляется автоматически axios-interceptor'ом.
+      const [doctorsData, queueData] = await Promise.all([
+        fetchRegistrarDoctors(),
+        fetchRegistrarQueueSettings(),
       ]);
 
-      if (doctorsRes.ok) {
-        const doctorsData = await doctorsRes.json();
+      if (doctorsData?.doctors) {
         setDoctors(doctorsData.doctors);
       }
-
-      if (queueRes.ok) {
-        const queueData = await queueRes.json();
+      if (queueData) {
         setQueueSettings(queueData);
       }
-
     } catch (err) {
       logger.error('Ошибка загрузки данных врачей:', err);
       setError('Ошибка загрузки данных врачей');

@@ -25,12 +25,15 @@
  */
 import { useCallback } from 'react';
 import { api } from '../../api/client';
+// UX Audit Registrar #1: getPatient() — централизованный доступ к /patients/{id}.
+// Раньше здесь был raw fetch() с ручным Authorization-хедером.
+import { getPatient } from '../../api/patients';
 import logger from '../../utils/logger';
+// tokenManager всё ещё используется в loadIntegratedData для diagnostic-лога.
 import tokenManager from '../../utils/tokenManager';
 import notify from '../../services/notify';
 import { formatNetworkErrorMessage, isNetworkFetchError } from '../../utils/networkErrorMessages';
 import {
-  API_BASE,
   hasBackendPatientDisplayContract,
   hasBackendPatientGenderContract,
   normalizePatientGender,
@@ -157,19 +160,22 @@ export const useRegistrarData = ({
       // Возвращаем null для демо-пациентов, так как их данные уже есть в записи
       return null;
     }
-    const token = tokenManager.getAccessToken();
-    if (!token) return null;
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        return await response.json();
-      }
+      // UX Audit Registrar #1: raw fetch() с ручным Authorization-хедером
+      // заменён на getPatient() из api/patients.
+      // Auth-token добавляется автоматически axios-interceptor'ом в api/client.js.
+      // 401/403 обрабатываются интерсептором (redirect to login или refresh).
+      return await getPatient(patientId);
     } catch (error) {
+      const status = error?.response?.status;
       const rawMessage = error?.message || '';
+
+      // 404 — пациент не найден. Не логируем как ошибку, просто возвращаем null.
+      if (status === 404) {
+        return null;
+      }
+
       if (isNetworkFetchError(rawMessage)) {
         logger.warn('[Registrar] Не удалось загрузить пациента из URL: backend недоступен', {
           patientId,
