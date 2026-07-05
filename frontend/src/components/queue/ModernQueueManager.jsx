@@ -452,8 +452,7 @@ const ModernQueueManager = ({
                     label: opt.label
                   }))
                 ]}
-                className="mqm-select"
-                style={{ width: '100%' }}></Select>
+                className="mqm-select mqm-select-full"></Select>
             </div>
 
             <div className="mqm-actions">
@@ -477,7 +476,7 @@ const ModernQueueManager = ({
                 className="mqm-button-icon"
                 title="Генерировать общий QR код для всех специалистов клиники">
 
-                <Building2 size={16} style={{ color: 'var(--mac-text-primary)' }} aria-hidden="true" />
+                <Building2 size={16} className="mqm-icon-primary" aria-hidden="true" />
                 {t.clinicQr}
               </Button>
             </div>
@@ -522,7 +521,7 @@ const ModernQueueManager = ({
               </Button>
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+            <div className="mqm-inline-label">
               <Button
                 variant="outline"
                 size="default"
@@ -530,7 +529,7 @@ const ModernQueueManager = ({
                 disabled={!effectiveDoctor || loading}
                 className="mqm-button-icon">
 
-                <Settings size={16} style={{ color: 'var(--mac-text-primary)' }} aria-hidden="true" />
+                <Settings size={16} className="mqm-icon-primary" aria-hidden="true" />
                 {t.refreshQueue}
               </Button>
 
@@ -547,14 +546,7 @@ const ModernQueueManager = ({
 
               <button
                 type="button"
-                style={{
-                  cursor: 'pointer',
-                  border: 'none',
-                  background: 'transparent',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
+                className="mqm-auto-refresh-toggle"
                 onClick={() => setAutoRefresh(!autoRefresh)}
                 aria-label={autoRefresh ? 'Отключить автообновление очереди' : 'Включить автообновление очереди'}
                 title={autoRefresh ? 'Автообновление включено' : 'Автообновление выключено'}>
@@ -562,7 +554,7 @@ const ModernQueueManager = ({
                 <RefreshCw
                   size={20}
                   aria-hidden="true"
-                  style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
+                  className={autoRefresh ? 'mqm-auto-refresh-icon-on' : 'mqm-auto-refresh-icon-off'} />
 
               </button>
 
@@ -618,7 +610,7 @@ const ModernQueueManager = ({
 
       {/* Текущая очередь */}
       <div className="mqm-card">
-        <CardContent style={{ padding: 'var(--mac-spacing-5)' }}>
+        <CardContent className="mqm-card-content-padded">
           <div className="mqm-queue-header">
             <h3 className="mqm-title">
               {t.currentQueue}
@@ -657,12 +649,12 @@ const ModernQueueManager = ({
           <div className="mqm-qr-badge-container">
             {qrData?.is_clinic_wide ?
             <Badge variant="primary" className="mqm-qr-badge">
-                <Building2 size={14} style={{ marginRight: '6px' }} aria-hidden="true" />
+                <Building2 size={14} className="mqm-icon-margin-right-6px" aria-hidden="true" />
                 Общий QR код клиники
               </Badge> :
 
             <Badge variant="success" className="mqm-qr-badge">
-                <User size={14} style={{ marginRight: '6px' }} aria-hidden="true" />
+                <User size={14} className="mqm-icon-margin-right-6px" aria-hidden="true" />
                 QR код специалиста
               </Badge>
             }
@@ -726,7 +718,7 @@ const ModernQueueManager = ({
               Отсканируйте камеру телефона для записи в очередь
             </p>
             <p className="mqm-qr-expiry">
-              <Clock size={14} style={{ marginRight: 'var(--mac-spacing-1)', verticalAlign: 'text-bottom' }} aria-hidden="true" />
+              <Clock size={14} className="mqm-icon-margin-right-1" aria-hidden="true" />
               Действует до: {qrData?.expires_at ? new Date(qrData.expires_at).toLocaleString('ru-RU', {
                 day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
               }) : '—'}
@@ -740,7 +732,7 @@ const ModernQueueManager = ({
               onClick={downloadQR}
               className="mqm-qr-action-btn">
 
-              <ArrowDownCircle size={14} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />
+              <ArrowDownCircle size={14} className="mqm-icon-margin-right-2" aria-hidden="true" />
               {t.download}
             </Button>
             <Button
