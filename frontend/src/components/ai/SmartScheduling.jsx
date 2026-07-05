@@ -1378,7 +1378,7 @@ const SmartScheduling = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: '12px 20px',
+                  padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
@@ -1419,7 +1419,7 @@ const SmartScheduling = () => {
                   right: '0',
                   height: '3px',
                   backgroundColor: 'var(--mac-accent)',
-                  borderRadius: '2px 2px 0 0'
+                  borderRadius: 'var(--mac-radius-sm) var(--mac-radius-sm) 0 0'
                 }} />
                 }
               </button>);

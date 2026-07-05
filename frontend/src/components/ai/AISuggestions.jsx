@@ -89,7 +89,7 @@ const AISuggestions = ({
 
         <div style={{ maxHeight, overflow: 'auto' }}>
             {suggestions.map((item, index) =>
-          <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--mac-border)' }}>
+          <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--mac-spacing-3) 0', borderBottom: '1px solid var(--mac-border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Hospital style={{ color: 'var(--mac-accent-blue)' }} />
                   <div>
