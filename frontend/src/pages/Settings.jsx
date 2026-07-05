@@ -204,9 +204,9 @@ export default function Settings() {void
     return (
       <span style={{
         padding: '2px 8px', borderRadius: 999,
-        background: licenseOk ? '#ecfdf5' : '#fef2f2',
-        color: licenseOk ? '#065f46' : '#7f1d1d',
-        border: `1px solid ${licenseOk ? '#a7f3d0' : '#fecaca'}`,
+        background: licenseOk ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
+        color: licenseOk ? 'var(--mac-success)' : 'var(--mac-error)',
+        border: `1px solid ${licenseOk ? 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 70%))' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
         fontSize: 12,
         whiteSpace: 'nowrap'
       }}>{st}</span>);
@@ -466,7 +466,7 @@ function ProviderCard({ provider, onEdit, onDelete }) {
             onClick={onDelete}
             style={{
               padding: '4px 8px',
-              background: '#dc3545',
+              background: 'var(--mac-error)',
               color: 'white',
               border: 'none',
               borderRadius: 4,
@@ -515,7 +515,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
+      background: 'color-mix(in srgb, black, transparent 50%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -749,7 +749,7 @@ const btnPrimary = {
 
 const errBox = {
   color: 'var(--danger-color)',
-  background: 'rgba(239, 68, 68, 0.1)',
+  background: 'var(--mac-error-bg)',
   border: '1px solid var(--danger-color)',
   borderRadius: 8,
   padding: 8

@@ -479,7 +479,7 @@ export default function AnalyticsPage() {
       label: 'Доходы сегодня',
       value: today?.revenue?.total_revenue || 0,
       helper: 'Касса',
-      accent: '#059669',
+      accent: 'var(--mac-success)',
       format: 'revenue',
       icon: <DollarSign size={18} />
     },
@@ -487,14 +487,14 @@ export default function AnalyticsPage() {
       label: 'Пациенты за период',
       value: month?.patients?.total_patients || 0,
       helper: 'База',
-      accent: '#7c3aed',
+      accent: 'var(--mac-accent-purple)',
       icon: <Users size={18} />
     },
     {
       label: 'Конверсия завершения',
       value: month?.visits?.completion_rate || 0,
       helper: 'Эффективность',
-      accent: '#ea580c',
+      accent: 'var(--mac-warning)',
       format: 'percentage',
       icon: <TrendingUp size={18} />
     }];
@@ -528,7 +528,7 @@ export default function AnalyticsPage() {
             subtitle="Сразу видно, какие отделения тянут выручку."
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={departmentRevenue} format="revenue" accent="#059669" />
+            <AnalyticsComparisonList items={departmentRevenue} format="revenue" accent="var(--mac-success)" />
           </AnalyticsSectionCard>
         </div>
       </div>);
@@ -558,21 +558,21 @@ export default function AnalyticsPage() {
       label: 'Оплачено',
       value: summary.paid_appointments || 0,
       helper: 'Оплата',
-      accent: '#059669',
+      accent: 'var(--mac-success)',
       icon: <DollarSign size={18} />
     },
     {
       label: 'Завершено',
       value: summary.completed_appointments || 0,
       helper: 'Финал',
-      accent: '#7c3aed',
+      accent: 'var(--mac-accent-purple)',
       icon: <Activity size={18} />
     },
     {
       label: 'Общая конверсия',
       value: conversion_rates.overall_conversion || 0,
       helper: 'Воронка',
-      accent: '#ea580c',
+      accent: 'var(--mac-warning)',
       format: 'percentage',
       icon: <TrendingUp size={18} />
     }];
@@ -607,7 +607,7 @@ export default function AnalyticsPage() {
             subtitle="Где путь пациента сужается сильнее всего."
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={funnel} format="percentage" accent="#ea580c" />
+            <AnalyticsComparisonList items={funnel} format="percentage" accent="var(--mac-warning)" />
           </AnalyticsSectionCard>
         </div>
       </div>);
@@ -632,7 +632,7 @@ export default function AnalyticsPage() {
       label: 'Общий доход',
       value: total_revenue,
       helper: 'Сумма',
-      accent: '#059669',
+      accent: 'var(--mac-success)',
       format: 'revenue',
       icon: <DollarSign size={18} />
     },
@@ -647,7 +647,7 @@ export default function AnalyticsPage() {
       label: 'Средний чек',
       value: average_transaction,
       helper: 'Среднее',
-      accent: '#7c3aed',
+      accent: 'var(--mac-accent-purple)',
       format: 'revenue',
       icon: <ArrowUpRight size={18} />
     }];
@@ -678,7 +678,7 @@ export default function AnalyticsPage() {
             subtitle="Насколько ровно идёт денежный поток."
             compact={isCompactLayout}
           >
-            <AnalyticsLineTrend items={dailyTrend} format="revenue" accent="#059669" compact={isCompactLayout} />
+            <AnalyticsLineTrend items={dailyTrend} format="revenue" accent="var(--mac-success)" compact={isCompactLayout} />
           </AnalyticsSectionCard>
           <AnalyticsSectionCard
             title="Доход по провайдерам"
@@ -711,14 +711,14 @@ export default function AnalyticsPage() {
       label: 'Всего транзакций',
       value: summary.total_transactions || 0,
       helper: 'Операции',
-      accent: '#059669',
+      accent: 'var(--mac-success)',
       icon: <Activity size={18} />
     },
     {
       label: 'Общий доход',
       value: summary.total_revenue || 0,
       helper: 'Выручка',
-      accent: '#7c3aed',
+      accent: 'var(--mac-accent-purple)',
       format: 'revenue',
       icon: <DollarSign size={18} />
     },
@@ -726,7 +726,7 @@ export default function AnalyticsPage() {
       label: 'Комиссия',
       value: summary.total_commission || 0,
       helper: 'Издержки',
-      accent: '#ea580c',
+      accent: 'var(--mac-warning)',
       format: 'revenue',
       icon: <Wallet size={18} />
     }];
@@ -761,7 +761,7 @@ export default function AnalyticsPage() {
             subtitle="Где меньше отказов и стабильнее обработка."
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={providerSuccess} format="percentage" accent="#059669" />
+            <AnalyticsComparisonList items={providerSuccess} format="percentage" accent="var(--mac-success)" />
           </AnalyticsSectionCard>
         </div>
       </div>);
