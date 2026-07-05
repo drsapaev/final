@@ -11,7 +11,8 @@ import {
 
   Phone,
   Edit,
-  Eye } from
+  Eye,
+  AlertTriangle } from
 'lucide-react';
 
 const ACTION_ALIASES = {
@@ -43,7 +44,8 @@ const AppointmentContextMenu = ({
   position,
   onClose,
   onAction,
-  theme = 'light'
+  theme = 'light',
+  isDoctorView = false
 }) => {
   const menuRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -159,6 +161,21 @@ const AppointmentContextMenu = ({
     icon: Phone,
     color: colors.text,
     visible: !!row.patient_phone
+  },
+  { type: 'divider' },
+  {
+    id: 'force_majeure',
+    label: 'Форс-мажор',
+    icon: AlertTriangle,
+    color: colors.warning,
+    visible: !isDoctorView
+  },
+  {
+    id: 'schedule_next',
+    label: 'Назначить следующий визит',
+    icon: Calendar,
+    color: colors.accent,
+    visible: !isDoctorView
   }].
   filter((item) => item.type === 'divider' || item.visible);
 

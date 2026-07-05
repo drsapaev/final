@@ -200,8 +200,7 @@ const RegistrarPanel = () => {
   const [queueProfiles, setQueueProfiles] = useState([]);
 
   // Состояния для печати
-  const [printDialog, setPrintDialog] = useState({ open: false, type: 'ticket', data: null });void
-  useState(null);
+  const [printDialog, setPrintDialog] = useState({ open: false, type: 'ticket', data: null });
   const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
   const [recordPreviewDialog, setRecordPreviewDialog] = useState({ open: false, row: null });
@@ -1802,6 +1801,8 @@ const RegistrarPanel = () => {
             ...(paymentDialog.row || {}),
             ...(appointment || {})
           };
+          // UX Audit: закрываем PaymentDialog при открытии PrintDialog.
+          setPaymentDialog({ open: false, row: null, paid: false, source: null });
           setPrintDialog({
             open: true,
             type: 'ticket',
