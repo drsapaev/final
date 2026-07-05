@@ -25,11 +25,11 @@ export function AppointmentsTab({
   isDark = false,
 }) {
   return (
-    <div style={{ width: '100%', maxWidth: 'none', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ width: '100%', maxWidth: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard className="cardio-card-fullwidth">
         <div className="cardio-appointments-header">
           <h3 className="cardio-appointments-title">
-            <Calendar size={20} className="cardio-icon-mr" style={{ marginRight: '12px', color: 'var(--mac-accent)' }} />
+            <Calendar size={20} className="cardio-icon-mr" style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-accent)' }} />
             Записи к кардиологу
           </h3>
           <AppointmentSummaryBar

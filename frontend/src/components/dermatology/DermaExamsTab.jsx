@@ -33,17 +33,17 @@ export function DermaExamsTab({
   if (activeTab === 'skin') {
     return (
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing('xl') }}>
-        <MacOSCard style={{ padding: '24px' }}>
+        <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+            <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
               Осмотры кожи
             </h3>
             <Button onClick={onOpenSkinForm}>Новый осмотр</Button>
           </div>
 
           {showSkinForm && (
-            <form onSubmit={onSkinSubmit} style={{ marginBottom: '24px' }}>
-              <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: '16px' }}>
+            <form onSubmit={onSkinSubmit} style={{ marginBottom: 'var(--mac-spacing-6)' }}>
+              <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 'var(--mac-spacing-4)' }}>
                 <div>
                   <label className="derma-form-label">Дата осмотра</label>
                   <Input type="date" aria-label="Дата осмотра" value={skinExamination.exam_date || ''} onChange={(e) => setSkinExamination({ ...skinExamination, exam_date: e.target.value })} required />
@@ -76,15 +76,15 @@ export function DermaExamsTab({
                   <Input aria-label="Симптомы" value={skinExamination.symptoms || ''} onChange={(e) => setSkinExamination({ ...skinExamination, symptoms: e.target.value })} placeholder="Напр. зуд, жжение" />
                 </div>
               </div>
-              <div style={{ marginTop: '16px' }}>
+              <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
                 <label className="derma-form-label">Диагноз</label>
                 <Textarea aria-label="Диагноз" value={skinExamination.diagnosis || ''} onChange={(e) => setSkinExamination({ ...skinExamination, diagnosis: e.target.value })} rows={2} />
               </div>
-              <div style={{ marginTop: '16px' }}>
+              <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
                 <label className="derma-form-label">План лечения</label>
                 <Textarea aria-label="План лечения" value={skinExamination.treatment_plan || ''} onChange={(e) => setSkinExamination({ ...skinExamination, treatment_plan: e.target.value })} rows={3} />
               </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--mac-spacing-4)' }}>
                 <Button type="button" variant="outline" onClick={onCancelSkinForm}>Отмена</Button>
                 <Button type="submit">Сохранить осмотр</Button>
               </div>
@@ -92,16 +92,16 @@ export function DermaExamsTab({
           )}
 
           {skinExaminations.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
               {skinExaminations.map((exam) => (
-                <div key={exam.id} style={{ padding: '16px', border: '1px solid var(--mac-border)', borderRadius: '8px', background: 'var(--mac-surface)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div key={exam.id} style={{ padding: 'var(--mac-spacing-4)', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-md)', background: 'var(--mac-surface)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-2)' }}>
                     <Badge variant="info">{exam.exam_date}</Badge>
-                    {exam.skin_type && <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Тип кожи: {exam.skin_type}</span>}
+                    {exam.skin_type && <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Тип кожи: {exam.skin_type}</span>}
                   </div>
-                  {exam.skin_condition && <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>Состояние: {exam.skin_condition}</div>}
-                  {exam.lesions && <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>Поражения: {exam.lesions}</div>}
-                  {exam.diagnosis && <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>Диагноз: {exam.diagnosis}</div>}
+                  {exam.skin_condition && <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>Состояние: {exam.skin_condition}</div>}
+                  {exam.lesions && <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>Поражения: {exam.lesions}</div>}
+                  {exam.diagnosis && <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>Диагноз: {exam.diagnosis}</div>}
                 </div>
               ))}
             </div>
@@ -118,17 +118,17 @@ export function DermaExamsTab({
   if (activeTab === 'cosmetic') {
     return (
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing('xl') }}>
-        <MacOSCard style={{ padding: '24px' }}>
+        <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+            <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
               Косметологические процедуры
             </h3>
             <Button onClick={onOpenCosmeticForm}>Новая процедура</Button>
           </div>
 
           {showCosmeticForm && (
-            <form onSubmit={onCosmeticSubmit} style={{ marginBottom: '24px' }}>
-              <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: '16px' }}>
+            <form onSubmit={onCosmeticSubmit} style={{ marginBottom: 'var(--mac-spacing-6)' }}>
+              <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 'var(--mac-spacing-4)' }}>
                 <div>
                   <label className="derma-form-label">Дата процедуры</label>
                   <Input type="date" aria-label="Дата процедуры" value={cosmeticProcedure.procedure_date || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_date: e.target.value })} required />
@@ -150,11 +150,11 @@ export function DermaExamsTab({
                   <Input type="number" aria-label="Стоимость" value={cosmeticProcedure.total_cost || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, total_cost: e.target.value })} placeholder="0" />
                 </div>
               </div>
-              <div style={{ marginTop: '16px' }}>
+              <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
                 <label className="derma-form-label">Результаты</label>
                 <Textarea aria-label="Результаты" value={cosmeticProcedure.results || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, results: e.target.value })} rows={2} />
               </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--mac-spacing-4)' }}>
                 <Button type="button" variant="outline" onClick={onCancelCosmeticForm}>Отмена</Button>
                 <Button type="submit">Сохранить процедуру</Button>
               </div>
@@ -162,18 +162,18 @@ export function DermaExamsTab({
           )}
 
           {cosmeticProcedures.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
               {cosmeticProcedures.map((proc) => (
-                <div key={proc.id} style={{ padding: '16px', border: '1px solid var(--mac-border)', borderRadius: '8px', background: 'var(--mac-surface)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div key={proc.id} style={{ padding: 'var(--mac-spacing-4)', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-md)', background: 'var(--mac-surface)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-2)' }}>
                     <Badge variant="info">{proc.procedure_date}</Badge>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+                    <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                       {Number(proc.total_cost || 0).toLocaleString()} UZS
                     </span>
                   </div>
-                  {proc.procedure_type && <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>Тип: {proc.procedure_type}</div>}
-                  {proc.area_treated && <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>Область: {proc.area_treated}</div>}
-                  {proc.products_used && <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>Продукты: {proc.products_used}</div>}
+                  {proc.procedure_type && <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>Тип: {proc.procedure_type}</div>}
+                  {proc.area_treated && <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>Область: {proc.area_treated}</div>}
+                  {proc.products_used && <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>Продукты: {proc.products_used}</div>}
                 </div>
               ))}
             </div>

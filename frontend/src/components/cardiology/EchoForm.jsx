@@ -226,7 +226,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
         padding: '12px 16px',
         backgroundColor: 'var(--mac-bg-secondary)',
         border: '1px solid var(--mac-border)',
-        borderRadius: '8px',
+        borderRadius: 'var(--mac-radius-md)',
         cursor: 'pointer'
       }}
       onClick={() => toggleSection(section)}

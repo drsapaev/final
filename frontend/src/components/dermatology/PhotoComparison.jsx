@@ -173,7 +173,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               onClick={handleZoomOut}
               aria-label="Уменьшить масштаб фото"
               style={{
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 4,
                 background: 'transparent',
@@ -190,7 +190,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               onClick={handleZoomIn}
               aria-label="Увеличить масштаб фото"
               style={{
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 4,
                 background: 'transparent',
@@ -206,7 +206,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               onClick={handleResetZoom}
               aria-label="Сбросить масштаб фото"
               style={{
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 4,
                 background: 'transparent',
@@ -222,7 +222,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               onClick={handleFullscreen}
               aria-label="Открыть сравнение фото на весь экран"
               style={{
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 4,
                 background: 'transparent',
@@ -359,7 +359,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             color: 'white',
             padding: '4px 8px',
             borderRadius: 4,
-            fontSize: '14px'
+            fontSize: 'var(--mac-font-size-base)'
           }}>
               ДО
             </div>
@@ -371,7 +371,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             color: 'white',
             padding: '4px 8px',
             borderRadius: 4,
-            fontSize: '14px'
+            fontSize: 'var(--mac-font-size-base)'
           }}>
               ПОСЛЕ
             </div>

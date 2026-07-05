@@ -22,25 +22,25 @@ export function DermaHistoryTab({
         <div className="derma-grid-auto-350-24">
           {/* Skin examinations history */}
           <div>
-            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: 'var(--mac-text-primary)' }}>
+            <h4 style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-3)', color: 'var(--mac-text-primary)' }}>
               Осмотры кожи ({skinExaminations.length})
             </h4>
             {skinExaminations.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                 {skinExaminations.map((exam) => (
-                  <div key={exam.id} style={{ padding: '12px', border: '1px solid var(--mac-border)', borderRadius: '8px', background: 'var(--mac-surface)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <div key={exam.id} style={{ padding: 'var(--mac-spacing-3)', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-md)', background: 'var(--mac-surface)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-1)' }}>
                       <Badge variant="info">{exam.exam_date}</Badge>
-                      <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                      <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                         {exam.skin_type} - {exam.skin_condition}
                       </span>
                     </div>
-                    {exam.diagnosis && <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>{exam.diagnosis}</div>}
+                    {exam.diagnosis && <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>{exam.diagnosis}</div>}
                   </div>
                 ))}
               </div>
             ) : (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mac-text-secondary)' }}>
+              <div style={{ padding: 'var(--mac-spacing-6)', textAlign: 'center', color: 'var(--mac-text-secondary)' }}>
                 Нет осмотров
               </div>
             )}
@@ -48,25 +48,25 @@ export function DermaHistoryTab({
 
           {/* Cosmetic procedures history */}
           <div>
-            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: 'var(--mac-text-primary)' }}>
+            <h4 style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-3)', color: 'var(--mac-text-primary)' }}>
               Косметологические процедуры ({cosmeticProcedures.length})
             </h4>
             {cosmeticProcedures.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                 {cosmeticProcedures.map((proc) => (
-                  <div key={proc.id} style={{ padding: '12px', border: '1px solid var(--mac-border)', borderRadius: '8px', background: 'var(--mac-surface)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <div key={proc.id} style={{ padding: 'var(--mac-spacing-3)', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-md)', background: 'var(--mac-surface)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-1)' }}>
                       <Badge variant="info">{proc.procedure_date}</Badge>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+                      <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                         {Number(proc.total_cost || 0).toLocaleString()} UZS
                       </span>
                     </div>
-                    {proc.procedure_type && <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>{proc.procedure_type} - {proc.area_treated}</div>}
+                    {proc.procedure_type && <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>{proc.procedure_type} - {proc.area_treated}</div>}
                   </div>
                 ))}
               </div>
             ) : (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mac-text-secondary)' }}>
+              <div style={{ padding: 'var(--mac-spacing-6)', textAlign: 'center', color: 'var(--mac-text-secondary)' }}>
                 Нет процедур
               </div>
             )}
