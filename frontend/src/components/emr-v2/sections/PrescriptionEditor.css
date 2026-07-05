@@ -194,7 +194,7 @@
     max-height: 200px;
     overflow-y: auto;
     background: white;
-    border: 1px solid #e5e5e5;
+    border: 1px solid var(--mac-border);
     border-radius: 6px;
     box-shadow: 0 4px 12px color-mix(in srgb, black, transparent 90%);
     z-index: 10;

@@ -4,6 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import globals from 'globals';
 import tsParser from '@typescript-eslint/parser';
+import noHardcodedColors from './scripts/no-hardcoded-colors.js';
 
 export default [
   js.configs.recommended,
@@ -13,6 +14,11 @@ export default [
       react,
       'react-hooks': reactHooks,
       'jsx-a11y': jsxA11y,
+      custom: {
+        rules: {
+          'no-hardcoded-colors': noHardcodedColors,
+        },
+      },
     },
     languageOptions: {
       ecmaVersion: 2022,
@@ -34,6 +40,9 @@ export default [
       },
     },
     rules: {
+      // Custom: ban hardcoded colors (prevent regressions)
+      'custom/no-hardcoded-colors': 'warn',
+
       // React правила
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,

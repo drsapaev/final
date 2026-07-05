@@ -444,7 +444,7 @@ const ForceMajeureModal = ({
           <p style={{ margin: '0 0 10px', fontSize: 'var(--mac-font-size-base)', color: '#991b1b', fontWeight: 'var(--mac-font-weight-semibold)' }}>
             ⚠️ Это действие нельзя отменить!
           </p>
-          <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: theme === 'dark' ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : '#7f1d1d' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: theme === 'dark' ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-error)' }}>
             Введите <strong>ПОДТВЕРЖДАЮ</strong> для продолжения:
           </label>
           <Input

@@ -43,7 +43,7 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
     <div style={{ border: '1px solid #e5e5e5', borderRadius: 'var(--mac-radius-md)', padding: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-3)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mac-spacing-2)' }}>
         <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Услуги</span>
-        <span style={{ fontSize: 'var(--mac-font-size-base)', color: '#28a745', fontWeight: 'var(--mac-font-weight-semibold)' }}>{totalCost.toLocaleString()} UZS</span>
+        <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-semibold)' }}>{totalCost.toLocaleString()} UZS</span>
       </div>
       {groups.map(group => (
         <div key={group} style={{ marginBottom: 'var(--mac-spacing-2)' }}>
