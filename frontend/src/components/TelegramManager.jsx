@@ -1006,7 +1006,7 @@ const TelegramManager = () => {
     borderRadius: 'var(--mac-radius-lg)',
     background: 'var(--mac-bg-secondary, rgba(238, 246, 255, 0.88))',
     boxShadow: 'var(--mac-shadow-sm)',
-    padding: '16px'
+    padding: 'var(--mac-spacing-4)'
   };
   const capabilityGridStyle = {
     display: 'grid',
@@ -1018,11 +1018,11 @@ const TelegramManager = () => {
     borderRadius: 'var(--mac-radius-md)',
     background: 'var(--mac-card-bg, rgba(255, 255, 255, 0.82))',
     boxShadow: 'var(--mac-shadow-sm)',
-    padding: '12px',
+    padding: 'var(--mac-spacing-3)',
     minHeight: 136,
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px'
+    gap: 'var(--mac-spacing-2)'
   };
   const capabilityIconStyle = {
     width: 28,
