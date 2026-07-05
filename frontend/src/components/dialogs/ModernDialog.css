@@ -237,3 +237,59 @@
     justify-content: center;
   }
 }
+
+/* ============================================================
+ * UX Audit Registrar #5: inline-стили → CSS-классы
+ * ============================================================ */
+
+/* Backdrop overlay (position: fixed full-screen with blur) */
+.modern-dialog-backdrop--overlay {
+    background-color: color-mix(in srgb, black, transparent 50%);
+    backdrop-filter: blur(4px);
+}
+
+/* Invisible backdrop button (click-to-close) */
+.modern-dialog-backdrop-button {
+    position: absolute;
+    inset: 0;
+    border: none;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+}
+
+/* Dialog container — base styles (maxWidth/maxHeight still inline via props) */
+.modern-dialog-container--styled {
+    background-color: var(--mac-card-bg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+    box-shadow: var(--mac-shadow-md);
+}
+
+[data-theme="dark"] .modern-dialog-container--styled {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+}
+
+/* Title color */
+.modern-dialog-title--styled {
+    color: var(--mac-text-primary);
+}
+
+/* Close button color */
+.modern-dialog-close--styled {
+    color: var(--mac-text-secondary);
+}
+
+/* Actions bar — background + top border (theme-aware) */
+.modern-dialog-actions--styled {
+    background-color: var(--mac-bg-secondary);
+    border-top: 1px solid var(--mac-border);
+}
+
+[data-theme="dark"] .modern-dialog-actions--styled {
+    background-color: var(--mac-text-primary);
+    border-top-color: var(--mac-text-primary);
+}

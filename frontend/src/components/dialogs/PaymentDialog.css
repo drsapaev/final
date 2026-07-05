@@ -1,0 +1,187 @@
+/**
+ * PaymentDialog Styles
+ *
+ * UX Audit Registrar #5: все inline-стили из PaymentDialog.jsx перенесены сюда.
+ * Использует macos design tokens (--mac-*) + [data-theme="dark"] для light/dark support.
+ */
+
+/* Dialog background */
+.payment-dialog--styled {
+    background-color: var(--mac-bg-primary);
+}
+
+/* === Success state (isPaid === true) === */
+
+.payment-success {
+    text-align: center;
+    padding: 8px 0 4px;
+}
+
+.payment-success-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border-radius: var(--mac-radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--mac-success-bg);
+    color: var(--mac-success);
+    border: 1px solid var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 60%));
+}
+
+[data-theme="dark"] .payment-success-icon {
+    background: rgba(16, 185, 129, 0.14);
+    border-color: rgba(16, 185, 129, 0.24);
+}
+
+.payment-success-title {
+    color: var(--mac-text-primary);
+    margin-bottom: var(--mac-spacing-2);
+    font-size: var(--mac-font-size-xl);
+    font-weight: var(--mac-font-weight-semibold);
+}
+
+.payment-success-details {
+    color: var(--mac-text-secondary);
+    margin-bottom: var(--mac-spacing-4);
+    line-height: 1.5;
+}
+
+.payment-success-cta {
+    padding: 14px;
+    background-color: color-mix(in srgb, var(--mac-success, #10b981), transparent 92%);
+    border-radius: var(--mac-radius-lg);
+    border: 1px solid color-mix(in srgb, var(--mac-success, #10b981), transparent 76%);
+}
+
+.payment-success-cta-text {
+    color: var(--mac-success);
+    font-size: var(--mac-font-size-base);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* === Form state (isPaid === false) === */
+
+/* Patient info card */
+.payment-patient-card {
+    margin-bottom: var(--mac-spacing-6);
+    padding: var(--mac-spacing-4);
+    background-color: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: 14px;
+}
+
+[data-theme="dark"] .payment-patient-card {
+    border-color: color-mix(in srgb, white, transparent 92%);
+}
+
+.payment-patient-title {
+    color: var(--mac-text-primary);
+    margin: 0 0 8px 0;
+    font-size: var(--mac-font-size-lg);
+    font-weight: var(--mac-font-weight-semibold);
+}
+
+.payment-patient-name {
+    color: var(--mac-text-secondary);
+    margin: 0;
+    font-size: var(--mac-font-size-base);
+}
+
+.payment-patient-services {
+    color: var(--mac-text-secondary);
+    margin: 4px 0 0 0;
+    font-size: var(--mac-font-size-xs);
+}
+
+/* Form fields */
+.payment-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-5);
+}
+
+.payment-field-label {
+    display: block;
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+    margin-bottom: var(--mac-spacing-2);
+    color: var(--mac-text-primary);
+}
+
+/* Amount input */
+.payment-amount-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    background-color: white;
+    color: var(--mac-text-primary);
+    font-size: var(--mac-font-size-lg);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
+}
+
+[data-theme="dark"] .payment-amount-input {
+    background-color: color-mix(in srgb, white, transparent 96%);
+    border-color: color-mix(in srgb, white, transparent 90%);
+}
+
+.payment-amount-input--error {
+    border-color: var(--mac-error);
+}
+
+.payment-amount-input:focus {
+    border-color: var(--mac-accent-blue);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 88%);
+}
+
+.payment-amount-input--error:focus {
+    border-color: var(--mac-error);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--mac-error), transparent 88%);
+}
+
+.payment-field-error {
+    color: var(--mac-error);
+    font-size: var(--mac-font-size-xs);
+    margin: 4px 0 0 0;
+}
+
+/* Payment methods grid */
+.payment-methods-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--mac-spacing-2);
+}
+
+.payment-method-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-2);
+    padding: 12px 14px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    background-color: white;
+    color: var(--mac-text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+}
+
+[data-theme="dark"] .payment-method-btn {
+    background-color: color-mix(in srgb, white, transparent 96%);
+    border-color: color-mix(in srgb, white, transparent 90%);
+}
+
+.payment-method-btn--selected {
+    border-color: var(--mac-accent-blue);
+    background-color: var(--mac-accent-bg);
+    color: var(--mac-accent-blue-hover);
+}
+
+[data-theme="dark"] .payment-method-btn--selected {
+    background-color: color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 84%);
+}
