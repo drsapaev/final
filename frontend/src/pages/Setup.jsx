@@ -307,8 +307,11 @@ export default function Setup() {
   // UX Audit Stage 2 (Setup issue 2.2): toggle «Филиал = клиника».
   // При включении — копируем текущие значения клиники в филиал.
   // При выключении — оставляем скопированные значения как есть (не очищаем).
-  const handleBranchSameAsClinicChange = (event) => {
-    const checked = event.target.checked;
+  //
+  // UX Audit Setup bugfix: macos Checkbox вызывает onChange(boolean) напрямую,
+  // а не onChange(event). Раньше здесь было `event.target.checked` —
+  // это undefined, и чекбокс вообще не работал.
+  const handleBranchSameAsClinicChange = (checked) => {
     setBranchSameAsClinic(checked);
     if (checked) {
       setForm((prev) => ({
