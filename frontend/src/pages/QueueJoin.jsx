@@ -11,7 +11,6 @@ import {
   Calendar,
   Timer
 } from 'lucide-react';
-import { A11Y_COLORS } from '../constants/a11yTokens';
 import {
   fetchQrTokenInfo,
   startQueueJoinSession,
@@ -518,66 +517,66 @@ const QueueJoin = () => {
     background: 'var(--mac-card-bg)',
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
-    borderRadius: '20px',
+    borderRadius: 'var(--mac-radius-xl)',
     boxShadow: 'var(--mac-main-shell-shadow)',
     border: '1px solid var(--mac-card-border)',
-    padding: '32px 24px'
+    padding: 'var(--mac-spacing-8) var(--mac-spacing-6)'
   };
 
   const titleStyle = {
-    fontSize: '22px',
-    fontWeight: '600',
+    fontSize: 'var(--mac-font-size-2xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-primary)',
-    marginBottom: '8px',
+    marginBottom: 'var(--mac-spacing-2)',
     letterSpacing: '-0.02em'
   };
 
   const bodyTextStyle = {
-    fontSize: '15px',
+    fontSize: 'var(--mac-font-size-lg)',
     color: 'var(--mac-text-secondary)',
     lineHeight: '1.5'
   };
 
   const mutedCaptionStyle = {
-    fontSize: '13px',
+    fontSize: 'var(--mac-font-size-sm)',
     color: 'var(--mac-text-tertiary)',
-    fontWeight: '500'
+    fontWeight: 'var(--mac-font-weight-medium)'
   };
 
   const statusActionStackStyle = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px'
+    gap: 'var(--mac-spacing-3)'
   };
 
   const recoveryButtonBaseStyle = {
     width: '100%',
-    padding: '16px 24px',
-    borderRadius: '12px',
+    padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
+    borderRadius: 'var(--mac-radius-lg)',
     border: 'none',
-    fontSize: '17px',
-    fontWeight: '600',
+    fontSize: 'var(--mac-font-size-xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     cursor: 'pointer',
     transition: 'background 0.2s ease, box-shadow 0.2s ease'
   };
 
   const primaryRecoveryButtonStyle = {
     ...recoveryButtonBaseStyle,
-    background: A11Y_COLORS.primary,
+    background: 'var(--mac-accent-blue)',
     color: 'var(--mac-text-on-accent)',
     boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
   };
 
   const dangerRecoveryButtonStyle = {
     ...recoveryButtonBaseStyle,
-    background: A11Y_COLORS.danger,
+    background: 'var(--mac-error)',
     color: 'var(--mac-text-on-accent)',
     boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-error), transparent 70%)'
   };
 
   const successRecoveryButtonStyle = {
     ...recoveryButtonBaseStyle,
-    background: A11Y_COLORS.success,
+    background: 'var(--mac-success)',
     color: 'var(--mac-text-on-accent)',
     boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-success), transparent 70%)'
   };
@@ -588,7 +587,7 @@ const QueueJoin = () => {
       <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
         <div className="max-w-md w-full text-center" style={glassCardStyle}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" style={{
-            borderColor: A11Y_COLORS.primary
+            borderColor: 'var(--mac-accent-blue)'
           }}></div>
           <h2 style={titleStyle}>Юкланмоқда...</h2>
           <p style={bodyTextStyle}>Навбат ҳақида маълумот олиш</p>
@@ -610,11 +609,11 @@ const QueueJoin = () => {
           }} aria-hidden="true" />
           <h2 id="queue-join-error-title" style={{
             ...titleStyle,
-            marginBottom: '12px',
+            marginBottom: 'var(--mac-spacing-3)',
           }}>Хатолик</h2>
           <p style={{
             ...bodyTextStyle,
-            marginBottom: '24px',
+            marginBottom: 'var(--mac-spacing-6)',
           }} id="queue-join-error-message" role="alert" aria-live="assertive">{error}</p>
           <div style={statusActionStackStyle}>
             <button
@@ -654,14 +653,14 @@ const QueueJoin = () => {
           }} />
           <h2 style={{
             fontSize: '24px',
-            fontWeight: '600',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '12px',
+            marginBottom: 'var(--mac-spacing-3)',
             letterSpacing: '-0.02em'
           }}>Навбат тез орада очилади</h2>
           <p style={{
             ...bodyTextStyle,
-            marginBottom: '24px',
+            marginBottom: 'var(--mac-spacing-6)',
           }}>
             Навбатга ёзилиш {queueInfo?.start_time}да очилади
           </p>
@@ -671,14 +670,14 @@ const QueueJoin = () => {
             background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-warning), transparent 88%) 0%, color-mix(in srgb, var(--mac-warning), transparent 93%) 100%)',
             borderRadius: '16px',
             padding: '24px',
-            marginBottom: '24px',
+            marginBottom: 'var(--mac-spacing-6)',
             border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 76%)'
           }}>
             <div style={{
               fontSize: '44px',
-              fontWeight: '600',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-warning)',
-              marginBottom: '8px',
+              marginBottom: 'var(--mac-spacing-2)',
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
               letterSpacing: '0.02em'
             }}>
@@ -688,51 +687,51 @@ const QueueJoin = () => {
           </div>
 
           {/* Информация о враче и кабинете - macOS стиль */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-6)' }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
+              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
               background: 'var(--mac-bg-secondary)',
-              borderRadius: '12px'
+              borderRadius: 'var(--mac-radius-lg)'
             }}>
               <div className="flex items-center">
                 <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
-                <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Специалист</span>
+                <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Специалист</span>
               </div>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{queueInfo?.specialist_name}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{queueInfo?.specialist_name}</span>
             </div>
 
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
+              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
               background: 'var(--mac-bg-secondary)',
-              borderRadius: '12px'
+              borderRadius: 'var(--mac-radius-lg)'
             }}>
               <div className="flex items-center">
                 <MapPin style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
-                <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Бўлим</span>
+                <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Бўлим</span>
               </div>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{queueInfo?.department_name}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{queueInfo?.department_name}</span>
             </div>
 
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
+              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
               background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-accent), transparent 88%) 0%, color-mix(in srgb, var(--mac-accent), transparent 93%) 100%)',
-              borderRadius: '12px',
+              borderRadius: 'var(--mac-radius-lg)',
               border: '1px solid color-mix(in srgb, var(--mac-accent), transparent 76%)'
             }}>
               <div className="flex items-center">
-                <Calendar style={{ width: '18px', height: '18px', color: A11Y_COLORS.primary, marginRight: '8px' }} />
-                <span style={{ fontSize: '14px', fontWeight: '500', color: A11Y_COLORS.primary }}>Қабул куни</span>
+                <Calendar style={{ width: '18px', height: '18px', color: 'var(--mac-accent-blue)', marginRight: '8px' }} />
+                <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>Қабул куни</span>
               </div>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: A11Y_COLORS.primary }}>
+              <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-accent-blue)' }}>
                 {queueInfo?.target_date ? new Date(queueInfo.target_date).toLocaleDateString('uz-UZ', {
                   year: 'numeric',
                   month: 'long',
@@ -743,13 +742,13 @@ const QueueJoin = () => {
           </div>
 
           <div style={{
-            fontSize: '13px',
+            fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-tertiary)',
-            marginBottom: '24px',
+            marginBottom: 'var(--mac-spacing-6)',
             textAlign: 'center',
             lineHeight: '1.5'
           }}>
-            <p style={{ marginBottom: '8px' }}>📱 Бу саҳифани очиқ қолдиринг</p>
+            <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>📱 Бу саҳифани очиқ қолдиринг</p>
             <p>Ёзилиш очилганда сизни автоматик равишда йўналтирамиз</p>
           </div>
 
@@ -759,12 +758,12 @@ const QueueJoin = () => {
               style={{
                 flex: 1,
                 background: 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)',
-                color: A11Y_COLORS.primary,
+                color: 'var(--mac-accent-blue)',
                 padding: '14px 20px',
-                borderRadius: '12px',
+                borderRadius: 'var(--mac-radius-lg)',
                 border: 'none',
-                fontSize: '17px',
-                fontWeight: '600',
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
@@ -777,19 +776,19 @@ const QueueJoin = () => {
               onClick={loadTokenInfo}
               style={{
                 flex: 1,
-                background: A11Y_COLORS.primary,
+                background: 'var(--mac-accent-blue)',
                 color: 'var(--mac-text-on-accent)',
                 padding: '14px 20px',
-                borderRadius: '12px',
+                borderRadius: 'var(--mac-radius-lg)',
                 border: 'none',
-                fontSize: '17px',
-                fontWeight: '600',
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
                 boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
               }}
-              onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
-              onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
+              onMouseEnter={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
+              onMouseLeave={(e) => e.target.style.background = 'var(--mac-accent-blue)'}
             >
               Обновить
             </button>
@@ -822,14 +821,14 @@ const QueueJoin = () => {
           <CheckCircle style={{
             width: '64px',
             height: '64px',
-            color: A11Y_COLORS.success,
+            color: 'var(--mac-success)',
             margin: '0 auto 20px'
           }} aria-hidden="true" />
           <h2 id="queue-join-success-title" style={{
             fontSize: '24px',
-            fontWeight: '600',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '24px',
+            marginBottom: 'var(--mac-spacing-6)',
             letterSpacing: '-0.02em'
           }}>
             {isMultiple ? 'Сиз навбатларга рўйхатдан ўтдингиз!' : 'Сиз навбатда!'}
@@ -842,19 +841,19 @@ const QueueJoin = () => {
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
                 borderRadius: '16px',
                 padding: '24px',
-                marginBottom: '24px',
+                marginBottom: 'var(--mac-spacing-6)',
                 border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)'
               }}>
                 <p style={{
-                  fontSize: '15px',
-                  fontWeight: '600',
+                  fontSize: 'var(--mac-font-size-lg)',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
                   color: 'var(--mac-text-primary)',
-                  marginBottom: '16px',
+                  marginBottom: 'var(--mac-spacing-4)',
                   textAlign: 'center'
                 }}>
                   Сиз {result.entries.length} навбатга рўйхатдан ўтдингиз:
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
                   {result.entries.map((entry, idx) => (
                     <div
                       key={idx}
@@ -864,24 +863,24 @@ const QueueJoin = () => {
                         justifyContent: 'space-between',
                         padding: '16px',
                         background: 'color-mix(in srgb, var(--mac-card-bg), transparent 16%)',
-                        borderRadius: '12px',
+                        borderRadius: 'var(--mac-radius-lg)',
                         border: '1px solid color-mix(in srgb, var(--mac-success), transparent 72%)'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
                         <span style={{ fontSize: '24px' }}>{entry.icon || '👨‍⚕️'}</span>
                         <div>
-                          <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+                          <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                             {entry.specialist_name || entry.department || `Специалист ${idx + 1}`}
                           </div>
-                          <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
+                          <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
                             Вақт: {entry.queue_time ? formatRegistrarTime(entry.queue_time, 'uz-UZ') : '—'}
                           </div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '28px', fontWeight: '600', color: A11Y_COLORS.success }}>№{entry.queue_number || entry.number || '—'}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)' }}>навбатда</div>
+                        <div style={{ fontSize: '28px', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>№{entry.queue_number || entry.number || '—'}</div>
+                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>навбатда</div>
                       </div>
                     </div>
                   ))}
@@ -889,14 +888,14 @@ const QueueJoin = () => {
               </div>
 
               <div style={{
-                fontSize: '13px',
+                fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-tertiary)',
-                marginBottom: '24px',
+                marginBottom: 'var(--mac-spacing-6)',
                 lineHeight: '1.5'
               }}>
                 <p>Илтимос, қабулга тайёр бўлинг.</p>
                 <p>Навбатингиз келганда сизга хабар берамиз.</p>
-                <p style={{ marginTop: '12px', fontWeight: '500', color: A11Y_COLORS.primary }}>
+                <p style={{ marginTop: '12px', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
                   💡 Ёзилмаларни мутахассислар вкладкаларида кўришингиз мумкин
                 </p>
               </div>
@@ -907,36 +906,36 @@ const QueueJoin = () => {
               <div style={{
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
                 borderRadius: '16px',
-                padding: '32px 24px',
-                marginBottom: '24px',
+                padding: 'var(--mac-spacing-8) var(--mac-spacing-6)',
+                marginBottom: 'var(--mac-spacing-6)',
                 border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)'
               }}>
                 <div style={{
                   fontSize: '48px',
-                  fontWeight: '600',
-                  color: A11Y_COLORS.success,
-                  marginBottom: '8px',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  color: 'var(--mac-success)',
+                  marginBottom: 'var(--mac-spacing-2)',
                   letterSpacing: '-0.02em'
                 }}>
                   №{result.queue_number}
                 </div>
-                <p style={{ fontSize: '15px', color: 'var(--mac-text-secondary)', fontWeight: '500' }}>Навбатдаги рақамингиз</p>
+                <p style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Навбатдаги рақамингиз</p>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-6)' }}>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '12px 16px',
+                  padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                   background: 'var(--mac-bg-secondary)',
-                  borderRadius: '12px'
+                  borderRadius: 'var(--mac-radius-lg)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
-                    <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Олдингизда</span>
+                    <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Олдингизда</span>
                   </div>
-                  <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{result.queue_number - 1} к.</span>
+                  <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{result.queue_number - 1} к.</span>
                 </div>
 
                 {result.estimated_wait_time && (
@@ -944,15 +943,15 @@ const QueueJoin = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '12px 16px',
+                    padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                     background: 'var(--mac-bg-secondary)',
-                    borderRadius: '12px'
+                    borderRadius: 'var(--mac-radius-lg)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
-                      <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Кутиш</span>
+                      <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Кутиш</span>
                     </div>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{formatWaitTime(result.estimated_wait_time)}</span>
+                    <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{formatWaitTime(result.estimated_wait_time)}</span>
                   </div>
                 )}
 
@@ -961,28 +960,28 @@ const QueueJoin = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '12px 16px',
+                    padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                     background: 'var(--mac-bg-secondary)',
-                    borderRadius: '12px'
+                    borderRadius: 'var(--mac-radius-lg)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
-                      <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Специалист</span>
+                      <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Специалист</span>
                     </div>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{result.specialist_name}</span>
+                    <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{result.specialist_name}</span>
                   </div>
                 )}
               </div>
 
               <div style={{
-                fontSize: '13px',
+                fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-tertiary)',
-                marginBottom: '24px',
+                marginBottom: 'var(--mac-spacing-6)',
                 lineHeight: '1.5'
               }}>
                 <p>Илтимос, қабулга тайёр бўлинг.</p>
                 <p>Навбатингиз келганда сизга хабар берамиз.</p>
-                <p style={{ marginTop: '12px', fontWeight: '500', color: A11Y_COLORS.primary }}>
+                <p style={{ marginTop: '12px', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
                   💡 Ёзилмани {departmentName} вкладкасида кўришингиз мумкин
                 </p>
               </div>
@@ -1031,8 +1030,8 @@ const QueueJoin = () => {
         }}>
           <h1 style={{
             fontSize: '26px',
-            fontWeight: '600',
-            marginBottom: '16px',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            marginBottom: 'var(--mac-spacing-4)',
             letterSpacing: '-0.02em',
             lineHeight: '1.2'
           }}>Навбатга қўшилиш</h1>
@@ -1040,12 +1039,12 @@ const QueueJoin = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div className="flex items-center" style={{ opacity: 0.95 }}>
               <MapPin style={{ width: '16px', height: '16px', marginRight: '8px', flexShrink: 0 }} />
-              <span style={{ fontSize: '14px', lineHeight: '1.4' }}>{queueInfo?.department_name || 'Умумий амалиёт'}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: '1.4' }}>{queueInfo?.department_name || 'Умумий амалиёт'}</span>
             </div>
 
             <div className="flex items-center" style={{ opacity: 0.9 }}>
               <User style={{ width: '16px', height: '16px', marginRight: '8px', flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', lineHeight: '1.4' }}>{queueInfo?.specialist_name}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-sm)', lineHeight: '1.4' }}>{queueInfo?.specialist_name}</span>
             </div>
 
             {queueInfo?.target_date && (
@@ -1057,8 +1056,8 @@ const QueueJoin = () => {
               }}>
                 <Calendar style={{ width: '16px', height: '16px', marginRight: '8px', flexShrink: 0 }} />
                 <span style={{
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   lineHeight: '1.4'
                 }}>
                   Қабул куни: {new Date(queueInfo.target_date).toLocaleDateString('uz-UZ', {
@@ -1075,14 +1074,14 @@ const QueueJoin = () => {
         {step === 'select-specialists' && (
           <div style={{ padding: '24px' }}>
             <div style={{
-              marginBottom: '24px',
+              marginBottom: 'var(--mac-spacing-6)',
               textAlign: 'center'
             }}>
               <h3 style={{
                 fontSize: '20px',
-                fontWeight: '600',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 color: 'var(--mac-text-primary)',
-                marginBottom: '8px',
+                marginBottom: 'var(--mac-spacing-2)',
                 letterSpacing: '-0.02em'
               }}>
                 {/* P-024 fix: previously "Мутахассисларни танланг" (UZ) while the
@@ -1092,7 +1091,7 @@ const QueueJoin = () => {
               </h3>
               <p style={{
                 color: 'var(--mac-text-secondary)',
-                fontSize: '15px',
+                fontSize: 'var(--mac-font-size-lg)',
                 lineHeight: '1.5',
                 margin: 0
               }}>
@@ -1104,15 +1103,15 @@ const QueueJoin = () => {
             <div style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
-              marginBottom: '24px'
+              gap: 'var(--mac-spacing-3)',
+              marginBottom: 'var(--mac-spacing-6)'
             }}>
               {isSpecialistsLoading ? (
                 <div style={{
                   padding: '16px',
                   textAlign: 'center',
                   color: 'var(--mac-text-secondary)',
-                  fontSize: '15px'
+                  fontSize: 'var(--mac-font-size-lg)'
                 }}>
                   {/* UX Audit Registrar #2: унифицирован i18n — был UZ, теперь RU. */}
                   Загрузка специалистов...
@@ -1122,8 +1121,8 @@ const QueueJoin = () => {
                   padding: '18px 16px',
                   textAlign: 'center',
                   color: 'var(--mac-text-secondary)',
-                  fontSize: '14px',
-                  borderRadius: '12px',
+                  fontSize: 'var(--mac-font-size-base)',
+                  borderRadius: 'var(--mac-radius-lg)',
                   border: '1px dashed color-mix(in srgb, var(--mac-text-secondary), transparent 72%)',
                   background: 'color-mix(in srgb, var(--mac-bg-secondary), transparent 10%)',
                   display: 'flex',
@@ -1136,20 +1135,20 @@ const QueueJoin = () => {
                     onClick={loadTokenInfo}
                     style={{
                       alignSelf: 'center',
-                      background: A11Y_COLORS.primary,
+                      background: 'var(--mac-accent-blue)',
                       color: 'var(--mac-text-on-accent)',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: 'var(--mac-radius-md)',
                       padding: '8px 14px',
-                      fontSize: '13px',
-                      fontWeight: '600',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      fontWeight: 'var(--mac-font-weight-semibold)',
                       cursor: 'pointer'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = A11Y_COLORS.primaryHover;
+                      e.currentTarget.style.background = 'var(--mac-accent-blue-hover)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = A11Y_COLORS.primary;
+                      e.currentTarget.style.background = 'var(--mac-accent-blue)';
                     }}
                   >
                     Обновить
@@ -1165,7 +1164,7 @@ const QueueJoin = () => {
                         display: 'flex',
                         alignItems: 'center',
                         padding: '16px',
-                        borderRadius: '12px',
+                        borderRadius: 'var(--mac-radius-lg)',
                         border: `2px solid ${isSelected ? specialist.color : 'var(--mac-border)'}`,
                         background: isSelected ?
                           `color-mix(in srgb, ${specialist.color}, transparent 85%)` :
@@ -1199,8 +1198,8 @@ const QueueJoin = () => {
                       />
                       <span style={{ fontSize: '24px', marginRight: '12px' }}>{specialist.icon}</span>
                       <span style={{
-                        fontSize: '17px',
-                        fontWeight: '600',
+                        fontSize: 'var(--mac-font-size-xl)',
+                        fontWeight: 'var(--mac-font-weight-semibold)',
                         color: isSelected ? specialist.color : 'var(--mac-text-primary)'
                       }}>
                         {formatSpecialistLabel(specialist)}
@@ -1225,25 +1224,25 @@ const QueueJoin = () => {
               disabled={selectedSpecialists.length === 0}
               style={{
                 width: '100%',
-                background: selectedSpecialists.length > 0 ? A11Y_COLORS.primary : 'var(--mac-border)',
+                background: selectedSpecialists.length > 0 ? 'var(--mac-accent-blue)' : 'var(--mac-border)',
                 color: selectedSpecialists.length > 0 ? 'var(--mac-text-on-accent)' : 'var(--mac-text-tertiary)',
-                padding: '16px 24px',
-                borderRadius: '12px',
+                padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
+                borderRadius: 'var(--mac-radius-lg)',
                 border: 'none',
-                fontSize: '17px',
-                fontWeight: '600',
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 cursor: selectedSpecialists.length > 0 ? 'pointer' : 'not-allowed',
                 transition: 'all 0.2s ease',
                 boxShadow: selectedSpecialists.length > 0 ? '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)' : 'none'
               }}
               onMouseEnter={(e) => {
                 if (selectedSpecialists.length > 0) {
-                  e.target.style.background = A11Y_COLORS.primaryHover;
+                  e.target.style.background = 'var(--mac-accent-blue-hover)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (selectedSpecialists.length > 0) {
-                  e.target.style.background = A11Y_COLORS.primary;
+                  e.target.style.background = 'var(--mac-accent-blue)';
                 }
               }}
             >
@@ -1253,12 +1252,12 @@ const QueueJoin = () => {
             {error && (
               <div style={{
                 marginTop: '16px',
-                padding: '12px 16px',
-                borderRadius: '8px',
+                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+                borderRadius: 'var(--mac-radius-md)',
                 background: 'var(--mac-error-bg)',
                 border: '1px solid var(--mac-error-border)',
                 color: 'var(--mac-error)',
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
                 textAlign: 'center'
               }} role="alert" aria-live="assertive">
                 {error}
@@ -1273,8 +1272,8 @@ const QueueJoin = () => {
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '16px',
-              marginBottom: '24px'
+              gap: 'var(--mac-spacing-4)',
+              marginBottom: 'var(--mac-spacing-6)'
             }}>
               <div style={{
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-accent), transparent 88%) 0%, color-mix(in srgb, var(--mac-accent), transparent 93%) 100%)',
@@ -1290,21 +1289,21 @@ const QueueJoin = () => {
                 <Users style={{
                   width: '32px',
                   height: '32px',
-                  color: A11Y_COLORS.primary,
-                  marginBottom: '12px'
+                  color: 'var(--mac-accent-blue)',
+                  marginBottom: 'var(--mac-spacing-3)'
                 }} />
                 <div style={{
                   fontSize: '36px',
-                  fontWeight: '600',
-                  color: A11Y_COLORS.primary,
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  color: 'var(--mac-accent-blue)',
                   letterSpacing: '-0.02em',
                   lineHeight: '1',
-                  marginBottom: '8px'
+                  marginBottom: 'var(--mac-spacing-2)'
                 }}>{queueInfo?.queue_length || 0}</div>
                 <div style={{
-                  fontSize: '13px',
+                  fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-tertiary)',
-                  fontWeight: '500'
+                  fontWeight: 'var(--mac-font-weight-medium)'
                 }}>навбатда</div>
               </div>
 
@@ -1322,21 +1321,21 @@ const QueueJoin = () => {
                 <Clock style={{
                   width: '32px',
                   height: '32px',
-                  color: A11Y_COLORS.success,
-                  marginBottom: '12px'
+                  color: 'var(--mac-success)',
+                  marginBottom: 'var(--mac-spacing-3)'
                 }} />
                 <div style={{
                   fontSize: '36px',
-                  fontWeight: '600',
-                  color: A11Y_COLORS.success,
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  color: 'var(--mac-success)',
                   letterSpacing: '-0.02em',
                   lineHeight: '1',
-                  marginBottom: '8px'
+                  marginBottom: 'var(--mac-spacing-2)'
                 }}>~{(queueInfo?.queue_length || 0) * 15}</div>
                 <div style={{
-                  fontSize: '13px',
+                  fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-tertiary)',
-                  fontWeight: '500'
+                  fontWeight: 'var(--mac-font-weight-medium)'
                 }}>мин кутиш</div>
               </div>
             </div>
@@ -1351,7 +1350,7 @@ const QueueJoin = () => {
             }}>
               <p style={{
                 color: 'var(--mac-text-secondary)',
-                fontSize: '15px',
+                fontSize: 'var(--mac-font-size-lg)',
                 lineHeight: '1.5',
                 margin: 0,
                 maxWidth: '320px'
@@ -1362,19 +1361,19 @@ const QueueJoin = () => {
                 onClick={() => setStep('form')}
                 style={{
                   width: '100%',
-                  background: A11Y_COLORS.primary,
+                  background: 'var(--mac-accent-blue)',
                   color: 'var(--mac-text-on-accent)',
-                  padding: '16px 24px',
-                  borderRadius: '12px',
+                  padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
+                  borderRadius: 'var(--mac-radius-lg)',
                   border: 'none',
-                  fontSize: '17px',
-                  fontWeight: '600',
+                  fontSize: 'var(--mac-font-size-xl)',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
                 }}
-                onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
-                onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
+                onMouseEnter={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
+                onMouseLeave={(e) => e.target.style.background = 'var(--mac-accent-blue)'}
               >
                 Давом этиш
               </button>
@@ -1391,10 +1390,10 @@ const QueueJoin = () => {
                   htmlFor="queue-patient-name"
                   style={{
                   display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-primary)',
-                  marginBottom: '8px'
+                  marginBottom: 'var(--mac-spacing-2)'
                 }}
                 >
                   ФИО *
@@ -1416,7 +1415,7 @@ const QueueJoin = () => {
                       paddingBottom: '12px',
                       border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
                       borderRadius: '10px',
-                      fontSize: '17px',
+                      fontSize: 'var(--mac-font-size-xl)',
                       fontFamily: 'inherit',
                       background: 'var(--mac-bg-secondary)',
                       transition: 'all 0.2s ease',
@@ -1448,10 +1447,10 @@ const QueueJoin = () => {
                   htmlFor="queue-phone"
                   style={{
                   display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-primary)',
-                  marginBottom: '8px'
+                  marginBottom: 'var(--mac-spacing-2)'
                 }}
                 >
                   Телефон рақами *
@@ -1498,7 +1497,7 @@ const QueueJoin = () => {
                       paddingBottom: '12px',
                       border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
                       borderRadius: '10px',
-                      fontSize: '17px',
+                      fontSize: 'var(--mac-font-size-xl)',
                       fontFamily: 'inherit',
                       background: 'var(--mac-bg-secondary)',
                       transition: 'all 0.2s ease',
@@ -1522,7 +1521,7 @@ const QueueJoin = () => {
                     required
                   />
                 </div>
-                <div id="queue-phone-hint" style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
+                <div id="queue-phone-hint" style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
                   Формат: +998 (XX) XXX-XX-XX
                 </div>
               </div>
@@ -1533,15 +1532,15 @@ const QueueJoin = () => {
                   htmlFor="queue-telegram-id"
                   style={{
                   display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-primary)',
-                  marginBottom: '8px'
+                  marginBottom: 'var(--mac-spacing-2)'
                 }}
                 >
                   Telegram ID (ихтиёрий)
                 </label>
-                <div style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)', marginBottom: '8px' }}>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-2)' }}>
                   Telegramда хабардор қилиш учун
                 </div>
                 <input
@@ -1553,10 +1552,10 @@ const QueueJoin = () => {
                   onChange={(e) => handleInputChange('telegramId', e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
+                    padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                     border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
                     borderRadius: '10px',
-                    fontSize: '17px',
+                    fontSize: 'var(--mac-font-size-xl)',
                     fontFamily: 'inherit',
                     background: 'var(--mac-bg-secondary)',
                     transition: 'all 0.2s ease',
@@ -1579,30 +1578,30 @@ const QueueJoin = () => {
                 <div style={{
                   background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-error), transparent 88%) 0%, color-mix(in srgb, var(--mac-error), transparent 93%) 100%)',
                   border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
-                  borderRadius: '12px',
+                  borderRadius: 'var(--mac-radius-lg)',
                   padding: '12px'
                 }} id="queue-join-error" role="alert" aria-live="assertive">
                   <div className="flex items-center">
                     <AlertCircle className="h-5 w-5 mr-2" style={{ color: 'var(--mac-error)' }} />
-                    <span style={{ color: 'var(--mac-error)', fontSize: '14px' }}>{error}</span>
+                    <span style={{ color: 'var(--mac-error)', fontSize: 'var(--mac-font-size-base)' }}>{error}</span>
                   </div>
                 </div>
               )}
 
               {/* Кнопки - macOS стиль */}
-              <div className="flex" style={{ gap: '12px', paddingTop: '16px' }}>
+              <div className="flex" style={{ gap: 'var(--mac-spacing-3)', paddingTop: '16px' }}>
                 <button
                   type="button"
                   onClick={() => setStep('info')}
                   style={{
                     flex: 1,
                     background: 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)',
-                    color: A11Y_COLORS.primary,
+                    color: 'var(--mac-accent-blue)',
                     padding: '14px 20px',
-                    borderRadius: '12px',
+                    borderRadius: 'var(--mac-radius-lg)',
                     border: 'none',
-                    fontSize: '17px',
-                    fontWeight: '600',
+                    fontSize: 'var(--mac-font-size-xl)',
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
                   }}
@@ -1616,19 +1615,19 @@ const QueueJoin = () => {
                   disabled={loading}
                   style={{
                     flex: 1,
-                    background: loading ? 'var(--mac-text-tertiary)' : A11Y_COLORS.primary,
+                    background: loading ? 'var(--mac-text-tertiary)' : 'var(--mac-accent-blue)',
                     color: 'var(--mac-text-on-accent)',
                     padding: '14px 20px',
-                    borderRadius: '12px',
+                    borderRadius: 'var(--mac-radius-lg)',
                     border: 'none',
-                    fontSize: '17px',
-                    fontWeight: '600',
+                    fontSize: 'var(--mac-font-size-xl)',
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     cursor: loading ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s ease',
                     boxShadow: loading ? 'none' : '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
                   }}
-                  onMouseEnter={(e) => !loading && (e.target.style.background = A11Y_COLORS.primaryHover)}
-                  onMouseLeave={(e) => !loading && (e.target.style.background = A11Y_COLORS.primary)}
+                  onMouseEnter={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue-hover)')}
+                  onMouseLeave={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue)')}
                 >
                   {loading ? 'Қўшилмоқда...' : 'Қўшилиш'}
                 </button>
