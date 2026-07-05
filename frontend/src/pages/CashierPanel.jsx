@@ -1202,7 +1202,7 @@ const CashierPanel = () => {
               <Skeleton className="cashier-skeleton-h" /> :
               appointments.length > 0 ?
               <div className="cashier-table-scroll">
-                    <table className="cashier-table">
+                    <div className="admin-table-wrapper"><table className="cashier-table">
                       <thead>
                         <tr className="cashier-table-row">
                           <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
@@ -1283,7 +1283,7 @@ const CashierPanel = () => {
                           </tr>
                     )}
                       </tbody>
-                    </table>
+                    </table></div>
 
                     {/* ✅ v2.0: Пагинация для ожидающих оплаты */}
                     {pendingTotalPages > 1 &&
@@ -1324,7 +1324,7 @@ const CashierPanel = () => {
               <Skeleton className="cashier-skeleton-h" /> :
 
               <div className="cashier-table-scroll">
-                    <table className="cashier-table">
+                    <div className="admin-table-wrapper"><table className="cashier-table">
                       <thead>
                         <tr className="cashier-table-row">
                           <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
@@ -1424,7 +1424,7 @@ const CashierPanel = () => {
                           </tr>
                     }
                       </tbody>
-                    </table>
+                    </table></div>
 
                     {/* ✅ УЛУЧШЕНИЕ: Пагинация c Server-Side логикой */}
                     {totalPages > 1 &&
@@ -1646,7 +1646,7 @@ const CashierPanel = () => {
                       <Box sx={{
                     flex: 1,
                     height: 24,
-                    backgroundColor: 'rgba(52, 199, 89, 0.2)',
+                    backgroundColor: 'var(--mac-success-bg)',
                     borderRadius: 4,
                     position: 'relative'
                   }}>
