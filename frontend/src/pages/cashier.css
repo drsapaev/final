@@ -76,7 +76,7 @@
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  background-color: rgba(0, 122, 255, 0.12);
+  background-color: var(--mac-accent-bg);
   color: var(--mac-accent-blue);
   border: 1px solid rgba(0, 122, 255, 0.25);
   white-space: nowrap;

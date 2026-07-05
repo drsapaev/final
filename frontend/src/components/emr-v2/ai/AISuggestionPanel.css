@@ -48,7 +48,7 @@
     width: 28px;
     height: 28px;
     border: none;
-    background: rgba(255, 255, 255, 0.2);
+    background: color-mix(in srgb, white, transparent 80%);
     color: white;
     font-size: 1rem;
     border-radius: 4px;
@@ -57,7 +57,7 @@
 
 .ai-suggestion-panel__refresh:hover,
 .ai-suggestion-panel__close:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: color-mix(in srgb, white, transparent 70%);
 }
 
 .ai-suggestion-panel__refresh:disabled {
@@ -81,7 +81,7 @@
     justify-content: center;
     padding: 40px 20px;
     text-align: center;
-    color: #666;
+    color: var(--mac-text-secondary);
 }
 
 .ai-suggestion-panel__spinner {
@@ -125,7 +125,7 @@
 .ai-suggestion-panel__group-header {
     font-size: 0.75rem;
     font-weight: 600;
-    color: #666;
+    color: var(--mac-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;

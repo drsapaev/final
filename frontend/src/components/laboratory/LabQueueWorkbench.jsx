@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { useState } from 'react';
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
-} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   formatLabStatus,
   formatPaymentStatus,
@@ -69,22 +69,22 @@ MaskedPhone.propTypes = {
 
 const cardGridStyle = {
   display: 'grid',
-  gap: '16px'
+  gap: 'var(--mac-spacing-4)'
 };
 
 const queueCardStyle = {
   border: '1px solid var(--mac-border)',
-  borderRadius: '16px',
+  borderRadius: 'var(--mac-radius-xl)',
   background: 'var(--mac-bg-primary)',
-  padding: '16px',
+  padding: 'var(--mac-spacing-4)',
   display: 'grid',
-  gap: '12px'
+  gap: 'var(--mac-spacing-3)'
 };
 
 const metaRowStyle = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '8px',
+  gap: 'var(--mac-spacing-2)',
   alignItems: 'center'
 };
 
@@ -164,13 +164,13 @@ export default function LabQueueWorkbench({
   });
 
   return (
-    <div style={{ display: 'grid', gap: '16px' }}>
+    <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
       <Card variant="filled" padding="none">
         <CardHeader
           style={{
             background: 'var(--mac-bg-tertiary)',
             borderBottom: '1px solid var(--mac-border)',
-            padding: '16px'
+            padding: 'var(--mac-spacing-4)'
           }}
         >
           <CardTitle
@@ -178,7 +178,7 @@ export default function LabQueueWorkbench({
               margin: 0,
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: 'var(--mac-spacing-2)'
             }}
           >
             <Icon name="testtube.2" size={20} />
@@ -198,9 +198,9 @@ export default function LabQueueWorkbench({
           <div
             style={{
               display: 'flex',
-              gap: '12px',
+              gap: 'var(--mac-spacing-3)',
               flexWrap: 'wrap',
-              marginTop: '12px',
+              marginTop: 'var(--mac-spacing-3)',
               alignItems: 'center',
             }}
           >
@@ -223,7 +223,7 @@ export default function LabQueueWorkbench({
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <Input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -232,11 +232,11 @@ export default function LabQueueWorkbench({
                 style={{
                   width: '100%',
                   padding: '8px 12px 8px 32px',
-                  borderRadius: '10px',
+                  borderRadius: 'var(--mac-radius-lg)',
                   border: '1px solid var(--mac-border)',
                   background: 'var(--mac-bg-primary)',
                   color: 'var(--mac-text-primary)',
-                  fontSize: '14px',
+                  fontSize: 'var(--mac-font-size-base)',
                   outline: 'none',
                 }}
               />
@@ -254,8 +254,8 @@ export default function LabQueueWorkbench({
                     border: 'none',
                     cursor: 'pointer',
                     color: 'var(--mac-text-muted)',
-                    padding: '4px',
-                    fontSize: '16px',
+                    padding: 'var(--mac-spacing-1)',
+                    fontSize: 'var(--mac-font-size-lg)',
                     lineHeight: 1,
                   }}
                 >
@@ -266,7 +266,7 @@ export default function LabQueueWorkbench({
             <div
               role="group"
               aria-label="Фильтр по статусу"
-              style={{ display: 'flex', gap: '4px' }}
+              style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}
             >
               {[
                 { key: 'all',        label: 'Все' },
@@ -279,13 +279,13 @@ export default function LabQueueWorkbench({
                   onClick={() => setStatusFilter(opt.key)}
                   aria-pressed={statusFilter === opt.key}
                   style={{
-                    padding: '6px 12px',
-                    borderRadius: '8px',
+                    padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                    borderRadius: 'var(--mac-radius-md)',
                     border: `1px solid ${statusFilter === opt.key ? 'var(--mac-accent)' : 'var(--mac-border)'}`,
                     background: statusFilter === opt.key ? 'var(--mac-accent)' : 'var(--mac-bg-primary)',
                     color: statusFilter === opt.key ? 'white' : 'var(--mac-text-primary)',
                     cursor: 'pointer',
-                    fontSize: '13px',
+                    fontSize: 'var(--mac-font-size-sm)',
                     fontWeight: statusFilter === opt.key ? 600 : 400,
                   }}
                 >
@@ -298,8 +298,8 @@ export default function LabQueueWorkbench({
           {(searchQuery || statusFilter !== 'all') && (
             <div
               style={{
-                marginTop: '8px',
-                fontSize: '12px',
+                marginTop: 'var(--mac-spacing-2)',
+                fontSize: 'var(--mac-font-size-xs)',
                 color: 'var(--mac-text-muted)',
               }}
             >
@@ -311,7 +311,7 @@ export default function LabQueueWorkbench({
             </div>
           )}
         </CardHeader>
-        <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}>
+        <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)' }}>
           {loading ? (
             // QW-3 fix: skeleton-загрузка вместо текста «Загрузка…».
             // Skeleton показывает структуру будущих карточек и снижает
@@ -325,13 +325,13 @@ export default function LabQueueWorkbench({
                     background: 'var(--mac-bg-tertiary)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                    <div style={{ display: 'grid', gap: '8px', flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
+                    <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)', flex: 1 }}>
                       <div
                         style={{
                           height: '18px',
                           width: '60%',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
                           backgroundSize: '200% 100%',
                           animation: 'lab-skeleton-shimmer 1.5s infinite',
@@ -341,7 +341,7 @@ export default function LabQueueWorkbench({
                         style={{
                           height: '14px',
                           width: '80%',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
                           backgroundSize: '200% 100%',
                           animation: 'lab-skeleton-shimmer 1.5s infinite',
@@ -351,7 +351,7 @@ export default function LabQueueWorkbench({
                         style={{
                           height: '14px',
                           width: '50%',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
                           backgroundSize: '200% 100%',
                           animation: 'lab-skeleton-shimmer 1.5s infinite',
@@ -402,12 +402,12 @@ export default function LabQueueWorkbench({
                       boxShadow: isSelected ? '0 0 0 2px color-mix(in oklab, var(--mac-accent) 20%, transparent)' : 'none'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
-                      <div style={{ display: 'grid', gap: '8px' }}>
-                        <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+                        <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                           {appointment.patient_fio || 'Пациент без имени'}
                         </div>
-                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
+                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
                         Визит: {appointment.visit_id || 'не привязан'} | Телефон:{' '}
                         {/* P-05 fix: маскирование номера телефона в публичном
                             пространстве лаборатории. Раскрытие — по клику. */}
@@ -419,7 +419,7 @@ export default function LabQueueWorkbench({
                       </Badge>
                     </div>
 
-                    <div style={{ color: 'var(--mac-text-secondary)', fontSize: '14px', lineHeight: 1.5 }}>
+                    <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)', lineHeight: 1.5 }}>
                       <strong style={{ color: 'var(--mac-text-primary)' }}>Услуги:</strong> {formatServices(appointment)}
                     </div>
 
@@ -430,8 +430,8 @@ export default function LabQueueWorkbench({
                       {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name}</Badge>}
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)', alignItems: 'center' }}>
+                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
                         {/* P-05 fix: patient_id — внутренний идентификатор, не нужен
                             лаборанту для работы. Скрываем по умолчанию, раскрытие —
                             по клику. Снижает риск утечки PII через скриншоты. */}
@@ -471,19 +471,19 @@ export default function LabQueueWorkbench({
             style={{
               background: 'var(--mac-bg-tertiary)',
               borderBottom: '1px solid var(--mac-border)',
-              padding: '16px'
+              padding: 'var(--mac-spacing-4)'
             }}
           >
-            <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
               <Icon name="clock.arrow.circlepath" size={20} />
               История отчётов пациента
             </CardTitle>
           </CardHeader>
-          <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}>
+          <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)' }}>
             {reportHistory.length === 0 ? (
               <Alert severity="info">Для выбранного пациента ещё нет лабораторных отчётов.</Alert>
             ) : (
-              <div style={{ display: 'grid', gap: '12px' }}>
+              <div style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
                 {reportHistory.map((item) => (
                   <div
                     key={item.id}
@@ -494,19 +494,19 @@ export default function LabQueueWorkbench({
                       background: 'var(--mac-bg-primary)',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      gap: '12px',
+                      gap: 'var(--mac-spacing-3)',
                       alignItems: 'center'
                     }}
                   >
-                    <div style={{ display: 'grid', gap: '4px' }}>
-                      <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
+                      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                         {item.template?.name || `Отчёт #${item.id}`}
                       </div>
-                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
                         Создан: {new Date(item.created_at).toLocaleString()} | Статус: {formatLabStatus(item.status)}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <Badge variant={getLabStatusVariant(item.status)}>
                         {formatLabStatus(item.status)}
                       </Badge>

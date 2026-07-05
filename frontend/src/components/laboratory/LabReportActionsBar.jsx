@@ -36,7 +36,7 @@ export default function LabReportActionsBar({
   }
 
   return (
-    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
       {showPrimaryGroup && (
         <>
           <Button variant="outline" onClick={onSaveDraft} disabled={saving || !canSaveDraft}>

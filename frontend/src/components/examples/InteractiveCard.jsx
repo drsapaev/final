@@ -105,7 +105,7 @@ export const InteractiveListItem = ({
     display: 'flex',
     alignItems: 'center',
     padding: getSpacing('md'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     backgroundColor: isHovered ? getColor('primary', 50) : getColor('surface'),
     border: `1px solid ${isHovered ? getColor('primary', 200) : getColor('border')}`,
     cursor: onClick ? 'pointer' : 'default',
@@ -136,7 +136,7 @@ export const InteractiveListItem = ({
       <div style={{ flex: 1 }}>
         <div style={{
           fontSize: getFontSize('base'),
-          fontWeight: '600',
+          fontWeight: 'var(--mac-font-weight-semibold)',
           color: getColor('text'),
           marginBottom: getSpacing('xs')
         }}>

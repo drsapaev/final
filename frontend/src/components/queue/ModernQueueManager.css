@@ -45,15 +45,15 @@
 }
 
 .mqm-stat-icon.primary {
-    background: linear-gradient(135deg, var(--mac-accent-blue), #0066cc);
+    background: linear-gradient(135deg, var(--mac-accent-blue), var(--mac-accent-blue));
 }
 
 .mqm-stat-icon.warning {
-    background: linear-gradient(135deg, var(--mac-warning), #d97706);
+    background: linear-gradient(135deg, var(--mac-warning), var(--mac-warning));
 }
 
 .mqm-stat-icon.success {
-    background: linear-gradient(135deg, var(--mac-success), #059669);
+    background: linear-gradient(135deg, var(--mac-success), var(--mac-success));
 }
 
 .mqm-stat-value {
@@ -132,7 +132,7 @@
 .mqm-input:focus,
 .mqm-select:focus {
     border-color: var(--mac-accent-blue);
-    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+    box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 .mqm-input:hover,
@@ -232,7 +232,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white, transparent 92%);
 }
 
 .mqm-qr-info-row {
@@ -277,7 +277,7 @@
     max-width: 100%;
     height: auto;
     border-radius: var(--mac-radius-sm);
-    background: #ffffff;
+    background: var(--mac-bg-primary);
     padding: 16px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
@@ -402,4 +402,84 @@
 [data-theme="dark"] .mqm-qr-image,
 [data-theme="dark"] .mqm-qr-svg {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+/* ============================================================
+ * UX Audit Registrar #3: inline-стили → CSS-классы
+ * ============================================================ */
+
+/* Select full-width */
+.mqm-select-full {
+    width: 100%;
+}
+
+/* Icon color = primary text */
+.mqm-icon-primary {
+    color: var(--mac-text-primary);
+}
+
+/* Inline label container (icon + text) */
+.mqm-inline-label {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-2);
+}
+
+/* Settings icon container in modal header */
+.mqm-modal-header-icon {
+    color: var(--mac-text-primary);
+}
+
+/* Auto-refresh toggle icon color states */
+.mqm-auto-refresh-icon-on {
+    color: var(--mac-success);
+}
+
+.mqm-auto-refresh-icon-off {
+    color: var(--mac-text-tertiary);
+}
+
+/* Icon margin for inline icons */
+.mqm-icon-margin-right-1 {
+    margin-right: var(--mac-spacing-1);
+    vertical-align: text-bottom;
+}
+
+.mqm-icon-margin-right-2 {
+    margin-right: var(--mac-spacing-2);
+}
+
+.mqm-icon-margin-right-6px {
+    margin-right: 6px;
+}
+
+/* Card content padding */
+.mqm-card-content-padded {
+    padding: var(--mac-spacing-5);
+}
+
+/* QR dialog action button container */
+.mqm-qr-actions {
+    display: flex;
+    gap: var(--mac-spacing-2);
+    margin-top: var(--mac-spacing-4);
+}
+
+/* QR dialog action button */
+.mqm-qr-action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--mac-spacing-1);
+}
+
+/* Auto-refresh toggle button (icon-only) */
+.mqm-auto-refresh-toggle {
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    align-items: center;
 }

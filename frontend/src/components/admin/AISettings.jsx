@@ -166,18 +166,18 @@ const AISettings = () => {
       <MacOSCard className="admin-p-32">
         <div className="admin-flex-center-justify">
           <RefreshCw className="admin-icon-20-spin-mr-8" />
-          <span className="admin-text-primary">Загрузка AI настроек...</span>
+          <span className="text-[var(--mac-text-primary)]">Загрузка AI настроек...</span>
         </div>
       </MacOSCard>);
 
   }
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       {/* Заголовок */}
-      <div className="admin-flex-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="admin-text-2xl admin-text-semi admin-text-primary admin-m-0 admin-mb-4">
+          <h2 className="admin-text-2xl admin-text-semi text-[var(--mac-text-primary)] admin-m-0 mb-1">
             Настройки AI
           </h2>
           <p className="admin-text-sm-secondary admin-m-0">
@@ -187,11 +187,11 @@ const AISettings = () => {
         
         <div className="admin-flex-gap-12">
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw className="admin-icon-16-mr-8" />
+            <RefreshCw className="w-4 h-4 mr-2" />
             Обновить
           </Button>
           <Button onClick={() => setShowAddForm(true)}>
-            <Plus className="admin-icon-16-mr-8" />
+            <Plus className="w-4 h-4 mr-2" />
             Добавить провайдера
           </Button>
         </div>
@@ -199,15 +199,15 @@ const AISettings = () => {
 
       {/* Сообщения */}
       {message.text &&
-      <div className="admin-flex-center admin-p-16 admin-msg-banner-dynamic" style={{
+      <div className="flex items-center justify-center p-4 admin-msg-banner-dynamic" style={{
         '--admin-msg-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
         '--admin-msg-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
         '--admin-msg-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
       }}>
           {message.type === 'success' ?
-        <CheckCircle className="admin-icon-20-mr-8" /> :
+        <CheckCircle className="w-5 h-5 mr-2" /> :
 
-        <AlertCircle className="admin-icon-20-mr-8" />
+        <AlertCircle className="w-5 h-5 mr-2" />
         }
           {message.text}
         </div>
@@ -217,7 +217,7 @@ const AISettings = () => {
       {stats.total_requests !== undefined &&
       <div className="admin-grid-auto-200">
           <MacOSCard className="admin-loading-p-24-center">
-            <div className="admin-stat-number admin-text-blue admin-mb-8">
+            <div className="admin-stat-number admin-text-blue mb-2">
               {stats.total_requests}
             </div>
             <div className="admin-text-sm-secondary">
@@ -225,7 +225,7 @@ const AISettings = () => {
             </div>
           </MacOSCard>
           <MacOSCard className="admin-loading-p-24-center">
-            <div className="admin-stat-number admin-text-success admin-mb-8">
+            <div className="admin-stat-number text-[var(--mac-success)] mb-2">
               {stats.successful_requests}
             </div>
             <div className="admin-text-sm-secondary">
@@ -233,7 +233,7 @@ const AISettings = () => {
             </div>
           </MacOSCard>
           <MacOSCard className="admin-loading-p-24-center">
-            <div className="admin-stat-number admin-text-warning admin-mb-8">
+            <div className="admin-stat-number text-[var(--mac-warning)] mb-2">
               {Math.round(stats.cache_hit_rate)}%
             </div>
             <div className="admin-text-sm-secondary">
@@ -241,7 +241,7 @@ const AISettings = () => {
             </div>
           </MacOSCard>
           <MacOSCard className="admin-loading-p-24-center">
-            <div className="admin-stat-number admin-text-purple admin-mb-8">
+            <div className="admin-stat-number admin-text-purple mb-2">
               {stats.total_tokens_used}
             </div>
             <div className="admin-text-sm-secondary">
@@ -258,12 +258,12 @@ const AISettings = () => {
           const testResult = testResults[provider.id];
 
           return (
-            <MacOSCard key={provider.id} className="admin-p-24">
+            <MacOSCard key={provider.id} className="p-6">
               <div className="admin-flex-between-mb-16">
-                <div className="admin-flex-center">
+                <div className="flex items-center justify-center">
                   <div className="admin-status-dot-12" style={{ '--admin-dot-bg': provider.active ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
                   <div>
-                    <h3 className="admin-heading-lg admin-text-med admin-text-primary admin-m-0">
+                    <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0">
                       {provider.display_name}
                     </h3>
                     <p className="admin-text-sm-secondary admin-m-0">
@@ -284,26 +284,26 @@ const AISettings = () => {
 
               {/* Настройки провайдера */}
               <div className="admin-flex-col-12-sm">
-                <div className="admin-flex-between">
-                  <span className="admin-text-secondary">Модель:</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--mac-text-secondary)]">Модель:</span>
                   <span className="admin-text-med-primary">{provider.model || '—'}</span>
                 </div>
                 
-                <div className="admin-flex-between">
-                  <span className="admin-text-secondary">Температура:</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--mac-text-secondary)]">Температура:</span>
                   <span className="admin-text-med-primary">{provider.temperature}</span>
                 </div>
                 
-                <div className="admin-flex-between">
-                  <span className="admin-text-secondary">Макс. токенов:</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--mac-text-secondary)]">Макс. токенов:</span>
                   <span className="admin-text-med-primary">{provider.max_tokens}</span>
                 </div>
 
                 {/* API ключ */}
-                <div className="admin-flex-between">
-                  <span className="admin-text-secondary">API ключ:</span>
-                  <div className="admin-flex-center-8">
-                    <span className="admin-text-xs admin-text-primary admin-font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--mac-text-secondary)]">API ключ:</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="admin-text-xs text-[var(--mac-text-primary)] admin-font-mono">
                       {showApiKeys[provider.id] ?
                       provider.api_key || '***не установлен***' :
                       '***скрыт***'
@@ -316,15 +316,15 @@ const AISettings = () => {
                       title={showApiKeys[provider.id] ? `Hide API key for ${provider.display_name}` : `Show API key for ${provider.display_name}`}
                       aria-label={showApiKeys[provider.id] ? `Hide API key for ${provider.display_name}` : `Show API key for ${provider.display_name}`}
                       onClick={() => toggleApiKeyVisibility(provider.id)}>
-                      {showApiKeys[provider.id] ? <EyeOff aria-hidden="true" className="admin-icon-14" /> : <Eye aria-hidden="true" className="admin-icon-14" />}
+                      {showApiKeys[provider.id] ? <EyeOff aria-hidden="true" className="w-3.5 h-3.5" /> : <Eye aria-hidden="true" className="w-3.5 h-3.5" />}
                     </Button>
                   </div>
                 </div>
 
                 {/* Возможности */}
                 {provider.capabilities &&
-                <div className="admin-flex-between">
-                    <span className="admin-text-secondary">Возможности:</span>
+                <div className="flex items-center justify-between">
+                    <span className="text-[var(--mac-text-secondary)]">Возможности:</span>
                     <div className="admin-flex-gap-4">
                       {provider.capabilities.map((cap) =>
                     <Badge key={cap} variant="outline" className="admin-text-xs">
@@ -338,30 +338,30 @@ const AISettings = () => {
 
               {/* Результат тестирования */}
               {testResult &&
-              <div className="admin-mt-16 admin-p-12 admin-test-result-dynamic" style={{
+              <div className="mt-4 p-3 admin-test-result-dynamic" style={{
                 '--admin-tr-bg': testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
                 '--admin-tr-border': testResult.success ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
               }}>
-                  <div className="admin-text-sm">
+                  <div className="text-sm">
                     {testResult.testing ?
-                  <div className="admin-flex-center">
+                  <div className="flex items-center justify-center">
                         <RefreshCw className="admin-icon-14-spin-mr-8" />
                         Тестирование...
                       </div> :
                   testResult.success ?
                   <div>
-                        <div className="admin-flex-center admin-text-success admin-mb-4">
+                        <div className="flex items-center justify-center text-[var(--mac-success)] mb-1">
                           <CheckCircle className="admin-icon-14-mr-8" />
                           Тест пройден успешно
                         </div>
                         <div className="admin-text-xs admin-flex-col-4">
-                          <div className="admin-text-primary">Время ответа: {testResult.response_time_ms}мс</div>
-                          <div className="admin-text-primary">Токенов: {testResult.tokens_used}</div>
+                          <div className="text-[var(--mac-text-primary)]">Время ответа: {testResult.response_time_ms}мс</div>
+                          <div className="text-[var(--mac-text-primary)]">Токенов: {testResult.tokens_used}</div>
                         </div>
                       </div> :
 
-                  <div className="admin-text-error">
-                        <div className="admin-flex-center admin-mb-4">
+                  <div className="text-[var(--mac-error)]">
+                        <div className="flex items-center justify-center mb-1">
                           <AlertCircle className="admin-icon-14-mr-8" />
                           Ошибка тестирования
                         </div>
@@ -391,7 +391,7 @@ const AISettings = () => {
                   aria-label={`Test ${provider.display_name} provider`}
                   onClick={() => handleTestProvider(provider.id)}
                   disabled={!provider.active || !provider.api_key}>
-                  <TestTube aria-hidden="true" className="admin-icon-14" />
+                  <TestTube aria-hidden="true" className="w-3.5 h-3.5" />
                 </Button>
               </div>
             </MacOSCard>);
@@ -399,24 +399,24 @@ const AISettings = () => {
         })}
 
         {/* Карточка добавления нового провайдера */}
-        <MacOSCard className="admin-p-24 admin-text-center admin-card-dashed">
+        <MacOSCard className="p-6 text-center admin-card-dashed">
           <Brain className="admin-icon-48-mx-auto-mb-16-tertiary" />
-          <h3 className="admin-heading-lg admin-text-med admin-text-primary admin-m-0 admin-mb-8">
+          <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-2">
             Добавить AI провайдера
           </h3>
-          <p className="admin-text-secondary admin-mb-16 admin-m-0">
+          <p className="text-[var(--mac-text-secondary)] mb-4 admin-m-0">
             Настройте новый AI провайдер для использования в системе
           </p>
           <Button onClick={() => setShowAddForm(true)}>
-            <Plus className="admin-icon-16-mr-8" />
+            <Plus className="w-4 h-4 mr-2" />
             Добавить
           </Button>
         </MacOSCard>
       </div>
 
       {/* Системные настройки */}
-      <MacOSCard className="admin-p-24">
-        <h3 className="admin-heading-lg admin-text-med admin-text-primary admin-m-0 admin-mb-16 admin-flex-center">
+      <MacOSCard className="p-6">
+        <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-4 flex items-center justify-center">
           <Settings className="admin-icon-20-mr-8-blue" />
           Системные настройки AI
         </h3>
@@ -486,14 +486,14 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
   };
 
   return (
-    <MacOSCard className="admin-p-24">
-      <h3 className="admin-heading-lg admin-text-med admin-text-primary admin-m-0 admin-mb-16">
+    <MacOSCard className="p-6">
+      <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-4">
         {provider ? 'Редактирование провайдера' : 'Добавление AI провайдера'}
       </h3>
       
       {/* Быстрые пресеты */}
       {!provider &&
-      <div className="admin-mb-24">
+      <div className="mb-6">
           <label className="admin-text-sm-med-primary admin-label-block-md">
             Быстрые настройки:
           </label>
@@ -512,7 +512,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
         </div>
       }
       
-      <form onSubmit={handleSubmit} className="admin-flex-col-16">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="admin-grid-auto-300">
           <div>
             <label className="admin-text-sm-med-primary admin-label-block-md">
@@ -523,7 +523,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               value={formData.name}
               onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
               placeholder="openai, gemini, deepseek"
-              className="admin-w-full"
+              className="w-full"
               required />
             
           </div>
@@ -537,7 +537,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               value={formData.display_name}
               onChange={(e) => setFormData((prev) => ({ ...prev, display_name: e.target.value }))}
               placeholder="OpenAI GPT-4"
-              className="admin-w-full"
+              className="w-full"
               required />
             
           </div>
@@ -552,7 +552,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               value={formData.api_key}
               onChange={(e) => setFormData((prev) => ({ ...prev, api_key: e.target.value }))}
               placeholder="sk-..."
-              className="admin-w-full" />
+              className="w-full" />
             
           </div>
 
@@ -565,7 +565,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               value={formData.model}
               onChange={(e) => setFormData((prev) => ({ ...prev, model: e.target.value }))}
               placeholder="gpt-4, gemini-pro"
-              className="admin-w-full" />
+              className="w-full" />
             
           </div>
 
@@ -580,7 +580,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               step="0.1"
               value={formData.temperature}
               onChange={(e) => setFormData((prev) => ({ ...prev, temperature: parseFloat(e.target.value) }))}
-              className="admin-w-full" />
+              className="w-full" />
             
           </div>
 
@@ -594,26 +594,26 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               max="8000"
               value={formData.max_tokens}
               onChange={(e) => setFormData((prev) => ({ ...prev, max_tokens: parseInt(e.target.value) }))}
-              className="admin-w-full" />
+              className="w-full" />
             
           </div>
         </div>
 
         <div className="admin-flex-center-16">
-          <label className="admin-flex-center">
+          <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.active}
               onChange={(checked) => setFormData((prev) => ({ ...prev, active: checked }))}
-              className="admin-mr-8" />
+              className="mr-2" />
             
             <span className="admin-text-sm-med-primary">Активен</span>
           </label>
           
-          <label className="admin-flex-center">
+          <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.is_default}
               onChange={(checked) => setFormData((prev) => ({ ...prev, is_default: checked }))}
-              className="admin-mr-8" />
+              className="mr-2" />
             
             <span className="admin-text-sm-med-primary">По умолчанию</span>
           </label>
@@ -621,11 +621,11 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 
         <div className="admin-flex-end-12">
           <Button type="button" variant="outline" onClick={onCancel}>
-            <X className="admin-icon-16-mr-8" />
+            <X className="w-4 h-4 mr-2" />
             Отменить
           </Button>
           <Button type="submit">
-            <Save className="admin-icon-16-mr-8" />
+            <Save className="w-4 h-4 mr-2" />
             Сохранить
           </Button>
         </div>
@@ -643,47 +643,47 @@ const SystemSettingsForm = ({ settings, onSave }) => {
   }, [settings]);
 
   return (
-    <div className="admin-flex-col-16">
+    <div className="flex flex-col gap-4">
       <div className="admin-grid-auto-300">
         <div>
-          <label className="admin-flex-center">
+          <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.enabled || false}
               onChange={(checked) => setFormData((prev) => ({ ...prev, enabled: checked }))}
-              className="admin-mr-8" />
+              className="mr-2" />
             
             <span className="admin-text-sm-med-primary">AI система включена</span>
           </label>
         </div>
 
         <div>
-          <label className="admin-flex-center">
+          <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.cache_enabled || false}
               onChange={(checked) => setFormData((prev) => ({ ...prev, cache_enabled: checked }))}
-              className="admin-mr-8" />
+              className="mr-2" />
             
             <span className="admin-text-sm-med-primary">Кэширование включено</span>
           </label>
         </div>
 
         <div>
-          <label className="admin-flex-center">
+          <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.require_consent_for_files || false}
               onChange={(checked) => setFormData((prev) => ({ ...prev, require_consent_for_files: checked }))}
-              className="admin-mr-8" />
+              className="mr-2" />
             
             <span className="admin-text-sm-med-primary">Требовать согласие для файлов</span>
           </label>
         </div>
 
         <div>
-          <label className="admin-flex-center">
+          <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.anonymize_data || false}
               onChange={(checked) => setFormData((prev) => ({ ...prev, anonymize_data: checked }))}
-              className="admin-mr-8" />
+              className="mr-2" />
             
             <span className="admin-text-sm-med-primary">Анонимизировать данные</span>
           </label>
@@ -692,7 +692,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
 
       <div className="admin-flex-justify-end">
         <Button onClick={() => onSave(formData)}>
-          <Save className="admin-icon-16-mr-8" />
+          <Save className="w-4 h-4 mr-2" />
           Сохранить настройки
         </Button>
       </div>

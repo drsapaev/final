@@ -15,6 +15,7 @@ import {
 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernInput.css';
+import { Input } from '../ui/macos';
 
 const ModernInput = ({
   type = 'text',
@@ -149,7 +150,7 @@ const ModernInput = ({
         }
 
         {/* Поле ввода */}
-        <input
+        <Input
           ref={inputRef}
           type={type === 'password' ? showPassword ? 'text' : 'password' : type}
           className={`input-field ${IconComponent ? 'has-left-icon' : ''} ${clearable && value || type === 'password' ? 'has-right-icon' : ''}`}

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   Select,
-} from '../ui/macos';
+  Input } from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
 
@@ -33,13 +33,13 @@ function getSeverityStyle(severity = 'info') {
   switch (String(severity).toLowerCase()) {
     case 'critical':
     case 'error':
-      return { color: '#b91c1c', background: 'rgba(185, 28, 28, 0.12)' };
+      return { color: 'var(--mac-error)', background: 'rgba(185, 28, 28, 0.12)' };
     case 'warning':
-      return { color: '#b45309', background: 'rgba(180, 83, 9, 0.12)' };
+      return { color: 'var(--mac-warning-active, var(--mac-warning))', background: 'rgba(180, 83, 9, 0.12)' };
     case 'success':
       return { color: '#15803d', background: 'rgba(21, 128, 61, 0.12)' };
     default:
-      return { color: '#1d4ed8', background: 'rgba(29, 78, 216, 0.10)' };
+      return { color: 'var(--mac-accent-blue-hover)', background: 'rgba(29, 78, 216, 0.10)' };
   }
 }
 
@@ -292,7 +292,7 @@ export default function NotificationInbox({ userRole, onClose }) {
           }}
         >
           <Search size={16} />
-          <input
+          <Input
             type="search"
             aria-label="Поиск по уведомлениям"
             value={searchText}
@@ -421,7 +421,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                       style={{
                         alignSelf: 'start',
                         fontSize: 11,
-                        padding: '4px 8px',
+                        padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                         borderRadius: 999,
                         background: severityStyle.background,
                         color: severityStyle.color,
@@ -463,7 +463,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                         borderRadius: 999,
                         border: '1px solid rgba(29, 78, 216, 0.2)',
                         background: 'rgba(29, 78, 216, 0.12)',
-                        color: '#1d4ed8',
+                        color: 'var(--mac-accent-blue-hover)',
                         fontSize: 11
                       }}
                     >
@@ -483,7 +483,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                         borderRadius: 999,
                         padding: '6px 10px',
                         background: 'rgba(29, 78, 216, 0.12)',
-                        color: '#1d4ed8',
+                        color: 'var(--mac-accent-blue-hover)',
                         cursor: 'pointer'
                       }}
                     >

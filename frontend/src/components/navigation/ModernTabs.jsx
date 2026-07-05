@@ -280,11 +280,11 @@ const ModernTabs = ({
             borderRight: `1px solid ${colors.border}`,
             borderBottom: `1px solid ${colors.border}`,
             borderRadius: '12px 12px 0 0',
-            padding: '8px 16px',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
             boxShadow: 'none'
           }}>
 
-          <div style={{ padding: '12px', textAlign: 'center', color: colors.textSecondary }}>
+          <div style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center', color: colors.textSecondary }}>
             Загрузка отделений...
           </div>
         </div>
@@ -304,7 +304,7 @@ const ModernTabs = ({
           borderRight: `1px solid ${colors.border}`,
           borderBottom: `1px solid ${colors.border}`,
           borderRadius: '12px 12px 0 0',
-          padding: '8px 16px',
+          padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
           boxShadow: 'none'
         }}>
 

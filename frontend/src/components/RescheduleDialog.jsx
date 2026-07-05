@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { rescheduleVisit, rescheduleTomorrow } from '../api/visits';
 import PropTypes from 'prop-types';
+import { Input } from './ui/macos';
 
 /**
  * Диалог переноса визита.
@@ -76,9 +77,9 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
 
   // Объявляем стили до использования  
   const errBox = {
-    color: '#dc2626',
-    background: '#fee2e2', 
-    border: '1px solid #fecaca',
+    color: 'var(--mac-error)',
+    background: 'var(--mac-error-bg)', 
+    border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
     borderRadius: 8,
     padding: 8,
     fontSize: 14,
@@ -95,12 +96,12 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
       aria-label="Закрыть диалог переноса визита"
     >
       <div style={modal}>
-        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Перенос визита</h3>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 'var(--mac-font-weight-semibold)' }}>Перенос визита</h3>
 
         <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
           <label style={{ display: 'grid', gap: 6 }}>
             <span>Новая дата</span>
-            <input
+            <Input
               type="date"
               aria-label="Новая дата визита"
               value={d}
@@ -113,7 +114,7 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
           {err ? (
             <div style={errBox}>{err}</div>
           ) : (
-            <div style={{ fontSize: 12, color: '#6b7280' }}>
+            <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>
               Визит: <b>#{visit?.id ?? '—'}</b>
             </div>
           )}
@@ -123,10 +124,10 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
           <button onClick={onClose} disabled={busy} style={btn}>
             Отмена
           </button>
-          <button onClick={doTomorrow} disabled={busy} style={{ ...btn, borderColor: '#16a34a' }}>
+          <button onClick={doTomorrow} disabled={busy} style={{ ...btn, borderColor: 'var(--mac-success)' }}>
             На завтра
           </button>
-          <button onClick={doReschedule} disabled={busy} style={{ ...btn, background: '#111', color: '#fff' }}>
+          <button onClick={doReschedule} disabled={busy} style={{ ...btn, background: '#111', color: 'var(--mac-bg-primary)' }}>
             Перенести
           </button>
         </div>
@@ -158,23 +159,23 @@ const backdrop = {
 };
 const modal = {
   width: 'min(560px, 92vw)',
-  background: '#fff',
-  border: '1px solid #e5e7eb',
+  background: 'var(--mac-bg-primary)',
+  border: '1px solid var(--mac-border)',
   borderRadius: 12,
   boxShadow: '0 10px 30px rgba(0,0,0,.08)',
   padding: 16,
 };
 const input = {
   padding: '8px 10px',
-  border: '1px solid #e5e7eb',
+  border: '1px solid var(--mac-border)',
   borderRadius: 8,
   outline: 'none',
 };
 const btn = {
-  padding: '8px 12px',
+  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
   borderRadius: 10,
-  border: '1px solid #d1d5db',
-  background: '#fff',
+  border: '1px solid var(--mac-border)',
+  background: 'var(--mac-bg-primary)',
   cursor: 'pointer',
 };
 

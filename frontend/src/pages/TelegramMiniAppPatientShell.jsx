@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert, Badge, Button, Card, CardContent, Input, Textarea,
-} from '../components/ui/macos';
+  Checkbox } from '../components/ui/macos';
 import { api } from '../api/client.js';
 
 const MINI_APP_LANGUAGE_RU = 'ru';
@@ -2147,13 +2147,7 @@ function TelegramMiniAppPatientShell() {
                     {(form.fields || []).map((field) => (
                       field.type === 'boolean' ? (
                         <label key={field.key} style={miniAppCheckboxRowStyle}>
-                          <input
-                            type="checkbox"
-                            aria-label={field.label || field.key}
-                            checked={getMiniAppFormFieldValue(formAnswers, form.id, field)}
-                            onChange={handlePatientFormFieldChange(form.id, field)}
-                            style={miniAppCheckboxStyle}
-                          />
+                          <Checkbox aria-label={field.label || field.key} checked={getMiniAppFormFieldValue(formAnswers, form.id, field)} onChange={handlePatientFormFieldChange(form.id, field)} style={miniAppCheckboxStyle} />
                           <span>{field.label}</span>
                         </label>
                       ) : (
@@ -2328,14 +2322,14 @@ const miniAppHeroTitleGroupStyle = {
 
 const miniAppKickerStyle = {
   margin: '0 0 6px',
-  fontSize: '13px',
-  fontWeight: 700,
+  fontSize: 'var(--mac-font-size-sm)',
+  fontWeight: 'var(--mac-font-weight-bold)',
   color: 'var(--mac-text-secondary, #5f6b7a)',
 };
 
 const miniAppTitleStyle = {
   margin: 0,
-  fontSize: '28px',
+  fontSize: 'var(--mac-font-size-3xl)',
   lineHeight: 1.15,
   fontWeight: 800,
   color: 'var(--mac-text-primary, #111827)',
@@ -2343,21 +2337,21 @@ const miniAppTitleStyle = {
 
 const miniAppStatusBadgeStyle = {
   flexShrink: 0,
-  fontWeight: 700,
+  fontWeight: 'var(--mac-font-weight-bold)',
   maxWidth: 'min(100%, 220px)',
   whiteSpace: 'normal',
   textAlign: 'center',
 };
 
 const miniAppNoticeStyle = {
-  fontSize: '14px',
+  fontSize: 'var(--mac-font-size-base)',
   lineHeight: 1.5,
 };
 
 const miniAppQueueEmptyContentStyle = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '4px',
+  gap: 'var(--mac-spacing-1)',
 };
 
 const miniAppActionRowStyle = {
@@ -2369,19 +2363,19 @@ const miniAppActionRowStyle = {
 
 const miniAppOnboardingSummaryStyle = {
   border: '1px solid var(--mac-border, #d8dde8)',
-  borderRadius: '12px',
+  borderRadius: 'var(--mac-radius-lg)',
   padding: '14px',
   background: 'var(--mac-bg-secondary, rgba(255, 255, 255, 0.72))',
   display: 'flex',
   flexDirection: 'column',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
 };
 
 const miniAppOnboardingSummaryHeaderStyle = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
   flexWrap: 'wrap',
 };
 
@@ -2394,19 +2388,19 @@ const miniAppOnboardingSummaryGridStyle = {
 const miniAppOnboardingSummaryItemStyle = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '4px',
+  gap: 'var(--mac-spacing-1)',
   minWidth: 0,
 };
 
 const miniAppGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(156px, 1fr))',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
 };
 
 const miniAppSelectedSectionStyle = {
-  marginBottom: '12px',
-  borderColor: 'rgba(23, 92, 211, 0.28)',
+  marginBottom: 'var(--mac-spacing-3)',
+  borderColor: 'var(--mac-accent-border)',
 };
 
 const miniAppSelectedSectionContentStyle = {
@@ -2419,7 +2413,7 @@ const miniAppSelectedSectionContentStyle = {
 
 const miniAppSelectedSectionTitleStyle = {
   margin: 0,
-  fontSize: '20px',
+  fontSize: 'var(--mac-font-size-2xl)',
   lineHeight: 1.25,
   fontWeight: 800,
   color: 'var(--mac-text-primary, #111827)',
@@ -2429,18 +2423,18 @@ const miniAppSelectedSectionStatusStyle = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'flex-end',
-  gap: '8px',
+  gap: 'var(--mac-spacing-2)',
   minWidth: '128px',
 };
 
 const miniAppAppointmentPreviewStyle = {
-  marginBottom: '12px',
-  borderColor: 'rgba(52, 199, 89, 0.26)',
+  marginBottom: 'var(--mac-spacing-3)',
+  borderColor: 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 74%))',
 };
 
 const miniAppOnboardingBlockedStyle = {
-  marginBottom: '12px',
-  borderColor: 'rgba(255, 149, 0, 0.28)',
+  marginBottom: 'var(--mac-spacing-3)',
+  borderColor: 'var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 72%))',
 };
 
 const miniAppAppointmentPreviewContentStyle = {
@@ -2460,13 +2454,13 @@ const miniAppAppointmentPreviewHeaderStyle = {
 const miniAppAppointmentFormStyle = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
 };
 
 const miniAppAppointmentFormGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
 };
 
 const miniAppAppointmentInputStyle = {
@@ -2478,12 +2472,12 @@ const miniAppAppointmentPreviewResultStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))',
   alignItems: 'center',
-  gap: '12px',
-  padding: '12px',
-  border: '1px solid rgba(52, 199, 89, 0.24)',
-  borderRadius: '8px',
-  background: 'rgba(52, 199, 89, 0.08)',
-  fontSize: '13px',
+  gap: 'var(--mac-spacing-3)',
+  padding: 'var(--mac-spacing-3)',
+  border: '1px solid var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 76%))',
+  borderRadius: 'var(--mac-radius-md)',
+  background: 'var(--mac-success-bg)',
+  fontSize: 'var(--mac-font-size-sm)',
   color: 'var(--mac-text-primary, #111827)',
 };
 
@@ -2495,7 +2489,7 @@ const miniAppVisitsSectionStyle = {
 
 const miniAppSubsectionTitleStyle = {
   margin: 0,
-  fontSize: '15px',
+  fontSize: 'var(--mac-font-size-lg)',
   lineHeight: 1.3,
   fontWeight: 800,
   color: 'var(--mac-text-primary, #111827)',
@@ -2511,9 +2505,9 @@ const miniAppVisitItemStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '10px',
-  padding: '12px',
+  padding: 'var(--mac-spacing-3)',
   border: '1px solid var(--mac-border, rgba(15, 23, 42, 0.12))',
-  borderRadius: '8px',
+  borderRadius: 'var(--mac-radius-md)',
   background: 'var(--mac-bg-secondary, #ffffff)',
 };
 
@@ -2523,7 +2517,7 @@ const miniAppVisitItemHeaderStyle = {
   alignItems: 'center',
   gap: '10px',
   flexWrap: 'wrap',
-  fontSize: '14px',
+  fontSize: 'var(--mac-font-size-base)',
 };
 
 const miniAppCheckboxRowStyle = {
@@ -2533,9 +2527,9 @@ const miniAppCheckboxRowStyle = {
   minHeight: '40px',
   padding: '10px 12px',
   border: '1px solid var(--mac-border, rgba(15, 23, 42, 0.12))',
-  borderRadius: '8px',
+  borderRadius: 'var(--mac-radius-md)',
   background: 'var(--mac-bg-secondary, rgba(255, 255, 255, 0.72))',
-  fontSize: '14px',
+  fontSize: 'var(--mac-font-size-base)',
   fontWeight: 650,
   color: 'var(--mac-text-primary, #111827)',
 };
@@ -2556,10 +2550,10 @@ const miniAppListItemStyle = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  gap: '12px',
-  padding: '12px',
+  gap: 'var(--mac-spacing-3)',
+  padding: 'var(--mac-spacing-3)',
   border: '1px solid var(--mac-border, rgba(15, 23, 42, 0.12))',
-  borderRadius: '8px',
+  borderRadius: 'var(--mac-radius-md)',
   background: 'var(--mac-bg-secondary, rgba(255, 255, 255, 0.72))',
   flexWrap: 'wrap',
 };
@@ -2569,7 +2563,7 @@ const miniAppCapabilityStyle = {
 };
 
 const miniAppCapabilitySelectedStyle = {
-  outline: '2px solid rgba(23, 92, 211, 0.18)',
+  outline: '2px solid var(--mac-accent-border)',
   outlineOffset: '-2px',
 };
 
@@ -2579,7 +2573,7 @@ const miniAppCapabilityContentStyle = {
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'space-between',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
 };
 
 const miniAppCapabilityHeaderStyle = {
@@ -2591,14 +2585,14 @@ const miniAppCapabilityHeaderStyle = {
 
 const miniAppCapabilityTitleStyle = {
   margin: 0,
-  fontSize: '16px',
+  fontSize: 'var(--mac-font-size-lg)',
   lineHeight: 1.25,
   fontWeight: 750,
 };
 
 const miniAppCapabilityTextStyle = {
   margin: 0,
-  fontSize: '13px',
+  fontSize: 'var(--mac-font-size-sm)',
   lineHeight: 1.4,
   color: 'var(--mac-text-secondary, #5f6b7a)',
   overflowWrap: 'anywhere',

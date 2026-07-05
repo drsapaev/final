@@ -15,7 +15,7 @@
     background: var(--mac-bg-primary, #ffffff);
     border: 1px solid var(--mac-border, #e5e5e5);
     border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 40px color-mix(in srgb, black, transparent 80%);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -61,7 +61,7 @@
 .ai-avatar {
     width: 36px;
     height: 36px;
-    background: rgba(255, 255, 255, 0.2);
+    background: color-mix(in srgb, white, transparent 80%);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -149,7 +149,7 @@
 }
 
 .ai-message.user .message-text {
-    color: #ffffff;
+    color: var(--mac-bg-primary);
     /* White text for user messages */
 }
 
@@ -180,7 +180,7 @@
     position: absolute;
     left: 10px;
     top: 10px;
-    color: #8b5cf6;
+    color: var(--mac-accent-purple);
 }
 
 .copy-btn {
@@ -189,7 +189,7 @@
     bottom: 8px;
     background: transparent;
     border: none;
-    color: #999;
+    color: var(--mac-text-tertiary);
     cursor: pointer;
     padding: 4px;
     border-radius: 4px;
@@ -203,7 +203,7 @@
 
 .copy-btn:hover {
     background: rgba(0, 0, 0, 0.05);
-    color: #666;
+    color: var(--mac-text-secondary);
 }
 
 /* Thinking animation */
@@ -219,7 +219,7 @@
 .dot {
     width: 6px;
     height: 6px;
-    background: #8b5cf6;
+    background: var(--mac-accent-purple);
     border-radius: 50%;
     animation: bounce 1.4s infinite ease-in-out both;
 }
@@ -269,7 +269,7 @@
 }
 
 .ai-chat-input textarea:focus {
-    border-color: #8b5cf6;
+    border-color: var(--mac-accent-purple);
     box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1);
 }
 
@@ -277,7 +277,7 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: #8b5cf6;
+    background: var(--mac-accent-purple);
     color: white;
     border: none;
     display: flex;
@@ -288,7 +288,7 @@
 }
 
 .ai-send-btn:hover:not(:disabled) {
-    background: #7c3aed;
+    background: var(--mac-accent-purple);
     transform: scale(1.05);
 }
 
@@ -297,6 +297,6 @@
 }
 
 .ai-send-btn:disabled {
-    background: #ccc;
+    background: var(--mac-border);
     cursor: not-allowed;
 }

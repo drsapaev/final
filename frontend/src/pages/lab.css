@@ -41,11 +41,11 @@
   clip: auto;
   white-space: nowrap;
   background: var(--mac-accent);
-  color: #ffffff;
+  color: var(--mac-bg-primary);
   border-radius: 8px;
   z-index: 9999;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px color-mix(in srgb, black, transparent 80%);
 }
 
 /* ─── Card header (gradient background + bottom border) ─── */

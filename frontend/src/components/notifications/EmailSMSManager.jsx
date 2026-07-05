@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -36,7 +37,7 @@ import {
 const pageStyles = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '16px',
+  gap: 'var(--mac-spacing-4)',
   width: '100%',
   minWidth: 0,
   padding: 'clamp(12px, 2vw, 20px)'
@@ -46,25 +47,25 @@ const headerStyles = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
   flexWrap: 'wrap'
 };
 
 const gridStyles = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
-  gap: '12px'
+  gap: 'var(--mac-spacing-3)'
 };
 
 const formGridStyles = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
-  gap: '12px'
+  gap: 'var(--mac-spacing-3)'
 };
 
 const stackStyles = {
   display: 'grid',
-  gap: '12px'
+  gap: 'var(--mac-spacing-3)'
 };
 
 const iconButtonStyle = {
@@ -132,7 +133,7 @@ const EmailSMSManager = () => {
   const loadStatistics = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/email-sms/statistics', {
+      const response = await fetch('/email-sms/statistics', {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -148,7 +149,7 @@ const EmailSMSManager = () => {
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch('/api/v1/email-sms/templates', {
+      const response = await fetch('/email-sms/templates', {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -163,7 +164,7 @@ const EmailSMSManager = () => {
   const sendTestEmail = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/email-sms/test-email', {
+      const response = await fetch('/email-sms/test-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +189,7 @@ const EmailSMSManager = () => {
   const sendTestSMS = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/email-sms/test-sms', {
+      const response = await fetch('/email-sms/test-sms', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -213,7 +214,7 @@ const EmailSMSManager = () => {
     try {
       setLoading(true);
       const endpoint = bulkForm.type === 'email' ? 'send-bulk-email' : 'send-bulk-sms';
-      const response = await fetch(`/api/v1/email-sms/${endpoint}`, {
+      const response = await fetch(`/email-sms/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -241,7 +242,7 @@ const EmailSMSManager = () => {
   const resetStatistics = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/email-sms/reset-statistics', {
+      const response = await fetch('/email-sms/reset-statistics', {
         method: 'POST',
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
@@ -344,14 +345,14 @@ const EmailSMSManager = () => {
 
     return (
       <Card padding="small" shadow="small">
-        <CardContent style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+        <CardContent style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)', alignItems: 'flex-start' }}>
           <div>
-            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: '13px', fontWeight: 600 }}>{title}</p>
-            <strong style={{ display: 'block', marginTop: '8px', fontSize: '26px', color: 'var(--mac-text-primary)' }}>
+            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-semibold)' }}>{title}</p>
+            <strong style={{ display: 'block', marginTop: 'var(--mac-spacing-2)', fontSize: '26px', color: 'var(--mac-text-primary)' }}>
               {value}
             </strong>
             {detail && (
-              <span style={{ display: 'block', marginTop: '4px', color: toneColor, fontSize: '12px' }}>
+              <span style={{ display: 'block', marginTop: 'var(--mac-spacing-1)', color: toneColor, fontSize: 'var(--mac-font-size-xs)' }}>
                 {detail}
               </span>
             )}
@@ -479,7 +480,7 @@ const EmailSMSManager = () => {
           minRows={4}
           placeholder="Текст сообщения"
         />
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
           <Button variant="primary" onClick={sendTestEmail} disabled={loading || !emailForm.to} loading={loading && activeTab === 'email'}>
             {loading && activeTab === 'email' ? 'Отправка...' : 'Отправить тест'}
           </Button>
@@ -536,7 +537,7 @@ const EmailSMSManager = () => {
           minRows={3}
           placeholder="Текст SMS сообщения"
         />
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
           <Button variant="success" onClick={sendTestSMS} disabled={loading || !smsForm.phone} loading={loading && activeTab === 'sms'}>
             {loading && activeTab === 'sms' ? 'Отправка...' : 'Отправить тест'}
           </Button>
@@ -618,7 +619,7 @@ const EmailSMSManager = () => {
           placeholder="Текст сообщения"
         />
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
           <Button
             variant="primary"
             onClick={sendBulkNotification}
@@ -673,7 +674,7 @@ const EmailSMSManager = () => {
           </Card>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
           <Button variant="primary">Сохранить настройки</Button>
           <Button variant="danger" onClick={resetStatistics} disabled={loading}>
             Сбросить статистику
@@ -706,10 +707,10 @@ const EmailSMSManager = () => {
     <div style={pageStyles}>
       <div style={headerStyles}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '28px', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--mac-font-size-3xl)', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
             Email/SMS уведомления
           </h1>
-          <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
+          <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
             Управление тестовыми отправками, шаблонами и массовыми рассылками
           </p>
         </div>
@@ -731,7 +732,7 @@ const EmailSMSManager = () => {
 };
 
 const TabLabel = ({ icon: Icon, text }) => (
-  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
     <Icon size={14} />
     {text}
   </span>
@@ -744,10 +745,10 @@ TabLabel.propTypes = {
 
 const ActionCard = ({ icon: Icon, title, description, actionLabel, onAction, variant }) => (
   <Card padding="default" shadow="small">
-    <CardContent style={{ display: 'grid', gap: '12px' }}>
+    <CardContent style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <Icon size={24} style={{ color: variant === 'success' ? 'var(--mac-success)' : 'var(--mac-accent-blue)' }} />
-        <h3 style={{ margin: 0, fontSize: '17px' }}>{title}</h3>
+        <h3 style={{ margin: 0, fontSize: 'var(--mac-font-size-xl)' }}>{title}</h3>
       </div>
       <p style={{ margin: 0, color: 'var(--mac-text-secondary)' }}>{description}</p>
       <Button variant={variant} onClick={onAction} fullWidth>
@@ -774,7 +775,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
       render: (_value, template) => (
         <div style={{ minWidth: '180px' }}>
           <strong>{template.title}</strong>
-          <p style={{ margin: '4px 0 0', color: 'var(--mac-text-secondary)', fontSize: '12px' }}>
+          <p style={{ margin: '4px 0 0', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
             {template.description}
           </p>
         </div>
@@ -784,7 +785,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
       key: 'variables',
       title: 'Переменные',
       render: (_value, template) => (
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)', flexWrap: 'wrap' }}>
           {(template.variables || []).map((variable) => (
             <Badge key={variable} size="small" variant="outline">
               {variable}
@@ -797,7 +798,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
       key: 'actions',
       title: 'Действия',
       render: (_value, template) => (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--mac-spacing-2)' }}>
           <Button variant="ghost" size="small" aria-label={`View template ${template.title}`} style={iconButtonStyle}>
             <Eye size={16} />
           </Button>
@@ -812,7 +813,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
   return (
     <Card padding="default" shadow="small">
       <CardHeader>
-        <CardTitle style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        <CardTitle style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           <Icon size={20} style={{ color: tone }} />
           {title}
         </CardTitle>

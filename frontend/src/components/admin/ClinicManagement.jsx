@@ -129,9 +129,9 @@ const ClinicManagement = () => {
 
 
   const renderOverview = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Состояние системы */}
-      <MacOSCard className="admin-p-16">
+      <MacOSCard className="p-4">
           <div className="admin-d-flex-ai-center-jc-between-mb-16">
           <h3 className="admin-fs-lg-fw-semi-primary-m-0-2">
             Состояние системы
@@ -149,26 +149,26 @@ const ClinicManagement = () => {
         </div>
         
         {systemHealth ?
-      <div className="admin-flex-col-16">
+      <div className="flex flex-col gap-4">
             <div className="admin-flex-center-12">
               <Badge
             variant={systemHealth.status === 'healthy' ? 'success' :
             systemHealth.status === 'warning' ? 'warning' : 'error'}
             text={getHealthLabel(systemHealth.status)} />
           
-              <span className="admin-text-sm admin-text-secondary">
+              <span className="text-sm text-[var(--mac-text-secondary)]">
                 Последняя проверка: {new Date().toLocaleString()}
               </span>
             </div>
             
             {systemHealth.warnings && systemHealth.warnings.length > 0 &&
-        <div className="admin-flex-col-8">
+        <div className="flex flex-col gap-2">
                 <h4 className="admin-fs-sm-fw-med-primary-1">
                   Предупреждения:
                 </h4>
                 {systemHealth.warnings.map((warning, index) =>
           <div key={index} className="admin-d-flex-ai-center-gap-8-fs-sm-warning">
-                    <AlertTriangle className="admin-icon-16" />
+                    <AlertTriangle className="w-4 h-4" />
                     <span>{warning}</span>
                   </div>
           )}
@@ -232,7 +232,7 @@ const ClinicManagement = () => {
     }
 
       {/* Быстрые действия */}
-      <MacOSCard className="admin-p-16">
+      <MacOSCard className="p-4">
           <h3 className="admin-fs-lg-fw-semi-primary-mb-16-1">
             Быстрые действия
           </h3>
@@ -247,7 +247,7 @@ const ClinicManagement = () => {
             e.target.style.transform = 'scale(1)';
           }}>
           
-            <Building2 className="admin-icon-20" />
+            <Building2 className="w-5 h-5" />
             <span>Управление филиалами</span>
           </Button>
           
@@ -262,7 +262,7 @@ const ClinicManagement = () => {
             e.target.style.transform = 'scale(1)';
           }}>
           
-            <Wrench className="admin-icon-20" />
+            <Wrench className="w-5 h-5" />
             <span>Управление оборудованием</span>
           </Button>
           
@@ -277,7 +277,7 @@ const ClinicManagement = () => {
             e.target.style.transform = 'scale(1)';
           }}>
           
-            <Key className="admin-icon-20" />
+            <Key className="w-5 h-5" />
             <span>Управление лицензиями</span>
           </Button>
           
@@ -292,51 +292,51 @@ const ClinicManagement = () => {
             e.target.style.transform = 'scale(1)';
           }}>
           
-            <HardDrive className="admin-icon-20" />
+            <HardDrive className="w-5 h-5" />
             <span>Резервное копирование</span>
           </Button>
         </div>
       </MacOSCard>
 
       {/* Системная информация */}
-      <MacOSCard className="admin-p-16">
+      <MacOSCard className="p-4">
           <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
             Системная информация
           </h3>
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-fw-wrap">
-          <div className="admin-flex-col-8">
+          <div className="flex flex-col gap-2">
             <div className="admin-d-flex-jc-between-fs-sm-5">
-              <span className="admin-text-secondary">Версия системы:</span>
+              <span className="text-[var(--mac-text-secondary)]">Версия системы:</span>
               <span className="admin-fw-med-primary-3">
                 1.0.0
               </span>
             </div>
             <div className="admin-d-flex-jc-between-fs-sm-4">
-              <span className="admin-text-secondary">База данных:</span>
+              <span className="text-[var(--mac-text-secondary)]">База данных:</span>
               <span className="admin-fw-med-primary-2">
                 SQLite
               </span>
             </div>
             <div className="admin-d-flex-jc-between-fs-sm-3">
-              <span className="admin-text-secondary">Статус БД:</span>
+              <span className="text-[var(--mac-text-secondary)]">Статус БД:</span>
               <Badge variant="success" text="Подключена" />
             </div>
           </div>
-          <div className="admin-flex-col-8">
+          <div className="flex flex-col gap-2">
             <div className="admin-d-flex-jc-between-fs-sm-2">
-              <span className="admin-text-secondary">Последнее обновление:</span>
+              <span className="text-[var(--mac-text-secondary)]">Последнее обновление:</span>
               <span className="admin-fw-med-primary-1">
                 {new Date().toLocaleDateString()}
               </span>
             </div>
             <div className="admin-d-flex-jc-between-fs-sm-1">
-              <span className="admin-text-secondary">Время работы:</span>
+              <span className="text-[var(--mac-text-secondary)]">Время работы:</span>
               <span className="admin-fw-med-primary">
                 24/7
               </span>
             </div>
             <div className="admin-d-flex-jc-between-fs-sm">
-              <span className="admin-text-secondary">Безопасность:</span>
+              <span className="text-[var(--mac-text-secondary)]">Безопасность:</span>
               <Badge variant="success" text="Активна" />
             </div>
           </div>
@@ -350,7 +350,7 @@ const ClinicManagement = () => {
   if (loading) {
     return (
       <div className="admin-p-0-bgc-bg-primary-2">
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <div className="admin-d-flex-ai-center-gap-12-mb-24-1">
             <Building2 className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0-1">
@@ -367,7 +367,7 @@ const ClinicManagement = () => {
   if (error && !stats) {
     return (
       <div className="admin-p-0-bgc-bg-primary-1">
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <div className="admin-d-flex-ai-center-gap-12-mb-24">
             <Building2 className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
@@ -380,7 +380,7 @@ const ClinicManagement = () => {
             description="Проверьте подключение к серверу и попробуйте обновить страницу"
             action={
             <Button onClick={loadSystemData} variant="primary">
-                <RefreshCw className="admin-icon-16-mr-8" />
+                <RefreshCw className="w-4 h-4 mr-2" />
                 Попробовать снова
               </Button>
             } />
@@ -412,7 +412,7 @@ const ClinicManagement = () => {
             type={message.type === 'success' ? 'success' : 'error'}
             title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
             message={message.text}
-            className="admin-mb-24" />
+            className="mb-6" />
 
           }
 
@@ -422,7 +422,7 @@ const ClinicManagement = () => {
             type="warning"
             title="Предупреждение"
             message={error}
-            className="admin-mb-24" />
+            className="mb-6" />
 
           }
 
@@ -467,7 +467,7 @@ const ClinicManagement = () => {
         size="sm"
         className="admin-z-9999">
         
-        <div className="admin-p-24">
+        <div className="p-6">
           <p className="admin-fs-base-primary-mb-24-lh-1p5">
             Вы уверены, что хотите выполнить это действие? 
             Это может повлиять на работу системы.
@@ -484,7 +484,7 @@ const ClinicManagement = () => {
               onClick={handleConfirmAction}
               className="admin-bgc-blue-bd-none">
               
-              <CheckCircle className="admin-icon-16-mr-8" />
+              <CheckCircle className="w-4 h-4 mr-2" />
               Подтвердить
             </Button>
           </div>

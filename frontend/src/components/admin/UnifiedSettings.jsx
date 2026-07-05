@@ -12,7 +12,7 @@ import SecuritySettings from './SecuritySettings';
 import WizardSettings from './WizardSettings';
 import ClinicSettings from './ClinicSettings';
 import ColorSchemeSelector from './ColorSchemeSelector.jsx';
-import AccentPicker from '../ui/macos/AccentPicker.jsx';
+import { AccentPicker } from '../ui/macos';
 // P-025 fix: shared loading/error/empty wrapper for Unified* panels.
 import StateWrapper from '../common/StateWrapper.jsx';
 

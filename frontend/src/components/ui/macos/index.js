@@ -31,6 +31,13 @@ export { default as MacOSEmptyState } from './MacOSEmptyState';
 export { default as Skeleton } from './Skeleton';
 export { default as Alert } from './Alert';
 export { default as Modal } from './Modal';
+// UX Audit Registrar #1: AccentPicker — экспортируем из macos index,
+// чтобы `import { AccentPicker } from '../components/ui/macos'` работал.
+// Раньше файл существовал, но не был в barrel-export, из-за чего production-build падал.
+export { default as AccentPicker } from './AccentPicker';
+// UX Audit Registrar #1: AnimatedTransition — экспортируем из macos index.
+// Используется в DoctorPanel и др. До этого build падал на этом импорте.
+export { default as AnimatedTransition } from './AnimatedTransition';
 
 // Basic UI Components
 export { default as Box } from './Box';

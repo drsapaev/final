@@ -1006,7 +1006,7 @@ const TelegramManager = () => {
     borderRadius: 'var(--mac-radius-lg)',
     background: 'var(--mac-bg-secondary, rgba(238, 246, 255, 0.88))',
     boxShadow: 'var(--mac-shadow-sm)',
-    padding: '16px'
+    padding: 'var(--mac-spacing-4)'
   };
   const capabilityGridStyle = {
     display: 'grid',
@@ -1018,11 +1018,11 @@ const TelegramManager = () => {
     borderRadius: 'var(--mac-radius-md)',
     background: 'var(--mac-card-bg, rgba(255, 255, 255, 0.82))',
     boxShadow: 'var(--mac-shadow-sm)',
-    padding: '12px',
+    padding: 'var(--mac-spacing-3)',
     minHeight: 136,
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px'
+    gap: 'var(--mac-spacing-2)'
   };
   const capabilityIconStyle = {
     width: 28,
@@ -1768,7 +1768,7 @@ const TelegramManager = () => {
                         }}>
                         <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2} sx={{ flexWrap: 'wrap' }} mb={2}>
                           <Box>
-                            <Typography variant="body1" style={{ fontWeight: 600 }}>
+                            <Typography variant="body1" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
                               Request #{requestId}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -1870,7 +1870,7 @@ const TelegramManager = () => {
                                       }}>
                                       <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1} sx={{ flexWrap: 'wrap' }}>
                                         <Box>
-                                          <Typography variant="body2" style={{ fontWeight: 600 }}>
+                                          <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
                                             {maskedName}
                                           </Typography>
                                           <Typography variant="caption" color="text.secondary">
@@ -1987,7 +1987,7 @@ const TelegramManager = () => {
                                   <Typography variant="caption" color="text.secondary">
                                     Patient-facing safe message
                                   </Typography>
-                                  <Typography variant="body2" style={{ marginTop: 6, fontWeight: 600 }}>
+                                  <Typography variant="body2" style={{ marginTop: 6, fontWeight: 'var(--mac-font-weight-semibold)' }}>
                                     {notificationPreview.title}
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
@@ -2150,7 +2150,7 @@ const TelegramManager = () => {
                   padding: 12,
                   background: 'var(--mac-bg-secondary)'
                 }}>
-                <Typography variant="body2" style={{ fontWeight: 600 }}>
+                <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
                   Request #{dialogRequest.id}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
@@ -2188,7 +2188,7 @@ const TelegramManager = () => {
                       padding: 12,
                       background: 'var(--mac-bg-primary)'
                     }}>
-                    <Typography variant="body2" style={{ fontWeight: 600 }}>
+                    <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
                       {getCandidateValue(dialogSelectedCandidate, 'maskedName', 'masked_name', 'Masked patient')}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>

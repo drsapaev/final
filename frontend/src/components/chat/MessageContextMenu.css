@@ -46,7 +46,7 @@
 }
 
 .message-context-menu button.delete:hover {
-    background-color: #FF3B30;
+    background-color: var(--mac-error);
     color: white;
 }
 

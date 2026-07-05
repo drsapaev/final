@@ -6,6 +6,7 @@
  * - Mass cancellation with refund
  * - Safety confirmation (dry run + type CONFIRM)
  */
+import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import {
   AlertTriangle,
@@ -23,6 +24,7 @@ import { tokenManager } from '../../utils/tokenManager';
 import ModernDialog from '../dialogs/ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 const ForceMajeureModal = ({
   isOpen,
@@ -50,25 +52,13 @@ const ForceMajeureModal = ({
     if (!specialistId) return;
 
     try {
-      const token = getAuthToken();
-      const response = await fetch(
-        `/api/v1/force-majeure/pending-entries?specialist_id=${specialistId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setDryRunResult({
-          count: data.length,
-          entries: data,
-          totalAmount: data.reduce((sum, e) => sum + (e.total_amount || 0), 0)
-        });
-      }
+      const response = await api.get(`/force-majeure/pending-entries?specialist_id=${specialistId}`);
+      const data = response.data;
+      setDryRunResult({
+        count: data.length,
+        entries: data,
+        totalAmount: data.reduce((sum, e) => sum + (e.total_amount || 0), 0)
+      });
     } catch (err) {
       logger.error('[ForceMajeureModal] Error loading pending entries:', err);
     }
@@ -102,29 +92,16 @@ const ForceMajeureModal = ({
     setError(null);
 
     try {
-      const token = getAuthToken();
-      const response = await fetch('/api/v1/force-majeure/transfer', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const response = await api.post('/force-majeure/transfer', {
           specialist_id: specialistId,
           reason: reason,
           send_notifications: true
-        })
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setSuccess(`Перенесено записей: ${result.transferred || 0}`);
-        logger.log('[ForceMajeureModal] Transfer successful:', result);
-        if (onSuccess) onSuccess('transfer', result);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка переноса');
-      }
+      const result = response.data;
+      setSuccess(`Перенесено записей: ${result.transferred || 0}`);
+      logger.log('[ForceMajeureModal] Transfer successful:', result);
+      if (onSuccess) onSuccess('transfer', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Transfer error:', err);
       setError(err.message || 'Ошибка сети');
@@ -149,30 +126,17 @@ const ForceMajeureModal = ({
     setError(null);
 
     try {
-      const token = getAuthToken();
-      const response = await fetch('/api/v1/force-majeure/cancel-with-refund', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          specialist_id: specialistId,
-          reason: reason,
-          refund_type: refundType,
-          send_notifications: true
-        })
+      const response = await api.post('/force-majeure/cancel-with-refund', {
+        specialist_id: specialistId,
+        reason: reason,
+        refund_type: refundType,
+        send_notifications: true
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setSuccess(`Отменено записей: ${result.cancelled || 0}, возвратов: ${result.refunds_created || 0}`);
-        logger.log('[ForceMajeureModal] Cancel successful:', result);
-        if (onSuccess) onSuccess('cancel', result);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка отмены');
-      }
+      const result = response.data;
+      setSuccess(`Отменено записей: ${result.cancelled || 0}, возвратов: ${result.refunds_created || 0}`);
+      logger.log('[ForceMajeureModal] Cancel successful:', result);
+      if (onSuccess) onSuccess('cancel', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Cancel error:', err);
       setError(err.message || 'Ошибка сети');
@@ -196,10 +160,10 @@ const ForceMajeureModal = ({
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
-      gap: '16px',
+      gap: 'var(--mac-spacing-4)',
       width: '100%'
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--mac-spacing-3)', minWidth: 0 }}>
         <div style={{
           width: '40px',
           height: '40px',
@@ -212,7 +176,7 @@ const ForceMajeureModal = ({
             ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.2))'
             : 'linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.16))',
           border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.18)'}`,
-          color: '#d97706',
+          color: 'var(--mac-warning-hover, var(--mac-warning))',
           boxShadow: '0 10px 24px rgba(245, 158, 11, 0.12)'
         }}>
           <AlertTriangle size={20} />
@@ -220,8 +184,8 @@ const ForceMajeureModal = ({
         <div style={{ minWidth: 0 }}>
           <h2 style={{
             margin: 0,
-            fontSize: '18px',
-            fontWeight: 600,
+            fontSize: 'var(--mac-font-size-xl)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: getColor('textPrimary'),
             lineHeight: 1.2
           }}>
@@ -229,7 +193,7 @@ const ForceMajeureModal = ({
           </h2>
           <p style={{
             margin: '4px 0 0',
-            fontSize: '13px',
+            fontSize: 'var(--mac-font-size-sm)',
             color: getColor('textSecondary'),
             lineHeight: 1.4
           }}>
@@ -288,13 +252,13 @@ const ForceMajeureModal = ({
       closeOnEscape={!loading}
       showCloseButton={false}
       dialogStyle={dialogSurfaceStyle}>
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
         <div style={{
           display: 'flex',
-          gap: '8px',
-          padding: '6px',
+          gap: 'var(--mac-spacing-2)',
+          padding: 'var(--mac-spacing-2)',
           borderRadius: '14px',
-          background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(148, 163, 184, 0.12)',
+          background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'rgba(148, 163, 184, 0.12)',
           border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(148, 163, 184, 0.16)'}`
         }}>
           <button
@@ -304,15 +268,15 @@ const ForceMajeureModal = ({
               flex: 1,
               padding: '10px 12px',
               border: 'none',
-              borderRadius: '10px',
+              borderRadius: 'var(--mac-radius-lg)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              color: activeTab === 'transfer' ? '#1d4ed8' : getColor('textSecondary'),
+              gap: 'var(--mac-spacing-2)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: activeTab === 'transfer' ? 'var(--mac-accent-blue-hover)' : getColor('textSecondary'),
               background: activeTab === 'transfer'
                 ? (theme === 'dark' ? 'rgba(59, 130, 246, 0.16)' : 'white')
                 : 'transparent',
@@ -328,15 +292,15 @@ const ForceMajeureModal = ({
               flex: 1,
               padding: '10px 12px',
               border: 'none',
-              borderRadius: '10px',
+              borderRadius: 'var(--mac-radius-lg)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              color: activeTab === 'cancel' ? '#dc2626' : getColor('textSecondary'),
+              gap: 'var(--mac-spacing-2)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: activeTab === 'cancel' ? 'var(--mac-error)' : getColor('textSecondary'),
               background: activeTab === 'cancel'
                 ? (theme === 'dark' ? 'rgba(239, 68, 68, 0.14)' : 'white')
                 : 'transparent',
@@ -349,20 +313,20 @@ const ForceMajeureModal = ({
 
         {dryRunResult &&
         <div style={{
-          background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'var(--mac-bg-secondary)',
-          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+          background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'var(--mac-bg-secondary)',
+          border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
           borderRadius: '14px',
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
-          <Users size={32} color={theme === 'dark' ? '#9ca3af' : '#6b7280'} />
+          <Users size={32} color={theme === 'dark' ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)'} />
           <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: getColor('textPrimary') }}>
+            <p style={{ margin: 0, fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: getColor('textPrimary') }}>
               {dryRunResult.count} записей
             </p>
-            <p style={{ margin: 0, fontSize: '13px', color: getColor('textSecondary') }}>
+            <p style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: getColor('textSecondary') }}>
               будут {activeTab === 'transfer' ? 'перенесены' : 'отменены'}
               {dryRunResult.totalAmount > 0 && ` • ${dryRunResult.totalAmount.toLocaleString()} сум`}
             </p>
@@ -375,7 +339,7 @@ const ForceMajeureModal = ({
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              padding: '8px',
+              padding: 'var(--mac-spacing-2)',
               color: getColor('textSecondary')
             }}
             aria-label="Обновить список">
@@ -387,10 +351,10 @@ const ForceMajeureModal = ({
         <div>
           <label style={{
             display: 'block',
-            marginBottom: '8px',
-            fontWeight: 500,
+            marginBottom: 'var(--mac-spacing-2)',
+            fontWeight: 'var(--mac-font-weight-medium)',
             color: getColor('textPrimary'),
-            fontSize: '14px'
+            fontSize: 'var(--mac-font-size-base)'
           }}>
             Причина *
           </label>
@@ -402,18 +366,18 @@ const ForceMajeureModal = ({
             style={{
               width: '100%',
               padding: '12px 14px',
-              border: `1px solid ${error ? '#ef4444' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'var(--mac-border)'}`,
-              borderRadius: '12px',
-              fontSize: '14px',
+              border: `1px solid ${error ? 'var(--mac-error)' : theme === 'dark' ? 'color-mix(in srgb, white, transparent 90%)' : 'var(--mac-border)'}`,
+              borderRadius: 'var(--mac-radius-lg)',
+              fontSize: 'var(--mac-font-size-base)',
               minHeight: '96px',
               resize: 'vertical',
               color: getColor('textPrimary'),
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
+              backgroundColor: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
               fontFamily: 'inherit',
               outline: 'none'
             }} />
           {!isReasonValid && reason.length > 0 &&
-          <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#ef4444' }}>
+          <p style={{ margin: '6px 0 0', fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-error)' }}>
             Минимум 5 символов
           </p>
           }
@@ -423,20 +387,20 @@ const ForceMajeureModal = ({
         <div style={{ display: 'grid', gap: '10px' }}>
           <label style={{
             display: 'block',
-            marginBottom: '2px',
-            fontWeight: 500,
+            marginBottom: 'var(--mac-spacing-1)',
+            fontWeight: 'var(--mac-font-weight-medium)',
             color: getColor('textPrimary'),
-            fontSize: '14px'
+            fontSize: 'var(--mac-font-size-base)'
           }}>
             Тип возврата
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--mac-spacing-3)' }}>
             <label style={{
-              padding: '12px',
-              border: refundType === 'deposit' ? '1px solid #3b82f6' : `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
-              borderRadius: '12px',
+              padding: 'var(--mac-spacing-3)',
+              border: refundType === 'deposit' ? '1px solid var(--mac-accent-blue)' : `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
+              borderRadius: 'var(--mac-radius-lg)',
               cursor: 'pointer',
-              background: refundType === 'deposit' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : '#eff6ff') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
+              background: refundType === 'deposit' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white')
             }}>
               <input
                 type="radio"
@@ -446,15 +410,15 @@ const ForceMajeureModal = ({
                 checked={refundType === 'deposit'}
                 onChange={(e) => setRefundType(e.target.value)}
                 style={{ display: 'none' }} />
-              <div style={{ fontWeight: 600, color: getColor('textPrimary'), fontSize: '14px' }}>На депозит</div>
-              <div style={{ fontSize: '12px', color: getColor('textSecondary'), marginTop: '4px' }}>Мгновенно на баланс</div>
+              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: getColor('textPrimary'), fontSize: 'var(--mac-font-size-base)' }}>На депозит</div>
+              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: getColor('textSecondary'), marginTop: 'var(--mac-spacing-1)' }}>Мгновенно на баланс</div>
             </label>
             <label style={{
-              padding: '12px',
-              border: refundType === 'bank_transfer' ? '1px solid #3b82f6' : `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
-              borderRadius: '12px',
+              padding: 'var(--mac-spacing-3)',
+              border: refundType === 'bank_transfer' ? '1px solid var(--mac-accent-blue)' : `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
+              borderRadius: 'var(--mac-radius-lg)',
               cursor: 'pointer',
-              background: refundType === 'bank_transfer' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : '#eff6ff') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
+              background: refundType === 'bank_transfer' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white')
             }}>
               <input
                 type="radio"
@@ -464,26 +428,26 @@ const ForceMajeureModal = ({
                 checked={refundType === 'bank_transfer'}
                 onChange={(e) => setRefundType(e.target.value)}
                 style={{ display: 'none' }} />
-              <div style={{ fontWeight: 600, color: getColor('textPrimary'), fontSize: '14px' }}>На карту</div>
-              <div style={{ fontSize: '12px', color: getColor('textSecondary'), marginTop: '4px' }}>Заявка на возврат</div>
+              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: getColor('textPrimary'), fontSize: 'var(--mac-font-size-base)' }}>На карту</div>
+              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: getColor('textSecondary'), marginTop: 'var(--mac-spacing-1)' }}>Заявка на возврат</div>
             </label>
           </div>
         </div>
         }
 
         <div style={{
-          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
-          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : '#fecaca'}`,
+          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
+          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
           borderRadius: '14px',
-          padding: '16px'
+          padding: 'var(--mac-spacing-4)'
         }}>
-          <p style={{ margin: '0 0 10px', fontSize: '14px', color: '#991b1b', fontWeight: 600 }}>
+          <p style={{ margin: '0 0 10px', fontSize: 'var(--mac-font-size-base)', color: '#991b1b', fontWeight: 'var(--mac-font-weight-semibold)' }}>
             ⚠️ Это действие нельзя отменить!
           </p>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: theme === 'dark' ? '#fca5a5' : '#7f1d1d' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: theme === 'dark' ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-error)' }}>
             Введите <strong>ПОДТВЕРЖДАЮ</strong> для продолжения:
           </label>
-          <input
+          <Input
             type="text"
             aria-label="Type confirmation phrase"
             value={confirmText}
@@ -492,26 +456,26 @@ const ForceMajeureModal = ({
             style={{
               width: '100%',
               padding: '10px 12px',
-              border: `1px solid ${isConfirmValid ? '#22c55e' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : '#fca5a5'}`,
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: 600,
+              border: `1px solid ${isConfirmValid ? 'var(--mac-success)' : theme === 'dark' ? 'color-mix(in srgb, white, transparent 90%)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
+              borderRadius: 'var(--mac-radius-lg)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               textAlign: 'center',
               letterSpacing: '2px',
               color: getColor('textPrimary'),
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
+              backgroundColor: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
               outline: 'none'
             }} />
         </div>
 
         {error &&
         <div style={{
-          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
-          color: '#dc2626',
+          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
+          color: 'var(--mac-error)',
           padding: '12px 14px',
-          borderRadius: '12px',
-          fontSize: '14px',
-          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : '#fecaca'}`
+          borderRadius: 'var(--mac-radius-lg)',
+          fontSize: 'var(--mac-font-size-base)',
+          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`
         }}>
           {error}
         </div>
@@ -520,10 +484,10 @@ const ForceMajeureModal = ({
         {success &&
         <div style={{
           background: theme === 'dark' ? 'rgba(16, 185, 129, 0.10)' : '#f0fdf4',
-          color: '#16a34a',
+          color: 'var(--mac-success)',
           padding: '12px 14px',
-          borderRadius: '12px',
-          fontSize: '14px',
+          borderRadius: 'var(--mac-radius-lg)',
+          fontSize: 'var(--mac-font-size-base)',
           border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#bbf7d0'}`
         }}>
           ✅ {success}

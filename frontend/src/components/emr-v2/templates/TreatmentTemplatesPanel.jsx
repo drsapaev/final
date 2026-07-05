@@ -14,6 +14,7 @@ import { useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import treatmentTemplatesData from '../../../data/treatmentTemplates.json';
 import './TreatmentTemplatesPanel.css';
+import { Input } from '../../ui/macos';
 
 /**
  * Category metadata
@@ -145,7 +146,7 @@ export function TreatmentTemplatesPanel({
 
                 {/* Search */}
                 <div className="treatment-templates-search">
-                    <input
+                    <Input
                         type="text"
                         aria-label="Поиск шаблона лечения"
                         placeholder="Поиск шаблона..."

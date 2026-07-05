@@ -21,7 +21,7 @@
 }
 
 .emr-status-indicator__version {
-    background: rgba(0, 0, 0, 0.1);
+    background: color-mix(in srgb, black, transparent 90%);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 0.75rem;
@@ -31,8 +31,8 @@
 /* States */
 
 .emr-status-indicator--new {
-    background: #f5f5f5;
-    color: #666;
+    background: var(--mac-bg-secondary);
+    color: var(--mac-text-secondary);
 }
 
 .emr-status-indicator--saved {
@@ -101,5 +101,5 @@
 /* Hover effect */
 .emr-status-indicator:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px color-mix(in srgb, black, transparent 90%);
 }

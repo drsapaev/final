@@ -6,7 +6,7 @@ import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   Button, Badge, Card,
-} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth.js';
 import { apiClient } from '../api/client';
@@ -27,6 +27,7 @@ import DentalTemplatesTab from '../components/dental/DentalTemplatesTab';
 import DentalDashboardTab from '../components/dental/DentalDashboardTab';
 import DentalPatientsTab from '../components/dental/DentalPatientsTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import SessionWarningModal from '../components/common/SessionWarningModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 
@@ -2282,7 +2283,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата осмотра *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата осмотра"
                     value={examinationForm.examination_date}
@@ -2357,7 +2358,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Отсутствующие зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Отсутствующие зубы"
                     value={examinationForm.missing_teeth}
@@ -2456,7 +2457,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата лечения *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата лечения"
                     value={treatmentForm.treatment_date}
@@ -2487,7 +2488,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Вовлеченные зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Зубы в лечении"
                     value={treatmentForm.teeth_involved}
@@ -2498,7 +2499,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
-                    <input
+                    <Input
                     type="number"
                     aria-label="Стоимость лечения"
                     value={treatmentForm.cost}
@@ -2524,7 +2525,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Материалы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Использованные материалы"
                     value={treatmentForm.materials_used}
@@ -2552,7 +2553,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Осложнения</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Осложнения лечения"
                     value={treatmentForm.complications}
@@ -2563,7 +2564,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата контроля</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата повторного приёма"
                     value={treatmentForm.follow_up_date}
@@ -2623,7 +2624,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата протезирования *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата протезирования"
                     value={prostheticForm.prosthetic_date}
@@ -2654,7 +2655,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Заменяемые зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Замещённые зубы"
                     value={prostheticForm.teeth_replaced}
@@ -2683,7 +2684,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Оттенок</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Оттенок протеза"
                     value={prostheticForm.shade}
@@ -2694,7 +2695,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
-                    <input
+                    <Input
                     type="number"
                     aria-label="Стоимость протеза"
                     value={prostheticForm.cost}
@@ -2739,7 +2740,7 @@ const DentistPanelUnified = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Гарантийный период</label>
-                  <input
+                  <Input
                   type="text"
                   aria-label="Гарантийный срок"
                   value={prostheticForm.warranty_period}
@@ -2830,36 +2831,11 @@ const DentistPanelUnified = () => {
 
       {/* C-2 (UX audit): session timeout warning dialog */}
       {sessionWarning && (
-        <div
-          role="alertdialog"
-          aria-label="Предупреждение об истечении сессии"
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.5)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-          }}
-        >
-          <div style={{
-            background: 'var(--mac-surface, white)', border: '1px solid var(--mac-border, #d8dde8)',
-            borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '90%',
-          }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--mac-text-primary, #1a1d29)' }}>
-              Сессия скоро истечёт
-            </h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--mac-text-secondary, #6b7280)', lineHeight: 1.5 }}>
-              Ваша сессия истекает. Несохранённые данные могут быть потеряны.
-              Сохраните текущий приём или продлите сессию.
-            </p>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setSessionWarning(null)} style={{ padding: '8px 16px', border: '1px solid var(--mac-border, #d8dde8)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontSize: '14px' }}>
-                Позже
-              </button>
-              <button onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', background: 'var(--mac-accent, #dc2626)', color: 'white', cursor: 'pointer', fontSize: '14px' }}>
-                Продлить сессию
-              </button>
-            </div>
-          </div>
-        </div>
+        <SessionWarningModal
+          visible={!!sessionWarning}
+          onDismiss={() => setSessionWarning(null)}
+          onExtend={() => notify.info('Продлеваем сессию...')}
+        />
       )}
     </div>);
 

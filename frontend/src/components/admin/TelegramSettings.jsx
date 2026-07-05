@@ -156,16 +156,16 @@ const TelegramSettings = () => {
       <MacOSCard className="admin-p-32">
         <div className="admin-flex-ai-center-jc-center">
           <RefreshCw className="admin-w-20-h-20-mr-8-anim-spin1slinearinfinite" />
-          <span className="admin-text-primary">Загрузка Telegram настроек...</span>
+          <span className="text-[var(--mac-text-primary)]">Загрузка Telegram настроек...</span>
         </div>
       </MacOSCard>);
 
   }
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       {/* Заголовок */}
-      <div className="admin-flex-between">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="admin-2xl-semi-primary-m-0-mb-4">
             Настройки Telegram
@@ -177,14 +177,14 @@ const TelegramSettings = () => {
 
         <div className="admin-flex-gap-12">
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw className="admin-icon-16-mr-8" />
+            <RefreshCw className="w-4 h-4 mr-2" />
             Обновить
           </Button>
           <Button onClick={saveSettings} disabled={saving}>
             {saving ?
             <RefreshCw className="admin-w-16-h-16-mr-8-anim-spin1slinearinfinite" /> :
 
-            <Save className="admin-icon-16-mr-8" />
+            <Save className="w-4 h-4 mr-2" />
             }
             Сохранить
           </Button>
@@ -215,7 +215,7 @@ const TelegramSettings = () => {
           <div className="admin-2xl-bold-blue-mb-8">
             {stats.total_users || 0}
           </div>
-          <div className="admin-text-sm admin-text-secondary">
+          <div className="text-sm text-[var(--mac-text-secondary)]">
             Всего пользователей
           </div>
         </MacOSCard>
@@ -223,7 +223,7 @@ const TelegramSettings = () => {
           <div className="admin-2xl-bold-success-mb-8">
             {stats.messages_sent || 0}
           </div>
-          <div className="admin-text-sm admin-text-secondary">
+          <div className="text-sm text-[var(--mac-text-secondary)]">
             Сообщений отправлено
           </div>
         </MacOSCard>
@@ -231,7 +231,7 @@ const TelegramSettings = () => {
           <div className="admin-2xl-bold-warning-mb-8">
             {stats.messages_delivered || 0}
           </div>
-          <div className="admin-text-sm admin-text-secondary">
+          <div className="text-sm text-[var(--mac-text-secondary)]">
             Доставлено
           </div>
         </MacOSCard>
@@ -239,7 +239,7 @@ const TelegramSettings = () => {
           <div className="admin-2xl-bold-error-mb-8">
             {stats.messages_failed || 0}
           </div>
-          <div className="admin-text-sm admin-text-secondary">
+          <div className="text-sm text-[var(--mac-text-secondary)]">
             Ошибок
           </div>
         </MacOSCard>
@@ -247,13 +247,13 @@ const TelegramSettings = () => {
 
       <div className="admin-grid-gtc-rauto-fitcminmax400pxc1fr-gap-24">
         {/* Основные настройки */}
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
             <Bot className="admin-w-20-h-20-mr-8-blue" />
             Настройки бота
           </h3>
 
-          <div className="admin-flex-col-16">
+          <div className="flex flex-col gap-4">
             <div>
               <label className="admin-block-sm-med-primary-mb-8">
                 <Key className="admin-w-16-h-16-inline-mr-4" />
@@ -275,7 +275,7 @@ const TelegramSettings = () => {
                   onClick={() => setShowToken(!showToken)}
                   className="admin-bordertopleftradius-e03ef8-borderbottomleftradius-355679">
                   
-                  {showToken ? <EyeOff className="admin-icon-16" /> : <Eye className="admin-icon-16" />}
+                  {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
               <p className="admin-sm-secondary-mt-4-m-0">
@@ -290,10 +290,10 @@ const TelegramSettings = () => {
                   Информация о боте:
                 </h4>
                 <div className="admin-sm-flex-col-gap-4">
-                  <div className="admin-text-primary"><strong>Username:</strong> @{botInfo.username}</div>
-                  <div className="admin-text-primary"><strong>Имя:</strong> {botInfo.first_name}</div>
-                  <div className="admin-text-primary"><strong>ID:</strong> {botInfo.id}</div>
-                  <div className="admin-text-primary"><strong>Группы:</strong> {botInfo.can_join_groups ? 'Да' : 'Нет'}</div>
+                  <div className="text-[var(--mac-text-primary)]"><strong>Username:</strong> @{botInfo.username}</div>
+                  <div className="text-[var(--mac-text-primary)]"><strong>Имя:</strong> {botInfo.first_name}</div>
+                  <div className="text-[var(--mac-text-primary)]"><strong>ID:</strong> {botInfo.id}</div>
+                  <div className="text-[var(--mac-text-primary)]"><strong>Группы:</strong> {botInfo.can_join_groups ? 'Да' : 'Нет'}</div>
                 </div>
               </div>
             }
@@ -315,11 +315,11 @@ const TelegramSettings = () => {
 
             <div className="admin-flex-gap-12">
               <Button onClick={testBot} disabled={!settings.bot_token}>
-                <TestTube className="admin-icon-16-mr-8" />
+                <TestTube className="w-4 h-4 mr-2" />
                 Тест бота
               </Button>
               <Button onClick={setWebhook} disabled={!settings.bot_token}>
-                <Webhook className="admin-icon-16-mr-8" />
+                <Webhook className="w-4 h-4 mr-2" />
                 Установить webhook
               </Button>
             </div>
@@ -327,14 +327,14 @@ const TelegramSettings = () => {
         </MacOSCard>
 
         {/* Настройки уведомлений */}
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
             <Bell className="admin-w-20-h-20-mr-8-success" />
             Уведомления
           </h3>
 
-          <div className="admin-flex-col-16">
-            <div className="admin-flex-col-12">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               <label className="admin-flex-ai-center">
                 <Checkbox
                   checked={settings.notifications_enabled}
@@ -381,7 +381,7 @@ const TelegramSettings = () => {
                 value={settings.default_language}
                 onChange={(value) => handleSettingChange('default_language', value)}
                 options={DEFAULT_LANGUAGE_OPTIONS}
-                className="admin-w-full"
+                className="w-full"
                 aria-label={'\u042f\u0437\u044b\u043a \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e'}
               ></Select>
               
@@ -401,8 +401,8 @@ const TelegramSettings = () => {
                 </h4>
                 {webhookInfo.webhook_info &&
               <div className="admin-sm-flex-col-gap-4">
-                    <div className="admin-text-primary"><strong>URL:</strong> {webhookInfo.webhook_info.url || 'Не установлен'}</div>
-                    <div className="admin-text-primary"><strong>Обновления:</strong> {webhookInfo.webhook_info.pending_update_count || 0}</div>
+                    <div className="text-[var(--mac-text-primary)]"><strong>URL:</strong> {webhookInfo.webhook_info.url || 'Не установлен'}</div>
+                    <div className="text-[var(--mac-text-primary)]"><strong>Обновления:</strong> {webhookInfo.webhook_info.pending_update_count || 0}</div>
                   </div>
               }
               </div>
@@ -412,7 +412,7 @@ const TelegramSettings = () => {
       </div>
 
       {/* Тестирование */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
           <Send className="admin-w-20-h-20-mr-8-purple" />
           Тестирование отправки сообщений
@@ -428,7 +428,7 @@ const TelegramSettings = () => {
               value={testChatId}
               onChange={(e) => setTestChatId(e.target.value)}
               placeholder="123456789"
-              className="admin-w-full" />
+              className="w-full" />
             
             <p className="admin-sm-secondary-mt-4-m-0">
               ID чата для отправки тестового сообщения
@@ -453,7 +453,7 @@ const TelegramSettings = () => {
             onClick={sendTestMessage}
             disabled={!settings.bot_token || !testChatId || !testMessage}>
             
-            <Send className="admin-icon-16-mr-8" />
+            <Send className="w-4 h-4 mr-2" />
             Отправить тест
           </Button>
         </div>

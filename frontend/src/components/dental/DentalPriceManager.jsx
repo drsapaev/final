@@ -16,6 +16,7 @@ import notify from '../../services/notify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 /**
  * Компонент для указания цены стоматологом после лечения
@@ -194,7 +195,7 @@ const DentalPriceManager = ({
               </label>
               <div className="relative">
                 <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
+                <Input
                   id="dental-final-price"
                   type="text"
                   aria-label="Итоговая цена"
@@ -226,7 +227,7 @@ const DentalPriceManager = ({
               </select>
               
               {reason === 'custom' &&
-              <input
+              <Input
                 id="dental-custom-price-reason"
                 type="text"
                 aria-label="Другая причина изменения цены"

@@ -388,7 +388,7 @@ const GraphQLExplorer = () => {
   };
 
   const sectionCardStyle = {
-    padding: '24px',
+    padding: 'var(--mac-spacing-6)',
     boxShadow: 'var(--mac-shadow-sm)'
   };
 
@@ -399,7 +399,7 @@ const GraphQLExplorer = () => {
   };
 
   const renderExplorerTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Отображение ошибок */}
       {error &&
     <Alert
@@ -470,7 +470,7 @@ const GraphQLExplorer = () => {
           className="admin-w-100pct-ff-Monaco-Consolas-Cour-fs-sm-lh-1p5-rz-vertical-1" />
         
 
-          <div className="admin-mt-16">
+          <div className="mt-4">
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">Переменные (JSON)</label>
             <Textarea
             value={variables}
@@ -525,7 +525,7 @@ const GraphQLExplorer = () => {
 
 
   const renderSchemaTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       <MacOSCard style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
           <Database size={20} />
@@ -558,7 +558,7 @@ const GraphQLExplorer = () => {
                         <span className="admin-fw-semi-primary">
                           {field.name}
                         </span>
-                        <span className="admin-text-secondary">
+                        <span className="text-[var(--mac-text-secondary)]">
                           {field.type?.name || 'Unknown'}
                         </span>
                       </div>

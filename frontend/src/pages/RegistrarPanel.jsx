@@ -6,7 +6,7 @@ import AppointmentContextMenu from '../components/tables/AppointmentContextMenu'
 import ModernTabs from '../components/navigation/ModernTabs';
 import {
   Button, Badge, Icon,
-} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import { AnimatedLoader } from '../components/ui';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
@@ -42,7 +42,6 @@ import { getViewFromPath } from './registrar/registrarNavigation';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
-  API_BASE,
   REGISTRAR_TAB_LABEL_KEYS,
   REGISTRAR_STATUS_LABEL_KEYS,
   normalizePatientGender,
@@ -86,11 +85,17 @@ import { toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver
 
 // API client
 import { api } from '../api/client';
+// UX Audit Registrar #1: getPatient() — централизованный доступ к /patients/{id}.
+// Раньше здесь был raw fetch() с ручным Authorization-хедером.
+import { getPatient } from '../api/patients';
 // ⭐ BATCH API: Для атомарных операций с записями пациента (см. BATCH_UPDATE_ARCHITECTURE.md)
 
 
 // ✅ Форс-мажор модальное окно
 import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
+// UX Audit Registrar #14: extracted DataSourceIndicator and CSV utilities.
+import DataSourceIndicator from './registrar/DataSourceIndicator';
+import { generateCSV, downloadCSV } from './registrar/registrarCsv';
 
 const RegistrarPanel = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
@@ -161,28 +166,27 @@ const RegistrarPanel = () => {
       if (!patientIdFromUrl) return;
 
       try {
-        const token = tokenManager.getAccessToken();
-        if (!token) return;
+        // UX Audit Registrar #1: raw fetch() с ручным Authorization-хедером
+        // заменён на getPatient() из api/patients.
+        // Auth-token добавляется автоматически axios-interceptor'ом в api/client.js.
+        // 401/403 обрабатываются интерсептором (redirect to login или refresh).
+        const patientData = await getPatient(patientIdFromUrl);
+        const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
 
-        const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        // Устанавливаем поисковый запрос с именем пациента
+        setSearchParams((prev) => {
+          const newParams = new URLSearchParams(prev);
+          newParams.set('q', patientName);
+          return newParams;
         });
 
-        if (response.ok) {
-          const patientData = await response.json();
-          const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
-
-          // Устанавливаем поисковый запрос с именем пациента
-          setSearchParams((prev) => {
-            const newParams = new URLSearchParams(prev);
-            newParams.set('q', patientName);
-            return newParams;
-          });
-
-          logger.info('[Registrar] Загружен пациент из URL:', patientName);
-        }
+        logger.info('[Registrar] Загружен пациент из URL:', patientName);
       } catch (error) {
-        logger.error('[Registrar] Не удалось загрузить пациента:', error);
+        // 404 — пациент не найден, не логируем как error.
+        const status = error?.response?.status;
+        if (status !== 404) {
+          logger.error('[Registrar] Не удалось загрузить пациента:', error);
+        }
       }
     };
 
@@ -197,8 +201,7 @@ const RegistrarPanel = () => {
   const [queueProfiles, setQueueProfiles] = useState([]);
 
   // Состояния для печати
-  const [printDialog, setPrintDialog] = useState({ open: false, type: 'ticket', data: null });void
-  useState(null);
+  const [printDialog, setPrintDialog] = useState({ open: false, type: 'ticket', data: null });
   const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
   const [recordPreviewDialog, setRecordPreviewDialog] = useState({ open: false, row: null });
@@ -699,6 +702,30 @@ const RegistrarPanel = () => {
     // setSearchParams is a stable identity from useSearchParams — React Router 6.3+
     // guarantees referential stability, so it is safe to omit from deps.
   }, [searchParams, showWizard]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // UX Audit Registrar #17: Keyboard shortcuts для продуктивности регистратора.
+  // Ctrl+N — новая запись (открыть wizard)
+  // Esc — закрыть wizard/dialogs (если открыт)
+  // Не срабатывает когда фокус в input/textarea (чтобы не мешать вводу).
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Ctrl+N — новая запись
+      if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
+        // Не срабатываем в input/textarea/select
+        const tag = event.target?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        event.preventDefault();
+        if (!showWizard) {
+          setWizardEditMode(false);
+          setWizardInitialData(null);
+          setShowWizard(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showWizard]);  
 
   // ✅ Проверка localStorage для обновления после присоединения к очереди (fallback механизм)
   useEffect(() => {
@@ -1260,113 +1287,8 @@ const RegistrarPanel = () => {
   filteredAppointmentsRef.current = filteredAppointments;
 
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
-  const DataSourceIndicator = memo(({ count }) => {
-    // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
-    // DS-3: inline styles replaced with .registrar-ds-* CSS classes
-    if (dataSource === 'error') {
-      return (
-        <div className="registrar-ds-indicator registrar-ds-error">
-          <Icon name="exclamationmark.triangle" size="small" className="registrar-text-white" />
-          <span>Не удалось загрузить записи. Проверьте подключение к серверу.</span>
-          <button
-            onClick={() => loadAppointments({ source: 'error_refresh_button', force: true })}
-            className="registrar-ds-retry-btn">
-
-            Повторить
-          </button>
-        </div>);
-
-    }
-
-    if (dataSource === 'api') {
-      return (
-        <div className="registrar-ds-indicator registrar-ds-success">
-          <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
-          <span>Данные загружены с сервера</span>
-          <span className="registrar-ds-count">
-            {count} из {paginationInfo.total} записей
-          </span>
-        </div>);
-
-    }
-
-    if (dataSource === 'loading') {
-      return (
-        <div className="registrar-ds-indicator registrar-ds-loading">
-          <Icon name="arrow.up.arrow.down" size="small" className="registrar-text-white" />
-          <span>Загрузка данных...</span>
-        </div>);
-
-    }
-
-    return null;
-  });
-
-  DataSourceIndicator.displayName = 'DataSourceIndicator';
-  DataSourceIndicator.propTypes = {
-    count: PropTypes.number.isRequired,
-  };
-
-  // Функция генерации CSV
-  const generateCSV = (data) => {
-    const headers = ['№', 'ФИО', 'Год рождения', 'Телефон', 'Услуги', 'Тип обращения', 'Вид оплаты', 'Стоимость', 'Статус'];
-    const rows = data.map((row, index) => [
-    index + 1,
-    row.patient_fio || '',
-    row.patient_birth_year || '',
-    // R-05 fix: маскируем телефон в CSV-экспорте
-    maskPhoneForCSV(row.patient_phone || ''),
-    Array.isArray(row.services) ? row.services.join('; ') : row.services || '',
-    row.visit_type || '',
-    row.payment_type || '',
-    row.cost || '',
-    row.status || '']
-    );
-
-    // R-23 fix: CSV injection protection (CWE-1236).
-    // Экранируем двойные кавычки (CSV standard: " → "")
-    // и префиксируем опасные символы (=, +, -, @) одинарной кавычкой,
-    // чтобы Excel/LibreOffice не интерпретировали их как формулы.
-    const escapeCSVCell = (value) => {
-      const str = String(value ?? '');
-      let escaped = str.replace(/"/g, '""');
-      if (/^[=+\-@]/.test(escaped)) {
-        escaped = '\'' + escaped;
-      }
-      return `"${escaped}"`;
-    };
-
-    const csvContent = [
-    headers.join(','),
-    ...rows.map((row) => row.map(escapeCSVCell).join(','))].
-    join('\n');
-
-    return csvContent;
-  };
-
-  // R-05 fix: маскирование телефона для CSV-экспорта.
-  function maskPhoneForCSV(phone) {
-    if (!phone) return '';
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length < 4) return '***';
-    const lastTwo = digits.slice(-2);
-    const countryMatch = phone.match(/^\+\d{1,3}/);
-    const country = countryMatch ? countryMatch[0] : '+';
-    return `${country} ***-**-${lastTwo}`;
-  }
-
-  // Функция скачивания CSV
-  const downloadCSV = (content, filename) => {
-    const blob = new Blob(['\ufeff' + content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  // UX Audit Registrar #14: DataSourceIndicator, generateCSV, downloadCSV
+  // extracted to ./registrar/DataSourceIndicator.jsx and ./registrar/registrarCsv.js.
 
 
   // Обработчик действий контекстного меню
@@ -1559,7 +1481,14 @@ const RegistrarPanel = () => {
             handleStartVisit={handleStartVisit}
             generateCSV={generateCSV}
             downloadCSV={downloadCSV}
-            DataSourceIndicator={DataSourceIndicator}
+            DataSourceIndicator={() => (
+              <DataSourceIndicator
+                dataSource={dataSource}
+                count={appointments.length}
+                paginationInfo={paginationInfo}
+                onRetry={loadAppointments}
+              />
+            )}
           />
         )}
 
@@ -1673,12 +1602,12 @@ const RegistrarPanel = () => {
               language={language}
               outerBorder={false}
               services={services}
-              showCheckboxes={false} // ✅ Отключаем чекбоксы для регистратуры
+              showCheckboxes={true} // UX Audit Registrar #13: включаем чекбоксы для bulk print
               onRowClick={(row) => {
                 logger.info('Открыть детали записи:', row);
                 // Здесь можно открыть модальное окно с деталями записи
               }}
-              onActionClick={(action, row, event) => {
+              onActionClick={async (action, row, event) => {
                 switch (action) {
                   case 'view':
                     logger.info('Просмотр записи:', row);
@@ -1692,26 +1621,42 @@ const RegistrarPanel = () => {
                     logger.info('Открытие модального окна оплаты для записи:', row);
                     setPaymentDialog({ open: true, row, paid: false, source: 'table' });
                     break;
-                  case 'in_cabinet':
-                    // UX Audit Registrar #15: confirmation перед отправкой в кабинет.
-                    if (!window.confirm(`Отправить пациента "${row.patient_fio || row.patient_name || ''}" в кабинет?`)) {
-                      break;
-                    }
+                  case 'in_cabinet': {
+                    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+                    // Раньше: if (!window.confirm(`Отправить пациента "..." в кабинет?`)) break;
+                    // Теперь: macOS-style ConfirmDialog через useConfirm.
+                    const inCabinetName = row.patient_fio || row.patient_name || '';
+                    const inCabinetOk = await confirm({
+                      title: 'Отправить в кабинет',
+                      message: `Отправить пациента «${inCabinetName}» в кабинет?`,
+                      confirmLabel: 'Отправить',
+                      cancelLabel: 'Отмена',
+                      intent: 'primary',
+                    });
+                    if (!inCabinetOk) break;
                     logger.info('Отправка пациента в кабинет:', row);
                     updateAppointmentStatus(row.id, 'in_cabinet', '', row);
                     break;
+                  }
                   case 'call':
                     logger.info('Вызов пациента:', row);
                     handleStartVisit(row);
                     break;
-                  case 'complete':
-                    // UX Audit Registrar #15: confirmation перед завершением приёма.
-                    if (!window.confirm(`Завершить приём пациента "${row.patient_fio || row.patient_name || ''}"?`)) {
-                      break;
-                    }
+                  case 'complete': {
+                    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+                    const completeName = row.patient_fio || row.patient_name || '';
+                    const completeOk = await confirm({
+                      title: 'Завершение приёма',
+                      message: `Завершить приём пациента «${completeName}»?`,
+                      confirmLabel: 'Завершить',
+                      cancelLabel: 'Отмена',
+                      intent: 'primary',
+                    });
+                    if (!completeOk) break;
                     logger.info('Завершение приёма:', row);
                     updateAppointmentStatus(row.id, 'done', '', row);
                     break;
+                  }
                   case 'print':
                     logger.info('Печать талона:', row);
                     setPrintDialog({ open: true, type: 'ticket', data: row });
@@ -1877,6 +1822,8 @@ const RegistrarPanel = () => {
             ...(paymentDialog.row || {}),
             ...(appointment || {})
           };
+          // UX Audit: закрываем PaymentDialog при открытии PrintDialog.
+          setPaymentDialog({ open: false, row: null, paid: false, source: null });
           setPrintDialog({
             open: true,
             type: 'ticket',
@@ -2059,7 +2006,7 @@ const RegistrarPanel = () => {
             // QW-02 fix: previously called window.prompt('Введите дату переноса (YYYY-MM-DD):', currentVal)
             // — a jarring native browser dialog that blocks the tab, has no date picker,
             // no min-date guard, and breaks the macOS-style visual language of the app.
-            // Now the date is captured via the inline <input type="date"> rendered in the
+            // Now the date is captured via the inline <Input type="date"> rendered in the
             // dialog body (see customRescheduleDate state + date input below). This action
             // validates the captured date and performs the reschedule.
             onClick: async () => {
@@ -2148,7 +2095,7 @@ const RegistrarPanel = () => {
             <label htmlFor="reschedule-custom-date" className="registrar-reschedule-label registrar-reschedule-label-text">
               Дата переноса
             </label>
-            <input
+            <Input
               id="reschedule-custom-date"
               type="date"
               value={customRescheduleDate}
@@ -2161,7 +2108,7 @@ const RegistrarPanel = () => {
             <label htmlFor="reschedule-custom-time" className="registrar-reschedule-label registrar-reschedule-label-block">
               Время переноса (необязательно)
             </label>
-            <input
+            <Input
               id="reschedule-custom-time"
               type="time"
               value={customRescheduleTime}

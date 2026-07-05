@@ -166,13 +166,13 @@
 }
 
 .periodontal-tooth.moderate {
-    border-color: #fcd34d;
+    border-color: var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 60%));
     background: #fffbeb;
 }
 
 .periodontal-tooth.severe {
-    border-color: #f87171;
-    background: #fef2f2;
+    border-color: var(--mac-error);
+    background: var(--mac-error-bg);
 }
 
 .periodontal-tooth .tooth-number {
@@ -231,13 +231,13 @@
 }
 
 .periodontal-stats .stat-item.severe {
-    background: #fef2f2;
-    border-color: #f87171;
+    background: var(--mac-error-bg);
+    border-color: var(--mac-error);
 }
 
 .periodontal-stats .stat-item.moderate {
     background: #fffbeb;
-    border-color: #fcd34d;
+    border-color: var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 60%));
 }
 
 .periodontal-stats .stat-value {
@@ -247,11 +247,11 @@
 }
 
 .periodontal-stats .stat-item.severe .stat-value {
-    color: #dc2626;
+    color: var(--mac-error);
 }
 
 .periodontal-stats .stat-item.moderate .stat-value {
-    color: #d97706;
+    color: var(--mac-warning);
 }
 
 .periodontal-stats .stat-label {

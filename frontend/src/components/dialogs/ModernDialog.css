@@ -107,52 +107,52 @@
 }
 
 .modern-dialog-action.primary {
-  background-color: #3b82f6;
+  background-color: var(--mac-accent-blue);
   color: white;
-  border-color: #3b82f6;
+  border-color: var(--mac-accent-blue);
 }
 
 .modern-dialog-action.primary:hover:not(:disabled) {
-  background-color: #2563eb;
-  border-color: #2563eb;
+  background-color: var(--mac-accent-blue-hover);
+  border-color: var(--mac-accent-blue-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px var(--mac-accent-border);
 }
 
 .modern-dialog-action.secondary {
   background-color: transparent;
-  color: #6b7280;
-  border-color: #d1d5db;
+  color: var(--mac-text-secondary);
+  border-color: var(--mac-border);
 }
 
 .modern-dialog-action.secondary:hover:not(:disabled) {
-  background-color: #f3f4f6;
-  border-color: #9ca3af;
+  background-color: var(--mac-bg-secondary);
+  border-color: var(--mac-text-tertiary);
   transform: translateY(-1px);
 }
 
 .modern-dialog-action.danger {
-  background-color: #ef4444;
+  background-color: var(--mac-error);
   color: white;
-  border-color: #ef4444;
+  border-color: var(--mac-error);
 }
 
 .modern-dialog-action.danger:hover:not(:disabled) {
-  background-color: #dc2626;
-  border-color: #dc2626;
+  background-color: var(--mac-error);
+  border-color: var(--mac-error);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 12px var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%));
 }
 
 .modern-dialog-action.success {
-  background-color: #10b981;
+  background-color: var(--mac-success);
   color: white;
-  border-color: #10b981;
+  border-color: var(--mac-success);
 }
 
 .modern-dialog-action.success:hover:not(:disabled) {
-  background-color: #059669;
-  border-color: #059669;
+  background-color: var(--mac-success);
+  border-color: var(--mac-success);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
@@ -187,7 +187,7 @@
 
 /* Темная тема */
 .dark .modern-dialog-close:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: color-mix(in srgb, white, transparent 90%);
 }
 
 [data-theme="dark"] .modern-dialog-close:hover {
@@ -195,12 +195,12 @@
 }
 
 .dark .modern-dialog-action.secondary {
-  color: #9ca3af;
-  border-color: #374151;
+  color: var(--mac-text-tertiary);
+  border-color: var(--mac-text-primary);
 }
 
 .dark .modern-dialog-action.secondary:hover:not(:disabled) {
-  background-color: #374151;
+  background-color: var(--mac-text-primary);
   border-color: #4b5563;
 }
 
@@ -236,4 +236,60 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+/* ============================================================
+ * UX Audit Registrar #5: inline-стили → CSS-классы
+ * ============================================================ */
+
+/* Backdrop overlay (position: fixed full-screen with blur) */
+.modern-dialog-backdrop--overlay {
+    background-color: color-mix(in srgb, black, transparent 50%);
+    backdrop-filter: blur(4px);
+}
+
+/* Invisible backdrop button (click-to-close) */
+.modern-dialog-backdrop-button {
+    position: absolute;
+    inset: 0;
+    border: none;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+}
+
+/* Dialog container — base styles (maxWidth/maxHeight still inline via props) */
+.modern-dialog-container--styled {
+    background-color: var(--mac-card-bg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+    box-shadow: var(--mac-shadow-md);
+}
+
+[data-theme="dark"] .modern-dialog-container--styled {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+}
+
+/* Title color */
+.modern-dialog-title--styled {
+    color: var(--mac-text-primary);
+}
+
+/* Close button color */
+.modern-dialog-close--styled {
+    color: var(--mac-text-secondary);
+}
+
+/* Actions bar — background + top border (theme-aware) */
+.modern-dialog-actions--styled {
+    background-color: var(--mac-bg-secondary);
+    border-top: 1px solid var(--mac-border);
+}
+
+[data-theme="dark"] .modern-dialog-actions--styled {
+    background-color: var(--mac-text-primary);
+    border-top-color: var(--mac-text-primary);
 }

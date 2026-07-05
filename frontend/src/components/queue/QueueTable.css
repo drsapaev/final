@@ -1,0 +1,124 @@
+/**
+ * QueueTable Styles
+ *
+ * UX Audit Registrar #3: все inline-стили из QueueTable.jsx перенесены сюда.
+ * Использует macos design tokens (--mac-*) для полной light/dark theme support.
+ */
+
+/* Empty / loading / error states (4 варианта: selectDoctor, loading, queueNotFound, queueEmpty) */
+.qt-empty-state {
+    padding: var(--mac-spacing-12) var(--mac-spacing-6);
+    text-align: center;
+    color: var(--mac-text-secondary);
+    font-size: var(--mac-font-size-base);
+}
+
+.qt-empty-state-icon {
+    margin-bottom: var(--mac-spacing-3);
+    opacity: 0.5;
+}
+
+.qt-empty-state-icon-warning {
+    margin-bottom: var(--mac-spacing-3);
+    opacity: 0.5;
+    color: var(--mac-warning);
+}
+
+.qt-empty-state-hint {
+    font-size: var(--mac-font-size-xs);
+    margin-top: var(--mac-spacing-2);
+}
+
+.qt-loading-spinner {
+    margin: 0 auto var(--mac-spacing-3);
+}
+
+/* Table container */
+.qt-table-container {
+    overflow-x: auto;
+    margin-top: var(--mac-spacing-4);
+}
+
+.qt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--mac-font-size-base);
+}
+
+/* Header */
+.qt-table-header-row {
+    border-bottom: 1px solid var(--mac-border);
+    background-color: var(--mac-bg-tertiary);
+}
+
+.qt-table-th {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    text-align: left;
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+    white-space: nowrap;
+}
+
+.qt-table-th-right {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    text-align: right;
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+    white-space: nowrap;
+}
+
+/* Body rows */
+.qt-table-row {
+    border-bottom: 1px solid var(--mac-border);
+    transition: background-color var(--mac-duration-normal) var(--mac-ease);
+    background-color: transparent;
+}
+
+.qt-table-row-called {
+    border-bottom: 1px solid var(--mac-border);
+    transition: background-color var(--mac-duration-normal) var(--mac-ease);
+    background-color: color-mix(in srgb, var(--mac-accent-blue, #007aff) 5%, transparent);
+}
+
+.qt-table-row:hover,
+.qt-table-row-called:hover {
+    background-color: var(--mac-bg-tertiary);
+}
+
+/* Cells */
+.qt-table-cell-number {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    color: var(--mac-text-primary);
+    font-weight: var(--mac-font-weight-semibold);
+    font-size: var(--mac-font-size-lg);
+}
+
+.qt-table-cell-primary {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    color: var(--mac-text-primary);
+}
+
+.qt-table-cell-phone {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    color: var(--mac-text-secondary);
+    font-family: monospace;
+}
+
+.qt-table-cell-secondary {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    color: var(--mac-text-secondary);
+}
+
+.qt-table-cell-status {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+}
+
+.qt-table-cell-actions {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    text-align: right;
+}
+
+/* Status badge icon */
+.qt-status-badge-icon {
+    margin-right: var(--mac-spacing-1);
+}

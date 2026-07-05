@@ -24,15 +24,15 @@ export function DermaPhotosTab({
         icon={Camera}
         title="Выберите пациента"
         description="Откройте прием из очереди или списка записей для работы с фото"
-        action={<Button variant="outline" onClick={onGoToAppointments} style={{ marginTop: '16px' }}>Перейти к записям</Button>}
+        action={<Button variant="outline" onClick={onGoToAppointments} style={{ marginTop: 'var(--mac-spacing-4)' }}>Перейти к записям</Button>}
       />
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--mac-text-primary)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           Загрузка фото
         </h3>
         <PhotoUploader
@@ -42,8 +42,8 @@ export function DermaPhotosTab({
         />
       </MacOSCard>
 
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--mac-text-primary)' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           AI анализ кожи
         </h3>
         <SkinAnalysis
@@ -56,8 +56,8 @@ export function DermaPhotosTab({
         />
       </MacOSCard>
 
-      <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--mac-text-primary)' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           Сравнение «до» и «после»
         </h3>
         <PhotoComparison

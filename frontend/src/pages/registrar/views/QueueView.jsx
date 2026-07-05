@@ -43,7 +43,7 @@ const QueueView = React.memo(({
             <h1 style={{
               margin: 0,
               fontSize: getFontSize('3xl'),
-              fontWeight: '400',
+              fontWeight: 'var(--mac-font-weight-normal)',
               lineHeight: '1.25',
               display: 'flex',
               alignItems: 'center',

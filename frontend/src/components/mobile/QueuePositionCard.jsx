@@ -24,7 +24,7 @@ const QueuePositionCard = ({ queueEntry }) => {
       case 'waiting':
         return {
           color: 'var(--mac-accent-blue)',
-          bgColor: 'rgba(0, 122, 255, 0.1)',
+          bgColor: 'var(--mac-accent-bg)',
           text: 'В ожидании',
           description: `Перед вами ${peopleBefore || 0} чел.`
         };

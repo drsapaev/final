@@ -6,6 +6,7 @@ import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSele
 import '../../styles/cursor-effects.css';
 import '../../styles/animations.css';
 import '../ui/animations.css';
+import { Input } from '../ui/macos';
 import {
   Hospital,
   Sun,
@@ -77,8 +78,8 @@ export default function Header() {
     justifyContent: 'space-between',
     padding: `${getSpacing('md')} ${getSpacing('xl')}`,
     background: theme === 'light' ?
-    'rgba(255, 255, 255, 0.9)' :
-    'rgba(15, 23, 42, 0.9)',
+    'color-mix(in srgb, white, transparent 10%)' :
+    'color-mix(in srgb, var(--mac-text-primary), transparent 10%)',
     backdropFilter: 'blur(20px)',
     borderBottom: `1px solid ${borderColor}`,
     position: 'sticky',
@@ -120,7 +121,7 @@ export default function Header() {
   {
     padding: `${getSpacing('sm')} ${getSpacing('md')}`,
     border: `1px solid ${borderColor}`,
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     background: theme === 'light' ? 'white' : getColor('gray', 800),
     color: textColor,
     fontSize: getFontSize('sm')
@@ -132,12 +133,12 @@ export default function Header() {
     gap: getSpacing('xs'),
     padding: `${getSpacing('sm')} ${getSpacing('md')}`,
     border: 'none',
-    borderRadius: '12px',
+    borderRadius: 'var(--mac-radius-lg)',
     background: 'transparent',
     color: textColor,
     cursor: 'pointer',
     fontSize: getFontSize('sm'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     transition: 'all 0.3s ease',
     textDecoration: 'none'
   };void
@@ -163,12 +164,12 @@ export default function Header() {
     gap: getSpacing('xs'),
     padding: `${getSpacing('sm')} ${getSpacing('md')}`,
     border: `1px solid ${borderColor}`,
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     background: theme === 'light' ? 'white' : getColor('gray', 800),
     color: textColor,
     cursor: 'pointer',
     fontSize: getFontSize('sm'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     transition: 'all 0.3s ease'
   };void
 
@@ -184,7 +185,7 @@ export default function Header() {
     gap: getSpacing('sm'),
     padding: `${getSpacing('sm')} ${getSpacing('md')}`,
     background: theme === 'light' ? getColor('gray', 100) : getColor('gray', 800),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     fontSize: getFontSize('sm'),
     color: textColor
   };void
@@ -229,7 +230,7 @@ export default function Header() {
   {
     padding: '2px 8px',
     borderRadius: 999,
-    fontSize: '12px',
+    fontSize: 'var(--mac-font-size-xs)',
     border: `1px solid ${borderColor}`,
     background: theme === 'light' ? getColor('gray', 100) : getColor('gray', 800),
     color: textColor,
@@ -249,7 +250,7 @@ export default function Header() {
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid',
         transition: 'all 0.2s ease',
-        backgroundColor: theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 23, 42, 0.9)',
+        backgroundColor: theme === 'light' ? 'color-mix(in srgb, white, transparent 10%)' : 'color-mix(in srgb, var(--mac-text-primary), transparent 10%)',
         borderColor: theme === 'light' ? getColor('gray', 200) : getColor('gray', 700),
         boxShadow: theme === 'light' ?
         '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' :
@@ -264,10 +265,10 @@ export default function Header() {
         [data-theme="dark"] .app-header-2025 button,
         [data-theme="dark"] .app-header-2025 select,
         [data-theme="dark"] .app-header-2025 input {
-          color: #f8fafc !important;
+          color: var(--mac-bg-secondary) !important;
         }
         [data-theme="dark"] .app-header-2025 .role-badge {
-          color: #e2e8f0 !important;
+          color: var(--mac-border) !important;
         }
         /* Современная типографика кнопок */
         .app-header-2025 button,
@@ -281,7 +282,7 @@ export default function Header() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 24px',
+        padding: 'var(--mac-spacing-3) var(--mac-spacing-6)',
         maxWidth: '100%'
       }}>
         {/* Логотип */}
@@ -291,7 +292,7 @@ export default function Header() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: 'var(--mac-spacing-3)',
             background: 'none',
             border: 'none',
             cursor: 'pointer',
@@ -300,12 +301,12 @@ export default function Header() {
           }}>
           
           <Hospital size={24} color={getColor('primary', 500)} />
-          <span style={{ fontSize: '20px', fontWeight: 'bold' }}>Clinic</span>
-          <span style={{ fontSize: '12px', fontWeight: 'normal', opacity: 0.6 }}>v0.1.0</span>
+          <span style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)' }}>Clinic</span>
+          <span style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-normal)', opacity: 0.6 }}>v0.1.0</span>
         </button>
 
         {/* Навигация */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
           {navItems.map((item) => {
             const isActive = location.pathname === item.to;
             return (
@@ -314,14 +315,14 @@ export default function Header() {
                 className="interactive-element hover-lift ripple-effect focus-ring"
                 style={{
                   height: '40px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  fontSize: 'var(--mac-font-size-base)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   transition: 'all 0.2s ease',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   cursor: 'pointer',
                   ...(isActive ? {
                     background: `linear-gradient(135deg, ${getColor('primary', 600)} 0%, ${getColor('primary', 700)} 100%)`,
@@ -351,14 +352,14 @@ export default function Header() {
               className="interactive-element hover-lift ripple-effect focus-ring"
               style={{
                 height: '40px',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                borderRadius: 'var(--mac-radius-md)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-medium)',
                 transition: 'all 0.2s ease',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: 'var(--mac-spacing-2)',
                 cursor: 'pointer',
                 ...(new URLSearchParams(location.search).get('view') === 'welcome' ? {
                   background: `linear-gradient(135deg, ${getColor('success', 600)} 0%, ${getColor('success', 700)} 100%)`,
@@ -383,14 +384,14 @@ export default function Header() {
               className="interactive-element hover-lift ripple-effect focus-ring"
               style={{
                 height: '40px',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                borderRadius: 'var(--mac-radius-md)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-medium)',
                 transition: 'all 0.2s ease',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: 'var(--mac-spacing-2)',
                 cursor: 'pointer',
                 ...(new URLSearchParams(location.search).get('view') === 'queue' ? {
                   background: 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)',
@@ -414,17 +415,17 @@ export default function Header() {
 
               {/* История (календарь+поиск) в контексте кнопки "Главная" */}
               {view === 'welcome' &&
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '24px' }}>
-                  <input
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)', marginLeft: '24px' }}>
+                  <Input
                 type="date"
                 aria-label="Filter appointment history by date"
                 className="interactive-element focus-ring"
                 style={{
                   height: '40px',
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                  borderRadius: '8px',
-                  fontSize: '14px',
+                  borderRadius: 'var(--mac-radius-md)',
+                  fontSize: 'var(--mac-font-size-base)',
                   transition: 'all 0.2s ease',
                   backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
                   color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100)
@@ -450,7 +451,7 @@ export default function Header() {
                     color: theme === 'light' ? getColor('gray', 600) : getColor('gray', 300)
                   }} />
                 
-                    <input
+                    <Input
                   type="search"
                   aria-label="Search appointment history"
                   placeholder="Поиск по ФИО, телефону, услугам или ID записи..."
@@ -460,8 +461,8 @@ export default function Header() {
                     paddingLeft: '40px',
                     paddingRight: '12px',
                     border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                    borderRadius: '8px',
-                    fontSize: '14px',
+                    borderRadius: 'var(--mac-radius-md)',
+                    fontSize: 'var(--mac-font-size-base)',
                     minWidth: '240px',
                     transition: 'all 0.2s ease',
                     backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
@@ -489,7 +490,7 @@ export default function Header() {
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
+          gap: 'var(--mac-spacing-3)',
           whiteSpace: 'nowrap'
         }}>
           {/* Переключатель темы */}
@@ -504,7 +505,7 @@ export default function Header() {
               alignItems: 'center',
               justifyContent: 'center',
               border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-              borderRadius: '8px',
+              borderRadius: 'var(--mac-radius-md)',
               transition: 'all 0.2s ease',
               backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
               color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
@@ -522,11 +523,11 @@ export default function Header() {
             className="interactive-element focus-ring"
             style={{
               height: '40px',
-              padding: '8px 12px',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
               border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
+              borderRadius: 'var(--mac-radius-md)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               transition: 'all 0.2s ease',
               minWidth: '64px',
               backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
@@ -547,14 +548,14 @@ export default function Header() {
               className="interactive-element hover-lift ripple-effect focus-ring user-profile-button"
               style={{
                 height: '40px',
-                padding: '8px 12px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: 'var(--mac-spacing-2)',
                 border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
+                borderRadius: 'var(--mac-radius-md)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-medium)',
                 transition: 'all 0.2s ease',
                 backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
                 color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
@@ -567,13 +568,13 @@ export default function Header() {
               title="Открыть панель регистратора">
               
                 <User size={16} />
-                <span style={{ fontWeight: '700' }}>{displayName}</span>
+                <span style={{ fontWeight: 'var(--mac-font-weight-bold)' }}>{displayName}</span>
                 {showRoleBadge &&
               <span
                 className="role-badge"
                 style={{
                   padding: '2px 8px',
-                  fontSize: '12px',
+                  fontSize: 'var(--mac-font-size-xs)',
                   borderRadius: '999px',
                   border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
                   backgroundColor: theme === 'light' ? getColor('gray', 100) : getColor('gray', 600),
@@ -591,13 +592,13 @@ export default function Header() {
               className="interactive-element hover-lift ripple-effect action-button-hover focus-ring logout-button"
               style={{
                 height: '40px',
-                padding: '8px 12px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
+                gap: 'var(--mac-spacing-2)',
+                borderRadius: 'var(--mac-radius-md)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'white',
                 transition: 'all 0.2s ease',
                 background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
@@ -624,13 +625,13 @@ export default function Header() {
             className="interactive-element hover-lift ripple-effect action-button-hover focus-ring"
             style={{
               height: '40px',
-              padding: '8px 12px',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
+              gap: 'var(--mac-spacing-2)',
+              borderRadius: 'var(--mac-radius-md)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               color: 'white',
               transition: 'all 0.2s ease',
               background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,

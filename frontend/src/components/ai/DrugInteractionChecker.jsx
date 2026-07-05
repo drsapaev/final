@@ -27,7 +27,7 @@ import {
   Badge,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 const DrugInteractionChecker = () => {
@@ -193,14 +193,14 @@ const DrugInteractionChecker = () => {
   };
 
   const renderInteractionsForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
             <h4 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-medium)',
@@ -208,7 +208,7 @@ const DrugInteractionChecker = () => {
             margin: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
               <Pill style={{ width: '16px', height: '16px' }} />
               Препараты
@@ -216,24 +216,24 @@ const DrugInteractionChecker = () => {
             <Button
             onClick={addMedication}
             variant="outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', padding: 'var(--mac-spacing-1) var(--mac-spacing-2)' }}>
             
               <Plus style={{ width: '12px', height: '12px' }} />
               Добавить препарат
             </Button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', maxHeight: '200px', overflowY: 'auto' }}>
             {interactionData.medications.map((medication, index) =>
           <MacOSCard key={index} style={{
-            padding: '12px',
+            padding: 'var(--mac-spacing-3)',
             backgroundColor: 'var(--mac-bg-primary)',
             border: '1px solid var(--mac-border)'
           }}>
                 <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: '12px',
+              gap: 'var(--mac-spacing-3)',
               alignItems: 'center'
             }}>
                   <Input
@@ -264,7 +264,7 @@ const DrugInteractionChecker = () => {
                 aria-label={`Remove medication ${index + 1}`}
                 onClick={() => removeMedication(index)}
                 variant="outline"
-                style={{ padding: '4px', minWidth: 'auto' }}>
+                style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                       <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
                     </Button>
@@ -276,7 +276,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -286,7 +286,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <User style={{ width: '16px', height: '16px' }} />
             Профиль пациента
@@ -294,7 +294,7 @@ const DrugInteractionChecker = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -302,7 +302,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -322,7 +322,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Пол
               </label>
@@ -346,7 +346,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Вес (кг)
               </label>
@@ -366,7 +366,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Функция почек
               </label>
@@ -390,7 +390,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -400,7 +400,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
             Аллергии
@@ -430,7 +430,7 @@ const DrugInteractionChecker = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-danger)',
             border: 'none'
           }}>
@@ -457,10 +457,10 @@ const DrugInteractionChecker = () => {
 
 
   const renderSafetyForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-success-bg)',
         border: '1px solid var(--mac-success-border)'
       }}>
@@ -470,7 +470,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Pill style={{ width: '16px', height: '16px' }} />
             Информация о препарате
@@ -478,7 +478,7 @@ const DrugInteractionChecker = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -486,7 +486,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Препарат
               </label>
@@ -507,7 +507,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Дозировка
               </label>
@@ -528,7 +528,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Частота
               </label>
@@ -547,7 +547,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -557,7 +557,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <User style={{ width: '16px', height: '16px' }} />
             Профиль пациента
@@ -565,7 +565,7 @@ const DrugInteractionChecker = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -573,7 +573,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -593,7 +593,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Пол
               </label>
@@ -617,7 +617,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Беременность
               </label>
@@ -642,7 +642,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Грудное вскармливание
               </label>
@@ -664,7 +664,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -674,7 +674,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
             Заболевания
@@ -701,7 +701,7 @@ const DrugInteractionChecker = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-success)',
             border: 'none'
           }}>
@@ -728,10 +728,10 @@ const DrugInteractionChecker = () => {
 
 
   const renderAlternativesForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -741,7 +741,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <RefreshCw style={{ width: '16px', height: '16px' }} />
             Информация о замене
@@ -749,7 +749,7 @@ const DrugInteractionChecker = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -757,7 +757,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Препарат для замены
               </label>
@@ -778,7 +778,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Причина замены
               </label>
@@ -797,7 +797,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -807,7 +807,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <User style={{ width: '16px', height: '16px' }} />
             Профиль пациента
@@ -815,7 +815,7 @@ const DrugInteractionChecker = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -823,7 +823,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -843,7 +843,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Пол
               </label>
@@ -874,7 +874,7 @@ const DrugInteractionChecker = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-accent)',
             border: 'none'
           }}>
@@ -901,10 +901,10 @@ const DrugInteractionChecker = () => {
 
 
   const renderDosageForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -914,7 +914,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Calculator style={{ width: '16px', height: '16px' }} />
             Информация о препарате
@@ -922,7 +922,7 @@ const DrugInteractionChecker = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -930,7 +930,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Препарат
               </label>
@@ -951,7 +951,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Показание
               </label>
@@ -970,7 +970,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -980,7 +980,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <User style={{ width: '16px', height: '16px' }} />
             Основные параметры пациента
@@ -988,7 +988,7 @@ const DrugInteractionChecker = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -996,7 +996,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -1016,7 +1016,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Вес (кг)
               </label>
@@ -1036,7 +1036,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Рост (см)
               </label>
@@ -1054,7 +1054,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -1064,7 +1064,7 @@ const DrugInteractionChecker = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
             Лабораторные показатели
@@ -1072,7 +1072,7 @@ const DrugInteractionChecker = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -1080,7 +1080,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Креатинин (мкмоль/л)
               </label>
@@ -1100,7 +1100,7 @@ const DrugInteractionChecker = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Клиренс креатинина (мл/мин)
               </label>
@@ -1127,7 +1127,7 @@ const DrugInteractionChecker = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-accent)',
             border: 'none'
           }}>
@@ -1159,11 +1159,11 @@ const DrugInteractionChecker = () => {
     if (result.error) {
       return (
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-primary)',
           border: '1px solid var(--mac-border)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <XCircle style={{ width: '20px', height: '20px', color: 'var(--mac-danger)' }} />
             <h3 style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -1175,7 +1175,7 @@ const DrugInteractionChecker = () => {
             </h3>
           </div>
           <p style={{
-            marginTop: '8px',
+            marginTop: 'var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-danger)',
             margin: '8px 0 0 0'
@@ -1187,8 +1187,8 @@ const DrugInteractionChecker = () => {
     }
 
     return (
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
@@ -1196,7 +1196,7 @@ const DrugInteractionChecker = () => {
             margin: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа
@@ -1204,7 +1204,7 @@ const DrugInteractionChecker = () => {
           <Button
             onClick={exportResult}
             variant="outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
             
             <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
@@ -1213,9 +1213,9 @@ const DrugInteractionChecker = () => {
 
         {/* Специальное отображение для взаимодействий */}
         {activeTab === 'interactions' && result.interactions &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
             <MacOSCard style={{
-            padding: '16px',
+            padding: 'var(--mac-spacing-4)',
             backgroundColor: 'var(--mac-accent-bg)',
             border: '1px solid var(--mac-accent-border)'
           }}>
@@ -1229,30 +1229,30 @@ const DrugInteractionChecker = () => {
               <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-              gap: '16px',
+              gap: 'var(--mac-spacing-4)',
               fontSize: 'var(--mac-font-size-sm)'
             }}>
                 <div>
                   <span style={{ color: 'var(--mac-accent)' }}>Всего:</span>
-                  <span style={{ marginLeft: '4px', fontWeight: 'var(--mac-font-weight-medium)' }}>
+                  <span style={{ marginLeft: 'var(--mac-spacing-1)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                     {result.interaction_summary?.total_interactions || 0}
                   </span>
                 </div>
                 <div>
                   <span style={{ color: 'var(--mac-danger)' }}>Критические:</span>
-                  <span style={{ marginLeft: '4px', fontWeight: 'var(--mac-font-weight-medium)' }}>
+                  <span style={{ marginLeft: 'var(--mac-spacing-1)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                     {result.interaction_summary?.severity_distribution?.critical || 0}
                   </span>
                 </div>
                 <div>
                   <span style={{ color: 'var(--mac-warning)' }}>Значительные:</span>
-                  <span style={{ marginLeft: '4px', fontWeight: 'var(--mac-font-weight-medium)' }}>
+                  <span style={{ marginLeft: 'var(--mac-spacing-1)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                     {result.interaction_summary?.severity_distribution?.major || 0}
                   </span>
                 </div>
                 <div>
                   <span style={{ color: 'var(--mac-accent)' }}>Умеренные:</span>
-                  <span style={{ marginLeft: '4px', fontWeight: 'var(--mac-font-weight-medium)' }}>
+                  <span style={{ marginLeft: 'var(--mac-spacing-1)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                     {result.interaction_summary?.severity_distribution?.moderate || 0}
                   </span>
                 </div>
@@ -1261,11 +1261,11 @@ const DrugInteractionChecker = () => {
 
             {result.interactions.map((interaction, index) =>
           <MacOSCard key={index} style={{
-            padding: '16px',
+            padding: 'var(--mac-spacing-4)',
             backgroundColor: getSeverityColor(interaction.severity).backgroundColor,
             border: `1px solid ${getSeverityColor(interaction.severity).borderColor}`
           }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-2)' }}>
                   <h5 style={{
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: getSeverityColor(interaction.severity).textColor,
@@ -1283,7 +1283,7 @@ const DrugInteractionChecker = () => {
                 </div>
                 <p style={{
               fontSize: 'var(--mac-font-size-sm)',
-              marginBottom: '8px',
+              marginBottom: 'var(--mac-spacing-2)',
               color: getSeverityColor(interaction.severity).textColor
             }}>
                   {interaction.clinical_effect}
@@ -1303,7 +1303,7 @@ const DrugInteractionChecker = () => {
 
         {/* Общее отображение для других результатов */}
         {activeTab !== 'interactions' &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
             {Object.entries(result).map(([key, value]) =>
           <div key={key} style={{
             borderLeft: '4px solid var(--mac-accent)',
@@ -1323,7 +1323,7 @@ const DrugInteractionChecker = () => {
               <pre style={{
                 whiteSpace: 'pre-wrap',
                 backgroundColor: 'var(--mac-bg-secondary)',
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 overflowX: 'auto',
@@ -1347,16 +1347,16 @@ const DrugInteractionChecker = () => {
 
   return (
     <div style={{
-      padding: '24px',
+      padding: 'var(--mac-spacing-6)',
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         {/* Заголовок */}
         <div style={{
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           <h2 style={{
             fontSize: 'var(--mac-font-size-2xl)',
@@ -1365,7 +1365,7 @@ const DrugInteractionChecker = () => {
             margin: '0 0 8px 0',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: 'var(--mac-spacing-3)'
           }}>
             <Pill style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             AI Проверка Лекарственных Взаимодействий
@@ -1382,7 +1382,7 @@ const DrugInteractionChecker = () => {
         {/* Вкладки */}
         <div style={{
           display: 'flex',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -1392,13 +1392,13 @@ const DrugInteractionChecker = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: '12px 20px',
+                  padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
                   fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                   fontSize: 'var(--mac-font-size-sm)',
@@ -1433,7 +1433,7 @@ const DrugInteractionChecker = () => {
                   right: '0',
                   height: '3px',
                   backgroundColor: 'var(--mac-accent)',
-                  borderRadius: '2px 2px 0 0'
+                  borderRadius: 'var(--mac-radius-sm) var(--mac-radius-sm) 0 0'
                 }} />
                 }
               </button>);
@@ -1444,13 +1444,13 @@ const DrugInteractionChecker = () => {
         {/* Разделительная линия */}
         <div style={{
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }} />
 
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px'
+          gap: 'var(--mac-spacing-6)'
         }}>
           <div>
             <h3 style={{

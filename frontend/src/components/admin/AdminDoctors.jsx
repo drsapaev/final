@@ -135,7 +135,7 @@ const AdminDoctors = () => {
   };
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       <MacOSCard variant="default" shadow="none" className="admin-patients-header-card">
         <div
           className="admin-patients-header-row"
@@ -312,7 +312,7 @@ const AdminDoctors = () => {
                       aria-label={`Действия для врача ${getDoctorName(doctor)}`}
                       className="admin-p-12-16"
                     >
-                      <div className="admin-flex-center-8">
+                      <div className="flex items-center justify-center gap-2">
                         <IconButton label="Редактировать врача" onClick={() => handleEditDoctor(doctor)}>
                           <Edit size={16} />
                         </IconButton>

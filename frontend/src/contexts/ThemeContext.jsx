@@ -110,15 +110,24 @@ export const ThemeProvider = ({ children }) => {
 
   const getColor = useCallback((color, shade = 500) => {
     if (color === 'primary' || color === 'secondary') {
-      return tokenColors[color]?.[shade] || tokenColors.primary?.[500] || '#0ea5e9';
+      return tokenColors[color]?.[shade] || tokenColors.primary?.[500] || 'var(--mac-accent-blue)';
     }
     if (color === 'success' || color === 'warning' || color === 'danger' || color === 'info') {
-      return tokenColors.status?.[color] || tokenColors.primary?.[500] || '#0ea5e9';
+      return tokenColors.status?.[color] || tokenColors.primary?.[500] || 'var(--mac-accent-blue)';
     }
-    if (color === 'text' || color === 'background' || color === 'border' || color === 'surface') {
-      return tokenColors.semantic?.[color]?.primary || '#ffffff';
+    if (color === 'text') {
+      return tokenColors.semantic?.text?.primary || 'var(--mac-text-primary)';
     }
-    return tokenColors.primary?.[500] || '#0ea5e9';
+    if (color === 'background') {
+      return tokenColors.semantic?.background?.primary || 'var(--mac-bg-primary)';
+    }
+    if (color === 'border') {
+      return tokenColors.semantic?.border?.medium || 'var(--mac-border)';
+    }
+    if (color === 'surface') {
+      return tokenColors.semantic?.surface?.card || 'var(--mac-bg-primary)';
+    }
+    return tokenColors.primary?.[500] || 'var(--mac-accent-blue)';
   }, []);
 
   const getSpacing = useCallback((size) => {
@@ -296,18 +305,18 @@ export const ThemeProvider = ({ children }) => {
     );
 
     root.style.setProperty('--mac-success-bg', toRgbaString(success, isDark ? 0.22 : 0.12));
-    root.style.setProperty('--mac-success-bg-light', mixColors(success, '#ffffff', isDark ? 0.12 : 0.8));
+    root.style.setProperty('--mac-success-bg-light', mixColors(success, 'var(--mac-bg-primary)', isDark ? 0.12 : 0.8));
     root.style.setProperty('--mac-success-border', toRgbaString(success, isDark ? 0.34 : 0.22));
 
     root.style.setProperty('--mac-warning-bg', toRgbaString(warning, isDark ? 0.22 : 0.14));
-    root.style.setProperty('--mac-warning-bg-light', mixColors(warning, '#ffffff', isDark ? 0.1 : 0.78));
+    root.style.setProperty('--mac-warning-bg-light', mixColors(warning, 'var(--mac-bg-primary)', isDark ? 0.1 : 0.78));
     root.style.setProperty('--mac-warning-border', toRgbaString(warning, isDark ? 0.36 : 0.24));
 
     root.style.setProperty('--mac-error-bg', toRgbaString(error, isDark ? 0.22 : 0.12));
-    root.style.setProperty('--mac-error-bg-light', mixColors(error, '#ffffff', isDark ? 0.08 : 0.8));
+    root.style.setProperty('--mac-error-bg-light', mixColors(error, 'var(--mac-bg-primary)', isDark ? 0.08 : 0.8));
     root.style.setProperty('--mac-error-border', toRgbaString(error, isDark ? 0.36 : 0.24));
     root.style.setProperty('--mac-danger', error);
-    root.style.setProperty('--mac-danger-hover', mixColors(error, isDark ? '#ffffff' : '#120708', isDark ? 0.12 : 0.16));
+    root.style.setProperty('--mac-danger-hover', mixColors(error, isDark ? 'var(--mac-bg-primary)' : '#120708', isDark ? 0.12 : 0.16));
   }, [colorScheme, isDark]);
 
   useEffect(() => {

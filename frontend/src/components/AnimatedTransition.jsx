@@ -150,26 +150,26 @@ export const AnimatedButton = ({
       transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
       cursor: 'pointer',
       border: 'none',
-      borderRadius: '12px',
-      fontWeight: '600',
+      borderRadius: 'var(--mac-radius-lg)',
+      fontWeight: 'var(--mac-font-weight-semibold)',
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px',
+      gap: 'var(--mac-spacing-2)',
       ...style
     };
 
     // Размеры
     const sizes = {
-      sm: { padding: '8px 16px', fontSize: '14px' },
-      md: { padding: '12px 24px', fontSize: '16px' },
-      lg: { padding: '16px 32px', fontSize: '18px' }
+      sm: { padding: 'var(--mac-spacing-2) var(--mac-spacing-4)', fontSize: 'var(--mac-font-size-base)' },
+      md: { padding: 'var(--mac-spacing-3) var(--mac-spacing-6)', fontSize: 'var(--mac-font-size-lg)' },
+      lg: { padding: '16px 32px', fontSize: 'var(--mac-font-size-xl)' }
     };
 
     // Варианты
     const variants = {
       primary: {
-        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+        background: 'linear-gradient(135deg, var(--mac-accent-blue) 0%, var(--mac-accent-blue-hover) 100%)',
         color: 'white',
         boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)'
       },
@@ -179,12 +179,12 @@ export const AnimatedButton = ({
         boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
       },
       success: {
-        background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+        background: 'linear-gradient(135deg, var(--mac-success) 0%, var(--mac-success) 100%)',
         color: 'white',
         boxShadow: '0 4px 14px 0 rgba(34, 197, 94, 0.3)'
       },
       danger: {
-        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+        background: 'linear-gradient(135deg, var(--mac-error) 0%, var(--mac-error) 100%)',
         color: 'white',
         boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
       }
@@ -239,8 +239,8 @@ export const AnimatedCard = ({
     const baseStyle = {
       background: 'rgba(255, 255, 255, 0.8)',
       border: '1px solid rgba(255, 255, 255, 0.2)',
-      borderRadius: '20px',
-      padding: '24px',
+      borderRadius: 'var(--mac-radius-xl)',
+      padding: 'var(--mac-spacing-6)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
       ...style

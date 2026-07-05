@@ -96,7 +96,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: 'var(--mac-spacing-5)',
         background: theme === 'light'
             ? 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)'
             : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
@@ -109,23 +109,23 @@ export default function ChangePasswordRequired({ currentPassword }) {
     };
 
     const titleStyle = {
-        fontSize: '24px',
-        fontWeight: '700',
-        marginBottom: '8px',
+        fontSize: 'var(--mac-font-size-3xl)',
+        fontWeight: 'var(--mac-font-weight-bold)',
+        marginBottom: 'var(--mac-spacing-2)',
         color: 'var(--mac-text-primary)',
         textAlign: 'center'
     };
 
     const subtitleStyle = {
-        fontSize: '14px',
+        fontSize: 'var(--mac-font-size-base)',
         color: 'var(--mac-text-secondary)',
-        marginBottom: '24px',
+        marginBottom: 'var(--mac-spacing-6)',
         textAlign: 'center'
     };
 
     const inputContainerStyle = {
         position: 'relative',
-        marginBottom: '16px'
+        marginBottom: 'var(--mac-spacing-4)'
     };
 
     const toggleButtonStyle = {
@@ -137,30 +137,30 @@ export default function ChangePasswordRequired({ currentPassword }) {
         border: 'none',
         cursor: 'pointer',
         color: 'var(--mac-text-secondary)',
-        padding: '4px'
+        padding: 'var(--mac-spacing-1)'
     };
 
     const requirementsStyle = {
-        marginBottom: '20px',
-        padding: '12px',
-        borderRadius: '8px',
+        marginBottom: 'var(--mac-spacing-5)',
+        padding: 'var(--mac-spacing-3)',
+        borderRadius: 'var(--mac-radius-md)',
         background: theme === 'light' ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)'
     };
 
     const requirementItemStyle = (passed) => ({
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        fontSize: '13px',
+        gap: 'var(--mac-spacing-2)',
+        fontSize: 'var(--mac-font-size-sm)',
         color: passed ? getColor('success', 500) : 'var(--mac-text-tertiary)',
-        marginBottom: '4px'
+        marginBottom: 'var(--mac-spacing-1)'
     });
 
     return (
         <div style={containerStyle}>
             <MacOSCard style={cardStyle}>
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                    <Lock size={48} color={getColor('warning', 500)} style={{ marginBottom: '12px' }} />
+                <div style={{ textAlign: 'center', marginBottom: 'var(--mac-spacing-5)' }}>
+                    <Lock size={48} color={getColor('warning', 500)} style={{ marginBottom: 'var(--mac-spacing-3)' }} />
                     <h1 style={titleStyle}>Смена пароля</h1>
                     <p style={subtitleStyle}>
                         Для безопасности вашего аккаунта необходимо сменить временный пароль
@@ -171,13 +171,13 @@ export default function ChangePasswordRequired({ currentPassword }) {
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        padding: '12px',
-                        marginBottom: '16px',
-                        borderRadius: '8px',
+                        gap: 'var(--mac-spacing-2)',
+                        padding: 'var(--mac-spacing-3)',
+                        marginBottom: 'var(--mac-spacing-4)',
+                        borderRadius: 'var(--mac-radius-md)',
                         background: `${getColor('danger', 100)}`,
                         color: getColor('danger', 700),
-                        fontSize: '14px'
+                        fontSize: 'var(--mac-font-size-base)'
                     }}>
                         <AlertCircle size={16} />
                         {error}
@@ -188,13 +188,13 @@ export default function ChangePasswordRequired({ currentPassword }) {
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        padding: '12px',
-                        marginBottom: '16px',
-                        borderRadius: '8px',
+                        gap: 'var(--mac-spacing-2)',
+                        padding: 'var(--mac-spacing-3)',
+                        marginBottom: 'var(--mac-spacing-4)',
+                        borderRadius: 'var(--mac-radius-md)',
                         background: `${getColor('success', 100)}`,
                         color: getColor('success', 700),
-                        fontSize: '14px'
+                        fontSize: 'var(--mac-font-size-base)'
                     }}>
                         <CheckCircle size={16} />
                         {success}
@@ -244,7 +244,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
 
                     {/* Password Requirements */}
                     <div style={requirementsStyle}>
-                        <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: 'var(--mac-text-secondary)' }}>
+                        <div style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: 'var(--mac-text-secondary)' }}>
                             Требования к паролю:
                         </div>
                         {passwordRequirements.map((req, index) => (
@@ -280,10 +280,10 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            fontSize: '13px',
+                            gap: 'var(--mac-spacing-2)',
+                            fontSize: 'var(--mac-font-size-sm)',
                             color: doPasswordsMatch ? getColor('success', 500) : getColor('danger', 500),
-                            marginBottom: '16px'
+                            marginBottom: 'var(--mac-spacing-4)'
                         }}>
                             {doPasswordsMatch ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
                             {doPasswordsMatch ? 'Пароли совпадают' : 'Пароли не совпадают'}
@@ -294,7 +294,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         type="submit"
                         variant="primary"
                         disabled={loading || !isPasswordValid || !doPasswordsMatch}
-                        style={{ width: '100%', marginTop: '8px' }}
+                        style={{ width: '100%', marginTop: 'var(--mac-spacing-2)' }}
                     >
                         {loading ? 'Сохранение...' : 'Сменить пароль'}
                     </Button>

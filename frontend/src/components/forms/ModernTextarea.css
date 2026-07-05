@@ -19,11 +19,11 @@
   background: white;
   border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 25px 50px color-mix(in srgb, black, transparent 70%);
 }
 
 .dark .modern-textarea.expanded {
-  background: #1f2937;
+  background: var(--mac-text-primary);
 }
 
 /* Заголовок */
@@ -54,7 +54,7 @@
 }
 
 .required-mark {
-  color: #ef4444;
+  color: var(--mac-error);
   margin-left: 2px;
 }
 
@@ -104,15 +104,15 @@
 
 .textarea-container:hover:not(.disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px color-mix(in srgb, black, transparent 90%);
 }
 
 .textarea-container.focused {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 .textarea-container.error {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-error-bg);
 }
 
 .textarea-container.success {
@@ -168,12 +168,12 @@
 }
 
 .textarea-field::placeholder {
-  color: #9ca3af;
+  color: var(--mac-text-tertiary);
   transition: color 0.2s ease;
 }
 
 .textarea-field:focus::placeholder {
-  color: #d1d5db;
+  color: var(--mac-border);
 }
 
 .textarea-field:disabled {
@@ -198,11 +198,11 @@
 }
 
 .textarea-status.error {
-  color: #ef4444;
+  color: var(--mac-error);
 }
 
 .textarea-status.success {
-  color: #22c55e;
+  color: var(--mac-success);
 }
 
 /* Нижняя панель */
@@ -248,11 +248,11 @@
 }
 
 .textarea-message.error {
-  color: #ef4444;
+  color: var(--mac-error);
 }
 
 .textarea-message.success {
-  color: #22c55e;
+  color: var(--mac-success);
 }
 
 /* Анимации */
@@ -278,16 +278,16 @@
 
 /* Темная тема */
 .dark .textarea-container {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
 }
 
 .dark .textarea-field {
-  color: #f9fafb;
+  color: var(--mac-bg-secondary);
 }
 
 .dark .textarea-field::placeholder {
-  color: #6b7280;
+  color: var(--mac-text-secondary);
 }
 
 .dark .textarea-field:focus::placeholder {
@@ -354,7 +354,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, black, transparent 50%);
   z-index: -1;
   animation: fadeIn 0.2s ease-out;
 }

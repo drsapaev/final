@@ -3,6 +3,8 @@ import {
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 import { formatRegistrarTime } from '../../utils/dateUtils';
+// UX Audit Registrar #3: все inline-стили перенесены в QueueTable.css.
+import './QueueTable.css';
 
 /**
  * QueueTable Component
@@ -17,16 +19,8 @@ const QueueTable = ({
     // If no queue data or no doctor selected
     if (!effectiveDoctor) {
         return (
-            <div style={{
-                padding: '48px 24px',
-                textAlign: 'center',
-                color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
-            }}>
-                <Icon name="person.crop.circle.badge.questionmark" size="large" style={{
-                    marginBottom: '12px',
-                    opacity: 0.5
-                }} />
+            <div className="qt-empty-state">
+                <Icon name="person.crop.circle.badge.questionmark" size="large" className="qt-empty-state-icon" />
                 <p>{t?.selectDoctor || 'Выберите специалиста'}</p>
             </div>
         );
@@ -35,13 +29,8 @@ const QueueTable = ({
     // If loading
     if (loading) {
         return (
-            <div style={{
-                padding: '48px 24px',
-                textAlign: 'center',
-                color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
-            }}>
-                <div className="mqm-spinner" style={{ margin: '0 auto 12px' }}></div>
+            <div className="qt-empty-state">
+                <div className="mqm-spinner qt-loading-spinner"></div>
                 <p>Загрузка очереди...</p>
             </div>
         );
@@ -50,19 +39,10 @@ const QueueTable = ({
     // If no queue data
     if (!queueData) {
         return (
-            <div style={{
-                padding: '48px 24px',
-                textAlign: 'center',
-                color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
-            }}>
-                <Icon name="exclamationmark.triangle" size="large" style={{
-                    marginBottom: '12px',
-                    opacity: 0.5,
-                    color: 'var(--mac-warning)'
-                }} />
+            <div className="qt-empty-state">
+                <Icon name="exclamationmark.triangle" size="large" className="qt-empty-state-icon-warning" />
                 <p>{t?.queueNotFound || 'Очередь не найдена'}</p>
-                <p style={{ fontSize: '12px', marginTop: '8px' }}>
+                <p className="qt-empty-state-hint">
                     Попробуйте сгенерировать QR код для создания очереди
                 </p>
             </div>
@@ -75,18 +55,10 @@ const QueueTable = ({
     // If queue is empty
     if (entries.length === 0) {
         return (
-            <div style={{
-                padding: '48px 24px',
-                textAlign: 'center',
-                color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
-            }}>
-                <Icon name="person.2.slash" size="large" style={{
-                    marginBottom: '12px',
-                    opacity: 0.5
-                }} />
+            <div className="qt-empty-state">
+                <Icon name="person.2.slash" size="large" className="qt-empty-state-icon" />
                 <p>{t?.queueEmpty || 'Очередь пуста'}</p>
-                <p style={{ fontSize: '12px', marginTop: '8px' }}>
+                <p className="qt-empty-state-hint">
                     Пациенты могут записаться через QR код
                 </p>
             </div>
@@ -112,7 +84,7 @@ const QueueTable = ({
 
         return (
             <Badge variant={config.variant}>
-                <Icon name={config.icon} size="small" style={{ marginRight: '4px' }} />
+                <Icon name={config.icon} size="small" className="qt-status-badge-icon" />
                 {config.label}
             </Badge>
         );
@@ -129,138 +101,53 @@ const QueueTable = ({
     };
 
     return (
-        <div className="queue-table-container" style={{
-            overflowX: 'auto',
-            marginTop: '16px'
-        }}>
-            <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '14px'
-            }}>
-                <thead>
-                    <tr style={{
-                        borderBottom: '1px solid var(--mac-border)',
-                        backgroundColor: 'var(--mac-bg-tertiary)'
-                    }}>
-                        <th style={{
-                            padding: '12px 16px',
-                            textAlign: 'left',
-                            fontWeight: '600',
-                            color: 'var(--mac-text-primary)',
-                            whiteSpace: 'nowrap'
-                        }}>
-                            №
-                        </th>
-                        <th style={{
-                            padding: '12px 16px',
-                            textAlign: 'left',
-                            fontWeight: '600',
-                            color: 'var(--mac-text-primary)'
-                        }}>
-                            {t?.patient || 'Пациент'}
-                        </th>
-                        <th style={{
-                            padding: '12px 16px',
-                            textAlign: 'left',
-                            fontWeight: '600',
-                            color: 'var(--mac-text-primary)'
-                        }}>
-                            {t?.phone || 'Телефон'}
-                        </th>
-                        <th style={{
-                            padding: '12px 16px',
-                            textAlign: 'left',
-                            fontWeight: '600',
-                            color: 'var(--mac-text-primary)'
-                        }}>
-                            {t?.time || 'Время'}
-                        </th>
-                        <th style={{
-                            padding: '12px 16px',
-                            textAlign: 'left',
-                            fontWeight: '600',
-                            color: 'var(--mac-text-primary)'
-                        }}>
-                            {t?.status || 'Статус'}
-                        </th>
-                        <th style={{
-                            padding: '12px 16px',
-                            textAlign: 'right',
-                            fontWeight: '600',
-                            color: 'var(--mac-text-primary)'
-                        }}>
-                            {t?.actions || 'Действия'}
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {entries.map((entry, index) => (
-                        <tr
-                            key={entry.id || index}
-                            style={{
-                                borderBottom: '1px solid var(--mac-border)',
-                                transition: 'background-color 0.2s ease',
-                                backgroundColor: entry.status === 'called'
-                                    ? 'rgba(0, 122, 255, 0.05)'
-                                    : 'transparent'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = entry.status === 'called'
-                                    ? 'rgba(0, 122, 255, 0.05)'
-                                    : 'transparent';
-                            }}
-                        >
-                            <td style={{
-                                padding: '12px 16px',
-                                color: 'var(--mac-text-primary)',
-                                fontWeight: '600',
-                                fontSize: '16px'
-                            }}>
-                                {entry.queue_number || entry.number || index + 1}
-                            </td>
-                            <td style={{
-                                padding: '12px 16px',
-                                color: 'var(--mac-text-primary)'
-                            }}>
-                                {entry.patient_name || entry.name || '—'}
-                            </td>
-                            <td style={{
-                                padding: '12px 16px',
-                                color: 'var(--mac-text-secondary)',
-                                fontFamily: 'monospace'
-                            }}>
-                                {entry.patient_phone || entry.phone || '—'}
-                            </td>
-                            <td style={{
-                                padding: '12px 16px',
-                                color: 'var(--mac-text-secondary)'
-                            }}>
-                                {formatTime(entry.created_at || entry.timestamp)}
-                            </td>
-                            <td style={{
-                                padding: '12px 16px'
-                            }}>
-                                {getStatusBadge(entry.status)}
-                            </td>
-                            <td style={{
-                                padding: '12px 16px',
-                                textAlign: 'right'
-                            }}>
-                                {entry.status === 'called' && (
-                                    <Badge variant="info">
-                                        <Icon name="bell.fill" size="small" style={{ marginRight: '4px' }} />
-                                        {t?.called || 'Вызван'}
-                                    </Badge>
-                                )}
-                            </td>
+        <div className="qt-table-container">
+            <div className="admin-table-wrapper">
+                <table className="qt-table">
+                    <thead>
+                        <tr className="qt-table-header-row">
+                            <th className="qt-table-th">№</th>
+                            <th className="qt-table-th">{t?.patient || 'Пациент'}</th>
+                            <th className="qt-table-th">{t?.phone || 'Телефон'}</th>
+                            <th className="qt-table-th">{t?.time || 'Время'}</th>
+                            <th className="qt-table-th">{t?.status || 'Статус'}</th>
+                            <th className="qt-table-th-right">{t?.actions || 'Действия'}</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {entries.map((entry, index) => (
+                            <tr
+                                key={entry.id || index}
+                                className={entry.status === 'called' ? 'qt-table-row-called' : 'qt-table-row'}
+                            >
+                                <td className="qt-table-cell-number">
+                                    {entry.queue_number || entry.number || index + 1}
+                                </td>
+                                <td className="qt-table-cell-primary">
+                                    {entry.patient_name || entry.name || '—'}
+                                </td>
+                                <td className="qt-table-cell-phone">
+                                    {entry.patient_phone || entry.phone || '—'}
+                                </td>
+                                <td className="qt-table-cell-secondary">
+                                    {formatTime(entry.created_at || entry.timestamp)}
+                                </td>
+                                <td className="qt-table-cell-status">
+                                    {getStatusBadge(entry.status)}
+                                </td>
+                                <td className="qt-table-cell-actions">
+                                    {entry.status === 'called' && (
+                                        <Badge variant="info">
+                                            <Icon name="bell.fill" size="small" className="qt-status-badge-icon" />
+                                            {t?.called || 'Вызван'}
+                                        </Badge>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };

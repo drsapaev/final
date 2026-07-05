@@ -85,28 +85,28 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '12px',
-    marginBottom: '20px',
+    gap: 'var(--mac-spacing-3)',
+    marginBottom: 'var(--mac-spacing-5)',
   },
   title: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '17px',
-    fontWeight: 600,
+    fontSize: 'var(--mac-font-size-xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   actions: {
     display: 'flex',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
   },
   fieldGrid: {
     display: 'grid',
     gap: '14px',
-    marginBottom: '20px',
+    marginBottom: 'var(--mac-spacing-5)',
   },
   twoColumnGrid: {
     display: 'grid',
@@ -116,9 +116,9 @@ const styles = {
   metrics: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gap: '12px',
+    gap: 'var(--mac-spacing-3)',
     padding: '14px',
-    marginBottom: '20px',
+    marginBottom: 'var(--mac-spacing-5)',
     border: '1px solid var(--mac-border)',
     borderRadius: 'var(--mac-radius-lg)',
     background: 'var(--mac-bg-secondary)',
@@ -129,15 +129,15 @@ const styles = {
   metricValue: {
     display: 'block',
     color: 'var(--mac-text-primary)',
-    fontSize: '24px',
-    fontWeight: 700,
+    fontSize: 'var(--mac-font-size-3xl)',
+    fontWeight: 'var(--mac-font-weight-bold)',
     lineHeight: 1.1,
   },
   metricLabel: {
     display: 'block',
-    marginTop: '4px',
+    marginTop: 'var(--mac-spacing-1)',
     color: 'var(--mac-text-secondary)',
-    fontSize: '12px',
+    fontSize: 'var(--mac-font-size-xs)',
   },
   stageList: {
     display: 'grid',
@@ -164,25 +164,25 @@ const styles = {
     height: '28px',
     borderRadius: '50%',
     color: 'var(--mac-accent-blue)',
-    background: 'rgba(0, 122, 255, 0.08)',
+    background: 'var(--mac-accent-bg)',
   },
   stageName: {
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '14px',
-    fontWeight: 600,
+    fontSize: 'var(--mac-font-size-base)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   stageDescription: {
     margin: '4px 0 0',
     color: 'var(--mac-text-secondary)',
-    fontSize: '13px',
+    fontSize: 'var(--mac-font-size-sm)',
     lineHeight: 1.4,
   },
   stageMeta: {
     display: 'flex',
-    gap: '6px',
+    gap: 'var(--mac-spacing-2)',
     flexWrap: 'wrap',
-    marginTop: '8px',
+    marginTop: 'var(--mac-spacing-2)',
   },
   iconButton: {
     display: 'inline-flex',
@@ -199,17 +199,17 @@ const styles = {
   saveRow: {
     display: 'flex',
     justifyContent: 'center',
-    marginTop: '20px',
+    marginTop: 'var(--mac-spacing-5)',
   },
   dialogGrid: {
     display: 'grid',
     gap: '14px',
-    marginTop: '4px',
+    marginTop: 'var(--mac-spacing-1)',
   },
   badgeIcon: {
     width: '13px',
     height: '13px',
-    marginRight: '4px',
+    marginRight: 'var(--mac-spacing-1)',
   },
 };
 
@@ -370,7 +370,8 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
             <div><strong>Стоимость:</strong> ${(treatmentPlan.totalCost / 1000).toFixed(0)}k сум</div>
           </div>
           <h2>Этапы</h2>
-          <table>
+          <div className="admin-table-wrapper">
+<table>
             <thead>
               <tr>
                 <th>#</th>
@@ -384,6 +385,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
             </thead>
             <tbody>${stagesHtml}</tbody>
           </table>
+</div>
         </body>
       </html>
     `

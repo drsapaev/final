@@ -12,6 +12,10 @@ import {
   ArrowRight,
   Trash2,
   AlertCircle,
+  Stethoscope,
+  FlaskConical,
+  Syringe,
+  ClipboardList,
 
 
 
@@ -52,6 +56,8 @@ import {
 } from '../../api/patients';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+// UX Audit Registrar #2: useConfirm hook для замены window.confirm().
+import { useConfirm } from '../common/ConfirmDialog';
 // ⭐ SSOT: Unified service extraction
 import { normalizeServicesFromInitialData } from '../../utils/serviceCodeResolver';
 import './AppointmentWizardV2.css';
@@ -115,6 +121,10 @@ const AppointmentWizardV2 = ({
   const { hasRole } = useRoleAccess();
   const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
 
+  // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
+  // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
+  const [confirm, confirmDialog] = useConfirm();
+
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(STEP_PATIENT);
 
@@ -145,8 +155,9 @@ const AppointmentWizardV2 = ({
   const [patientSuggestions, setPatientSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const [isSearchingPatients, setIsSearchingPatients] = useState(false); // UX Audit Registrar #11
   const [phoneCheckTimeout, setPhoneCheckTimeout] = useState(null); // ✅ Timeout для проверки телефона
-  const [, setPhoneError] = useState(null); // ✅ Ошибка уникальности телефона
+  const [phoneError, setPhoneError] = useState(null); // ✅ Ошибка уникальности телефона
   const [servicesData, setServicesData] = useState([]);
   const [doctorsData, setDoctorsData] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
@@ -445,6 +456,9 @@ const AppointmentWizardV2 = ({
       return;
     }
 
+    // UX Audit Registrar #11: loading indicator во время поиска.
+    setIsSearchingPatients(true);
+
     try {
       // UX Audit Stage 3 (Wizard issue 5.1):
       // Заменён raw fetch() на searchPatientsApi() из api/patients.
@@ -495,6 +509,8 @@ const AppointmentWizardV2 = ({
       setShowSuggestions(true);
     } catch (error) {
       logger.error('Ошибка поиска пациентов:', error);
+    } finally {
+      setIsSearchingPatients(false);
     }
   }, []);
 
@@ -1313,6 +1329,36 @@ const AppointmentWizardV2 = ({
     const token = tokenManager.getAccessToken();
     if (!token) {
       toast.error('Требуется авторизация. Пожалуйста, войдите в систему заново.');
+      return;
+    }
+
+    // UX Audit Registrar #9: Summary confirmation перед завершением.
+    // Показываем что именно будет создано — услуги, количество визитов, сумма.
+    // Раньше кнопка «Завершить» сразу создавала запись без preview.
+    const cartItems = wizardData.cart.items || [];
+    const totalAmount = cartItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+    const serviceCount = cartItems.length;
+    const doctorCount = new Set(cartItems.map((item) => item.doctor_id).filter(Boolean)).size;
+
+    const summaryLines = [
+      `Пациент: ${wizardData.patient.fio || '—'}`,
+      `Услуг в корзине: ${serviceCount}`,
+      doctorCount > 1 ? `Врачей: ${doctorCount}` : null,
+      totalAmount > 0 ? `Сумма: ${new Intl.NumberFormat('ru-RU').format(totalAmount)} сум` : 'Бесплатно',
+    ].filter(Boolean);
+
+    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+    // Раньше: window.confirm('Создать запись?\n\n' + summaryLines.join('\n'))
+    // Теперь: macOS-style ConfirmDialog через useConfirm.
+    const confirmed = await confirm({
+      title: 'Создать запись',
+      message: 'Создать запись с указанными данными?',
+      description: summaryLines.join('\n'),
+      confirmLabel: 'Создать',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -2457,15 +2503,15 @@ const AppointmentWizardV2 = ({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    gap: '16px',
+    gap: 'var(--mac-spacing-4)',
     padding: '10px 20px 12px',
     borderBottom: '1px solid var(--mac-border)',
     background: 'var(--mac-bg-primary)'
   };
 
   const wizardHeaderTitleStyle = {
-    fontSize: '17px',
-    fontWeight: '600',
+    fontSize: 'var(--mac-font-size-xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-primary)',
     margin: 0,
     letterSpacing: '-0.02em',
@@ -2474,7 +2520,7 @@ const AppointmentWizardV2 = ({
 
   const wizardHeaderSubtitleStyle = {
     margin: '4px 0 0',
-    fontSize: '13px',
+    fontSize: 'var(--mac-font-size-sm)',
     color: 'var(--mac-text-secondary)',
     lineHeight: 1.4
   };
@@ -2482,7 +2528,7 @@ const AppointmentWizardV2 = ({
   const wizardHeaderIconStyle = {
     width: '36px',
     height: '36px',
-    borderRadius: '12px',
+    borderRadius: 'var(--mac-radius-lg)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2517,20 +2563,20 @@ const AppointmentWizardV2 = ({
     background: 'var(--mac-bg-secondary)',
     color: 'var(--mac-text-primary)',
     cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 500,
+    fontSize: 'var(--mac-font-size-sm)',
+    fontWeight: 'var(--mac-font-weight-medium)',
     whiteSpace: 'nowrap',
     transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: 'var(--mac-spacing-2)',
     boxShadow: 'var(--mac-shadow-sm)'
   };
 
   // Кастомный заголовок для Шага 1
   const Step1Header =
   <div style={wizardHeaderShellStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)', minWidth: 0 }}>
         <div style={wizardHeaderIconStyle}>
           <Check size={18} />
         </div>
@@ -2577,7 +2623,7 @@ const AppointmentWizardV2 = ({
         onClear={() => setServiceSearchQuery('')}
         autoFocus
         size="sm"
-        style={{ height: '38px', fontSize: '13px' }} />
+        style={{ height: '38px', fontSize: 'var(--mac-font-size-sm)' }} />
 
       </div>
 
@@ -2586,7 +2632,7 @@ const AppointmentWizardV2 = ({
       flex: 1,
       display: 'flex',
       justifyContent: 'center',
-      gap: '8px',
+      gap: 'var(--mac-spacing-2)',
       padding: '0 8px',
       flexWrap: 'wrap'
     }}>
@@ -2621,7 +2667,12 @@ const AppointmentWizardV2 = ({
           }
         }}>
 
-            <span style={{ fontSize: '15px' }}>{cat.icon}</span>
+            <span style={{ fontSize: 'var(--mac-font-size-lg)', display: 'inline-flex', alignItems: 'center' }}>
+            {cat.icon === 'stethoscope' ? <Stethoscope size={16} /> :
+             cat.icon === 'flask' ? <FlaskConical size={16} /> :
+             cat.icon === 'syringe' ? <Syringe size={16} /> :
+             cat.icon === 'clipboard' ? <ClipboardList size={16} /> : null}
+          </span>
             {cat.label}
           </button>
       )}
@@ -2631,7 +2682,7 @@ const AppointmentWizardV2 = ({
       <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
+      gap: 'var(--mac-spacing-2)',
       flex: '0 0 auto'
     }}>
         {/* Кнопка обновления */}
@@ -2773,6 +2824,31 @@ const AppointmentWizardV2 = ({
         }}>
 
         <div className="wizard-container-v2">
+          {/* UX Audit Registrar #22: Progress indicator — визуальный progress bar.
+              Текст «Шаг 1 из 2» уже есть в header, но визуальный bar даёт
+              мгновенное понимание прогресса без чтения. */}
+          <div style={{
+            display: 'flex',
+            gap: 'var(--mac-spacing-2)',
+            marginBottom: 'var(--mac-spacing-3)',
+            padding: '0 4px',
+          }}>
+            {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
+              <div
+                key={step}
+                style={{
+                  flex: 1,
+                  height: '4px',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  backgroundColor: currentStep >= step
+                    ? 'var(--mac-accent-blue, #007aff)'
+                    : 'color-mix(in srgb, var(--mac-text-secondary, #8e8e93), transparent 70%)',
+                  transition: 'background-color 200ms ease',
+                }}
+              />
+            ))}
+          </div>
+
           {/* Контент шагов */}
           <div className="wizard-content-v2">
             {currentStep === STEP_PATIENT &&
@@ -2781,6 +2857,7 @@ const AppointmentWizardV2 = ({
               errors={errors}
               suggestions={patientSuggestions}
               showSuggestions={showSuggestions}
+              isSearching={isSearchingPatients}
               onSearch={handlePatientSearch}
               onSelectPatient={selectPatient}
               onUpdate={(field, value) =>
@@ -2801,8 +2878,7 @@ const AppointmentWizardV2 = ({
                 cart: { ...prev.cart, [field]: value }
               }))
               }
-              phoneError={errors.phone} />
-
+              phoneError={phoneError} />
             }
 
             {currentStep === STEP_CART &&
@@ -2842,6 +2918,9 @@ const AppointmentWizardV2 = ({
           </div>
         </div>
       </ModernDialog>
+
+      {/* UX Audit Registrar #2: ConfirmDialog (useConfirm hook). */}
+      {confirmDialog}
 
       {/* Диалоги онлайн оплаты удалены из UI */}
     </>);

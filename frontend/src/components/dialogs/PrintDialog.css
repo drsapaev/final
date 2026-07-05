@@ -1,0 +1,324 @@
+/**
+ * PrintDialog Styles
+ *
+ * UX Audit Registrar #5: все inline-стили из PrintDialog.jsx перенесены сюда.
+ * Использует macos design tokens (--mac-*) + [data-theme="dark"] для light/dark support.
+ */
+
+/* Dialog background */
+.print-dialog--styled {
+    background-color: var(--mac-bg-primary);
+}
+
+/* === Document info card === */
+.print-doc-card {
+    margin-bottom: var(--mac-spacing-6);
+    padding: var(--mac-spacing-4);
+    background-color: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: 14px;
+}
+
+[data-theme="dark"] .print-doc-card {
+    border-color: color-mix(in srgb, white, transparent 92%);
+}
+
+.print-doc-title {
+    color: var(--mac-text-primary);
+    margin: 0 0 8px 0;
+    font-size: var(--mac-font-size-lg);
+    font-weight: var(--mac-font-weight-semibold);
+}
+
+.print-doc-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-1);
+}
+
+.print-doc-field {
+    color: var(--mac-text-secondary);
+    margin: 0;
+    font-size: var(--mac-font-size-base);
+}
+
+.print-doc-ticket-count {
+    color: var(--mac-accent-blue);
+    margin: 0;
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-semibold);
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-2);
+}
+
+/* === Browser print notice === */
+.print-browser-notice {
+    padding: var(--mac-spacing-4);
+    border-radius: 14px;
+    background-color: var(--mac-accent-bg);
+    border: 1px solid var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 70%));
+    color: var(--mac-text-primary);
+}
+
+[data-theme="dark"] .print-browser-notice {
+    background-color: color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 92%);
+    border-color: color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 76%);
+}
+
+.print-browser-notice-header {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+    margin-bottom: var(--mac-spacing-2);
+}
+
+.print-browser-notice-text {
+    margin: 0 0 8px 0;
+    font-size: var(--mac-font-size-base);
+    color: var(--mac-text-secondary);
+}
+
+.print-browser-notice-hint {
+    margin: 0;
+    font-size: var(--mac-font-size-base);
+    color: var(--mac-text-secondary);
+}
+
+/* === Printer selection === */
+.print-field-label {
+    display: block;
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+    margin-bottom: var(--mac-spacing-3);
+    color: var(--mac-text-primary);
+}
+
+.print-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--mac-text-secondary);
+}
+
+.print-loading-spinner {
+    margin-right: var(--mac-spacing-3);
+}
+
+.print-error-box {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+    padding: var(--mac-spacing-4);
+    background-color: var(--mac-error-bg);
+    border: 1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%));
+    border-radius: 14px;
+    color: var(--mac-error);
+}
+
+[data-theme="dark"] .print-error-box {
+    background-color: color-mix(in srgb, var(--mac-error, #ef4444), transparent 90%);
+    border-color: color-mix(in srgb, var(--mac-error, #ef4444), transparent 76%);
+    color: var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%));
+}
+
+.print-error-title {
+    margin: 0 0 8px 0;
+    font-weight: var(--mac-font-weight-medium);
+}
+
+.print-error-message {
+    margin: 0;
+    font-size: var(--mac-font-size-base);
+}
+
+.print-retry-btn {
+    margin-top: var(--mac-spacing-2);
+    background: none;
+    border: none;
+    color: var(--mac-accent-blue);
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: var(--mac-font-size-base);
+    padding: 0;
+}
+
+/* === Printer list === */
+.print-printer-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-2);
+}
+
+.print-printer-item {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+    padding: '12px 14px';
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    background-color: white;
+    color: var(--mac-text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    width: 100%;
+}
+
+[data-theme="dark"] .print-printer-item {
+    background-color: color-mix(in srgb, white, transparent 96%);
+    border-color: color-mix(in srgb, white, transparent 90%);
+}
+
+.print-printer-item--selected {
+    border-color: var(--mac-accent-blue);
+    background-color: var(--mac-accent-bg);
+}
+
+.print-printer-item--default {
+    border-color: var(--mac-accent-blue);
+}
+
+.print-printer-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.print-printer-name {
+    font-weight: var(--mac-font-weight-medium);
+    font-size: var(--mac-font-size-base);
+}
+
+.print-printer-status {
+    font-size: var(--mac-font-size-xs);
+    color: var(--mac-text-secondary);
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-1);
+}
+
+.print-printer-status--online {
+    color: var(--mac-success);
+}
+
+.print-printer-status--offline {
+    color: var(--mac-text-tertiary);
+}
+
+.print-printer-badge {
+    font-size: var(--mac-font-size-xs);
+    color: var(--mac-accent-blue);
+    background-color: var(--mac-accent-bg);
+    padding: 2px 8px;
+    border-radius: var(--mac-radius-full);
+}
+
+/* === Empty state === */
+.print-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--mac-spacing-6);
+    color: var(--mac-text-secondary);
+    text-align: center;
+}
+
+.print-empty-state-icon {
+    opacity: 0.3;
+    margin-bottom: var(--mac-spacing-4);
+}
+
+.print-empty-state-text {
+    margin: 0;
+}
+
+/* Printer item variants */
+.print-printer-item {
+    padding: 12px 14px;
+}
+
+.print-printer-item--disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+[data-theme="dark"] .print-printer-item--selected {
+    background-color: color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 84%);
+}
+
+/* Radio indicator */
+.print-radio {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--mac-text-tertiary);
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.print-radio--selected {
+    border-color: var(--mac-accent-blue);
+    background-color: var(--mac-accent-blue);
+}
+
+.print-radio-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: white;
+}
+
+/* Printer icon */
+.print-printer-icon {
+    color: var(--mac-text-secondary);
+    flex-shrink: 0;
+}
+
+/* Printer name + type */
+.print-printer-name-text {
+    color: var(--mac-text-primary);
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+}
+
+.print-printer-type {
+    color: var(--mac-text-secondary);
+    font-size: var(--mac-font-size-xs);
+    margin-top: 2px;
+}
+
+/* Status badge */
+.print-status-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-1);
+    font-size: var(--mac-font-size-xs);
+    font-weight: var(--mac-font-weight-medium);
+    color: var(--mac-text-secondary);
+}
+
+.print-status-badge--online {
+    color: var(--mac-success);
+}
+
+.print-status-badge--error {
+    color: var(--mac-error);
+}
+
+.print-printers-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-2);
+}
+
+.print-empty-state-full {
+    text-align: center;
+    padding: 40px;
+    color: var(--mac-text-secondary);
+}

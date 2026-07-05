@@ -188,12 +188,12 @@ export const Modal = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px'
+        padding: 'var(--mac-spacing-5)'
       }}
       onMouseDown={handleMaskClick}
       role="dialog"
@@ -204,8 +204,8 @@ export const Modal = ({
         ref={modalRef}
         className={`modal-content ${sizes[size]} ${className}`}
         style={{
-          backgroundColor: '#ffffff',
-          borderRadius: '12px',
+          backgroundColor: 'var(--mac-bg-primary)',
+          borderRadius: 'var(--mac-radius-lg)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           maxHeight: '90vh',
           overflow: 'hidden',
@@ -221,7 +221,7 @@ export const Modal = ({
             className="modal-header"
             style={{
               padding: '20px 24px',
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid var(--mac-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between'
@@ -231,9 +231,9 @@ export const Modal = ({
               id="modal-title"
               style={{
                 margin: 0,
-                fontSize: '18px',
-                fontWeight: '600',
-                color: '#374151'
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)'
               }}
             >
               {title}
@@ -245,16 +245,16 @@ export const Modal = ({
                 style={{
                   background: 'none',
                   border: 'none',
-                  fontSize: '24px',
+                  fontSize: 'var(--mac-font-size-3xl)',
                   cursor: 'pointer',
-                  color: '#6b7280',
-                  padding: '4px',
-                  borderRadius: '4px',
+                  color: 'var(--mac-text-secondary)',
+                  padding: 'var(--mac-spacing-1)',
+                  borderRadius: 'var(--mac-radius-sm)',
                   transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
                 }}
                 onMouseEnter={(e) => {
                   if (!prefersReducedMotion) {
-                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -273,7 +273,7 @@ export const Modal = ({
         <div
           className="modal-body"
           style={{
-            padding: '24px',
+            padding: 'var(--mac-spacing-6)',
             overflow: 'auto',
             flex: 1
           }}

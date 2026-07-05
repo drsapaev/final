@@ -124,7 +124,7 @@ export function ExaminationSection({
 
       }>
       
-            <div style={{ marginBottom: '12px' }}>
+            <div style={{ marginBottom: 'var(--mac-spacing-3)' }}>
                 <ExaminationMatrix
           specialty={specialty}
           isEditable={!disabled}

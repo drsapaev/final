@@ -7,7 +7,7 @@ import { CreditCard, FlaskConical } from 'lucide-react';
 
 import {
   Alert, Button, Card, CardContent, Typography,
-} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import PaymentWidget from '../components/payment/PaymentWidget';
 import { getApiOrigin, setToken, getToken } from '../api/client';
 
@@ -186,7 +186,7 @@ const PaymentTest = () => {
               <div style={fieldStackStyle}>
                 <label style={fieldLabelStyle} htmlFor="payment-test-visit-id">
                   ID визита
-                  <input
+                  <Input
                     id="payment-test-visit-id"
                     type="number"
                     aria-label="Payment test visit id"
@@ -198,7 +198,7 @@ const PaymentTest = () => {
 
                 <label style={fieldLabelStyle} htmlFor="payment-test-amount">
                   Сумма
-                  <input
+                  <Input
                     id="payment-test-amount"
                     type="number"
                     aria-label="Payment test amount"

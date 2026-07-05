@@ -51,7 +51,7 @@ const AILoader = ({
       )}
 
       {text && (
-        <Typography variant={fontSize} color="textPrimary" style={{ fontWeight: 500, textAlign: 'center' }}>
+        <Typography variant={fontSize} color="textPrimary" style={{ fontWeight: 'var(--mac-font-weight-medium)', textAlign: 'center' }}>
           {text}
         </Typography>
       )}
@@ -72,7 +72,7 @@ const AILoader = ({
     return (
       <div style={{
         position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.5)', zIndex: 9999
+        background: 'color-mix(in srgb, black, transparent 50%)', zIndex: 9999
       }}>
         <div style={{
           background: 'var(--mac-bg-primary)', borderRadius: 12, padding: 24, minWidth: 320,

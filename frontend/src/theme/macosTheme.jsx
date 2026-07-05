@@ -2,14 +2,14 @@ import PropTypes from 'prop-types';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ensureMinContrast, getReadableTextColor, mixColors, toRgbaString } from './colorUtils.js';
 const ACCENTS = {
-  blue: '#007aff',
-  purple: '#5856d6',
+  blue: 'var(--mac-accent-blue)',
+  purple: 'var(--mac-accent-purple)',
   pink: '#ff2d55',
-  red: '#ff3b30',
-  orange: '#ff9500',
+  red: 'var(--mac-error)',
+  orange: 'var(--mac-warning)',
   yellow: '#ffcc00',
-  green: '#34c759',
-  graphite: '#8e8e93'
+  green: 'var(--mac-success)',
+  graphite: 'var(--mac-text-tertiary)'
 };
 
 const STORAGE_KEY = 'ui.accent';
@@ -81,21 +81,21 @@ export function MacOSThemeProvider({ children }) {
 
     // Define adaptive accent colors for light/dark mode
     const ACCENT_ADAPTIVE = {
-      blue: mode === 'dark' ? '#0a84ff' : '#007aff',
-      purple: mode === 'dark' ? '#5e5ce6' : '#5856d6',
+      blue: mode === 'dark' ? '#0a84ff' : 'var(--mac-accent-blue)',
+      purple: mode === 'dark' ? '#5e5ce6' : 'var(--mac-accent-purple)',
       pink: mode === 'dark' ? '#ff375f' : '#ff2d55',
-      red: mode === 'dark' ? '#ff453a' : '#ff3b30',
-      orange: mode === 'dark' ? '#ff9f0a' : '#ff9500',
+      red: mode === 'dark' ? '#ff453a' : 'var(--mac-error)',
+      orange: mode === 'dark' ? '#ff9f0a' : 'var(--mac-warning)',
       yellow: mode === 'dark' ? '#ffd60a' : '#ffcc00',
-      green: mode === 'dark' ? '#30d158' : '#34c759',
-      graphite: mode === 'dark' ? '#636366' : '#8e8e93'
+      green: mode === 'dark' ? '#30d158' : 'var(--mac-success)',
+      graphite: mode === 'dark' ? '#636366' : 'var(--mac-text-tertiary)'
     };
 
     const adaptiveAccent = ACCENT_ADAPTIVE[accent] || ACCENTS[accent];
-    const hoverAccent = mixColors(adaptiveAccent, mode === 'dark' ? '#ffffff' : '#06101d', mode === 'dark' ? 0.12 : 0.18);
-    const activeAccent = mixColors(adaptiveAccent, mode === 'dark' ? '#ffffff' : '#02060c', mode === 'dark' ? 0.2 : 0.28);
+    const hoverAccent = mixColors(adaptiveAccent, mode === 'dark' ? 'var(--mac-bg-primary)' : '#06101d', mode === 'dark' ? 0.12 : 0.18);
+    const activeAccent = mixColors(adaptiveAccent, mode === 'dark' ? 'var(--mac-bg-primary)' : '#02060c', mode === 'dark' ? 0.2 : 0.28);
     const accentFg = getReadableTextColor(adaptiveAccent, {
-      light: '#ffffff',
+      light: 'var(--mac-bg-primary)',
       dark: '#081018',
     });
 
@@ -109,7 +109,7 @@ export function MacOSThemeProvider({ children }) {
     root.style.setProperty('--mac-accent-blue-active', activeAccent);
     root.style.setProperty('--mac-accent-bg', toRgbaString(adaptiveAccent, mode === 'dark' ? 0.22 : 0.12));
     root.style.setProperty('--mac-accent-blue-bg', toRgbaString(adaptiveAccent, mode === 'dark' ? 0.24 : 0.14));
-    root.style.setProperty('--mac-accent-blue-light', mixColors(adaptiveAccent, '#ffffff', mode === 'dark' ? 0.18 : 0.78));
+    root.style.setProperty('--mac-accent-blue-light', mixColors(adaptiveAccent, 'var(--mac-bg-primary)', mode === 'dark' ? 0.18 : 0.78));
     root.style.setProperty('--mac-accent-border', toRgbaString(adaptiveAccent, mode === 'dark' ? 0.38 : 0.24));
     root.style.setProperty('--mac-text-on-accent', accentFg);
     root.style.setProperty('--accent-foreground', accentFg);
@@ -120,7 +120,7 @@ export function MacOSThemeProvider({ children }) {
       if (k !== 'blue') {
         root.style.setProperty(`--mac-accent-${k}`, adaptive);
         root.style.setProperty(`--mac-accent-${k}-bg`, toRgbaString(adaptive, mode === 'dark' ? 0.24 : 0.14));
-        root.style.setProperty(`--mac-accent-${k}-light`, mixColors(adaptive, '#ffffff', mode === 'dark' ? 0.18 : 0.78));
+        root.style.setProperty(`--mac-accent-${k}-light`, mixColors(adaptive, 'var(--mac-bg-primary)', mode === 'dark' ? 0.18 : 0.78));
       }
     });
 

@@ -78,9 +78,9 @@ const InteractiveButton = ({
       onMouseLeave={handleMouseLeave}
       style={{
         padding: getSpacing('sm') + ' ' + getSpacing('lg'),
-        borderRadius: '6px',
+        borderRadius: 'var(--mac-radius-sm)',
         fontSize: getSpacing('base'),
-        fontWeight: '500',
+        fontWeight: 'var(--mac-font-weight-medium)',
         cursor: 'pointer',
         outline: 'none',
         ...getButtonStyle(),
@@ -96,7 +96,7 @@ const InteractiveButton = ({
         left: '50%',
         width: '100px',
         height: '100px',
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        backgroundColor: 'color-mix(in srgb, white, transparent 70%)',
         borderRadius: '50%',
         transform: 'translate(-50%, -50%) scale(0)',
         animation: 'ripple 0.6s linear',

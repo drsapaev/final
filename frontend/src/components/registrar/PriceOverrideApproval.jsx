@@ -14,9 +14,15 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
-import { getApiBaseUrl } from '../../api/runtime';
+// UX Audit Registrar #1: миграция с raw fetch() на централизованный api-клиент.
+// Раньше здесь было 2 raw fetch() к /registrar/price-overrides и
+// /registrar/price-override/approve с дублированием URL/headers/error-handling.
+// Теперь все операции идут через api/registrar.js (внутри — axios + interceptors).
+import {
+  fetchPriceOverrides,
+  approvePriceOverride,
+} from '../../api/registrar';
 import logger from '../../utils/logger';
-const API_BASE = getApiBaseUrl();
 
 const PRICE_OVERRIDE_ACTION_CAN_FIELD = {
   approve: 'can_approve',
@@ -46,7 +52,7 @@ const hasBackendPriceOverrideAction = (override, action) => {
 /**
  * Компонент для одобрения/отклонения изменений цен врачами
  */
-const PriceOverrideApproval = () => {void
+const PriceOverrideApproval = () => {
   useTheme();
   const [priceOverrides, setPriceOverrides] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,15 +65,10 @@ const PriceOverrideApproval = () => {void
   const loadPriceOverrides = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `${API_BASE}/registrar/price-overrides?status_filter=${statusFilter}&limit=100`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setPriceOverrides(data);
-      } else {
-        toast.error('Ошибка загрузки изменений цен');
-      }
+      // UX Audit Registrar #1: raw fetch() → fetchPriceOverrides() из api/registrar.
+      // Auth/CSRF/refresh-token обрабатываются axios-interceptor'ом в api/client.js.
+      const data = await fetchPriceOverrides({ statusFilter, limit: 100 });
+      setPriceOverrides(data);
     } catch (error) {
       logger.error('Error loading price overrides:', error);
       toast.error('Ошибка загрузки изменений цен');
@@ -83,34 +84,26 @@ const PriceOverrideApproval = () => {void
   const handleApproval = async (overrideId, action, rejectionReason = null) => {
     setIsProcessing(true);
     try {
-      const response = await fetch(`${API_BASE}/registrar/price-override/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          override_id: overrideId,
-          action: action,
-          rejection_reason: rejectionReason
-        })
+      // UX Audit Registrar #1: raw fetch() POST → approvePriceOverride() из api/registrar.
+      const result = await approvePriceOverride({
+        overrideId,
+        action,
+        rejectionReason,
       });
+      toast.success(result.message);
 
-      if (response.ok) {
-        const result = await response.json();
-        toast.success(result.message);
+      // Обновляем список
+      loadPriceOverrides();
 
-        // Обновляем список
-        loadPriceOverrides();
-
-        // Закрываем модальное окно
-        setShowApprovalModal(false);
-        setSelectedOverride(null);
-        setRejectionReason('');
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка обработки запроса');
-      }
+      // Закрываем модальное окно
+      setShowApprovalModal(false);
+      setSelectedOverride(null);
+      setRejectionReason('');
     } catch (error) {
       logger.error('Error processing approval:', error);
-      toast.error('Ошибка обработки запроса');
+      // Axios errors: detail лежит в error.response.data.detail.
+      const detail = error?.response?.data?.detail || error?.message || 'Ошибка обработки запроса';
+      toast.error(detail);
     } finally {
       setIsProcessing(false);
     }

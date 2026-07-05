@@ -22,13 +22,13 @@
 
 .modern-card.variant-elevated {
   border: none;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 8px 25px color-mix(in srgb, black, transparent 85%) !important;
 }
 
 /* Интерактивные состояния */
 .modern-card.hoverable:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 8px 25px color-mix(in srgb, black, transparent 85%) !important;
 }
 
 .modern-card.clickable {
@@ -42,11 +42,11 @@
 
 .modern-card.clickable:active {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, black, transparent 90%) !important;
 }
 
 .modern-card.clickable:focus {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--mac-accent-blue);
   outline-offset: 2px;
 }
 
@@ -54,11 +54,11 @@
 .card-header {
   margin-bottom: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid color-mix(in srgb, black, transparent 90%);
 }
 
 .dark .card-header {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: color-mix(in srgb, white, transparent 90%);
 }
 
 .card-body {
@@ -68,11 +68,11 @@
 .card-footer {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid color-mix(in srgb, black, transparent 90%);
 }
 
 .dark .card-footer {
-  border-top-color: rgba(255, 255, 255, 0.1);
+  border-top-color: color-mix(in srgb, white, transparent 90%);
 }
 
 .card-title {
@@ -91,7 +91,7 @@
 
 /* Темная тема */
 .dark .modern-card.variant-elevated {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 8px 25px color-mix(in srgb, black, transparent 70%) !important;
 }
 
 .dark .modern-card.hoverable:hover {
@@ -103,7 +103,7 @@
 }
 
 .dark .modern-card.clickable:active {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, black, transparent 75%) !important;
 }
 
 /* Адаптивность */

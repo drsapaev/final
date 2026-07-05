@@ -8,6 +8,7 @@
  */
 import PropTypes from 'prop-types';
 import './EMRTextField.css';
+import { Input } from '../../ui/macos';
 
 /**
  * EMRTextField Component
@@ -65,7 +66,7 @@ export function EMRTextField({
             {multiline ? (
                 <textarea {...inputProps} rows={rows} />
             ) : (
-                <input type="text" {...inputProps} />
+                <Input type="text" {...inputProps} />
             )}
         </div>
     );

@@ -16,8 +16,8 @@ const pageStyle = {
 
 const statusCardStyle = {
   marginBottom: 16,
-  borderColor: 'rgba(255, 149, 0, 0.36)',
-  background: 'rgba(255, 149, 0, 0.08)',
+  borderColor: 'var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 64%))',
+  background: 'var(--mac-warning-bg)',
 };
 
 const statusContentStyle = {
@@ -106,7 +106,7 @@ const PaymentCancel = () => {
       {/* Информация об ошибке */}
       {error &&
       <Alert severity="error" role="alert" style={{ marginBottom: 12 }}>
-          <Typography variant="body1" style={{ fontWeight: 600 }}>
+          <Typography variant="body1" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
             Детали ошибки:
           </Typography>
           <Typography variant="body2">

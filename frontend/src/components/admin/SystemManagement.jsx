@@ -222,12 +222,12 @@ const SystemManagement = () => {
   // ===================== РЕНДЕРИНГ =====================
 
   const renderMonitoringTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Общее состояние системы */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <div className="admin-flex-between-mb-16">
           <h3 className="admin-h3-icon-m0">
-            <Activity className="admin-icon-20" />
+            <Activity className="w-5 h-5" />
             Состояние системы
           </h3>
           <Button
@@ -235,14 +235,14 @@ const SystemManagement = () => {
           variant="outline"
           size="sm">
 
-            <RefreshCw className="admin-icon-16-mr-8" />
+            <RefreshCw className="w-4 h-4 mr-2" />
             Обновить
           </Button>
         </div>
 
         {systemHealth &&
       <div className="admin-grid-auto-200">
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-stat-value-dynamic" style={{ '--admin-stat-color': getStatusColor(systemHealth.overall_status) }}>
                 {systemHealth.overall_status?.toUpperCase()}
               </div>
@@ -254,7 +254,7 @@ const SystemManagement = () => {
             {systemHealth.components && Object.entries(systemHealth.components).map(([component, status]) => {
           const StatusIcon = getStatusIcon(status);
           return (
-            <div key={component} className="admin-text-center">
+            <div key={component} className="text-center">
                   <StatusIcon className="admin-status-icon-32" style={{ '--admin-icon-color': getStatusColor(status) }} />
                   <div className="admin-text-med-primary-block">
                     {component}
@@ -273,17 +273,17 @@ const SystemManagement = () => {
       {systemMetrics &&
     <div className="admin-grid-auto-300-24">
           {/* CPU */}
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
-                <Cpu className="admin-icon-16" />
+                <Cpu className="w-4 h-4" />
                 CPU
               </h4>
               <Badge variant={systemMetrics.cpu?.usage_percent > 80 ? 'error' : 'success'}>
                 {systemMetrics.cpu?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
-            <div className="admin-flex-col-8">
+            <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
                 Ядер: {systemMetrics.cpu?.count}
             </div>
@@ -296,17 +296,17 @@ const SystemManagement = () => {
           </MacOSCard>
 
           {/* Память */}
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
-                <MemoryStick className="admin-icon-16" />
+                <MemoryStick className="w-4 h-4" />
                 Память
               </h4>
               <Badge variant={systemMetrics.memory?.usage_percent > 85 ? 'error' : 'success'}>
                 {systemMetrics.memory?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
-            <div className="admin-flex-col-8">
+            <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
                 Всего: {formatBytes(systemMetrics.memory?.total)}
               </div>
@@ -320,17 +320,17 @@ const SystemManagement = () => {
           </MacOSCard>
 
           {/* Диск */}
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
-                <HardDrive className="admin-icon-16" />
+                <HardDrive className="w-4 h-4" />
                 Диск
               </h4>
               <Badge variant={systemMetrics.disk?.usage_percent > 90 ? 'error' : 'success'}>
                 {systemMetrics.disk?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
-            <div className="admin-flex-col-8">
+            <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
                 Всего: {formatBytes(systemMetrics.disk?.total)}
               </div>
@@ -346,9 +346,9 @@ const SystemManagement = () => {
     }
 
       {/* Алерты */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <h3 className="admin-h3-icon-mb-16">
-          <AlertTriangle className="admin-icon-20" />
+          <AlertTriangle className="w-5 h-5" />
           Последние алерты
         </h3>
         
@@ -360,7 +360,7 @@ const SystemManagement = () => {
         iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-success)' }} /> :
 
 
-      <div className="admin-flex-col-12">
+      <div className="flex flex-col gap-3">
             {alerts.slice(0, 10).map((alert, index) =>
         <div key={index} className="admin-alert-row">
                 <div className="admin-flex-center-12">
@@ -383,17 +383,17 @@ const SystemManagement = () => {
 
 
   const renderBackupsTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Создание бэкапа */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <h3 className="admin-h3-icon-mb-16">
-          <Database className="admin-icon-20" />
+          <Database className="w-5 h-5" />
           Создание бэкапа
         </h3>
         
         <div className="admin-grid-auto-200-mb-16">
           <div>
-            <label className="admin-form-label">
+            <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
               Тип бэкапа
             </label>
             <Select
@@ -405,16 +405,16 @@ const SystemManagement = () => {
             { value: 'configuration', label: 'Конфигурация' }]
             }
             size="large"
-            className="admin-w-full" />
+            className="w-full" />
 
           </div>
 
-          <div className="admin-flex-center">
+          <div className="flex items-center justify-center">
             <label className="admin-label-flex-pointer">
               <Checkbox
               checked={backupForm.include_files}
               onChange={(checked) => setBackupForm((prev) => ({ ...prev, include_files: checked }))}
-              className="admin-mr-8" />
+              className="mr-2" />
 
               Включить файлы
             </label>
@@ -424,12 +424,12 @@ const SystemManagement = () => {
             <Button
             onClick={createBackup}
             disabled={loading}
-            className="admin-w-full">
+            className="w-full">
 
               {loading ?
             <RefreshCw className="admin-icon-16-spin-mr-8" /> :
 
-            <Download className="admin-icon-16-mr-8" />
+            <Download className="w-4 h-4 mr-2" />
             }
               Создать бэкап
             </Button>
@@ -438,10 +438,10 @@ const SystemManagement = () => {
       </MacOSCard>
 
       {/* Список бэкапов */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <div className="admin-flex-between-mb-16">
           <h3 className="admin-h3-icon-m0">
-            <Shield className="admin-icon-20" />
+            <Shield className="w-5 h-5" />
             Список бэкапов
           </h3>
           <Button
@@ -449,7 +449,7 @@ const SystemManagement = () => {
           variant="outline"
           size="sm">
 
-            <RefreshCw className="admin-icon-16-mr-8" />
+            <RefreshCw className="w-4 h-4 mr-2" />
             Обновить
           </Button>
         </div>
@@ -473,7 +473,7 @@ const SystemManagement = () => {
         data={backups.map((backup) => ({
           ...backup,
           name:
-          <div className="admin-flex-center-8">
+          <div className="flex items-center justify-center gap-2">
                   <Database className="admin-icon-16-tertiary" />
                   <span className="admin-span-med">{backup.name}</span>
                       </div>,
@@ -489,7 +489,7 @@ const SystemManagement = () => {
                     variant="outline"
                     title={`View backup ${backup.name}`}
                     aria-label={`View backup ${backup.name}`}>
-                    <Eye aria-hidden="true" className="admin-icon-14" />
+                    <Eye aria-hidden="true" className="w-3.5 h-3.5" />
                   </Button>
                   <Button
               type="button"
@@ -498,9 +498,9 @@ const SystemManagement = () => {
               variant="outline"
               title={`Delete backup ${backup.name}`}
               aria-label={`Delete backup ${backup.name}`}
-              className="admin-text-error">
+              className="text-[var(--mac-error)]">
 
-                    <Trash2 aria-hidden="true" className="admin-icon-14" />
+                    <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
                   </Button>
                       </div>
 
@@ -519,10 +519,10 @@ const SystemManagement = () => {
 
 
   const renderSettingsTab = () =>
-  <div className="admin-flex-col-24">
-      <MacOSCard className="admin-p-24">
+  <div className="flex flex-col gap-6">
+      <MacOSCard className="p-6">
         <h3 className="admin-h3-icon-mb-16">
-          <Settings className="admin-icon-20" />
+          <Settings className="w-5 h-5" />
           Настройки мониторинга
         </h3>
         
@@ -531,9 +531,9 @@ const SystemManagement = () => {
             <h4 className="admin-settings-h4">
               Пороговые значения
             </h4>
-            <div className="admin-flex-col-12">
+            <div className="flex flex-col gap-3">
               <div>
-                <label className="admin-form-label admin-mb-4">
+                <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2 mb-1">
                   CPU (%)
                 </label>
                 <Input
@@ -542,11 +542,11 @@ const SystemManagement = () => {
                 onChange={(e) => setThresholds((prev) => ({ ...prev, cpu_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
-                className="admin-w-full" />
+                className="w-full" />
 
               </div>
               <div>
-                <label className="admin-form-label admin-mb-4">
+                <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2 mb-1">
                   Память (%)
                 </label>
                 <Input
@@ -555,11 +555,11 @@ const SystemManagement = () => {
                 onChange={(e) => setThresholds((prev) => ({ ...prev, memory_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
-                className="admin-w-full" />
+                className="w-full" />
 
               </div>
               <div>
-                <label className="admin-form-label admin-mb-4">
+                <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2 mb-1">
                   Диск (%)
                 </label>
                 <Input
@@ -568,7 +568,7 @@ const SystemManagement = () => {
                 onChange={(e) => setThresholds((prev) => ({ ...prev, disk_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
-                className="admin-w-full" />
+                className="w-full" />
 
               </div>
             </div>
@@ -578,7 +578,7 @@ const SystemManagement = () => {
             <h4 className="admin-settings-h4">
               Автоматизация
             </h4>
-            <div className="admin-flex-col-12">
+            <div className="flex flex-col gap-3">
               <div className="admin-automation-row">
                 <div>
                   <div className="admin-text-med-primary-block">
@@ -610,7 +610,7 @@ const SystemManagement = () => {
           </div>
         </div>
         
-        <div className="admin-mt-24">
+        <div className="mt-6">
           <Button>
             Сохранить настройки
           </Button>
@@ -621,11 +621,11 @@ const SystemManagement = () => {
 
   return (
     <div className="admin-p-0-max-1400">
-      <div className="admin-flex-between admin-mb-24">
+      <div className="flex items-center justify-between mb-6">
         <div className="admin-flex-center-16">
           <Server className="admin-icon-32-accent" />
           <div>
-            <h1 className="admin-text-2xl admin-text-semi admin-text-primary admin-m-0">
+            <h1 className="admin-text-2xl admin-text-semi text-[var(--mac-text-primary)] admin-m-0">
               Управление системой
             </h1>
             <p className="admin-page-subtitle">
@@ -633,7 +633,7 @@ const SystemManagement = () => {
             </p>
           </div>
         </div>
-        <div className="admin-flex-center-8">
+        <div className="flex items-center justify-center gap-2">
           {systemHealth &&
           <Badge variant={systemHealth.overall_status === 'healthy' ? 'success' : 'error'}>
               {systemHealth.overall_status}
@@ -659,7 +659,7 @@ const SystemManagement = () => {
               className="admin-tab-btn"
               data-active={isActive}>
 
-              <IconComponent className="admin-icon-16 admin-icon-16-color" style={{ '--admin-icon-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
+              <IconComponent className="w-4 h-4 admin-icon-16-color" style={{ '--admin-icon-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
                 {tab.label}
               {isActive &&
               <div className="admin-tab-active-underline" />

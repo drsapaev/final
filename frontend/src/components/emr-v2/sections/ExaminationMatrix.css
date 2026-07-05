@@ -80,7 +80,7 @@
 
 /* STATE: Norm (Selected) - Green */
 .ex-matrix__item--norm {
-    border-color: #34c759;
+    border-color: var(--mac-success);
     background: rgba(52, 199, 89, 0.05);
 }
 
@@ -90,7 +90,7 @@
 
 /* STATE: Path (Selected) - Red */
 .ex-matrix__item--path {
-    border-color: #ff3b30;
+    border-color: var(--mac-error);
     background: rgba(255, 59, 48, 0.05);
 }
 
@@ -116,7 +116,7 @@
     justify-content: center;
     border: 1px solid var(--mac-border, #e5e5e5);
     border-radius: 6px;
-    background: #fff;
+    background: var(--mac-bg-primary);
     cursor: pointer;
     font-size: 12px;
     color: #aeaeb2;
@@ -129,25 +129,25 @@
 
 .ex-matrix__action-btn--norm:hover,
 .ex-matrix__status-norm {
-    color: #34c759;
-    border-color: #34c759;
+    color: var(--mac-success);
+    border-color: var(--mac-success);
 }
 
 .ex-matrix__action-btn--path:hover,
 .ex-matrix__status-path {
-    color: #ff3b30;
-    border-color: #ff3b30;
+    color: var(--mac-error);
+    border-color: var(--mac-error);
 }
 
 /* Selected states for buttons */
 .ex-matrix__item--norm .ex-matrix__action-btn--norm {
-    background: #34c759;
+    background: var(--mac-success);
     color: white;
-    border-color: #34c759;
+    border-color: var(--mac-success);
 }
 
 .ex-matrix__item--path .ex-matrix__action-btn--path {
-    background: #ff3b30;
+    background: var(--mac-error);
     color: white;
-    border-color: #ff3b30;
+    border-color: var(--mac-error);
 }

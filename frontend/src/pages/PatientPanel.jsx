@@ -999,7 +999,7 @@ const PatientPanel = () => {
                 size="small"
                 className="patient-search-icon"
               />
-              <input
+              <Input
                 aria-label={
                   hasPatientData
                     ? 'Search patient records and quick actions'

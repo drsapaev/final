@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Card, Button } from '../ui/macos';
+import { Card, Button,
+  Input,
+  Checkbox } from '../ui/macos';
 import {
   Download,
   FileText,
@@ -230,11 +232,7 @@ const DataExporter = ({
             
             <div className="space-y-3">
               <label className="flex items-center space-x-3">
-                <input
-                type="checkbox"
-                aria-label="Include charts in export"
-                checked={includeCharts}
-                onChange={(e) => setIncludeCharts(e.target.checked)}
+                <Checkbox aria-label="Include charts in export" checked={includeCharts} onChange={(e) => setIncludeCharts(e.target.checked)}
                 className="rounded" />
               
                 <div>
@@ -244,11 +242,7 @@ const DataExporter = ({
               </label>
 
               <label className="flex items-center space-x-3">
-                <input
-                type="checkbox"
-                aria-label="Include raw data in export"
-                checked={includeRawData}
-                onChange={(e) => setIncludeRawData(e.target.checked)}
+                <Checkbox aria-label="Include raw data in export" checked={includeRawData} onChange={(e) => setIncludeRawData(e.target.checked)}
                 className="rounded" />
               
                 <div>
@@ -258,11 +252,7 @@ const DataExporter = ({
               </label>
 
               <label className="flex items-center space-x-3">
-                <input
-                type="checkbox"
-                aria-label="Send export by email"
-                checked={emailExport}
-                onChange={(e) => setEmailExport(e.target.checked)}
+                <Checkbox aria-label="Send export by email" checked={emailExport} onChange={(e) => setEmailExport(e.target.checked)}
                 className="rounded" />
               
                 <div>
@@ -273,7 +263,7 @@ const DataExporter = ({
 
               {emailExport &&
             <div className="ml-6">
-                  <input
+                  <Input
                 type="email"
                 aria-label="Export email address"
                 value={emailAddress}

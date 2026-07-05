@@ -142,7 +142,7 @@
 }
 
 .animate-gradient {
-  background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+  background: linear-gradient(-45deg, var(--mac-accent-purple), var(--mac-accent-purple), #f093fb, #f5576c);
   background-size: 400% 400%;
   animation: gradientShift 3s ease infinite;
 }
@@ -175,7 +175,7 @@
 
 .hover-lift:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 20px 25px -5px color-mix(in srgb, black, transparent 90%), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .hover-scale {
@@ -202,7 +202,7 @@
 }
 
 .dark .loading-skeleton {
-  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background: linear-gradient(90deg, var(--mac-text-primary) 25%, #4b5563 50%, var(--mac-text-primary) 75%);
   background-size: 200% 100%;
 }
 

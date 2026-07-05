@@ -28,6 +28,7 @@ import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import SessionWarningModal from '../components/common/SessionWarningModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
@@ -1835,17 +1836,11 @@ const DermatologistPanelUnified = () => {
         {/* QW-5/QW-6 (UX audit): confirm dialog + session timeout warning */}
       {confirmDialog}
       {sessionWarning && (
-        <div role="alertdialog" aria-label="Предупреждение об истечении сессии"
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-          <div style={{ background: 'var(--mac-surface, white)', border: '1px solid var(--mac-border, #d8dde8)', borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '90%' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--mac-text-primary, #1a1d29)' }}>Сессия скоро истечёт</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--mac-text-secondary, #6b7280)', lineHeight: 1.5 }}>Ваша сессия истекает. Несохранённые данные могут быть потеряны.</p>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setSessionWarning(null)} style={{ padding: '8px 16px', border: '1px solid var(--mac-border)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontSize: '14px' }}>Позже</button>
-              <button onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', background: 'var(--mac-accent, #dc2626)', color: 'white', cursor: 'pointer', fontSize: '14px' }}>Продлить сессию</button>
-            </div>
-          </div>
-        </div>
+        <SessionWarningModal
+          visible={!!sessionWarning}
+          onDismiss={() => setSessionWarning(null)}
+          onExtend={() => notify.info('Продлеваем сессию...')}
+        />
       )}
 
       {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}

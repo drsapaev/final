@@ -356,7 +356,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                     }}
                     aria-label={`Редактировать шаблон процедуры ${template.name}`}
                     style={{
-                      padding: '8px',
+                      padding: 'var(--mac-spacing-2)',
                       border: '1px solid var(--mac-border)',
                       borderRadius: 4,
                       background: 'transparent',

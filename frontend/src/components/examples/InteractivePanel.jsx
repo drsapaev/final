@@ -55,7 +55,7 @@ const InteractivePanel = ({
         onClick={onClick}
         style={{
           padding: getSpacing('lg'),
-          borderRadius: '12px',
+          borderRadius: 'var(--mac-radius-lg)',
           marginBottom: getSpacing('md'),
           ...panelStyle
         }}
@@ -80,7 +80,7 @@ const InteractivePanel = ({
             }}>
               <h3 style={{
                 fontSize: getFontSize('lg'),
-                fontWeight: '600',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 color: getColor('text'),
                 margin: 0
               }}>
@@ -140,7 +140,7 @@ const InteractivePanel = ({
             <div style={{
               padding: getSpacing('md'),
               backgroundColor: getColor('background'),
-              borderRadius: '8px',
+              borderRadius: 'var(--mac-radius-md)',
               border: `1px solid ${getColor('border')}`
             }}>
               <p style={{
@@ -215,7 +215,7 @@ export const StateInteractivePanel = ({
       {...props}
       style={{
         padding: getSpacing('lg'),
-        borderRadius: '12px',
+        borderRadius: 'var(--mac-radius-lg)',
         backgroundColor: stateColors.bg,
         border: `2px solid ${stateColors.border}`,
         transition: 'all 0.3s ease',
@@ -241,7 +241,7 @@ export const StateInteractivePanel = ({
       }}>
         <h3 style={{
           fontSize: getFontSize('lg'),
-          fontWeight: '600',
+          fontWeight: 'var(--mac-font-weight-semibold)',
           color: stateColors.text,
           margin: 0
         }}>
@@ -276,7 +276,7 @@ export const StateInteractivePanel = ({
           marginTop: getSpacing('md'),
           padding: getSpacing('md'),
           backgroundColor: getColor('primary', 100),
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           display: 'flex',
           alignItems: 'center',
           gap: getSpacing('sm')

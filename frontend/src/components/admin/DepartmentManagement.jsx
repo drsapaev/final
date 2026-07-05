@@ -64,7 +64,7 @@ const DEFAULT_FORM = {
   name_uz: '',
   key: '',
   description: '',
-  color: '#0066cc',
+  color: 'var(--mac-accent-blue)',
   icon: 'Package', // ✅ ИЗМЕНЕНО: Используем имя иконки из iconMap вместо emoji
   display_order: 999,
   active: true
@@ -309,7 +309,7 @@ const DepartmentManagement = () => {
       name_uz: dept.name_uz || '',
       key: dept.key || '',
       description: dept.description || '',
-      color: dept.color || '#0066cc',
+      color: dept.color || 'var(--mac-accent-blue)',
       icon: dept.icon || '🏥',
       display_order: dept.display_order || 999,
       active: dept.active ?? true
@@ -493,7 +493,7 @@ const DepartmentManagement = () => {
       `"${(dept.name_uz || '').replace(/"/g, '""')}"`,
       `"${(dept.key || '').replace(/"/g, '""')}"`,
       `"${(dept.description || '').replace(/"/g, '""')}"`,
-      `"${(dept.color || '#0066cc').replace(/"/g, '""')}"`,
+      `"${(dept.color || 'var(--mac-accent-blue)').replace(/"/g, '""')}"`,
       `"${(dept.icon || '🏥').replace(/"/g, '""')}"`,
       dept.display_order || 999,
       dept.active !== false ? 'true' : 'false'].
@@ -589,7 +589,7 @@ const DepartmentManagement = () => {
 
       // Импорт данных
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk`, {
+      const response = await fetch('admin/departments/bulk', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -654,7 +654,7 @@ const DepartmentManagement = () => {
 
     try {
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk-delete`, {
+      const response = await fetch('admin/departments/bulk-delete', {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -687,7 +687,7 @@ const DepartmentManagement = () => {
 
     try {
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk-activate`, {
+      const response = await fetch('admin/departments/bulk-activate', {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -729,7 +729,7 @@ const DepartmentManagement = () => {
       <MacOSCard>
                 <div className="admin-loading-p-40-center">
                     <div className="spinner admin-spinner-mb-16"></div>
-                    <p className="admin-text-secondary">Загрузка отделений...</p>
+                    <p className="text-[var(--mac-text-secondary)]">Загрузка отделений...</p>
                 </div>
             </MacOSCard>);
 
@@ -739,8 +739,8 @@ const DepartmentManagement = () => {
     <div className="admin-flex-col-20">
             {/* Статистика отделений */}
             <div className="admin-grid-auto-200-mb-16">
-                <MacOSCard className="admin-p-16">
-                    <div className="admin-text-center">
+                <MacOSCard className="p-4">
+                    <div className="text-center">
                         <div className="admin-stat-number-mb-4">
                             {departmentStats.total}
                         </div>
@@ -750,8 +750,8 @@ const DepartmentManagement = () => {
                     </div>
                 </MacOSCard>
 
-                <MacOSCard className="admin-p-16">
-                    <div className="admin-text-center">
+                <MacOSCard className="p-4">
+                    <div className="text-center">
                         <div className="admin-stat-number-success-mb-4">
                             {departmentStats.active}
                         </div>
@@ -761,8 +761,8 @@ const DepartmentManagement = () => {
                     </div>
                 </MacOSCard>
 
-                <MacOSCard className="admin-p-16">
-                    <div className="admin-text-center">
+                <MacOSCard className="p-4">
+                    <div className="text-center">
                         <div className="admin-stat-number-warning-mb-4">
                             {departmentStats.inactive}
                         </div>
@@ -772,8 +772,8 @@ const DepartmentManagement = () => {
                     </div>
                 </MacOSCard>
 
-                <MacOSCard className="admin-p-16">
-                    <div className="admin-text-center">
+                <MacOSCard className="p-4">
+                    <div className="text-center">
                         <div className="admin-stat-number-info-mb-4">
                             {departmentStats.withDoctors}
                         </div>
@@ -785,7 +785,7 @@ const DepartmentManagement = () => {
             </div>
 
             <MacOSCard>
-                <div className="admin-p-24">
+                <div className="p-6">
                     <div className="admin-flex-between-mb-24">
                         <h2 className="admin-title-20">
                             Управление отделениями
@@ -796,7 +796,7 @@ const DepartmentManagement = () => {
                 size="default"
                 onClick={() => setShowAddForm(!showAddForm)}>
                 
-                                <Plus size={16} className="admin-mr-8" />
+                                <Plus size={16} className="mr-2" />
                                 Добавить отделение
                             </Button>
 
@@ -806,7 +806,7 @@ const DepartmentManagement = () => {
                 onClick={handleExport}
                 title="Экспортировать отделения в CSV">
                 
-                                <Download size={16} className="admin-mr-8" />
+                                <Download size={16} className="mr-2" />
                                 Экспорт
                             </Button>
 
@@ -818,7 +818,7 @@ const DepartmentManagement = () => {
                   className="admin-cursor-pointer"
                   title="Импортировать отделения из CSV">
                   
-                                    <Upload size={16} className="admin-mr-8" />
+                                    <Upload size={16} className="mr-2" />
                                     Импорт
                                 </Button>
                                 <input
@@ -835,7 +835,7 @@ const DepartmentManagement = () => {
                     {/* Панель поиска и фильтров */}
                     <div className="admin-flex-gap-16-wrap-mb-24">
                         <div className="admin-flex-search-row">
-                            <Search size={16} className="admin-text-secondary" />
+                            <Search size={16} className="text-[var(--mac-text-secondary)]" />
                             <Input
                 placeholder="Поиск по названию или ключу..."
                 value={searchTerm}
@@ -966,7 +966,7 @@ const DepartmentManagement = () => {
                                     Настройка услуг для вкладки
                                 </h4>
 
-                                <div className="admin-mb-16">
+                                <div className="mb-4">
                                     <Checkbox
                   checked={serviceMapping.create_service}
                   onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
@@ -1026,7 +1026,7 @@ const DepartmentManagement = () => {
 
                             <div className="admin-flex-gap-12-mt-16">
                                 <Button variant="primary" onClick={handleAddDepartment}>
-                                    <Save size={16} className="admin-mr-8" />
+                                    <Save size={16} className="mr-2" />
                                     Сохранить
                                 </Button>
                                 <Button variant="secondary" onClick={() => {
@@ -1034,7 +1034,7 @@ const DepartmentManagement = () => {
                 setFormData(DEFAULT_FORM);
                 setServiceMapping(DEFAULT_SERVICE_MAPPING);
               }}>
-                                    <X size={16} className="admin-mr-8" />
+                                    <X size={16} className="mr-2" />
                                     Отмена
                                 </Button>
                             </div>
@@ -1136,7 +1136,7 @@ const DepartmentManagement = () => {
                         
                                             </td>
                                             <td className="admin-td-padded">
-                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || '#0066cc' }}>
+                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || 'var(--mac-accent-blue)' }}>
                                                     {IconComponent ?
                           <IconComponent size={20} /> :
 
@@ -1226,7 +1226,7 @@ const DepartmentManagement = () => {
               totalPages={totalPages}
               onPageChange={setCurrentPage} />
             
-                            <div className="admin-flex-center-8">
+                            <div className="flex items-center justify-center gap-2">
                                 <span className="admin-text-14-secondary">
                                     Показывать:
                                 </span>
@@ -1359,7 +1359,7 @@ const DepartmentManagement = () => {
                         Настройка услуг для вкладки
                     </h4>
 
-                    <div className="admin-mb-16">
+                    <div className="mb-4">
                         <Checkbox
               checked={serviceMapping.create_service}
               onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
@@ -1441,7 +1441,7 @@ const DepartmentManagement = () => {
             variant="primary"
             onClick={handleUpdateDepartment}>
             
-                        <Save size={16} className="admin-mr-8" />
+                        <Save size={16} className="mr-2" />
                         Сохранить изменения
                     </Button>
                 </div>

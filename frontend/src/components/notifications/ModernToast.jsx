@@ -76,7 +76,7 @@ const ModernToast = ({
       error: {
         icon: AlertCircle,
         color: getColor('danger'),
-        bgColor: 'rgba(239, 68, 68, 0.1)',
+        bgColor: 'var(--mac-error-bg)',
         borderColor: getColor('danger')
       },
       warning: {

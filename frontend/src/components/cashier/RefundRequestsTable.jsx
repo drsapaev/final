@@ -6,6 +6,7 @@
  * - Approve/Reject actions for pending requests
  * - Complete action for approved requests
  */
+import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Check,
@@ -133,7 +134,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
         params.append('status_filter', filter);
       }
 
-      const response = await fetch(`/api/v1/force-majeure/refund-requests?${params}`, {
+      const response = await fetch(`/force-majeure/refund-requests?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -162,7 +163,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     setProcessingId(requestId);
     try {
       const token = getAuthToken();
-      const response = await fetch(`/api/v1/force-majeure/refund-requests/${requestId}/process`, {
+      const response = await fetch(`/force-majeure/refund-requests/${requestId}/process`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

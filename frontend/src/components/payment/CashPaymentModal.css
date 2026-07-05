@@ -1,0 +1,147 @@
+/**
+ * CashPaymentModal Styles
+ *
+ * UX Audit Registrar #4: все inline-стили из CashPaymentModal.jsx перенесены сюда.
+ * Использует macos design tokens (--mac-*) для полной light/dark theme support.
+ */
+
+/* Overlay (position: fixed full-screen) */
+.cpm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: color-mix(in srgb, black, transparent 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+/* Modal card */
+.cpm-modal {
+    background-color: var(--mac-bg-secondary);
+    border-radius: var(--mac-radius-md);
+    padding: var(--mac-spacing-6);
+    width: 100%;
+    max-width: 400px;
+    margin: var(--mac-spacing-4);
+    border: 1px solid var(--mac-border);
+    box-shadow: var(--mac-shadow-md);
+}
+
+/* Header row: title + close button */
+.cpm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--mac-spacing-4);
+}
+
+.cpm-title {
+    font-size: var(--mac-font-size-xl);
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+}
+
+.cpm-close-btn {
+    color: var(--mac-text-secondary);
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
+
+.cpm-close-icon {
+    width: 24px;
+    height: 24px;
+}
+
+/* Patient info block */
+.cpm-patient-info {
+    margin-bottom: var(--mac-spacing-4);
+}
+
+.cpm-patient-label {
+    font-size: var(--mac-font-size-base);
+    color: var(--mac-text-secondary);
+    margin-bottom: var(--mac-spacing-2);
+}
+
+.cpm-patient-name {
+    font-size: var(--mac-font-size-lg);
+    font-weight: var(--mac-font-weight-medium);
+    color: var(--mac-text-primary);
+}
+
+.cpm-patient-meta {
+    font-size: var(--mac-font-size-base);
+    color: var(--mac-text-secondary);
+}
+
+/* Recommended amount hint */
+.cpm-amount-hint {
+    font-size: var(--mac-font-size-sm);
+    color: var(--mac-accent-blue);
+    margin-top: var(--mac-spacing-2);
+    padding: var(--mac-spacing-2) var(--mac-spacing-3);
+    background-color: var(--mac-accent-bg);
+    border-radius: var(--mac-radius-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-2);
+}
+
+.cpm-amount-hint-icon {
+    flex-shrink: 0;
+}
+
+/* Form field group */
+.cpm-field-group {
+    margin-bottom: var(--mac-spacing-4);
+}
+
+.cpm-field-label {
+    display: block;
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+    color: var(--mac-text-primary);
+    margin-bottom: var(--mac-spacing-1);
+}
+
+/* Input/Select/Textarea — shared styling */
+.cpm-input,
+.cpm-select,
+.cpm-textarea {
+    width: 100%;
+    padding: var(--mac-spacing-2) var(--mac-spacing-3);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-sm);
+    font-size: var(--mac-font-size-lg);
+    background-color: var(--mac-bg-primary);
+    color: var(--mac-text-primary);
+}
+
+.cpm-textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.cpm-actions-group {
+    margin-bottom: var(--mac-spacing-6);
+}
+
+.cpm-button-row {
+    display: flex;
+    gap: var(--mac-spacing-3);
+    justify-content: flex-end;
+}
+
+.cpm-submit-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: var(--mac-spacing-2);
+}

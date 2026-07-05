@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { X } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
+// UX Audit Registrar #5: useTheme удалён — все стили в CSS с macos tokens.
 import './ModernDialog.css';
 
 const ModernDialog = ({
@@ -21,7 +21,8 @@ const ModernDialog = ({
   dialogStyle = {},
   ...props
 }) => {
-  const { theme, getColor } = useTheme();
+  // UX Audit Registrar #5: useTheme() удалён — getColor/theme больше не нужны
+  // (все стили перенесены в CSS с macos tokens + [data-theme="dark"] selectors).
   const dialogRef = useRef(null);
 
   // Фокус-ловушка и управление клавишами
@@ -77,27 +78,11 @@ const ModernDialog = ({
 
   if (!isOpen) return null;
 
-  const backdropButtonStyle = {
-    position: 'absolute',
-    inset: 0,
-    border: 'none',
-    margin: 0,
-    padding: 0,
-    background: 'transparent'
-  };
-
+  // UX Audit Registrar #5: backdropButtonStyle и dialogStyles вынесены в CSS,
+  // но dialogStyles всё ещё нужен для maxWidth/maxHeight/dialogStyle props.
   const dialogStyles = {
-    backgroundColor: getColor('cardBg'),
     maxWidth,
     maxHeight,
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    position: 'relative',
-    zIndex: 1,
-    boxShadow: theme === 'dark' ?
-    '0 25px 50px -12px rgba(0, 0, 0, 0.8)' :
-    '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
     ...dialogStyle
   };
 
@@ -109,17 +94,13 @@ const ModernDialog = ({
 
   return (
     <div
-      className={`modern-dialog-backdrop ${className}`}
+      className={`modern-dialog-backdrop modern-dialog-backdrop--overlay ${className}`}
       role="presentation"
-      style={{
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(4px)'
-      }}
       {...props}>
       {closeOnBackdrop &&
       <button
         type="button"
-        style={backdropButtonStyle}
+        className="modern-dialog-backdrop-button"
         onClick={onClose}
         tabIndex={-1}
         aria-label="Закрыть диалог" />
@@ -128,7 +109,7 @@ const ModernDialog = ({
       
       <div
         ref={dialogRef}
-        className={`modern-dialog-container ${dialogClassName}`}
+        className={`modern-dialog-container modern-dialog-container--styled ${dialogClassName}`}
         role="dialog"
         aria-modal="true"
         {...dialogLabelProps}
@@ -144,8 +125,7 @@ const ModernDialog = ({
                 {title &&
             <h3
               id="dialog-title"
-              className="modern-dialog-title"
-              style={{ color: getColor('textPrimary') }}>
+              className="modern-dialog-title modern-dialog-title--styled">
               
                     {title}
                   </h3>
@@ -153,12 +133,9 @@ const ModernDialog = ({
                 {showCloseButton &&
             <button
               type="button"
-              className="modern-dialog-close"
+              className="modern-dialog-close modern-dialog-close--styled"
               onClick={onClose}
-              aria-label="Закрыть диалог"
-              style={{
-                color: getColor('textSecondary')
-              }}>
+              aria-label="Закрыть диалог">
               
                     <X size={20} />
                   </button>
@@ -176,11 +153,7 @@ const ModernDialog = ({
         {/* Действия */}
         {actions && actions.length > 0 &&
         <div
-          className="modern-dialog-actions"
-          style={{
-            backgroundColor: theme === 'dark' ? '#1f2937' : '#f9fafb',
-            borderTop: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
-          }}>
+          className="modern-dialog-actions modern-dialog-actions--styled">
           
             {actions.map((action, index) =>
           <button

@@ -4,7 +4,7 @@ import { api } from '../api';
 import { getVisit } from '../api/visits';
 import {
   AppEmpty, AppError, Button,
-} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors.js';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
@@ -128,16 +128,16 @@ export default function Search() {
   // Get status badge color
   const getStatusColor = (status) => {
     const colors = {
-      open: { bg: '#e3f2fd', color: '#1565c0', label: 'Открыт' },
-      waiting: { bg: '#fff3e0', color: '#ef6c00', label: 'Ожидание' },
-      in_progress: { bg: '#fff8e1', color: '#f9a825', label: 'В процессе' },
-      in_visit: { bg: '#e8f5e9', color: '#2e7d32', label: 'На приёме' },
-      completed: { bg: '#e8f5e9', color: '#2e7d32', label: 'Завершён' },
-      closed: { bg: '#f5f5f5', color: '#616161', label: 'Закрыт' },
-      canceled: { bg: '#ffebee', color: '#c62828', label: 'Отменён' },
-      paid: { bg: '#e8f5e9', color: '#2e7d32', label: 'Оплачен' },
+      open: { bg: 'var(--mac-accent-bg)', color: 'var(--mac-accent)', label: 'Открыт' },
+      waiting: { bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)', label: 'Ожидание' },
+      in_progress: { bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)', label: 'В процессе' },
+      in_visit: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: 'На приёме' },
+      completed: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: 'Завершён' },
+      closed: { bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)', label: 'Закрыт' },
+      canceled: { bg: 'var(--mac-error-bg)', color: 'var(--mac-error)', label: 'Отменён' },
+      paid: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: 'Оплачен' },
     };
-    return colors[status] || { bg: '#f5f5f5', color: '#616161', label: status || '—' };
+    return colors[status] || { bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)', label: status || '—' };
   };
 
   // Format date
@@ -212,7 +212,7 @@ export default function Search() {
           <label htmlFor={searchInputId} style={styles.visuallyHidden}>
             Поиск пациентов и визитов
           </label>
-          <input
+          <Input
             id={searchInputId}
             type="text"
             value={query}
@@ -449,9 +449,9 @@ const styles = {
   container: {
     maxWidth: 1200,
     margin: '0 auto',
-    padding: '24px',
+    padding: 'var(--mac-spacing-6)',
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+    background: 'var(--mac-bg-secondary)',
   },
   header: {
     textAlign: 'center',
@@ -459,8 +459,8 @@ const styles = {
   },
   title: {
     fontSize: 32,
-    fontWeight: 700,
-    color: '#1e293b',
+    fontWeight: 'var(--mac-font-weight-bold)',
+    color: 'var(--mac-text-primary)',
     margin: 0,
     display: 'flex',
     alignItems: 'center',
@@ -472,7 +472,7 @@ const styles = {
   },
   subtitle: {
     fontSize: 16,
-    color: '#64748b',
+    color: 'var(--mac-text-secondary)',
     marginTop: 8,
   },
   searchForm: {
@@ -499,19 +499,19 @@ const styles = {
     flex: 1,
     padding: '16px 20px',
     fontSize: 16,
-    border: '2px solid #e2e8f0',
+    border: '2px solid var(--mac-border)',
     borderRadius: 12,
     outline: 'none',
     transition: 'all 0.2s',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--mac-bg-primary)',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
   },
   searchButton: {
     padding: '16px 32px',
     fontSize: 16,
-    fontWeight: 600,
-    color: '#fff',
-    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: 'var(--mac-bg-primary)',
+    background: 'var(--mac-accent-blue)',
     border: 'none',
     borderRadius: 12,
     cursor: 'pointer',
@@ -523,7 +523,7 @@ const styles = {
   },
   hint: {
     textAlign: 'center',
-    color: '#94a3b8',
+    color: 'var(--mac-text-tertiary)',
     fontSize: 14,
     marginTop: 8,
   },
@@ -531,10 +531,10 @@ const styles = {
     maxWidth: 800,
     margin: '0 auto 24px',
     padding: '16px 20px',
-    backgroundColor: '#fef2f2',
-    color: '#dc2626',
+    backgroundColor: 'var(--mac-error-bg)',
+    color: 'var(--mac-error)',
     borderRadius: 12,
-    border: '1px solid #fecaca',
+    border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
   },
   tabs: {
     display: 'flex',
@@ -546,16 +546,16 @@ const styles = {
   tab: {
     padding: '10px 20px',
     fontSize: 14,
-    fontWeight: 500,
-    color: '#64748b',
-    backgroundColor: '#fff',
-    border: '1px solid #e2e8f0',
+    fontWeight: 'var(--mac-font-weight-medium)',
+    color: 'var(--mac-text-secondary)',
+    backgroundColor: 'var(--mac-bg-primary)',
+    border: '1px solid var(--mac-border)',
     borderRadius: 8,
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
   tabActive: {
-    color: '#fff',
+    color: 'var(--mac-bg-primary)',
     backgroundColor: 'var(--mac-accent-blue, #3b82f6)',
     borderColor: 'var(--mac-accent-blue, #3b82f6)',
   },
@@ -568,8 +568,8 @@ const styles = {
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 600,
-    color: '#1e293b',
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: 'var(--mac-text-primary)',
     marginBottom: 16,
     display: 'flex',
     alignItems: 'center',
@@ -580,8 +580,8 @@ const styles = {
   },
   count: {
     fontSize: 14,
-    fontWeight: 500,
-    color: '#64748b',
+    fontWeight: 'var(--mac-font-weight-medium)',
+    color: 'var(--mac-text-secondary)',
     backgroundColor: '#f1f5f9',
     padding: '4px 10px',
     borderRadius: 12,
@@ -594,9 +594,9 @@ const styles = {
   },
   card: {
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--mac-bg-primary)',
     borderRadius: 12,
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--mac-border)',
     cursor: 'pointer',
     transition: 'all 0.2s',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
@@ -609,29 +609,29 @@ const styles = {
   },
   patientId: {
     fontSize: 12,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-accent-blue, #3b82f6)',
-    backgroundColor: '#eff6ff',
-    padding: '4px 8px',
+    backgroundColor: 'var(--mac-accent-bg)',
+    padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
     borderRadius: 6,
   },
   visitId: {
     fontSize: 12,
-    fontWeight: 600,
-    color: '#8b5cf6',
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: 'var(--mac-accent-purple)',
     backgroundColor: '#f5f3ff',
-    padding: '4px 8px',
+    padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
     borderRadius: 6,
   },
   cardArrow: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: 'var(--mac-text-tertiary)',
     transition: 'transform 0.2s',
   },
   patientName: {
     fontSize: 16,
-    fontWeight: 600,
-    color: '#1e293b',
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: 'var(--mac-text-primary)',
     marginBottom: 8,
   },
   patientInfo: {
@@ -641,12 +641,12 @@ const styles = {
   },
   infoItem: {
     fontSize: 13,
-    color: '#64748b',
+    color: 'var(--mac-text-secondary)',
   },
   visitPatient: {
     fontSize: 15,
-    fontWeight: 500,
-    color: '#1e293b',
+    fontWeight: 'var(--mac-font-weight-medium)',
+    color: 'var(--mac-text-primary)',
     marginBottom: 10,
   },
   visitMeta: {
@@ -657,17 +657,17 @@ const styles = {
   },
   statusBadge: {
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     padding: '4px 10px',
     borderRadius: 6,
   },
   visitDate: {
     fontSize: 13,
-    color: '#64748b',
+    color: 'var(--mac-text-secondary)',
   },
   visitNotes: {
     fontSize: 13,
-    color: '#64748b',
+    color: 'var(--mac-text-secondary)',
     marginTop: 8,
     fontStyle: 'italic',
   },
@@ -682,13 +682,13 @@ const styles = {
   },
   noResultsText: {
     fontSize: 20,
-    fontWeight: 600,
-    color: '#64748b',
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: 'var(--mac-text-secondary)',
     marginBottom: 8,
   },
   noResultsHint: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: 'var(--mac-text-tertiary)',
   },
   initialState: {
     textAlign: 'center',
@@ -700,26 +700,26 @@ const styles = {
   },
   initialText: {
     fontSize: 20,
-    fontWeight: 600,
-    color: '#64748b',
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: 'var(--mac-text-secondary)',
     marginBottom: 8,
   },
   initialHint: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: 'var(--mac-text-tertiary)',
     marginBottom: 24,
   },
   tips: {
     display: 'inline-block',
     textAlign: 'left',
-    backgroundColor: '#f8fafc',
-    padding: '16px 24px',
+    backgroundColor: 'var(--mac-bg-secondary)',
+    padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
     borderRadius: 12,
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--mac-border)',
   },
   tip: {
     fontSize: 14,
-    color: '#64748b',
+    color: 'var(--mac-text-secondary)',
     marginBottom: 4,
   },
 };

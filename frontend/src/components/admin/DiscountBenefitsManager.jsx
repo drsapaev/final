@@ -11,7 +11,7 @@ import {
   Skeleton,
   MacOSEmptyState,
   Select,
-} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Percent,
   Plus,
@@ -347,31 +347,19 @@ const DiscountBenefitsManager = () => {
       </div>
       <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Discount applies to services"
-              checked={discountForm.applies_to_services}
-              onChange={(e) => setDiscountForm({ ...discountForm, applies_to_services: e.target.checked })}
+            <Checkbox aria-label="Discount applies to services" checked={discountForm.applies_to_services} onChange={(e) => setDiscountForm({ ...discountForm, applies_to_services: e.target.checked })}
               className="mr-2" />
         
           Применяется к услугам
         </label>
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Discount applies to appointments"
-              checked={discountForm.applies_to_appointments}
-              onChange={(e) => setDiscountForm({ ...discountForm, applies_to_appointments: e.target.checked })}
+            <Checkbox aria-label="Discount applies to appointments" checked={discountForm.applies_to_appointments} onChange={(e) => setDiscountForm({ ...discountForm, applies_to_appointments: e.target.checked })}
               className="mr-2" />
         
           Применяется к записям
         </label>
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Discount can combine with other discounts"
-              checked={discountForm.can_combine_with_others}
-              onChange={(e) => setDiscountForm({ ...discountForm, can_combine_with_others: e.target.checked })}
+            <Checkbox aria-label="Discount can combine with other discounts" checked={discountForm.can_combine_with_others} onChange={(e) => setDiscountForm({ ...discountForm, can_combine_with_others: e.target.checked })}
               className="mr-2" />
         
           Можно комбинировать с другими
@@ -484,31 +472,19 @@ const DiscountBenefitsManager = () => {
       </div>
       <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Benefit requires documents"
-              checked={benefitForm.requires_document}
-              onChange={(e) => setBenefitForm({ ...benefitForm, requires_document: e.target.checked })}
+            <Checkbox aria-label="Benefit requires documents" checked={benefitForm.requires_document} onChange={(e) => setBenefitForm({ ...benefitForm, requires_document: e.target.checked })}
               className="mr-2" />
         
           Требует документы
         </label>
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Benefit applies to services"
-              checked={benefitForm.applies_to_services}
-              onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_services: e.target.checked })}
+            <Checkbox aria-label="Benefit applies to services" checked={benefitForm.applies_to_services} onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_services: e.target.checked })}
               className="mr-2" />
         
           Применяется к услугам
         </label>
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Benefit applies to appointments"
-              checked={benefitForm.applies_to_appointments}
-              onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_appointments: e.target.checked })}
+            <Checkbox aria-label="Benefit applies to appointments" checked={benefitForm.applies_to_appointments} onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_appointments: e.target.checked })}
               className="mr-2" />
         
           Применяется к записям
@@ -623,14 +599,14 @@ const DiscountBenefitsManager = () => {
 
   // Рендер списка скидок
   const renderDiscountsList = () =>
-  <div className="admin-flex-col-24">
-      <div className="admin-flex-between">
+  <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
         <h3 className="admin-section-h3-m0">
           Скидки
         </h3>
         <Button
         onClick={() => setShowCreateForm(true)}
-        className="admin-flex-center-8">
+        className="flex items-center justify-center gap-2">
         
           <Plus size={16} />
           Создать скидку
@@ -638,7 +614,7 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard className="admin-p-0">
+    <MacOSCard className="p-0">
           <h4 className="admin-h4-md-semi-primary-mb-16">
             Создание новой скидки
           </h4>
@@ -654,14 +630,14 @@ const DiscountBenefitsManager = () => {
         description="В системе пока нет созданных скидок"
         action={
         <Button onClick={() => setShowCreateForm(true)}>
-                <Plus size={16} className="admin-mr-8" />
+                <Plus size={16} className="mr-2" />
                 Создать первую скидку
               </Button>
         } /> :
 
 
       discounts.map((discount) =>
-      <MacOSCard key={discount.id} className="admin-p-0">
+      <MacOSCard key={discount.id} className="p-0">
               <div className="admin-flex-between-flex-start">
                 <div>
                   <h4 className="admin-h4-md-semi-primary-mb-8">
@@ -682,7 +658,7 @@ const DiscountBenefitsManager = () => {
                     </Badge>
                   </div>
                 </div>
-                <div className="admin-text-right admin-text-sm admin-text-secondary">
+                <div className="admin-text-right text-sm text-[var(--mac-text-secondary)]">
                   <div>Использований: {discount.usage_count}/{discount.usage_limit || '∞'}</div>
                   <div>Приоритет: {discount.priority}</div>
                 </div>
@@ -696,14 +672,14 @@ const DiscountBenefitsManager = () => {
 
   // Рендер списка льгот
   const renderBenefitsList = () =>
-  <div className="admin-flex-col-24">
-      <div className="admin-flex-between">
+  <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
         <h3 className="admin-section-h3-m0">
           Льготы
         </h3>
         <Button
         onClick={() => setShowCreateForm(true)}
-        className="admin-flex-center-8">
+        className="flex items-center justify-center gap-2">
         
           <Plus size={16} />
           Создать льготу
@@ -711,7 +687,7 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard className="admin-p-0">
+    <MacOSCard className="p-0">
           <h4 className="admin-h4-md-semi-primary-mb-16">
             Создание новой льготы
           </h4>
@@ -727,14 +703,14 @@ const DiscountBenefitsManager = () => {
         description="В системе пока нет созданных льгот"
         action={
         <Button onClick={() => setShowCreateForm(true)}>
-                <Plus size={16} className="admin-mr-8" />
+                <Plus size={16} className="mr-2" />
                 Создать первую льготу
               </Button>
         } /> :
 
 
       benefits.map((benefit) =>
-      <MacOSCard key={benefit.id} className="admin-p-0">
+      <MacOSCard key={benefit.id} className="p-0">
               <div className="admin-flex-between-flex-start">
                 <div>
                   <h4 className="admin-h4-md-semi-primary-mb-8">
@@ -760,7 +736,7 @@ const DiscountBenefitsManager = () => {
               }
                   </div>
                 </div>
-                <div className="admin-text-right admin-text-sm admin-text-secondary">
+                <div className="admin-text-right text-sm text-[var(--mac-text-secondary)]">
                   {benefit.monthly_limit && <div>Месячный лимит: {benefit.monthly_limit} руб.</div>}
                   {benefit.yearly_limit && <div>Годовой лимит: {benefit.yearly_limit} руб.</div>}
                   {benefit.max_discount_amount && <div>Макс. скидка: {benefit.max_discount_amount} руб.</div>}
@@ -775,14 +751,14 @@ const DiscountBenefitsManager = () => {
 
   // Рендер списка программ лояльности
   const renderLoyaltyList = () =>
-  <div className="admin-flex-col-24">
-      <div className="admin-flex-between">
+  <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
         <h3 className="admin-section-h3-m0">
           Программы лояльности
         </h3>
         <Button
         onClick={() => setShowCreateForm(true)}
-        className="admin-flex-center-8">
+        className="flex items-center justify-center gap-2">
         
           <Plus size={16} />
           Создать программу
@@ -790,7 +766,7 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard className="admin-p-0">
+    <MacOSCard className="p-0">
           <h4 className="admin-h4-md-semi-primary-mb-16">
             Создание новой программы лояльности
           </h4>
@@ -806,14 +782,14 @@ const DiscountBenefitsManager = () => {
         description="В системе пока нет созданных программ лояльности"
         action={
         <Button onClick={() => setShowCreateForm(true)}>
-                <Plus size={16} className="admin-mr-8" />
+                <Plus size={16} className="mr-2" />
                 Создать первую программу
               </Button>
         } /> :
 
 
       loyaltyPrograms.map((program) =>
-      <MacOSCard key={program.id} className="admin-p-0">
+      <MacOSCard key={program.id} className="p-0">
               <div className="admin-flex-between-flex-start">
                 <div>
                   <h4 className="admin-h4-md-semi-primary-mb-8">
@@ -834,7 +810,7 @@ const DiscountBenefitsManager = () => {
                     </Badge>
                   </div>
                 </div>
-                <div className="admin-text-right admin-text-sm admin-text-secondary">
+                <div className="admin-text-right text-sm text-[var(--mac-text-secondary)]">
                   <div>Мин. для списания: {program.min_points_to_redeem} баллов</div>
                 </div>
               </div>
@@ -847,7 +823,7 @@ const DiscountBenefitsManager = () => {
 
   // Рендер аналитики
   const renderAnalytics = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       <h3 className="admin-section-h3-m0">
         Аналитика
       </h3>
@@ -856,19 +832,19 @@ const DiscountBenefitsManager = () => {
     <div className="admin-grid-auto-300">
           {/* Аналитика скидок */}
           {analytics.discounts &&
-      <MacOSCard className="admin-p-0">
+      <MacOSCard className="p-0">
               <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <TrendingUp size={16} />
                 Скидки
               </h4>
-              <div className="admin-flex-col-8">
-                <div className="admin-text-sm admin-text-secondary">
+              <div className="flex flex-col gap-2">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Всего применений: <span className="admin-text-med-primary">{analytics.discounts.total_applications}</span>
                 </div>
-                <div className="admin-text-sm admin-text-secondary">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Общая сумма скидок: <span className="admin-text-med-primary">{analytics.discounts.total_discount_amount?.toFixed(2)} руб.</span>
                 </div>
-                <div className="admin-text-sm admin-text-secondary">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Средний процент скидки: <span className="admin-text-med-primary">{analytics.discounts.average_discount_percentage?.toFixed(1)}%</span>
                 </div>
               </div>
@@ -877,19 +853,19 @@ const DiscountBenefitsManager = () => {
 
           {/* Аналитика льгот */}
           {analytics.benefits &&
-      <MacOSCard className="admin-p-0">
+      <MacOSCard className="p-0">
               <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <Users size={16} />
                 Льготы
               </h4>
-              <div className="admin-flex-col-8">
-                <div className="admin-text-sm admin-text-secondary">
+              <div className="flex flex-col gap-2">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Всего применений: <span className="admin-text-med-primary">{analytics.benefits.total_applications}</span>
                 </div>
-                <div className="admin-text-sm admin-text-secondary">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Общая сумма льгот: <span className="admin-text-med-primary">{analytics.benefits.total_benefit_amount?.toFixed(2)} руб.</span>
                 </div>
-                <div className="admin-text-sm admin-text-secondary">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Средний процент льготы: <span className="admin-text-med-primary">{analytics.benefits.average_benefit_percentage?.toFixed(1)}%</span>
                 </div>
               </div>
@@ -898,22 +874,22 @@ const DiscountBenefitsManager = () => {
 
           {/* Аналитика лояльности */}
           {analytics.loyalty &&
-      <MacOSCard className="admin-p-0">
+      <MacOSCard className="p-0">
               <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <DollarSign size={16} />
                 Лояльность
               </h4>
-              <div className="admin-flex-col-8">
-                <div className="admin-text-sm admin-text-secondary">
+              <div className="flex flex-col gap-2">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Всего участников: <span className="admin-text-med-primary">{analytics.loyalty.total_patients}</span>
                 </div>
-                <div className="admin-text-sm admin-text-secondary">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Активных участников: <span className="admin-text-med-primary">{analytics.loyalty.active_patients}</span>
                 </div>
-                <div className="admin-text-sm admin-text-secondary">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Всего баллов начислено: <span className="admin-text-med-primary">{analytics.loyalty.total_points_earned}</span>
                 </div>
-                <div className="admin-text-sm admin-text-secondary">
+                <div className="text-sm text-[var(--mac-text-secondary)]">
                   Процент погашения: <span className="admin-text-med-primary">{analytics.loyalty.redemption_rate?.toFixed(1)}%</span>
                 </div>
               </div>
@@ -938,8 +914,8 @@ const DiscountBenefitsManager = () => {
 
 
   return (
-    <div className="admin-p-0">
-      <div className="admin-flex-center-16 admin-mb-24">
+    <div className="p-0">
+      <div className="admin-flex-center-16 mb-6">
         <Percent size={24} color="var(--mac-accent)" />
         <div>
           <h2 className="admin-h2-xl-bold-primary-m0">

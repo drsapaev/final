@@ -140,7 +140,7 @@ export function NotificationPrompt() {
           position: fixed;
           bottom: 20px;
           right: 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, var(--mac-accent-purple) 0%, var(--mac-accent-purple) 100%);
           color: white;
           padding: 16px 20px;
           border-radius: 12px;
@@ -206,7 +206,7 @@ export function NotificationPrompt() {
         
         .notification-prompt__btn--primary {
           background: white;
-          color: #667eea;
+          color: var(--mac-accent-purple);
           padding: 8px 16px;
           font-size: 13px;
         }

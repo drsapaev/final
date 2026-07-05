@@ -217,7 +217,7 @@ const ReportsManager = () => {
   };
 
   const renderGenerateTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Форма генерации отчета */}
       <MacOSCard className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">
@@ -291,7 +291,7 @@ const ReportsManager = () => {
               </> :
 
           <>
-                <FileText aria-hidden="true" className="admin-icon-18" />
+                <FileText aria-hidden="true" className="w-4.5 h-4.5" />
                 <span>Сгенерировать отчет</span>
               </>
           }
@@ -322,7 +322,7 @@ const ReportsManager = () => {
 
       {/* Последние отчеты */}
       {reports.length > 0 &&
-    <MacOSCard className="admin-p-24">
+    <MacOSCard className="p-6">
           <h3 className="admin-h4-lg-semi-primary-mb-16">Последние отчеты</h3>
           <Table
         columns={[
@@ -356,7 +356,7 @@ const ReportsManager = () => {
             title={`Скачать отчёт ${row.filename}`}
             aria-label={`Скачать отчёт ${row.filename}`}
             onClick={() => downloadFile(row.filename)}>
-                    <Download aria-hidden="true" className="admin-icon-16" />
+                    <Download aria-hidden="true" className="w-4 h-4" />
                   </Button>
 
         }]
@@ -371,7 +371,7 @@ const ReportsManager = () => {
 
 
   const renderFilesTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       <MacOSCard className="admin-card-p-24-bg-card-12-min-h-400">
         <div className="admin-flex-between-mb-24">
           <h3 className="admin-h3-18-600-primary-m0-flex">
@@ -385,7 +385,7 @@ const ReportsManager = () => {
             size="sm"
             className="admin-btn-min-w-100-h-36">
 
-              <RefreshCw className="admin-icon-16-mr-8" />
+              <RefreshCw className="w-4 h-4 mr-2" />
               Обновить
             </Button>
             <Button
@@ -394,7 +394,7 @@ const ReportsManager = () => {
             size="sm"
             className="admin-btn-error-min-w-140-h-36">
 
-              <Trash2 className="admin-icon-16-mr-8" />
+              <Trash2 className="w-4 h-4 mr-2" />
               Очистить старые
             </Button>
           </div>
@@ -469,7 +469,7 @@ const ReportsManager = () => {
 
 
   const renderSettingsTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Автоматические отчеты */}
       <MacOSCard className="admin-card-p-24-bg-card-12">
         <div className="admin-flex-start-16-mb-24">
@@ -491,7 +491,7 @@ const ReportsManager = () => {
           onClick={() => toast.info('Функция настройки расписания в разработке')}
           className="admin-btn-blue-h-44-flex-center">
 
-            <Calendar className="admin-icon-18" />
+            <Calendar className="w-4.5 h-4.5" />
             Настроить расписание
           </Button>
 
@@ -500,7 +500,7 @@ const ReportsManager = () => {
           onClick={() => toast.info('Настройки уведомлений в разработке')}
           className="admin-btn-outline-h-44-flex-center">
 
-            <Activity className="admin-icon-18" />
+            <Activity className="w-4.5 h-4.5" />
             Настроить уведомления
           </Button>
         </div>
@@ -527,7 +527,7 @@ const ReportsManager = () => {
           onClick={cleanupOldReports}
           className="admin-btn-orange-h-44-flex-center">
 
-            <Trash2 className="admin-icon-18" />
+            <Trash2 className="w-4.5 h-4.5" />
             Очистить старые файлы
           </Button>
 
@@ -536,7 +536,7 @@ const ReportsManager = () => {
           onClick={() => toast.info('Функция экспорта в разработке')}
           className="admin-btn-outline-h-44-flex-center">
 
-            <Download className="admin-icon-18" />
+            <Download className="w-4.5 h-4.5" />
             Экспорт в облако
           </Button>
         </div>
@@ -579,7 +579,7 @@ const ReportsManager = () => {
 
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       {error ?
       <MacOSCard className="admin-card-p-48-flex-justify-center">
           <MacOSEmptyState
@@ -587,15 +587,15 @@ const ReportsManager = () => {
           title="Ошибка загрузки данных"
           description="Не удалось загрузить отчеты. Пожалуйста, попробуйте еще раз.">
 
-            <Button onClick={handleRetry} className="admin-mt-16">
-              <RefreshCw className="admin-icon-16-mr-8" />
+            <Button onClick={handleRetry} className="mt-4">
+              <RefreshCw className="w-4 h-4 mr-2" />
               Повторить попытку
             </Button>
           </MacOSEmptyState>
         </MacOSCard> :
 
       <>
-          <div className="admin-flex-between">
+          <div className="flex items-center justify-between">
             <h2 className="admin-h2-2xl-bold-primary-m0">Система отчетов</h2>
             <Badge variant="info">
               {files.length} файлов

@@ -1,6 +1,8 @@
+import { api } from '../../api/client';
 import { useState } from 'react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import { Input } from '../ui/macos';
 import {
   Key,
   Shield,
@@ -30,7 +32,7 @@ const AppActivation = () => {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/v1/activation/activate', {
+      const response = await api.post('/activation/activate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,12 +101,12 @@ const AppActivation = () => {
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 24px',
-          color: '#34c759'
+          color: 'var(--mac-success)'
         }}>
           <CheckCircle size={40} />
         </div>
 
-        <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>
+        <h2 style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 'var(--mac-spacing-3)' }}>
           Активация успешна!
         </h2>
 
@@ -112,8 +114,8 @@ const AppActivation = () => {
           Приложение активировано. Перезагрузка...
         </p>
 
-        <div className="info-panel" style={{ textAlign: 'left', background: 'rgba(52, 199, 89, 0.05)', borderColor: 'rgba(52, 199, 89, 0.2)' }}>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontWeight: 600, color: '#34c759' }}>
+        <div className="info-panel" style={{ textAlign: 'left', background: 'rgba(52, 199, 89, 0.05)', borderColor: 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 80%))' }}>
+          <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-2)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>
             <CheckCircle size={16} /> Доступные функции:
           </div>
           <ul style={{ margin: 0, paddingLeft: '24px', color: 'var(--mac-text-primary)', lineHeight: '1.6' }}>
@@ -132,18 +134,18 @@ const AppActivation = () => {
         <div style={{
           width: '64px',
           height: '64px',
-          background: 'rgba(0, 122, 255, 0.1)',
+          background: 'var(--mac-accent-bg)',
           borderRadius: '24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 20px',
-          color: '#007aff',
+          color: 'var(--mac-accent-blue)',
           boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)'
         }}>
           <Shield size={32} />
         </div>
-        <p style={{ color: 'var(--mac-text-secondary)', fontSize: '15px' }}>
+        <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-lg)' }}>
           Введите лицензионный ключ для разблокировки всех функций приложения
         </p>
       </div>
@@ -162,20 +164,20 @@ const AppActivation = () => {
         </div>
       )}
 
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
         <label htmlFor="activation-key" style={{
           display: 'block',
-          marginBottom: '8px',
-          fontSize: '13px',
-          fontWeight: 600,
+          marginBottom: 'var(--mac-spacing-2)',
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
           color: 'var(--mac-text-secondary)',
-          marginLeft: '4px'
+          marginLeft: 'var(--mac-spacing-1)'
         }}>
           КЛЮЧ АКТИВАЦИИ
         </label>
         <div style={{ position: 'relative' }}>
           <Key size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)' }} />
-          <input
+          <Input
             id="activation-key"
             type="text"
             aria-label="Ключ активации"
@@ -190,7 +192,7 @@ const AppActivation = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
         <button
           className="btn-premium btn-primary"
           onClick={handleActivate}
@@ -204,7 +206,7 @@ const AppActivation = () => {
         <button
           className="btn-premium btn-glass"
           onClick={copyDeviceInfo}
-          style={{ width: '100%', justifyContent: 'center', fontSize: '14px', padding: '12px' }}
+          style={{ width: '100%', justifyContent: 'center', fontSize: 'var(--mac-font-size-base)', padding: 'var(--mac-spacing-3)' }}
         >
           <Copy size={16} />
           Скопировать ID устройства
@@ -212,9 +214,9 @@ const AppActivation = () => {
       </div>
 
       <div className="info-panel">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--mac-text-primary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-2)', color: 'var(--mac-text-primary)' }}>
           <Smartphone size={14} />
-          <span style={{ fontWeight: 600 }}>Device Info</span>
+          <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Device Info</span>
         </div>
         <div style={{ fontFamily: 'monospace', opacity: 0.7 }}>
           <div>Platform: {navigator.platform}</div>

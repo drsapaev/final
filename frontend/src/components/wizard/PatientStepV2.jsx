@@ -10,8 +10,9 @@
  */
 
 import PropTypes from 'prop-types';
-import { Search, Phone, Calendar, AlertCircle } from 'lucide-react';
-import { Input } from '../ui/macos';
+import { Search, Phone, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
+import { Input,
+  Checkbox } from '../ui/macos';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
 
@@ -20,6 +21,7 @@ const PatientStepV2 = ({
   errors,
   suggestions,
   showSuggestions,
+  isSearching = false, // UX Audit Registrar #11
   onSearch,
   onSelectPatient,
   onUpdate,
@@ -88,20 +90,20 @@ const PatientStepV2 = ({
               transform: 'translateY(-50%)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: 'var(--mac-spacing-2)',
               fontSize: 'var(--mac-font-size-xs)',
               pointerEvents: 'none'
             }}>
               {safeData.id ?
               <>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--mac-primary)' }} />
-                  <span style={{ color: 'var(--mac-primary)', fontWeight: '500' }}>Существующий</span>
+                  <span style={{ color: 'var(--mac-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Существующий</span>
                 </> :
 
               (safeData.fio || '').length > 0 &&
               <>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--mac-success)' }} />
-                    <span style={{ color: 'var(--mac-success)', fontWeight: '500' }}>Новый</span>
+                    <span style={{ color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-medium)' }}>Новый</span>
                   </>
 
               }
@@ -114,11 +116,58 @@ const PatientStepV2 = ({
             color: 'var(--mac-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <AlertCircle size={14} />
               {errors.fio}
             </span>
+          }
+
+          {/* UX Audit Registrar #11: loading indicator во время поиска пациентов. */}
+          {isSearching &&
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            marginTop: 'var(--mac-spacing-1)',
+            padding: 'var(--mac-spacing-3)',
+            background: 'var(--mac-bg-primary)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            boxShadow: 'var(--mac-shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)',
+          }}>
+            <RefreshCw size={14} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+            Поиск пациентов...
+          </div>
+          }
+
+          {/* UX Audit #9: Empty state — patients not found. */}
+          {showSuggestions && !isSearching && suggestions.length === 0 && safeData.fio && safeData.fio.trim().length >= 2 &&
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            marginTop: 'var(--mac-spacing-1)',
+            padding: 'var(--mac-spacing-3)',
+            background: 'var(--mac-bg-primary)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            boxShadow: 'var(--mac-shadow-lg)',
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            textAlign: 'center',
+          }}>
+            Пациенты не найдены. Будет создан новый пациент.
+          </div>
           }
 
           {/* Саджесты */}
@@ -129,7 +178,7 @@ const PatientStepV2 = ({
             left: 0,
             right: 0,
             zIndex: 100,
-            marginTop: '4px',
+            marginTop: 'var(--mac-spacing-1)',
             background: 'var(--mac-bg-primary)',
             border: '1px solid var(--mac-border)',
             borderRadius: 'var(--mac-radius-md)',
@@ -158,9 +207,9 @@ const PatientStepV2 = ({
                   <div style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
                   </div>
-                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', display: 'flex', gap: '8px' }}>
-                    <span>📱 {patient.phone}</span>
-                    <span>🎂 {formatDateDisplay(patient.birth_date)}</span>
+                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', display: 'flex', gap: 'var(--mac-spacing-2)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}><Phone size={12} aria-hidden="true" />{patient.phone}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}><Calendar size={12} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
                   </div>
                 </button>
             )}
@@ -184,7 +233,7 @@ const PatientStepV2 = ({
           <div style={{
             display: 'flex',
             background: 'var(--mac-bg-secondary)',
-            padding: '4px',
+            padding: 'var(--mac-spacing-1)',
             borderRadius: 'var(--mac-radius-md)',
             border: '1px solid var(--mac-border)',
             height: '36px'
@@ -196,7 +245,7 @@ const PatientStepV2 = ({
               onClick={() => onUpdate('gender', gender)}
               style={{
                 flex: 1,
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: 'none',
                 borderRadius: 'var(--mac-radius-sm)',
                 background: selectedGender === gender ? 'var(--mac-bg-primary)' : 'transparent',
@@ -218,7 +267,7 @@ const PatientStepV2 = ({
             color: 'var(--mac-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <AlertCircle size={14} />
               {errors.gender}
@@ -237,7 +286,7 @@ const PatientStepV2 = ({
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
-            Телефон <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'normal' }}>(необязательно)</span>
+            Телефон <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'var(--mac-font-weight-normal)' }}>(необязательно)</span>
           </label>
           <Input
             ref={phoneRef}
@@ -265,7 +314,7 @@ const PatientStepV2 = ({
             color: 'var(--mac-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <AlertCircle size={14} />
               {errors.phone}
@@ -273,22 +322,22 @@ const PatientStepV2 = ({
           }
           {phoneError &&
           <div style={{
-            marginTop: '4px',
-            padding: '8px',
+            marginTop: 'var(--mac-spacing-1)',
+            padding: 'var(--mac-spacing-2)',
             background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
             border: '1px solid color-mix(in srgb, var(--mac-error), transparent 70%)',
             borderRadius: 'var(--mac-radius-sm)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <span style={{
               fontSize: 'var(--mac-font-size-xs)',
               color: 'var(--mac-error)',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              fontWeight: '500'
+              gap: 'var(--mac-spacing-1)',
+              fontWeight: 'var(--mac-font-weight-medium)'
             }}>
                 <AlertCircle size={14} />
                 {phoneError.message}
@@ -297,12 +346,12 @@ const PatientStepV2 = ({
               type="button"
               onClick={() => onSelectPatient(phoneError.patient)}
               style={{
-                background: 'var(--mac-error)',
+                background: 'var(--mac-accent-blue, #007aff)',
                 color: 'var(--mac-text-on-accent)',
                 border: 'none',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                fontSize: '11px',
+                borderRadius: 'var(--mac-radius-sm)',
+                padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+                fontSize: 'var(--mac-font-size-xs)',
                 cursor: 'pointer',
                 alignSelf: 'flex-start'
               }}>
@@ -324,7 +373,7 @@ const PatientStepV2 = ({
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
-            Дата рождения
+            Дата рождения <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'var(--mac-font-weight-normal)' }}>(необязательно)</span>
           </label>
           <Input
             type="text"
@@ -335,7 +384,8 @@ const PatientStepV2 = ({
             error={!!errors.birth_date}
             icon={Calendar}
             iconPosition="left"
-            size="md" />
+            size="md"
+            aria-label="Дата рождения" />
 
           {errors.birth_date &&
           <span style={{
@@ -343,7 +393,7 @@ const PatientStepV2 = ({
             color: 'var(--mac-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <AlertCircle size={14} />
               {errors.birth_date}
@@ -504,11 +554,7 @@ const PatientStepV2 = ({
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
 
-            <input
-              type="checkbox"
-              aria-label="Request all services free approval"
-              checked={cart?.all_free}
-              onChange={(e) => onUpdateCart('all_free', e.target.checked)}
+            <Checkbox aria-label="Request all services free approval" checked={cart?.all_free} onChange={(e) => onUpdateCart('all_free', e.target.checked)}
               style={{ margin: 0 }} />
 
             <span style={{
