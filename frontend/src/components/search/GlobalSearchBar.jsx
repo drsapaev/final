@@ -297,7 +297,7 @@ export default function GlobalSearchBar({ className = '' }) {
       overflowY: 'auto'
     },
     section: {
-      padding: '8px 0',
+      padding: 'var(--mac-spacing-2) 0',
       borderBottom: '1px solid var(--mac-separator, #e2e8f0)'
     },
     sectionTitle: {

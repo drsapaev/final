@@ -131,7 +131,7 @@ const styles = {
     gridTemplateColumns: '28px minmax(0, 1fr) auto',
     gap: '10px',
     alignItems: 'center',
-    padding: '8px 0',
+    padding: 'var(--mac-spacing-2) 0',
     borderBottom: '1px solid var(--mac-border)',
   },
   listItemStatic: {
@@ -139,7 +139,7 @@ const styles = {
     gridTemplateColumns: '28px minmax(0, 1fr)',
     gap: '10px',
     alignItems: 'start',
-    padding: '8px 0',
+    padding: 'var(--mac-spacing-2) 0',
     borderBottom: '1px solid var(--mac-border)',
   },
   listIcon: {

@@ -512,7 +512,7 @@ const MacOSDemo = () => {
                           key={tab.id}
                           onClick={() => setActiveTab1(tab.id)}
                           style={{
-                            padding: '12px 20px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
                             border: 'none',
                             background: 'transparent',
                             cursor: 'pointer',
@@ -594,7 +594,7 @@ const MacOSDemo = () => {
                           key={tab.id}
                           onClick={() => setActiveTab2(tab.id)}
                           style={{
-                            padding: '12px 20px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
                             border: 'none',
                             background: 'transparent',
                             cursor: 'pointer',

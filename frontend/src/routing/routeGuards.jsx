@@ -180,7 +180,7 @@ function SystemRoutePage({ title, description, code }) {
         <div style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-bold)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mac-text-secondary, #5f6b7a)' }}>
           {code}
         </div>
-        <h1 style={{ margin: '12px 0 8px', fontSize: '32px', lineHeight: 1.1, color: 'var(--mac-text-primary, #111827)' }}>
+        <h1 style={{ margin: '12px 0 8px', fontSize: 'var(--mac-font-size-3xl)', lineHeight: 1.1, color: 'var(--mac-text-primary, #111827)' }}>
           {title}
         </h1>
         <p style={{ margin: 0, fontSize: 'var(--mac-font-size-lg)', lineHeight: 1.6, color: 'var(--mac-text-secondary, #4b5563)' }}>

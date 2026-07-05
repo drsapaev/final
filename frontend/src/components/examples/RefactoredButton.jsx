@@ -109,7 +109,7 @@ const RefactoredButton = ({
       dermatology: {
         bg: colors.medical.dermatology,
         text: colors.semantic.text.inverse,
-        hover: '#7c3aed',
+        hover: 'var(--mac-accent-purple)',
         active: '#6d28d9',
         shadow: shadows.sm,
         hoverShadow: shadows.md,

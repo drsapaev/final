@@ -186,7 +186,7 @@ const MedicalTable = ({
                   backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = isDark ? '#475569' : 'var(--mac-bg-secondary)';
+                  e.target.style.backgroundColor = isDark ? 'var(--mac-text-secondary)' : 'var(--mac-bg-secondary)';
                 }}
                 onMouseLeave={(e) => {
                   e.target.style.backgroundColor = isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)';

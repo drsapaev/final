@@ -208,8 +208,8 @@ const PatientStepV2 = ({
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
                   </div>
                   <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', display: 'flex', gap: 'var(--mac-spacing-2)' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Phone size={12} aria-hidden="true" />{patient.phone}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}><Phone size={12} aria-hidden="true" />{patient.phone}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}><Calendar size={12} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
                   </div>
                 </button>
             )}
@@ -373,7 +373,7 @@ const PatientStepV2 = ({
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
-            Дата рождения <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 400 }}>(необязательно)</span>
+            Дата рождения <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'var(--mac-font-weight-normal)' }}>(необязательно)</span>
           </label>
           <Input
             type="text"

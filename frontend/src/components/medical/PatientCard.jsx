@@ -116,7 +116,7 @@ const PatientCard = ({
           {age && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Age:</span>
-              <span style={{ color: isDark ? '#cbd5e1' : 'var(--mac-text-primary)' }}>
+              <span style={{ color: isDark ? 'var(--mac-border)' : 'var(--mac-text-primary)' }}>
                 {age} {getGenderIcon(gender)}
               </span>
             </div>
@@ -125,7 +125,7 @@ const PatientCard = ({
           {lastVisit && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Last visit:</span>
-              <span style={{ color: isDark ? '#cbd5e1' : 'var(--mac-text-primary)' }}>
+              <span style={{ color: isDark ? 'var(--mac-border)' : 'var(--mac-text-primary)' }}>
                 {lastVisit}
               </span>
             </div>
@@ -134,7 +134,7 @@ const PatientCard = ({
           {department && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Dept:</span>
-              <span style={{ color: isDark ? '#cbd5e1' : 'var(--mac-text-primary)' }}>
+              <span style={{ color: isDark ? 'var(--mac-border)' : 'var(--mac-text-primary)' }}>
                 {department}
               </span>
             </div>

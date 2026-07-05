@@ -707,7 +707,7 @@ const EmailSMSManager = () => {
     <div style={pageStyles}>
       <div style={headerStyles}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '28px', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--mac-font-size-3xl)', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
             Email/SMS уведомления
           </h1>
           <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
