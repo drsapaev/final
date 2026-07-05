@@ -10,11 +10,10 @@
  */
 
 import PropTypes from 'prop-types';
-import { Search, Phone, Calendar, AlertCircle } from 'lucide-react';
+import { Search, Phone, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
 import { Input } from '../ui/macos';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
-import { RefreshCw } from 'lucide-react';
 
 const PatientStepV2 = ({
   data = {}, // ✅ Default empty object to prevent crash
@@ -148,6 +147,28 @@ const PatientStepV2 = ({
           </div>
           }
 
+          {/* UX Audit #9: Empty state — patients not found. */}
+          {showSuggestions && !isSearching && suggestions.length === 0 && safeData.fio && safeData.fio.trim().length >= 2 &&
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            marginTop: 'var(--mac-spacing-1)',
+            padding: 'var(--mac-spacing-3)',
+            background: 'var(--mac-bg-primary)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            boxShadow: 'var(--mac-shadow-lg)',
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            textAlign: 'center',
+          }}>
+            Пациенты не найдены. Будет создан новый пациент.
+          </div>
+          }
+
           {/* Саджесты */}
           {showSuggestions && suggestions.length > 0 &&
           <div style={{
@@ -186,8 +207,8 @@ const PatientStepV2 = ({
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
                   </div>
                   <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', display: 'flex', gap: 'var(--mac-spacing-2)' }}>
-                    <span>📱 {patient.phone}</span>
-                    <span>🎂 {formatDateDisplay(patient.birth_date)}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Phone size={12} aria-hidden="true" />{patient.phone}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
                   </div>
                 </button>
             )}
@@ -324,7 +345,7 @@ const PatientStepV2 = ({
               type="button"
               onClick={() => onSelectPatient(phoneError.patient)}
               style={{
-                background: 'var(--mac-error)',
+                background: 'var(--mac-accent-blue, #007aff)',
                 color: 'var(--mac-text-on-accent)',
                 border: 'none',
                 borderRadius: 'var(--mac-radius-sm)',
@@ -351,7 +372,7 @@ const PatientStepV2 = ({
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
-            Дата рождения
+            Дата рождения <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 400 }}>(необязательно)</span>
           </label>
           <Input
             type="text"
@@ -362,7 +383,8 @@ const PatientStepV2 = ({
             error={!!errors.birth_date}
             icon={Calendar}
             iconPosition="left"
-            size="md" />
+            size="md"
+            aria-label="Дата рождения" />
 
           {errors.birth_date &&
           <span style={{

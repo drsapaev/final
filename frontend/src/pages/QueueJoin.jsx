@@ -590,7 +590,7 @@ const QueueJoin = () => {
             borderColor: 'var(--mac-accent-blue)'
           }}></div>
           <h2 style={titleStyle}>Юкланмоқда...</h2>
-          <p style={bodyTextStyle}>Навбат ҳақида маълумот олиш</p>
+          <p style={bodyTextStyle}>Информация об очереди</p>
         </div>
       </div>
     );
@@ -657,12 +657,12 @@ const QueueJoin = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: 'var(--mac-spacing-3)',
             letterSpacing: '-0.02em'
-          }}>Навбат тез орада очилади</h2>
+          }}>Очередь скоро откроется</h2>
           <p style={{
             ...bodyTextStyle,
             marginBottom: 'var(--mac-spacing-6)',
           }}>
-            Навбатга ёзилиш {queueInfo?.start_time}да очилади
+            Запись в очередь откроется в {queueInfo?.start_time}
           </p>
 
           {/* Обратный отсчет - macOS стиль */}
@@ -683,7 +683,7 @@ const QueueJoin = () => {
             }}>
               {formatCountdown(countdown)}
             </div>
-            <p style={mutedCaptionStyle}>ёзилиш очилишига қадар</p>
+            <p style={mutedCaptionStyle}>до открытия записи</p>
           </div>
 
           {/* Информация о враче и кабинете - macOS стиль */}
@@ -831,7 +831,7 @@ const QueueJoin = () => {
             marginBottom: 'var(--mac-spacing-6)',
             letterSpacing: '-0.02em'
           }}>
-            {isMultiple ? 'Сиз навбатларга рўйхатдан ўтдингиз!' : 'Сиз навбатда!'}
+            {isMultiple ? 'Вы зарегистрированы в очередях!' : 'Вы в очереди!'}
           </h2>
 
           {isMultiple ? (
@@ -851,7 +851,7 @@ const QueueJoin = () => {
                   marginBottom: 'var(--mac-spacing-4)',
                   textAlign: 'center'
                 }}>
-                  Сиз {result.entries.length} навбатга рўйхатдан ўтдингиз:
+                  Вы зарегистрированы в {result.entries.length} очередях:
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
                   {result.entries.map((entry, idx) => (
@@ -880,7 +880,7 @@ const QueueJoin = () => {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '28px', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>№{entry.queue_number || entry.number || '—'}</div>
-                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>навбатда</div>
+                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>в очереди</div>
                       </div>
                     </div>
                   ))}
@@ -894,7 +894,7 @@ const QueueJoin = () => {
                 lineHeight: '1.5'
               }}>
                 <p>Илтимос, қабулга тайёр бўлинг.</p>
-                <p>Навбатингиз келганда сизга хабар берамиз.</p>
+                <p>Мы сообщим вам, когда подойдёт ваша очередь.</p>
                 <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
                   💡 Ёзилмаларни мутахассислар вкладкаларида кўришингиз мумкин
                 </p>
@@ -919,7 +919,7 @@ const QueueJoin = () => {
                 }}>
                   №{result.queue_number}
                 </div>
-                <p style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Навбатдаги рақамингиз</p>
+                <p style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Ваш номер в очереди</p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-6)' }}>
@@ -980,7 +980,7 @@ const QueueJoin = () => {
                 lineHeight: '1.5'
               }}>
                 <p>Илтимос, қабулга тайёр бўлинг.</p>
-                <p>Навбатингиз келганда сизга хабар берамиз.</p>
+                <p>Мы сообщим вам, когда подойдёт ваша очередь.</p>
                 <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
                   💡 Ёзилмани {departmentName} вкладкасида кўришингиз мумкин
                 </p>
@@ -1034,7 +1034,7 @@ const QueueJoin = () => {
             marginBottom: 'var(--mac-spacing-4)',
             letterSpacing: '-0.02em',
             lineHeight: '1.2'
-          }}>Навбатга қўшилиш</h1>
+          }}>Присоединиться к очереди</h1>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div className="flex items-center" style={{ opacity: 0.95 }}>
@@ -1304,7 +1304,7 @@ const QueueJoin = () => {
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-tertiary)',
                   fontWeight: 'var(--mac-font-weight-medium)'
-                }}>навбатда</div>
+                }}>в очереди</div>
               </div>
 
               <div style={{
@@ -1355,7 +1355,7 @@ const QueueJoin = () => {
                 margin: 0,
                 maxWidth: '320px'
               }}>
-                Навбатга қўшилиш учун қуйидаги формани тўлдиринг
+                Заполните форму ниже, чтобы присоединиться к очереди
               </p>
               <button
                 onClick={() => setStep('form')}
@@ -1404,7 +1404,7 @@ const QueueJoin = () => {
                     id="queue-patient-name"
                     name="patient_name"
                     type="text"
-                    aria-label="Patient full name"
+                    aria-label="ФИО пациента"
                     value={formData.patientName}
                     onChange={(e) => handleInputChange('patientName', e.target.value)}
                     style={{
@@ -1430,7 +1430,7 @@ const QueueJoin = () => {
                       e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                       e.target.style.boxShadow = 'none';
                     }}
-                    placeholder="Фамилия исмингизни киритинг"
+                    placeholder="Введите фамилию и имя"
                     autoComplete="name"
                     autoFocus
                     aria-required="true"
@@ -1453,7 +1453,7 @@ const QueueJoin = () => {
                   marginBottom: 'var(--mac-spacing-2)'
                 }}
                 >
-                  Телефон рақами *
+                  Номер телефона *
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
@@ -1461,7 +1461,7 @@ const QueueJoin = () => {
                     id="queue-phone"
                     name="phone"
                     type="tel"
-                    aria-label="Patient phone number"
+                    aria-label="Номер телефона пациента"
                     value={formData.phone}
                     onChange={handlePhoneChange}
                     onKeyDown={(e) => {
@@ -1541,13 +1541,13 @@ const QueueJoin = () => {
                   Telegram ID (ихтиёрий)
                 </label>
                 <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-2)' }}>
-                  Telegramда хабардор қилиш учун
+                  Для уведомлений в Telegram
                 </div>
                 <input
                   id="queue-telegram-id"
                   name="telegram_id"
                   type="number"
-                  aria-label="Telegram ID"
+                  aria-label="Telegram ID (необязательно)"
                   value={formData.telegramId}
                   onChange={(e) => handleInputChange('telegramId', e.target.value)}
                   style={{
@@ -1570,7 +1570,7 @@ const QueueJoin = () => {
                     e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                     e.target.style.boxShadow = 'none';
                   }}
-                  placeholder="Мажбурий эмас"
+                  placeholder="(необязательно)"
                 />
               </div>
 

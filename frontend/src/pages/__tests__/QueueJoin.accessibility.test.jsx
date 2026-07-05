@@ -112,17 +112,17 @@ describe('QueueJoin Accessibility & UX', () => {
     fireEvent.click(await screen.findByRole('button', { name: /давом этиш/i }));
 
     expect(await screen.findByLabelText(/фио/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/телефон рақами/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/номер телефона/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/фио/i), { target: { value: 'Тест Пациент' } });
-    fireEvent.change(screen.getByLabelText(/телефон рақами/i), { target: { value: '+998 (90)' } });
+    fireEvent.change(screen.getByLabelText(/номер телефона/i), { target: { value: '+998 (90)' } });
     fireEvent.click(screen.getByRole('button', { name: /қўшилиш/i }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/телефон указан не полностью/i);
 
     expect(screen.getByLabelText(/фио/i)).toHaveAttribute('aria-required', 'true');
-    expect(screen.getByLabelText(/телефон рақами/i)).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText(/номер телефона/i)).toHaveAttribute('aria-required', 'true');
   });
 
   it('persists in-progress form state for the same QR token', async () => {
@@ -131,7 +131,7 @@ describe('QueueJoin Accessibility & UX', () => {
     fireEvent.click(await screen.findByRole('button', { name: /давом этиш/i }));
 
     const nameInput = await screen.findByLabelText(/фио/i);
-    const phoneInput = screen.getByLabelText(/телефон рақами/i);
+    const phoneInput = screen.getByLabelText(/номер телефона/i);
 
     fireEvent.change(nameInput, { target: { value: 'Тест Пациент' } });
     fireEvent.change(phoneInput, { target: { value: '+998 (90) 123-45-67' } });
@@ -142,7 +142,7 @@ describe('QueueJoin Accessibility & UX', () => {
     fireEvent.click(await screen.findByRole('button', { name: /давом этиш/i }));
 
     expect(await screen.findByLabelText(/фио/i)).toHaveValue('Тест Пациент');
-    expect(screen.getByLabelText(/телефон рақами/i)).toHaveValue('+998 (90) 123-45-67');
+    expect(screen.getByLabelText(/номер телефона/i)).toHaveValue('+998 (90) 123-45-67');
   });
 
   it('shows meaningful empty state when no specialists are available for clinic-wide QR', async () => {
@@ -191,12 +191,12 @@ describe('QueueJoin Accessibility & UX', () => {
     fireEvent.change(await screen.findByLabelText(/фио/i), {
       target: { value: 'Тест Пациент' },
     });
-    fireEvent.change(screen.getByLabelText(/телефон рақами/i), {
+    fireEvent.change(screen.getByLabelText(/номер телефона/i), {
       target: { value: '+998 (90) 123-45-67' },
     });
     fireEvent.click(screen.getByRole('button', { name: /қўшилиш/i }));
 
-    await screen.findByText(/сиз навбатда!/i);
+    await screen.findByText(/Вы в очереди!/i);
     expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledWith(
       expect.objectContaining({
         specialist_ids: [6],

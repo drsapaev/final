@@ -284,10 +284,10 @@ export const resolveInitialServiceCategory = (items = [], activeTabValue = '') =
 // =====================================================================
 
 export const categories = [
-  { id: 'specialists', label: 'Специалисты', icon: '👨‍⚕️' },
-  { id: 'laboratory', label: 'Лаборатория', icon: '🧪' },
-  { id: 'procedures', label: 'Процедуры', icon: '💉' },
-  { id: 'other', label: 'Прочее', icon: '📋' },
+  { id: 'specialists', label: 'Специалисты', icon: 'stethoscope' },
+  { id: 'laboratory', label: 'Лаборатория', icon: 'flask' },
+  { id: 'procedures', label: 'Процедуры', icon: 'syringe' },
+  { id: 'other', label: 'Прочее', icon: 'clipboard' },
 ];
 
 // =====================================================================
