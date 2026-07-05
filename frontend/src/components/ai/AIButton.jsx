@@ -102,7 +102,7 @@ const AIButton = ({
           key={provider}
           onClick={() => handleProviderClick(provider)}
           style={{
-            display: 'flex', alignItems: 'center', width: '100%', padding: '8px 12px',
+            display: 'flex', alignItems: 'center', width: '100%', padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
             background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left'
           }}>
           

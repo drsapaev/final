@@ -87,14 +87,14 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
     width: '100%',
     padding: getSpacing('xl'),
     backgroundColor: getColor('background', 'secondary'),
-    borderRadius: '12px',
+    borderRadius: 'var(--mac-radius-lg)',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
     textAlign: 'center'
   };
 
   const titleStyle = {
     fontSize: getFontSize('xl'),
-    fontWeight: 'bold',
+    fontWeight: 'var(--mac-font-weight-bold)',
     color: getColor('error', 'primary'),
     marginBottom: getSpacing('md')
   };
@@ -111,9 +111,9 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
     backgroundColor: getColor('primary', 'main'),
     color: getColor('primary', 'contrast'),
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     fontSize: getFontSize('md'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     cursor: 'pointer',
     transition: 'all 0.2s ease'
   };
@@ -122,7 +122,7 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
     marginTop: getSpacing('lg'),
     padding: getSpacing('md'),
     backgroundColor: getColor('background', 'tertiary'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     fontSize: getFontSize('sm'),
     color: getColor('text', 'tertiary'),
     textAlign: 'left',

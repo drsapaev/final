@@ -188,13 +188,14 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
 
   const skeletonStyle = {
     backgroundColor: getColor('background', 'tertiary'),
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     height: '20px',
     animation: 'skeleton 1.5s ease-in-out infinite'
   };
 
   return (
-    <table style={tableStyle}>
+    <div className="admin-table-wrapper">
+<table style={tableStyle}>
       <thead>
         <tr>
           {Array.from({ length: columns }).map((_, i) =>
@@ -219,7 +220,8 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
           </tr>
         )}
       </tbody>
-    </table>);
+    </table>
+</div>);
 
 }
 
@@ -228,7 +230,7 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
  */
 export function CardLoading({ count = 3 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--mac-spacing-5)' }}>
       {Array.from({ length: count }).map((_, i) =>
       <AnimatedLoader.CardSkeleton key={i} />
       )}
@@ -252,13 +254,13 @@ export function CardLoadingOld({ count = 3 }) {
   const cardStyle = {
     padding: getSpacing('lg'),
     backgroundColor: getColor('background', 'secondary'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
   };
 
   const skeletonStyle = {
     backgroundColor: getColor('background', 'tertiary'),
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     height: '20px',
     marginBottom: getSpacing('sm'),
     animation: 'skeleton 1.5s ease-in-out infinite'
@@ -297,7 +299,7 @@ export function ListLoading({ count = 5 }) {
     gap: getSpacing('md'),
     padding: getSpacing('md'),
     backgroundColor: getColor('background', 'secondary'),
-    borderRadius: '8px'
+    borderRadius: 'var(--mac-radius-md)'
   };
 
   const avatarStyle = {
@@ -317,7 +319,7 @@ export function ListLoading({ count = 5 }) {
 
   const skeletonStyle = {
     backgroundColor: getColor('background', 'tertiary'),
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     height: '16px',
     animation: 'skeleton 1.5s ease-in-out infinite'
   };

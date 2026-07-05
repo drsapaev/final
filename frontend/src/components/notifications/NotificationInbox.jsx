@@ -421,7 +421,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                       style={{
                         alignSelf: 'start',
                         fontSize: 11,
-                        padding: '4px 8px',
+                        padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                         borderRadius: 999,
                         background: severityStyle.background,
                         color: severityStyle.color,

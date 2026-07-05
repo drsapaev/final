@@ -151,13 +151,13 @@ const MedicalImageAnalyzer = () => {
     switch (imageType) {
       case 'xray':
         return (
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
             <label style={{
               display: 'block',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
               Область исследования
             </label>
@@ -172,13 +172,13 @@ const MedicalImageAnalyzer = () => {
 
       case 'ultrasound':
         return (
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
             <label style={{
               display: 'block',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
               Исследуемый орган
             </label>
@@ -193,14 +193,14 @@ const MedicalImageAnalyzer = () => {
 
       case 'dermatoscopy':
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)', marginBottom: 'var(--mac-spacing-4)' }}>
             <div>
               <label style={{
                 display: 'block',
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
+                marginBottom: 'var(--mac-spacing-1)'
               }}>
                 Локализация образования
               </label>
@@ -218,7 +218,7 @@ const MedicalImageAnalyzer = () => {
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)',
-                marginBottom: '4px'
+                marginBottom: 'var(--mac-spacing-1)'
               }}>
                 Анамнез образования
               </label>
@@ -243,11 +243,11 @@ const MedicalImageAnalyzer = () => {
     if (result.error) {
       return (
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-primary)',
           border: '1px solid var(--mac-border)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
             <h3 style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -259,7 +259,7 @@ const MedicalImageAnalyzer = () => {
             </h3>
           </div>
           <p style={{
-            marginTop: '8px',
+            marginTop: 'var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-danger)',
             margin: '8px 0 0 0'
@@ -271,8 +271,8 @@ const MedicalImageAnalyzer = () => {
     }
 
     return (
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
@@ -280,7 +280,7 @@ const MedicalImageAnalyzer = () => {
             margin: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа
@@ -288,7 +288,7 @@ const MedicalImageAnalyzer = () => {
           <Button
             onClick={exportResult}
             variant="outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
             
             <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
@@ -298,15 +298,15 @@ const MedicalImageAnalyzer = () => {
         {/* Заключение */}
         {result.conclusion &&
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-primary)',
           border: '1px solid var(--mac-border)',
-          marginBottom: '16px'
+          marginBottom: 'var(--mac-spacing-4)'
         }}>
             <h4 style={{
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
+            marginBottom: 'var(--mac-spacing-2)'
           }}>
               Заключение
             </h4>
@@ -322,11 +322,11 @@ const MedicalImageAnalyzer = () => {
 
         {/* Уровень уверенности */}
         {result.confidence_level &&
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
             <span style={{
             display: 'inline-flex',
             alignItems: 'center',
-            padding: '4px 8px',
+            padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
             borderRadius: 'var(--mac-radius-full)',
             fontSize: 'var(--mac-font-size-xs)',
             fontWeight: 'var(--mac-font-weight-medium)',
@@ -341,25 +341,25 @@ const MedicalImageAnalyzer = () => {
 
         {/* Патологические находки */}
         {result.pathological_findings && result.pathological_findings.length > 0 &&
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
             <h4 style={{
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
+            marginBottom: 'var(--mac-spacing-2)'
           }}>
               Патологические находки
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
               {result.pathological_findings.map((finding, index) =>
             <MacOSCard key={index} style={{
-              padding: '12px',
+              padding: 'var(--mac-spacing-3)',
               backgroundColor: 'var(--mac-bg-primary)',
               border: '1px solid var(--mac-border)'
             }}>
                   <div style={{
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-warning)',
-                marginBottom: '4px'
+                marginBottom: 'var(--mac-spacing-1)'
               }}>
                     {finding.finding}
                   </div>
@@ -367,7 +367,7 @@ const MedicalImageAnalyzer = () => {
               <div style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-warning)',
-                marginBottom: '4px'
+                marginBottom: 'var(--mac-spacing-1)'
               }}>
                       Локализация: {finding.location}
                     </div>
@@ -389,11 +389,11 @@ const MedicalImageAnalyzer = () => {
 
         {/* Нормальные находки */}
         {result.normal_findings && result.normal_findings.length > 0 &&
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
             <h4 style={{
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
+            marginBottom: 'var(--mac-spacing-2)'
           }}>
               Нормальные структуры
             </h4>
@@ -405,7 +405,7 @@ const MedicalImageAnalyzer = () => {
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               {result.normal_findings.map((finding, index) =>
             <li key={index}>{finding}</li>
@@ -416,18 +416,18 @@ const MedicalImageAnalyzer = () => {
 
         {/* Рекомендации */}
         {result.recommendations &&
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
             <h4 style={{
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
+            marginBottom: 'var(--mac-spacing-2)'
           }}>
               Рекомендации
             </h4>
             <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-secondary)'
           }}>
@@ -437,10 +437,10 @@ const MedicalImageAnalyzer = () => {
                   <ul style={{
                 listStyleType: 'disc',
                 paddingLeft: '20px',
-                marginTop: '4px',
+                marginTop: 'var(--mac-spacing-1)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '2px'
+                gap: 'var(--mac-spacing-1)'
               }}>
                     {result.recommendations.additional_studies.map((study, index) =>
                 <li key={index}>{study}</li>
@@ -465,11 +465,11 @@ const MedicalImageAnalyzer = () => {
         {/* Срочные находки */}
         {result.urgent_findings &&
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-primary)',
           border: '1px solid var(--mac-border)'
         }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
               <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
               <h4 style={{
               fontWeight: 'var(--mac-font-weight-medium)',
@@ -487,16 +487,16 @@ const MedicalImageAnalyzer = () => {
 
   return (
     <div style={{
-      padding: '24px',
+      padding: 'var(--mac-spacing-6)',
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         {/* Заголовок */}
         <div style={{
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           <h2 style={{
             fontSize: 'var(--mac-font-size-2xl)',
@@ -505,7 +505,7 @@ const MedicalImageAnalyzer = () => {
             margin: '0 0 8px 0',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: 'var(--mac-spacing-3)'
           }}>
             <Brain style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
             AI Анализ Медицинских Изображений
@@ -522,24 +522,24 @@ const MedicalImageAnalyzer = () => {
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px'
+          gap: 'var(--mac-spacing-6)'
         }}>
           {/* Левая панель - загрузка и настройки */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
               {/* Выбор типа изображения */}
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
                 <h3 style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)',
-                marginBottom: '12px'
+                marginBottom: 'var(--mac-spacing-3)'
               }}>
                   Тип медицинского изображения
                 </h3>
                 <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: '12px'
+                gap: 'var(--mac-spacing-3)'
               }}>
                   {imageTypes.map((type) =>
                 <Button
@@ -550,8 +550,8 @@ const MedicalImageAnalyzer = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px',
-                    padding: '12px 16px',
+                    gap: 'var(--mac-spacing-2)',
+                    padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                     fontSize: 'var(--mac-font-size-sm)',
                     minHeight: '48px',
                     backgroundColor: imageType === type.value ? 'var(--mac-accent-blue)' : 'transparent',
@@ -582,12 +582,12 @@ const MedicalImageAnalyzer = () => {
               </MacOSCard>
 
               {/* Загрузка файла */}
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
                 <h3 style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)',
-                marginBottom: '12px'
+                marginBottom: 'var(--mac-spacing-3)'
               }}>
                   Загрузить изображение
                 </h3>
@@ -609,9 +609,9 @@ const MedicalImageAnalyzer = () => {
                 e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
               }}>
                 
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                     <Upload style={{ width: '48px', height: '48px', color: 'var(--mac-text-secondary)' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                       <label
                       htmlFor="file-upload"
                       style={{
@@ -641,7 +641,7 @@ const MedicalImageAnalyzer = () => {
                 </div>
                 {selectedFile &&
               <p style={{
-                marginTop: '8px',
+                marginTop: 'var(--mac-spacing-2)',
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-secondary)',
                 margin: '8px 0 0 0'
@@ -652,12 +652,12 @@ const MedicalImageAnalyzer = () => {
               </MacOSCard>
 
               {/* Метаданные */}
-              <MacOSCard style={{ padding: '24px' }}>
+              <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
                 <h3 style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)',
-                marginBottom: '16px'
+                marginBottom: 'var(--mac-spacing-4)'
               }}>
                   Дополнительная информация
                 </h3>
@@ -666,8 +666,8 @@ const MedicalImageAnalyzer = () => {
                 <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
-                marginBottom: '16px'
+                gap: 'var(--mac-spacing-4)',
+                marginBottom: 'var(--mac-spacing-4)'
               }}>
                   <div>
                     <label style={{
@@ -675,7 +675,7 @@ const MedicalImageAnalyzer = () => {
                     fontSize: 'var(--mac-font-size-sm)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     color: 'var(--mac-text-primary)',
-                    marginBottom: '4px'
+                    marginBottom: 'var(--mac-spacing-1)'
                   }}>
                       Возраст пациента
                     </label>
@@ -693,7 +693,7 @@ const MedicalImageAnalyzer = () => {
                     fontSize: 'var(--mac-font-size-sm)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     color: 'var(--mac-text-primary)',
-                    marginBottom: '4px'
+                    marginBottom: 'var(--mac-spacing-1)'
                   }}>
                       Пол
                     </label>
@@ -720,7 +720,7 @@ const MedicalImageAnalyzer = () => {
                   fontSize: 'var(--mac-font-size-sm)',
                   fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-primary)',
-                  marginBottom: '4px'
+                  marginBottom: 'var(--mac-spacing-1)'
                 }}>
                     Клиническая информация
                   </label>
@@ -743,11 +743,11 @@ const MedicalImageAnalyzer = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
+                gap: 'var(--mac-spacing-2)',
                 backgroundColor: 'var(--mac-accent-blue)',
                 border: 'none',
                 width: '100%',
-                padding: '12px 24px'
+                padding: 'var(--mac-spacing-3) var(--mac-spacing-6)'
               }}>
               
                 {analyzing ?
@@ -769,22 +769,22 @@ const MedicalImageAnalyzer = () => {
             </div>
 
             {/* Правая панель - превью и результат */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
               {/* Превью изображения */}
               {previewUrl &&
-            <MacOSCard style={{ padding: '24px' }}>
+            <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
                   <h3 style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)',
-                marginBottom: '12px'
+                marginBottom: 'var(--mac-spacing-3)'
               }}>
                     Превью изображения
                   </h3>
                   <div style={{
                 border: '1px solid var(--mac-border)',
                 borderRadius: 'var(--mac-radius-md)',
-                padding: '16px',
+                padding: 'var(--mac-spacing-4)',
                 backgroundColor: 'var(--mac-bg-secondary)',
                 textAlign: 'center'
               }}>

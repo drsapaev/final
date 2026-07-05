@@ -209,7 +209,7 @@ const UserExportManager = () => {
 
   // Стили
   const containerStyle = {
-    padding: '24px',
+    padding: 'var(--mac-spacing-6)',
     minHeight: '100vh',
     backgroundColor: 'var(--mac-bg-primary)'
   };

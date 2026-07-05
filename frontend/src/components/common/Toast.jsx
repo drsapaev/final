@@ -125,7 +125,7 @@ function ToastItem({ toast, onRemove }) {
   const getToastStyles = (type) => {
     const baseStyle = {
       padding: '1rem',
-      borderRadius: '8px',
+      borderRadius: 'var(--mac-radius-md)',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
       display: 'flex',
       alignItems: 'flex-start',
@@ -165,7 +165,7 @@ function ToastItem({ toast, onRemove }) {
 
   const getIcon = (type) => {
     const iconStyle = {
-      fontSize: '16px',
+      fontSize: 'var(--mac-font-size-lg)',
       flexShrink: 0,
       marginTop: '2px'
     };
@@ -182,12 +182,12 @@ function ToastItem({ toast, onRemove }) {
 
   const contentStyle = {
     flex: 1,
-    fontSize: '14px',
+    fontSize: 'var(--mac-font-size-base)',
     lineHeight: 1.4
   };
 
   const titleStyle = {
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     marginBottom: toast.message ? '0.25rem' : 0
   };
 
@@ -198,7 +198,7 @@ function ToastItem({ toast, onRemove }) {
   const closeButtonStyle = {
     background: 'none',
     border: 'none',
-    fontSize: '16px',
+    fontSize: 'var(--mac-font-size-lg)',
     cursor: 'pointer',
     color: 'inherit',
     opacity: 0.7,

@@ -95,7 +95,7 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
       aria-label="Закрыть диалог переноса визита"
     >
       <div style={modal}>
-        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Перенос визита</h3>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 'var(--mac-font-weight-semibold)' }}>Перенос визита</h3>
 
         <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
           <label style={{ display: 'grid', gap: 6 }}>
@@ -171,7 +171,7 @@ const input = {
   outline: 'none',
 };
 const btn = {
-  padding: '8px 12px',
+  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
   borderRadius: 10,
   border: '1px solid var(--mac-border)',
   background: 'var(--mac-bg-primary)',

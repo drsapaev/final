@@ -97,7 +97,7 @@ const PWAInstallPrompt = () => {
             type="button"
             title="Закрыть предложение установки приложения"
             aria-label="Закрыть предложение установки приложения"
-            style={{ padding: '4px', minWidth: 'auto' }}
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}
           >
             <X aria-hidden="true" size={16} />
           </Button>

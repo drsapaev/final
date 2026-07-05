@@ -57,11 +57,11 @@ export default function UserSelect() {
                 gap: 12,
                 padding: '12px 14px',
                 border: '1px solid var(--mac-card-border)',
-                borderRadius: '8px',
+                borderRadius: 'var(--mac-radius-md)',
                 background: 'var(--mac-card-bg)'
               }}>
               <div>
-                <div style={{ fontWeight: 700, color: 'var(--mac-text-primary)' }}>{u.full_name || u.username}</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-text-primary)' }}>{u.full_name || u.username}</div>
                 <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{u.role || '—'} · {u.email || '—'}</div>
               </div>
               <div>

@@ -13,7 +13,7 @@
   --accent-pink: #ff5c8d;
   --accent-orange: #ffb347;
   --accent-green: var(--mac-success);
-  --accent-graphite: #8e8e93;
+  --accent-graphite: var(--mac-text-tertiary);
 
   /* Светлая тема */
   --mac-text-primary: var(--mac-text-primary);
@@ -37,7 +37,7 @@
     --bg: #0b0c0f;
     --text: #eef2f7;
     --surface: rgba(25, 28, 34, 0.6);
-    --glass-stroke: rgba(255, 255, 255, 0.08);
+    --glass-stroke: color-mix(in srgb, white, transparent 92%);
     --shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
 
     /* Новый тёмный стиль (по PNG) */
@@ -93,7 +93,7 @@
     linear-gradient(160deg, rgba(9, 15, 24, 0.96) 0%, rgba(26, 44, 63, 0.84) 100%);
   --mac-gradient-sidebar: linear-gradient(180deg, rgba(12, 18, 27, 0.74) 0%, rgba(23, 37, 54, 0.66) 100%);
   --shadow: 0 8px 28px color-mix(in srgb, black, transparent 62%);
-  --mac-shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.3);
+  --mac-shadow-sm: 0 2px 10px color-mix(in srgb, black, transparent 70%);
   --mac-shadow-md: 0 10px 28px color-mix(in srgb, black, transparent 62%);
   --mac-blur-light: saturate(185%) blur(24px);
   background: rgba(8, 12, 18, 0.22);
@@ -294,7 +294,7 @@
 
 [data-color-scheme="glass"] .app-shell::after {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 26%),
+    linear-gradient(180deg, color-mix(in srgb, white, transparent 96%), transparent 26%),
     linear-gradient(145deg, rgba(98, 149, 255, 0.04) 0%, transparent 34%);
 }
 
@@ -339,7 +339,7 @@
 
 [data-color-scheme="glass"] .app-main::before {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 18%),
+    linear-gradient(180deg, color-mix(in srgb, white, transparent 96%) 0%, transparent 18%),
     radial-gradient(circle at 12% 0%, rgba(144, 224, 239, 0.1), transparent 20%);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -740,8 +740,8 @@ body {
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #ddd"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid var(--mac-border)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid var(--mac-border)"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #ccc"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #ccc"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid var(--mac-border)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid var(--mac-border)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid var(--mac-border)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid var(--mac-border)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #eee"],

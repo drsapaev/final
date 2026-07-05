@@ -510,17 +510,17 @@ const EnhancedAppointmentsTable = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px',
-          padding: '4px 8px',
-          borderRadius: '6px',
+          gap: 'var(--mac-spacing-1)',
+          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+          borderRadius: 'var(--mac-radius-sm)',
           backgroundColor: config.bg,
           color: config.color,
-          fontSize: '12px',
-          fontWeight: '500',
+          fontSize: 'var(--mac-font-size-xs)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           cursor: 'help',
           border: `1px solid ${withOpacity(config.color, 0.2)}`
         }}>
-        <span style={{ fontSize: '14px' }}>{config.emoji}</span>
+        <span style={{ fontSize: 'var(--mac-font-size-base)' }}>{config.emoji}</span>
         <span>{config.text}</span>
       </div>);
 
@@ -727,7 +727,7 @@ const EnhancedAppointmentsTable = ({
 
     return (
       <div
-        style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', cursor: 'help' }}
+        style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--mac-spacing-1)', cursor: 'help' }}
         title={tooltipText}>
 
         {compactCodes.map((code, idx) =>
@@ -735,9 +735,9 @@ const EnhancedAppointmentsTable = ({
           key={idx}
           style={{
             padding: '2px 6px',
-            borderRadius: '4px',
-            fontSize: '11px',
-            fontWeight: 'bold',
+            borderRadius: 'var(--mac-radius-sm)',
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             backgroundColor: withOpacity('var(--mac-accent-blue)', 0.12),
             color: 'var(--mac-accent-blue)',
             border: `1px solid ${withOpacity('var(--mac-accent-blue)', 0.25)}`
@@ -780,9 +780,9 @@ const EnhancedAppointmentsTable = ({
     return (
       <span style={{
         padding: '3px 6px',
-        borderRadius: '8px',
-        fontSize: '11px',
-        fontWeight: '600',
+        borderRadius: 'var(--mac-radius-md)',
+        fontSize: 'var(--mac-font-size-xs)',
+        fontWeight: 'var(--mac-font-weight-semibold)',
         backgroundColor: backgroundColor,
         color: color,
         border: `1px solid ${borderColor}`
@@ -839,17 +839,17 @@ const EnhancedAppointmentsTable = ({
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: 'var(--mac-spacing-2)',
         justifyContent: 'center'
       }}>
         <span style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '4px',
+          gap: 'var(--mac-spacing-1)',
           padding: '3px 8px',
-          borderRadius: '6px',
-          fontSize: '12px',
-          fontWeight: '500',
+          borderRadius: 'var(--mac-radius-sm)',
+          fontSize: 'var(--mac-font-size-xs)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           backgroundColor: withOpacity(color, 0.08),
           color: color,
           border: `1px solid ${withOpacity(color, 0.2)}`
@@ -859,7 +859,7 @@ const EnhancedAppointmentsTable = ({
         </span>
         {paymentStatus &&
         <span style={{
-          fontSize: '16px',
+          fontSize: 'var(--mac-font-size-lg)',
           lineHeight: 1
         }}>
             {paymentStatus === 'paid' ? '✅' :
@@ -1063,12 +1063,12 @@ const EnhancedAppointmentsTable = ({
           <>
           <span
             style={{
-              padding: '4px 8px',
+              padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
               backgroundColor: config.bg,
               color: 'var(--mac-text-primary)',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '700',
+              borderRadius: 'var(--mac-radius-sm)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               minWidth: '32px',
               textAlign: 'center',
               display: 'inline-block',
@@ -1085,13 +1085,13 @@ const EnhancedAppointmentsTable = ({
           {Array.isArray(row.queue_numbers) && row.queue_numbers.length > 1 && (
             <span
               style={{
-                marginLeft: '4px',
+                marginLeft: 'var(--mac-spacing-1)',
                 padding: '2px 6px',
                 backgroundColor: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 85%)',
                 color: 'var(--mac-accent-blue, #007aff)',
-                borderRadius: '4px',
-                fontSize: '11px',
-                fontWeight: '600',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: 'var(--mac-font-size-xs)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
               }}
               title={row.queue_numbers.map((q) => `${q.queue_name || 'Очередь'}: №${q.number}`).join('\n')}
             >
@@ -1145,12 +1145,12 @@ const EnhancedAppointmentsTable = ({
           <>
           <span
             style={{
-              padding: '4px 8px',
+              padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
               backgroundColor: config.bg,
               color: 'var(--mac-text-primary)',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '700',
+              borderRadius: 'var(--mac-radius-sm)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               minWidth: '32px',
               textAlign: 'center',
               display: 'inline-block',
@@ -1165,13 +1165,13 @@ const EnhancedAppointmentsTable = ({
           {row.queue_numbers.length > 1 && (
             <span
               style={{
-                marginLeft: '4px',
+                marginLeft: 'var(--mac-spacing-1)',
                 padding: '2px 6px',
                 backgroundColor: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 85%)',
                 color: 'var(--mac-accent-blue, #007aff)',
-                borderRadius: '4px',
-                fontSize: '11px',
-                fontWeight: '600',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: 'var(--mac-font-size-xs)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
               }}
               title={row.queue_numbers.map((q) => `${q.queue_name || 'Очередь'}: №${q.number}`).join('\n')}
             >
@@ -1191,12 +1191,12 @@ const EnhancedAppointmentsTable = ({
 
       return (
         <span style={{
-          padding: '4px 8px',
+          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
           backgroundColor: 'var(--mac-accent-blue)',
           color: 'var(--mac-text-primary)',
-          borderRadius: '6px',
-          fontSize: '14px',
-          fontWeight: '700',
+          borderRadius: 'var(--mac-radius-sm)',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-bold)',
           minWidth: '32px',
           textAlign: 'center',
           display: 'inline-block',
@@ -1212,10 +1212,10 @@ const EnhancedAppointmentsTable = ({
     return (
       <span style={{
         color: 'var(--mac-text-secondary)',
-        fontSize: '12px',
+        fontSize: 'var(--mac-font-size-xs)',
         padding: '2px 6px',
         backgroundColor: withOpacity('var(--mac-text-secondary)', 0.06),
-        borderRadius: '4px'
+        borderRadius: 'var(--mac-radius-sm)'
       }}>
         #{fallbackIndex}
       </span>);
@@ -1259,7 +1259,7 @@ const EnhancedAppointmentsTable = ({
       }}>
       {/* Панель инструментов */}
       <div style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         borderBottom: '1px solid var(--mac-border)',
         overflowX: 'auto',
         minWidth: '600px'
@@ -1267,7 +1267,7 @@ const EnhancedAppointmentsTable = ({
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
+          gap: 'var(--mac-spacing-3)',
           flexWrap: 'nowrap',
           minWidth: 0
         }}>
@@ -1308,7 +1308,7 @@ const EnhancedAppointmentsTable = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: 'var(--mac-spacing-2)',
               flex: '0 0 auto',
               minWidth: '100px'
             }}>
@@ -1337,7 +1337,8 @@ const EnhancedAppointmentsTable = ({
         position: 'relative',
         zIndex: 1
       }}>
-        <table style={{
+        <div className="admin-table-wrapper">
+<table style={{
           width: '100%',
           borderCollapse: 'collapse',
           tableLayout: 'auto',
@@ -1377,14 +1378,14 @@ const EnhancedAppointmentsTable = ({
                   textAlign: 'center',
                   borderBottom: '1px solid var(--mac-border)',
                   color: 'var(--mac-text-primary)',
-                  fontWeight: '600',
-                  fontSize: '14px',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  fontSize: 'var(--mac-font-size-base)',
                   width: '60px',
                   cursor: 'pointer',
                   userSelect: 'none'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
                   {t.number}
                   {sortConfig.key === 'queue_number' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1400,14 +1401,14 @@ const EnhancedAppointmentsTable = ({
                   textAlign: 'left',
                   borderBottom: '1px solid var(--mac-border)',
                   color: 'var(--mac-text-primary)',
-                  fontWeight: '600',
-                  fontSize: '14px',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  fontSize: 'var(--mac-font-size-base)',
                   cursor: 'pointer',
                   minWidth: isDoctorView ? '15%' : '200px',
                   width: isDoctorView ? '15%' : 'auto'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
                   {t.patient}
                   {sortConfig.key === 'patient_fio' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1422,8 +1423,8 @@ const EnhancedAppointmentsTable = ({
                 textAlign: 'left',
                 borderBottom: '1px solid var(--mac-border)',
                 color: 'var(--mac-text-primary)',
-                fontWeight: '600',
-                fontSize: '14px',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-base)',
                 minWidth: '170px'
               }}>
                   {t.phone}
@@ -1438,14 +1439,14 @@ const EnhancedAppointmentsTable = ({
                   textAlign: 'center',
                   borderBottom: '1px solid var(--mac-border)',
                   color: 'var(--mac-text-primary)',
-                  fontWeight: '600',
-                  fontSize: '14px',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  fontSize: 'var(--mac-font-size-base)',
                   cursor: 'pointer',
                   width: isDoctorView ? '5%' : '60px',
                   minWidth: isDoctorView ? '5%' : '60px'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
                   {t.birthYear}
                   {sortConfig.key === 'patient_birth_year' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1460,8 +1461,8 @@ const EnhancedAppointmentsTable = ({
                 textAlign: 'left',
                 borderBottom: '1px solid var(--mac-border)',
                 color: 'var(--mac-text-primary)',
-                fontWeight: '600',
-                fontSize: '14px',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-base)',
                 minWidth: '140px'
               }}
               className="hide-on-mobile">
@@ -1476,8 +1477,8 @@ const EnhancedAppointmentsTable = ({
                 textAlign: 'center',
                 borderBottom: '1px solid var(--mac-border)',
                 color: 'var(--mac-text-primary)',
-                fontWeight: '600',
-                fontSize: '14px',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-base)',
                 minWidth: isDoctorView ? '70px' : '80px',
                 width: isDoctorView ? '70px' : 'auto'
               }}>
@@ -1490,8 +1491,8 @@ const EnhancedAppointmentsTable = ({
                 textAlign: 'left',
                 borderBottom: '1px solid var(--mac-border)',
                 color: 'var(--mac-text-primary)',
-                fontWeight: '600',
-                fontSize: '14px',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-base)',
                 minWidth: isDoctorView ? '12%' : '180px',
                 width: isDoctorView ? '12%' : 'auto'
               }}>
@@ -1504,8 +1505,8 @@ const EnhancedAppointmentsTable = ({
                 textAlign: 'center',
                 borderBottom: '1px solid var(--mac-border)',
                 color: 'var(--mac-text-primary)',
-                fontWeight: '600',
-                fontSize: '14px',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-base)',
                 minWidth: isDoctorView ? '8%' : '100px',
                 width: isDoctorView ? '8%' : 'auto'
               }}>
@@ -1520,14 +1521,14 @@ const EnhancedAppointmentsTable = ({
                   textAlign: 'center',
                   borderBottom: '1px solid var(--mac-border)',
                   color: 'var(--mac-text-primary)',
-                  fontWeight: '600',
-                  fontSize: '14px',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  fontSize: 'var(--mac-font-size-base)',
                   cursor: 'pointer',
                   minWidth: isDoctorView ? '9%' : '100px',
                   width: isDoctorView ? '9%' : 'auto'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
                   {t.date}
                   {sortConfig.key === 'appointment_date' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1543,14 +1544,14 @@ const EnhancedAppointmentsTable = ({
                   textAlign: 'center',
                   borderBottom: '1px solid var(--mac-border)',
                   color: 'var(--mac-text-primary)',
-                  fontWeight: '600',
-                  fontSize: '14px',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  fontSize: 'var(--mac-font-size-base)',
                   cursor: 'pointer',
                   minWidth: isDoctorView ? '7%' : '80px',
                   width: isDoctorView ? '7%' : 'auto'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
                   {t.status}
                   {sortConfig.key === 'status' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1567,14 +1568,14 @@ const EnhancedAppointmentsTable = ({
                   textAlign: 'right',
                   borderBottom: '1px solid var(--mac-border)',
                   color: 'var(--mac-text-primary)',
-                  fontWeight: '600',
-                  fontSize: '14px',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  fontSize: 'var(--mac-font-size-base)',
                   cursor: 'pointer',
                   minWidth: isDoctorView ? '8%' : '90px',
                   width: isDoctorView ? '8%' : 'auto'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'flex-end' }}>
                   {t.cost}
                   {sortConfig.key === 'cost' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1588,8 +1589,8 @@ const EnhancedAppointmentsTable = ({
                 textAlign: 'center',
                 borderBottom: '1px solid var(--mac-border)',
                 color: 'var(--mac-text-primary)',
-                fontWeight: '600',
-                fontSize: '14px',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-base)',
                 width: isDoctorView ? '15%' : 'auto',
                 minWidth: isDoctorView ? '15%' : '200px'
               }}>
@@ -1606,7 +1607,7 @@ const EnhancedAppointmentsTable = ({
                   padding: '40px',
                   textAlign: 'center',
                   color: 'var(--mac-text-secondary)',
-                  fontSize: '16px'
+                  fontSize: 'var(--mac-font-size-lg)'
                 }}>
 
                   {t.noData}
@@ -1697,7 +1698,7 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     textAlign: 'center',
                     color: 'var(--mac-text-secondary)',
-                    fontSize: '14px'
+                    fontSize: 'var(--mac-font-size-base)'
                   }}>
                       {renderQueueNumbers(row)}
                     </td>
@@ -1706,8 +1707,8 @@ const EnhancedAppointmentsTable = ({
                     <td style={{
                     padding: '12px 8px',
                     color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
-                    fontWeight: '500',
+                    fontSize: 'var(--mac-font-size-base)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
                     minWidth: isDoctorView ? '15%' : '200px',
                     width: isDoctorView ? '15%' : 'auto',
                     overflow: 'hidden',
@@ -1717,19 +1718,19 @@ const EnhancedAppointmentsTable = ({
                   title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}>
 
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
                           <span>{row.patient_fio || '—'}</span>
                           {/* Ярлыки источника/приоритета */}
                           {/* ✅ SSOT: Только source='online' показывает QR badge */}
                           {row.source === 'online' &&
                         <span
                           style={{
-                            fontSize: '10px',
+                            fontSize: 'var(--mac-font-size-xs)',
                             padding: '2px 6px',
-                            borderRadius: '4px',
+                            borderRadius: 'var(--mac-radius-sm)',
                             background: 'linear-gradient(135deg, var(--mac-accent-purple) 0%, var(--mac-accent-purple) 100%)',
                             color: 'white',
-                            fontWeight: '600',
+                            fontWeight: 'var(--mac-font-weight-semibold)',
                             whiteSpace: 'nowrap'
                           }}
                           title="Приоритет: ранняя онлайн-регистрация">
@@ -1740,12 +1741,12 @@ const EnhancedAppointmentsTable = ({
                           {row.source === 'desk' &&
                         <span
                           style={{
-                            fontSize: '10px',
+                            fontSize: 'var(--mac-font-size-xs)',
                             padding: '2px 6px',
-                            borderRadius: '4px',
+                            borderRadius: 'var(--mac-radius-sm)',
                             background: 'var(--mac-separator)',
                             color: 'var(--mac-text-secondary)',
-                            fontWeight: '600',
+                            fontWeight: 'var(--mac-font-weight-semibold)',
                             whiteSpace: 'nowrap'
                           }}>
 
@@ -1755,7 +1756,7 @@ const EnhancedAppointmentsTable = ({
                         </div>
                         {row.patient_birth_year &&
                       <div style={{
-                        fontSize: '12px',
+                        fontSize: 'var(--mac-font-size-xs)',
                         color: 'var(--mac-text-secondary)',
                         marginTop: '2px'
                       }}>
@@ -1770,7 +1771,7 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                     minWidth: '170px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -1779,9 +1780,9 @@ const EnhancedAppointmentsTable = ({
                         <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: 'var(--mac-spacing-2)'
                     }}>
-                          <Phone size={18} style={{ color: 'var(--mac-accent-blue)', fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
+                          <Phone size={18} style={{ color: 'var(--mac-accent-blue)', fontWeight: 'var(--mac-font-weight-bold)', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
                           {formatPhoneNumber(row.patient_phone)}
                         </div>
                       </td>
@@ -1792,7 +1793,7 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     textAlign: 'center',
                     color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                     width: isDoctorView ? '50px' : '60px',
                     minWidth: isDoctorView ? '50px' : '60px',
                     maxWidth: isDoctorView ? '50px' : '60px'
@@ -1805,7 +1806,7 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                     minWidth: '140px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -1819,11 +1820,11 @@ const EnhancedAppointmentsTable = ({
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: 'var(--mac-spacing-2)'
                     }}>
                             <Home size={18} style={{
                         color: 'var(--mac-accent-blue)',
-                        fontWeight: 'bold',
+                        fontWeight: 'var(--mac-font-weight-bold)',
                         filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
                         flexShrink: 0
                       }} />
@@ -1932,7 +1933,7 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     textAlign: 'center',
                     color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                     minWidth: '100px'
                   }}>
                       <div>
@@ -1946,24 +1947,24 @@ const EnhancedAppointmentsTable = ({
                           return (
                             <div title={`Часовой пояс: ${timeDisplay.timeZone}`}>
                                 <div style={{
-                                fontSize: '11px',
-                                fontWeight: 600,
+                                fontSize: 'var(--mac-font-size-xs)',
+                                fontWeight: 'var(--mac-font-weight-semibold)',
                                 color: 'var(--mac-text-secondary)',
-                                marginBottom: '2px'
+                                marginBottom: 'var(--mac-spacing-1)'
                               }}>
                                   {timeDisplay.primaryLabel}
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
                                   <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
                                   {timeDisplay.primaryDate}
                                 </div>
                                 <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px',
+                                gap: 'var(--mac-spacing-1)',
                                 justifyContent: 'center',
                                 marginTop: '2px',
-                                fontSize: '12px',
+                                fontSize: 'var(--mac-font-size-xs)',
                                 color: 'var(--mac-text-secondary)'
                               }}>
                                   <Clock size={10} />
@@ -1971,8 +1972,8 @@ const EnhancedAppointmentsTable = ({
                                 </div>
                                 {timeDisplay.showChanged &&
                               <div style={{
-                                marginTop: '4px',
-                                fontSize: '11px',
+                                marginTop: 'var(--mac-spacing-1)',
+                                fontSize: 'var(--mac-font-size-xs)',
                                 color: 'var(--mac-text-tertiary)',
                                 lineHeight: 1.35
                               }}>
@@ -1987,7 +1988,7 @@ const EnhancedAppointmentsTable = ({
                         if (row.appointment_date || row.appointment_time) {
                           return (
                             <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
                                   <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
                                   {row.appointment_date || '—'}
                                 </div>
@@ -1995,10 +1996,10 @@ const EnhancedAppointmentsTable = ({
                               <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px',
+                                gap: 'var(--mac-spacing-1)',
                                 justifyContent: 'center',
                                 marginTop: '2px',
-                                fontSize: '12px',
+                                fontSize: 'var(--mac-font-size-xs)',
                                 color: 'var(--mac-text-secondary)'
                               }}>
                                     <Clock size={10} />
@@ -2040,8 +2041,8 @@ const EnhancedAppointmentsTable = ({
 
                       return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
                     })(),
-                    fontSize: '14px',
-                    fontWeight: '600',
+                    fontSize: 'var(--mac-font-size-base)',
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     minWidth: '90px'
                   }}>
                       {(() => {
@@ -2083,7 +2084,7 @@ const EnhancedAppointmentsTable = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px',
+                        gap: 'var(--mac-spacing-1)',
                         flexWrap: 'wrap',
                         position: 'relative',
                         zIndex: 100
@@ -2103,14 +2104,14 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('payment', row, e);
                         }}
                         style={{
-                          padding: '4px 8px',
+                          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'var(--mac-success, #34c759)',
                           color: 'var(--mac-text-primary)',
                           cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: '500'
+                          fontSize: 'var(--mac-font-size-xs)',
+                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}
                         title="Оплата">
 
@@ -2132,14 +2133,14 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('call', row, e);
                         }}
                         style={{
-                          padding: '4px 8px',
+                          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'var(--mac-accent-blue, #007aff)',
                           color: 'var(--mac-text-primary)',
                           cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: '500'
+                          fontSize: 'var(--mac-font-size-xs)',
+                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}
                         title="Вызвать">
 
@@ -2161,9 +2162,9 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('print', row, e);
                         }}
                         style={{
-                          padding: '4px',
+                          padding: 'var(--mac-spacing-1)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'transparent',
                           color: 'var(--mac-accent-blue)',
                           cursor: 'pointer',
@@ -2190,14 +2191,14 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('complete', row, e);
                         }}
                         style={{
-                          padding: '4px 8px',
+                          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'var(--mac-warning, #f59e0b)',
                           color: 'var(--mac-text-primary)',
                           cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: '500'
+                          fontSize: 'var(--mac-font-size-xs)',
+                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}
                         title="Завершить">
 
@@ -2243,9 +2244,9 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('view', row, e);
                         }}
                         style={{
-                          padding: '4px',
+                          padding: 'var(--mac-spacing-1)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'transparent',
                           color: 'var(--mac-text-secondary)',
                           cursor: 'pointer',
@@ -2273,9 +2274,9 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('edit', row, e);
                         }}
                         style={{
-                          padding: '4px',
+                          padding: 'var(--mac-spacing-1)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'transparent',
                           color: 'var(--mac-text-secondary)',
                           cursor: 'pointer',
@@ -2303,9 +2304,9 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('view_emr', row, e);
                         }}
                         style={{
-                          padding: '4px',
+                          padding: 'var(--mac-spacing-1)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'transparent',
                           color: 'var(--mac-accent-blue, #007aff)',
                           cursor: 'pointer',
@@ -2333,9 +2334,9 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('reschedule', row, e);
                         }}
                         style={{
-                          padding: '4px',
+                          padding: 'var(--mac-spacing-1)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'transparent',
                           color: 'var(--mac-warning, #f59e0b)',
                           cursor: 'pointer',
@@ -2360,9 +2361,9 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('cancel', row, e);
                         }}
                         style={{
-                          padding: '4px',
+                          padding: 'var(--mac-spacing-1)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'transparent',
                           color: 'var(--mac-error, #ef4444)',
                           cursor: 'pointer',
@@ -2387,9 +2388,9 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('more', row, e);
                         }}
                         style={{
-                          padding: '4px',
+                          padding: 'var(--mac-spacing-1)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'transparent',
                           color: 'var(--mac-text-secondary)',
                           cursor: 'pointer',
@@ -2415,14 +2416,14 @@ const EnhancedAppointmentsTable = ({
                           onActionClick?.('schedule_next', row, e);
                         }}
                         style={{
-                          padding: '4px 8px',
+                          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                           border: 'none',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--mac-radius-sm)',
                           backgroundColor: 'var(--mac-accent-blue, #007aff)',
                           color: 'var(--mac-text-primary)',
                           cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: '500'
+                          fontSize: 'var(--mac-font-size-xs)',
+                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}
                         title="Назначить следующий визит">
 
@@ -2437,37 +2438,38 @@ const EnhancedAppointmentsTable = ({
             }
           </tbody>
         </table>
+</div>
       </div>
 
       {/* Пагинация */}
       {totalPages > 1 &&
       <div style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         borderTop: '1px solid var(--mac-border)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'between',
-        gap: '16px',
+        gap: 'var(--mac-spacing-4)',
         flexWrap: 'wrap'
       }}>
           <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           color: 'var(--mac-text-secondary)',
-          fontSize: '14px'
+          fontSize: 'var(--mac-font-size-base)'
         }}>
             <span>{t.page}</span>
             <select
             value={currentPage}
             onChange={(e) => setCurrentPage(parseInt(e.target.value))}
             style={{
-              padding: '4px 8px',
+              padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
               border: '1px solid var(--mac-border)',
-              borderRadius: '4px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',
-              fontSize: '14px'
+              fontSize: 'var(--mac-font-size-base)'
             }}>
 
               {Array.from({ length: totalPages }, (_, i) =>
@@ -2482,9 +2484,9 @@ const EnhancedAppointmentsTable = ({
           <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           color: 'var(--mac-text-secondary)',
-          fontSize: '14px'
+          fontSize: 'var(--mac-font-size-base)'
         }}>
             <span>Показано: {paginatedData.length} из {filteredData.length}</span>
           </div>
@@ -2492,19 +2494,19 @@ const EnhancedAppointmentsTable = ({
           <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <button
             className="pagination-button"
             onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
             style={{
-              padding: '6px 12px',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
               border: '1px solid var(--mac-border)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: 'var(--mac-bg-primary)',
               color: currentPage === 1 ? 'var(--mac-text-secondary)' : 'var(--mac-text-primary)',
-              fontSize: '14px',
+              fontSize: 'var(--mac-font-size-base)',
               cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
             }}>
 
@@ -2515,12 +2517,12 @@ const EnhancedAppointmentsTable = ({
             onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
             style={{
-              padding: '6px 12px',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
               border: '1px solid var(--mac-border)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: 'var(--mac-bg-primary)',
               color: currentPage === totalPages ? 'var(--mac-text-secondary)' : 'var(--mac-text-primary)',
-              fontSize: '14px',
+              fontSize: 'var(--mac-font-size-base)',
               cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
             }}>
 

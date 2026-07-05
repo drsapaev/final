@@ -2485,15 +2485,15 @@ const AppointmentWizardV2 = ({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    gap: '16px',
+    gap: 'var(--mac-spacing-4)',
     padding: '10px 20px 12px',
     borderBottom: '1px solid var(--mac-border)',
     background: 'var(--mac-bg-primary)'
   };
 
   const wizardHeaderTitleStyle = {
-    fontSize: '17px',
-    fontWeight: '600',
+    fontSize: 'var(--mac-font-size-xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-primary)',
     margin: 0,
     letterSpacing: '-0.02em',
@@ -2502,7 +2502,7 @@ const AppointmentWizardV2 = ({
 
   const wizardHeaderSubtitleStyle = {
     margin: '4px 0 0',
-    fontSize: '13px',
+    fontSize: 'var(--mac-font-size-sm)',
     color: 'var(--mac-text-secondary)',
     lineHeight: 1.4
   };
@@ -2510,7 +2510,7 @@ const AppointmentWizardV2 = ({
   const wizardHeaderIconStyle = {
     width: '36px',
     height: '36px',
-    borderRadius: '12px',
+    borderRadius: 'var(--mac-radius-lg)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2545,20 +2545,20 @@ const AppointmentWizardV2 = ({
     background: 'var(--mac-bg-secondary)',
     color: 'var(--mac-text-primary)',
     cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 500,
+    fontSize: 'var(--mac-font-size-sm)',
+    fontWeight: 'var(--mac-font-weight-medium)',
     whiteSpace: 'nowrap',
     transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: 'var(--mac-spacing-2)',
     boxShadow: 'var(--mac-shadow-sm)'
   };
 
   // Кастомный заголовок для Шага 1
   const Step1Header =
   <div style={wizardHeaderShellStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)', minWidth: 0 }}>
         <div style={wizardHeaderIconStyle}>
           <Check size={18} />
         </div>
@@ -2605,7 +2605,7 @@ const AppointmentWizardV2 = ({
         onClear={() => setServiceSearchQuery('')}
         autoFocus
         size="sm"
-        style={{ height: '38px', fontSize: '13px' }} />
+        style={{ height: '38px', fontSize: 'var(--mac-font-size-sm)' }} />
 
       </div>
 
@@ -2614,7 +2614,7 @@ const AppointmentWizardV2 = ({
       flex: 1,
       display: 'flex',
       justifyContent: 'center',
-      gap: '8px',
+      gap: 'var(--mac-spacing-2)',
       padding: '0 8px',
       flexWrap: 'wrap'
     }}>
@@ -2649,7 +2649,7 @@ const AppointmentWizardV2 = ({
           }
         }}>
 
-            <span style={{ fontSize: '15px' }}>{cat.icon}</span>
+            <span style={{ fontSize: 'var(--mac-font-size-lg)' }}>{cat.icon}</span>
             {cat.label}
           </button>
       )}
@@ -2659,7 +2659,7 @@ const AppointmentWizardV2 = ({
       <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
+      gap: 'var(--mac-spacing-2)',
       flex: '0 0 auto'
     }}>
         {/* Кнопка обновления */}
@@ -2806,8 +2806,8 @@ const AppointmentWizardV2 = ({
               мгновенное понимание прогресса без чтения. */}
           <div style={{
             display: 'flex',
-            gap: '6px',
-            marginBottom: '12px',
+            gap: 'var(--mac-spacing-2)',
+            marginBottom: 'var(--mac-spacing-3)',
             padding: '0 4px',
           }}>
             {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
@@ -2816,7 +2816,7 @@ const AppointmentWizardV2 = ({
                 style={{
                   flex: 1,
                   height: '4px',
-                  borderRadius: '2px',
+                  borderRadius: 'var(--mac-radius-sm)',
                   backgroundColor: currentStep >= step
                     ? 'var(--mac-accent-blue, #007aff)'
                     : 'color-mix(in srgb, var(--mac-text-secondary, #8e8e93), transparent 70%)',

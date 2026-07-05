@@ -214,8 +214,8 @@ const PrintDialog = ({
         {/* Информация о документе */}
         <div
           style={{
-            marginBottom: '24px',
-            padding: '16px',
+            marginBottom: 'var(--mac-spacing-6)',
+            padding: 'var(--mac-spacing-4)',
             ...surfaceStyle,
           }}
         >
@@ -223,8 +223,8 @@ const PrintDialog = ({
             style={{
               color: 'var(--color-text-primary)',
               margin: '0 0 8px 0',
-              fontSize: '16px',
-              fontWeight: '600',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
             }}
           >
             {getDocumentTitle()}
@@ -232,14 +232,14 @@ const PrintDialog = ({
 
           {documentData && (
             <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-1)' }}
             >
               {documentData.patient_fio && (
                 <p
                   style={{
                     color: 'var(--color-text-secondary)',
                     margin: 0,
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                   }}
                 >
                   Пациент: <strong>{documentData.patient_fio}</strong>
@@ -251,7 +251,7 @@ const PrintDialog = ({
                   style={{
                     color: 'var(--color-text-secondary)',
                     margin: 0,
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                   }}
                 >
                   Услуги: {formatPrintServices(documentData.services)}
@@ -263,7 +263,7 @@ const PrintDialog = ({
                   style={{
                     color: 'var(--color-text-secondary)',
                     margin: 0,
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                   }}
                 >
                   {/* UX Audit Registrar #1: toLocaleString() без локали + валюта ₽ (рубли)
@@ -286,8 +286,8 @@ const PrintDialog = ({
                       style={{
                         color: 'var(--mac-accent-blue, #0ea5e9)',
                         margin: 0,
-                        fontSize: '14px',
-                        fontWeight: 600,
+                        fontSize: 'var(--mac-font-size-base)',
+                        fontWeight: 'var(--mac-font-weight-semibold)',
                       }}
                     >
                       🖨️ Будет напечатано талонов: {ticketCount}
@@ -303,7 +303,7 @@ const PrintDialog = ({
         {usesBrowserPrint ? (
           <div
             style={{
-              padding: '16px',
+              padding: 'var(--mac-spacing-4)',
               borderRadius: '14px',
               backgroundColor:
                 theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'var(--mac-accent-bg)',
@@ -315,8 +315,8 @@ const PrintDialog = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
-                marginBottom: '8px',
+                gap: 'var(--mac-spacing-3)',
+                marginBottom: 'var(--mac-spacing-2)',
               }}
             >
               <Printer size={20} />
@@ -325,7 +325,7 @@ const PrintDialog = ({
             <p
               style={{
                 margin: '0 0 8px 0',
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
                 color: 'var(--color-text-secondary)',
               }}
             >
@@ -334,7 +334,7 @@ const PrintDialog = ({
             <p
               style={{
                 margin: 0,
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
                 color: 'var(--color-text-secondary)',
               }}
             >
@@ -348,9 +348,9 @@ const PrintDialog = ({
               <label
                 style={{
                   display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  marginBottom: '12px',
+                  fontSize: 'var(--mac-font-size-base)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  marginBottom: 'var(--mac-spacing-3)',
                   color: 'var(--color-text-primary)',
                 }}
               >
@@ -369,7 +369,7 @@ const PrintDialog = ({
                 >
                   <div
                     className="loading-spinner"
-                    style={{ marginRight: '12px' }}
+                    style={{ marginRight: 'var(--mac-spacing-3)' }}
                   ></div>
                   Загрузка принтеров...
                 </div>
@@ -378,8 +378,8 @@ const PrintDialog = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
-                    padding: '16px',
+                    gap: 'var(--mac-spacing-3)',
+                    padding: 'var(--mac-spacing-4)',
                     backgroundColor:
                       theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
                     border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.24)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
@@ -389,19 +389,19 @@ const PrintDialog = ({
                 >
                   <AlertCircle size={20} />
                   <div>
-                    <p style={{ margin: '0 0 8px 0', fontWeight: '500' }}>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: 'var(--mac-font-weight-medium)' }}>
                       Ошибка загрузки принтеров
                     </p>
-                    <p style={{ margin: 0, fontSize: '14px' }}>{error}</p>
+                    <p style={{ margin: 0, fontSize: 'var(--mac-font-size-base)' }}>{error}</p>
                     <button
                       onClick={loadPrinters}
                       style={{
-                        marginTop: '8px',
-                        padding: '4px 8px',
-                        fontSize: '12px',
+                        marginTop: 'var(--mac-spacing-2)',
+                        padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+                        fontSize: 'var(--mac-font-size-xs)',
                         backgroundColor: 'transparent',
                         border: '1px solid currentColor',
-                        borderRadius: '4px',
+                        borderRadius: 'var(--mac-radius-sm)',
                         color: 'inherit',
                         cursor: 'pointer',
                       }}
@@ -415,7 +415,7 @@ const PrintDialog = ({
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '8px',
+                    gap: 'var(--mac-spacing-2)',
                   }}
                 >
                   {printers.map((printer) => (
@@ -441,7 +441,7 @@ const PrintDialog = ({
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
+                        gap: 'var(--mac-spacing-3)',
                         padding: '12px 14px',
                         border: `1px solid ${
                           selectedPrinter === printer.id
@@ -450,7 +450,7 @@ const PrintDialog = ({
                               ? 'color-mix(in srgb, white, transparent 90%)'
                               : 'var(--mac-border)'
                         }`,
-                        borderRadius: '12px',
+                        borderRadius: 'var(--mac-radius-lg)',
                         backgroundColor:
                           selectedPrinter === printer.id
                             ? theme === 'dark'
@@ -510,8 +510,8 @@ const PrintDialog = ({
                         <div
                           style={{
                             color: 'var(--color-text-primary)',
-                            fontSize: '14px',
-                            fontWeight: '500',
+                            fontSize: 'var(--mac-font-size-base)',
+                            fontWeight: 'var(--mac-font-weight-medium)',
                           }}
                         >
                           {printer.name}
@@ -519,7 +519,7 @@ const PrintDialog = ({
                         <div
                           style={{
                             color: 'var(--color-text-secondary)',
-                            fontSize: '12px',
+                            fontSize: 'var(--mac-font-size-xs)',
                             marginTop: '2px',
                           }}
                         >
@@ -539,9 +539,9 @@ const PrintDialog = ({
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '12px',
-                          fontWeight: '500',
+                          gap: 'var(--mac-spacing-1)',
+                          fontSize: 'var(--mac-font-size-xs)',
+                          fontWeight: 'var(--mac-font-weight-medium)',
                           color:
                             printer.status === 'online'
                               ? 'var(--mac-success)'
@@ -582,7 +582,7 @@ const PrintDialog = ({
                 >
                   <Printer
                     size={48}
-                    style={{ opacity: 0.3, marginBottom: '16px' }}
+                    style={{ opacity: 0.3, marginBottom: 'var(--mac-spacing-4)' }}
                   />
                   <p style={{ margin: 0 }}>Принтеры не найдены</p>
                 </div>

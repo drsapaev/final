@@ -307,7 +307,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                           {getProblemIcon(problem.type)}
                         </div>
                         <div style={{ flex: 1 }}>
-                          <Typography variant="body1" style={{ fontWeight: 500 }}>
+                          <Typography variant="body1" style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>
                             {problem.name}
                           </Typography>
                           <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginTop: 4 }}>
@@ -359,7 +359,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                   <div>
                     {analysisResult.recommendations.map((rec, index) =>
                 <div key={index} style={{ marginBottom: 16 }}>
-                        <Typography variant="body1" style={{ fontWeight: 500, marginBottom: 8 }}>
+                        <Typography variant="body1" style={{ fontWeight: 'var(--mac-font-weight-medium)', marginBottom: 8 }}>
                           {rec.title}
                         </Typography>
                         <Typography variant="body2" style={{ marginBottom: 8 }}>

@@ -217,7 +217,7 @@ const AppointmentContextMenu = ({
           left: adjustedPosition.x,
           backgroundColor: colors.bg,
           border: `1px solid ${colors.border}`,
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
           minWidth: '180px',
           maxWidth: '220px',
@@ -250,16 +250,16 @@ const AppointmentContextMenu = ({
               onClick={() => handleItemClick(item.id)}
               style={{
                 width: '100%',
-                padding: '8px 16px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
                 border: 'none',
                 backgroundColor: 'transparent',
                 color: item.color,
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
                 textAlign: 'left',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
+                gap: 'var(--mac-spacing-3)',
                 transition: 'background-color 0.15s ease'
               }}
               onMouseEnter={(e) => {

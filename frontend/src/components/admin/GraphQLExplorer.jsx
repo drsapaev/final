@@ -388,7 +388,7 @@ const GraphQLExplorer = () => {
   };
 
   const sectionCardStyle = {
-    padding: '24px',
+    padding: 'var(--mac-spacing-6)',
     boxShadow: 'var(--mac-shadow-sm)'
   };
 

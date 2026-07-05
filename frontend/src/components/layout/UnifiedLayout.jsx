@@ -45,7 +45,7 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
     maxWidth: '100%',
     backgroundColor: isDark ? '#0f172a' : 'var(--mac-bg-secondary)',
     transition: 'margin-left 0.3s ease',
-    padding: '20px',
+    padding: 'var(--mac-spacing-5)',
     overflow: 'auto' // Разрешаем скролл для просмотра всего контента
   };
 

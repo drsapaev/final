@@ -86,7 +86,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
   const renderStep1 = () =>
   <div style={{ maxWidth: '500px', margin: '0 auto' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Shield size={48} style={{ color: 'var(--accent-color)', marginBottom: '16px' }} />
+        <Shield size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--mac-spacing-4)' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
           Настройка двухфакторной аутентификации
         </h2>
@@ -95,11 +95,11 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         </p>
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
         <label htmlFor="two-factor-recovery-email" style={{
         display: 'block',
-        marginBottom: '8px',
-        fontWeight: '500',
+        marginBottom: 'var(--mac-spacing-2)',
+        fontWeight: 'var(--mac-font-weight-medium)',
         color: 'var(--text-primary)'
       }}>
           Email для восстановления (необязательно)
@@ -113,12 +113,12 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         placeholder="your@email.com"
         style={{
           width: '100%',
-          padding: '12px',
+          padding: 'var(--mac-spacing-3)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           background: 'var(--bg-primary)',
           color: 'var(--text-primary)',
-          fontSize: '14px'
+          fontSize: 'var(--mac-font-size-base)'
         }} />
       
       </div>
@@ -126,8 +126,8 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       <div style={{ marginBottom: '32px' }}>
         <label htmlFor="two-factor-recovery-phone" style={{
         display: 'block',
-        marginBottom: '8px',
-        fontWeight: '500',
+        marginBottom: 'var(--mac-spacing-2)',
+        fontWeight: 'var(--mac-font-weight-medium)',
         color: 'var(--text-primary)'
       }}>
           Телефон для восстановления (необязательно)
@@ -141,34 +141,34 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         placeholder="+7 (999) 123-45-67"
         style={{
           width: '100%',
-          padding: '12px',
+          padding: 'var(--mac-spacing-3)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           background: 'var(--bg-primary)',
           color: 'var(--text-primary)',
-          fontSize: '14px'
+          fontSize: 'var(--mac-font-size-base)'
         }} />
       
       </div>
 
-      <div style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
         <button
         onClick={handleSetup}
         disabled={loading}
         style={{
           flex: 1,
-          padding: '12px 24px',
+          padding: 'var(--mac-spacing-3) var(--mac-spacing-6)',
           background: 'var(--accent-color)',
           color: 'white',
           border: 'none',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           cursor: loading ? 'not-allowed' : 'pointer',
-          fontSize: '14px',
-          fontWeight: '500',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
         
           {loading ? <RefreshCw size={16} className="animate-spin" /> : <Shield size={16} />}
@@ -178,14 +178,14 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         <button
         onClick={onCancel}
         style={{
-          padding: '12px 24px',
+          padding: 'var(--mac-spacing-3) var(--mac-spacing-6)',
           background: 'var(--bg-secondary)',
           color: 'var(--text-primary)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: '500'
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)'
         }}>
         
           Отмена
@@ -197,7 +197,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
   const renderStep2 = () =>
   <div style={{ maxWidth: '600px', margin: '0 auto' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Smartphone size={48} style={{ color: 'var(--accent-color)', marginBottom: '16px' }} />
+        <Smartphone size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--mac-spacing-4)' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
           Настройте приложение аутентификатора
         </h2>
@@ -208,9 +208,9 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
 
       <div style={{
       background: 'var(--bg-secondary)',
-      padding: '24px',
-      borderRadius: '12px',
-      marginBottom: '24px',
+      padding: 'var(--mac-spacing-6)',
+      borderRadius: 'var(--mac-radius-lg)',
+      marginBottom: 'var(--mac-spacing-6)',
       textAlign: 'center'
     }}>
         {setupData?.qr_code_url &&
@@ -220,18 +220,18 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         style={{
           maxWidth: '200px',
           height: 'auto',
-          marginBottom: '16px',
+          marginBottom: 'var(--mac-spacing-4)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px'
+          borderRadius: 'var(--mac-radius-md)'
         }} />
 
       }
         
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
           <label style={{
           display: 'block',
-          marginBottom: '8px',
-          fontWeight: '500',
+          marginBottom: 'var(--mac-spacing-2)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--text-primary)'
         }}>
             Или введите ключ вручную:
@@ -239,16 +239,16 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
           <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           background: 'var(--bg-primary)',
-          padding: '8px 12px',
-          borderRadius: '6px',
+          padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+          borderRadius: 'var(--mac-radius-sm)',
           border: '1px solid var(--border-color)'
         }}>
             <code style={{
             flex: 1,
             fontFamily: 'monospace',
-            fontSize: '12px',
+            fontSize: 'var(--mac-font-size-xs)',
             color: 'var(--text-primary)',
             wordBreak: 'break-all'
           }}>
@@ -258,16 +258,16 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
             onClick={() => copyToClipboard(setupData?.secret_key, 'secret')}
             aria-label="Скопировать секретный ключ двухфакторной аутентификации"
             style={{
-              padding: '4px 8px',
+              padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
               background: 'var(--accent-color)',
               color: 'white',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: 'var(--mac-radius-sm)',
               cursor: 'pointer',
-              fontSize: '12px',
+              fontSize: 'var(--mac-font-size-xs)',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: 'var(--mac-spacing-1)'
             }}>
             
               {copiedCode === 'secret' ? <CheckCircle size={12} /> : <Copy size={12} />}
@@ -276,11 +276,11 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         </div>
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
         <label htmlFor="two-factor-totp-code" style={{
         display: 'block',
-        marginBottom: '8px',
-        fontWeight: '500',
+        marginBottom: 'var(--mac-spacing-2)',
+        fontWeight: 'var(--mac-font-weight-medium)',
         color: 'var(--text-primary)'
       }}>
           Введите 6-значный код из приложения:
@@ -295,12 +295,12 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         maxLength={6}
         style={{
           width: '100%',
-          padding: '12px',
+          padding: 'var(--mac-spacing-3)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           background: 'var(--bg-primary)',
           color: 'var(--text-primary)',
-          fontSize: '18px',
+          fontSize: 'var(--mac-font-size-xl)',
           textAlign: 'center',
           letterSpacing: '2px',
           fontFamily: 'monospace'
@@ -308,24 +308,24 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       
       </div>
 
-      <div style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
         <button
         onClick={handleVerify}
         disabled={loading || totpCode.length !== 6}
         style={{
           flex: 1,
-          padding: '12px 24px',
+          padding: 'var(--mac-spacing-3) var(--mac-spacing-6)',
           background: 'var(--accent-color)',
           color: 'white',
           border: 'none',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           cursor: loading || totpCode.length !== 6 ? 'not-allowed' : 'pointer',
-          fontSize: '14px',
-          fontWeight: '500',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
         
           {loading ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle size={16} />}
@@ -335,14 +335,14 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         <button
         onClick={() => setStep(1)}
         style={{
-          padding: '12px 24px',
+          padding: 'var(--mac-spacing-3) var(--mac-spacing-6)',
           background: 'var(--bg-secondary)',
           color: 'var(--text-primary)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: '500'
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)'
         }}>
         
           Назад
@@ -354,7 +354,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
   const renderStep3 = () =>
   <div style={{ maxWidth: '600px', margin: '0 auto' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <CheckCircle size={48} style={{ color: 'var(--mac-success)', marginBottom: '16px' }} />
+        <CheckCircle size={48} style={{ color: 'var(--mac-success)', marginBottom: 'var(--mac-spacing-4)' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
           2FA успешно настроена!
         </h2>
@@ -365,15 +365,15 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
 
       <div style={{
       background: 'var(--bg-secondary)',
-      padding: '24px',
-      borderRadius: '12px',
-      marginBottom: '24px'
+      padding: 'var(--mac-spacing-6)',
+      borderRadius: 'var(--mac-radius-lg)',
+      marginBottom: 'var(--mac-spacing-6)'
     }}>
         <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: '16px'
+        marginBottom: 'var(--mac-spacing-4)'
       }}>
           <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
             Backup коды
@@ -381,16 +381,16 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
           <button
           onClick={downloadBackupCodes}
           style={{
-            padding: '8px 12px',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
             background: 'var(--accent-color)',
             color: 'white',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: 'var(--mac-radius-sm)',
             cursor: 'pointer',
-            fontSize: '12px',
+            fontSize: 'var(--mac-font-size-xs)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
           
             <Download size={12} />
@@ -401,8 +401,8 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '8px',
-        marginBottom: '16px'
+        gap: 'var(--mac-spacing-2)',
+        marginBottom: 'var(--mac-spacing-4)'
       }}>
           {backupCodes.map((code, index) =>
         <div
@@ -410,17 +410,17 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            padding: '8px 12px',
+            gap: 'var(--mac-spacing-2)',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
             background: 'var(--bg-primary)',
-            borderRadius: '6px',
+            borderRadius: 'var(--mac-radius-sm)',
             border: '1px solid var(--border-color)'
           }}>
           
               <code style={{
             flex: 1,
             fontFamily: 'monospace',
-            fontSize: '12px',
+            fontSize: 'var(--mac-font-size-xs)',
             color: 'var(--text-primary)'
           }}>
                 {code}
@@ -429,7 +429,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
             onClick={() => copyToClipboard(code, `code-${index}`)}
             aria-label={`Скопировать резервный код ${index + 1}`}
             style={{
-              padding: '4px',
+              padding: 'var(--mac-spacing-1)',
               background: 'transparent',
               color: 'var(--text-secondary)',
               border: 'none',
@@ -445,42 +445,42 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         </div>
         
         <div style={{
-        padding: '12px',
+        padding: 'var(--mac-spacing-3)',
         background: 'var(--mac-warning-bg)',
-        borderRadius: '6px',
+        borderRadius: 'var(--mac-radius-sm)',
         border: '1px solid #F59E0B'
       }}>
           <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           color: '#92400E',
-          fontSize: '12px'
+          fontSize: 'var(--mac-font-size-xs)'
         }}>
             <AlertCircle size={16} />
-            <span style={{ fontWeight: '500' }}>Важно:</span>
+            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Важно:</span>
             <span>Сохраните эти коды в безопасном месте. Каждый код можно использовать только один раз.</span>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
         <button
         onClick={() => onComplete && onComplete()}
         style={{
           flex: 1,
-          padding: '12px 24px',
+          padding: 'var(--mac-spacing-3) var(--mac-spacing-6)',
           background: 'var(--accent-color)',
           color: 'white',
           border: 'none',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: '500',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
         
           <CheckCircle size={16} />
@@ -495,12 +495,12 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       <div style={{
         background: 'var(--mac-error-bg)',
         border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
-        borderRadius: '8px',
-        padding: '16px',
-        marginBottom: '16px',
+        borderRadius: 'var(--mac-radius-md)',
+        padding: 'var(--mac-spacing-4)',
+        marginBottom: 'var(--mac-spacing-4)',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: 'var(--mac-spacing-2)',
         color: 'var(--mac-error)'
       }}>
         <AlertCircle size={20} />
@@ -514,12 +514,12 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       <div style={{
         background: 'var(--mac-success-bg)',
         border: '1px solid #6EE7B7',
-        borderRadius: '8px',
-        padding: '16px',
-        marginBottom: '16px',
+        borderRadius: 'var(--mac-radius-md)',
+        padding: 'var(--mac-spacing-4)',
+        marginBottom: 'var(--mac-spacing-4)',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: 'var(--mac-spacing-2)',
         color: 'var(--mac-success)'
       }}>
         <CheckCircle size={20} />

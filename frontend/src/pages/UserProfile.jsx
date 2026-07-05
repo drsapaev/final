@@ -244,7 +244,7 @@ function ProfileMetaCard({ icon: Icon, label, value, accent }) {
       <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 4 }}>
         {label}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+      <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
         {value}
       </div>
     </div>
@@ -264,7 +264,7 @@ function ProfileField({ label, children }) {
       <label
         style={{
           fontSize: 13,
-          fontWeight: 600,
+          fontWeight: 'var(--mac-font-weight-semibold)',
           color: 'var(--mac-text-secondary)',
         }}
       >
@@ -466,7 +466,7 @@ export default function UserProfile() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 30,
-                fontWeight: 700,
+                fontWeight: 'var(--mac-font-weight-bold)',
                 boxShadow: '0 18px 36px color-mix(in srgb, var(--mac-accent), transparent 72%)',
               }}
             >
@@ -488,7 +488,7 @@ export default function UserProfile() {
                       borderRadius: 999,
                       padding: '6px 10px',
                       fontSize: 12,
-                      fontWeight: 600,
+                      fontWeight: 'var(--mac-font-weight-semibold)',
                       ...(toneChipStyles[badge.tone] || toneChipStyles.info),
                     }}
                   >
@@ -602,7 +602,7 @@ export default function UserProfile() {
               }}
             >
               <div>
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
+                <div style={{ fontSize: 15, fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 6 }}>
                   Основной профиль
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
@@ -790,7 +790,7 @@ export default function UserProfile() {
               }}
             >
               <div style={{ minWidth: 240 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
+                <div style={{ fontSize: 15, fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 6 }}>
                   Завершение редактирования
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>

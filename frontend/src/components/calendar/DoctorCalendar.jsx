@@ -173,7 +173,7 @@ const DoctorCalendar = ({
   const styles = {
     container: {
       backgroundColor: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
-      borderRadius: '12px',
+      borderRadius: 'var(--mac-radius-lg)',
       boxShadow: isDark ?
       '0 4px 20px rgba(0, 0, 0, 0.3)' :
       '0 4px 20px rgba(0, 0, 0, 0.08)',
@@ -188,16 +188,16 @@ const DoctorCalendar = ({
       backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'
     },
     title: {
-      fontSize: '18px',
-      fontWeight: '600',
+      fontSize: 'var(--mac-font-size-xl)',
+      fontWeight: 'var(--mac-font-weight-semibold)',
       color: isDark ? 'var(--mac-text-primary)' : 'var(--mac-text-primary)',
       display: 'flex',
       alignItems: 'center',
       gap: '10px'
     },
     navButton: {
-      padding: '8px',
-      borderRadius: '8px',
+      padding: 'var(--mac-spacing-2)',
+      borderRadius: 'var(--mac-radius-md)',
       border: 'none',
       backgroundColor: isDark ? 'color-mix(in srgb, white, transparent 92%)' : 'rgba(0,0,0,0.05)',
       color: isDark ? 'var(--mac-text-primary)' : 'var(--mac-text-primary)',
@@ -208,13 +208,13 @@ const DoctorCalendar = ({
       transition: 'all 0.2s'
     },
     todayButton: {
-      padding: '8px 16px',
-      borderRadius: '8px',
+      padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
+      borderRadius: 'var(--mac-radius-md)',
       border: 'none',
       backgroundColor: 'var(--mac-accent-blue)',
       color: 'var(--mac-bg-primary)',
-      fontSize: '13px',
-      fontWeight: '500',
+      fontSize: 'var(--mac-font-size-sm)',
+      fontWeight: 'var(--mac-font-weight-medium)',
       cursor: 'pointer',
       transition: 'all 0.2s'
     },
@@ -228,13 +228,13 @@ const DoctorCalendar = ({
       padding: '12px 8px',
       textAlign: 'center',
       backgroundColor: isDark ? 'var(--mac-bg-secondary)' : '#f5f5f7',
-      fontSize: '12px',
-      fontWeight: '600',
+      fontSize: 'var(--mac-font-size-xs)',
+      fontWeight: 'var(--mac-font-weight-semibold)',
       color: isDark ? 'var(--mac-text-secondary)' : '#6e6e73'
     },
     dayCell: {
       minHeight: compact ? '80px' : '120px',
-      padding: '8px',
+      padding: 'var(--mac-spacing-2)',
       backgroundColor: isDark ? 'var(--mac-bg-primary)' : 'var(--mac-bg-primary)',
       position: 'relative'
     },
@@ -242,9 +242,9 @@ const DoctorCalendar = ({
       backgroundColor: isDark ? 'var(--mac-accent-bg)' : 'rgba(0, 122, 255, 0.05)'
     },
     dayNumber: {
-      fontSize: '14px',
-      fontWeight: '500',
-      marginBottom: '8px',
+      fontSize: 'var(--mac-font-size-base)',
+      fontWeight: 'var(--mac-font-weight-medium)',
+      marginBottom: 'var(--mac-spacing-2)',
       color: isDark ? 'var(--mac-text-primary)' : 'var(--mac-text-primary)'
     },
     dayNumberToday: {
@@ -258,10 +258,10 @@ const DoctorCalendar = ({
       justifyContent: 'center'
     },
     slot: {
-      padding: '4px 8px',
-      marginBottom: '4px',
-      borderRadius: '6px',
-      fontSize: '11px',
+      padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+      marginBottom: 'var(--mac-spacing-1)',
+      borderRadius: 'var(--mac-radius-sm)',
+      fontSize: 'var(--mac-font-size-xs)',
       cursor: 'pointer',
       transition: 'all 0.2s'
     },
@@ -284,11 +284,11 @@ const DoctorCalendar = ({
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: '20px',
+      padding: 'var(--mac-spacing-5)',
       color: 'var(--mac-error)',
       backgroundColor: isDark ? 'rgba(255, 59, 48, 0.1)' : 'rgba(255, 59, 48, 0.05)',
       margin: '16px',
-      borderRadius: '8px'
+      borderRadius: 'var(--mac-radius-md)'
     }
   };
 
@@ -305,7 +305,7 @@ const DoctorCalendar = ({
 
     if (daySchedule.length === 0) {
       return (
-        <div style={{ fontSize: '11px', color: isDark ? '#999' : '#999', fontStyle: 'italic' }}>
+        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: isDark ? '#999' : '#999', fontStyle: 'italic' }}>
                     Нет записей
                 </div>);
 
@@ -323,9 +323,9 @@ const DoctorCalendar = ({
       onClick={() => slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)}
       onKeyDown={(event) => handleActivationKeyDown(event, () => (slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)))}>
 
-                <div style={{ fontWeight: '500' }}>{slot.time || slot.start_time}</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{slot.time || slot.start_time}</div>
                 {slot.patient_name &&
-      <div style={{ fontSize: '10px', opacity: 0.8 }}>{slot.patient_name}</div>
+      <div style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.8 }}>{slot.patient_name}</div>
       }
             </div>
     );
@@ -375,7 +375,7 @@ const DoctorCalendar = ({
                     </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
                     <button
             style={styles.navButton}
             onClick={goToPrevWeek}
@@ -415,7 +415,7 @@ const DoctorCalendar = ({
             {/* Error */}
             {error &&
       <div style={styles.error}>
-                    <AlertCircle size={16} style={{ marginRight: '8px' }} />
+                    <AlertCircle size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} />
                     {error}
                 </div>
       }
@@ -423,7 +423,7 @@ const DoctorCalendar = ({
             {/* Loading */}
             {loading ?
       <div style={styles.loading}>
-                    <RefreshCw size={24} className="spinning" style={{ marginRight: '8px' }} />
+                    <RefreshCw size={24} className="spinning" style={{ marginRight: 'var(--mac-spacing-2)' }} />
                     Загрузка расписания...
                 </div> :
 

@@ -404,7 +404,7 @@ const PaymentWidget = ({
               <Typography variant="body2" color="textSecondary">
                 Сумма к оплате:
               </Typography>
-              <Typography variant="h5" color="primary" style={{ fontWeight: 'bold' }}>
+              <Typography variant="h5" color="primary" style={{ fontWeight: 'var(--mac-font-weight-bold)' }}>
                 {formatAmount(amount, currency)}
               </Typography>
             </div>

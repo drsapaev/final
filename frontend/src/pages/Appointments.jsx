@@ -144,7 +144,8 @@ export default function Appointments() {
             />
           ) : (
             <div style={tableWrapStyle}>
-              <table style={tableStyle}>
+              <div className="admin-table-wrapper">
+<table style={tableStyle}>
               <thead>
                 <tr>
                   <th>ID</th>
@@ -165,7 +166,7 @@ export default function Appointments() {
                       {(a.end_time ? ` — ${a.end_time}` : '')}
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                         {a.status || '—'}
                         {a.status && (
                           <AppointmentFlow 
@@ -194,6 +195,7 @@ export default function Appointments() {
                 )}
               </tbody>
               </table>
+</div>
             </div>
           )}
           </CardContent>

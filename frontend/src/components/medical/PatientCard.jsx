@@ -61,13 +61,13 @@ const PatientCard = ({
             background: 'var(--mac-error-bg)',
             color: 'var(--mac-error)',
             padding: '4px 12px',
-            borderRadius: '12px',
-            fontSize: '12px',
-            fontWeight: '500',
-            marginBottom: '12px',
+            borderRadius: 'var(--mac-radius-lg)',
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            marginBottom: 'var(--mac-spacing-3)',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: 'var(--mac-spacing-2)',
             alignSelf: 'flex-start'
           }}>
             📦 Архивирован

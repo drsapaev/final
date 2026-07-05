@@ -160,8 +160,8 @@ export const Tab = ({
       disabled={disabled}
       onClick={onClick}
       style={{
-        padding: '12px 16px',
-        fontSize: '14px',
+        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+        fontSize: 'var(--mac-font-size-base)',
         fontWeight: active ? '600' : '400',
         color: active ? 'var(--mac-accent-blue)' : disabled ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
         backgroundColor: active ? 'var(--mac-accent-bg)' : 'transparent',
@@ -233,7 +233,7 @@ export const TabPanel = ({
     <div
       className={`tab-panel ${animationClasses} ${className}`}
       style={{
-        padding: '20px',
+        padding: 'var(--mac-spacing-5)',
         backgroundColor: 'var(--mac-bg-primary)'
       }}
       {...props}>
@@ -280,7 +280,7 @@ export const NavigationMenu = ({
         className={`navigation-item ${activeItem === item.id ? 'active' : ''}`}
         style={{
           padding: isHorizontal ? '12px 16px' : '8px 16px',
-          fontSize: '14px',
+          fontSize: 'var(--mac-font-size-base)',
           fontWeight: activeItem === item.id ? '600' : '400',
           color: activeItem === item.id ? 'var(--mac-accent-blue)' : item.disabled ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
           backgroundColor: activeItem === item.id ? 'var(--mac-accent-bg)' : 'transparent',
@@ -291,7 +291,7 @@ export const NavigationMenu = ({
           transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           width: '100%',
           ...(isHorizontal && activeItem === item.id ? {
             borderBottom: '2px solid var(--mac-accent-blue)'
@@ -308,17 +308,17 @@ export const NavigationMenu = ({
           }
         }}>
         
-          {item.icon && <span style={{ fontSize: '16px' }}>{item.icon}</span>}
+          {item.icon && <span style={{ fontSize: 'var(--mac-font-size-lg)' }}>{item.icon}</span>}
           <span>{item.label}</span>
           {item.badge &&
         <span
           style={{
             marginLeft: 'auto',
             padding: '2px 6px',
-            fontSize: '11px',
+            fontSize: 'var(--mac-font-size-xs)',
             backgroundColor: 'var(--mac-error)',
             color: 'var(--mac-bg-primary)',
-            borderRadius: '10px',
+            borderRadius: 'var(--mac-radius-lg)',
             minWidth: '18px',
             textAlign: 'center'
           }}>
@@ -345,8 +345,8 @@ export const Breadcrumbs = ({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        fontSize: '14px',
+        gap: 'var(--mac-spacing-2)',
+        fontSize: 'var(--mac-font-size-base)',
         color: 'var(--mac-text-secondary)'
       }}
       {...props}>
@@ -357,7 +357,7 @@ export const Breadcrumbs = ({
         <span style={{ color: 'var(--mac-text-tertiary)' }}>{separator}</span>
         }
           {index === items.length - 1 ?
-        <span style={{ color: 'var(--mac-text-primary)', fontWeight: '500' }}>
+        <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
               {item.label}
             </span> :
 
@@ -448,21 +448,21 @@ export const Pagination = ({
       {...props}>
       
       {/* Информация о странице */}
-      <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+      <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>
         Страница {currentPage} из {totalPages}
       </div>
 
       {/* Контролы пагинации */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
         {/* Предыдущая страница */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
           style={{
-            padding: '8px 12px',
-            fontSize: '14px',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-base)',
             border: '1px solid var(--mac-border)',
-            borderRadius: '6px',
+            borderRadius: 'var(--mac-radius-sm)',
             backgroundColor: currentPage === 1 ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
             color: currentPage === 1 ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
@@ -484,18 +484,18 @@ export const Pagination = ({
 
         {/* Номера страниц */}
         {showPageNumbers &&
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
             {visiblePages.map((page, index) =>
           <button
             key={index}
             onClick={() => typeof page === 'number' && onPageChange(page)}
             disabled={page === '...'}
             style={{
-              padding: '8px 12px',
-              fontSize: '14px',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+              fontSize: 'var(--mac-font-size-base)',
               fontWeight: page === currentPage ? '600' : '400',
               border: '1px solid var(--mac-border)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: page === currentPage ? 'var(--mac-accent-blue)' : page === '...' ? 'transparent' : 'var(--mac-bg-primary)',
               color: page === currentPage ? 'var(--mac-bg-primary)' : page === '...' ? 'transparent' : 'var(--mac-text-primary)',
               cursor: page === '...' ? 'default' : 'pointer',
@@ -524,10 +524,10 @@ export const Pagination = ({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           style={{
-            padding: '8px 12px',
-            fontSize: '14px',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-base)',
             border: '1px solid var(--mac-border)',
-            borderRadius: '6px',
+            borderRadius: 'var(--mac-radius-sm)',
             backgroundColor: currentPage === totalPages ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
             color: currentPage === totalPages ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
@@ -550,16 +550,16 @@ export const Pagination = ({
 
       {/* Выбор размера страницы */}
       {showPageSize &&
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Показывать:</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+          <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Показывать:</span>
           <select
           value={pageSize}
           onChange={(e) => onPageSizeChange && onPageSizeChange(Number(e.target.value))}
           style={{
-            padding: '4px 8px',
-            fontSize: '14px',
+            padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+            fontSize: 'var(--mac-font-size-base)',
             border: '1px solid var(--mac-border)',
-            borderRadius: '4px',
+            borderRadius: 'var(--mac-radius-sm)',
             backgroundColor: 'var(--mac-bg-primary)',
             color: 'var(--mac-text-primary)'
           }}>

@@ -124,7 +124,7 @@ const MedicalTable = ({
       className={`medical-table ${className}`}
       style={{
         backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
-        borderRadius: '8px',
+        borderRadius: 'var(--mac-radius-md)',
         border: `1px solid ${isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'}`,
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
@@ -132,7 +132,8 @@ const MedicalTable = ({
       {...props}
     >
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <div className="admin-table-wrapper">
+<table className="w-full">
           <thead 
             style={{
               backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
@@ -209,6 +210,7 @@ const MedicalTable = ({
             ))}
           </tbody>
         </table>
+</div>
       </div>
 
       {/* Пагинация */}

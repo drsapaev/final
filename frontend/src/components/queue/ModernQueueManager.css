@@ -45,15 +45,15 @@
 }
 
 .mqm-stat-icon.primary {
-    background: linear-gradient(135deg, var(--mac-accent-blue), #0066cc);
+    background: linear-gradient(135deg, var(--mac-accent-blue), var(--mac-accent-blue));
 }
 
 .mqm-stat-icon.warning {
-    background: linear-gradient(135deg, var(--mac-warning), #d97706);
+    background: linear-gradient(135deg, var(--mac-warning), var(--mac-warning));
 }
 
 .mqm-stat-icon.success {
-    background: linear-gradient(135deg, var(--mac-success), #059669);
+    background: linear-gradient(135deg, var(--mac-success), var(--mac-success));
 }
 
 .mqm-stat-value {
@@ -132,7 +132,7 @@
 .mqm-input:focus,
 .mqm-select:focus {
     border-color: var(--mac-accent-blue);
-    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+    box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 .mqm-input:hover,
@@ -232,7 +232,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white, transparent 92%);
 }
 
 .mqm-qr-info-row {
@@ -277,7 +277,7 @@
     max-width: 100%;
     height: auto;
     border-radius: var(--mac-radius-sm);
-    background: #ffffff;
+    background: var(--mac-bg-primary);
     padding: 16px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }

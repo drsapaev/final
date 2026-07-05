@@ -67,9 +67,9 @@
 }
 
 .emr-vitals__field--critical input {
-    border-color: #ff3b30 !important;
+    border-color: var(--mac-error) !important;
     background: rgba(255, 59, 48, 0.05);
-    color: #ff3b30;
+    color: var(--mac-error);
 }
 
 /* UNITS */
@@ -109,7 +109,7 @@
 
 .emr-vitals__warning--critical {
     color: white;
-    background: #ff3b30;
+    background: var(--mac-error);
     animation: flash 1s infinite;
 }
 

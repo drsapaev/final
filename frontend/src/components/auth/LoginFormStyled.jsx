@@ -55,8 +55,8 @@ const LoginFormStyled = () => {
     boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 92%)',
   };
   const authButtonBaseStyles = {
-    borderRadius: '10px',
-    fontWeight: '600',
+    borderRadius: 'var(--mac-radius-lg)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     letterSpacing: '0.01em',
     boxShadow: 'none',
     WebkitBackdropFilter: 'none',
@@ -344,11 +344,11 @@ const LoginFormStyled = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px'
+        padding: 'var(--mac-spacing-5)'
       }}>
         <div style={{
           background: 'white',
-          borderRadius: '12px',
+          borderRadius: 'var(--mac-radius-lg)',
           boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
           padding: '40px',
           width: '100%',
@@ -368,7 +368,7 @@ const LoginFormStyled = () => {
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 20px',
-              fontSize: '24px',
+              fontSize: 'var(--mac-font-size-3xl)',
               color: 'white',
               position: 'relative'
             }}>
@@ -381,8 +381,8 @@ const LoginFormStyled = () => {
               <span style={{ position: 'relative', zIndex: 1 }}>🔐</span>
             </div>
             <h1 style={{
-              fontSize: '24px',
-              fontWeight: 'bold',
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               color: colors.semantic.text.primary,
               margin: '0 0 8px 0'
             }}>
@@ -391,7 +391,7 @@ const LoginFormStyled = () => {
             <p style={{
               color: colors.semantic.text.secondary,
               margin: '0',
-              fontSize: '14px'
+              fontSize: 'var(--mac-font-size-base)'
             }}>
               Подтвердите вход с помощью кода
             </p>
@@ -402,11 +402,11 @@ const LoginFormStyled = () => {
               Раньше это были 3 обычные <button> без role/aria-selected/aria-controls.
               Теперь screen reader правильно объявляет это как таб-лист с 3 табами.
               Keyboard navigation: ArrowLeft/Right, Home, End. */}
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
             <div
               role="tablist"
               aria-label="Методы двухфакторной аутентификации"
-              style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}
+              style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-4)' }}
             >
               {twoFactorTabs.map((tab, index) => {
                 const isActive = twoFactorMethod === tab.id;
@@ -423,12 +423,12 @@ const LoginFormStyled = () => {
                     onKeyDown={(e) => handle2FATabKeyDown(e, index)}
                     style={{
                       flex: 1,
-                      padding: '8px 12px',
+                      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                       background: isActive ? colors.primary[500] : 'transparent',
                       color: isActive ? 'white' : colors.semantic.text.secondary,
                       border: '1px solid var(--mac-border)',
-                      borderRadius: '6px',
-                      fontSize: '12px',
+                      borderRadius: 'var(--mac-radius-sm)',
+                      fontSize: 'var(--mac-font-size-xs)',
                       cursor: 'pointer',
                       font: 'inherit',
                       outline: isActive ? `2px solid ${colors.primary[500]}` : 'none',
@@ -475,7 +475,7 @@ const LoginFormStyled = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '20px',
+          padding: 'var(--mac-spacing-5)',
           position: 'relative'
         }}
       >
@@ -504,7 +504,7 @@ const LoginFormStyled = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: 'var(--mac-spacing-5)',
         position: 'relative'
       }}
     >
@@ -538,8 +538,8 @@ const LoginFormStyled = () => {
             textAlign: 'center'
           }}>
             <span style={{
-              fontSize: '24px',
-              fontWeight: '600',
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               // UX Audit Stage 2 (Login issue 3.3): --mac-text-primary вместо #1d1d1f
               color: 'var(--mac-text-primary, #1d1d1f)',
               letterSpacing: '-0.5px'
@@ -549,8 +549,8 @@ const LoginFormStyled = () => {
               <span aria-hidden="true">🔐</span>{' '}Вход в систему
             </span>
             <span style={{
-              fontSize: '14px',
-              fontWeight: '400',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-normal)',
               // UX Audit Stage 2 (Login issue 3.3): --mac-text-secondary вместо #86868b
               color: 'var(--mac-text-secondary, #86868b)',
               letterSpacing: '0.1px'
@@ -567,7 +567,7 @@ const LoginFormStyled = () => {
                 поле username. Backend сам определяет тип по формату ввода.
                 Теперь — единое поле «Логин» с подсказкой. */}
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 500 }}>
+              <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                 Логин *
               </label>
               <Input
@@ -582,7 +582,7 @@ const LoginFormStyled = () => {
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 500 }}>Пароль *</label>
+              <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 'var(--mac-font-weight-medium)' }}>Пароль *</label>
               <div style={{ position: 'relative' }}>
                 <Input
                   type={showPassword ? 'text' : 'password'}
@@ -620,7 +620,7 @@ const LoginFormStyled = () => {
                     marginTop: 6,
                     padding: '6px 10px',
                     fontSize: 12,
-                    fontWeight: 600,
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     color: 'var(--mac-warning-active, var(--mac-warning))',
                     background: 'rgba(245, 158, 11, 0.12)',
                     border: '1px solid rgba(245, 158, 11, 0.3)',

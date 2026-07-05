@@ -31,7 +31,7 @@
 }
 
 .chat-window.dragging {
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 40px color-mix(in srgb, black, transparent 70%);
   opacity: 0.9;
 }
 
@@ -124,7 +124,7 @@
 }
 
 .chat-status-indicator.offline {
-  background-color: #FF3B30;
+  background-color: var(--mac-error);
 }
 
 .chat-status-indicator.connecting {
@@ -183,7 +183,7 @@
 
 .user-search-input:focus {
   border-color: var(--mac-accent-blue);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 /* Conversations */
@@ -395,7 +395,7 @@
 
 .message-input-container textarea:focus {
   border-color: var(--mac-accent-blue);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 .voice-btn,
@@ -464,12 +464,12 @@
 }
 
 .message.sent .play-button {
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, white, transparent 80%);
   color: white;
 }
 
 .message.sent .play-button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, white, transparent 70%);
 }
 
 .message.received .play-button {
@@ -504,11 +504,11 @@
 }
 
 .message.sent .wave-bar {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: color-mix(in srgb, white, transparent 70%);
 }
 
 .message.sent .wave-bar.filled {
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: color-mix(in srgb, white, transparent 10%);
 }
 
 .message.received .wave-bar {
@@ -683,7 +683,7 @@
 .pulse-dot {
   width: 8px;
   height: 8px;
-  background-color: #FF3B30;
+  background-color: var(--mac-error);
   border-radius: 50%;
   animation: recordPulse 1.5s ease-in-out infinite;
 }
@@ -705,7 +705,7 @@
 .recording-time {
   font-size: var(--mac-font-size-sm);
   font-weight: 600;
-  color: #FF3B30;
+  color: var(--mac-error);
   font-variant-numeric: tabular-nums;
 }
 
@@ -714,7 +714,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background-color: #FF3B30;
+  background-color: var(--mac-error);
   color: white;
   border: none;
   border-radius: var(--mac-radius-sm);
@@ -751,7 +751,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: #FF3B30;
+  background-color: var(--mac-error);
   color: white;
   border: none;
   display: flex;
@@ -971,7 +971,7 @@
 
 .input-wrapper textarea:focus {
   border-color: var(--mac-accent-blue);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 .char-counter {
@@ -1011,7 +1011,7 @@
   background-color: #34C759;
   border: 2px solid var(--mac-bg-primary);
   border-radius: 50%;
-  box-shadow: 0 0 0 1px rgba(52, 199, 89, 0.2);
+  box-shadow: 0 0 0 1px var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 80%));
 }
 
 /* Online dot in chat header next to user name */
@@ -1139,7 +1139,7 @@
 }
 
 .reaction-bubble.active {
-  background: rgba(0, 122, 255, 0.1);
+  background: var(--mac-accent-bg);
   border-color: var(--mac-accent-blue);
   color: var(--mac-accent-blue);
 }
@@ -1160,7 +1160,7 @@
   justify-content: center;
   cursor: pointer;
   color: var(--mac-text-secondary);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px color-mix(in srgb, black, transparent 90%);
 }
 
 .message:hover .add-reaction-btn {

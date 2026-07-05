@@ -244,120 +244,120 @@ export default function PatientPickupView() {
     container: {
       minHeight: '100vh',
       background: 'var(--mac-gradient-window, linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%))',
-      padding: '24px',
+      padding: 'var(--mac-spacing-6)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
     },
     header: {
       display: 'flex',
       alignItems: 'center',
-      gap: '16px',
-      marginBottom: '24px'
+      gap: 'var(--mac-spacing-4)',
+      marginBottom: 'var(--mac-spacing-6)'
     },
     backButton: {
       background: 'var(--mac-bg-secondary, white)',
       border: '1px solid var(--mac-border, #e2e8f0)',
-      borderRadius: '8px',
-      padding: '8px 16px',
+      borderRadius: 'var(--mac-radius-md)',
+      padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
       cursor: 'pointer',
-      fontSize: '14px',
+      fontSize: 'var(--mac-font-size-base)',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: 'var(--mac-spacing-2)'
     },
     title: {
-      fontSize: '24px',
-      fontWeight: '600',
+      fontSize: 'var(--mac-font-size-3xl)',
+      fontWeight: 'var(--mac-font-weight-semibold)',
       color: 'var(--mac-text-primary, #1e293b)',
       margin: 0
     },
     card: {
       background: 'var(--mac-bg-primary, white)',
-      borderRadius: '16px',
+      borderRadius: 'var(--mac-radius-xl)',
       boxShadow: 'var(--mac-shadow-md)',
-      padding: '24px',
-      marginBottom: '24px'
+      padding: 'var(--mac-spacing-6)',
+      marginBottom: 'var(--mac-spacing-6)'
     },
     patientInfo: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '16px'
+      gap: 'var(--mac-spacing-4)'
     },
     infoItem: {
       display: 'flex',
       flexDirection: 'column',
-      gap: '4px'
+      gap: 'var(--mac-spacing-1)'
     },
     infoLabel: {
-      fontSize: '12px',
+      fontSize: 'var(--mac-font-size-xs)',
       color: 'var(--mac-text-tertiary, #64748b)',
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
     },
     infoValue: {
-      fontSize: '16px',
-      fontWeight: '500',
+      fontSize: 'var(--mac-font-size-lg)',
+      fontWeight: 'var(--mac-font-weight-medium)',
       color: 'var(--mac-text-primary, #1e293b)'
     },
     sectionTitle: {
-      fontSize: '18px',
-      fontWeight: '600',
+      fontSize: 'var(--mac-font-size-xl)',
+      fontWeight: 'var(--mac-font-weight-semibold)',
       color: 'var(--mac-text-primary, #1e293b)',
-      marginBottom: '16px',
+      marginBottom: 'var(--mac-spacing-4)',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: 'var(--mac-spacing-2)'
     },
     labList: {
       display: 'flex',
       flexDirection: 'column',
-      gap: '12px'
+      gap: 'var(--mac-spacing-3)'
     },
     labItem: {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       background: 'var(--mac-bg-secondary, #f8fafc)',
-      borderRadius: '12px',
+      borderRadius: 'var(--mac-radius-lg)',
       border: '1px solid var(--mac-border, #e2e8f0)'
     },
     labInfo: {
       flex: 1
     },
     labName: {
-      fontSize: '15px',
-      fontWeight: '500',
+      fontSize: 'var(--mac-font-size-lg)',
+      fontWeight: 'var(--mac-font-weight-medium)',
       color: 'var(--mac-text-primary, #1e293b)',
-      marginBottom: '4px'
+      marginBottom: 'var(--mac-spacing-1)'
     },
     labDate: {
-      fontSize: '13px',
+      fontSize: 'var(--mac-font-size-sm)',
       color: 'var(--mac-text-secondary, #64748b)'
     },
     statusBadge: {
       display: 'inline-flex',
       alignItems: 'center',
-      gap: '6px',
-      padding: '6px 12px',
-      borderRadius: '20px',
-      fontSize: '13px',
-      fontWeight: '500'
+      gap: 'var(--mac-spacing-2)',
+      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+      borderRadius: 'var(--mac-radius-xl)',
+      fontSize: 'var(--mac-font-size-sm)',
+      fontWeight: 'var(--mac-font-weight-medium)'
     },
     actions: {
       display: 'flex',
-      gap: '8px',
-      marginLeft: '16px'
+      gap: 'var(--mac-spacing-2)',
+      marginLeft: 'var(--mac-spacing-4)'
     },
     actionButton: {
       background: 'var(--mac-bg-primary, white)',
       border: '1px solid var(--mac-border, #e2e8f0)',
-      borderRadius: '8px',
-      padding: '8px 12px',
+      borderRadius: 'var(--mac-radius-md)',
+      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
       cursor: 'pointer',
-      fontSize: '13px',
+      fontSize: 'var(--mac-font-size-sm)',
       display: 'flex',
       alignItems: 'center',
-      gap: '6px',
+      gap: 'var(--mac-spacing-2)',
       transition: 'all 0.2s ease'
     },
     loading: {
@@ -563,7 +563,7 @@ export default function PatientPickupView() {
                             <table style={{
             width: '100%',
             borderCollapse: 'collapse',
-            fontSize: '14px'
+            fontSize: 'var(--mac-font-size-base)'
           }}>
                                 <caption style={styles.visuallyHidden}>История визитов пациента</caption>
                                 <thead>
@@ -571,11 +571,11 @@ export default function PatientPickupView() {
                 background: 'var(--mac-bg-tertiary, #f1f5f9)',
                 borderBottom: '2px solid var(--mac-separator, #e2e8f0)'
               }}>
-                                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--mac-text-secondary)' }}>Дата</th>
-                                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--mac-text-secondary)' }}>№ Визита</th>
-                                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--mac-text-secondary)' }}>Услуги</th>
-                                        <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--mac-text-secondary)' }}>Сумма</th>
-                                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: 'var(--mac-text-secondary)' }}>Статус</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Дата</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>№ Визита</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Услуги</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'right', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Сумма</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Статус</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -597,30 +597,30 @@ export default function PatientPickupView() {
                     borderBottom: '1px solid var(--mac-separator, #e2e8f0)',
                     background: idx % 2 === 0 ? 'transparent' : 'var(--mac-bg-secondary, #fafafa)'
                   }}>
-                                                <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                                                <td style={{ padding: 'var(--mac-spacing-3)', whiteSpace: 'nowrap' }}>
                                                     {formatDate(visit.visit_date || visit.created_at)}
-                                                    {visit.visit_time && <span style={{ color: 'var(--mac-text-tertiary)', marginLeft: '8px' }}>{visit.visit_time}</span>}
+                                                    {visit.visit_time && <span style={{ color: 'var(--mac-text-tertiary)', marginLeft: 'var(--mac-spacing-2)' }}>{visit.visit_time}</span>}
                                                 </td>
-                                                <td style={{ padding: '12px', fontWeight: '500' }}>
+                                                <td style={{ padding: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                                                     #{visit.id}
                                                 </td>
-                                                <td style={{ padding: '12px', maxWidth: '300px' }}>
+                                                <td style={{ padding: 'var(--mac-spacing-3)', maxWidth: '300px' }}>
                                                     {servicesText}
                                                 </td>
-                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                                                <td style={{ padding: 'var(--mac-spacing-3)', textAlign: 'right', fontWeight: 'var(--mac-font-weight-semibold)', whiteSpace: 'nowrap' }}>
                                                     {totalAmount > 0 ? `${totalAmount.toLocaleString('ru-RU')} сум` : '—'}
                                                 </td>
-                                                <td style={{ padding: '12px', textAlign: 'center' }}>
+                                                <td style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center' }}>
                                                     <span
                                                       aria-label={`Статус визита: ${visitStatus.label}`}
                                                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px',
+                        gap: 'var(--mac-spacing-1)',
                         padding: '4px 10px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: '500',
+                        borderRadius: 'var(--mac-radius-lg)',
+                        fontSize: 'var(--mac-font-size-xs)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
                         background: visitStatus.bg,
                         color: visitStatus.color
                       }}>

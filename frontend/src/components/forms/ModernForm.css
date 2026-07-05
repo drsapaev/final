@@ -67,7 +67,7 @@
 }
 
 .form-message.error {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--mac-error-bg);
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
@@ -83,7 +83,7 @@
   justify-content: center;
   gap: 8px;
   padding: 16px;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   font-size: 14px;
   font-weight: 500;
 }
@@ -98,13 +98,13 @@
   flex-direction: column;
   gap: 16px;
   padding: 20px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid color-mix(in srgb, black, transparent 90%);
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.02);
 }
 
 .dark .form-group {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: color-mix(in srgb, white, transparent 90%);
   background: rgba(255, 255, 255, 0.02);
 }
 

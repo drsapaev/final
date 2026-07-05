@@ -136,7 +136,7 @@ const ResponsiveModal = ({
             style={{
               margin: 0,
               fontSize: isMobile ? '18px' : '20px',
-              fontWeight: '600'
+              fontWeight: 'var(--mac-font-weight-semibold)'
             }}>
             
               {title}
@@ -150,7 +150,7 @@ const ResponsiveModal = ({
             aria-label={typeof title === 'string' ? `Закрыть: ${title}` : 'Закрыть модальное окно'}
             style={{
               minWidth: 'auto',
-              padding: '8px',
+              padding: 'var(--mac-spacing-2)',
               color: 'white',
               border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
@@ -175,7 +175,7 @@ const ResponsiveModal = ({
         {isMobile &&
         <div
           style={{
-            padding: '16px',
+            padding: 'var(--mac-spacing-4)',
             borderTop: '1px solid var(--mac-border)',
             background: 'var(--mac-bg-secondary)'
           }}>

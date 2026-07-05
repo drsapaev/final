@@ -37,7 +37,7 @@ export default function NotificationBell({ unreadCount = 0, onClick }) {
             color: 'white',
             fontSize: 11,
             lineHeight: '18px',
-            fontWeight: 700,
+            fontWeight: 'var(--mac-font-weight-bold)',
             textAlign: 'center'
           }}
         >

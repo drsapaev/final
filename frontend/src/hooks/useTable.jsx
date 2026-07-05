@@ -210,10 +210,10 @@ export const TableHeader = ({
           key={column.key}
           className="table-header-cell"
           style={{
-            padding: '12px 16px',
+            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
             textAlign: column.align || 'left',
-            fontSize: '14px',
-            fontWeight: '600',
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             backgroundColor: 'var(--mac-bg-secondary)',
             borderBottom: '1px solid var(--mac-border)',
@@ -233,10 +233,10 @@ export const TableHeader = ({
             }
           }}>
           
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
               {column.title || column.key}
               {sortable && column.sortable !== false && sortConfig && sortConfig.key === column.key &&
-            <span style={{ fontSize: '12px' }}>
+            <span style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                   {sortConfig.direction === 'asc' ? '↑' : '↓'}
                 </span>
             }
@@ -308,7 +308,7 @@ export const TableRow = ({
       
       {/* Чекбокс для выбора */}
       {selectable &&
-      <td style={{ padding: '12px 16px', width: '40px' }}>
+      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', width: '40px' }}>
           <input
           type="checkbox"
           aria-label={selected ? 'Deselect table row' : 'Select table row'}
@@ -325,18 +325,18 @@ export const TableRow = ({
 
       {/* Стрелка для разворачивания */}
       {expandable &&
-        <td style={{ padding: '12px 16px', width: '40px' }}>
+        <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', width: '40px' }}>
           <button
           aria-label={expanded ? 'Collapse table row' : 'Expand table row'}
           onClick={handleExpand}
           style={{
             background: 'none',
             border: 'none',
-            fontSize: '16px',
+            fontSize: 'var(--mac-font-size-lg)',
             cursor: 'pointer',
             color: 'var(--mac-text-secondary)',
-            padding: '4px',
-            borderRadius: '4px',
+            padding: 'var(--mac-spacing-1)',
+            borderRadius: 'var(--mac-radius-sm)',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
@@ -361,9 +361,9 @@ export const TableRow = ({
         key={column.key}
         className="table-cell"
         style={{
-          padding: '12px 16px',
+          padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
           textAlign: column.align || 'left',
-          fontSize: '14px',
+          fontSize: 'var(--mac-font-size-base)',
           color: 'var(--mac-text-primary)',
           borderBottom: '1px solid var(--mac-border)'
         }}>
@@ -442,21 +442,21 @@ export const TablePagination = ({
       {...props}>
       
       {/* Информация о странице */}
-      <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+      <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>
         Показано {startItem}-{endItem} из {totalItems} записей
       </div>
 
       {/* Контролы пагинации */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
         {/* Предыдущая страница */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
           style={{
-            padding: '8px 12px',
-            fontSize: '14px',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-base)',
             border: '1px solid var(--mac-border)',
-            borderRadius: '6px',
+            borderRadius: 'var(--mac-radius-sm)',
             backgroundColor: currentPage === 1 ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
             color: currentPage === 1 ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
@@ -477,7 +477,7 @@ export const TablePagination = ({
         </button>
 
         {/* Номера страниц */}
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
             const pageNumber = Math.max(1, Math.min(totalPages, currentPage - 2 + i));
             return (
@@ -485,11 +485,11 @@ export const TablePagination = ({
                 key={pageNumber}
                 onClick={() => onPageChange(pageNumber)}
                 style={{
-                  padding: '8px 12px',
-                  fontSize: '14px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                  fontSize: 'var(--mac-font-size-base)',
                   fontWeight: pageNumber === currentPage ? '600' : '400',
                   border: '1px solid var(--mac-border)',
-                  borderRadius: '6px',
+                  borderRadius: 'var(--mac-radius-sm)',
                   backgroundColor: pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)',
                   color: pageNumber === currentPage ? 'var(--mac-bg-primary)' : 'var(--mac-text-primary)',
                   cursor: 'pointer',
@@ -518,10 +518,10 @@ export const TablePagination = ({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           style={{
-            padding: '8px 12px',
-            fontSize: '14px',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-base)',
             border: '1px solid var(--mac-border)',
-            borderRadius: '6px',
+            borderRadius: 'var(--mac-radius-sm)',
             backgroundColor: currentPage === totalPages ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
             color: currentPage === totalPages ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
@@ -564,11 +564,11 @@ export const TableSearch = ({
         borderBottom: '1px solid var(--mac-border)',
         display: 'flex',
         alignItems: 'center',
-        gap: '12px'
+        gap: 'var(--mac-spacing-3)'
       }}
       {...props}>
       
-      <div style={{ fontSize: '16px', color: 'var(--mac-text-secondary)' }}>🔍</div>
+      <div style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)' }}>🔍</div>
       <input
         type="text"
         aria-label={placeholder || 'Table search'}
@@ -577,10 +577,10 @@ export const TableSearch = ({
         placeholder={placeholder}
         style={{
           flex: 1,
-          padding: '8px 12px',
-          fontSize: '14px',
+          padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+          fontSize: 'var(--mac-font-size-base)',
           border: '1px solid var(--mac-border)',
-          borderRadius: '6px',
+          borderRadius: 'var(--mac-radius-sm)',
           backgroundColor: 'var(--mac-bg-primary)',
           color: 'var(--mac-text-primary)',
           outline: 'none',
@@ -652,7 +652,7 @@ export const Table = ({
       style={{
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)',
-        borderRadius: '8px',
+        borderRadius: 'var(--mac-radius-md)',
         overflow: 'hidden',
         ...style
       }}
@@ -669,7 +669,8 @@ export const Table = ({
 
       {/* Таблица */}
       <div style={{ overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="admin-table-wrapper">
+<table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <TableHeader
             columns={columns}
             sortConfig={sortConfig}
@@ -689,6 +690,7 @@ export const Table = ({
             onRowClick={onRowClick} />
           
         </table>
+</div>
       </div>
 
       {/* Пагинация */}
@@ -710,7 +712,7 @@ export const Table = ({
           padding: '40px',
           textAlign: 'center',
           color: 'var(--mac-text-secondary)',
-          fontSize: '14px'
+          fontSize: 'var(--mac-font-size-base)'
         }}>
         
           Загрузка данных...
@@ -723,7 +725,7 @@ export const Table = ({
           padding: '40px',
           textAlign: 'center',
           color: 'var(--mac-error)',
-          fontSize: '14px'
+          fontSize: 'var(--mac-font-size-base)'
         }}>
         
           Ошибка загрузки данных: {error}
@@ -736,7 +738,7 @@ export const Table = ({
           padding: '40px',
           textAlign: 'center',
           color: 'var(--mac-text-secondary)',
-          fontSize: '14px'
+          fontSize: 'var(--mac-font-size-base)'
         }}>
         
           {emptyMessage}

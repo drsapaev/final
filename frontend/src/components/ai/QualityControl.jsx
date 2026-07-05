@@ -230,20 +230,20 @@ const QualityControl = () => {
   };
 
   const renderQualityAnalysis = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-info-bg)',
       border: '1px solid var(--mac-info-border)'
     }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-3)' }}>
           <h4 style={{
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-info)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <FileCheck style={{ width: '16px', height: '16px' }} />
             Медицинские записи для анализа
@@ -251,15 +251,15 @@ const QualityControl = () => {
           <Button
           onClick={addMedicalRecord}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить запись
           </Button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', maxHeight: '160px', overflowY: 'auto' }}>
           {medicalRecords.map((record, index) =>
-        <div key={record.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div key={record.id} style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
               <Select
             value={record.type}
             onChange={(e) => {
@@ -303,7 +303,7 @@ const QualityControl = () => {
             aria-label={`Remove medical record ${index + 1}`}
             onClick={() => removeMedicalRecord(index)}
             variant="outline"
-            style={{ padding: '4px', minWidth: 'auto' }}>
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
             
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </Button>
@@ -313,7 +313,7 @@ const QualityControl = () => {
       </MacOSCard>
 
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-success-bg)',
       border: '1px solid var(--mac-success-border)'
     }}>
@@ -323,7 +323,7 @@ const QualityControl = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <ClipboardCheck style={{ width: '16px', height: '16px' }} />
           Стандарты качества
@@ -331,7 +331,7 @@ const QualityControl = () => {
         <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
+        gap: 'var(--mac-spacing-4)'
       }}>
           <div>
             <label style={{
@@ -339,7 +339,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Порог полноты (%)
             </label>
@@ -356,7 +356,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Своевременность (часы)
             </label>
@@ -367,7 +367,7 @@ const QualityControl = () => {
             style={{ width: '100%' }} />
           
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <Checkbox
             id="required_signatures"
             checked={qualityStandards.required_signatures}
@@ -381,7 +381,7 @@ const QualityControl = () => {
               Обязательные подписи
             </label>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <Checkbox
             id="icd_coding_required"
             checked={qualityStandards.icd_coding_required}
@@ -401,9 +401,9 @@ const QualityControl = () => {
 
 
   const renderGapsDetection = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-warning-bg)',
       border: '1px solid var(--mac-warning-border)'
     }}>
@@ -413,7 +413,7 @@ const QualityControl = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <Activity style={{ width: '16px', height: '16px' }} />
           Медицинская запись пациента
@@ -421,7 +421,7 @@ const QualityControl = () => {
         <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
+        gap: 'var(--mac-spacing-4)'
       }}>
           <div>
             <label style={{
@@ -429,7 +429,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               ID пациента
             </label>
@@ -446,7 +446,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               ФИО пациента
             </label>
@@ -463,7 +463,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Диагноз
             </label>
@@ -480,7 +480,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Симптомы
             </label>
@@ -495,18 +495,18 @@ const QualityControl = () => {
       </MacOSCard>
 
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-accent-bg)',
       border: '1px solid var(--mac-accent-border)'
     }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-3)' }}>
           <h4 style={{
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-accent)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Search style={{ width: '16px', height: '16px' }} />
             Обязательные поля для проверки
@@ -514,15 +514,15 @@ const QualityControl = () => {
           <Button
           onClick={addRequiredField}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить поле
           </Button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)', maxHeight: '128px', overflowY: 'auto' }}>
           {requiredFields.map((field, index) =>
-        <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div key={index} style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
               <Input
             type="text"
             value={field}
@@ -540,7 +540,7 @@ const QualityControl = () => {
             aria-label={`Remove required field ${index + 1}`}
             onClick={() => removeRequiredField(index)}
             variant="outline"
-            style={{ padding: '4px', minWidth: 'auto' }}>
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
             
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </Button>
@@ -552,9 +552,9 @@ const QualityControl = () => {
 
 
   const renderImprovements = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-accent-bg)',
       border: '1px solid var(--mac-accent-border)'
     }}>
@@ -564,7 +564,7 @@ const QualityControl = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <TrendingUp style={{ width: '16px', height: '16px' }} />
           Анализ текущего состояния
@@ -572,7 +572,7 @@ const QualityControl = () => {
         <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
+        gap: 'var(--mac-spacing-4)'
       }}>
           <div>
             <label style={{
@@ -580,7 +580,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Оценка полноты (%)
             </label>
@@ -597,7 +597,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Отсутствующие поля
             </label>
@@ -613,7 +613,7 @@ const QualityControl = () => {
       </MacOSCard>
 
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-success-bg)',
       border: '1px solid var(--mac-success-border)'
     }}>
@@ -623,7 +623,7 @@ const QualityControl = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <Target style={{ width: '16px', height: '16px' }} />
           Лучшие практики
@@ -631,7 +631,7 @@ const QualityControl = () => {
         <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
+        gap: 'var(--mac-spacing-4)'
       }}>
           <div>
             <label style={{
@@ -639,7 +639,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Стандарт документации
             </label>
@@ -656,7 +656,7 @@ const QualityControl = () => {
             style={{ width: '100%' }} />
           
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <Checkbox
             id="template_usage"
             checked={bestPractices.template_usage}
@@ -670,7 +670,7 @@ const QualityControl = () => {
               Использование шаблонов
             </label>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <Checkbox
             id="real_time_documentation"
             checked={bestPractices.real_time_documentation}
@@ -690,9 +690,9 @@ const QualityControl = () => {
 
 
   const renderConsistency = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)'
     }}>
@@ -702,19 +702,19 @@ const QualityControl = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <Target style={{ width: '16px', height: '16px' }} />
           Клинические данные
         </h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
           <div>
             <label style={{
             display: 'block',
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Диагноз
             </label>
@@ -727,7 +727,7 @@ const QualityControl = () => {
           </div>
           
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-2)' }}>
               <label style={{
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
@@ -739,15 +739,15 @@ const QualityControl = () => {
               <Button
               onClick={addSymptom}
               variant="outline"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', padding: 'var(--mac-spacing-1) var(--mac-spacing-2)' }}>
               
                 <Plus style={{ width: '12px', height: '12px' }} />
                 Добавить
               </Button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '96px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)', maxHeight: '96px', overflowY: 'auto' }}>
               {symptoms.map((symptom, index) =>
-            <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div key={index} style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
                   <Input
                 type="text"
                 value={symptom}
@@ -765,7 +765,7 @@ const QualityControl = () => {
                 aria-label={`Remove symptom ${index + 1}`}
                 onClick={() => removeSymptom(index)}
                 variant="outline"
-                style={{ padding: '4px', minWidth: 'auto' }}>
+                style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
                 
                     <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
                   </Button>
@@ -780,7 +780,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Лечение (JSON)
             </label>
@@ -807,20 +807,20 @@ const QualityControl = () => {
 
 
   const renderPrescriptionSafety = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-warning-bg)',
       border: '1px solid var(--mac-warning-border)'
     }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-3)' }}>
           <h4 style={{
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-warning)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Shield style={{ width: '16px', height: '16px' }} />
             Назначения для проверки
@@ -828,15 +828,15 @@ const QualityControl = () => {
           <Button
           onClick={addPrescription}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить назначение
           </Button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', maxHeight: '160px', overflowY: 'auto' }}>
           {prescriptions.map((prescription, index) =>
-        <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div key={index} style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
               <Input
             type="text"
             value={prescription.medication}
@@ -876,7 +876,7 @@ const QualityControl = () => {
             aria-label={`Remove prescription ${index + 1}`}
             onClick={() => removePrescription(index)}
             variant="outline"
-            style={{ padding: '4px', minWidth: 'auto' }}>
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
             
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </Button>
@@ -886,7 +886,7 @@ const QualityControl = () => {
       </MacOSCard>
 
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-info-bg)',
       border: '1px solid var(--mac-info-border)'
     }}>
@@ -896,7 +896,7 @@ const QualityControl = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <Activity style={{ width: '16px', height: '16px' }} />
           Профиль пациента
@@ -904,7 +904,7 @@ const QualityControl = () => {
         <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
+        gap: 'var(--mac-spacing-4)'
       }}>
           <div>
             <label style={{
@@ -912,7 +912,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Возраст
             </label>
@@ -929,7 +929,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Пол
             </label>
@@ -950,7 +950,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Вес (кг)
             </label>
@@ -967,7 +967,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Аллергии
             </label>
@@ -985,7 +985,7 @@ const QualityControl = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Сопутствующие заболевания
             </label>
@@ -1008,11 +1008,11 @@ const QualityControl = () => {
     if (result.error) {
       return (
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-error-bg)',
           border: '1px solid var(--mac-error-border)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <XCircle style={{ width: '20px', height: '20px', color: 'var(--mac-danger)' }} />
             <h3 style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -1024,7 +1024,7 @@ const QualityControl = () => {
             </h3>
           </div>
           <p style={{
-            marginTop: '8px',
+            marginTop: 'var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-danger)',
             margin: '8px 0 0 0'
@@ -1036,8 +1036,8 @@ const QualityControl = () => {
     }
 
     return (
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
@@ -1045,16 +1045,16 @@ const QualityControl = () => {
             margin: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа качества
           </h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
             <Button
               onClick={() => copyToClipboard(JSON.stringify(result, null, 2))}
               variant="outline"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
               
               <Copy style={{ width: '16px', height: '16px' }} />
               Копировать
@@ -1062,7 +1062,7 @@ const QualityControl = () => {
             <Button
               onClick={exportResult}
               variant="outline"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
               
               <Download style={{ width: '16px', height: '16px' }} />
               Экспорт
@@ -1070,7 +1070,7 @@ const QualityControl = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
           {Object.entries(result).map(([key, value]) =>
           <div key={key} style={{
             borderLeft: '4px solid var(--mac-accent)',
@@ -1090,7 +1090,7 @@ const QualityControl = () => {
               <pre style={{
                 whiteSpace: 'pre-wrap',
                 backgroundColor: 'var(--mac-bg-secondary)',
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 overflowX: 'auto',
@@ -1113,16 +1113,16 @@ const QualityControl = () => {
 
   return (
     <div style={{
-      padding: '24px',
+      padding: 'var(--mac-spacing-6)',
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         {/* Заголовок */}
         <div style={{
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           <h2 style={{
             fontSize: 'var(--mac-font-size-2xl)',
@@ -1131,7 +1131,7 @@ const QualityControl = () => {
             margin: '0 0 8px 0',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: 'var(--mac-spacing-3)'
           }}>
             <ClipboardCheck style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             AI Контроль Качества Медицинских Записей
@@ -1148,7 +1148,7 @@ const QualityControl = () => {
         {/* Вкладки */}
         <div style={{
           display: 'flex',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -1165,7 +1165,7 @@ const QualityControl = () => {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
                   fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                   fontSize: 'var(--mac-font-size-sm)',
@@ -1209,14 +1209,14 @@ const QualityControl = () => {
         {/* Разделительная линия */}
         <div style={{
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }} />
 
         {/* Контент */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px'
+          gap: 'var(--mac-spacing-6)'
         }}>
           <div>
             <h3 style={{
@@ -1234,14 +1234,14 @@ const QualityControl = () => {
             {activeTab === 'consistency' && renderConsistency()}
             {activeTab === 'prescription-safety' && renderPrescriptionSafety()}
             
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ marginTop: 'var(--mac-spacing-6)', display: 'flex', justifyContent: 'center' }}>
               <Button
                 type="button"
                 title={loading ? 'Running quality control AI analysis' : 'Run quality control AI analysis'}
                 aria-label={loading ? 'Running quality control AI analysis' : 'Run quality control AI analysis'}
                 onClick={handleSubmit}
                 disabled={loading}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                 
                 {loading ?
                 <>
@@ -1275,12 +1275,12 @@ const QualityControl = () => {
             
             {error &&
             <MacOSCard style={{
-              padding: '16px',
+              padding: 'var(--mac-spacing-4)',
               backgroundColor: 'var(--mac-error-bg)',
               border: '1px solid var(--mac-error-border)',
-              marginTop: '16px'
+              marginTop: 'var(--mac-spacing-4)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                   <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-danger)' }} />
                   <h3 style={{
                   fontSize: 'var(--mac-font-size-sm)',
@@ -1292,7 +1292,7 @@ const QualityControl = () => {
                   </h3>
                 </div>
                 <p style={{
-                marginTop: '8px',
+                marginTop: 'var(--mac-spacing-2)',
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-danger)',
                 margin: '8px 0 0 0'

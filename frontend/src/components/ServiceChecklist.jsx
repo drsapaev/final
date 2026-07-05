@@ -39,16 +39,16 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
   const totalCost = depServices.filter(s => value.includes(s.id)).reduce((sum, s) => sum + s.price, 0);
 
   return (
-    <div style={{ border: '1px solid #e5e5e5', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <span style={{ fontWeight: 600 }}>Услуги</span>
-        <span style={{ fontSize: '14px', color: '#28a745', fontWeight: 600 }}>{totalCost.toLocaleString()} UZS</span>
+    <div style={{ border: '1px solid #e5e5e5', borderRadius: 'var(--mac-radius-md)', padding: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-3)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mac-spacing-2)' }}>
+        <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Услуги</span>
+        <span style={{ fontSize: 'var(--mac-font-size-base)', color: '#28a745', fontWeight: 'var(--mac-font-weight-semibold)' }}>{totalCost.toLocaleString()} UZS</span>
       </div>
       {groups.map(group => (
-        <div key={group} style={{ marginBottom: '8px' }}>
-          <div style={{ fontWeight: 500, fontSize: '12px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>{group}</div>
+        <div key={group} style={{ marginBottom: 'var(--mac-spacing-2)' }}>
+          <div style={{ fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>{group}</div>
           {depServices.filter(s => s.group === group).map(service => (
-            <label key={service.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <label key={service.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-1)' }}>
               <input
                 type="checkbox"
                 aria-label={`Выбрать услугу: ${service.name}`}
@@ -60,8 +60,8 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
                   onChange(newValue);
                 }}
               />
-              <span style={{ fontSize: '12px', flex: 1 }}>{service.name}</span>
-              <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{service.price.toLocaleString()} UZS</span>
+              <span style={{ fontSize: 'var(--mac-font-size-xs)', flex: 1 }}>{service.name}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>{service.price.toLocaleString()} UZS</span>
             </label>
           ))}
         </div>

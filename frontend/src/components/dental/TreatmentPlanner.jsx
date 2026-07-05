@@ -94,7 +94,7 @@ const styles = {
     margin: 0,
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-xl)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   actions: {
     display: 'flex',
@@ -129,7 +129,7 @@ const styles = {
     display: 'block',
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-3xl)',
-    fontWeight: 700,
+    fontWeight: 'var(--mac-font-weight-bold)',
     lineHeight: 1.1,
   },
   metricLabel: {
@@ -169,7 +169,7 @@ const styles = {
     margin: 0,
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-base)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   stageDescription: {
     margin: '4px 0 0',
@@ -368,7 +368,8 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
             <div><strong>Стоимость:</strong> ${(treatmentPlan.totalCost / 1000).toFixed(0)}k сум</div>
           </div>
           <h2>Этапы</h2>
-          <table>
+          <div className="admin-table-wrapper">
+<table>
             <thead>
               <tr>
                 <th>#</th>
@@ -382,6 +383,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
             </thead>
             <tbody>${stagesHtml}</tbody>
           </table>
+</div>
         </body>
       </html>
     `

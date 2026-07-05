@@ -111,14 +111,14 @@ function AnalyticsSectionCard({ title, subtitle, children, action, compact = fal
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        gap: '16px',
+        gap: 'var(--mac-spacing-4)',
         marginBottom: '18px'
       }}>
         <div>
           <h3 style={{
             margin: 0,
             fontSize: compact ? '16px' : '18px',
-            fontWeight: 700,
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: analyticsTextPrimary
           }}>
             {title}
@@ -157,7 +157,7 @@ function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-acc
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: '12px'
+        gap: 'var(--mac-spacing-3)'
       }}>
         <span style={{
           display: 'inline-flex',
@@ -173,8 +173,8 @@ function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-acc
         </span>
         {helper ?
         <span style={{
-          fontSize: '12px',
-          fontWeight: 600,
+          fontSize: 'var(--mac-font-size-xs)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
           color: accent,
           background: `${accent}12`,
           padding: '6px 10px',
@@ -189,7 +189,7 @@ function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-acc
         <div style={{
           fontSize: compact ? '12px' : '13px',
           color: analyticsTextSecondary,
-          marginBottom: '8px'
+          marginBottom: 'var(--mac-spacing-2)'
         }}>
           {label}
         </div>
@@ -216,17 +216,17 @@ function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-
   return (
     <div style={{ display: 'grid', gap: '14px' }}>
       {items.map((item) =>
-      <div key={item.label} style={{ display: 'grid', gap: '8px' }}>
+      <div key={item.label} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
           <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'baseline',
-          gap: '12px'
+          gap: 'var(--mac-spacing-3)'
         }}>
-            <span style={{ fontSize: '14px', color: analyticsTextPrimary, fontWeight: 600 }}>
+            <span style={{ fontSize: 'var(--mac-font-size-base)', color: analyticsTextPrimary, fontWeight: 'var(--mac-font-weight-semibold)' }}>
               {item.label}
             </span>
-            <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>
+            <span style={{ fontSize: 'var(--mac-font-size-sm)', color: analyticsTextSecondary }}>
               {formatMetricValue(item.value, format)}
             </span>
           </div>
@@ -267,10 +267,10 @@ function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accen
     <div style={{ display: 'grid', gap: '14px' }}>
       <div style={{
         height: compact ? '180px' : '210px',
-        borderRadius: '16px',
+        borderRadius: 'var(--mac-radius-xl)',
         background: 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 6%) 0%, color-mix(in srgb, var(--mac-main-shell-bg), white 12%) 100%)',
         border: analyticsBorder,
-        padding: '16px'
+        padding: 'var(--mac-spacing-4)'
       }}>
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
           <defs>
@@ -289,9 +289,9 @@ function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accen
         gap: '10px'
       }}>
         {items.slice(0, 6).map((item) =>
-        <div key={item.label} style={{ background: analyticsInsetSurface, border: analyticsBorder, borderRadius: '12px', padding: '10px 12px' }}>
-            <div style={{ fontSize: '12px', color: analyticsTextSecondary, marginBottom: '4px' }}>{item.label}</div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: analyticsTextPrimary }}>
+        <div key={item.label} style={{ background: analyticsInsetSurface, border: analyticsBorder, borderRadius: 'var(--mac-radius-lg)', padding: '10px 12px' }}>
+            <div style={{ fontSize: 'var(--mac-font-size-xs)', color: analyticsTextSecondary, marginBottom: 'var(--mac-spacing-1)' }}>{item.label}</div>
+            <div style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-bold)', color: analyticsTextPrimary }}>
               {formatMetricValue(item.value, format)}
             </div>
           </div>
@@ -310,8 +310,8 @@ function AnalyticsEmptyState({ title, description }) {
       textAlign: 'center',
       color: analyticsTextSecondary
     }}>
-      <div style={{ fontSize: '16px', fontWeight: 700, color: analyticsTextPrimary, marginBottom: '8px' }}>{title}</div>
-      <div style={{ fontSize: '14px', lineHeight: 1.6 }}>{description}</div>
+      <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-bold)', color: analyticsTextPrimary, marginBottom: 'var(--mac-spacing-2)' }}>{title}</div>
+      <div style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: 1.6 }}>{description}</div>
     </div>);
 }
 
@@ -444,7 +444,7 @@ export default function AnalyticsPage() {
   <div style={{
     display: 'grid',
     gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px'
+    gap: 'var(--mac-spacing-4)'
   }}>
       {metrics.map((metric) =>
     <AnalyticsStatCard
@@ -832,13 +832,13 @@ export default function AnalyticsPage() {
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '8px 12px',
+              gap: 'var(--mac-spacing-2)',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
               borderRadius: '999px',
               background: analyticsInsetSurface,
               color: getColor('primary', 800),
-              fontSize: '12px',
-              fontWeight: 700,
+              fontSize: 'var(--mac-font-size-xs)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               marginBottom: '14px',
               width: isCompactLayout ? 'fit-content' : 'auto'
             }}>
@@ -879,7 +879,7 @@ export default function AnalyticsPage() {
       <section style={{
         background: analyticsSurface,
         border: analyticsBorder,
-        borderRadius: '20px',
+        borderRadius: 'var(--mac-radius-xl)',
         padding: isCompactLayout ? '16px' : '20px',
         display: 'grid',
         gap: '18px',
@@ -889,28 +889,28 @@ export default function AnalyticsPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: isCompactLayout ? 'stretch' : 'center',
-          gap: '16px',
+          gap: 'var(--mac-spacing-4)',
           flexWrap: 'wrap',
           flexDirection: isCompactLayout ? 'column' : 'row'
         }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: analyticsTextSecondary, marginBottom: '6px' }}>
+            <div style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-bold)', letterSpacing: '0.08em', textTransform: 'uppercase', color: analyticsTextSecondary, marginBottom: 'var(--mac-spacing-2)' }}>
               Период и разрез
             </div>
-            <div style={{ fontSize: isCompactLayout ? '15px' : '16px', fontWeight: 700, color: analyticsTextPrimary }}>
+            <div style={{ fontSize: isCompactLayout ? '15px' : '16px', fontWeight: 'var(--mac-font-weight-bold)', color: analyticsTextPrimary }}>
               {activeTabMeta.label}: {activeTabMeta.description}
             </div>
           </div>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '8px',
-            padding: '8px 12px',
+            gap: 'var(--mac-spacing-2)',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
             borderRadius: '999px',
             background: analyticsInsetSurface,
             border: analyticsBorder,
             color: analyticsTextSecondary,
-            fontSize: '13px',
+            fontSize: 'var(--mac-font-size-sm)',
             width: isCompactLayout ? '100%' : 'auto',
             justifyContent: 'center'
           }}>
@@ -955,7 +955,7 @@ export default function AnalyticsPage() {
               style={{
                 width: '100%',
                 minHeight: '40px',
-                borderRadius: '12px',
+                borderRadius: 'var(--mac-radius-lg)',
                 boxSizing: 'border-box'
               }} />
           </div>
@@ -970,7 +970,7 @@ export default function AnalyticsPage() {
               style={{
                 width: '100%',
                 minHeight: '40px',
-                borderRadius: '12px',
+                borderRadius: 'var(--mac-radius-lg)',
                 boxSizing: 'border-box'
               }} />
           </div>
@@ -1007,7 +1007,7 @@ export default function AnalyticsPage() {
       <section style={{
         background: analyticsSurface,
         border: analyticsBorder,
-        borderRadius: '20px',
+        borderRadius: 'var(--mac-radius-xl)',
         padding: isCompactLayout ? '10px' : '12px',
         boxShadow: 'var(--mac-shadow-sm)'
       }}>
@@ -1045,7 +1045,7 @@ export default function AnalyticsPage() {
       {loading ?
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: isCompactLayout ? '160px' : '200px', color: analyticsTextSecondary }}>
           <RefreshCw size={24} style={{ animation: 'mac-spin 1s linear infinite' }} />
-          <span style={{ marginLeft: '12px' }}>Подготавливаем аналитический срез...</span>
+          <span style={{ marginLeft: 'var(--mac-spacing-3)' }}>Подготавливаем аналитический срез...</span>
         </div> :
       renderCurrentTab()
       }

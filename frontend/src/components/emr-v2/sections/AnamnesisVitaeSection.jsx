@@ -68,8 +68,8 @@ export function AnamnesisVitaeSection({
             }
         >
             {/* Vitals Widget */}
-            <div style={{ marginBottom: '16px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginBottom: '8px' }}>
+            <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+                <h4 style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-2)' }}>
                     Витальные показатели
                 </h4>
                 <VitalsWidget

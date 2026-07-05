@@ -576,7 +576,7 @@ const ModernQueueManager = ({
                     gap: 4,
                     marginLeft: 8,
                     fontSize: 11,
-                    fontWeight: 600,
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     color: wsState === 'connected' ? 'var(--mac-success)' :
                            wsState === 'reconnecting' || wsState === 'connecting' ? 'var(--mac-warning)' :
                            'var(--mac-text-tertiary)',
@@ -710,7 +710,7 @@ const ModernQueueManager = ({
               Отсканируйте камеру телефона для записи в очередь
             </p>
             <p className="mqm-qr-expiry">
-              <Clock size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} aria-hidden="true" />
+              <Clock size={14} style={{ marginRight: 'var(--mac-spacing-1)', verticalAlign: 'text-bottom' }} aria-hidden="true" />
               Действует до: {qrData?.expires_at ? new Date(qrData.expires_at).toLocaleString('ru-RU', {
                 day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
               }) : '—'}
@@ -724,7 +724,7 @@ const ModernQueueManager = ({
               onClick={downloadQR}
               className="mqm-qr-action-btn">
 
-              <ArrowDownCircle size={14} style={{ marginRight: '8px' }} aria-hidden="true" />
+              <ArrowDownCircle size={14} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />
               {t.download}
             </Button>
             <Button

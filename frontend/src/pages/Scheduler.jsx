@@ -69,7 +69,8 @@ export default function Scheduler() {
           {err && <div className="clinic-ops-error">{String(err)}</div>}
 
           <div className="clinic-ops-table-wrap">
-            <table className="clinic-ops-table">
+            <div className="admin-table-wrapper">
+<table className="clinic-ops-table">
               <thead>
                 <tr>
                   <th>Врач</th>
@@ -95,6 +96,7 @@ export default function Scheduler() {
                 }
               </tbody>
             </table>
+</div>
           </div>
         </div>
       </RoleGate>

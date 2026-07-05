@@ -439,7 +439,7 @@ export const AIAssistant = ({
         height: '100%',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)',
-        borderRadius: '8px',
+        borderRadius: 'var(--mac-radius-md)',
         overflow: 'hidden'
       }}
       {...props}>
@@ -456,22 +456,22 @@ export const AIAssistant = ({
           justifyContent: 'space-between'
         }}>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ fontSize: '20px' }}>🤖</div>
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+          <div style={{ fontSize: 'var(--mac-font-size-2xl)' }}>🤖</div>
+          <h3 style={{ margin: 0, fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
             ИИ Помощник
           </h3>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
           <button
             onClick={onStartListening}
             disabled={loading || isListening}
             style={{
-              padding: '6px 12px',
-              fontSize: '12px',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+              fontSize: 'var(--mac-font-size-xs)',
               border: '1px solid var(--mac-border)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: isListening ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',
               cursor: loading || isListening ? 'not-allowed' : 'pointer',
@@ -496,10 +496,10 @@ export const AIAssistant = ({
             onClick={onClearMessages}
             disabled={loading || messages.length === 0}
             style={{
-              padding: '6px 12px',
-              fontSize: '12px',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+              fontSize: 'var(--mac-font-size-xs)',
               border: '1px solid var(--mac-border)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',
               cursor: loading || messages.length === 0 ? 'not-allowed' : 'pointer',
@@ -530,7 +530,7 @@ export const AIAssistant = ({
         style={{
           flex: 1,
           overflow: 'auto',
-          padding: '16px'
+          padding: 'var(--mac-spacing-4)'
         }}>
         
         {messages.length === 0 ?
@@ -538,7 +538,7 @@ export const AIAssistant = ({
           style={{
             textAlign: 'center',
             color: 'var(--mac-text-secondary)',
-            fontSize: '14px',
+            fontSize: 'var(--mac-font-size-base)',
             marginTop: '40px'
           }}>
           
@@ -550,9 +550,9 @@ export const AIAssistant = ({
           key={message.id}
           className={`message ${message.role}`}
           style={{
-            marginBottom: '16px',
-            padding: '12px 16px',
-            borderRadius: '8px',
+            marginBottom: 'var(--mac-spacing-4)',
+            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+            borderRadius: 'var(--mac-radius-md)',
             maxWidth: '80%',
             ...(message.role === 'user' ?
             {
@@ -569,14 +569,14 @@ export const AIAssistant = ({
 
           }}>
           
-              <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
+              <div style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: '1.4' }}>
                 {message.content}
               </div>
               <div
             style={{
-              fontSize: '11px',
+              fontSize: 'var(--mac-font-size-xs)',
               opacity: 0.7,
-              marginTop: '4px'
+              marginTop: 'var(--mac-spacing-1)'
             }}>
             
                 {message.timestamp.toLocaleTimeString()}
@@ -599,11 +599,11 @@ export const AIAssistant = ({
         <div
           style={{
             color: 'var(--mac-error)',
-            fontSize: '12px',
-            marginBottom: '8px',
-            padding: '4px 8px',
+            fontSize: 'var(--mac-font-size-xs)',
+            marginBottom: 'var(--mac-spacing-2)',
+            padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-error-bg)',
-            borderRadius: '4px',
+            borderRadius: 'var(--mac-radius-sm)',
             border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'
           }}>
           
@@ -620,7 +620,7 @@ export const AIAssistant = ({
               input.value = '';
             }
           }}
-          style={{ display: 'flex', gap: '8px' }}>
+          style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
           
           <input
             type="text"
@@ -631,9 +631,9 @@ export const AIAssistant = ({
             style={{
               flex: 1,
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: 'var(--mac-font-size-base)',
               border: '1px solid var(--mac-border)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',
               outline: 'none',
@@ -657,10 +657,10 @@ export const AIAssistant = ({
             aria-label={loading ? 'Отправка сообщения ИИ помощнику' : 'Отправить сообщение ИИ помощнику'}
             style={{
               padding: '10px 16px',
-              fontSize: '14px',
-              fontWeight: '500',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               border: '1px solid var(--mac-accent-blue)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: 'var(--mac-accent-blue)',
               color: 'var(--mac-bg-primary)',
               cursor: loading ? 'not-allowed' : 'pointer',
@@ -668,7 +668,7 @@ export const AIAssistant = ({
               transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: 'var(--mac-spacing-2)'
             }}
             onMouseEnter={(e) => {
               if (!loading && !prefersReducedMotion) {
@@ -720,7 +720,7 @@ export const AISuggestions = ({
       style={{
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)',
-        borderRadius: '8px',
+        borderRadius: 'var(--mac-radius-md)',
         overflow: 'hidden'
       }}
       {...props}>
@@ -736,9 +736,9 @@ export const AISuggestions = ({
           justifyContent: 'space-between'
         }}>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ fontSize: '18px' }}>💡</div>
-          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+          <div style={{ fontSize: 'var(--mac-font-size-xl)' }}>💡</div>
+          <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
             ИИ Предложения
           </h4>
         </div>
@@ -747,10 +747,10 @@ export const AISuggestions = ({
           onClick={onGenerateMore}
           disabled={loading}
           style={{
-            padding: '6px 12px',
-            fontSize: '12px',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-xs)',
             border: '1px solid var(--mac-border)',
-            borderRadius: '6px',
+            borderRadius: 'var(--mac-radius-sm)',
             backgroundColor: 'var(--mac-bg-primary)',
             color: 'var(--mac-text-primary)',
             cursor: loading ? 'not-allowed' : 'pointer',
@@ -773,16 +773,16 @@ export const AISuggestions = ({
       </div>
 
       {/* Предложения */}
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: 'var(--mac-spacing-4)' }}>
         {error &&
         <div
           style={{
             color: 'var(--mac-error)',
-            fontSize: '12px',
-            marginBottom: '12px',
-            padding: '8px',
+            fontSize: 'var(--mac-font-size-xs)',
+            marginBottom: 'var(--mac-spacing-3)',
+            padding: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-error-bg)',
-            borderRadius: '4px',
+            borderRadius: 'var(--mac-radius-sm)',
             border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'
           }}>
           
@@ -795,28 +795,28 @@ export const AISuggestions = ({
           style={{
             textAlign: 'center',
             color: 'var(--mac-text-secondary)',
-            fontSize: '14px',
-            padding: '20px'
+            fontSize: 'var(--mac-font-size-base)',
+            padding: 'var(--mac-spacing-5)'
           }}>
           
             Предложений пока нет
           </div> :
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
             {suggestions.map((suggestion) =>
           <button
             key={suggestion.id}
             onClick={() => onSelectSuggestion && onSelectSuggestion(suggestion)}
             style={{
-              padding: '12px 16px',
+              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
               textAlign: 'left',
               border: '1px solid var(--mac-border)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               backgroundColor: 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',
               cursor: 'pointer',
               transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
-              fontSize: '14px',
+              fontSize: 'var(--mac-font-size-base)',
               lineHeight: '1.4'
             }}
             onMouseEnter={(e) => {
@@ -832,22 +832,22 @@ export const AISuggestions = ({
               }
             }}>
             
-                <div style={{ fontWeight: '500', marginBottom: '4px' }}>
+                <div style={{ fontWeight: 'var(--mac-font-weight-medium)', marginBottom: 'var(--mac-spacing-1)' }}>
                   {suggestion.text}
                 </div>
                 {suggestion.confidence &&
             <div
               style={{
-                fontSize: '11px',
+                fontSize: 'var(--mac-font-size-xs)',
                 color: 'var(--mac-text-secondary)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: 'var(--mac-spacing-2)'
               }}>
               
                     <span>Уверенность: {Math.round(suggestion.confidence * 100)}%</span>
                     {suggestion.category &&
-              <span style={{ backgroundColor: 'var(--mac-border)', padding: '2px 6px', borderRadius: '10px' }}>
+              <span style={{ backgroundColor: 'var(--mac-border)', padding: '2px 6px', borderRadius: 'var(--mac-radius-lg)' }}>
                         {suggestion.category}
                       </span>
               }

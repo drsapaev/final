@@ -66,7 +66,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
   const renderTOTPForm = () =>
   <div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Smartphone size={48} style={{ color: 'var(--accent-color)', marginBottom: '16px' }} />
+        <Smartphone size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--mac-spacing-4)' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
           Введите код из приложения
         </h2>
@@ -75,11 +75,11 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         </p>
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
         <label style={{
         display: 'block',
-        marginBottom: '8px',
-        fontWeight: '500',
+        marginBottom: 'var(--mac-spacing-2)',
+        fontWeight: 'var(--mac-font-weight-medium)',
         color: 'var(--text-primary)'
       }}>
           Код аутентификатора:
@@ -94,16 +94,16 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         maxLength={6}
         style={{
           width: '100%',
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           background: 'var(--bg-primary)',
           color: 'var(--text-primary)',
-          fontSize: '24px',
+          fontSize: 'var(--mac-font-size-3xl)',
           textAlign: 'center',
           letterSpacing: '4px',
           fontFamily: 'monospace',
-          fontWeight: '500'
+          fontWeight: 'var(--mac-font-weight-medium)'
         }} />
 
       </div>
@@ -113,7 +113,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
   const renderBackupCodeForm = () =>
   <div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Key size={48} style={{ color: 'var(--accent-color)', marginBottom: '16px' }} />
+        <Key size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--mac-spacing-4)' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
           Введите backup код
         </h2>
@@ -122,11 +122,11 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         </p>
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
         <label style={{
         display: 'block',
-        marginBottom: '8px',
-        fontWeight: '500',
+        marginBottom: 'var(--mac-spacing-2)',
+        fontWeight: 'var(--mac-font-weight-medium)',
         color: 'var(--text-primary)'
       }}>
           Backup код:
@@ -141,16 +141,16 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         maxLength={8}
         style={{
           width: '100%',
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           background: 'var(--bg-primary)',
           color: 'var(--text-primary)',
-          fontSize: '18px',
+          fontSize: 'var(--mac-font-size-xl)',
           textAlign: 'center',
           letterSpacing: '2px',
           fontFamily: 'monospace',
-          fontWeight: '500'
+          fontWeight: 'var(--mac-font-weight-medium)'
         }} />
 
       </div>
@@ -160,7 +160,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
   const renderRecoveryForm = () =>
   <div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Shield size={48} style={{ color: 'var(--accent-color)', marginBottom: '16px' }} />
+        <Shield size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--mac-spacing-4)' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
           Восстановление доступа
         </h2>
@@ -169,11 +169,11 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         </p>
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
         <label style={{
         display: 'block',
-        marginBottom: '8px',
-        fontWeight: '500',
+        marginBottom: 'var(--mac-spacing-2)',
+        fontWeight: 'var(--mac-font-weight-medium)',
         color: 'var(--text-primary)'
       }}>
           Токен восстановления:
@@ -187,12 +187,12 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         placeholder="Введите токен восстановления"
         style={{
           width: '100%',
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           border: '1px solid var(--border-color)',
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           background: 'var(--bg-primary)',
           color: 'var(--text-primary)',
-          fontSize: '14px',
+          fontSize: 'var(--mac-font-size-base)',
           fontFamily: 'monospace'
         }} />
 
@@ -207,11 +207,11 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       {method === 'recovery' && renderRecoveryForm()}
 
       {method !== 'recovery' &&
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
           <label style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           cursor: 'pointer',
           color: 'var(--text-primary)'
         }}>
@@ -222,7 +222,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
             onChange={(e) => setRememberDevice(e.target.checked)}
             style={{ margin: 0 }} />
 
-            <span style={{ fontSize: '14px' }}>
+            <span style={{ fontSize: 'var(--mac-font-size-base)' }}>
               Запомнить это устройство на 30 дней
             </span>
           </label>
@@ -233,14 +233,14 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       <div style={{
         background: 'var(--mac-error-bg)',
         border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
-        borderRadius: '8px',
-        padding: '12px',
-        marginBottom: '16px',
+        borderRadius: 'var(--mac-radius-md)',
+        padding: 'var(--mac-spacing-3)',
+        marginBottom: 'var(--mac-spacing-4)',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: 'var(--mac-spacing-2)',
         color: 'var(--mac-error)',
-        fontSize: '14px'
+        fontSize: 'var(--mac-font-size-base)'
       }}>
           <AlertCircle size={16} />
           <span>{error}</span>
@@ -251,21 +251,21 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       <div style={{
         background: 'var(--mac-success-bg)',
         border: '1px solid #6EE7B7',
-        borderRadius: '8px',
-        padding: '12px',
-        marginBottom: '16px',
+        borderRadius: 'var(--mac-radius-md)',
+        padding: 'var(--mac-spacing-3)',
+        marginBottom: 'var(--mac-spacing-4)',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: 'var(--mac-spacing-2)',
         color: 'var(--mac-success)',
-        fontSize: '14px'
+        fontSize: 'var(--mac-font-size-base)'
       }}>
           <CheckCircle size={16} />
           <span>{success}</span>
         </div>
       }
 
-      <div style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
         <button
           onClick={handleVerify}
           disabled={loading ||
@@ -275,22 +275,22 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
           }
           style={{
             flex: 1,
-            padding: '16px 24px',
+            padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
             background: 'var(--accent-color)',
             color: 'white',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: 'var(--mac-radius-md)',
             cursor: loading ||
             method === 'totp' && totpCode.length !== 6 ||
             method === 'backup' && backupCode.length !== 8 ||
             method === 'recovery' && !recoveryToken ?
             'not-allowed' : 'pointer',
-            fontSize: '16px',
-            fontWeight: '500',
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-medium)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
 
           {loading ? <RefreshCw size={20} className="animate-spin" /> : <CheckCircle size={20} />}
@@ -301,14 +301,14 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         <button
           onClick={onCancel}
           style={{
-            padding: '16px 24px',
+            padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
             background: 'var(--bg-secondary)',
             color: 'var(--text-primary)',
             border: '1px solid var(--border-color)',
-            borderRadius: '8px',
+            borderRadius: 'var(--mac-radius-md)',
             cursor: 'pointer',
-            fontSize: '16px',
-            fontWeight: '500'
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-medium)'
           }}>
 
             Отмена

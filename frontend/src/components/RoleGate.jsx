@@ -75,6 +75,6 @@ const box = {
   borderRadius: 8,
   padding: 12,
 };
-const cap = { fontWeight: 700, marginBottom: 6, fontSize: 14 };
+const cap = { fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6, fontSize: 14 };
 
 

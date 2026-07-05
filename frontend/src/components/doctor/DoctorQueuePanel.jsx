@@ -344,7 +344,7 @@ const DoctorQueuePanel = ({
 
   if (loading && !queueData) {
     return (
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         <Skeleton type="card" count={3} />
       </MacOSCard>);
 
@@ -361,7 +361,7 @@ const DoctorQueuePanel = ({
   }
 
   return (
-    <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
       {/* Сообщения */}
       {message.text &&
       <Alert
@@ -373,15 +373,15 @@ const DoctorQueuePanel = ({
       }
 
       {/* Информация о враче и очереди */}
-      <MacOSCard style={{ padding: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-4)' }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '16px'
+          marginBottom: 'var(--mac-spacing-4)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <User size={24} style={{ marginRight: '12px', color: 'var(--mac-accent)' }} />
+            <User size={24} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-accent)' }} />
             <div>
               <h3 style={{
                 margin: 0,
@@ -396,8 +396,8 @@ const DoctorQueuePanel = ({
                 alignItems: 'center',
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-secondary)',
-                gap: '16px',
-                marginTop: '4px'
+                gap: 'var(--mac-spacing-4)',
+                marginTop: 'var(--mac-spacing-1)'
               }}>
                 <span>{queueData.doctor.specialty}</span>
                 {queueData.doctor.cabinet &&
@@ -414,7 +414,7 @@ const DoctorQueuePanel = ({
             <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
               Статус очереди:
             </div>
@@ -428,14 +428,14 @@ const DoctorQueuePanel = ({
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-accent)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
               {queueData.stats.total}
             </div>
@@ -451,7 +451,7 @@ const DoctorQueuePanel = ({
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-warning)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
               {queueData.stats.waiting}
             </div>
@@ -467,7 +467,7 @@ const DoctorQueuePanel = ({
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-success)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
               {queueData.stats.served}
             </div>
@@ -483,7 +483,7 @@ const DoctorQueuePanel = ({
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-info)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
               {queueData.stats.online_entries}
             </div>
@@ -500,7 +500,7 @@ const DoctorQueuePanel = ({
       {/* Список пациентов в очереди */}
       <MacOSCard style={{ overflow: 'hidden' }}>
         <div style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-secondary)',
           borderBottom: '1px solid var(--mac-border)'
         }}>
@@ -518,7 +518,7 @@ const DoctorQueuePanel = ({
               Пациенты в очереди
             </h3>
             <Button variant="outline" onClick={loadQueueData}>
-              <RefreshCw size={14} style={{ marginRight: '4px' }} />
+              <RefreshCw size={14} style={{ marginRight: 'var(--mac-spacing-1)' }} />
               Обновить
             </Button>
           </div>
@@ -548,7 +548,7 @@ const DoctorQueuePanel = ({
                 tabIndex={0}
                 aria-label={`Выбрать пациента ${entry.patient_name || entry.number} из очереди`}
                 style={{
-                  padding: '16px',
+                  padding: 'var(--mac-spacing-4)',
                   cursor: 'pointer',
                   transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
                   backgroundColor: selectedPatient?.id === entry.id ? 'var(--mac-bg-accent)' : 'transparent',
@@ -571,7 +571,7 @@ const DoctorQueuePanel = ({
                   alignItems: 'center',
                   justifyContent: 'space-between'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-4)' }}>
                       {/* Номер в очереди */}
                       <div style={{
                       display: 'flex',
@@ -598,7 +598,7 @@ const DoctorQueuePanel = ({
                         fontWeight: 'var(--mac-font-weight-semibold)',
                         color: 'var(--mac-text-primary)',
                         fontSize: 'var(--mac-font-size-md)',
-                        marginBottom: '4px'
+                        marginBottom: 'var(--mac-spacing-1)'
                       }}>
                           {entry.patient_name}
                         </div>
@@ -608,16 +608,16 @@ const DoctorQueuePanel = ({
                         alignItems: 'center',
                         fontSize: 'var(--mac-font-size-sm)',
                         color: 'var(--mac-text-secondary)',
-                        marginBottom: '4px'
+                        marginBottom: 'var(--mac-spacing-1)'
                       }}>
-                            <Phone size={16} style={{ marginRight: '4px', color: 'var(--mac-accent)' }} />
+                            <Phone size={16} style={{ marginRight: 'var(--mac-spacing-1)', color: 'var(--mac-accent)' }} />
                             {entry.phone}
                           </div>
                       }
                         <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px'
+                        gap: 'var(--mac-spacing-2)'
                       }}>
                           <Badge variant="outline">
                             {source.icon} {source.label}
@@ -636,19 +636,19 @@ const DoctorQueuePanel = ({
                     <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px'
+                    gap: 'var(--mac-spacing-3)'
                   }}>
                       {/* Статус */}
                       <div style={{ textAlign: 'center' }}>
                         <Badge variant={status.color}>
-                          <StatusIcon size={14} style={{ marginRight: '4px' }} />
+                          <StatusIcon size={14} style={{ marginRight: 'var(--mac-spacing-1)' }} />
                           {status.label}
                         </Badge>
                         {entry.called_at &&
                       <div style={{
                         fontSize: 'var(--mac-font-size-xs)',
                         color: 'var(--mac-text-tertiary)',
-                        marginTop: '4px'
+                        marginTop: 'var(--mac-spacing-1)'
                       }}>
                             Вызван: {formatRegistrarTime(entry.called_at) || '—'}
                           </div>
@@ -656,7 +656,7 @@ const DoctorQueuePanel = ({
                       </div>
 
                       {/* Действия */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                         {canCall &&
                       <Button
                         onClick={(e) => {
@@ -664,7 +664,7 @@ const DoctorQueuePanel = ({
                           handleCallPatient(entry.id);
                         }}>
                         
-                            <Play size={14} style={{ marginRight: '4px' }} />
+                            <Play size={14} style={{ marginRight: 'var(--mac-spacing-1)' }} />
                             Вызвать
                           </Button>
                       }
@@ -677,7 +677,7 @@ const DoctorQueuePanel = ({
                           handleStartVisit(entry.id);
                         }}>
                         
-                            <Activity size={14} style={{ marginRight: '4px' }} />
+                            <Activity size={14} style={{ marginRight: 'var(--mac-spacing-1)' }} />
                             Начать
                           </Button>
                       }
@@ -690,7 +690,7 @@ const DoctorQueuePanel = ({
                           handleCompleteVisit(entry.id);
                         }}>
                         
-                            <CheckCircle size={14} style={{ marginRight: '4px' }} />
+                            <CheckCircle size={14} style={{ marginRight: 'var(--mac-spacing-1)' }} />
                             Завершить
                           </Button>
                       }
@@ -707,7 +707,7 @@ const DoctorQueuePanel = ({
       {/* Информация о настройках очереди */}
       {doctorInfo &&
       <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-accent)',
         border: '1px solid var(--mac-accent)'
       }}>
@@ -718,7 +718,7 @@ const DoctorQueuePanel = ({
           fontSize: 'var(--mac-font-size-md)',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             ⚙️ Настройки очереди:
           </h4>
@@ -727,7 +727,7 @@ const DoctorQueuePanel = ({
           color: 'var(--mac-text-secondary)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px'
+          gap: 'var(--mac-spacing-1)'
         }}>
             <div>Стартовый номер онлайн: #{doctorInfo?.queue_settings?.start_number || '—'}</div>
             <div>Лимит в день: {doctorInfo?.queue_settings?.max_per_day ?? '—'}</div>

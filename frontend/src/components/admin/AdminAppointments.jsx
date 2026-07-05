@@ -34,14 +34,14 @@ const statusOptions = [
 
 const tableHeaderStyle = {
   textAlign: 'left',
-  padding: '12px 16px',
+  padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
   color: 'var(--mac-text-secondary)',
   fontWeight: 'var(--mac-font-weight-semibold)',
   fontSize: 'var(--mac-font-size-sm)',
 };
 
 const textCellStyle = {
-  padding: '12px 16px',
+  padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
   fontSize: 'var(--mac-font-size-sm)',
   color: 'var(--mac-text-secondary)',
 };

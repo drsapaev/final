@@ -7,12 +7,12 @@
 :root {
   /* Основные цвета фона */
   --bg-primary: var(--mac-bg-primary);
-  --bg-secondary: #f8fafc;
+  --bg-secondary: var(--mac-bg-secondary);
   --bg-tertiary: #f1f5f9;
 
   /* Цвета текста */
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
+  --text-primary: var(--mac-text-primary);
+  --text-secondary: var(--mac-text-secondary);
   --text-tertiary: var(--mac-text-secondary);
 
   /* Границы и интерактивные элементы */
@@ -24,13 +24,13 @@
   --success-color: var(--mac-success);
   --warning-color: var(--mac-warning);
   --danger-color: var(--mac-error);
-  --info-color: #0ea5e9;
+  --info-color: var(--mac-accent-blue);
 
   /* Тени */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px color-mix(in srgb, black, transparent 90%), 0 2px 4px -1px color-mix(in srgb, black, transparent 94%);
+  --shadow-lg: 0 10px 15px -3px color-mix(in srgb, black, transparent 90%), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px color-mix(in srgb, black, transparent 90%), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
   /* Улучшенные цвета для высокой контрастности */
   /* Текст на градиентах */
@@ -55,7 +55,7 @@
   --status-info-bg-contrast: rgba(14, 165, 233, 0.15);
 
   /* Overlay для градиентов */
-  --gradient-overlay: rgba(0, 0, 0, 0.3);
+  --gradient-overlay: color-mix(in srgb, black, transparent 70%);
   --gradient-overlay-strong: color-mix(in srgb, black, transparent 50%);
 
   /* Современный UI‑шрифт глобально */
@@ -117,14 +117,14 @@ textarea {
 }
 
 .clinic-button-primary {
-  background: linear-gradient(135deg, var(--accent-color) 0%, #2563eb 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--mac-accent-blue-hover) 100%);
   color: white;
-  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 14px 0 var(--mac-accent-border);
 }
 
 /* Новые варианты кнопок для всего приложения */
 .clinic-button-success {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  background: linear-gradient(135deg, var(--mac-success) 0%, #15803d 100%);
   color: var(--mac-bg-primary);
   box-shadow: 0 4px 14px 0 rgba(34, 197, 94, 0.3);
 }
@@ -132,12 +132,12 @@ textarea {
 .clinic-button-danger {
   background: linear-gradient(135deg, var(--mac-error) 0%, var(--mac-error) 100%);
   color: var(--mac-bg-primary);
-  box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 14px 0 var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%));
 }
 
 .clinic-button-warning {
-  background: linear-gradient(135deg, var(--mac-warning) 0%, #d97706 100%);
-  color: #111827;
+  background: linear-gradient(135deg, var(--mac-warning) 0%, var(--mac-warning) 100%);
+  color: var(--mac-text-primary);
   box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.3);
 }
 
@@ -184,7 +184,7 @@ textarea {
 
 /* Универсальные стили для заголовков */
 .clinic-header {
-  background: linear-gradient(135deg, var(--accent-color) 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--mac-accent-blue-hover) 100%);
   color: white;
   padding: 20px 24px;
   border-bottom: 1px solid var(--border-color);
@@ -213,7 +213,7 @@ textarea {
 .clinic-input:focus {
   outline: none;
   border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 /* Высокий контраст для ссылок */
@@ -224,7 +224,7 @@ textarea {
 }
 
 .clinic-link:hover {
-  color: #2563eb;
+  color: var(--mac-accent-blue-hover);
   text-decoration: none;
 }
 
@@ -249,7 +249,7 @@ textarea {
 
 .clinic-status-danger {
   color: var(--danger-color);
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--mac-error-bg);
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
@@ -278,14 +278,14 @@ textarea {
 
 /* Темная тема специфичные стили - УЛУЧШЕННЫЕ (только классическая dark схема) */
 [data-theme="dark"][data-color-scheme="dark"] {
-  --text-on-gradient: #f8fafc;
+  --text-on-gradient: var(--mac-bg-secondary);
   --text-shadow-strong: 0 2px 4px rgba(0, 0, 0, 0.9);
-  --text-shadow-medium: 0 1px 2px rgba(0, 0, 0, 0.7);
+  --text-shadow-medium: 0 1px 2px color-mix(in srgb, black, transparent 30%);
 
   /* Улучшенные фоны для темной темы */
   --bg-card-dark: var(--mac-text-primary);
-  --bg-panel-dark: #334155;
-  --border-dark: #475569;
+  --bg-panel-dark: var(--mac-text-primary);
+  --border-dark: var(--mac-text-secondary);
 }
 
 [data-theme="dark"][data-color-scheme="dark"] .clinic-card {
@@ -301,7 +301,7 @@ textarea {
 }
 
 [data-theme="dark"][data-color-scheme="dark"] .clinic-page {
-  background: linear-gradient(135deg, #0f172a 0%, var(--mac-text-primary) 100%);
+  background: linear-gradient(135deg, var(--mac-text-primary) 0%, var(--mac-text-primary) 100%);
 }
 
 /* КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Прозрачные элементы в темной теме */
@@ -317,7 +317,7 @@ textarea {
   border-color: var(--border-dark) !important;
 }
 
-[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.2)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="color-mix(in srgb, white, transparent 80%)"] {
   border-color: var(--border-dark) !important;
 }
 

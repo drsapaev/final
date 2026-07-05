@@ -271,7 +271,7 @@ const ScheduleNextModal = ({
 
   const modalStyle = {
     backgroundColor: getColor('background'),
-    borderRadius: '16px',
+    borderRadius: 'var(--mac-radius-xl)',
     padding: getSpacing('xl'),
     maxWidth: '600px',
     width: '100%',
@@ -291,7 +291,7 @@ const ScheduleNextModal = ({
 
   const titleStyle = {
     fontSize: getFontSize('xl'),
-    fontWeight: '700',
+    fontWeight: 'var(--mac-font-weight-bold)',
     color: getColor('text'),
     margin: 0
   };
@@ -302,7 +302,7 @@ const ScheduleNextModal = ({
     color: getColor('text-secondary'),
     cursor: 'pointer',
     padding: getSpacing('sm'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
@@ -315,7 +315,7 @@ const ScheduleNextModal = ({
   const labelStyle = {
     display: 'block',
     fontSize: getFontSize('sm'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text'),
     marginBottom: getSpacing('sm')
   };
@@ -324,7 +324,7 @@ const ScheduleNextModal = ({
     width: '100%',
     padding: getSpacing('md'),
     border: `1px solid ${getColor('border')}`,
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     fontSize: getFontSize('sm'),
     backgroundColor: getColor('background'),
     color: getColor('text')
@@ -338,9 +338,9 @@ const ScheduleNextModal = ({
   const buttonStyle = {
     padding: `${getSpacing('md')} ${getSpacing('lg')}`,
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     fontSize: getFontSize('sm'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -374,7 +374,7 @@ const ScheduleNextModal = ({
 
   const alertStyle = {
     padding: getSpacing('md'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     marginBottom: getSpacing('lg'),
     display: 'flex',
     alignItems: 'center',

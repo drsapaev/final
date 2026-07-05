@@ -105,13 +105,13 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
           style={{
             display: 'flex',
             alignItems: 'flex-start',
-            gap: '12px',
-            padding: '16px',
+            gap: 'var(--mac-spacing-3)',
+            padding: 'var(--mac-spacing-4)',
             backgroundColor:
               theme === 'dark' ? 'rgba(245, 158, 11, 0.10)' : 'var(--mac-error-bg)',
             border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.24)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-warning), transparent 50%))'}`,
             borderRadius: '14px',
-            marginBottom: '24px',
+            marginBottom: 'var(--mac-spacing-6)',
           }}
         >
           <AlertTriangle
@@ -126,8 +126,8 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             <h4
               style={{
                 color: theme === 'dark' ? 'var(--mac-warning)' : '#92400e',
-                fontSize: '14px',
-                fontWeight: '600',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 margin: '0 0 4px 0',
               }}
             >
@@ -136,7 +136,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             <p
               style={{
                 color: theme === 'dark' ? '#fcd34d' : '#a16207',
-                fontSize: '13px',
+                fontSize: 'var(--mac-font-size-sm)',
                 margin: 0,
                 lineHeight: '1.4',
               }}
@@ -149,8 +149,8 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
         {/* Информация о записи */}
         <div
           style={{
-            marginBottom: '24px',
-            padding: '16px',
+            marginBottom: 'var(--mac-spacing-6)',
+            padding: 'var(--mac-spacing-4)',
             ...surfaceStyle,
           }}
         >
@@ -158,19 +158,19 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             style={{
               color: getColor('textPrimary'),
               margin: '0 0 12px 0',
-              fontSize: '16px',
-              fontWeight: '600',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
             }}
           >
             Информация о записи
           </h4>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span
                 style={{
                   color: getColor('textSecondary'),
-                  fontSize: '14px',
+                  fontSize: 'var(--mac-font-size-base)',
                 }}
               >
                 Пациент:
@@ -178,8 +178,8 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
               <span
                 style={{
                   color: getColor('textPrimary'),
-                  fontSize: '14px',
-                  fontWeight: '500',
+                  fontSize: 'var(--mac-font-size-base)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                 }}
               >
                 {appointment.patient_fio}
@@ -191,7 +191,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                 <span
                   style={{
                     color: getColor('textSecondary'),
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                   }}
                 >
                   Услуги:
@@ -199,8 +199,8 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                 <span
                   style={{
                     color: getColor('textPrimary'),
-                    fontSize: '14px',
-                    fontWeight: '500',
+                    fontSize: 'var(--mac-font-size-base)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
                     textAlign: 'right',
                     maxWidth: '60%',
                   }}
@@ -217,7 +217,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                 <span
                   style={{
                     color: getColor('textSecondary'),
-                    fontSize: '14px',
+                    fontSize: 'var(--mac-font-size-base)',
                   }}
                 >
                   Стоимость:
@@ -225,8 +225,8 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                 <span
                   style={{
                     color: getColor('textPrimary'),
-                    fontSize: '14px',
-                    fontWeight: '500',
+                    fontSize: 'var(--mac-font-size-base)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
                   }}
                 >
                   {appointment.cost.toLocaleString()} ₽
@@ -242,9 +242,9 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             htmlFor="cancel-reason"
             style={{
               display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              marginBottom: '8px',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              marginBottom: 'var(--mac-spacing-2)',
               color: getColor('textPrimary'),
             }}
           >
@@ -270,11 +270,11 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                     ? 'color-mix(in srgb, white, transparent 90%)'
                     : 'var(--mac-border)'
               }`,
-              borderRadius: '12px',
+              borderRadius: 'var(--mac-radius-lg)',
               backgroundColor:
                 theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
               color: getColor('textPrimary'),
-              fontSize: '14px',
+              fontSize: 'var(--mac-font-size-base)',
               resize: 'vertical',
               minHeight: '100px',
               transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
@@ -304,7 +304,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginTop: '8px',
+              marginTop: 'var(--mac-spacing-2)',
             }}
           >
             <div>
@@ -313,7 +313,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                   id="cancel-reason-error"
                   style={{
                     color: 'var(--mac-error)',
-                    fontSize: '12px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     margin: 0,
                   }}
                 >
@@ -324,7 +324,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             <span
               style={{
                 color: getColor('textSecondary'),
-                fontSize: '12px',
+                fontSize: 'var(--mac-font-size-xs)',
               }}
             >
               {reason.length}/500
@@ -335,7 +335,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
           <p
             style={{
               color: getColor('textSecondary'),
-              fontSize: '12px',
+              fontSize: 'var(--mac-font-size-xs)',
               margin: '8px 0 0 0',
               fontStyle: 'italic',
             }}

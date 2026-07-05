@@ -19,7 +19,7 @@ const SidebarToggle = ({ isCollapsed, onToggle, className = '' }) => {
         justifyContent: 'center',
         width: '40px',
         height: '40px',
-        borderRadius: '8px',
+        borderRadius: 'var(--mac-radius-md)',
         border: 'none',
         backgroundColor: isDark ? 'var(--mac-text-primary)' : '#f1f5f9',
         color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',

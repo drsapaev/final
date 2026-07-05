@@ -60,7 +60,7 @@ export function StateWrapper({
   // First load: show skeleton
   if (isLoading && !hasHadDataRef.current) {
     return (
-      <div style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
         {Array.from({ length: skeletonRows }).map((_, i) => (
           <Skeleton
             key={i}
@@ -117,12 +117,12 @@ export function StateWrapper({
             alignItems: 'center',
             gap: '10px',
             padding: '10px 14px',
-            marginBottom: '12px',
-            borderRadius: '10px',
+            marginBottom: 'var(--mac-spacing-3)',
+            borderRadius: 'var(--mac-radius-lg)',
             backgroundColor: 'color-mix(in srgb, var(--mac-warning, #ff9500) 8%, transparent)',
             border: '1px solid color-mix(in srgb, var(--mac-warning, #ff9500) 35%, transparent)',
             color: 'var(--mac-text-primary)',
-            fontSize: '13px',
+            fontSize: 'var(--mac-font-size-sm)',
           }}
         >
           <AlertCircle size={16} style={{ color: 'var(--mac-warning, #ff9500)', flexShrink: 0 }} />

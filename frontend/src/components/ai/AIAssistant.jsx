@@ -293,7 +293,7 @@ const AIAssistant = ({
         display: 'inline-flex', alignItems: 'center', gap: 6,
         border: `1px solid ${colors.border}`,
         background: colors.bg,
-        padding: '4px 8px', borderRadius: 9999, fontSize: 12
+        padding: 'var(--mac-spacing-1) var(--mac-spacing-2)', borderRadius: 9999, fontSize: 12
       }}>{children}</span>);
 
   };
@@ -388,7 +388,7 @@ const AIAssistant = ({
                         </span>
                   }
                     </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                    <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
                     <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
                       <Copy style={{ width: 14, height: 14, marginRight: 6 }} />Копировать
                     </Button>
@@ -424,7 +424,7 @@ const AIAssistant = ({
                 </span>
             }
             </div>
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
             <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
               <Copy style={{ width: 14, height: 14, marginRight: 6 }} />Копировать
             </Button>

@@ -80,7 +80,7 @@ function StatusCard({ title, configured, details }) {
                     background: configured ? 'var(--success-bg, #d1fae5)' : 'var(--danger-bg, #fee2e2)',
                     color: configured ? 'var(--success-text, #065f46)' : 'var(--danger-text, #991b1b)',
                     fontSize: 12,
-                    fontWeight: 600
+                    fontWeight: 'var(--mac-font-weight-semibold)'
                 }}>
                     {configured ? 'Активен' : 'Не настроен'}
                 </span>

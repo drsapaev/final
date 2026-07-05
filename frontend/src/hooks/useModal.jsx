@@ -193,7 +193,7 @@ export const Modal = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px'
+        padding: 'var(--mac-spacing-5)'
       }}
       onMouseDown={handleMaskClick}
       role="dialog"
@@ -205,7 +205,7 @@ export const Modal = ({
         className={`modal-content ${sizes[size]} ${className}`}
         style={{
           backgroundColor: 'var(--mac-bg-primary)',
-          borderRadius: '12px',
+          borderRadius: 'var(--mac-radius-lg)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           maxHeight: '90vh',
           overflow: 'hidden',
@@ -231,8 +231,8 @@ export const Modal = ({
               id="modal-title"
               style={{
                 margin: 0,
-                fontSize: '18px',
-                fontWeight: '600',
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 color: 'var(--mac-text-primary)'
               }}
             >
@@ -245,11 +245,11 @@ export const Modal = ({
                 style={{
                   background: 'none',
                   border: 'none',
-                  fontSize: '24px',
+                  fontSize: 'var(--mac-font-size-3xl)',
                   cursor: 'pointer',
                   color: 'var(--mac-text-secondary)',
-                  padding: '4px',
-                  borderRadius: '4px',
+                  padding: 'var(--mac-spacing-1)',
+                  borderRadius: 'var(--mac-radius-sm)',
                   transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
                 }}
                 onMouseEnter={(e) => {
@@ -273,7 +273,7 @@ export const Modal = ({
         <div
           className="modal-body"
           style={{
-            padding: '24px',
+            padding: 'var(--mac-spacing-6)',
             overflow: 'auto',
             flex: 1
           }}

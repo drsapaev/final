@@ -180,7 +180,7 @@ function AccessDenied({ message, theme }) {
 
   const titleStyle = {
     fontSize: getFontSize('lg'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('sm')
   };
@@ -253,13 +253,13 @@ export function UserInfo({ profile = null, showRoles = true, showPermissions = f
   const containerStyle = {
     padding: getSpacing('md'),
     backgroundColor: getColor('background', 'secondary'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     border: `1px solid ${getColor('border', 'light')}`
   };
 
   const titleStyle = {
     fontSize: getFontSize('md'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('sm')
   };
