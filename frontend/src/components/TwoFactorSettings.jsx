@@ -195,7 +195,7 @@ const TwoFactorSettings = () => {
       {error &&
       <div style={{
         background: 'var(--mac-error-bg)',
-        border: '1px solid #FCA5A5',
+        border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
         borderRadius: '8px',
         padding: '16px',
         marginBottom: '24px',
@@ -219,7 +219,7 @@ const TwoFactorSettings = () => {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        color: '#059669'
+        color: 'var(--mac-success)'
       }}>
           <CheckCircle size={20} />
           <span>{success}</span>
@@ -245,7 +245,7 @@ const TwoFactorSettings = () => {
           <div style={{
             padding: '4px 12px',
             background: status.enabled ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
-            color: status.enabled ? '#059669' : 'var(--mac-error)',
+            color: status.enabled ? 'var(--mac-success)' : 'var(--mac-error)',
             borderRadius: '20px',
             fontSize: '12px',
             fontWeight: '500'
@@ -509,7 +509,7 @@ const TwoFactorSettings = () => {
                 padding: '8px 12px',
                 background: 'var(--mac-error-bg)',
                 color: 'var(--mac-error)',
-                border: '1px solid #FCA5A5',
+                border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '12px',
@@ -566,7 +566,7 @@ const TwoFactorSettings = () => {
               padding: '12px 24px',
               background: 'var(--mac-error-bg)',
               color: 'var(--mac-error)',
-              border: '1px solid #FCA5A5',
+              border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
               borderRadius: '8px',
               cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: '14px',

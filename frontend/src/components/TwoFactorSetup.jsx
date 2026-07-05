@@ -494,7 +494,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
     return (
       <div style={{
         background: 'var(--mac-error-bg)',
-        border: '1px solid #FCA5A5',
+        border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
         borderRadius: '8px',
         padding: '16px',
         marginBottom: '16px',
@@ -520,7 +520,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        color: '#059669'
+        color: 'var(--mac-success)'
       }}>
         <CheckCircle size={20} />
         <span>{success}</span>

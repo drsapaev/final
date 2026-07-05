@@ -99,7 +99,7 @@ const FormInput = ({
       className={className}
       style={{
         padding: isMobile ? '12px' : '16px',
-        border: '1px solid #d1d5db',
+        border: '1px solid var(--mac-border)',
         borderRadius: isMobile ? '8px' : '12px',
         fontSize: isMobile ? '16px' : '16px', // Предотвращает zoom на iOS
         fontFamily: 'inherit',
@@ -140,7 +140,7 @@ const FormSelect = ({
       className={className}
       style={{
         padding: isMobile ? '12px' : '16px',
-        border: '1px solid #d1d5db',
+        border: '1px solid var(--mac-border)',
         borderRadius: isMobile ? '8px' : '12px',
         fontSize: isMobile ? '16px' : '16px',
         fontFamily: 'inherit',
@@ -188,7 +188,7 @@ const FormTextarea = ({
       className={className}
       style={{
         padding: isMobile ? '12px' : '16px',
-        border: '1px solid #d1d5db',
+        border: '1px solid var(--mac-border)',
         borderRadius: isMobile ? '8px' : '12px',
         fontSize: isMobile ? '16px' : '16px',
         fontFamily: 'inherit',

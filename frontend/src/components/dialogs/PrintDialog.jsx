@@ -53,7 +53,7 @@ const PrintDialog = ({
   const { theme } = useTheme();
   const surfaceStyle = {
     backgroundColor: 'var(--mac-bg-secondary)',
-    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+    border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
     borderRadius: '14px',
   };
   const [printers, setPrinters] = useState([]);
@@ -447,7 +447,7 @@ const PrintDialog = ({
                           selectedPrinter === printer.id
                             ? 'var(--mac-accent-blue)'
                             : theme === 'dark'
-                              ? 'rgba(255,255,255,0.10)'
+                              ? 'color-mix(in srgb, white, transparent 90%)'
                               : 'var(--mac-border)'
                         }`,
                         borderRadius: '12px',
@@ -457,7 +457,7 @@ const PrintDialog = ({
                               ? 'rgba(59, 130, 246, 0.16)'
                               : 'var(--mac-accent-bg)'
                             : theme === 'dark'
-                              ? 'rgba(255,255,255,0.04)'
+                              ? 'color-mix(in srgb, white, transparent 96%)'
                               : 'white',
                         cursor:
                           printer.status === 'online'
@@ -547,7 +547,7 @@ const PrintDialog = ({
                               ? 'var(--mac-success)'
                               : printer.status
                                 ? 'var(--mac-error)'
-                                : '#64748b',
+                                : 'var(--mac-text-secondary)',
                         }}
                       >
                         {printer.status === 'online' ? (

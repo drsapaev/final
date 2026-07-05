@@ -148,7 +148,7 @@ const PriceOverrideManager = ({
     <div style={{
       position: 'fixed',
       inset: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
       backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',

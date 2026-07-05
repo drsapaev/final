@@ -375,7 +375,7 @@ const LoginFormStyled = () => {
               <div style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'rgba(0, 0, 0, 0.2)',
+                background: 'color-mix(in srgb, black, transparent 80%)',
                 borderRadius: '50%'
               }} />
               <span style={{ position: 'relative', zIndex: 1 }}>🔐</span>
@@ -426,7 +426,7 @@ const LoginFormStyled = () => {
                       padding: '8px 12px',
                       background: isActive ? colors.primary[500] : 'transparent',
                       color: isActive ? 'white' : colors.semantic.text.secondary,
-                      border: '1px solid #e1e5e9',
+                      border: '1px solid var(--mac-border)',
                       borderRadius: '6px',
                       fontSize: '12px',
                       cursor: 'pointer',
@@ -514,8 +514,8 @@ const LoginFormStyled = () => {
       maxWidth: '400px',
       // UX Audit: card background следует за темой через --mac-* tokens.
       background: isDark
-        ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 26%) 100%)'
-        : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, #f8fafc), transparent 26%) 100%)',
+        ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
+        : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
         backdropFilter: 'blur(26px) saturate(140%)',
         WebkitBackdropFilter: 'blur(26px) saturate(140%)',
         border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
@@ -683,7 +683,7 @@ const LoginFormStyled = () => {
         </CardContent>
         {/*
           UX Audit Stage 2 (Login issue 3.3):
-          Стили перенесены с хардкодов (#0f172a, #64748b) на design tokens.
+          Стили перенесены с хардкодов (#0f172a, var(--mac-text-secondary)) на design tokens.
           Теперь поля ввода на login-экране корректно работают в light/dark теме.
           Раньше login был всегда тёмный, и эти стили форсировали тёмный текст —
           в light-теме приложения это выглядело инородно.

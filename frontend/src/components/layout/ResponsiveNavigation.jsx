@@ -24,7 +24,7 @@ const ResponsiveNavigation = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '16px',
-          background: 'rgba(255, 255, 255, 0.9)',
+          background: 'color-mix(in srgb, white, transparent 10%)',
           backdropFilter: 'blur(20px)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
@@ -67,7 +67,7 @@ const ResponsiveNavigation = ({
               padding: '16px',
               borderBottom: index < items.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
               cursor: 'pointer',
-              background: activeItem === item.key ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+              background: activeItem === item.key ? 'var(--mac-accent-bg)' : 'transparent',
               transition: 'background-color 0.2s ease'
             }}
             onClick={() => {
@@ -103,7 +103,7 @@ const ResponsiveNavigation = ({
         display: 'flex',
         gap: '8px',
         padding: '16px',
-        background: 'rgba(255, 255, 255, 0.9)',
+        background: 'color-mix(in srgb, white, transparent 10%)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         ...style
@@ -132,7 +132,7 @@ const ResponsiveNavigation = ({
       display: 'flex',
       gap: '12px',
       padding: '20px 24px',
-      background: 'rgba(255, 255, 255, 0.9)',
+      background: 'color-mix(in srgb, white, transparent 10%)',
       backdropFilter: 'blur(20px)',
       borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
       ...style

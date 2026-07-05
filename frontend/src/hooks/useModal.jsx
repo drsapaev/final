@@ -188,7 +188,7 @@ export const Modal = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
@@ -221,7 +221,7 @@ export const Modal = ({
             className="modal-header"
             style={{
               padding: '20px 24px',
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid var(--mac-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between'

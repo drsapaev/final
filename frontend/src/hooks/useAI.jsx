@@ -438,7 +438,7 @@ export const AIAssistant = ({
         flexDirection: 'column',
         height: '100%',
         backgroundColor: 'var(--mac-bg-primary)',
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--mac-border)',
         borderRadius: '8px',
         overflow: 'hidden'
       }}
@@ -450,7 +450,7 @@ export const AIAssistant = ({
         style={{
           padding: '16px 20px',
           backgroundColor: 'var(--mac-bg-secondary)',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--mac-border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
@@ -470,7 +470,7 @@ export const AIAssistant = ({
             style={{
               padding: '6px 12px',
               fontSize: '12px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--mac-border)',
               borderRadius: '6px',
               backgroundColor: isListening ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',
@@ -498,7 +498,7 @@ export const AIAssistant = ({
             style={{
               padding: '6px 12px',
               fontSize: '12px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--mac-border)',
               borderRadius: '6px',
               backgroundColor: 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',
@@ -591,7 +591,7 @@ export const AIAssistant = ({
         className="ai-assistant-input"
         style={{
           padding: '16px 20px',
-          borderTop: '1px solid #e5e7eb',
+          borderTop: '1px solid var(--mac-border)',
           backgroundColor: 'var(--mac-bg-secondary)'
         }}>
         
@@ -604,7 +604,7 @@ export const AIAssistant = ({
             padding: '4px 8px',
             backgroundColor: 'var(--mac-error-bg)',
             borderRadius: '4px',
-            border: '1px solid #fecaca'
+            border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'
           }}>
           
             {error}
@@ -632,7 +632,7 @@ export const AIAssistant = ({
               flex: 1,
               padding: '10px 12px',
               fontSize: '14px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--mac-border)',
               borderRadius: '6px',
               backgroundColor: 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',
@@ -659,7 +659,7 @@ export const AIAssistant = ({
               padding: '10px 16px',
               fontSize: '14px',
               fontWeight: '500',
-              border: '1px solid #3b82f6',
+              border: '1px solid var(--mac-accent-blue)',
               borderRadius: '6px',
               backgroundColor: 'var(--mac-accent-blue)',
               color: 'var(--mac-bg-primary)',
@@ -719,7 +719,7 @@ export const AISuggestions = ({
       className={`ai-suggestions ${className}`}
       style={{
         backgroundColor: 'var(--mac-bg-primary)',
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--mac-border)',
         borderRadius: '8px',
         overflow: 'hidden'
       }}
@@ -730,7 +730,7 @@ export const AISuggestions = ({
         style={{
           padding: '16px 20px',
           backgroundColor: 'var(--mac-bg-secondary)',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--mac-border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
@@ -749,7 +749,7 @@ export const AISuggestions = ({
           style={{
             padding: '6px 12px',
             fontSize: '12px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--mac-border)',
             borderRadius: '6px',
             backgroundColor: 'var(--mac-bg-primary)',
             color: 'var(--mac-text-primary)',
@@ -783,7 +783,7 @@ export const AISuggestions = ({
             padding: '8px',
             backgroundColor: 'var(--mac-error-bg)',
             borderRadius: '4px',
-            border: '1px solid #fecaca'
+            border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'
           }}>
           
             {error}
@@ -810,7 +810,7 @@ export const AISuggestions = ({
             style={{
               padding: '12px 16px',
               textAlign: 'left',
-              border: '1px solid #e5e7eb',
+              border: '1px solid var(--mac-border)',
               borderRadius: '6px',
               backgroundColor: 'var(--mac-bg-primary)',
               color: 'var(--mac-text-primary)',

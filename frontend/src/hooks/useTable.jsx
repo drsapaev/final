@@ -216,7 +216,7 @@ export const TableHeader = ({
             fontWeight: '600',
             color: 'var(--mac-text-primary)',
             backgroundColor: 'var(--mac-bg-secondary)',
-            borderBottom: '1px solid #e5e7eb',
+            borderBottom: '1px solid var(--mac-border)',
             cursor: sortable && column.sortable !== false ? 'pointer' : 'default',
             userSelect: 'none',
             transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
@@ -289,7 +289,7 @@ export const TableRow = ({
       className={`table-row ${selected ? 'selected' : ''} ${expanded ? 'expanded' : ''} ${className}`}
       style={{
         backgroundColor: selected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)',
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '1px solid var(--mac-border)',
         cursor: onClick ? 'pointer' : 'default',
         transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
       }}
@@ -365,7 +365,7 @@ export const TableRow = ({
           textAlign: column.align || 'left',
           fontSize: '14px',
           color: 'var(--mac-text-primary)',
-          borderBottom: '1px solid #e5e7eb'
+          borderBottom: '1px solid var(--mac-border)'
         }}>
         
           {column.render ? column.render(row[column.key], row) : row[column.key]}
@@ -437,7 +437,7 @@ export const TablePagination = ({
         justifyContent: 'space-between',
         padding: '16px 20px',
         backgroundColor: 'var(--mac-bg-secondary)',
-        borderTop: '1px solid #e5e7eb'
+        borderTop: '1px solid var(--mac-border)'
       }}
       {...props}>
       
@@ -455,7 +455,7 @@ export const TablePagination = ({
           style={{
             padding: '8px 12px',
             fontSize: '14px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--mac-border)',
             borderRadius: '6px',
             backgroundColor: currentPage === 1 ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
             color: currentPage === 1 ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
@@ -488,7 +488,7 @@ export const TablePagination = ({
                   padding: '8px 12px',
                   fontSize: '14px',
                   fontWeight: pageNumber === currentPage ? '600' : '400',
-                  border: '1px solid #d1d5db',
+                  border: '1px solid var(--mac-border)',
                   borderRadius: '6px',
                   backgroundColor: pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)',
                   color: pageNumber === currentPage ? 'var(--mac-bg-primary)' : 'var(--mac-text-primary)',
@@ -520,7 +520,7 @@ export const TablePagination = ({
           style={{
             padding: '8px 12px',
             fontSize: '14px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--mac-border)',
             borderRadius: '6px',
             backgroundColor: currentPage === totalPages ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
             color: currentPage === totalPages ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
@@ -561,7 +561,7 @@ export const TableSearch = ({
       style={{
         padding: '16px 20px',
         backgroundColor: 'var(--mac-bg-secondary)',
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '1px solid var(--mac-border)',
         display: 'flex',
         alignItems: 'center',
         gap: '12px'
@@ -579,7 +579,7 @@ export const TableSearch = ({
           flex: 1,
           padding: '8px 12px',
           fontSize: '14px',
-          border: '1px solid #d1d5db',
+          border: '1px solid var(--mac-border)',
           borderRadius: '6px',
           backgroundColor: 'var(--mac-bg-primary)',
           color: 'var(--mac-text-primary)',
@@ -651,7 +651,7 @@ export const Table = ({
       className={`table ${className}`}
       style={{
         backgroundColor: 'var(--mac-bg-primary)',
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--mac-border)',
         borderRadius: '8px',
         overflow: 'hidden',
         ...style

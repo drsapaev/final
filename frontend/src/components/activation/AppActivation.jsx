@@ -133,7 +133,7 @@ const AppActivation = () => {
         <div style={{
           width: '64px',
           height: '64px',
-          background: 'rgba(0, 122, 255, 0.1)',
+          background: 'var(--mac-accent-bg)',
           borderRadius: '24px',
           display: 'flex',
           alignItems: 'center',

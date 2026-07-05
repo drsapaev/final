@@ -166,7 +166,7 @@ export const Tab = ({
         color: active ? 'var(--mac-accent-blue)' : disabled ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
         backgroundColor: active ? 'var(--mac-accent-bg)' : 'transparent',
         border: 'none',
-        borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
+        borderBottom: active ? '2px solid var(--mac-accent-blue)' : '2px solid transparent',
         cursor: disabled ? 'not-allowed' : 'pointer',
         transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
         outline: 'none',
@@ -203,7 +203,7 @@ export const Tabs = ({
         className="tabs-header"
         style={{
           display: 'flex',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--mac-border)',
           backgroundColor: 'var(--mac-bg-secondary)'
         }}>
         
@@ -264,9 +264,9 @@ export const NavigationMenu = ({
         flexDirection: isHorizontal ? 'row' : 'column',
         gap: isHorizontal ? '0' : '8px',
         ...(isHorizontal ? {
-          borderBottom: '1px solid #e5e7eb'
+          borderBottom: '1px solid var(--mac-border)'
         } : {
-          borderRight: '1px solid #e5e7eb',
+          borderRight: '1px solid var(--mac-border)',
           paddingRight: '16px'
         })
       }}
@@ -294,7 +294,7 @@ export const NavigationMenu = ({
           gap: '8px',
           width: '100%',
           ...(isHorizontal && activeItem === item.id ? {
-            borderBottom: '2px solid #3b82f6'
+            borderBottom: '2px solid var(--mac-accent-blue)'
           } : {})
         }}
         onMouseEnter={(e) => {
@@ -461,7 +461,7 @@ export const Pagination = ({
           style={{
             padding: '8px 12px',
             fontSize: '14px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--mac-border)',
             borderRadius: '6px',
             backgroundColor: currentPage === 1 ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
             color: currentPage === 1 ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
@@ -494,7 +494,7 @@ export const Pagination = ({
               padding: '8px 12px',
               fontSize: '14px',
               fontWeight: page === currentPage ? '600' : '400',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--mac-border)',
               borderRadius: '6px',
               backgroundColor: page === currentPage ? 'var(--mac-accent-blue)' : page === '...' ? 'transparent' : 'var(--mac-bg-primary)',
               color: page === currentPage ? 'var(--mac-bg-primary)' : page === '...' ? 'transparent' : 'var(--mac-text-primary)',
@@ -526,7 +526,7 @@ export const Pagination = ({
           style={{
             padding: '8px 12px',
             fontSize: '14px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--mac-border)',
             borderRadius: '6px',
             backgroundColor: currentPage === totalPages ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
             color: currentPage === totalPages ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
@@ -558,7 +558,7 @@ export const Pagination = ({
           style={{
             padding: '4px 8px',
             fontSize: '14px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--mac-border)',
             borderRadius: '4px',
             backgroundColor: 'var(--mac-bg-primary)',
             color: 'var(--mac-text-primary)'

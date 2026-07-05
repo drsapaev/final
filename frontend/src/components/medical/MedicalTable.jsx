@@ -222,7 +222,7 @@ const MedicalTable = ({
         >
           <div 
             className="text-sm"
-            style={{ color: isDark ? 'var(--mac-text-tertiary)' : '#64748b' }}
+            style={{ color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}
           >
             Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length} results
           </div>

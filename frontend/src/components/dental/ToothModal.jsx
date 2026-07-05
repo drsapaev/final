@@ -150,7 +150,7 @@ const styles = {
     height: '28px',
     borderRadius: '50%',
     color: 'var(--mac-accent-blue)',
-    background: 'rgba(0, 122, 255, 0.08)',
+    background: 'var(--mac-accent-bg)',
   },
   itemTitle: {
     margin: 0,

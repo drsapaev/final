@@ -421,7 +421,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             width: isCollapsed ? '32px' : 'auto'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = isDark ? 'var(--mac-success)' : '#059669';
+            e.target.style.color = isDark ? 'var(--mac-success)' : 'var(--mac-success)';
             e.target.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {

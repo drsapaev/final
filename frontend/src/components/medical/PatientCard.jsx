@@ -97,7 +97,7 @@ const PatientCard = ({
             </h3>
             <p
               className="text-sm text-gray-500 truncate"
-              style={{ color: isDark ? 'var(--mac-text-tertiary)' : '#64748b' }}
+              style={{ color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}
             >
               ID: {patientId || id}
             </p>

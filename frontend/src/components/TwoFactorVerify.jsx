@@ -232,7 +232,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       {error &&
       <div style={{
         background: 'var(--mac-error-bg)',
-        border: '1px solid #FCA5A5',
+        border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
         borderRadius: '8px',
         padding: '12px',
         marginBottom: '16px',
@@ -257,7 +257,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        color: '#059669',
+        color: 'var(--mac-success)',
         fontSize: '14px'
       }}>
           <CheckCircle size={16} />

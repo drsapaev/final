@@ -64,7 +64,7 @@ const DEFAULT_FORM = {
   name_uz: '',
   key: '',
   description: '',
-  color: '#0066cc',
+  color: 'var(--mac-accent-blue)',
   icon: 'Package', // ✅ ИЗМЕНЕНО: Используем имя иконки из iconMap вместо emoji
   display_order: 999,
   active: true
@@ -309,7 +309,7 @@ const DepartmentManagement = () => {
       name_uz: dept.name_uz || '',
       key: dept.key || '',
       description: dept.description || '',
-      color: dept.color || '#0066cc',
+      color: dept.color || 'var(--mac-accent-blue)',
       icon: dept.icon || '🏥',
       display_order: dept.display_order || 999,
       active: dept.active ?? true
@@ -493,7 +493,7 @@ const DepartmentManagement = () => {
       `"${(dept.name_uz || '').replace(/"/g, '""')}"`,
       `"${(dept.key || '').replace(/"/g, '""')}"`,
       `"${(dept.description || '').replace(/"/g, '""')}"`,
-      `"${(dept.color || '#0066cc').replace(/"/g, '""')}"`,
+      `"${(dept.color || 'var(--mac-accent-blue)').replace(/"/g, '""')}"`,
       `"${(dept.icon || '🏥').replace(/"/g, '""')}"`,
       dept.display_order || 999,
       dept.active !== false ? 'true' : 'false'].
@@ -1136,7 +1136,7 @@ const DepartmentManagement = () => {
                         
                                             </td>
                                             <td className="admin-td-padded">
-                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || '#0066cc' }}>
+                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || 'var(--mac-accent-blue)' }}>
                                                     {IconComponent ?
                           <IconComponent size={20} /> :
 

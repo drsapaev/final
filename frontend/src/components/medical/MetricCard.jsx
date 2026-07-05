@@ -27,7 +27,7 @@ const MetricCard = ({
     },
     green: {
       bg: isDark ? '#14532d' : 'var(--mac-success-bg)',
-      text: isDark ? '#86efac' : '#16a34a',
+      text: isDark ? '#86efac' : 'var(--mac-success)',
       icon: isDark ? '#4ade80' : 'var(--mac-success)'
     },
     purple: {
@@ -60,7 +60,7 @@ const MetricCard = ({
         <div className="flex-1">
           <p 
             className={`font-medium mb-1 ${compact ? 'text-xs' : 'text-sm'}`}
-            style={{ color: isDark ? 'var(--mac-text-tertiary)' : '#64748b' }}
+            style={{ color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}
           >
             {title}
           </p>

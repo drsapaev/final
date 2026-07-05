@@ -43,7 +43,7 @@ function getPasswordStrength(password) {
     { label: 'Слабый', color: '#ea580c', percent: 50 },
     { label: 'Средний', color: 'var(--mac-warning)', percent: 75 },
     { label: 'Хороший', color: 'var(--mac-success)', percent: 100 },
-    { label: 'Сильный', color: '#16a34a', percent: 100 },
+    { label: 'Сильный', color: 'var(--mac-success)', percent: 100 },
   ];
   return { score, ...labels[score] };
 }

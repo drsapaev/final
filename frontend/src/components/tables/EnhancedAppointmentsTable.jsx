@@ -50,7 +50,7 @@ const SESSION_COLORS = [
   'var(--mac-accent-blue)', // blue
   'var(--mac-success)', // emerald
   'var(--mac-warning)', // amber
-  '#EF4444', // red
+  'var(--mac-error)', // red
   '#8B5CF6', // violet
   '#EC4899', // pink
   '#06B6D4', // cyan
@@ -1727,7 +1727,7 @@ const EnhancedAppointmentsTable = ({
                             fontSize: '10px',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            background: 'linear-gradient(135deg, var(--mac-accent-purple) 0%, var(--mac-accent-purple) 100%)',
                             color: 'white',
                             fontWeight: '600',
                             whiteSpace: 'nowrap'
