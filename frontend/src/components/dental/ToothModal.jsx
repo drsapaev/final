@@ -88,7 +88,7 @@ const styles = {
     margin: 0,
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-xl)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   content: {
     display: 'grid',
@@ -107,7 +107,7 @@ const styles = {
     margin: 0,
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-lg)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   buttonGrid: {
     display: 'flex',
@@ -156,7 +156,7 @@ const styles = {
     margin: 0,
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-base)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   itemMeta: {
     margin: '3px 0 0',
@@ -191,7 +191,7 @@ const styles = {
     margin: 0,
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-xl)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   totalCaption: {
     display: 'block',

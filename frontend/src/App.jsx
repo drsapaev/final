@@ -165,7 +165,7 @@ const ROUTE_COMPONENTS = {
 
 function LoadingScreen() {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: 'var(--mac-font-size-xl)' }}>
       Загрузка...
     </div>
   );
@@ -214,7 +214,7 @@ function AppShell({ children }) {
   return (
     <div className="app-shell" style={macOSWrapStyle} data-route-id={chrome.route?.id || 'unknown'}>
       {!chrome.hideHeader && (
-        <div style={{ padding: '12px', backgroundColor: 'transparent', width: '100%', maxWidth: '100%' }}>
+        <div style={{ padding: 'var(--mac-spacing-3)', backgroundColor: 'transparent', width: '100%', maxWidth: '100%' }}>
           <HeaderNew />
         </div>
       )}
@@ -255,7 +255,7 @@ function AppShell({ children }) {
                   zIndex: 10,
                   width: '28px',
                   height: '28px',
-                  borderRadius: '8px',
+                  borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border, rgba(0,0,0,0.1))',
                   backgroundColor: 'var(--mac-bg-secondary, rgba(0,0,0,0.04))',
                   color: 'var(--mac-text-primary)',

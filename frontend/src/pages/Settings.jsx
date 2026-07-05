@@ -16,7 +16,7 @@ import { useConfirm } from '../components/common/ConfirmDialog';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
-    padding: '8px 12px',
+    padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
     borderRadius: 10,
     border: '1px solid var(--border-color)',
     background: active ? 'var(--accent-color)' : 'var(--bg-primary)',
@@ -34,7 +34,7 @@ function Row({ k, v, onSave }) {
   useEffect(() => setVal(String(v ?? '')), [v]);
   return (
     <div style={row}>
-      <div style={{ fontWeight: 600 }}>{k}</div>
+      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{k}</div>
       <input aria-label={`Setting value for ${k}`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
       <button onClick={() => onSave(k, val)} style={btn}>Сохранить</button>
     </div>);
@@ -235,7 +235,7 @@ export default function Settings() {void
               <ColorSchemeSelector />
 
               <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: 12 }}>Accent color</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Accent color</div>
                 <div style={{ display: 'grid', gap: 10 }}>
                   <AccentPicker />
                   <div style={{ fontSize: 12, opacity: 0.75 }}>
@@ -245,7 +245,7 @@ export default function Settings() {void
               </div>
 
               <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: 12 }}>Как использовать вместе</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Как использовать вместе</div>
                 <div style={{ display: 'grid', gap: 8, fontSize: 13, color: 'var(--text-primary)' }}>
                   <div>1. Сначала выберите theme для фона, sidebar и карточек.</div>
                   <div>2. Потом подберите accent для primary actions и focus состояний.</div>
@@ -260,7 +260,7 @@ export default function Settings() {void
           {tab === 'notifications' &&
           <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: 12 }}>Статус системы уведомлений</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Статус системы уведомлений</div>
                 <NotificationSystemStatus />
               </div>
             </div>
@@ -269,7 +269,7 @@ export default function Settings() {void
           {tab === 'license' &&
           <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Статус активации</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Статус активации</div>
                 <div style={{ display: 'grid', gap: 4 }}>
                   <div>Состояние: {badge}</div>
                   <div>Ключ: <code>{status?.key || '—'}</code></div>
@@ -279,7 +279,7 @@ export default function Settings() {void
               </div>
 
               <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Активация сервера</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Активация сервера</div>
                 {errAct && <div style={errBox}>{String(errAct)}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <input
@@ -304,7 +304,7 @@ export default function Settings() {void
           {(tab === 'printer' || tab === 'online_queue' || tab === 'display_board') &&
           <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>
                   Категория: <code>{cat}</code>
                 </div>
                 {busyCat && <div style={{ opacity: .7 }}>Загрузка…</div>}
@@ -327,7 +327,7 @@ export default function Settings() {void
               {tab === 'display_board' &&
             <>
                   <div style={card}>
-                    <div style={{ fontWeight: 700, marginBottom: 6 }}>Табло: бренд и объявления</div>
+                    <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Табло: бренд и объявления</div>
                     <div style={{ display: 'grid', gap: 8 }}>
                       <KVField label="Бренд (brand)" defKey="brand" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                       <KVField label="Логотип (logo URL)" defKey="logo" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
@@ -344,7 +344,7 @@ export default function Settings() {void
                   </div>
 
                   <div style={card}>
-                    <div style={{ fontWeight: 700, marginBottom: 6 }}>Табло: мэппинг Роль → Отделение</div>
+                    <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Табло: мэппинг Роль → Отделение</div>
                     <RoleMapEditor items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                   </div>
                 </>
@@ -354,11 +354,11 @@ export default function Settings() {void
             <div style={{ display: 'grid', gap: 12 }}>
                   <div style={card}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <div style={{ fontWeight: 700 }}>Провайдеры оплаты</div>
+                      <div style={{ fontWeight: 'var(--mac-font-weight-bold)' }}>Провайдеры оплаты</div>
                       <button
                     onClick={() => setShowAddProvider(true)}
                     style={{
-                      padding: '8px 16px',
+                      padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
                       background: 'var(--accent-color)',
                       color: 'white',
                       border: 'none',
@@ -413,12 +413,12 @@ export default function Settings() {void
           {tab === 'security' &&
           <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: 12 }}>Двухфакторная аутентификация (2FA)</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Двухфакторная аутентификация (2FA)</div>
                 <TwoFactorManager />
               </div>
 
               <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: 12 }}>Верификация телефона</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Верификация телефона</div>
                 <PhoneVerification
                 showPhoneInput={true}
                 title="Верификация телефона"
@@ -446,18 +446,18 @@ function ProviderCard({ provider, onEdit, onDelete }) {
       gap: 8
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 600 }}>{provider.name}</div>
+        <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{provider.name}</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={onEdit}
             style={{
-              padding: '4px 8px',
+              padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
               background: 'var(--accent-color)',
               color: 'white',
               border: 'none',
               borderRadius: 4,
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: 'var(--mac-font-size-xs)'
             }}>
             
             Редактировать
@@ -465,20 +465,20 @@ function ProviderCard({ provider, onEdit, onDelete }) {
           <button
             onClick={onDelete}
             style={{
-              padding: '4px 8px',
+              padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
               background: 'var(--mac-error)',
               color: 'white',
               border: 'none',
               borderRadius: 4,
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: 'var(--mac-font-size-xs)'
             }}>
             
             Удалить
           </button>
         </div>
       </div>
-      <div style={{ fontSize: '14px', opacity: 0.8 }}>
+      <div style={{ fontSize: 'var(--mac-font-size-base)', opacity: 0.8 }}>
         <div>Код: {provider.code}</div>
         <div>Активен: {provider.is_active ? 'Да' : 'Нет'}</div>
         {provider.description && <div>Описание: {provider.description}</div>}
@@ -538,7 +538,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '20px',
+              fontSize: 'var(--mac-font-size-2xl)',
               cursor: 'pointer',
               color: 'var(--text-primary)'
             }}>
@@ -549,7 +549,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Название *</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Название *</label>
             <input
               type="text"
               aria-label="Provider name"
@@ -568,7 +568,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Код *</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Код *</label>
             <input
               type="text"
               aria-label="Provider code"
@@ -587,7 +587,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Описание</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Описание</label>
             <textarea
               aria-label="Provider description"
               value={formData.description}
@@ -606,7 +606,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Секретный ключ *</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Секретный ключ *</label>
             <input
               type="password"
               aria-label="Provider secret key"
@@ -625,7 +625,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Webhook URL</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Webhook URL</label>
             <input
               type="url"
               aria-label="Provider webhook URL"
@@ -643,7 +643,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>API URL</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>API URL</label>
             <input
               type="url"
               aria-label="Provider API URL"
@@ -668,7 +668,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               checked={formData.is_active}
               onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
             
-            <label htmlFor="is_active" style={{ fontWeight: 600 }}>Активен</label>
+            <label htmlFor="is_active" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Активен</label>
           </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
@@ -676,7 +676,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               type="button"
               onClick={onClose}
               style={{
-                padding: '8px 16px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
                 background: 'var(--bg-secondary)',
                 color: 'var(--text-primary)',
                 border: '1px solid var(--border-color)',
@@ -689,7 +689,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <button
               type="submit"
               style={{
-                padding: '8px 16px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
                 background: 'var(--accent-color)',
                 color: 'white',
                 border: 'none',
@@ -761,7 +761,7 @@ function KVField({ label, defKey, items, onSave }) {
   useEffect(() => setVal(found?.value || ''), [found?.value]);
   return (
     <div style={row}>
-      <div style={{ fontWeight: 600 }}>{label}</div>
+      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{label}</div>
       <input aria-label={`${label} setting value`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
       <button onClick={() => onSave(defKey, val)} style={btn}>Сохранить</button>
     </div>);
@@ -776,7 +776,7 @@ function RoleMapItem({ role, items, onSave }) {
 
   return (
     <div style={row}>
-      <div style={{ fontWeight: 600 }}>{role}</div>
+      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{role}</div>
       <input
         aria-label={`Route target for ${role}`}
         value={val}

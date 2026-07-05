@@ -261,20 +261,20 @@ const AnalyticsInsights = () => {
   };
 
   const renderTrendsAnalysis = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)'
     }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-3)' }}>
           <h4 style={{
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <BarChart3 style={{ width: '16px', height: '16px' }} />
             Медицинские данные для анализа
@@ -282,18 +282,18 @@ const AnalyticsInsights = () => {
           <Button
           onClick={addMedicalRecord}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить запись
           </Button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', maxHeight: '160px', overflowY: 'auto' }}>
           {medicalData.map((record, index) =>
         <div key={record.id || index} style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(6, 1fr)',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           alignItems: 'center'
         }}>
               <Input
@@ -367,7 +367,7 @@ const AnalyticsInsights = () => {
             aria-label={`Remove medical record ${index + 1}`}
             onClick={() => removeMedicalRecord(index)}
             variant="outline"
-            style={{ padding: '4px', minWidth: 'auto' }}>
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </Button>
@@ -379,10 +379,10 @@ const AnalyticsInsights = () => {
       <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-      gap: '16px'
+      gap: 'var(--mac-spacing-4)'
     }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -392,19 +392,19 @@ const AnalyticsInsights = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Calendar style={{ width: '16px', height: '16px' }} />
             Параметры анализа
           </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
             <div>
               <label style={{
               display: 'block',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Временной период
               </label>
@@ -427,7 +427,7 @@ const AnalyticsInsights = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Тип анализа
               </label>
@@ -451,20 +451,20 @@ const AnalyticsInsights = () => {
 
 
   const renderAnomalyDetection = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)'
     }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-3)' }}>
           <h4 style={{
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-warning)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Activity style={{ width: '16px', height: '16px' }} />
             Данные для анализа аномалий
@@ -475,18 +475,18 @@ const AnalyticsInsights = () => {
           aria-label="Add anomaly dataset entry"
           onClick={addDatasetEntry}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
 
             <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить запись
           </Button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', maxHeight: '160px', overflowY: 'auto' }}>
           {dataset.map((entry, index) =>
         <div key={entry.id || index} style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           alignItems: 'center'
         }}>
               <Input
@@ -544,7 +544,7 @@ const AnalyticsInsights = () => {
             aria-label={`Remove anomaly dataset entry ${index + 1}`}
             onClick={() => removeDatasetEntry(index)}
             variant="outline"
-            style={{ padding: '4px', minWidth: 'auto' }}>
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </Button>
@@ -554,7 +554,7 @@ const AnalyticsInsights = () => {
       </MacOSCard>
 
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-accent-bg)',
       border: '1px solid var(--mac-accent-border)'
     }}>
@@ -564,12 +564,12 @@ const AnalyticsInsights = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <Target style={{ width: '16px', height: '16px' }} />
           Базовые показатели
         </h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
           <Textarea
           value={JSON.stringify(baselineData, null, 2)}
           onChange={(e) => {
@@ -593,9 +593,9 @@ const AnalyticsInsights = () => {
 
 
   const renderOutcomePrediction = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-accent-bg)',
       border: '1px solid var(--mac-accent-border)'
     }}>
@@ -605,7 +605,7 @@ const AnalyticsInsights = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <Users style={{ width: '16px', height: '16px' }} />
           Данные пациента
@@ -613,7 +613,7 @@ const AnalyticsInsights = () => {
         <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
+        gap: 'var(--mac-spacing-4)'
       }}>
           <div>
             <label style={{
@@ -621,7 +621,7 @@ const AnalyticsInsights = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Возраст
             </label>
@@ -638,7 +638,7 @@ const AnalyticsInsights = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Пол
             </label>
@@ -659,7 +659,7 @@ const AnalyticsInsights = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Диагноз
             </label>
@@ -676,7 +676,7 @@ const AnalyticsInsights = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Дата начала лечения
             </label>
@@ -691,18 +691,18 @@ const AnalyticsInsights = () => {
       </MacOSCard>
 
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)'
     }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-3)' }}>
           <h4 style={{
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-success)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <BarChart3 style={{ width: '16px', height: '16px' }} />
             Исторические исходы
@@ -710,18 +710,18 @@ const AnalyticsInsights = () => {
           <Button
           onClick={addHistoricalOutcome}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить исход
           </Button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', maxHeight: '160px', overflowY: 'auto' }}>
           {historicalOutcomes.map((outcome, index) =>
         <div key={index} style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(6, 1fr)',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           alignItems: 'center'
         }}>
               <Input
@@ -790,7 +790,7 @@ const AnalyticsInsights = () => {
             aria-label={`Remove historical outcome ${index + 1}`}
             onClick={() => removeHistoricalOutcome(index)}
             variant="outline"
-            style={{ padding: '4px', minWidth: 'auto' }}>
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </Button>
@@ -802,9 +802,9 @@ const AnalyticsInsights = () => {
 
 
   const renderInsightsReport = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)'
     }}>
@@ -814,7 +814,7 @@ const AnalyticsInsights = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <FileText style={{ width: '16px', height: '16px' }} />
           Параметры отчета
@@ -822,7 +822,7 @@ const AnalyticsInsights = () => {
         <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '16px'
+        gap: 'var(--mac-spacing-4)'
       }}>
           <div>
             <label style={{
@@ -830,7 +830,7 @@ const AnalyticsInsights = () => {
             fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)',
-            marginBottom: '4px'
+            marginBottom: 'var(--mac-spacing-1)'
           }}>
               Тип отчета
             </label>
@@ -852,7 +852,7 @@ const AnalyticsInsights = () => {
       </MacOSCard>
 
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)'
     }}>
@@ -862,12 +862,12 @@ const AnalyticsInsights = () => {
         margin: '0 0 12px 0',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: 'var(--mac-spacing-2)'
       }}>
           <PieChart style={{ width: '16px', height: '16px' }} />
           Аналитические данные
         </h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
           <Textarea
           value={JSON.stringify(analyticsData, null, 2)}
           onChange={(e) => {
@@ -891,20 +891,20 @@ const AnalyticsInsights = () => {
 
 
   const renderRiskPatterns = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)'
     }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-3)' }}>
           <h4 style={{
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-danger)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Users style={{ width: '16px', height: '16px' }} />
             Популяционные данные
@@ -915,18 +915,18 @@ const AnalyticsInsights = () => {
           aria-label="Add population patient"
           onClick={addPopulationEntry}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
 
             <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить пациента
           </Button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', maxHeight: '160px', overflowY: 'auto' }}>
           {populationData.map((patient, index) =>
         <div key={patient.id || index} style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(6, 1fr)',
-          gap: '8px',
+          gap: 'var(--mac-spacing-2)',
           alignItems: 'center'
         }}>
               <Input
@@ -997,7 +997,7 @@ const AnalyticsInsights = () => {
             aria-label={`Remove population patient ${index + 1}`}
             onClick={() => removePopulationEntry(index)}
             variant="outline"
-            style={{ padding: '4px', minWidth: 'auto' }}>
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </Button>
@@ -1007,18 +1007,18 @@ const AnalyticsInsights = () => {
       </MacOSCard>
 
       <MacOSCard style={{
-      padding: '16px',
+      padding: 'var(--mac-spacing-4)',
       backgroundColor: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)'
     }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-3)' }}>
           <h4 style={{
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-warning)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
             Факторы риска
@@ -1029,15 +1029,15 @@ const AnalyticsInsights = () => {
           aria-label="Add risk factor"
           onClick={addRiskFactor}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
 
             <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить фактор
           </Button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)', maxHeight: '128px', overflowY: 'auto' }}>
           {riskFactors.map((factor, index) =>
-        <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div key={index} style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
               <Input
             type="text"
             value={factor}
@@ -1055,7 +1055,7 @@ const AnalyticsInsights = () => {
             aria-label={`Remove risk factor ${index + 1}`}
             onClick={() => removeRiskFactor(index)}
             variant="outline"
-            style={{ padding: '4px', minWidth: 'auto' }}>
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </Button>
@@ -1072,11 +1072,11 @@ const AnalyticsInsights = () => {
     if (result.error) {
       return (
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-primary)',
           border: '1px solid var(--mac-border)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <XCircle style={{ width: '20px', height: '20px', color: 'var(--mac-danger)' }} />
             <h3 style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -1088,7 +1088,7 @@ const AnalyticsInsights = () => {
             </h3>
           </div>
           <p style={{
-            marginTop: '8px',
+            marginTop: 'var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-danger)',
             margin: '8px 0 0 0'
@@ -1100,8 +1100,8 @@ const AnalyticsInsights = () => {
     }
 
     return (
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
@@ -1109,16 +1109,16 @@ const AnalyticsInsights = () => {
             margin: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результаты аналитики
           </h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
             <Button
               onClick={() => copyToClipboard(JSON.stringify(result, null, 2))}
               variant="outline"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
               
               <Copy style={{ width: '16px', height: '16px' }} />
               Копировать
@@ -1126,7 +1126,7 @@ const AnalyticsInsights = () => {
             <Button
               onClick={exportResult}
               variant="outline"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
               
               <Download style={{ width: '16px', height: '16px' }} />
               Экспорт
@@ -1134,7 +1134,7 @@ const AnalyticsInsights = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
           {Object.entries(result).map(([key, value]) =>
           <div key={key} style={{
             borderLeft: '4px solid var(--mac-accent)',
@@ -1155,7 +1155,7 @@ const AnalyticsInsights = () => {
                 whiteSpace: 'pre-wrap',
                 backgroundColor: 'var(--mac-bg-primary)',
                 border: '1px solid var(--mac-border)',
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 overflowX: 'auto',
@@ -1178,16 +1178,16 @@ const AnalyticsInsights = () => {
 
   return (
     <div style={{
-      padding: '24px',
+      padding: 'var(--mac-spacing-6)',
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         {/* Заголовок */}
         <div style={{
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           <h2 style={{
             fontSize: 'var(--mac-font-size-2xl)',
@@ -1196,7 +1196,7 @@ const AnalyticsInsights = () => {
             margin: '0 0 8px 0',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: 'var(--mac-spacing-3)'
           }}>
             <TrendingUp style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             AI Аналитические Инсайты
@@ -1213,7 +1213,7 @@ const AnalyticsInsights = () => {
         {/* Вкладки */}
         <div style={{
           display: 'flex',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -1230,7 +1230,7 @@ const AnalyticsInsights = () => {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)',
                   fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                   fontSize: 'var(--mac-font-size-sm)',
@@ -1274,14 +1274,14 @@ const AnalyticsInsights = () => {
         {/* Разделительная линия */}
         <div style={{
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }} />
 
         {/* Контент */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px'
+          gap: 'var(--mac-spacing-6)'
         }}>
           <div>
             <h3 style={{
@@ -1299,14 +1299,14 @@ const AnalyticsInsights = () => {
             {activeTab === 'reports' && renderInsightsReport()}
             {activeTab === 'risk-patterns' && renderRiskPatterns()}
             
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ marginTop: 'var(--mac-spacing-6)', display: 'flex', justifyContent: 'center' }}>
               <Button
                 type="button"
                 title={loading ? 'Running AI analytics' : 'Run AI analytics'}
                 aria-label={loading ? 'Running AI analytics' : 'Run AI analytics'}
                 onClick={handleSubmit}
                 disabled={loading}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                 
                 {loading ?
                 <>
@@ -1340,12 +1340,12 @@ const AnalyticsInsights = () => {
             
             {error &&
             <MacOSCard style={{
-              padding: '16px',
+              padding: 'var(--mac-spacing-4)',
               backgroundColor: 'var(--mac-bg-primary)',
               border: '1px solid var(--mac-border)',
-              marginTop: '16px'
+              marginTop: 'var(--mac-spacing-4)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                   <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-danger)' }} />
                   <h3 style={{
                   fontSize: 'var(--mac-font-size-sm)',
@@ -1357,7 +1357,7 @@ const AnalyticsInsights = () => {
                   </h3>
                 </div>
                 <p style={{
-                marginTop: '8px',
+                marginTop: 'var(--mac-spacing-2)',
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-danger)',
                 margin: '8px 0 0 0'

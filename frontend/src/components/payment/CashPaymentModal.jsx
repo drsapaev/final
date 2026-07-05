@@ -59,40 +59,40 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
             <div style={{
                 backgroundColor: 'var(--mac-bg-secondary)',
                 borderRadius: 'var(--mac-radius-md)',
-                padding: '24px',
+                padding: 'var(--mac-spacing-6)',
                 width: '100%',
                 maxWidth: '400px',
                 margin: '16px',
                 border: '1px solid var(--mac-border)',
                 boxShadow: 'var(--mac-shadow-lg)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>Обработка оплаты</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
+                    <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>Обработка оплаты</h3>
                     <button onClick={onClose} aria-label="Закрыть окно обработки оплаты" style={{ color: 'var(--mac-text-secondary)', cursor: 'pointer', border: 'none', background: 'none' }}>
                         <XCircle style={{ width: '24px', height: '24px' }} />
                     </button>
                 </div>
 
-                <div style={{ marginBottom: '16px' }}>
-                    <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '8px' }}>Пациент:</p>
-                    <p style={{ fontSize: '16px', fontWeight: '500', color: 'var(--mac-text-primary)' }}>
+                <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+                    <p style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-2)' }}>Пациент:</p>
+                    <p style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
                         {appointment?.patient_name || `Пациент #${appointment?.patient_id}`}
                     </p>
-                    <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                    <p style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>
                         {appointment?.department} • {appointment?.appointment_date} {appointment?.appointment_time}
                     </p>
                     {/* Recommended amount hint */}
                     {defaultAmount > 0 && (
                         <p style={{
-                            fontSize: '13px',
+                            fontSize: 'var(--mac-font-size-sm)',
                             color: '#007AFF',
-                            marginTop: '8px',
-                            padding: '8px 12px',
+                            marginTop: 'var(--mac-spacing-2)',
+                            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                             backgroundColor: 'var(--mac-accent-bg)',
                             borderRadius: 'var(--mac-radius-sm)',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px'
+                            gap: 'var(--mac-spacing-2)'
                         }}>
                             💡 Сумма к оплате: {formatAmount(defaultAmount)} сум
                         </p>
@@ -100,8 +100,8 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div style={{ marginBottom: '16px' }}>
-                        <label htmlFor="cash-payment-amount" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                    <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+                        <label htmlFor="cash-payment-amount" style={{ display: 'block', fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', marginBottom: 'var(--mac-spacing-1)' }}>
                             Сумма (сум)
                         </label>
                         <input
@@ -112,10 +112,10 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
                             style={{
                                 width: '100%',
-                                padding: '8px 12px',
+                                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                                 border: '1px solid var(--mac-border)',
                                 borderRadius: 'var(--mac-radius-sm)',
-                                fontSize: '16px',
+                                fontSize: 'var(--mac-font-size-lg)',
                                 backgroundColor: 'var(--mac-bg-primary)',
                                 color: 'var(--mac-text-primary)'
                             }}
@@ -124,8 +124,8 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                         />
                     </div>
 
-                    <div style={{ marginBottom: '16px' }}>
-                        <label htmlFor="cash-payment-method" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                    <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+                        <label htmlFor="cash-payment-method" style={{ display: 'block', fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', marginBottom: 'var(--mac-spacing-1)' }}>
                             Способ оплаты
                         </label>
                         <select
@@ -134,10 +134,10 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             onChange={(e) => setPaymentData(prev => ({ ...prev, method: e.target.value }))}
                             style={{
                                 width: '100%',
-                                padding: '8px 12px',
+                                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                                 border: '1px solid var(--mac-border)',
                                 borderRadius: 'var(--mac-radius-sm)',
-                                fontSize: '16px',
+                                fontSize: 'var(--mac-font-size-lg)',
                                 backgroundColor: 'var(--mac-bg-primary)',
                                 color: 'var(--mac-text-primary)'
                             }}
@@ -147,8 +147,8 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                         </select>
                     </div>
 
-                    <div style={{ marginBottom: '24px' }}>
-                        <label htmlFor="cash-payment-note" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                    <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
+                        <label htmlFor="cash-payment-note" style={{ display: 'block', fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', marginBottom: 'var(--mac-spacing-1)' }}>
                             Примечание (необязательно)
                         </label>
                         <textarea
@@ -158,10 +158,10 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             onChange={(e) => setPaymentData(prev => ({ ...prev, note: e.target.value }))}
                             style={{
                                 width: '100%',
-                                padding: '8px 12px',
+                                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                                 border: '1px solid var(--mac-border)',
                                 borderRadius: 'var(--mac-radius-sm)',
-                                fontSize: '16px',
+                                fontSize: 'var(--mac-font-size-lg)',
                                 minHeight: '80px',
                                 resize: 'vertical',
                                 backgroundColor: 'var(--mac-bg-primary)',
@@ -171,9 +171,9 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                         />
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', justifyContent: 'flex-end' }}>
                         <Button type="submit" variant="primary">
-                            <CheckCircle style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                            <CheckCircle style={{ width: '16px', height: '16px', marginRight: 'var(--mac-spacing-2)' }} />
                             Обработать оплату
                         </Button>
                         <Button type="button" variant="outline" onClick={onClose}>

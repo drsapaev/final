@@ -100,7 +100,7 @@ export function Table({
     width: '100%',
     borderCollapse: 'collapse',
     backgroundColor: getColor('background', 'primary'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     overflow: 'hidden',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
   };
@@ -114,7 +114,7 @@ export function Table({
     padding: getSpacing('md'),
     textAlign: 'left',
     fontSize: getFontSize('sm'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary'),
     borderBottom: `1px solid ${getColor('border', 'main')}`,
     cursor: sortable ? 'pointer' : 'default',
@@ -142,7 +142,7 @@ export function Table({
     padding: getSpacing('xs'),
     fontSize: getFontSize('xs'),
     border: `1px solid ${getColor('border', 'main')}`,
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     backgroundColor: getColor('background', 'primary'),
     color: getColor('text', 'primary')
   };
@@ -167,7 +167,7 @@ export function Table({
     padding: `${getSpacing('xs')} ${getSpacing('sm')}`,
     margin: `0 ${getSpacing('xs')}`,
     border: `1px solid ${getColor('border', 'main')}`,
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     backgroundColor: getColor('background', 'primary'),
     color: getColor('text', 'primary'),
     cursor: 'pointer',
@@ -192,7 +192,8 @@ export function Table({
 
   return (
     <div>
-      <table style={tableStyle} {...props}>
+      <div className="admin-table-wrapper">
+<table style={tableStyle} {...props}>
         <thead style={headerStyle}>
           <tr>
             {columns.map((column) => (
@@ -260,6 +261,7 @@ export function Table({
           )}
         </tbody>
       </table>
+</div>
       
       {pagination && totalPages > 1 && (
         <div style={paginationStyle}>
@@ -316,7 +318,7 @@ function TableLoading({ columns = 3, rows = 5 }) {
     width: '100%',
     borderCollapse: 'collapse',
     backgroundColor: getColor('background', 'primary'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     overflow: 'hidden'
   };
 
@@ -327,7 +329,7 @@ function TableLoading({ columns = 3, rows = 5 }) {
 
   const skeletonStyle = {
     backgroundColor: getColor('background', 'tertiary'),
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     height: '20px',
     animation: 'skeleton 1.5s ease-in-out infinite'
   };
@@ -396,10 +398,10 @@ export function TableExport({ data, columns, filename = 'export.csv' }) {
     backgroundColor: getColor('primary', 'main'),
     color: getColor('primary', 'contrast'),
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: 'var(--mac-radius-sm)',
     cursor: 'pointer',
     fontSize: getFontSize('sm'),
-    fontWeight: '500'
+    fontWeight: 'var(--mac-font-weight-medium)'
   };
 
   return (

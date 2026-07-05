@@ -176,7 +176,7 @@ const WelcomeView = React.memo(({
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '4px',
+                        gap: 'var(--mac-spacing-1)',
                         padding: '10px 12px',
                         borderRadius: 'var(--mac-radius-md)',
                         border: '1px solid var(--mac-card-border)',
@@ -184,14 +184,14 @@ const WelcomeView = React.memo(({
                       }}
                     >
                       <span style={{
-                        fontSize: '13px',
-                        fontWeight: 600,
+                        fontSize: 'var(--mac-font-size-sm)',
+                        fontWeight: 'var(--mac-font-weight-semibold)',
                         color: textColor,
                       }}>
                         {doc.name}
                       </span>
                       <span style={{
-                        fontSize: '12px',
+                        fontSize: 'var(--mac-font-size-xs)',
                         color: 'var(--mac-text-secondary)',
                       }}>
                         Пациентов: {doc.patientCount}
@@ -367,7 +367,7 @@ const WelcomeView = React.memo(({
                         }
                       }} />
 
-                        <div className="registrar-flex-wrap" style={{ gap: '8px' }}>
+                        <div className="registrar-flex-wrap" style={{ gap: 'var(--mac-spacing-2)' }}>
                           <button
                       type="button"
                       onClick={() => {
@@ -471,7 +471,7 @@ const WelcomeView = React.memo(({
                     <h3 className="registrar-empty-heading" style={{ color: textColor }}>
                       {!tokenManager.hasToken() ? 'Сессия истекла' : 'Очередь пуста'}
                     </h3>
-                    <p className="registrar-empty-desc-text" style={{ fontSize: '16px', color: textColor }}>
+                    <p className="registrar-empty-desc-text" style={{ fontSize: 'var(--mac-font-size-lg)', color: textColor }}>
                       {!tokenManager.hasToken() ?
                 'Нажмите "Войти снова", чтобы обновить данные.' :
                 'На сегодня нет записей в очереди.'}
@@ -518,9 +518,9 @@ const WelcomeView = React.memo(({
                       </div>
               }
                     <p style={{
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
                 color: textColor,
-                marginBottom: '24px'
+                marginBottom: 'var(--mac-spacing-6)'
               }}>
                       {activeTab ?
                 `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :

@@ -474,16 +474,16 @@ export default function LabTemplateWorkbench({
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '16px', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--mac-spacing-4)', alignItems: 'start' }}>
       <Card variant="filled" padding="none">
-        <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
-          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
+          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <Icon name="rectangle.stack.badge.plus" size={20} />
             Шаблоны
           </CardTitle>
         </CardHeader>
-        <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '16px' }}>
-          <div style={{ display: 'grid', gap: '8px' }}>
+        <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)', display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+          <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
             <input className="macos-input" aria-label="Код шаблона" placeholder="Код шаблона" value={newTemplate.code} onChange={(event) => setNewTemplate((prev) => ({ ...prev, code: event.target.value }))} />
             <input className="macos-input" aria-label="Название шаблона" placeholder="Название" value={newTemplate.name} onChange={(event) => setNewTemplate((prev) => ({ ...prev, name: event.target.value }))} />
             <input className="macos-input" aria-label="Семейство шаблона" placeholder="Семейство" value={newTemplate.family} onChange={(event) => setNewTemplate((prev) => ({ ...prev, family: event.target.value }))} />
@@ -495,7 +495,7 @@ export default function LabTemplateWorkbench({
           </div>
 
           {/* WF-21 fix: search для консистентности с LabQueueWorkbench */}
-          <div style={{ position: 'relative', marginBottom: '8px' }}>
+          <div style={{ position: 'relative', marginBottom: 'var(--mac-spacing-2)' }}>
             <input
               type="search"
               value={templateSearch}
@@ -504,12 +504,12 @@ export default function LabTemplateWorkbench({
               aria-label="Поиск шаблонов"
               style={{
                 width: '100%',
-                padding: '8px 12px',
-                borderRadius: '10px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                borderRadius: 'var(--mac-radius-lg)',
                 border: '1px solid var(--mac-border)',
                 background: 'var(--mac-bg-primary)',
                 color: 'var(--mac-text-primary)',
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
                 outline: 'none',
               }}
             />
@@ -522,7 +522,7 @@ export default function LabTemplateWorkbench({
                   position: 'absolute', right: '8px', top: '50%',
                   transform: 'translateY(-50%)', background: 'none',
                   border: 'none', cursor: 'pointer',
-                  color: 'var(--mac-text-muted)', fontSize: '16px',
+                  color: 'var(--mac-text-muted)', fontSize: 'var(--mac-font-size-lg)',
                 }}
               >
                 ×
@@ -530,7 +530,7 @@ export default function LabTemplateWorkbench({
             )}
           </div>
 
-          <div style={{ display: 'grid', gap: '8px' }}>
+          <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
             {templates
               .filter((t) => {
                 if (!templateSearch.trim()) return true;
@@ -545,17 +545,17 @@ export default function LabTemplateWorkbench({
                 style={{
                   border: '1px solid var(--mac-border)',
                   borderRadius: '14px',
-                  padding: '12px',
+                  padding: 'var(--mac-spacing-3)',
                   textAlign: 'left',
                   background: selectedTemplate?.id === template.id ? 'color-mix(in oklab, var(--mac-accent) 10%, var(--mac-bg-primary))' : 'var(--mac-bg-primary)',
                   cursor: 'pointer',
                   display: 'grid',
-                  gap: '6px'
+                  gap: 'var(--mac-spacing-2)'
                 }}
               >
-                <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>{template.name}</div>
-                <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>{template.code} • {template.family}</div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{template.name}</div>
+                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>{template.code} • {template.family}</div>
+                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
                   {template.published_version_id && <Badge variant="success">Опубликован</Badge>}
                   {template.draft_version_id && <Badge variant="warning">Черновик</Badge>}
                 </div>
@@ -566,14 +566,14 @@ export default function LabTemplateWorkbench({
       </Card>
 
       <Card variant="filled" padding="none">
-        <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
-          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
+          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
               <Icon name="slider.horizontal.3" size={20} />
               Редактор бланка
             </span>
             {selectedTemplate && (
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
                 <Button variant="outline" onClick={handleCloneTemplate} disabled={saving}>
                   <Icon name="doc.on.doc" size={16} />
                   Клонировать
@@ -590,19 +590,19 @@ export default function LabTemplateWorkbench({
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}>
+        <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)' }}>
           {!selectedTemplate ? (
             <Alert severity="info">Выберите шаблон слева, чтобы редактировать оформление, секции и строки анализов.</Alert>
           ) : (
             <div style={{ display: 'grid', gap: '18px' }}>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap', alignItems: 'center' }}>
                 <Badge variant="info">{selectedTemplate.code}</Badge>
                 <Badge variant="primary">{selectedTemplate.family}</Badge>
                 {activeVersion?.status && <Badge variant={activeVersion.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus(activeVersion.status)}</Badge>}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
-                <label style={{ display: 'grid', gap: '6px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--mac-spacing-3)' }}>
+                <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <span>Макет печати</span>
                   <select className="macos-input" aria-label="Макет печати" value={draftVersion.layout_preset} onChange={(event) => setDraftVersion((prev) => ({ ...prev, layout_preset: event.target.value }))}>
                     {layoutOptions.map((option) => (
@@ -610,33 +610,33 @@ export default function LabTemplateWorkbench({
                     ))}
                   </select>
                 </label>
-                <label style={{ display: 'grid', gap: '6px' }}>
+                <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <span>Подвал</span>
                   <textarea className="macos-input" aria-label="Подвал шаблона" rows={3} value={draftVersion.footer_notes} onChange={(event) => setDraftVersion((prev) => ({ ...prev, footer_notes: event.target.value }))} />
                 </label>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--mac-spacing-3)' }}>
                 {['document_title', 'document_subtitle', 'clinic_name', 'address', 'phone', 'logo_url'].map((key) => (
-                  <label key={key} style={{ display: 'grid', gap: '6px' }}>
+                  <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <span>{brandingFieldLabels[key] || key}</span>
                     <input className="macos-input" aria-label={brandingFieldLabels[key] || key} value={draftVersion.branding_overrides?.[key] || ''} onChange={(event) => updateBranding(key, event.target.value)} />
                   </label>
                 ))}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 'var(--mac-spacing-3)' }}>
                 {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
-                  <label key={key} style={{ display: 'grid', gap: '6px' }}>
+                  <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <span>{signerFieldLabels[key] || key}</span>
                     <input className="macos-input" aria-label={signerFieldLabels[key] || key} value={draftVersion.signer_defaults?.[key] || ''} onChange={(event) => updateSigner(key, event.target.value)} />
                   </label>
                 ))}
               </div>
 
-              <div style={{ display: 'grid', gap: '12px' }}>
+              <div style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontWeight: 600 }}>Секции и показатели</div>
+                  <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Секции и показатели</div>
                   <Button variant="outline" onClick={addSection}>
                     <Icon name="plus" size={16} />
                     Добавить секцию
@@ -644,13 +644,13 @@ export default function LabTemplateWorkbench({
                 </div>
 
                 {draftVersion.sections.map((section, sectionIndex) => (
-                  <div key={`${section.key}-${sectionIndex}`} style={{ border: '1px solid var(--mac-border)', borderRadius: '16px', padding: '14px', background: 'var(--mac-bg-primary)', display: 'grid', gap: '12px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px', alignItems: 'end' }}>
-                      <label style={{ display: 'grid', gap: '6px' }}>
+                  <div key={`${section.key}-${sectionIndex}`} style={{ border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-xl)', padding: '14px', background: 'var(--mac-bg-primary)', display: 'grid', gap: 'var(--mac-spacing-3)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 'var(--mac-spacing-2)', alignItems: 'end' }}>
+                      <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                         <span>Ключ секции</span>
                         <input className="macos-input" aria-label="Ключ секции" value={section.key} onChange={(event) => updateSection(sectionIndex, 'key', event.target.value)} />
                       </label>
-                      <label style={{ display: 'grid', gap: '6px' }}>
+                      <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                         <span>Заголовок секции</span>
                         <input className="macos-input" aria-label="Заголовок секции" value={section.title || ''} onChange={(event) => updateSection(sectionIndex, 'title', event.target.value)} />
                       </label>
@@ -660,19 +660,19 @@ export default function LabTemplateWorkbench({
                       </Button>
                     </div>
 
-                    <div style={{ display: 'grid', gap: '12px' }}>
+                    <div style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
                       {section.fields.map((field, fieldIndex) => (
-                        <div key={`${field.field_key}-${fieldIndex}`} style={{ border: '1px solid color-mix(in oklab, var(--mac-border) 80%, transparent)', borderRadius: '14px', padding: '12px', display: 'grid', gap: '10px' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 0.8fr 0.8fr auto', gap: '8px', alignItems: 'end' }}>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                        <div key={`${field.field_key}-${fieldIndex}`} style={{ border: '1px solid color-mix(in oklab, var(--mac-border) 80%, transparent)', borderRadius: '14px', padding: 'var(--mac-spacing-3)', display: 'grid', gap: '10px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 0.8fr 0.8fr auto', gap: 'var(--mac-spacing-2)', alignItems: 'end' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Ключ поля</span>
                               <input className="macos-input" aria-label="Ключ поля" value={field.field_key} onChange={(event) => updateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
                             </label>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Название поля</span>
                               <input className="macos-input" aria-label="Название поля" value={field.label} onChange={(event) => updateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
                             </label>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Тип значения</span>
                               <select className="macos-input" aria-label="Тип значения" value={field.value_type} onChange={(event) => updateField(sectionIndex, fieldIndex, 'value_type', event.target.value)}>
                                 {fieldTypeOptions.map((option) => (
@@ -680,7 +680,7 @@ export default function LabTemplateWorkbench({
                                 ))}
                               </select>
                             </label>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Единица измерения</span>
                               <input className="macos-input" aria-label="Единица измерения" value={field.unit || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
                             </label>
@@ -690,8 +690,8 @@ export default function LabTemplateWorkbench({
                             </Button>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.8fr 1.2fr auto', gap: '8px', alignItems: 'end' }}>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.8fr 1.2fr auto', gap: 'var(--mac-spacing-2)', alignItems: 'end' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Код анализируемого показателя</span>
                               <input
                                 className="macos-input"
@@ -701,7 +701,7 @@ export default function LabTemplateWorkbench({
                                 onChange={(event) => updateFieldCatalog(sectionIndex, fieldIndex, 'analyte_code', event.target.value)}
                               />
                             </label>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Код единицы измерения</span>
                               <input
                                 className="macos-input"
@@ -711,7 +711,7 @@ export default function LabTemplateWorkbench({
                                 onChange={(event) => updateField(sectionIndex, fieldIndex, 'unit_code', event.target.value)}
                               />
                             </label>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Источник нормы</span>
                               <select className="macos-input" aria-label="Источник нормы" value={field.reference_mode} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_mode', event.target.value)}>
                                 {referenceModeOptions.map((option) => (
@@ -719,26 +719,26 @@ export default function LabTemplateWorkbench({
                                 ))}
                               </select>
                             </label>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Текст нормы</span>
                               <input className="macos-input" aria-label="Текст нормы" value={field.reference_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
                             </label>
-                            <label style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingBottom: '8px' }}>
+                            <label style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', paddingBottom: '8px' }}>
                               <input type="checkbox" aria-label="Обязательное поле" checked={Boolean(field.required)} onChange={(event) => updateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
                               Обязательное поле
                             </label>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--mac-spacing-2)' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>JSON правил нормы</span>
                               <textarea className="macos-input" aria-label="JSON правил нормы" rows={4} value={field.reference_rule_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)} />
                             </label>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>JSON правил видимости</span>
                               <textarea className="macos-input" aria-label="JSON правил видимости" rows={4} value={field.visibility_rule_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'visibility_rule_text', event.target.value)} />
                             </label>
-                            <label style={{ display: 'grid', gap: '6px' }}>
+                            <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>JSON правил подсветки</span>
                               <textarea className="macos-input" aria-label="JSON правил подсветки" rows={4} value={field.highlight_rule_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'highlight_rule_text', event.target.value)} />
                             </label>

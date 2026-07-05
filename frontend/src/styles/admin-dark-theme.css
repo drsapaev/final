@@ -7,54 +7,54 @@
 :root[data-theme="dark"],
 .dark {
   /* Цвета фона - УЛУЧШЕННЫЕ ДЛЯ ВИДИМОСТИ */
-  --bg-primary: #0f172a;
+  --bg-primary: var(--mac-text-primary);
   --bg-secondary: var(--mac-text-primary);
-  --bg-tertiary: #334155;
-  --bg-hover: #475569;
+  --bg-tertiary: var(--mac-text-primary);
+  --bg-hover: var(--mac-text-secondary);
 
   /* Улучшенные фоны для карточек и панелей */
   --bg-card-solid: var(--mac-text-primary);
-  --bg-card-elevated: #334155;
-  --bg-panel-solid: #0f172a;
+  --bg-card-elevated: var(--mac-text-primary);
+  --bg-panel-solid: var(--mac-text-primary);
   --bg-panel-elevated: var(--mac-text-primary);
 
   /* Цвета текста */
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
+  --text-primary: var(--mac-bg-secondary);
+  --text-secondary: var(--mac-border);
   --text-muted: var(--mac-text-tertiary);
   --text-inverse: var(--mac-text-primary);
 
   /* Цвета границ - УЛУЧШЕННЫЕ ДЛЯ ВИДИМОСТИ */
-  --border-color: #334155;
-  --border-light: #475569;
+  --border-color: var(--mac-text-primary);
+  --border-light: var(--mac-text-secondary);
   --border-focus: var(--mac-accent-blue);
 
   /* Улучшенные границы для лучшей видимости */
-  --border-strong: #475569;
-  --border-card: #475569;
-  --border-panel: #334155;
+  --border-strong: var(--mac-text-secondary);
+  --border-card: var(--mac-text-secondary);
+  --border-panel: var(--mac-text-primary);
 
   /* Акцентные цвета */
   --accent-color: var(--mac-accent-blue);
-  --accent-hover: #2563eb;
-  --success-color: #10b981;
+  --accent-hover: var(--mac-accent-blue-hover);
+  --success-color: var(--mac-success);
   --warning-color: var(--mac-warning);
   --error-color: var(--mac-error);
   --info-color: #06b6d4;
 
   /* Тени */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 2px 0 color-mix(in srgb, black, transparent 70%);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px color-mix(in srgb, black, transparent 50%);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
 
   /* Специальные цвета для админ панели */
   --admin-sidebar-bg: var(--mac-text-primary);
-  --admin-header-bg: #0f172a;
+  --admin-header-bg: var(--mac-text-primary);
   --admin-card-bg: var(--mac-text-primary);
-  --admin-input-bg: #334155;
-  --admin-table-header-bg: #334155;
-  --admin-table-row-hover: #475569;
+  --admin-input-bg: var(--mac-text-primary);
+  --admin-table-header-bg: var(--mac-text-primary);
+  --admin-table-row-hover: var(--mac-text-secondary);
 }
 
 /* Глобальные стили для темной темы */
@@ -127,7 +127,7 @@
 
 .dark .admin-input:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
   outline: none;
 }
 
@@ -200,7 +200,7 @@
 .dark .navigation-button {
   background: rgba(59, 130, 246, 0.15) !important;
   border: 1px solid rgba(59, 130, 246, 0.4) !important;
-  color: #93c5fd !important;
+  color: var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 60%)) !important;
   padding: 8px 16px;
   border-radius: 6px;
   font-weight: 500;
@@ -212,25 +212,25 @@
 }
 
 .dark .navigation-button * {
-  color: #93c5fd !important;
+  color: var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 60%)) !important;
 }
 
 .dark .navigation-button:hover {
   background: rgba(59, 130, 246, 0.25) !important;
   border-color: rgba(59, 130, 246, 0.6) !important;
-  color: #bfdbfe !important;
+  color: var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 70%)) !important;
   transform: translateY(-1px);
 }
 
 .dark .navigation-button:hover * {
-  color: #bfdbfe !important;
+  color: var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 70%)) !important;
 }
 
 .dark .navigation-button.active {
   background: var(--mac-accent-blue) !important;
   border-color: var(--mac-accent-blue) !important;
   color: white !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px var(--mac-accent-border);
 }
 
 .dark .navigation-button.active * {
@@ -251,7 +251,7 @@
 }
 
 .dark .status-error {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--mac-error-bg);
   color: var(--error-color);
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
@@ -322,7 +322,7 @@
 }
 
 .dark .admin-modal-overlay {
-  background: rgba(0, 0, 0, 0.7);
+  background: color-mix(in srgb, black, transparent 30%);
   backdrop-filter: blur(4px);
 }
 
@@ -341,7 +341,7 @@
 
 .dark .admin-notification-error {
   background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%));
   color: var(--error-color);
 }
 
@@ -389,7 +389,7 @@
 /* Улучшения для фокуса (accessibility) */
 .dark .admin-focus-ring:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 0 3px var(--mac-accent-border);
 }
 
 /* НОВЫЕ КЛАССЫ ДЛЯ УЛУЧШЕНИЯ ВИДИМОСТИ */

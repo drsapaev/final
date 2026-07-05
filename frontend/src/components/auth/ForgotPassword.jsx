@@ -423,7 +423,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     padding: '12px 14px',
     border: '1px solid var(--mac-card-border, rgba(148, 163, 184, 0.35))',
     borderRadius: '14px',
-    fontSize: '14px',
+    fontSize: 'var(--mac-font-size-base)',
     background: 'color-mix(in srgb, var(--mac-card-bg, #fff), transparent 30%)',
     color: textPrimary,
     outline: 'none',
@@ -431,11 +431,11 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
   const labelStyle = {
     display: 'block',
-    marginBottom: '8px',
-    fontSize: '13px',
-    fontWeight: '600',
+    marginBottom: 'var(--mac-spacing-2)',
+    fontSize: 'var(--mac-font-size-sm)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: textSecondary,
-    marginLeft: '4px',
+    marginLeft: 'var(--mac-spacing-1)',
   };
 
   const btnPrimaryStyle = {
@@ -443,14 +443,14 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
-    padding: '12px 16px',
+    gap: 'var(--mac-spacing-2)',
+    padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
     border: 'none',
     borderRadius: '14px',
     background: accentColor,
     color: 'var(--mac-text-on-accent, white)',
-    fontSize: '14px',
-    fontWeight: '600',
+    fontSize: 'var(--mac-font-size-base)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     cursor: 'pointer',
     transition: 'opacity 150ms ease',
   };
@@ -465,26 +465,26 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const errorBannerStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '8px 12px',
+    gap: 'var(--mac-spacing-2)',
+    padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
     background: 'color-mix(in srgb, var(--mac-error, #ef4444), transparent 88%)',
     border: '1px solid color-mix(in srgb, var(--mac-error, #ef4444), transparent 70%)',
-    borderRadius: '10px',
+    borderRadius: 'var(--mac-radius-lg)',
     color: 'var(--mac-error, #ef4444)',
-    fontSize: '13px',
-    fontWeight: '500',
+    fontSize: 'var(--mac-font-size-sm)',
+    fontWeight: 'var(--mac-font-weight-medium)',
   };
 
   // ===== RENDER: METHOD SELECTION =====
   const renderMethodSelection = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <div style={{ textAlign: 'center' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px', color: textPrimary }}>{t.title}</h2>
-        <p style={{ color: textSecondary, fontSize: '14px' }}>{t.subtitle}</p>
+        <h2 style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.title}</h2>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.subtitle}</p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--mac-spacing-4)' }}>
           {[
             { key: 'phone', icon: Phone, label: t.methodPhone },
             { key: 'email', icon: Mail, label: t.methodEmail },
@@ -494,12 +494,12 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
               type="button"
               onClick={() => setMethod(key)}
               style={{
-                padding: '16px',
+                padding: 'var(--mac-spacing-4)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
+                gap: 'var(--mac-spacing-2)',
                 cursor: 'pointer',
                 background: method === key
                   ? `color-mix(in srgb, ${accentColor}, transparent 88%)`
@@ -507,11 +507,11 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
                 borderColor: method === key ? accentColor : 'var(--mac-card-border, rgba(148,163,184,0.2))',
                 border: '1px solid',
                 transition: 'all 0.2s ease',
-                borderRadius: '16px',
+                borderRadius: 'var(--mac-radius-xl)',
               }}
             >
               <Icon size={24} color={method === key ? accentColor : textSecondary} />
-              <span style={{ fontSize: '13px', fontWeight: '500', color: method === key ? accentColor : textPrimary }}>{label}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: method === key ? accentColor : textPrimary }}>{label}</span>
             </button>
           ))}
         </div>
@@ -536,7 +536,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
                 : inputStyle.border,
             }}
           />
-          <p style={{ fontSize: '12px', color: textTertiary, marginTop: '6px', marginLeft: '4px' }}>
+          <p style={{ fontSize: 'var(--mac-font-size-xs)', color: textTertiary, marginTop: 'var(--mac-spacing-2)', marginLeft: 'var(--mac-spacing-1)' }}>
             {method === 'phone' ? t.phoneFormat : t.emailFormat}
           </p>
         </div>
@@ -548,7 +548,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
           <button type="button" onClick={onBack} style={btnOutlineStyle} disabled={loading}>
             <ArrowLeft size={16} />
             {t.back}
@@ -573,17 +573,17 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
   // ===== RENDER: PHONE VERIFICATION =====
   const renderPhoneVerification = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ ...iconCircleStyle(accentColor), margin: '0 auto 16px' }}>
           <Phone size={32} color={accentColor} />
         </div>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: textPrimary }}>{t.enterCode}</h3>
-        <p style={{ color: textSecondary, fontSize: '14px' }}>{t.codeSentTo}</p>
-        <p style={{ color: accentColor, fontWeight: '600', marginTop: '4px' }}>{contact}</p>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.enterCode}</h3>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.codeSentTo}</p>
+        <p style={{ color: accentColor, fontWeight: 'var(--mac-font-weight-semibold)', marginTop: 'var(--mac-spacing-1)' }}>{contact}</p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         <div>
           <label style={labelStyle}>{t.codeLabel}</label>
           <input
@@ -599,9 +599,9 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             style={{
               ...inputStyle,
               textAlign: 'center',
-              fontSize: '24px',
+              fontSize: 'var(--mac-font-size-3xl)',
               letterSpacing: '4px',
-              fontWeight: '600',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               borderColor: inlineError
                 ? 'color-mix(in srgb, var(--mac-error, #ef4444), transparent 50%)'
                 : inputStyle.border,
@@ -613,7 +613,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         {/* UX Audit #3: Resend code button with countdown */}
         <div style={{ textAlign: 'center' }}>
           {resendCountdown > 0 ? (
-            <span style={{ fontSize: '13px', color: textTertiary }}>
+            <span style={{ fontSize: 'var(--mac-font-size-sm)', color: textTertiary }}>
               {t.resendIn} {resendCountdown} {t.seconds}
             </span>
           ) : (
@@ -625,8 +625,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
                 background: 'transparent',
                 border: 'none',
                 color: accentColor,
-                fontSize: '13px',
-                fontWeight: '600',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 textDecoration: 'underline',
                 font: 'inherit',
@@ -644,7 +644,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
           <button type="button" onClick={() => setStep('method')} style={btnOutlineStyle} disabled={loading}>
             <ArrowLeft size={16} />
             {t.back}
@@ -669,18 +669,18 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
   // ===== RENDER: EMAIL VERIFICATION =====
   const renderEmailVerification = () => (
-    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div style={iconCircleStyle(accentColor)}>
           <Mail size={32} color={accentColor} />
         </div>
       </div>
       <div>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: textPrimary }}>{t.checkEmail}</h3>
-        <p style={{ color: textSecondary, fontSize: '14px' }}>{t.emailSentTo}</p>
-        <p style={{ color: accentColor, fontWeight: '600', marginTop: '4px' }}>{contact}</p>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.checkEmail}</h3>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.emailSentTo}</p>
+        <p style={{ color: accentColor, fontWeight: 'var(--mac-font-weight-semibold)', marginTop: 'var(--mac-spacing-1)' }}>{contact}</p>
       </div>
-      <div style={{ fontSize: '13px', color: textTertiary, lineHeight: '1.5' }}>
+      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: textTertiary, lineHeight: '1.5' }}>
         <p>{t.emailInstruction1}</p>
         <p>{t.emailInstruction2}</p>
       </div>
@@ -693,18 +693,18 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
   // ===== RENDER: RESET PASSWORD =====
   const renderPasswordReset = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--mac-spacing-4)' }}>
           <div style={iconCircleStyle(successColor)}>
             <Key size={32} color={successColor} />
           </div>
         </div>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: textPrimary }}>{t.createNewPassword}</h3>
-        <p style={{ color: textSecondary, fontSize: '14px' }}>{t.enterNewPassword}</p>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.createNewPassword}</h3>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.enterNewPassword}</p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         {/* New password with show/hide (UX Audit #4) */}
         <div>
           <label style={labelStyle}>{t.newPassword}</label>
@@ -737,8 +737,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
                 border: 'none',
                 color: textSecondary,
                 cursor: 'pointer',
-                padding: '8px',
-                borderRadius: '8px',
+                padding: 'var(--mac-spacing-2)',
+                borderRadius: 'var(--mac-radius-md)',
               }}
             >
               {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -747,16 +747,16 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
           {/* Password strength indicator (UX Audit #8) */}
           {newPassword && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginTop: 'var(--mac-spacing-1)' }}>
               <div style={{ flex: 1, height: '4px', background: 'color-mix(in srgb, var(--mac-text-secondary, #8e8e93), transparent 70%)', borderRadius: '999px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${passwordStrength.percent}%`, background: passwordStrength.color, borderRadius: '999px', transition: 'width 200ms ease, background 200ms ease' }} />
               </div>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: passwordStrength.color, minWidth: '80px', textAlign: 'right' }}>
+              <span style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-semibold)', color: passwordStrength.color, minWidth: '80px', textAlign: 'right' }}>
                 {passwordStrength.label}
               </span>
             </div>
           )}
-          <span style={{ fontSize: '12px', color: textTertiary, display: 'block', marginTop: '4px' }}>
+          <span style={{ fontSize: 'var(--mac-font-size-xs)', color: textTertiary, display: 'block', marginTop: 'var(--mac-spacing-1)' }}>
             {t.passwordHint}
           </span>
         </div>
@@ -793,8 +793,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
                 border: 'none',
                 color: textSecondary,
                 cursor: 'pointer',
-                padding: '8px',
-                borderRadius: '8px',
+                padding: 'var(--mac-spacing-2)',
+                borderRadius: 'var(--mac-radius-md)',
               }}
             >
               {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -803,7 +803,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
           {/* Real-time match indicator (UX Audit #9) */}
           {confirmPassword && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '12px', fontWeight: '600' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginTop: 'var(--mac-spacing-1)', fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
               {passwordsMatch ? (
                 <><CheckCircle size={14} style={{ color: successColor }} /><span style={{ color: successColor }}>{t.passwordsMatch}</span></>
               ) : (
@@ -839,15 +839,15 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
   // ===== RENDER: SUCCESS =====
   const renderSuccess = () => (
-    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div style={iconCircleStyle(successColor)}>
           <CheckCircle size={32} color={successColor} />
         </div>
       </div>
       <div>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: textPrimary }}>{t.success}</h3>
-        <p style={{ color: textSecondary, fontSize: '14px' }}>{t.canLoginNow}</p>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.success}</h3>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.canLoginNow}</p>
       </div>
       {/* UX Audit #10: removed 3s auto-return, explicit button only */}
       <button

@@ -150,20 +150,20 @@ export const AnimatedButton = ({
       transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
       cursor: 'pointer',
       border: 'none',
-      borderRadius: '12px',
-      fontWeight: '600',
+      borderRadius: 'var(--mac-radius-lg)',
+      fontWeight: 'var(--mac-font-weight-semibold)',
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px',
+      gap: 'var(--mac-spacing-2)',
       ...style
     };
 
     // Размеры
     const sizes = {
-      sm: { padding: '8px 16px', fontSize: '14px' },
-      md: { padding: '12px 24px', fontSize: '16px' },
-      lg: { padding: '16px 32px', fontSize: '18px' }
+      sm: { padding: 'var(--mac-spacing-2) var(--mac-spacing-4)', fontSize: 'var(--mac-font-size-base)' },
+      md: { padding: 'var(--mac-spacing-3) var(--mac-spacing-6)', fontSize: 'var(--mac-font-size-lg)' },
+      lg: { padding: '16px 32px', fontSize: 'var(--mac-font-size-xl)' }
     };
 
     // Варианты
@@ -239,8 +239,8 @@ export const AnimatedCard = ({
     const baseStyle = {
       background: 'rgba(255, 255, 255, 0.8)',
       border: '1px solid rgba(255, 255, 255, 0.2)',
-      borderRadius: '20px',
-      padding: '24px',
+      borderRadius: 'var(--mac-radius-xl)',
+      padding: 'var(--mac-spacing-6)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
       ...style

@@ -321,16 +321,16 @@ export function CommandPalette({ profile, navigate }) {
               outline: 'none',
               backgroundColor: 'transparent',
               color: 'var(--mac-text-primary, #1a1a1a)',
-              fontSize: '15px',
+              fontSize: 'var(--mac-font-size-lg)',
               fontFamily: 'inherit',
             }}
           />
           <kbd style={{
             padding: '2px 6px',
-            borderRadius: '4px',
+            borderRadius: 'var(--mac-radius-sm)',
             backgroundColor: 'var(--mac-bg-secondary, rgba(0,0,0,0.05))',
             color: 'var(--mac-text-secondary, #6b7280)',
-            fontSize: '11px',
+            fontSize: 'var(--mac-font-size-xs)',
             fontFamily: 'ui-monospace, monospace',
           }}>ESC</kbd>
         </div>
@@ -342,7 +342,7 @@ export function CommandPalette({ profile, navigate }) {
           style={{
             overflowY: 'auto',
             flex: 1,
-            padding: '6px',
+            padding: 'var(--mac-spacing-2)',
           }}
         >
           {results.length === 0 && (
@@ -350,7 +350,7 @@ export function CommandPalette({ profile, navigate }) {
               padding: '24px 16px',
               textAlign: 'center',
               color: 'var(--mac-text-secondary, #6b7280)',
-              fontSize: '14px',
+              fontSize: 'var(--mac-font-size-base)',
             }}>
               Ничего не найдено для «{query}»
             </div>
@@ -371,7 +371,7 @@ export function CommandPalette({ profile, navigate }) {
                   alignItems: 'center',
                   gap: '10px',
                   padding: '10px 12px',
-                  borderRadius: '8px',
+                  borderRadius: 'var(--mac-radius-md)',
                   cursor: 'pointer',
                   backgroundColor: isSelected
                     ? 'var(--mac-accent-blue, #007aff)'
@@ -390,8 +390,8 @@ export function CommandPalette({ profile, navigate }) {
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: '14px',
-                    fontWeight: 500,
+                    fontSize: 'var(--mac-font-size-base)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -400,7 +400,7 @@ export function CommandPalette({ profile, navigate }) {
                   </div>
                   {item.description && (
                     <div style={{
-                      fontSize: '12px',
+                      fontSize: 'var(--mac-font-size-xs)',
                       color: isSelected ? 'color-mix(in srgb, white, transparent 30%)' : 'var(--mac-text-secondary, #6b7280)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -422,10 +422,10 @@ export function CommandPalette({ profile, navigate }) {
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          padding: '8px 16px',
+          gap: 'var(--mac-spacing-3)',
+          padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
           borderTop: '1px solid var(--mac-border, rgba(0,0,0,0.08))',
-          fontSize: '11px',
+          fontSize: 'var(--mac-font-size-xs)',
           color: 'var(--mac-text-secondary, #6b7280)',
         }}>
           <span>↑↓ навигация</span>

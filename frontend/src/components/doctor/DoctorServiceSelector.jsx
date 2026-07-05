@@ -182,7 +182,7 @@ const DoctorServiceSelector = ({
 
   if (loading) {
     return (
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         <Skeleton />
       </MacOSCard>);
 
@@ -190,26 +190,26 @@ const DoctorServiceSelector = ({
 
   if (error) {
     return (
-      <MacOSCard style={{ padding: '24px', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
-        <AlertCircle size={20} style={{ marginRight: '8px' }} />
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
+        <AlertCircle size={20} style={{ marginRight: 'var(--mac-spacing-2)' }} />
         <span>{error}</span>
       </MacOSCard>);
 
   }
 
   return (
-    <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
       {/* Итоговая информация */}
       {selectedServices.length > 0 &&
       <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         background: 'linear-gradient(135deg, var(--mac-success-bg) 0%, var(--mac-success-bg-light) 100%)',
         border: '1px solid var(--mac-success-border)'
       }}>
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-          gap: '16px',
+          gap: 'var(--mac-spacing-4)',
           textAlign: 'center'
         }}>
             <div>
@@ -253,14 +253,14 @@ const DoctorServiceSelector = ({
 
       {/* Выбранные услуги */}
       {selectedServices.length > 0 &&
-      <MacOSCard style={{ padding: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-4)' }}>
           <h3 style={{
           fontSize: 'var(--mac-font-size-lg)',
           fontWeight: 'var(--mac-font-weight-medium)',
-          marginBottom: '12px',
+          marginBottom: 'var(--mac-spacing-3)',
           color: 'var(--mac-text-primary)'
         }}>Выбранные услуги:</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
             {selectedServices.map((service) =>
           <div
             key={service.id}
@@ -268,14 +268,14 @@ const DoctorServiceSelector = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px',
+              padding: 'var(--mac-spacing-3)',
               background: 'var(--mac-bg-secondary)',
               borderRadius: 'var(--mac-radius-lg)',
               transition: 'all var(--mac-duration-fast) var(--mac-ease)'
             }}>
             
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <CheckCircle size={16} style={{ marginRight: '12px', color: 'var(--mac-success)' }} />
+                  <CheckCircle size={16} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-success)' }} />
                   <div>
                     <div style={{
                   fontWeight: 'var(--mac-font-weight-medium)',
@@ -293,13 +293,13 @@ const DoctorServiceSelector = ({
                 <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '12px'
+              gap: 'var(--mac-spacing-3)'
             }}>
                   {/* Количество */}
                   <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: 'var(--mac-spacing-2)'
               }}>
                     <Button
                   type="button"
@@ -391,26 +391,26 @@ const DoctorServiceSelector = ({
       }
 
       {/* Доступные услуги */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         {Object.entries(services).map(([categoryCode, categoryData]) => {
           const CategoryIcon = categoryIcons[categoryCode] || Package;
           const categoryName = categoryNames[categoryCode] || categoryData.category.name_ru;
 
           return (
-            <MacOSCard key={categoryCode} style={{ padding: '16px' }}>
+            <MacOSCard key={categoryCode} style={{ padding: 'var(--mac-spacing-4)' }}>
               <h3 style={{
                 fontSize: 'var(--mac-font-size-lg)',
                 fontWeight: 'var(--mac-font-weight-medium)',
-                marginBottom: '12px',
+                marginBottom: 'var(--mac-spacing-3)',
                 display: 'flex',
                 alignItems: 'center',
                 color: 'var(--mac-text-primary)'
               }}>
-                <CategoryIcon size={20} style={{ marginRight: '8px', color: 'var(--mac-info)' }} />
+                <CategoryIcon size={20} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-info)' }} />
                 {categoryName}
               </h3>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                 {categoryData.services.map((service) => {
                   const isSelected = isServiceSelected(service.id);
 
@@ -423,7 +423,7 @@ const DoctorServiceSelector = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '12px',
+                        padding: 'var(--mac-spacing-3)',
                         borderRadius: 'var(--mac-radius-lg)',
                         border: `1px solid ${isSelected ? 'var(--mac-info-border)' : 'var(--mac-border)'}`,
                         backgroundColor: isSelected ? 'var(--mac-info-bg)' : 'var(--mac-bg-secondary)',
@@ -449,9 +449,9 @@ const DoctorServiceSelector = ({
                       
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         {isSelected ?
-                        <CheckCircle size={20} style={{ marginRight: '12px', color: 'var(--mac-info)' }} /> :
+                        <CheckCircle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-info)' }} /> :
 
-                        <Circle size={20} style={{ marginRight: '12px', color: 'var(--mac-text-tertiary)' }} />
+                        <Circle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-text-tertiary)' }} />
                         }
                         <div>
                           <div style={{
@@ -475,7 +475,7 @@ const DoctorServiceSelector = ({
                         <div style={{
                           fontWeight: 'var(--mac-font-weight-bold)',
                           color: 'var(--mac-text-primary)',
-                          marginBottom: '4px'
+                          marginBottom: 'var(--mac-spacing-1)'
                         }}>
                           {service.price.toLocaleString()} {service.currency}
                         </div>
@@ -485,7 +485,7 @@ const DoctorServiceSelector = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'flex-end',
-                          gap: '4px'
+                          gap: 'var(--mac-spacing-1)'
                         }}>
                           <Clock size={12} />
                           {service.duration_minutes} мин
@@ -510,7 +510,7 @@ const DoctorServiceSelector = ({
           fontSize: 'var(--mac-font-size-lg)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
+          marginBottom: 'var(--mac-spacing-2)'
         }}>
             Услуги не найдены
           </h3>

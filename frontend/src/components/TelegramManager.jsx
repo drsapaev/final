@@ -1768,7 +1768,7 @@ const TelegramManager = () => {
                         }}>
                         <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2} sx={{ flexWrap: 'wrap' }} mb={2}>
                           <Box>
-                            <Typography variant="body1" style={{ fontWeight: 600 }}>
+                            <Typography variant="body1" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
                               Request #{requestId}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -1870,7 +1870,7 @@ const TelegramManager = () => {
                                       }}>
                                       <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1} sx={{ flexWrap: 'wrap' }}>
                                         <Box>
-                                          <Typography variant="body2" style={{ fontWeight: 600 }}>
+                                          <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
                                             {maskedName}
                                           </Typography>
                                           <Typography variant="caption" color="text.secondary">
@@ -1987,7 +1987,7 @@ const TelegramManager = () => {
                                   <Typography variant="caption" color="text.secondary">
                                     Patient-facing safe message
                                   </Typography>
-                                  <Typography variant="body2" style={{ marginTop: 6, fontWeight: 600 }}>
+                                  <Typography variant="body2" style={{ marginTop: 6, fontWeight: 'var(--mac-font-weight-semibold)' }}>
                                     {notificationPreview.title}
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
@@ -2150,7 +2150,7 @@ const TelegramManager = () => {
                   padding: 12,
                   background: 'var(--mac-bg-secondary)'
                 }}>
-                <Typography variant="body2" style={{ fontWeight: 600 }}>
+                <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
                   Request #{dialogRequest.id}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
@@ -2188,7 +2188,7 @@ const TelegramManager = () => {
                       padding: 12,
                       background: 'var(--mac-bg-primary)'
                     }}>
-                    <Typography variant="body2" style={{ fontWeight: 600 }}>
+                    <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
                       {getCandidateValue(dialogSelectedCandidate, 'maskedName', 'masked_name', 'Masked patient')}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>

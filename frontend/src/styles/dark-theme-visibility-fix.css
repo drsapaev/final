@@ -6,15 +6,15 @@
 
 :root[data-theme="dark"][data-color-scheme="dark"],
 body[data-theme="dark"][data-color-scheme="dark"] {
-  --dark-card-bg: #1e293b;
-  --dark-panel-bg: #334155;
-  --dark-modal-bg: #0f172a;
-  --dark-border: #475569;
-  --dark-border-light: #64748b;
-  --dark-border-strong: #94a3b8;
-  --dark-text-primary: #f8fafc;
-  --dark-text-secondary: #e2e8f0;
-  --dark-text-muted: #cbd5e1;
+  --dark-card-bg: var(--mac-text-primary);
+  --dark-panel-bg: var(--mac-text-primary);
+  --dark-modal-bg: var(--mac-text-primary);
+  --dark-border: var(--mac-text-secondary);
+  --dark-border-light: var(--mac-text-secondary);
+  --dark-border-strong: var(--mac-text-tertiary);
+  --dark-text-primary: var(--mac-bg-secondary);
+  --dark-text-secondary: var(--mac-border);
+  --dark-text-muted: var(--mac-border);
   --ui-font: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
 }
 
@@ -28,7 +28,7 @@ body[data-theme="dark"][data-color-scheme="dark"] {
 
 /* Keep generic buttons readable in classic dark mode */
 [data-theme="dark"][data-color-scheme="dark"] button:not([style*="linear-gradient"]) {
-  background-color: #374151;
+  background-color: var(--mac-text-primary);
   border-color: var(--dark-border) !important;
   color: var(--dark-text-primary) !important;
 }
@@ -52,13 +52,13 @@ body[data-theme="dark"][data-color-scheme="dark"] {
   border: 1px solid var(--dark-border) !important;
 }
 
-[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.1)"],
-[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255,255,255,0.1)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="color-mix(in srgb, white, transparent 90%)"],
+[data-theme="dark"][data-color-scheme="dark"] [style*="color-mix(in srgb, white, transparent 90%)"] {
   border-color: var(--dark-border) !important;
 }
 
-[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.2)"],
-[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255,255,255,0.2)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="color-mix(in srgb, white, transparent 80%)"],
+[data-theme="dark"][data-color-scheme="dark"] [style*="color-mix(in srgb, white, transparent 80%)"] {
   border-color: var(--dark-border-light) !important;
 }
 
@@ -69,7 +69,7 @@ body[data-theme="dark"][data-color-scheme="dark"] {
 [data-theme="dark"][data-color-scheme="dark"] .registrar-panel,
 [data-theme="dark"][data-color-scheme="dark"] .admin-panel,
 [data-theme="dark"][data-color-scheme="dark"] .analytics-panel {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+  background: linear-gradient(135deg, var(--mac-text-primary) 0%, var(--mac-text-primary) 100%) !important;
 }
 
 [data-theme="dark"][data-color-scheme="dark"] .card-container,

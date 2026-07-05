@@ -237,7 +237,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
         }
       }}>
       
-        <Typography variant="subtitle1" style={{ fontWeight: 500 }}>
+        <Typography variant="subtitle1" style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>
           {title}
         </Typography>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

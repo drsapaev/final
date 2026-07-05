@@ -209,7 +209,7 @@ export default function HeaderNew() {
         color: 'var(--mac-text-primary)',
         display: 'flex',
         alignItems: 'center',
-        gap: '4px',
+        gap: 'var(--mac-spacing-1)',
         padding: '8px 10px',
         flexShrink: 0
       }}>
@@ -225,12 +225,12 @@ export default function HeaderNew() {
     title="На главную"
     style={{
       color: 'var(--mac-text-primary)',
-      fontWeight: '700',
+      fontWeight: 'var(--mac-font-weight-bold)',
       fontSize: 'var(--mac-font-size-lg)',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
-      padding: '8px 12px'
+      gap: 'var(--mac-spacing-2)',
+      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)'
     }}>
 
       <Icon name="stethoscope" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
@@ -253,7 +253,7 @@ export default function HeaderNew() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: 'var(--mac-spacing-2)',
             flexShrink: 0,
             color: active ?
             'white' :
@@ -274,7 +274,7 @@ export default function HeaderNew() {
         title="Главная"
         onClick={() => navigate('/registrar/welcome')}
         className="hdr-hide-md"
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
 
             <Icon name="house" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : undefined }} />
             <span className="hdr-hide-md">Главная</span>
@@ -285,7 +285,7 @@ export default function HeaderNew() {
         title="Онлайн‑записи"
         onClick={() => navigate('/registrar/queue')}
         className="hdr-hide-xs"
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
 
             <Icon name="bell" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
             <span className="hdr-hide-sm">Онлайн‑записи</span>
@@ -307,7 +307,7 @@ export default function HeaderNew() {
             navigate(`${registrarHomeRoute}?action=new`);
           }
         }}
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0 }}>
 
             <Icon name="plus" size="small" style={{ color: 'white' }} />
             <span className="hdr-hide-md">Новая запись</span>
@@ -336,13 +336,13 @@ export default function HeaderNew() {
       title={`Switch to ${lang === 'ru' ? 'UZ' : lang === 'uz' ? 'EN' : 'RU'}`}
       style={{
         fontSize: 'var(--mac-font-size-sm)',
-        fontWeight: '600',
+        fontWeight: 'var(--mac-font-weight-semibold)',
         padding: '6px 10px',
         flex: '0 0 auto',
         border: theme === 'dark' ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--mac-border)',
         display: 'flex',
         alignItems: 'center',
-        gap: '4px'
+        gap: 'var(--mac-spacing-1)'
       }}>
 
         <Icon name="globe" size="small" />
@@ -419,13 +419,13 @@ export default function HeaderNew() {
               backgroundColor: isCustomTheme ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
               border: '1px solid var(--mac-border)',
               borderRadius: 'var(--mac-radius-md)',
-              padding: '8px',
+              padding: 'var(--mac-spacing-2)',
               minWidth: '220px',
               boxShadow: 'var(--mac-shadow-md, 0 8px 24px rgba(0,0,0,0.2))',
               zIndex: 2147483647,
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px',
+              gap: 'var(--mac-spacing-1)',
               pointerEvents: 'auto',
               color: 'var(--mac-text-primary)'
             }}>
@@ -442,8 +442,8 @@ export default function HeaderNew() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
+                gap: 'var(--mac-spacing-2)',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                 border: 'none',
                 width: '100%',
                 textAlign: 'left',
@@ -481,12 +481,12 @@ export default function HeaderNew() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: 'var(--mac-spacing-2)',
           flex: '0 0 auto'
         }}>
 
             <Icon name="person" size="small" style={{ color: 'var(--mac-text-primary)' }} />
-            <span style={{ fontWeight: 600 }}>
+            <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
               {user.full_name || user.username || 'Профиль'}
             </span>
           </Button>
@@ -502,7 +502,7 @@ export default function HeaderNew() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: 'var(--mac-spacing-2)',
           flex: '0 0 auto'
         }}>
 
@@ -519,7 +519,7 @@ export default function HeaderNew() {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: 'var(--mac-spacing-2)',
         flex: '0 0 auto'
       }}>
 
@@ -536,7 +536,7 @@ export default function HeaderNew() {
         {backButton}
         {brand}
       </div>
-      <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-4)' }}>
         <GlobalSearchBar />
         {/* P-027 (UX audit): surface the Cmd+K shortcut so power-users
             discover the CommandPalette without reading docs. */}
@@ -574,12 +574,12 @@ export default function HeaderNew() {
             display: 'inline-flex',
             alignItems: 'center',
             padding: '2px 8px',
-            fontSize: '11px',
-            fontWeight: '500',
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-secondary, #6b7280)',
             background: 'var(--mac-surface-secondary, #f3f4f6)',
             border: '1px solid var(--mac-border, #d1d5db)',
-            borderRadius: '4px',
+            borderRadius: 'var(--mac-radius-sm)',
             cursor: 'pointer',
             fontFamily: 'ui-monospace, SFMono-Regular, monospace',
             lineHeight: '1.4',

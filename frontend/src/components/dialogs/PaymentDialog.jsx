@@ -161,7 +161,7 @@ const PaymentDialog = ({
               width: '64px',
               height: '64px',
               margin: '0 auto 16px',
-              borderRadius: '20px',
+              borderRadius: 'var(--mac-radius-xl)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -176,9 +176,9 @@ const PaymentDialog = ({
           <h4
             style={{
               color: getColor('textPrimary'),
-              marginBottom: '8px',
-              fontSize: '18px',
-              fontWeight: '600',
+              marginBottom: 'var(--mac-spacing-2)',
+              fontSize: 'var(--mac-font-size-xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
             }}
           >
             Оплата успешно завершена
@@ -186,7 +186,7 @@ const PaymentDialog = ({
           <p
             style={{
               color: getColor('textSecondary'),
-              marginBottom: '16px',
+              marginBottom: 'var(--mac-spacing-4)',
               lineHeight: 1.5,
             }}
           >
@@ -200,14 +200,14 @@ const PaymentDialog = ({
               padding: '14px',
               backgroundColor:
                 theme === 'dark' ? 'rgba(16, 185, 129, 0.08)' : '#f0fdf4',
-              borderRadius: '12px',
+              borderRadius: 'var(--mac-radius-lg)',
               border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#bbf7d0'}`,
             }}
           >
             <p
               style={{
                 color: theme === 'dark' ? '#6ee7b7' : '#065f46',
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
                 margin: 0,
                 lineHeight: 1.5,
               }}
@@ -221,8 +221,8 @@ const PaymentDialog = ({
           {/* Информация о пациенте */}
           <div
             style={{
-              marginBottom: '24px',
-              padding: '16px',
+              marginBottom: 'var(--mac-spacing-6)',
+              padding: 'var(--mac-spacing-4)',
               ...surfaceStyle,
             }}
           >
@@ -230,8 +230,8 @@ const PaymentDialog = ({
               style={{
                 color: getColor('textPrimary'),
                 margin: '0 0 8px 0',
-                fontSize: '16px',
-                fontWeight: '600',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
               }}
             >
               Пациент
@@ -240,7 +240,7 @@ const PaymentDialog = ({
               style={{
                 color: getColor('textSecondary'),
                 margin: 0,
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
               }}
             >
               {appointment.patient_fio}
@@ -250,7 +250,7 @@ const PaymentDialog = ({
                 style={{
                   color: getColor('textSecondary'),
                   margin: '4px 0 0 0',
-                  fontSize: '12px',
+                  fontSize: 'var(--mac-font-size-xs)',
                 }}
               >
                 Услуги:{' '}
@@ -263,7 +263,7 @@ const PaymentDialog = ({
 
           {/* Форма оплаты */}
           <div
-            style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-5)' }}
           >
             {/* Сумма */}
             <div>
@@ -271,9 +271,9 @@ const PaymentDialog = ({
                 htmlFor="payment-amount"
                 style={{
                   display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  marginBottom: '8px',
+                  fontSize: 'var(--mac-font-size-base)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  marginBottom: 'var(--mac-spacing-2)',
                   color: getColor('textPrimary'),
                 }}
               >
@@ -303,11 +303,11 @@ const PaymentDialog = ({
                         ? 'color-mix(in srgb, white, transparent 90%)'
                         : 'var(--mac-border)'
                   }`,
-                  borderRadius: '12px',
+                  borderRadius: 'var(--mac-radius-lg)',
                   backgroundColor:
                     theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
                   color: getColor('textPrimary'),
-                  fontSize: '16px',
+                  fontSize: 'var(--mac-font-size-lg)',
                   transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
                   outline: 'none',
                 }}
@@ -330,7 +330,7 @@ const PaymentDialog = ({
                   id="payment-amount-error"
                   style={{
                     color: 'var(--mac-error)',
-                    fontSize: '12px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     margin: '4px 0 0 0',
                   }}
                 >
@@ -344,9 +344,9 @@ const PaymentDialog = ({
               <label
                 style={{
                   display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  marginBottom: '8px',
+                  fontSize: 'var(--mac-font-size-base)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  marginBottom: 'var(--mac-spacing-2)',
                   color: getColor('textPrimary'),
                 }}
               >
@@ -356,7 +356,7 @@ const PaymentDialog = ({
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                 }}
               >
                 {paymentMethods.map((method) => (
@@ -372,7 +372,7 @@ const PaymentDialog = ({
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: 'var(--mac-spacing-2)',
                       padding: '12px 14px',
                       border: `1px solid ${
                         paymentMethod === method.value
@@ -381,7 +381,7 @@ const PaymentDialog = ({
                             ? 'color-mix(in srgb, white, transparent 90%)'
                             : 'var(--mac-border)'
                       }`,
-                      borderRadius: '12px',
+                      borderRadius: 'var(--mac-radius-lg)',
                       backgroundColor:
                         paymentMethod === method.value
                           ? theme === 'dark'
@@ -396,8 +396,8 @@ const PaymentDialog = ({
                           : getColor('textPrimary'),
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      fontSize: '14px',
-                      fontWeight: '500',
+                      fontSize: 'var(--mac-font-size-base)',
+                      fontWeight: 'var(--mac-font-weight-medium)',
                     }}
                   >
                     {method.icon}
@@ -409,7 +409,7 @@ const PaymentDialog = ({
                 <p
                   style={{
                     color: 'var(--mac-error)',
-                    fontSize: '12px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     margin: '4px 0 0 0',
                   }}
                 >

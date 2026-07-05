@@ -46,7 +46,7 @@ const AISuggestions = ({
         display: 'inline-flex', alignItems: 'center', gap: 6,
         border: `1px solid ${colors.border}`,
         background: colors.bg,
-        padding: '4px 8px', borderRadius: 9999, fontSize: 12
+        padding: 'var(--mac-spacing-1) var(--mac-spacing-2)', borderRadius: 9999, fontSize: 12
       }}>{children}</span>);
 
   };
@@ -94,7 +94,7 @@ const AISuggestions = ({
                   <Hospital style={{ color: 'var(--mac-accent-blue)' }} />
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Typography variant="body2" style={{ fontWeight: 600 }}>{item.code}</Typography>
+                      <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{item.code}</Typography>
                       <Typography variant="body2" color="textSecondary">{item.name || item.description}</Typography>
                     </div>
                     {showConfidence && item.relevance &&
@@ -167,7 +167,7 @@ const AISuggestions = ({
           onKeyDown={(event) => handleActivationKeyDown(event, () => setExpanded(!expanded))}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Brain style={{ color: 'var(--mac-accent-blue)' }} />
-            <Typography variant="subtitle1" style={{ fontWeight: 500 }}>{title}</Typography>
+            <Typography variant="subtitle1" style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{title}</Typography>
             {suggestions.length > 0 && <Badge variant="primary">{suggestions.length}</Badge>}
           </div>
           {expanded ? <ChevronUp /> : <ChevronDown />}

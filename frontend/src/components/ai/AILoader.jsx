@@ -51,7 +51,7 @@ const AILoader = ({
       )}
 
       {text && (
-        <Typography variant={fontSize} color="textPrimary" style={{ fontWeight: 500, textAlign: 'center' }}>
+        <Typography variant={fontSize} color="textPrimary" style={{ fontWeight: 'var(--mac-font-weight-medium)', textAlign: 'center' }}>
           {text}
         </Typography>
       )}

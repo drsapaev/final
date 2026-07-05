@@ -23,12 +23,12 @@ const ResponsiveNavigation = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           background: 'color-mix(in srgb, white, transparent 10%)',
           backdropFilter: 'blur(20px)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
-          <div style={{ fontSize: '18px', fontWeight: '600' }}>
+          <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
             Меню
           </div>
           <Button
@@ -39,7 +39,7 @@ const ResponsiveNavigation = ({
             title={isMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
             aria-label={isMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
             aria-expanded={isMenuOpen}
-            style={{ minWidth: 'auto', padding: '8px' }}>
+            style={{ minWidth: 'auto', padding: 'var(--mac-spacing-2)' }}>
             
             {isMenuOpen ? <X aria-hidden="true" size={20} /> : <Menu aria-hidden="true" size={20} />}
           </Button>
@@ -64,7 +64,7 @@ const ResponsiveNavigation = ({
             role="button"
             tabIndex={0}
             style={{
-              padding: '16px',
+              padding: 'var(--mac-spacing-4)',
               borderBottom: index < items.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
               cursor: 'pointer',
               background: activeItem === item.key ? 'var(--mac-accent-bg)' : 'transparent',
@@ -82,9 +82,9 @@ const ResponsiveNavigation = ({
               }
             }}>
             
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
                   {item.icon}
-                  <span style={{ fontSize: '16px', fontWeight: '500' }}>
+                  <span style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                     {item.label}
                   </span>
                 </div>
@@ -101,8 +101,8 @@ const ResponsiveNavigation = ({
     return (
       <div className={`responsive-nav ${className}`} style={{
         display: 'flex',
-        gap: '8px',
-        padding: '16px',
+        gap: 'var(--mac-spacing-2)',
+        padding: 'var(--mac-spacing-4)',
         background: 'color-mix(in srgb, white, transparent 10%)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
@@ -116,9 +116,9 @@ const ResponsiveNavigation = ({
           onClick={() => onItemClick?.(item.key)}
           style={{ flex: 1, minWidth: 0 }}>
           
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
               {item.icon}
-              <span style={{ fontSize: '12px' }}>{item.label}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-xs)' }}>{item.label}</span>
             </div>
           </Button>
         )}
@@ -130,7 +130,7 @@ const ResponsiveNavigation = ({
   return (
     <div className={`responsive-nav ${className}`} style={{
       display: 'flex',
-      gap: '12px',
+      gap: 'var(--mac-spacing-3)',
       padding: '20px 24px',
       background: 'color-mix(in srgb, white, transparent 10%)',
       backdropFilter: 'blur(20px)',
@@ -144,7 +144,7 @@ const ResponsiveNavigation = ({
         size="md"
         onClick={() => onItemClick?.(item.key)}>
         
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             {item.icon}
             <span>{item.label}</span>
           </div>

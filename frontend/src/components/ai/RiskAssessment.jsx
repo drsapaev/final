@@ -247,10 +247,10 @@ const RiskAssessment = () => {
   };
 
   const renderPatientRiskForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -260,7 +260,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
             Основные данные пациента
@@ -268,7 +268,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -276,7 +276,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -296,7 +296,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Пол
               </label>
@@ -320,7 +320,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Вес (кг)
               </label>
@@ -338,7 +338,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -348,7 +348,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Activity style={{ width: '16px', height: '16px' }} />
             Факторы образа жизни
@@ -356,7 +356,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -364,7 +364,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Курение
               </label>
@@ -389,7 +389,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Употребление алкоголя
               </label>
@@ -412,7 +412,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -422,19 +422,19 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <FileText style={{ width: '16px', height: '16px' }} />
             Медицинская информация
           </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
             <div>
               <label style={{
               display: 'block',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Состояние/Заболевание
               </label>
@@ -448,7 +448,7 @@ const RiskAssessment = () => {
             </div>
 
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-2)' }}>
                 <label style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
@@ -460,15 +460,15 @@ const RiskAssessment = () => {
                 <Button
                 onClick={() => addArrayItem(setPatientRiskData, 'patient_data.comorbidities')}
                 variant="outline"
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', padding: 'var(--mac-spacing-1) var(--mac-spacing-2)' }}>
                 
                   <Plus style={{ width: '12px', height: '12px' }} />
                   Добавить
                 </Button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '120px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)', maxHeight: '120px', overflowY: 'auto' }}>
                 {patientRiskData.patient_data.comorbidities.map((item, index) =>
-              <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div key={index} style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
                     <Input
                   type="text"
                   value={item}
@@ -482,7 +482,7 @@ const RiskAssessment = () => {
                   aria-label={`Remove comorbidity ${index + 1}`}
                   onClick={() => removeArrayItem(setPatientRiskData, 'patient_data.comorbidities', index)}
                   variant="outline"
-                  style={{ padding: '4px', minWidth: 'auto' }}>
+                  style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                       <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
                     </Button>
@@ -492,7 +492,7 @@ const RiskAssessment = () => {
             </div>
 
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-2)' }}>
                 <label style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
@@ -504,15 +504,15 @@ const RiskAssessment = () => {
                 <Button
                 onClick={() => addArrayItem(setPatientRiskData, 'risk_factors')}
                 variant="outline"
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', padding: 'var(--mac-spacing-1) var(--mac-spacing-2)' }}>
                 
                   <Plus style={{ width: '12px', height: '12px' }} />
                   Добавить
                 </Button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '120px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)', maxHeight: '120px', overflowY: 'auto' }}>
                 {patientRiskData.risk_factors.map((item, index) =>
-              <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div key={index} style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
                     <Input
                   type="text"
                   value={item}
@@ -526,7 +526,7 @@ const RiskAssessment = () => {
                   aria-label={`Remove risk factor ${index + 1}`}
                   onClick={() => removeArrayItem(setPatientRiskData, 'risk_factors', index)}
                   variant="outline"
-                  style={{ padding: '4px', minWidth: 'auto' }}>
+                  style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                       <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
                     </Button>
@@ -547,7 +547,7 @@ const RiskAssessment = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-danger)',
             border: 'none'
           }}>
@@ -574,10 +574,10 @@ const RiskAssessment = () => {
 
 
   const renderComplicationForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -587,7 +587,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Activity style={{ width: '16px', height: '16px' }} />
             Информация о процедуре
@@ -595,7 +595,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -603,7 +603,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Процедура/Состояние
               </label>
@@ -621,7 +621,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Временные рамки
               </label>
@@ -643,7 +643,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -653,7 +653,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <UserCheck style={{ width: '16px', height: '16px' }} />
             Данные пациента
@@ -661,7 +661,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -669,7 +669,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -689,7 +689,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Пол
               </label>
@@ -720,7 +720,7 @@ const RiskAssessment = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-warning)',
             border: 'none'
           }}>
@@ -747,10 +747,10 @@ const RiskAssessment = () => {
 
 
   const renderMortalityForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -760,7 +760,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Heart style={{ width: '16px', height: '16px' }} />
             Информация о состоянии
@@ -768,7 +768,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -776,7 +776,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Состояние
               </label>
@@ -794,7 +794,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Система оценки
               </label>
@@ -816,7 +816,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -826,7 +826,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <UserCheck style={{ width: '16px', height: '16px' }} />
             Данные пациента
@@ -834,7 +834,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -842,7 +842,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -862,7 +862,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Пол
               </label>
@@ -893,7 +893,7 @@ const RiskAssessment = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-danger)',
             border: 'none'
           }}>
@@ -920,10 +920,10 @@ const RiskAssessment = () => {
 
 
   const renderSurgicalForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -933,7 +933,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Stethoscope style={{ width: '16px', height: '16px' }} />
             Информация об операции
@@ -941,7 +941,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -949,7 +949,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Тип операции
               </label>
@@ -967,7 +967,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Тип анестезии
               </label>
@@ -989,7 +989,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -999,7 +999,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <UserCheck style={{ width: '16px', height: '16px' }} />
             Профиль пациента
@@ -1007,7 +1007,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -1015,7 +1015,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -1035,7 +1035,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Класс ASA
               </label>
@@ -1062,7 +1062,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Функциональный статус
               </label>
@@ -1094,7 +1094,7 @@ const RiskAssessment = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-accent)',
             border: 'none'
           }}>
@@ -1121,10 +1121,10 @@ const RiskAssessment = () => {
 
 
   const renderReadmissionForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -1134,7 +1134,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <UserCheck style={{ width: '16px', height: '16px' }} />
             Информация о выписке
@@ -1142,7 +1142,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -1150,7 +1150,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Основной диагноз
               </label>
@@ -1171,7 +1171,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Состояние при выписке
               </label>
@@ -1192,7 +1192,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-info-bg)',
         border: '1px solid var(--mac-info-border)'
       }}>
@@ -1202,7 +1202,7 @@ const RiskAssessment = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Clock style={{ width: '16px', height: '16px' }} />
             Данные пациента
@@ -1210,7 +1210,7 @@ const RiskAssessment = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -1218,7 +1218,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -1238,7 +1238,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Длительность госпитализации
               </label>
@@ -1259,7 +1259,7 @@ const RiskAssessment = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Социальная поддержка
               </label>
@@ -1292,7 +1292,7 @@ const RiskAssessment = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-success)',
             border: 'none'
           }}>
@@ -1324,11 +1324,11 @@ const RiskAssessment = () => {
     if (result.error) {
       return (
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-primary)',
           border: '1px solid var(--mac-border)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <XCircle style={{ width: '20px', height: '20px', color: 'var(--mac-danger)' }} />
             <h3 style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -1340,7 +1340,7 @@ const RiskAssessment = () => {
             </h3>
           </div>
           <p style={{
-            marginTop: '8px',
+            marginTop: 'var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-danger)',
             margin: '8px 0 0 0'
@@ -1352,8 +1352,8 @@ const RiskAssessment = () => {
     }
 
     return (
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
@@ -1361,7 +1361,7 @@ const RiskAssessment = () => {
             margin: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа рисков
@@ -1369,7 +1369,7 @@ const RiskAssessment = () => {
           <Button
             onClick={exportResult}
             variant="outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
             
             <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
@@ -1378,9 +1378,9 @@ const RiskAssessment = () => {
 
         {/* Специальное отображение для оценки рисков пациента */}
         {activeTab === 'patient-risk' && result.overall_risk_assessment &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
             <MacOSCard style={{
-            padding: '16px',
+            padding: 'var(--mac-spacing-4)',
             backgroundColor: getRiskColor(result.overall_risk_assessment.risk_level).backgroundColor,
             border: `1px solid ${getRiskColor(result.overall_risk_assessment.risk_level).borderColor}`
           }}>
@@ -1394,30 +1394,30 @@ const RiskAssessment = () => {
               <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-              gap: '16px',
+              gap: 'var(--mac-spacing-4)',
               fontSize: 'var(--mac-font-size-sm)'
             }}>
                 <div>
                   <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>Уровень:</span>
-                  <span style={{ marginLeft: '4px', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>
+                  <span style={{ marginLeft: 'var(--mac-spacing-1)', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>
                     {result.overall_risk_assessment.risk_level}
                   </span>
                 </div>
                 <div>
                   <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>Балл:</span>
-                  <span style={{ marginLeft: '4px', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>
+                  <span style={{ marginLeft: 'var(--mac-spacing-1)', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>
                     {result.overall_risk_assessment.risk_score}
                   </span>
                 </div>
                 <div>
                   <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>Достоверность:</span>
-                  <span style={{ marginLeft: '4px', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>
+                  <span style={{ marginLeft: 'var(--mac-spacing-1)', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>
                     {result.overall_risk_assessment.confidence_level}
                   </span>
                 </div>
                 <div>
                   <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>Дата:</span>
-                  <span style={{ marginLeft: '4px', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>
+                  <span style={{ marginLeft: 'var(--mac-spacing-1)', color: getRiskColor(result.overall_risk_assessment.risk_level).textColor }}>
                     {result.overall_risk_assessment.assessment_date}
                   </span>
                 </div>
@@ -1428,11 +1428,11 @@ const RiskAssessment = () => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px'
+            gap: 'var(--mac-spacing-4)'
           }}>
                 {Object.entries(result.risk_categories).map(([category, data]) =>
             <MacOSCard key={category} style={{
-              padding: '12px',
+              padding: 'var(--mac-spacing-3)',
               backgroundColor: getRiskColor(data.level).backgroundColor,
               border: `1px solid ${getRiskColor(data.level).borderColor}`
             }}>
@@ -1468,7 +1468,7 @@ const RiskAssessment = () => {
 
         {/* Общее отображение для других результатов */}
         {activeTab !== 'patient-risk' &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
             {Object.entries(result).map(([key, value]) =>
           <div key={key} style={{
             borderLeft: '4px solid var(--mac-accent)',
@@ -1488,7 +1488,7 @@ const RiskAssessment = () => {
               <pre style={{
                 whiteSpace: 'pre-wrap',
                 backgroundColor: 'var(--mac-bg-secondary)',
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 overflowX: 'auto',
@@ -1512,16 +1512,16 @@ const RiskAssessment = () => {
 
   return (
     <div style={{
-      padding: '24px',
+      padding: 'var(--mac-spacing-6)',
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         {/* Заголовок */}
         <div style={{
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           <h2 style={{
             fontSize: 'var(--mac-font-size-2xl)',
@@ -1530,7 +1530,7 @@ const RiskAssessment = () => {
             margin: '0 0 8px 0',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: 'var(--mac-spacing-3)'
           }}>
             <Shield style={{ width: '32px', height: '32px', color: 'var(--mac-danger)' }} />
             AI Оценка Рисков и Прогнозирование Осложнений
@@ -1547,7 +1547,7 @@ const RiskAssessment = () => {
         {/* Вкладки */}
         <div style={{
           display: 'flex',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -1563,7 +1563,7 @@ const RiskAssessment = () => {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
                   fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                   fontSize: 'var(--mac-font-size-sm)',
@@ -1609,13 +1609,13 @@ const RiskAssessment = () => {
         {/* Разделительная линия */}
         <div style={{
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }} />
 
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px'
+          gap: 'var(--mac-spacing-6)'
         }}>
           <div>
             <h3 style={{

@@ -449,7 +449,7 @@ const styles = {
   container: {
     maxWidth: 1200,
     margin: '0 auto',
-    padding: '24px',
+    padding: 'var(--mac-spacing-6)',
     minHeight: '100vh',
     background: 'var(--mac-bg-secondary)',
   },
@@ -459,7 +459,7 @@ const styles = {
   },
   title: {
     fontSize: 32,
-    fontWeight: 700,
+    fontWeight: 'var(--mac-font-weight-bold)',
     color: 'var(--mac-text-primary)',
     margin: 0,
     display: 'flex',
@@ -509,7 +509,7 @@ const styles = {
   searchButton: {
     padding: '16px 32px',
     fontSize: 16,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-bg-primary)',
     background: 'var(--mac-accent-blue)',
     border: 'none',
@@ -546,7 +546,7 @@ const styles = {
   tab: {
     padding: '10px 20px',
     fontSize: 14,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: 'var(--mac-text-secondary)',
     backgroundColor: 'var(--mac-bg-primary)',
     border: '1px solid var(--mac-border)',
@@ -568,7 +568,7 @@ const styles = {
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-primary)',
     marginBottom: 16,
     display: 'flex',
@@ -580,7 +580,7 @@ const styles = {
   },
   count: {
     fontSize: 14,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: 'var(--mac-text-secondary)',
     backgroundColor: '#f1f5f9',
     padding: '4px 10px',
@@ -609,18 +609,18 @@ const styles = {
   },
   patientId: {
     fontSize: 12,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-accent-blue, #3b82f6)',
     backgroundColor: 'var(--mac-accent-bg)',
-    padding: '4px 8px',
+    padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
     borderRadius: 6,
   },
   visitId: {
     fontSize: 12,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-accent-purple)',
     backgroundColor: '#f5f3ff',
-    padding: '4px 8px',
+    padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
     borderRadius: 6,
   },
   cardArrow: {
@@ -630,7 +630,7 @@ const styles = {
   },
   patientName: {
     fontSize: 16,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-primary)',
     marginBottom: 8,
   },
@@ -645,7 +645,7 @@ const styles = {
   },
   visitPatient: {
     fontSize: 15,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: 'var(--mac-text-primary)',
     marginBottom: 10,
   },
@@ -657,7 +657,7 @@ const styles = {
   },
   statusBadge: {
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     padding: '4px 10px',
     borderRadius: 6,
   },
@@ -682,7 +682,7 @@ const styles = {
   },
   noResultsText: {
     fontSize: 20,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-secondary)',
     marginBottom: 8,
   },
@@ -700,7 +700,7 @@ const styles = {
   },
   initialText: {
     fontSize: 20,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-secondary)',
     marginBottom: 8,
   },
@@ -713,7 +713,7 @@ const styles = {
     display: 'inline-block',
     textAlign: 'left',
     backgroundColor: 'var(--mac-bg-secondary)',
-    padding: '16px 24px',
+    padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
     borderRadius: 12,
     border: '1px solid var(--mac-border)',
   },

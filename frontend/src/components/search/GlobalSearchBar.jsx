@@ -254,9 +254,9 @@ export default function GlobalSearchBar({ className = '' }) {
     input: {
       width: '100%',
       padding: '8px 12px 8px 36px',
-      fontSize: '14px',
+      fontSize: 'var(--mac-font-size-base)',
       border: '1px solid var(--mac-border, #d1d5db)',
-      borderRadius: '8px',
+      borderRadius: 'var(--mac-radius-md)',
       background: 'var(--mac-bg-secondary, #f8fafc)',
       color: 'var(--mac-text-primary, #1e293b)',
       outline: 'none',
@@ -275,11 +275,11 @@ export default function GlobalSearchBar({ className = '' }) {
       right: '12px',
       top: '50%',
       transform: 'translateY(-50%)',
-      fontSize: '11px',
+      fontSize: 'var(--mac-font-size-xs)',
       color: 'var(--mac-text-tertiary, #94a3b8)',
       background: 'var(--mac-bg-tertiary, #e2e8f0)',
       padding: '2px 6px',
-      borderRadius: '4px',
+      borderRadius: 'var(--mac-radius-sm)',
       pointerEvents: 'none'
     },
     dropdown: {
@@ -289,7 +289,7 @@ export default function GlobalSearchBar({ className = '' }) {
       width: `${dropdownPos.width}px`,
       background: 'var(--mac-bg-primary, white)',
       border: '1px solid var(--mac-border, #e2e8f0)',
-      borderRadius: '12px',
+      borderRadius: 'var(--mac-radius-lg)',
       boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
       zIndex: 2147483647,
       maxHeight: '400px',
@@ -301,8 +301,8 @@ export default function GlobalSearchBar({ className = '' }) {
     },
     sectionTitle: {
       padding: '4px 12px',
-      fontSize: '11px',
-      fontWeight: '600',
+      fontSize: 'var(--mac-font-size-xs)',
+      fontWeight: 'var(--mac-font-weight-semibold)',
       color: 'var(--mac-text-tertiary, #64748b)',
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
@@ -320,7 +320,7 @@ export default function GlobalSearchBar({ className = '' }) {
       color: 'white'
     },
     itemIcon: {
-      fontSize: '16px',
+      fontSize: 'var(--mac-font-size-lg)',
       width: '24px',
       textAlign: 'center'
     },
@@ -329,26 +329,26 @@ export default function GlobalSearchBar({ className = '' }) {
       minWidth: 0
     },
     itemTitle: {
-      fontSize: '14px',
-      fontWeight: '500',
+      fontSize: 'var(--mac-font-size-base)',
+      fontWeight: 'var(--mac-font-weight-medium)',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap'
     },
     itemSubtitle: {
-      fontSize: '12px',
+      fontSize: 'var(--mac-font-size-xs)',
       opacity: 0.7,
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap'
     },
     loading: {
-      padding: '20px',
+      padding: 'var(--mac-spacing-5)',
       textAlign: 'center',
       color: 'var(--mac-text-tertiary, #64748b)'
     },
     noResults: {
-      padding: '20px',
+      padding: 'var(--mac-spacing-5)',
       textAlign: 'center',
       color: 'var(--mac-text-tertiary, #64748b)'
     },

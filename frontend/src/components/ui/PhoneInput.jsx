@@ -145,10 +145,10 @@ const PhoneInput = ({
       placeholder={placeholder}
       style={{
         width: '100%',
-        padding: '12px 16px',
+        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
         border: '1px solid var(--mac-border)',
-        borderRadius: '8px',
-        fontSize: '16px',
+        borderRadius: 'var(--mac-radius-md)',
+        fontSize: 'var(--mac-font-size-lg)',
         fontFamily: 'inherit',
         outline: 'none',
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease',

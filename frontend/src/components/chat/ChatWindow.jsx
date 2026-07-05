@@ -668,7 +668,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                         </h3>
                     </div>
 
-                    <div className="chat-actions" style={{ display: 'flex', gap: '4px' }}>
+                    <div className="chat-actions" style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
                         {activeConversation && !showNewChat &&
             <button
               onClick={() => {
@@ -772,7 +772,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                     {/* Conversation List or Default Users */}
                     {!activeConversation && !showNewChat &&
           <div className="conversations-list">
-                            <div className="chat-search-bar" style={{ padding: '8px 12px', display: 'flex', gap: 8 }}>
+                            <div className="chat-search-bar" style={{ padding: 'var(--mac-spacing-2) var(--mac-spacing-3)', display: 'flex', gap: 8 }}>
                                 <div style={{ position: 'relative', flex: 1 }}>
                                     <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-tertiary)' }} />
                                     <input
@@ -793,7 +793,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                 <button
                 onClick={() => setConvFilter((f) => f === 'unread' ? 'all' : 'unread')}
                 style={{
-                  padding: '4px 8px',
+                  padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                   borderRadius: 6,
                   border: '1px solid var(--mac-border)',
                   background: convFilter === 'unread' ? 'var(--mac-accent-blue)' : 'transparent',
@@ -849,7 +849,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
             /* Если нет бесед, показываем список всех доступных пользователей */
             <>
-                                    <div className="section-header" style={{ padding: '12px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--mac-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    <div className="section-header" style={{ padding: '12px 14px', fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                         Сотрудники
                                     </div>
                                     {allUsers.length === 0 ?
@@ -873,7 +873,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                 </div>
                                                 <div className="conv-info">
                                                     <div className="conv-name">{u.name}</div>
-                                                    <div className="conv-role" style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>
+                                                    <div className="conv-role" style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                                                         {u.role || 'Сотрудник'}
                                                     </div>
                                                 </div>
@@ -898,7 +898,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
               
                                 {showMsgSearch &&
               <div className="message-search-bar" style={{
-                padding: '8px 12px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                 position: 'sticky',
                 top: 0,
                 zIndex: 10,
@@ -913,7 +913,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                   autoFocus
                   style={{
                     width: '100%',
-                    padding: '6px 12px',
+                    padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                     borderRadius: 6,
                     border: '1px solid var(--mac-border)',
                     fontSize: 13

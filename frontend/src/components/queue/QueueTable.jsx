@@ -21,10 +21,10 @@ const QueueTable = ({
                 padding: '48px 24px',
                 textAlign: 'center',
                 color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
+                fontSize: 'var(--mac-font-size-base)'
             }}>
                 <Icon name="person.crop.circle.badge.questionmark" size="large" style={{
-                    marginBottom: '12px',
+                    marginBottom: 'var(--mac-spacing-3)',
                     opacity: 0.5
                 }} />
                 <p>{t?.selectDoctor || 'Выберите специалиста'}</p>
@@ -39,7 +39,7 @@ const QueueTable = ({
                 padding: '48px 24px',
                 textAlign: 'center',
                 color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
+                fontSize: 'var(--mac-font-size-base)'
             }}>
                 <div className="mqm-spinner" style={{ margin: '0 auto 12px' }}></div>
                 <p>Загрузка очереди...</p>
@@ -54,15 +54,15 @@ const QueueTable = ({
                 padding: '48px 24px',
                 textAlign: 'center',
                 color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
+                fontSize: 'var(--mac-font-size-base)'
             }}>
                 <Icon name="exclamationmark.triangle" size="large" style={{
-                    marginBottom: '12px',
+                    marginBottom: 'var(--mac-spacing-3)',
                     opacity: 0.5,
                     color: 'var(--mac-warning)'
                 }} />
                 <p>{t?.queueNotFound || 'Очередь не найдена'}</p>
-                <p style={{ fontSize: '12px', marginTop: '8px' }}>
+                <p style={{ fontSize: 'var(--mac-font-size-xs)', marginTop: 'var(--mac-spacing-2)' }}>
                     Попробуйте сгенерировать QR код для создания очереди
                 </p>
             </div>
@@ -79,14 +79,14 @@ const QueueTable = ({
                 padding: '48px 24px',
                 textAlign: 'center',
                 color: 'var(--mac-text-secondary)',
-                fontSize: '14px'
+                fontSize: 'var(--mac-font-size-base)'
             }}>
                 <Icon name="person.2.slash" size="large" style={{
-                    marginBottom: '12px',
+                    marginBottom: 'var(--mac-spacing-3)',
                     opacity: 0.5
                 }} />
                 <p>{t?.queueEmpty || 'Очередь пуста'}</p>
-                <p style={{ fontSize: '12px', marginTop: '8px' }}>
+                <p style={{ fontSize: 'var(--mac-font-size-xs)', marginTop: 'var(--mac-spacing-2)' }}>
                     Пациенты могут записаться через QR код
                 </p>
             </div>
@@ -112,7 +112,7 @@ const QueueTable = ({
 
         return (
             <Badge variant={config.variant}>
-                <Icon name={config.icon} size="small" style={{ marginRight: '4px' }} />
+                <Icon name={config.icon} size="small" style={{ marginRight: 'var(--mac-spacing-1)' }} />
                 {config.label}
             </Badge>
         );
@@ -131,12 +131,13 @@ const QueueTable = ({
     return (
         <div className="queue-table-container" style={{
             overflowX: 'auto',
-            marginTop: '16px'
+            marginTop: 'var(--mac-spacing-4)'
         }}>
-            <table style={{
+            <div className="admin-table-wrapper">
+<table style={{
                 width: '100%',
                 borderCollapse: 'collapse',
-                fontSize: '14px'
+                fontSize: 'var(--mac-font-size-base)'
             }}>
                 <thead>
                     <tr style={{
@@ -144,50 +145,50 @@ const QueueTable = ({
                         backgroundColor: 'var(--mac-bg-tertiary)'
                     }}>
                         <th style={{
-                            padding: '12px 16px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                             textAlign: 'left',
-                            fontWeight: '600',
+                            fontWeight: 'var(--mac-font-weight-semibold)',
                             color: 'var(--mac-text-primary)',
                             whiteSpace: 'nowrap'
                         }}>
                             №
                         </th>
                         <th style={{
-                            padding: '12px 16px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                             textAlign: 'left',
-                            fontWeight: '600',
+                            fontWeight: 'var(--mac-font-weight-semibold)',
                             color: 'var(--mac-text-primary)'
                         }}>
                             {t?.patient || 'Пациент'}
                         </th>
                         <th style={{
-                            padding: '12px 16px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                             textAlign: 'left',
-                            fontWeight: '600',
+                            fontWeight: 'var(--mac-font-weight-semibold)',
                             color: 'var(--mac-text-primary)'
                         }}>
                             {t?.phone || 'Телефон'}
                         </th>
                         <th style={{
-                            padding: '12px 16px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                             textAlign: 'left',
-                            fontWeight: '600',
+                            fontWeight: 'var(--mac-font-weight-semibold)',
                             color: 'var(--mac-text-primary)'
                         }}>
                             {t?.time || 'Время'}
                         </th>
                         <th style={{
-                            padding: '12px 16px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                             textAlign: 'left',
-                            fontWeight: '600',
+                            fontWeight: 'var(--mac-font-weight-semibold)',
                             color: 'var(--mac-text-primary)'
                         }}>
                             {t?.status || 'Статус'}
                         </th>
                         <th style={{
-                            padding: '12px 16px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                             textAlign: 'right',
-                            fontWeight: '600',
+                            fontWeight: 'var(--mac-font-weight-semibold)',
                             color: 'var(--mac-text-primary)'
                         }}>
                             {t?.actions || 'Действия'}
@@ -215,44 +216,44 @@ const QueueTable = ({
                             }}
                         >
                             <td style={{
-                                padding: '12px 16px',
+                                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                                 color: 'var(--mac-text-primary)',
-                                fontWeight: '600',
-                                fontSize: '16px'
+                                fontWeight: 'var(--mac-font-weight-semibold)',
+                                fontSize: 'var(--mac-font-size-lg)'
                             }}>
                                 {entry.queue_number || entry.number || index + 1}
                             </td>
                             <td style={{
-                                padding: '12px 16px',
+                                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                                 color: 'var(--mac-text-primary)'
                             }}>
                                 {entry.patient_name || entry.name || '—'}
                             </td>
                             <td style={{
-                                padding: '12px 16px',
+                                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                                 color: 'var(--mac-text-secondary)',
                                 fontFamily: 'monospace'
                             }}>
                                 {entry.patient_phone || entry.phone || '—'}
                             </td>
                             <td style={{
-                                padding: '12px 16px',
+                                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                                 color: 'var(--mac-text-secondary)'
                             }}>
                                 {formatTime(entry.created_at || entry.timestamp)}
                             </td>
                             <td style={{
-                                padding: '12px 16px'
+                                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)'
                             }}>
                                 {getStatusBadge(entry.status)}
                             </td>
                             <td style={{
-                                padding: '12px 16px',
+                                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                                 textAlign: 'right'
                             }}>
                                 {entry.status === 'called' && (
                                     <Badge variant="info">
-                                        <Icon name="bell.fill" size="small" style={{ marginRight: '4px' }} />
+                                        <Icon name="bell.fill" size="small" style={{ marginRight: 'var(--mac-spacing-1)' }} />
                                         {t?.called || 'Вызван'}
                                     </Badge>
                                 )}
@@ -261,6 +262,7 @@ const QueueTable = ({
                     ))}
                 </tbody>
             </table>
+</div>
         </div>
     );
 };

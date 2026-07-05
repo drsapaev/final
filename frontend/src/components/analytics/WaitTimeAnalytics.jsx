@@ -183,15 +183,15 @@ const WaitTimeAnalytics = () => {
   };
 
   const renderOverviewTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       {/* Сводка */}
       {summary &&
-    <MacOSCard style={{ padding: '24px' }}>
+    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '16px'
+        marginBottom: 'var(--mac-spacing-4)'
       }}>
             <h3 style={{
           margin: 0,
@@ -200,7 +200,7 @@ const WaitTimeAnalytics = () => {
           fontWeight: 'var(--mac-font-weight-semibold)',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
               <Activity style={{ width: '20px', height: '20px' }} />
               Сводка за последние {summary.period_days} дней
@@ -216,7 +216,7 @@ const WaitTimeAnalytics = () => {
             </Badge>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
             <MacOSStatCard
           title="Среднее время ожидания"
           value={formatTime(summary.average_wait_time_minutes)}
@@ -247,7 +247,7 @@ const WaitTimeAnalytics = () => {
           </div>
 
           {summary.top_recommendations && summary.top_recommendations.length > 0 &&
-      <div style={{ marginTop: '16px' }}>
+      <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
               <h4 style={{
           margin: '0 0 8px 0',
           color: 'var(--mac-text-primary)',
@@ -256,18 +256,18 @@ const WaitTimeAnalytics = () => {
         }}>
                 Рекомендации
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-1)' }}>
                 {summary.top_recommendations.map((recommendation, index) =>
           <div
             key={index}
             style={{
-              padding: '8px',
+              padding: 'var(--mac-spacing-2)',
               backgroundColor: 'var(--mac-warning-bg)',
               border: '1px solid var(--mac-warning-border)',
               borderRadius: 'var(--mac-radius-sm)',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: 'var(--mac-spacing-2)'
             }}>
             
                     <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--mac-warning)' }} />
@@ -284,12 +284,12 @@ const WaitTimeAnalytics = () => {
 
       {/* Real-time оценки */}
       {realTimeEstimates &&
-    <MacOSCard style={{ padding: '24px' }}>
+    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '16px'
+        marginBottom: 'var(--mac-spacing-4)'
       }}>
             <h3 style={{
           margin: 0,
@@ -298,7 +298,7 @@ const WaitTimeAnalytics = () => {
           fontWeight: 'var(--mac-font-weight-semibold)',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
               <Zap style={{ width: '20px', height: '20px' }} />
               Текущие оценки времени ожидания
@@ -315,12 +315,12 @@ const WaitTimeAnalytics = () => {
         description="В данный момент нет активных очередей для отображения" /> :
 
 
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
               {Object.values(realTimeEstimates.queues).map((queue) =>
         <div
           key={queue.queue_id}
           style={{
-            padding: '16px',
+            padding: 'var(--mac-spacing-4)',
             border: '1px solid var(--mac-border)',
             borderRadius: 'var(--mac-radius-md)',
             display: 'flex',
@@ -333,7 +333,7 @@ const WaitTimeAnalytics = () => {
                     <div style={{
               fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                       {queue.department} - {queue.doctor_name}
                     </div>
@@ -342,13 +342,13 @@ const WaitTimeAnalytics = () => {
               color: 'var(--mac-text-secondary)',
               display: 'flex',
               alignItems: 'center',
-              gap: '16px'
+              gap: 'var(--mac-spacing-4)'
             }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
                         <Users style={{ width: '14px', height: '14px' }} />
                         {queue.current_queue_length} в очереди
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
                         <Clock style={{ width: '14px', height: '14px' }} />
                         ~{formatTime(queue.average_service_time)} на пациента
                       </span>
@@ -356,7 +356,7 @@ const WaitTimeAnalytics = () => {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{
-              fontSize: '20px',
+              fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: queue.estimated_wait_time_minutes > 30 ? 'var(--mac-error)' : 'var(--mac-success)'
             }}>
@@ -376,8 +376,8 @@ const WaitTimeAnalytics = () => {
 
           {realTimeEstimates.summary && Object.keys(realTimeEstimates.queues).length > 0 &&
       <div style={{
-        marginTop: '16px',
-        padding: '16px',
+        marginTop: 'var(--mac-spacing-4)',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-secondary)',
         borderRadius: 'var(--mac-radius-sm)'
       }}>
@@ -394,15 +394,15 @@ const WaitTimeAnalytics = () => {
 
 
   const renderDetailedTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       {loading ?
-    <MacOSCard style={{ padding: '24px' }}>
+    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <Skeleton height="200px" />
         </MacOSCard> :
     analytics ?
     <>
           {/* Общая статистика */}
-          <MacOSCard style={{ padding: '24px' }}>
+          <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
             <h3 style={{
           margin: '0 0 16px 0',
           color: 'var(--mac-text-primary)',
@@ -410,13 +410,13 @@ const WaitTimeAnalytics = () => {
           fontWeight: 'var(--mac-font-weight-semibold)',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
               <BarChart3 style={{ width: '20px', height: '20px' }} />
               Детальная статистика ({analytics.period.start_date} - {analytics.period.end_date})
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
               <MacOSStatCard
             title="Среднее"
             value={formatTime(analytics.overall_stats.average_minutes)}
@@ -456,7 +456,7 @@ const WaitTimeAnalytics = () => {
 
           {/* Разбивка по отделениям */}
           {Object.keys(analytics.department_breakdown).length > 0 &&
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
               <h3 style={{
           margin: '0 0 16px 0',
           color: 'var(--mac-text-primary)',
@@ -465,12 +465,12 @@ const WaitTimeAnalytics = () => {
         }}>
                 По отделениям
               </h3>
-              <div style={{ display: 'grid', gap: '16px' }}>
+              <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
                 {Object.entries(analytics.department_breakdown).map(([dept, stats]) =>
           <div
             key={dept}
             style={{
-              padding: '16px',
+              padding: 'var(--mac-spacing-4)',
               border: '1px solid var(--mac-border)',
               borderRadius: 'var(--mac-radius-sm)',
               display: 'flex',
@@ -488,7 +488,7 @@ const WaitTimeAnalytics = () => {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '16px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
+                      <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
                         {formatTime(stats.average_minutes)}
                       </div>
                       <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
@@ -503,7 +503,7 @@ const WaitTimeAnalytics = () => {
 
           {/* Рекомендации */}
           {analytics.recommendations && analytics.recommendations.length > 0 &&
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
               <h3 style={{
           margin: '0 0 16px 0',
           color: 'var(--mac-text-primary)',
@@ -512,18 +512,18 @@ const WaitTimeAnalytics = () => {
         }}>
                 Рекомендации по улучшению
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                 {analytics.recommendations.map((recommendation, index) =>
           <div
             key={index}
             style={{
-              padding: '16px',
+              padding: 'var(--mac-spacing-4)',
               backgroundColor: 'var(--mac-info-bg)',
               border: '1px solid var(--mac-info-border)',
               borderRadius: 'var(--mac-radius-sm)',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: 'var(--mac-spacing-2)'
             }}>
             
                     <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
@@ -547,7 +547,7 @@ const WaitTimeAnalytics = () => {
 
 
   const renderServicesTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{
         margin: 0,
@@ -564,7 +564,7 @@ const WaitTimeAnalytics = () => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
@@ -573,17 +573,17 @@ const WaitTimeAnalytics = () => {
       </div>
 
       {loading ?
-    <MacOSCard style={{ padding: '24px' }}>
+    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <Skeleton height="300px" />
         </MacOSCard> :
     serviceAnalytics && Object.keys(serviceAnalytics.service_analytics).length > 0 ?
-    <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'grid', gap: '16px' }}>
+    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+          <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
             {Object.entries(serviceAnalytics.service_analytics).map(([serviceCode, data]) =>
         <div
           key={serviceCode}
           style={{
-            padding: '16px',
+            padding: 'var(--mac-spacing-4)',
             border: '1px solid var(--mac-border)',
             borderRadius: 'var(--mac-radius-md)',
             backgroundColor: 'var(--mac-bg-secondary)'
@@ -593,7 +593,7 @@ const WaitTimeAnalytics = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '8px'
+            marginBottom: 'var(--mac-spacing-2)'
           }}>
                   <div>
                     <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
@@ -613,7 +613,7 @@ const WaitTimeAnalytics = () => {
                 </div>
                 
                 {data.wait_time_stats &&
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 'var(--mac-spacing-2)' }}>
                     <MacOSStatCard
               title="Среднее"
               value={formatTime(data.wait_time_stats.average_minutes)}
@@ -654,7 +654,7 @@ const WaitTimeAnalytics = () => {
 
 
   const renderHeatmapTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{
         margin: 0,
@@ -671,7 +671,7 @@ const WaitTimeAnalytics = () => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
@@ -680,12 +680,12 @@ const WaitTimeAnalytics = () => {
       </div>
 
       {loading ?
-    <MacOSCard style={{ padding: '24px' }}>
+    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <Skeleton height="400px" />
         </MacOSCard> :
     heatmapData ?
-    <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ marginBottom: '16px' }}>
+    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+          <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
             <h4 style={{
           margin: '0 0 8px 0',
           color: 'var(--mac-text-primary)',
@@ -702,14 +702,14 @@ const WaitTimeAnalytics = () => {
           <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
-        gap: '8px',
-        marginBottom: '16px'
+        gap: 'var(--mac-spacing-2)',
+        marginBottom: 'var(--mac-spacing-4)'
       }}>
             {heatmapData.heatmap_data.map((hourData) =>
         <div
           key={hourData.hour}
           style={{
-            padding: '8px',
+            padding: 'var(--mac-spacing-2)',
             backgroundColor: `rgba(59, 130, 246, ${hourData.intensity})`,
             color: hourData.intensity > 0.5 ? 'white' : 'var(--mac-text-primary)',
             borderRadius: 'var(--mac-radius-sm)',
@@ -720,10 +720,10 @@ const WaitTimeAnalytics = () => {
                 <div style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
                   {hourData.hour_label}
                 </div>
-                <div style={{ fontSize: '10px' }}>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                   {formatTime(hourData.average_wait_minutes)}
                 </div>
-                <div style={{ fontSize: '9px', opacity: 0.8 }}>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.8 }}>
                   {hourData.patient_count} пац.
                 </div>
               </div>
@@ -732,7 +732,7 @@ const WaitTimeAnalytics = () => {
 
           {heatmapData.summary &&
       <div style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-secondary)',
         borderRadius: 'var(--mac-radius-sm)',
         display: 'flex',
@@ -763,13 +763,13 @@ const WaitTimeAnalytics = () => {
 
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       {/* Заголовок */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '16px',
-        marginBottom: '8px'
+        gap: 'var(--mac-spacing-4)',
+        marginBottom: 'var(--mac-spacing-2)'
       }}>
         <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
         <div>
@@ -792,12 +792,12 @@ const WaitTimeAnalytics = () => {
       </div>
 
       {/* Фильтры */}
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
           <div>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: 'var(--mac-spacing-2)',
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)'
@@ -813,7 +813,7 @@ const WaitTimeAnalytics = () => {
           <div>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: 'var(--mac-spacing-2)',
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)'
@@ -829,7 +829,7 @@ const WaitTimeAnalytics = () => {
           <div>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: 'var(--mac-spacing-2)',
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)'
@@ -850,7 +850,7 @@ const WaitTimeAnalytics = () => {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: 'var(--mac-spacing-2)'
               }}>
               
               {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Filter style={{ width: '16px', height: '16px' }} />}

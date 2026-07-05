@@ -125,13 +125,13 @@ const FileUpload = ({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const containerStyle = {
-    padding: '24px',
+    padding: 'var(--mac-spacing-6)',
     border: `2px dashed ${
       isDragActive || isFocused
         ? 'var(--mac-accent-blue, #007AFF)'
         : 'var(--mac-border, #E5E5E5)'
     }`,
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     backgroundColor: isDragActive ? 'var(--mac-bg-secondary, #F5F5F7)' : 'var(--mac-bg-primary, #FFFFFF)',
     cursor: disabled ? 'default' : 'pointer',
     textAlign: 'center',
@@ -153,7 +153,7 @@ const FileUpload = ({
         <div
           role="status"
           aria-live="polite"
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
         >
                         <Loader className="animate-spin" size={32} style={{ color: 'var(--mac-accent-blue, #007AFF)' }} />
                         <p style={{ color: 'var(--mac-text-secondary, #8E8E93)', margin: 0 }}>
@@ -166,13 +166,13 @@ const FileUpload = ({
             size={32}
             style={{
               color: isDragActive ? 'var(--mac-accent-blue, #007AFF)' : 'var(--mac-text-tertiary, #C7C7CC)',
-              marginBottom: '12px'
+              marginBottom: 'var(--mac-spacing-3)'
             }} />
 
-                        <p style={{ margin: '0 0 4px', color: 'var(--mac-text-primary, #1D1D1F)', fontWeight: 500 }}>
+                        <p style={{ margin: '0 0 4px', color: 'var(--mac-text-primary, #1D1D1F)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                             {isDragActive ? 'Drop files here' : 'Click or drag files to upload'}
                         </p>
-                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--mac-text-secondary, #8E8E93)' }}>
+                        <p style={{ margin: 0, fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary, #8E8E93)' }}>
                             Supports JPG, PNG, HEIC up to {maxSize / 1024 / 1024}MB
                         </p>
                     </>
@@ -184,15 +184,15 @@ const FileUpload = ({
         id="file-upload-error"
         role="alert"
         style={{
-        marginTop: '12px',
-        padding: '12px',
+        marginTop: 'var(--mac-spacing-3)',
+        padding: 'var(--mac-spacing-3)',
         backgroundColor: '#FFF2F2',
         color: '#D32F2F',
-        borderRadius: '8px',
+        borderRadius: 'var(--mac-radius-md)',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        fontSize: '14px'
+        gap: 'var(--mac-spacing-2)',
+        fontSize: 'var(--mac-font-size-base)'
       }}>
                     <AlertCircle size={16} />
                     {error}
@@ -203,8 +203,8 @@ const FileUpload = ({
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-        gap: '12px',
-        marginTop: '16px'
+        gap: 'var(--mac-spacing-3)',
+        marginTop: 'var(--mac-spacing-4)'
       }}>
                     {previews.map((preview) =>
         <div key={preview.id} style={{ position: 'relative', group: 'preview-item' }}>
@@ -212,7 +212,7 @@ const FileUpload = ({
             width: '100%',
             paddingTop: '100%',
             position: 'relative',
-            borderRadius: '8px',
+            borderRadius: 'var(--mac-radius-md)',
             overflow: 'hidden',
             backgroundColor: '#F5F5F7',
             border: '1px solid var(--mac-border, #E5E5E5)'
@@ -241,7 +241,7 @@ const FileUpload = ({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '8px'
+              padding: 'var(--mac-spacing-2)'
             }}>
                                         <FileIcon size={24} color="#8E8E93" />
                                     </div>
@@ -276,9 +276,9 @@ const FileUpload = ({
                             </button>
 
                             <p style={{
-            fontSize: '11px',
+            fontSize: 'var(--mac-font-size-xs)',
             color: 'var(--mac-text-secondary, #8E8E93)',
-            marginTop: '4px',
+            marginTop: 'var(--mac-spacing-1)',
             textAlign: 'center',
             whiteSpace: 'nowrap',
             overflow: 'hidden',

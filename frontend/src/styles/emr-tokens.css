@@ -12,7 +12,7 @@
      SURFACES — Фоны и поверхности
      ============================================ */
     --surface-app: #0f0f23;
-    --surface-sidebar: linear-gradient(180deg, #4c1d95 0%, #2563eb 100%);
+    --surface-sidebar: linear-gradient(180deg, #4c1d95 0%, var(--mac-accent-blue-hover) 100%);
     --surface-card: #1a1a2e;
     --surface-input: #252540;
     --surface-input-focus: #2d2d4a;
@@ -25,7 +25,7 @@
     /* 12.5:1 AAA */
     --text-secondary: #a8adb8;
     /* 6.2:1 AA */
-    --text-muted: #6b7280;
+    --text-muted: var(--mac-text-secondary);
     /* 3.8:1 - осторожно! */
     --text-inverse: #1a1a2e;
     --text-link: #818cf8;
@@ -40,26 +40,26 @@
     --accent-primary-muted: rgba(99, 102, 241, 0.15);
 
     /* Success (Green) */
-    --accent-success: #22c55e;
+    --accent-success: var(--mac-success);
     --accent-success-hover: #4ade80;
     --accent-success-muted: rgba(34, 197, 94, 0.15);
 
     /* Warning (Orange) */
-    --accent-warning: #f59e0b;
-    --accent-warning-hover: #fbbf24;
+    --accent-warning: var(--mac-warning);
+    --accent-warning-hover: var(--mac-warning);
     --accent-warning-muted: rgba(245, 158, 11, 0.15);
 
     /* Danger (Red) */
-    --accent-danger: #ef4444;
-    --accent-danger-hover: #f87171;
+    --accent-danger: var(--mac-error);
+    --accent-danger-hover: var(--mac-error);
     --accent-danger-muted: rgba(239, 68, 68, 0.15);
 
     /* ============================================
      BORDERS
      ============================================ */
     --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-default: rgba(255, 255, 255, 0.1);
-    --border-strong: rgba(255, 255, 255, 0.2);
+    --border-default: color-mix(in srgb, white, transparent 90%);
+    --border-strong: color-mix(in srgb, white, transparent 80%);
     --border-focus: var(--accent-primary);
 
     /* ============================================
@@ -67,7 +67,7 @@
      ============================================ */
     --my-experience-bg: var(--accent-success-muted);
     --my-experience-border: var(--accent-success);
-    --my-experience-text: #a7f3d0;
+    --my-experience-text: var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 60%));
 
     /* ============================================
      SPECIAL: Templates Button
@@ -80,7 +80,7 @@
      SPECIAL: Pinned Template
      ============================================ */
     --pinned-bg: rgba(251, 191, 36, 0.1);
-    --pinned-border: #fbbf24;
+    --pinned-border: var(--mac-warning);
     --pinned-text: #fde68a;
 
     /* ============================================
@@ -106,9 +106,9 @@
     /* ============================================
      SHADOWS
      ============================================ */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
-    --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 2px color-mix(in srgb, black, transparent 80%);
+    --shadow-md: 0 2px 8px color-mix(in srgb, black, transparent 75%);
+    --shadow-lg: 0 4px 20px color-mix(in srgb, black, transparent 70%);
     --shadow-input-focus: 0 0 0 3px rgba(99, 102, 241, 0.25);
     --shadow-success-focus: 0 0 0 3px rgba(34, 197, 94, 0.25);
     --shadow-danger-focus: 0 0 0 3px rgba(239, 68, 68, 0.25);

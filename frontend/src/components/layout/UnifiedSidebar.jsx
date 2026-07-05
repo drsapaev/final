@@ -155,7 +155,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     boxShadow: isActive ? '0 6px 18px rgba(0,0,0,0.18)' : 'none',
     textDecoration: 'none',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    fontSize: '14px',
+    fontSize: 'var(--mac-font-size-base)',
     fontWeight: isActive ? '500' : '400',
     marginBottom: isCollapsed ? '4px' : '4px',
     width: isCollapsed ? '40px' : 'auto',
@@ -215,8 +215,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           {!isCollapsed &&
           <h1
             style={{
-              fontSize: '24px',
-              fontWeight: '700',
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
               margin: 0
             }}>
@@ -230,13 +230,13 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
               width: '28px',
               height: '28px',
               backgroundColor: 'var(--mac-accent-blue)',
-              borderRadius: '6px',
+              borderRadius: 'var(--mac-radius-sm)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
-              fontSize: '14px',
-              fontWeight: 'bold'
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-bold)'
             }}>
 
               {profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}
@@ -250,7 +250,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           onClick={onToggle}
           style={{
             color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)',
-            padding: '6px',
+            padding: 'var(--mac-spacing-2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -385,7 +385,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             justifyContent: 'center',
             gap: isCollapsed ? '0' : '4px',
             fontSize: isCollapsed ? '10px' : '12px',
-            fontWeight: '500',
+            fontWeight: 'var(--mac-font-weight-medium)',
             minHeight: isCollapsed ? '32px' : 'auto',
             width: isCollapsed ? '32px' : 'auto'
           }}
@@ -416,7 +416,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             justifyContent: 'center',
             gap: isCollapsed ? '0' : '4px',
             fontSize: isCollapsed ? '10px' : '12px',
-            fontWeight: '500',
+            fontWeight: 'var(--mac-font-weight-medium)',
             minHeight: isCollapsed ? '32px' : 'auto',
             width: isCollapsed ? '32px' : 'auto'
           }}
@@ -452,8 +452,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             gap: isCollapsed ? '0' : '12px',
             padding: isCollapsed ? '8px' : '12px 16px',
             color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
-            fontSize: '14px',
-            fontWeight: '500',
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-medium)',
             minWidth: isCollapsed ? '40px' : 'auto',
             minHeight: isCollapsed ? '40px' : 'auto',
             justifyContent: 'center'

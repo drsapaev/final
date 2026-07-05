@@ -98,11 +98,11 @@
 }
 
 .alert-dismiss:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: color-mix(in srgb, black, transparent 90%);
 }
 
 .dark .alert-dismiss:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, white, transparent 90%);
 }
 
 /* Контент */
@@ -147,19 +147,19 @@
 
 /* Специальные стили для типов */
 .modern-alert.success .alert-title {
-  color: #059669;
+  color: var(--mac-success);
 }
 
 .modern-alert.error .alert-title {
-  color: #dc2626;
+  color: var(--mac-error);
 }
 
 .modern-alert.warning .alert-title {
-  color: #d97706;
+  color: var(--mac-warning);
 }
 
 .modern-alert.info .alert-title {
-  color: #0284c7;
+  color: var(--mac-accent-blue);
 }
 
 .dark .modern-alert.success .alert-title {
@@ -167,11 +167,11 @@
 }
 
 .dark .modern-alert.error .alert-title {
-  color: #f87171;
+  color: var(--mac-error);
 }
 
 .dark .modern-alert.warning .alert-title {
-  color: #fbbf24;
+  color: var(--mac-warning);
 }
 
 .dark .modern-alert.info .alert-title {

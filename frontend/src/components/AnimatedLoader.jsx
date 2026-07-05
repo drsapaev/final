@@ -67,22 +67,22 @@ const AnimatedTableSkeleton = ({
 }) => {
   const tableStyles = {
     background: 'var(--mac-bg-primary, white)',
-    borderRadius: '12px',
-    padding: '20px',
+    borderRadius: 'var(--mac-radius-lg)',
+    padding: 'var(--mac-spacing-5)',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
     ...style
   };
 
   const skeletonRowStyles = {
     display: 'flex',
-    gap: '16px',
-    marginBottom: '12px',
+    gap: 'var(--mac-spacing-4)',
+    marginBottom: 'var(--mac-spacing-3)',
     alignItems: 'center'
   };
 
   const skeletonCellStyles = {
     backgroundColor: SKELETON_BG,
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     animation: 'skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
     height: '20px'
   };
@@ -132,15 +132,15 @@ const AnimatedCardSkeleton = ({
 }) => {
   const cardStyles = {
     background: 'var(--mac-bg-primary, white)',
-    borderRadius: '12px',
-    padding: '20px',
+    borderRadius: 'var(--mac-radius-lg)',
+    padding: 'var(--mac-spacing-5)',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
     ...style
   };
 
   const skeletonStyles = {
     backgroundColor: SKELETON_BG,
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     animation: 'skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
   };
 
@@ -153,30 +153,30 @@ const AnimatedCardSkeleton = ({
           ...skeletonStyles,
           width: '60%',
           height: '24px',
-          marginBottom: '16px'
+          marginBottom: 'var(--mac-spacing-4)'
         }} />
       <div
         style={{
           ...skeletonStyles,
           width: '100%',
           height: '16px',
-          marginBottom: '8px'
+          marginBottom: 'var(--mac-spacing-2)'
         }} />
       <div
         style={{
           ...skeletonStyles,
           width: '80%',
           height: '16px',
-          marginBottom: '8px'
+          marginBottom: 'var(--mac-spacing-2)'
         }} />
       <div
         style={{
           ...skeletonStyles,
           width: '60%',
           height: '16px',
-          marginBottom: '16px'
+          marginBottom: 'var(--mac-spacing-4)'
         }} />
-      <div style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
         <div
           style={{
             ...skeletonStyles,

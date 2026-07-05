@@ -79,7 +79,7 @@
     right: -2px;
     width: 8px;
     height: 8px;
-    background: #4caf50;
+    background: var(--mac-success);
     border-radius: 50%;
     border: 2px solid white;
 }

@@ -44,7 +44,7 @@ export default function Audit() {
     );
   }, [q, rows]);
 
-  const stateCellStyle = { minHeight: '96px', padding: '16px' };
+  const stateCellStyle = { minHeight: '96px', padding: 'var(--mac-spacing-4)' };
   const visuallyHiddenStyle = {
     position: 'absolute',
     width: '1px',
@@ -155,7 +155,8 @@ export default function Audit() {
           )}
 
           <div style={tableWrapStyle} aria-busy={busy} aria-describedby={tableCaptionId}>
-            <table style={tableStyle}>
+            <div className="admin-table-wrapper">
+<table style={tableStyle}>
               <caption id={tableCaptionId} style={visuallyHiddenStyle}>Журнал аудита</caption>
               <thead>
                 <tr>
@@ -205,6 +206,7 @@ export default function Audit() {
                 )}
               </tbody>
             </table>
+</div>
           </div>
           </CardContent>
         </Card>

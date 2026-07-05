@@ -170,20 +170,20 @@ function SystemRoutePage({ title, description, code }) {
       <div style={{
         maxWidth: '560px',
         width: '100%',
-        borderRadius: '16px',
+        borderRadius: 'var(--mac-radius-xl)',
         border: '1px solid var(--mac-border, #d8dde8)',
         background: 'var(--mac-bg-primary, #ffffff)',
         boxShadow: '0 16px 40px rgba(15, 23, 42, 0.08)',
         padding: '32px',
         textAlign: 'center',
       }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mac-text-secondary, #5f6b7a)' }}>
+        <div style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-bold)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mac-text-secondary, #5f6b7a)' }}>
           {code}
         </div>
         <h1 style={{ margin: '12px 0 8px', fontSize: '32px', lineHeight: 1.1, color: 'var(--mac-text-primary, #111827)' }}>
           {title}
         </h1>
-        <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.6, color: 'var(--mac-text-secondary, #4b5563)' }}>
+        <p style={{ margin: 0, fontSize: 'var(--mac-font-size-lg)', lineHeight: 1.6, color: 'var(--mac-text-secondary, #4b5563)' }}>
           {description}
         </p>
       </div>

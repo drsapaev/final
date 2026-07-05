@@ -54,7 +54,7 @@ const styles = {
     margin: '0 0 16px',
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-xl)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   dropzone: (active) => ({
     marginTop: 'var(--mac-spacing-4)',
@@ -117,7 +117,7 @@ const styles = {
     margin: 0,
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-base)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   badgeRow: {
     display: 'flex',
@@ -172,7 +172,7 @@ const styles = {
     margin: '0 0 8px',
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-sm)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   bodyText: {
     margin: 0,
@@ -190,7 +190,7 @@ const styles = {
     margin: 0,
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-xl)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   dialogContent: {
     maxHeight: '78vh',
@@ -225,7 +225,7 @@ const styles = {
     margin: '4px 0 0',
     color: 'var(--mac-text-primary)',
     fontSize: 'var(--mac-font-size-xl)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
 };
 

@@ -333,7 +333,7 @@ const ModernStatistics = ({
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   fontSize: '32px', // 32px как у левой иконки
                   fontWeight: 'var(--mac-font-weight-bold)',
                   color: getTrendColor(card.trend, isGoodWhenDown)
@@ -356,7 +356,7 @@ const ModernStatistics = ({
                   marginBottom: 'var(--mac-spacing-2)'
                 }}>
                   {formatValue(card.value, card.format)}
-                  <span style={{ fontSize: '28px', fontWeight: 'var(--mac-font-weight-semibold)', marginLeft: '8px' }}>
+                  <span style={{ fontSize: '28px', fontWeight: 'var(--mac-font-weight-semibold)', marginLeft: 'var(--mac-spacing-2)' }}>
                     {card.suffix}
                   </span>
                 </div>

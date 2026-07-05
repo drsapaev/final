@@ -90,20 +90,20 @@ const PatientStepV2 = ({
               transform: 'translateY(-50%)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: 'var(--mac-spacing-2)',
               fontSize: 'var(--mac-font-size-xs)',
               pointerEvents: 'none'
             }}>
               {safeData.id ?
               <>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--mac-primary)' }} />
-                  <span style={{ color: 'var(--mac-primary)', fontWeight: '500' }}>Существующий</span>
+                  <span style={{ color: 'var(--mac-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Существующий</span>
                 </> :
 
               (safeData.fio || '').length > 0 &&
               <>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--mac-success)' }} />
-                    <span style={{ color: 'var(--mac-success)', fontWeight: '500' }}>Новый</span>
+                    <span style={{ color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-medium)' }}>Новый</span>
                   </>
 
               }
@@ -116,7 +116,7 @@ const PatientStepV2 = ({
             color: 'var(--mac-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <AlertCircle size={14} />
               {errors.fio}
@@ -131,7 +131,7 @@ const PatientStepV2 = ({
             left: 0,
             right: 0,
             zIndex: 100,
-            marginTop: '4px',
+            marginTop: 'var(--mac-spacing-1)',
             padding: 'var(--mac-spacing-3)',
             background: 'var(--mac-bg-primary)',
             border: '1px solid var(--mac-border)',
@@ -139,9 +139,9 @@ const PatientStepV2 = ({
             boxShadow: 'var(--mac-shadow-lg)',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             color: 'var(--mac-text-secondary)',
-            fontSize: '13px',
+            fontSize: 'var(--mac-font-size-sm)',
           }}>
             <RefreshCw size={14} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
             Поиск пациентов...
@@ -156,7 +156,7 @@ const PatientStepV2 = ({
             left: 0,
             right: 0,
             zIndex: 100,
-            marginTop: '4px',
+            marginTop: 'var(--mac-spacing-1)',
             background: 'var(--mac-bg-primary)',
             border: '1px solid var(--mac-border)',
             borderRadius: 'var(--mac-radius-md)',
@@ -185,7 +185,7 @@ const PatientStepV2 = ({
                   <div style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
                   </div>
-                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', display: 'flex', gap: '8px' }}>
+                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', display: 'flex', gap: 'var(--mac-spacing-2)' }}>
                     <span>📱 {patient.phone}</span>
                     <span>🎂 {formatDateDisplay(patient.birth_date)}</span>
                   </div>
@@ -211,7 +211,7 @@ const PatientStepV2 = ({
           <div style={{
             display: 'flex',
             background: 'var(--mac-bg-secondary)',
-            padding: '4px',
+            padding: 'var(--mac-spacing-1)',
             borderRadius: 'var(--mac-radius-md)',
             border: '1px solid var(--mac-border)',
             height: '36px'
@@ -223,7 +223,7 @@ const PatientStepV2 = ({
               onClick={() => onUpdate('gender', gender)}
               style={{
                 flex: 1,
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: 'none',
                 borderRadius: 'var(--mac-radius-sm)',
                 background: selectedGender === gender ? 'var(--mac-bg-primary)' : 'transparent',
@@ -245,7 +245,7 @@ const PatientStepV2 = ({
             color: 'var(--mac-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <AlertCircle size={14} />
               {errors.gender}
@@ -264,7 +264,7 @@ const PatientStepV2 = ({
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
-            Телефон <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'normal' }}>(необязательно)</span>
+            Телефон <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'var(--mac-font-weight-normal)' }}>(необязательно)</span>
           </label>
           <Input
             ref={phoneRef}
@@ -292,7 +292,7 @@ const PatientStepV2 = ({
             color: 'var(--mac-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <AlertCircle size={14} />
               {errors.phone}
@@ -300,22 +300,22 @@ const PatientStepV2 = ({
           }
           {phoneError &&
           <div style={{
-            marginTop: '4px',
-            padding: '8px',
+            marginTop: 'var(--mac-spacing-1)',
+            padding: 'var(--mac-spacing-2)',
             background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
             border: '1px solid color-mix(in srgb, var(--mac-error), transparent 70%)',
             borderRadius: 'var(--mac-radius-sm)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <span style={{
               fontSize: 'var(--mac-font-size-xs)',
               color: 'var(--mac-error)',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              fontWeight: '500'
+              gap: 'var(--mac-spacing-1)',
+              fontWeight: 'var(--mac-font-weight-medium)'
             }}>
                 <AlertCircle size={14} />
                 {phoneError.message}
@@ -327,9 +327,9 @@ const PatientStepV2 = ({
                 background: 'var(--mac-error)',
                 color: 'var(--mac-text-on-accent)',
                 border: 'none',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                fontSize: '11px',
+                borderRadius: 'var(--mac-radius-sm)',
+                padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+                fontSize: 'var(--mac-font-size-xs)',
                 cursor: 'pointer',
                 alignSelf: 'flex-start'
               }}>
@@ -370,7 +370,7 @@ const PatientStepV2 = ({
             color: 'var(--mac-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: 'var(--mac-spacing-1)'
           }}>
               <AlertCircle size={14} />
               {errors.birth_date}

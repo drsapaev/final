@@ -62,15 +62,15 @@ export const QueueActionButtons = ({
 
   const {
     actionButtonStyle = {
-      padding: '6px',
-      borderRadius: '6px',
+      padding: 'var(--mac-spacing-2)',
+      borderRadius: 'var(--mac-radius-sm)',
       border: 'none',
       cursor: 'pointer',
       transition: 'all 0.2s ease',
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: '4px'
+      marginRight: 'var(--mac-spacing-1)'
     },
     dangerColor = 'var(--mac-error)',
     successColor = 'var(--mac-success)',
@@ -342,21 +342,21 @@ export const QueueActionButtons = ({
       case 'completed':
       case 'done':
         return (
-          <span style={{ color: successColor, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ color: successColor, fontSize: 'var(--mac-font-size-xs)', display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
                         <CheckCircle size={14} /> Завершён
                     </span>);
 
 
       case 'incomplete':
         return (
-          <span style={{ color: dangerColor, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ color: dangerColor, fontSize: 'var(--mac-font-size-xs)', display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
                         <AlertCircle size={14} /> Не завершён
                     </span>);
 
 
       case 'cancelled':
         return (
-          <span style={{ color: 'var(--mac-text-secondary)', fontSize: '12px' }}>Отменён</span>);
+          <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>Отменён</span>);
 
 
       default:
@@ -365,7 +365,7 @@ export const QueueActionButtons = ({
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
             {loading ?
       <Clock size={iconSize} style={{ animation: 'spin 1s linear infinite' }} /> :
 
@@ -391,28 +391,28 @@ export const QueueStatsBar = ({ stats, getColor }) => {
   const gc = getColor || defaultGetColor;
 
   return (
-    <div style={{ display: 'flex', gap: '12px', fontSize: '14px' }}>
+    <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', fontSize: 'var(--mac-font-size-base)' }}>
             <span style={{
         background: `${gc('warning', 500)}20`,
         color: gc('warning', 500),
-        padding: '4px 8px',
-        borderRadius: '6px'
+        padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+        borderRadius: 'var(--mac-radius-sm)'
       }}>
                 Ожидают: {stats?.waiting || 0}
             </span>
             <span style={{
         background: `${gc('primary', 500)}20`,
         color: gc('primary', 500),
-        padding: '4px 8px',
-        borderRadius: '6px'
+        padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+        borderRadius: 'var(--mac-radius-sm)'
       }}>
                 Вызваны: {stats?.called || 0}
             </span>
             <span style={{
         background: `${gc('success', 500)}20`,
         color: gc('success', 500),
-        padding: '4px 8px',
-        borderRadius: '6px'
+        padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+        borderRadius: 'var(--mac-radius-sm)'
       }}>
                 Обслужены: {stats?.served || 0}
             </span>

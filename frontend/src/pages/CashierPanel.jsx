@@ -1642,7 +1642,7 @@ const CashierPanel = () => {
                 {hourlyStats.filter((h) => h.count > 0).length > 0 ?
                 hourlyStats.filter((h) => h.count > 0).map((h) =>
                 <Box key={h.hour} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Typography sx={{ width: 60, fontWeight: 600 }}>{h.hour}:00</Typography>
+                      <Typography sx={{ width: 60, fontWeight: 'var(--mac-font-weight-semibold)' }}>{h.hour}:00</Typography>
                       <Box sx={{
                     flex: 1,
                     height: 24,

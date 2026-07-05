@@ -51,12 +51,12 @@ const FormGroup = ({
       <label
         style={{
           fontSize: isMobile ? '14px' : '16px',
-          fontWeight: '500',
+          fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: 'var(--mac-error)', marginLeft: '4px' }}>*</span>}
+          {required && <span style={{ color: 'var(--mac-error)', marginLeft: 'var(--mac-spacing-1)' }}>*</span>}
         </label>
       }
       {children}

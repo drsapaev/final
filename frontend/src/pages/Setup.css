@@ -125,7 +125,7 @@
 }
 
 .setup-required-marker {
-  color: #dc2626;
+  color: var(--mac-error);
   font-weight: 700;
 }
 
@@ -151,7 +151,7 @@
 }
 
 .setup-field--invalid:focus {
-  border-color: #dc2626;
+  border-color: var(--mac-error);
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
 }
 
@@ -277,11 +277,11 @@
 }
 
 .setup-password-match--ok {
-  color: #16a34a;
+  color: var(--mac-success);
 }
 
 .setup-password-match--err {
-  color: #dc2626;
+  color: var(--mac-error);
 }
 
 /* ============ Вспомогательные подсказки ============ */
@@ -305,7 +305,7 @@
 
 .setup-message--error {
   background: rgba(239, 68, 68, 0.10);
-  color: #b91c1c;
+  color: var(--mac-error);
 }
 
 .setup-message--success {
@@ -334,7 +334,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #b45309;
+  color: var(--mac-warning);
   font-size: 13px;
   line-height: 1.5;
 }

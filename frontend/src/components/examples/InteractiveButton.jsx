@@ -78,9 +78,9 @@ const InteractiveButton = ({
       onMouseLeave={handleMouseLeave}
       style={{
         padding: getSpacing('sm') + ' ' + getSpacing('lg'),
-        borderRadius: '6px',
+        borderRadius: 'var(--mac-radius-sm)',
         fontSize: getSpacing('base'),
-        fontWeight: '500',
+        fontWeight: 'var(--mac-font-weight-medium)',
         cursor: 'pointer',
         outline: 'none',
         ...getButtonStyle(),

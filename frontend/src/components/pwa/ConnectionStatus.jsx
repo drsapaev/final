@@ -88,7 +88,7 @@ const styles = {
   toastTitle: {
     margin: 0,
     fontSize: 'var(--mac-font-size-base, 14px)',
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-primary, #1e293b)'
   },
   toastDescription: {
@@ -120,7 +120,7 @@ const styles = {
     justifyContent: 'center',
     gap: 8,
     fontSize: 'var(--mac-font-size-xs, 12px)',
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     lineHeight: 1.4
   }
 };

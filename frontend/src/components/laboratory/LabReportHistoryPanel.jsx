@@ -61,15 +61,15 @@ export default function LabReportHistoryPanel({
 
   return (
     <Card variant="filled" padding="none">
-      <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
-        <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
+        <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           <Icon name="clock.arrow.circlepath" size={20} />
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '12px' }}>
+      <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)', display: 'grid', gap: 'var(--mac-spacing-3)' }}>
         {/* Фильтр по severity */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--mac-spacing-2)' }}>
           {SEVERITY_FILTERS.map((filter) => (
             <Button
               key={filter.id}
@@ -101,29 +101,29 @@ export default function LabReportHistoryPanel({
                   padding: '12px 14px',
                   display: 'flex',
                   justifyContent: 'space-between',
-                  gap: '12px',
+                  gap: 'var(--mac-spacing-3)',
                   alignItems: 'center',
                   cursor: 'pointer',
                 }}
               >
-                <div style={{ display: 'grid', gap: '4px', textAlign: 'left' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)', textAlign: 'left' }}>
+                  <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                     {item.template?.name || `Отчёт #${item.id}`}
                   </div>
-                  <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+                  <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
                     {showRecentReportsBrowser
                       ? `${patientLabel} | ${new Date(item.created_at).toLocaleString()}`
                       : new Date(item.created_at).toLocaleString()}
                   </div>
                   {showRecentReportsBrowser && (
-                    <div style={{ color: 'var(--mac-text-secondary)', fontSize: '12px' }}>
+                    <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
                       Визит: {item.visit_id || 'без визита'}
                     </div>
                   )}
                 </div>
                 <div style={{
                   display: 'flex',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   alignItems: 'center',
                   flexWrap: 'wrap',
                   justifyContent: 'flex-end',
