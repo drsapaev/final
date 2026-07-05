@@ -3,6 +3,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
+// UX Audit Registrar #2: useConfirm hook для замены window.confirm().
+import { useConfirm } from '../common/ConfirmDialog';
 // UX Audit Stage 3 (Queue issue 7.3):
 // Заменены SF Symbols (Icon) на lucide-react — единая библиотека иконок.
 // Раньше Queue был единственным экраном, использующим SF Symbols.
@@ -51,6 +53,10 @@ const ModernQueueManager = ({
   const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
+  // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
+  const [confirm, confirmDialog] = useConfirm();
 
   // Переводы
   const t = {
@@ -214,13 +220,18 @@ const ModernQueueManager = ({
     }
 
     // Confirmation: открытие приёма закрывает онлайн-запись для новых пациентов.
+    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
     const doctorName = doctors.find((d) => String(d.id) === String(effectiveDoctor))?.full_name || 'выбранного врача';
-    const confirmed = window.confirm(
-      `Открыть приём для "${doctorName}"?\n\n` +
-      'После открытия приёма онлайн-запись через QR будет закрыта — ' +
-      'новые пациенты не смогут записаться онлайн.\n\n' +
-      'Нажмите «ОК» чтобы продолжить, или «Отмена» чтобы вернуться.'
-    );
+    const confirmed = await confirm({
+      title: 'Открыть приём',
+      message: `Открыть приём для «${doctorName}»?`,
+      description:
+        'После открытия приёма онлайн-запись через QR будет закрыта — ' +
+        'новые пациенты не смогут записаться онлайн.',
+      confirmLabel: 'Открыть приём',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
     if (!confirmed) {
       return;
     }
@@ -254,11 +265,16 @@ const ModernQueueManager = ({
       return;
     }
 
-    const confirmed = window.confirm(
-      'Закрыть приём?\n\n' +
-      'Онлайн-запись через QR будет открыта — новые пациенты смогут записаться онлайн.\n\n' +
-      'Нажмите «ОК» чтобы продолжить, или «Отмена» чтобы вернуться.'
-    );
+    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+    const confirmed = await confirm({
+      title: 'Закрыть приём',
+      message: 'Закрыть приём?',
+      description:
+        'Онлайн-запись через QR будет открыта — новые пациенты смогут записаться онлайн.',
+      confirmLabel: 'Закрыть приём',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
     if (!confirmed) {
       return;
     }
@@ -737,6 +753,9 @@ const ModernQueueManager = ({
           </div>
         </div>
       </ModernDialog>
+
+      {/* UX Audit Registrar #2: ConfirmDialog (useConfirm hook). */}
+      {confirmDialog}
     </div>);
 
 };

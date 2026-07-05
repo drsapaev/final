@@ -56,6 +56,8 @@ import {
 } from '../../api/patients';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+// UX Audit Registrar #2: useConfirm hook для замены window.confirm().
+import { useConfirm } from '../common/ConfirmDialog';
 // ⭐ SSOT: Unified service extraction
 import { normalizeServicesFromInitialData } from '../../utils/serviceCodeResolver';
 import './AppointmentWizardV2.css';
@@ -118,6 +120,10 @@ const AppointmentWizardV2 = ({
   // Проверка прав доступа
   const { hasRole } = useRoleAccess();
   const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
+
+  // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
+  // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
+  const [confirm, confirmDialog] = useConfirm();
 
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(STEP_PATIENT);
@@ -1341,9 +1347,17 @@ const AppointmentWizardV2 = ({
       totalAmount > 0 ? `Сумма: ${new Intl.NumberFormat('ru-RU').format(totalAmount)} сум` : 'Бесплатно',
     ].filter(Boolean);
 
-    const confirmed = window.confirm(
-      'Создать запись?\n\n' + summaryLines.join('\n')
-    );
+    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+    // Раньше: window.confirm('Создать запись?\n\n' + summaryLines.join('\n'))
+    // Теперь: macOS-style ConfirmDialog через useConfirm.
+    const confirmed = await confirm({
+      title: 'Создать запись',
+      message: 'Создать запись с указанными данными?',
+      description: summaryLines.join('\n'),
+      confirmLabel: 'Создать',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
     if (!confirmed) {
       return;
     }
@@ -2904,6 +2918,9 @@ const AppointmentWizardV2 = ({
           </div>
         </div>
       </ModernDialog>
+
+      {/* UX Audit Registrar #2: ConfirmDialog (useConfirm hook). */}
+      {confirmDialog}
 
       {/* Диалоги онлайн оплаты удалены из UI */}
     </>);
