@@ -106,10 +106,10 @@ export default function PatientPickupView() {
   // Get status badge for lab results
   const getStatusBadge = (status) => {
     const config = {
-      done: { icon: '🟢', label: 'Готов', bg: '#dcfce7', color: '#166534' },
-      in_progress: { icon: '🟡', label: 'В процессе', bg: '#fef9c3', color: '#854d0e' },
-      ordered: { icon: '⚪', label: 'Заказан', bg: '#f1f5f9', color: '#475569' },
-      canceled: { icon: '🔴', label: 'Отменён', bg: '#fee2e2', color: '#991b1b' }
+      done: { icon: '🟢', label: 'Готов', bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
+      in_progress: { icon: '🟡', label: 'В процессе', bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
+      ordered: { icon: '⚪', label: 'Заказан', bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)' },
+      canceled: { icon: '🔴', label: 'Отменён', bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' }
     };
     const normalizedStatus = String(status || '').toUpperCase();
     if (['FINALIZED', 'PRINTED'].includes(normalizedStatus)) return config.done;
@@ -134,15 +134,15 @@ export default function PatientPickupView() {
   // Get status badge for visits
   const getVisitStatusBadge = (status) => {
     const config = {
-      scheduled: { icon: '📅', label: 'Запланирован', bg: '#e0f2fe', color: '#0369a1' },
-      in_queue: { icon: '⏳', label: 'В очереди', bg: '#fef9c3', color: '#854d0e' },
-      in_progress: { icon: '🟡', label: 'На приёме', bg: '#fef3c7', color: '#92400e' },
-      completed: { icon: '🟢', label: 'Завершён', bg: '#dcfce7', color: '#166534' },
-      paid: { icon: '💳', label: 'Оплачено', bg: '#d1fae5', color: '#047857' },
-      cancelled: { icon: '🔴', label: 'Отменён', bg: '#fee2e2', color: '#991b1b' },
-      no_show: { icon: '❌', label: 'Неявка', bg: '#fecaca', color: '#dc2626' }
+      scheduled: { icon: '📅', label: 'Запланирован', bg: 'var(--mac-accent-bg)', color: 'var(--mac-accent)' },
+      in_queue: { icon: '⏳', label: 'В очереди', bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
+      in_progress: { icon: '🟡', label: 'На приёме', bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
+      completed: { icon: '🟢', label: 'Завершён', bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
+      paid: { icon: '💳', label: 'Оплачено', bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
+      cancelled: { icon: '🔴', label: 'Отменён', bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' },
+      no_show: { icon: '❌', label: 'Неявка', bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' }
     };
-    return config[status] || { icon: '⚪', label: status || 'Неизвестно', bg: '#f1f5f9', color: '#475569' };
+    return config[status] || { icon: '⚪', label: status || 'Неизвестно', bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)' };
   };
 
   // Handle print
@@ -273,7 +273,7 @@ export default function PatientPickupView() {
     card: {
       background: 'var(--mac-bg-primary, white)',
       borderRadius: '16px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+      boxShadow: 'var(--mac-shadow-md)',
       padding: '24px',
       marginBottom: '24px'
     },
@@ -368,7 +368,7 @@ export default function PatientPickupView() {
     error: {
       textAlign: 'center',
       padding: '60px',
-      color: '#dc2626'
+      color: 'var(--mac-error)'
     },
     emptyState: {
       textAlign: 'center',
@@ -559,7 +559,7 @@ export default function PatientPickupView() {
           style={styles.emptyState}
         /> :
 
-        <div style={{ overflowX: 'auto' }} aria-label="История визитов пациента">
+        <div className="admin-table-wrapper" style={{ overflowX: 'auto' }} aria-label="История визитов пациента">
                             <table style={{
             width: '100%',
             borderCollapse: 'collapse',
