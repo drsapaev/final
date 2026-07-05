@@ -125,7 +125,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
           <div>
             <h4
               style={{
-                color: theme === 'dark' ? 'var(--mac-warning)' : '#92400e',
+                color: 'var(--mac-warning)',
                 fontSize: 'var(--mac-font-size-base)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
                 margin: '0 0 4px 0',
@@ -135,7 +135,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             </h4>
             <p
               style={{
-                color: theme === 'dark' ? '#fcd34d' : '#a16207',
+                color: 'var(--mac-warning)',
                 fontSize: 'var(--mac-font-size-sm)',
                 margin: 0,
                 lineHeight: '1.4',
@@ -284,7 +284,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             onFocus={(e) => {
               if (!error) {
                 e.target.style.borderColor = 'var(--mac-accent-blue)';
-                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+                e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 88%)';
               }
             }}
             onBlur={(e) => {

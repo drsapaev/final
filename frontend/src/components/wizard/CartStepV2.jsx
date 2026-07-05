@@ -13,7 +13,7 @@ import { useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
 

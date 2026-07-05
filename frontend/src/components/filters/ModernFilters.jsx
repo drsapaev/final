@@ -16,7 +16,7 @@ import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils
 import './ModernFilters.css';
 import PropTypes from 'prop-types';
 import { Input,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 
 const ModernFilters = ({
   searchParams,

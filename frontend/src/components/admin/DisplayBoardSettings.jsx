@@ -26,7 +26,7 @@ import {
 import {
   MacOSCard, Button, Select,
   Input,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';

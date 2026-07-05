@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, Button,
   Input,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Download,
   FileText,

@@ -15,7 +15,7 @@ import {
   Input,
   Select,
   Textarea,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Activity,
   CheckCircle,

@@ -11,7 +11,7 @@ import {
   Skeleton,
   MacOSEmptyState,
   Select,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Percent,
   Plus,

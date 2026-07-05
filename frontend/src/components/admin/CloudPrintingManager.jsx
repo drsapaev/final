@@ -9,7 +9,7 @@ import {
   Textarea,
   AppEmpty,
   Modal,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Printer,
   RefreshCw,

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Chart, registerables } from 'chart.js';
 import { Card, Button,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Download,
   RefreshCw,

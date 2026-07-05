@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert, Badge, Button, Card, CardContent, Input, Textarea,
-  Checkbox} from '../components/ui/macos';
+  Checkbox } from '../components/ui/macos';
 import { api } from '../api/client.js';
 
 const MINI_APP_LANGUAGE_RU = 'ru';

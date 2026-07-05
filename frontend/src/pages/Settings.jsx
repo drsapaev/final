@@ -14,7 +14,7 @@ import NotificationSystemStatus from '../components/settings/NotificationSystemS
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Input,
-  Checkbox} from '../components/ui/macos';
+  Checkbox } from '../components/ui/macos';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
