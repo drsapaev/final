@@ -455,7 +455,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
           display: 'flex',
           alignItems: 'center',
           gap: 'var(--mac-spacing-2)',
-          color: '#92400E',
+          color: 'var(--mac-warning)',
           fontSize: 'var(--mac-font-size-xs)'
         }}>
             <AlertCircle size={16} />
