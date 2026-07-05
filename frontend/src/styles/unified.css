@@ -20,19 +20,19 @@
   --color-primary-200: #bfdbfe;
   --color-primary-300: #93c5fd;
   --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
+  --color-primary-500: var(--mac-accent-blue);
   --color-primary-600: #2563eb;
   --color-primary-700: #1d4ed8;
   --color-primary-800: #1e40af;
   --color-primary-900: #1e3a8a;
 
   /* SECONDARY COLORS */
-  --color-secondary-50: #f9fafb;
-  --color-secondary-100: #f3f4f6;
-  --color-secondary-200: #e5e7eb;
-  --color-secondary-300: #d1d5db;
+  --color-secondary-50: var(--mac-bg-secondary);
+  --color-secondary-100: var(--mac-bg-secondary);
+  --color-secondary-200: var(--mac-border);
+  --color-secondary-300: var(--mac-border);
   --color-secondary-400: #9ca3af;
-  --color-secondary-500: #6b7280;
+  --color-secondary-500: var(--mac-text-secondary);
   --color-secondary-600: #4b5563;
   --color-secondary-700: #374151;
   --color-secondary-800: #1f2937;
@@ -40,52 +40,52 @@
 
   /* STATUS COLORS */
   --color-status-success: #10b981;
-  --color-status-warning: #f59e0b;
-  --color-status-danger: #ef4444;
+  --color-status-warning: var(--mac-warning);
+  --color-status-danger: var(--mac-error);
   --color-status-info: #06b6d4;
-  --color-status-neutral: #6b7280;
+  --color-status-neutral: var(--mac-text-secondary);
 
   /* MEDICAL DEPARTMENT COLORS */
-  --color-medical-cardiology: #dc2626;
+  --color-medical-cardiology: var(--mac-error);
   --color-medical-dermatology: #8b5cf6;
   --color-medical-dentistry: #059669;
   --color-medical-laboratory: #0891b2;
   --color-medical-neurology: #a855f7;
   --color-medical-gynecology: #ec4899;
-  --color-medical-pediatrics: #f59e0b;
+  --color-medical-pediatrics: var(--mac-warning);
   --color-medical-surgery: #7c2d12;
   --color-medical-psychiatry: #7c3aed;
-  --color-medical-radiology: #64748b;
+  --color-medical-radiology: var(--mac-text-secondary);
   --color-medical-ophthalmology: #06b6d4;
-  --color-medical-general: #3b82f6;
+  --color-medical-general: var(--mac-accent-blue);
 
   /* SEMANTIC TEXT COLORS */
   --color-text-primary: #111827;
   --color-text-secondary: #374151;
-  --color-text-tertiary: #6b7280;
-  --color-text-inverse: #ffffff;
+  --color-text-tertiary: var(--mac-text-secondary);
+  --color-text-inverse: var(--mac-bg-primary);
   --color-text-disabled: #9ca3af;
 
   /* SEMANTIC BACKGROUND COLORS */
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f9fafb;
-  --color-bg-tertiary: #f3f4f6;
-  --color-bg-elevated: #ffffff;
-  --color-bg-overlay: rgba(0, 0, 0, 0.5);
-  --color-bg-disabled: #f3f4f6;
+  --color-bg-primary: var(--mac-bg-primary);
+  --color-bg-secondary: var(--mac-bg-secondary);
+  --color-bg-tertiary: var(--mac-bg-secondary);
+  --color-bg-elevated: var(--mac-bg-primary);
+  --color-bg-overlay: color-mix(in srgb, black, transparent 50%);
+  --color-bg-disabled: var(--mac-bg-secondary);
 
   /* SEMANTIC BORDER COLORS */
-  --color-border-light: #e5e7eb;
-  --color-border-medium: #d1d5db;
+  --color-border-light: var(--mac-border);
+  --color-border-medium: var(--mac-border);
   --color-border-dark: #9ca3af;
-  --color-border-focus: #3b82f6;
-  --color-border-error: #ef4444;
+  --color-border-focus: var(--mac-accent-blue);
+  --color-border-error: var(--mac-error);
 
   /* SEMANTIC SURFACE COLORS */
-  --color-surface-card: #ffffff;
-  --color-surface-input: #ffffff;
-  --color-surface-hover: #f9fafb;
-  --color-surface-active: #f3f4f6;
+  --color-surface-card: var(--mac-bg-primary);
+  --color-surface-input: var(--mac-bg-primary);
+  --color-surface-hover: var(--mac-bg-secondary);
+  --color-surface-active: var(--mac-bg-secondary);
   --color-surface-selected: #eff6ff;
 
   /* TYPOGRAPHY */
@@ -193,29 +193,29 @@
 @media (prefers-color-scheme: dark) {
   :root {
     /* DARK MODE: TEXT COLORS */
-    --color-text-primary: #f9fafb;
-    --color-text-secondary: #d1d5db;
+    --color-text-primary: var(--mac-bg-secondary);
+    --color-text-secondary: var(--mac-border);
     --color-text-tertiary: #9ca3af;
     --color-text-inverse: #111827;
-    --color-text-disabled: #6b7280;
+    --color-text-disabled: var(--mac-text-secondary);
 
     /* DARK MODE: BACKGROUND COLORS */
     --color-bg-primary: #0f172a;
-    --color-bg-secondary: #1e293b;
+    --color-bg-secondary: var(--mac-text-primary);
     --color-bg-tertiary: #334155;
-    --color-bg-elevated: #1e293b;
+    --color-bg-elevated: var(--mac-text-primary);
     --color-bg-overlay: rgba(0, 0, 0, 0.8);
     --color-bg-disabled: #1f2937;
 
     /* DARK MODE: BORDER COLORS */
     --color-border-light: #475569;
     --color-border-medium: #334155;
-    --color-border-dark: #1e293b;
+    --color-border-dark: var(--mac-text-primary);
     --color-border-focus: #60a5fa;
     --color-border-error: #fca5a5;
 
     /* DARK MODE: SURFACE COLORS */
-    --color-surface-card: #1e293b;
+    --color-surface-card: var(--mac-text-primary);
     --color-surface-input: #334155;
     --color-surface-hover: #334155;
     --color-surface-active: #475569;
@@ -226,7 +226,7 @@
     --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
     --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 20px 25px -5px color-mix(in srgb, black, transparent 50%), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
     --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
   }

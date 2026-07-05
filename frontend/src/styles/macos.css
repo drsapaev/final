@@ -1,22 +1,22 @@
 :root {
   --accent: var(--accent-blue);
   --bg: #eef3f8;
-  --text: #111315;
-  --surface: rgba(255, 255, 255, 0.7);
+  --text: var(--mac-text-primary);
+  --surface: color-mix(in srgb, white, transparent 30%);
   --glass-stroke: rgba(0, 0, 0, 0.12);
   --shadow: 0 10px 30px rgba(16, 18, 27, 0.12);
   --blur: 18px;
 
   /* Основная палитра */
-  --accent-blue: #007aff;
+  --accent-blue: var(--mac-accent-blue);
   --accent-purple: #7d6aff;
   --accent-pink: #ff5c8d;
   --accent-orange: #ffb347;
-  --accent-green: #34c759;
+  --accent-green: var(--mac-success);
   --accent-graphite: #8e8e93;
 
   /* Светлая тема */
-  --mac-text-primary: #111315;
+  --mac-text-primary: var(--mac-text-primary);
   --mac-text-secondary: color-mix(in oklab, var(--mac-text-primary), white 40%);
   --mac-text-tertiary: color-mix(in oklab, var(--mac-text-primary), white 65%);
   --mac-bg-primary: #fbfcfe;
@@ -47,7 +47,7 @@
     --mac-text-primary: #f3f4f7;
     --mac-text-secondary: #b6bac1;
     --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(10, 132, 255, 0.35), transparent 55%), radial-gradient(120% 120% at 100% 0%, rgba(94, 92, 230, 0.3), transparent 55%);
-    --mac-separator: rgba(255, 255, 255, 0.12);
+    --mac-separator: color-mix(in srgb, white, transparent 88%);
   }
 }
 
@@ -65,9 +65,9 @@
     radial-gradient(circle at 16% 14%, rgba(255, 181, 120, 0.28), transparent 24%),
     radial-gradient(circle at 82% 18%, rgba(255, 118, 113, 0.16), transparent 20%),
     linear-gradient(145deg, rgba(65, 34, 53, 0.97) 0%, rgba(143, 79, 85, 0.92) 54%, rgba(228, 156, 97, 0.9) 100%);
-  --mac-separator: rgba(255, 255, 255, 0.12);
-  --mac-border: rgba(255, 255, 255, 0.16);
-  --mac-border-secondary: rgba(255, 255, 255, 0.1);
+  --mac-separator: color-mix(in srgb, white, transparent 88%);
+  --mac-border: color-mix(in srgb, white, transparent 84%);
+  --mac-border-secondary: color-mix(in srgb, white, transparent 90%);
   --mac-gradient-sidebar: linear-gradient(180deg, rgba(55, 29, 42, 0.82) 0%, rgba(98, 50, 60, 0.72) 100%);
   --mac-bg-toolbar: rgba(58, 31, 42, 0.64);
   --mac-shadow-sm: 0 2px 10px rgba(28, 12, 19, 0.24);
@@ -76,9 +76,9 @@
 
 /* 🪟 Стеклянная тема */
 [data-color-scheme="glass"] {
-  --mac-bg-primary: rgba(15, 23, 35, 0.72);
+  --mac-bg-primary: color-mix(in srgb, var(--mac-text-primary), transparent 28%);
   --mac-bg-secondary: rgba(25, 37, 52, 0.6);
-  --mac-bg-toolbar: rgba(15, 23, 35, 0.72);
+  --mac-bg-toolbar: color-mix(in srgb, var(--mac-text-primary), transparent 28%);
   --mac-bg-tertiary: rgba(52, 70, 90, 0.46);
   --mac-text-primary: #f7fbff;
   --mac-text-secondary: rgba(247, 251, 255, 0.76);
@@ -87,14 +87,14 @@
   --mac-error: #ff8b7e;
   --mac-border: rgba(255, 255, 255, 0.18);
   --mac-border-secondary: rgba(255, 255, 255, 0.11);
-  --mac-separator: rgba(255, 255, 255, 0.14);
+  --mac-separator: color-mix(in srgb, white, transparent 86%);
   --mac-gradient-window:
     radial-gradient(circle at 18% 16%, rgba(125, 211, 252, 0.2), transparent 26%),
     linear-gradient(160deg, rgba(9, 15, 24, 0.96) 0%, rgba(26, 44, 63, 0.84) 100%);
   --mac-gradient-sidebar: linear-gradient(180deg, rgba(12, 18, 27, 0.74) 0%, rgba(23, 37, 54, 0.66) 100%);
-  --shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  --shadow: 0 8px 28px color-mix(in srgb, black, transparent 62%);
   --mac-shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.3);
-  --mac-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.38);
+  --mac-shadow-md: 0 10px 28px color-mix(in srgb, black, transparent 62%);
   --mac-blur-light: saturate(185%) blur(24px);
   background: rgba(8, 12, 18, 0.22);
   backdrop-filter: blur(24px) saturate(170%);
@@ -110,9 +110,9 @@
   --mac-success: #4ade80;
   --mac-warning: #9fe4ff;
   --mac-error: #ff7cb6;
-  --mac-border: rgba(255, 255, 255, 0.16);
-  --mac-border-secondary: rgba(255, 255, 255, 0.1);
-  --mac-separator: rgba(255, 255, 255, 0.14);
+  --mac-border: color-mix(in srgb, white, transparent 84%);
+  --mac-border-secondary: color-mix(in srgb, white, transparent 90%);
+  --mac-separator: color-mix(in srgb, white, transparent 86%);
   --mac-gradient-window:
     radial-gradient(circle at 18% 16%, rgba(102, 233, 255, 0.26), transparent 26%),
     radial-gradient(circle at 82% 16%, rgba(178, 132, 255, 0.22), transparent 24%),
@@ -289,7 +289,7 @@
   background:
     radial-gradient(circle at 14% 18%, rgba(144, 224, 239, 0.18), transparent 26%),
     radial-gradient(circle at 84% 20%, rgba(125, 160, 255, 0.14), transparent 24%),
-    radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.06), transparent 32%);
+    radial-gradient(circle at 50% 90%, color-mix(in srgb, white, transparent 94%), transparent 32%);
 }
 
 [data-color-scheme="glass"] .app-shell::after {
@@ -307,7 +307,7 @@
 
 [data-color-scheme="gradient"] .app-shell::after {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 22%),
+    linear-gradient(180deg, color-mix(in srgb, white, transparent 94%), transparent 22%),
     linear-gradient(135deg, rgba(140, 225, 255, 0.05) 0%, transparent 30%);
 }
 
@@ -365,7 +365,7 @@
   background:
     radial-gradient(circle at 10% 12%, rgba(83, 138, 255, 0.08), transparent 26%),
     radial-gradient(circle at 88% 14%, rgba(144, 175, 222, 0.1), transparent 22%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 28%);
+    linear-gradient(180deg, color-mix(in srgb, white, transparent 90%), transparent 28%);
 }
 
 [data-theme="light"] .app-main {
@@ -384,7 +384,7 @@
 [data-theme="light"] .mac-card {
   background-color: var(--mac-card-bg) !important;
   border: 1px solid var(--mac-card-border) !important;
-  box-shadow: 0 18px 36px rgba(148, 163, 184, 0.12), 0 1px 0 rgba(255, 255, 255, 0.7) inset !important;
+  box-shadow: 0 18px 36px rgba(148, 163, 184, 0.12), 0 1px 0 color-mix(in srgb, white, transparent 30%) inset !important;
 }
 
 [data-theme="light"] .mac-card:hover {
@@ -545,7 +545,7 @@ body {
 .theme-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, black, transparent 50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -700,50 +700,50 @@ body {
 }
 
 /* Historical hardcoded inline rescue layer: normalize old white/gray surfaces */
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #fff"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#fff"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #ffffff"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#ffffff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: var(--mac-bg-primary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:var(--mac-bg-primary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: var(--mac-bg-primary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:var(--mac-bg-primary)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: rgb(255, 255, 255)"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #fff"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#fff"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #ffffff"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#ffffff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: var(--mac-bg-primary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:var(--mac-bg-primary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: var(--mac-bg-primary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:var(--mac-bg-primary)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: rgb(255, 255, 255)"] {
   background: var(--mac-card-bg) !important;
   color: var(--mac-text-primary) !important;
 }
 
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #f9fafb"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#f9fafb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:var(--mac-bg-secondary)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: rgb(249, 250, 251)"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #f3f4f6"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#f3f4f6"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #f5f5f5"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#f5f5f5"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #fafafa"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#fafafa"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #f9fafb"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#f9fafb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:var(--mac-bg-secondary)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: rgb(249, 250, 251)"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #f3f4f6"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#f3f4f6"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #f5f5f5"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#f5f5f5"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #fafafa"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#fafafa"] {
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: var(--mac-bg-secondary)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:var(--mac-bg-secondary)"] {
   background: color-mix(in srgb, var(--mac-bg-secondary), transparent 10%) !important;
   color: var(--mac-text-primary) !important;
 }
 
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #ddd"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #ddd"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #d1d5db"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #d1d5db"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid var(--mac-border)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid var(--mac-border)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #ccc"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #ccc"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #e5e7eb"],
-[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #e5e7eb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid var(--mac-border)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid var(--mac-border)"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #eee"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #eee"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid rgb(221, 221, 221)"],
