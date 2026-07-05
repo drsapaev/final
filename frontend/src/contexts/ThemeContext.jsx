@@ -115,8 +115,17 @@ export const ThemeProvider = ({ children }) => {
     if (color === 'success' || color === 'warning' || color === 'danger' || color === 'info') {
       return tokenColors.status?.[color] || tokenColors.primary?.[500] || 'var(--mac-accent-blue)';
     }
-    if (color === 'text' || color === 'background' || color === 'border' || color === 'surface') {
-      return tokenColors.semantic?.[color]?.primary || 'var(--mac-bg-primary)';
+    if (color === 'text') {
+      return tokenColors.semantic?.text?.primary || 'var(--mac-text-primary)';
+    }
+    if (color === 'background') {
+      return tokenColors.semantic?.background?.primary || 'var(--mac-bg-primary)';
+    }
+    if (color === 'border') {
+      return tokenColors.semantic?.border?.medium || 'var(--mac-border)';
+    }
+    if (color === 'surface') {
+      return tokenColors.semantic?.surface?.card || 'var(--mac-bg-primary)';
     }
     return tokenColors.primary?.[500] || 'var(--mac-accent-blue)';
   }, []);

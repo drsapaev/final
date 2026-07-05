@@ -1,36 +1,6 @@
-:root {
-  --accent: var(--accent-blue);
-  --bg: #eef3f8;
-  --text: var(--mac-text-primary);
-  --surface: color-mix(in srgb, white, transparent 30%);
-  --glass-stroke: rgba(0, 0, 0, 0.12);
-  --shadow: 0 10px 30px rgba(16, 18, 27, 0.12);
-  --blur: 18px;
-
-  /* Основная палитра */
-  --accent-blue: var(--mac-accent-blue);
-  --accent-purple: #7d6aff;
-  --accent-pink: #ff5c8d;
-  --accent-orange: #ffb347;
-  --accent-green: var(--mac-success);
-  --accent-graphite: var(--mac-text-tertiary);
-
-  /* Светлая тема */
-  --mac-text-primary: var(--mac-text-primary);
-  --mac-text-secondary: color-mix(in oklab, var(--mac-text-primary), white 40%);
-  --mac-text-tertiary: color-mix(in oklab, var(--mac-text-primary), white 65%);
-  --mac-bg-primary: #fbfcfe;
-  --mac-bg-secondary: #f2f5f9;
-  --mac-bg-tertiary: #e7edf4;
-  --mac-bg-toolbar: rgba(255, 255, 255, 0.92);
-  --mac-border: rgba(15, 23, 42, 0.1);
-  --mac-separator: rgba(0, 0, 0, 0.07);
-  --mac-radius-sm: 8px;
-  --mac-radius-md: 12px;
-  --mac-radius-lg: 20px;
-  --mac-blur-light: saturate(180%) blur(18px);
-  --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(70, 118, 255, 0.06), transparent 52%), linear-gradient(180deg, #f7f9fc 0%, #e8eef5 100%);
-}
+/* P0 fix: :root overrides removed — canonical tokens are in theme/macos-tokens.css.
+   This block was overriding --mac-bg-primary, --mac-border, --mac-radius-* etc.
+   Removed 32 lines of duplicate/conflicting token definitions. */
 
 @media (prefers-color-scheme: dark) {
   :root {
