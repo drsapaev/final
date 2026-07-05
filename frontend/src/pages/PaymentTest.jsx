@@ -256,7 +256,11 @@ const PaymentTest = () => {
                       variant="outline"
                       size="small"
                       onClick={() => {
-                        setToken(null);
+                        // P2 warning: setToken(null) globally resets auth — only use in test context
+  // This is a test page, so it's acceptable, but add a confirm dialog
+  if (window.confirm('Это сбросит авторизацию. Продолжить?')) {
+    setToken(null);
+  }
                         setIsAuthenticated(false);
                         setResult({ type: 'info', message: 'Авторизация сброшена' });
                       }}
