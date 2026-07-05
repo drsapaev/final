@@ -100,7 +100,7 @@ const AppActivation = () => {
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 24px',
-          color: '#34c759'
+          color: 'var(--mac-success)'
         }}>
           <CheckCircle size={40} />
         </div>
@@ -114,7 +114,7 @@ const AppActivation = () => {
         </p>
 
         <div className="info-panel" style={{ textAlign: 'left', background: 'rgba(52, 199, 89, 0.05)', borderColor: 'rgba(52, 199, 89, 0.2)' }}>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontWeight: 600, color: '#34c759' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontWeight: 600, color: 'var(--mac-success)' }}>
             <CheckCircle size={16} /> Доступные функции:
           </div>
           <ul style={{ margin: 0, paddingLeft: '24px', color: 'var(--mac-text-primary)', lineHeight: '1.6' }}>
@@ -139,7 +139,7 @@ const AppActivation = () => {
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 20px',
-          color: '#007aff',
+          color: 'var(--mac-accent-blue)',
           boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)'
         }}>
           <Shield size={32} />

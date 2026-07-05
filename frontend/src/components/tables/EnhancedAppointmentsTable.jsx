@@ -47,9 +47,9 @@ import { LEGACY_CODE_TO_NAME, ID_TO_NAME, getServiceDisplayName } from '../../ut
 import PropTypes from 'prop-types';
 
 const SESSION_COLORS = [
-  '#3B82F6', // blue
-  '#10B981', // emerald
-  '#F59E0B', // amber
+  'var(--mac-accent-blue)', // blue
+  'var(--mac-success)', // emerald
+  'var(--mac-warning)', // amber
   '#EF4444', // red
   '#8B5CF6', // violet
   '#EC4899', // pink

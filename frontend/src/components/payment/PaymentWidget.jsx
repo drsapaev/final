@@ -503,7 +503,7 @@ const PaymentWidget = ({
             <Typography variant="body1" gutterBottom>
               Вы собираетесь оплатить:
             </Typography>
-            <Box style={{ padding: 16, backgroundColor: '#f5f5f5', borderRadius: 4, marginBottom: 16 }}>
+            <Box style={{ padding: 16, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4, marginBottom: 16 }}>
               <Typography variant="h6" color="primary">
                 {formatAmount(amount, currency)}
               </Typography>

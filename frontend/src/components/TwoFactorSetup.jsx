@@ -512,7 +512,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
   if (success) {
     return (
       <div style={{
-        background: '#D1FAE5',
+        background: 'var(--mac-success-bg)',
         border: '1px solid #6EE7B7',
         borderRadius: '8px',
         padding: '16px',

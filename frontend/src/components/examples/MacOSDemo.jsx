@@ -189,7 +189,7 @@ const MacOSDemo = () => {
               onClick={() => showToast('info', 'Search initiated')}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
 
-                  <Icon name="magnifyingglass" size="small" style={{ color: '#007aff' }} />
+                  <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-accent-blue)' }} />
                   Search
                 </Button>
                 
@@ -199,7 +199,7 @@ const MacOSDemo = () => {
               onClick={() => showToast('warning', 'Settings opened')}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
 
-                  <Icon name="gear" size="small" style={{ color: '#8e8e93' }} />
+                  <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
                   Settings
                 </Button>
               </div>
@@ -310,21 +310,21 @@ const MacOSDemo = () => {
                     Primary
                   </Button>
                   <Button variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="gear" size="small" style={{ color: '#8e8e93' }} />
+                    <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
                     Secondary
                   </Button>
                   <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="square.and.arrow.up" size="small" style={{ color: '#007aff' }} />
+                    <Icon name="square.and.arrow.up" size="small" style={{ color: 'var(--mac-accent-blue)' }} />
                     Outline
                   </Button>
                   <Button variant="ghost" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="eye" size="small" style={{ color: '#34c759' }} />
+                    <Icon name="eye" size="small" style={{ color: 'var(--mac-success)' }} />
                     Ghost
                   </Button>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <Button variant="success" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="checkmark.circle" size="small" style={{ color: '#34c759' }} />
+                    <Icon name="checkmark.circle" size="small" style={{ color: 'var(--mac-success)' }} />
                     Success
                   </Button>
                   <Button variant="warning" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -836,7 +836,7 @@ const MacOSDemo = () => {
             onClick={() => setIsModalOpen(false)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
 
-              <Icon name="xmark" size="small" style={{ color: '#8e8e93' }} />
+              <Icon name="xmark" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
               Cancel
             </Button>
             <Button

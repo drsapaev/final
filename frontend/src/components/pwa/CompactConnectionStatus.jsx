@@ -80,10 +80,10 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
   };
 
   const getConnectionColor = () => {
-    if (!isOnline) return '#ef4444'; // red-500
-    if (isSyncing) return '#f59e0b'; // amber-500
-    if (isServiceWorkerReady) return '#10b981'; // emerald-500
-    return '#3b82f6'; // blue-500
+    if (!isOnline) return 'var(--mac-error)'; // red-500
+    if (isSyncing) return 'var(--mac-warning)'; // amber-500
+    if (isServiceWorkerReady) return 'var(--mac-success)'; // emerald-500
+    return 'var(--mac-accent-blue)'; // blue-500
   };
 
   const getConnectionLabel = () => {

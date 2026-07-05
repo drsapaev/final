@@ -498,7 +498,7 @@ export const TablePagination = ({
                 }}
                 onMouseEnter={(e) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = pageNumber === currentPage ? '#2563eb' : 'var(--mac-bg-secondary)';
+                    e.target.style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
                   }
                 }}
                 onMouseLeave={(e) => {

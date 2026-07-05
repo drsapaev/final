@@ -76,8 +76,8 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
 
   // Объявляем стили до использования  
   const errBox = {
-    color: '#dc2626',
-    background: '#fee2e2', 
+    color: 'var(--mac-error)',
+    background: 'var(--mac-error-bg)', 
     border: '1px solid #fecaca',
     borderRadius: 8,
     padding: 8,
@@ -113,7 +113,7 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
           {err ? (
             <div style={errBox}>{err}</div>
           ) : (
-            <div style={{ fontSize: 12, color: '#6b7280' }}>
+            <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>
               Визит: <b>#{visit?.id ?? '—'}</b>
             </div>
           )}
@@ -126,7 +126,7 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
           <button onClick={doTomorrow} disabled={busy} style={{ ...btn, borderColor: '#16a34a' }}>
             На завтра
           </button>
-          <button onClick={doReschedule} disabled={busy} style={{ ...btn, background: '#111', color: '#fff' }}>
+          <button onClick={doReschedule} disabled={busy} style={{ ...btn, background: '#111', color: 'var(--mac-bg-primary)' }}>
             Перенести
           </button>
         </div>
@@ -158,7 +158,7 @@ const backdrop = {
 };
 const modal = {
   width: 'min(560px, 92vw)',
-  background: '#fff',
+  background: 'var(--mac-bg-primary)',
   border: '1px solid #e5e7eb',
   borderRadius: 12,
   boxShadow: '0 10px 30px rgba(0,0,0,.08)',
@@ -174,7 +174,7 @@ const btn = {
   padding: '8px 12px',
   borderRadius: 10,
   border: '1px solid #d1d5db',
-  background: '#fff',
+  background: 'var(--mac-bg-primary)',
   cursor: 'pointer',
 };
 

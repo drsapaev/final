@@ -337,13 +337,13 @@ export const AnimatedProgress = ({
         style={{
           width: `${percentage}%`,
           height: '8px',
-          backgroundColor: '#3b82f6',
+          backgroundColor: 'var(--mac-accent-blue)',
           borderRadius: '4px',
           transition: 'width 0.3s ease'
         }}
       />
       {showValue && (
-        <div style={{ marginTop: '4px', fontSize: '12px', color: '#6b7280' }}>
+        <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
           {Math.round(animatedValue)} / {max}
         </div>
       )}

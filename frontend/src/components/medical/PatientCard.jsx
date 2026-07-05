@@ -34,7 +34,7 @@ const PatientCard = ({
   const getStatusColor = (status) => {
     if (is_deleted) return 'var(--mac-text-tertiary)';  // Gray for archived
     switch (status) {
-      case 'active': return '#10b981';
+      case 'active': return 'var(--mac-success)';
       case 'inactive': return 'var(--mac-text-secondary)';
       case 'urgent': return 'var(--mac-error)';
       case 'pending': return 'var(--mac-warning)';

@@ -65,8 +65,8 @@ const AVAILABLE_ICONS = [
 
 // Predefined colors
 const PRESET_COLORS = [
-    '#E53E3E', // Red
-    '#3182CE', // Blue
+    'var(--mac-error)', // Red
+    'var(--mac-accent-blue)', // Blue
     '#9F7AEA', // Purple
     '#38A169', // Green
     '#DD6B20', // Orange
@@ -651,7 +651,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                     <span
                                         className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn" style={{ '--admin-bgc0': profile.is_active !== false
                                                 ? 'rgba(16, 185, 129, 0.1)'
-                                                : 'rgba(239, 68, 68, 0.1)', '--admin-col1': profile.is_active !== false ? '#10B981' : '#EF4444' }}
+                                                : 'rgba(239, 68, 68, 0.1)', '--admin-col1': profile.is_active !== false ? 'var(--mac-success)' : '#EF4444' }}
                                     >
                                         {profile.is_active !== false ? 'Активен' : 'Скрыт'}
                                     </span>

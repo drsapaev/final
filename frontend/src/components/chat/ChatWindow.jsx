@@ -774,7 +774,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
           <div className="conversations-list">
                             <div className="chat-search-bar" style={{ padding: '8px 12px', display: 'flex', gap: 8 }}>
                                 <div style={{ position: 'relative', flex: 1 }}>
-                                    <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#8e8e93' }} />
+                                    <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-tertiary)' }} />
                                     <input
                   value={convSearchQuery}
                   onChange={(e) => setConvSearchQuery(e.target.value)}
@@ -849,7 +849,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
             /* Если нет бесед, показываем список всех доступных пользователей */
             <>
-                                    <div className="section-header" style={{ padding: '12px 14px', fontSize: '12px', fontWeight: '600', color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    <div className="section-header" style={{ padding: '12px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--mac-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                         Сотрудники
                                     </div>
                                     {allUsers.length === 0 ?
@@ -873,7 +873,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                 </div>
                                                 <div className="conv-info">
                                                     <div className="conv-name">{u.name}</div>
-                                                    <div className="conv-role" style={{ fontSize: '12px', color: '#8e8e93' }}>
+                                                    <div className="conv-role" style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>
                                                         {u.role || 'Сотрудник'}
                                                     </div>
                                                 </div>

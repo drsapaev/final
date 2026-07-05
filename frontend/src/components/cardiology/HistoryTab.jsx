@@ -101,7 +101,7 @@ export function HistoryTab({
                 borderRadius: 'var(--mac-radius-sm)',
                 border: `1px solid ${historyFilter === opt.value ? getColor('accent') : getColor('border')}`,
                 background: historyFilter === opt.value ? getColor('accent') : 'transparent',
-                color: historyFilter === opt.value ? '#fff' : getColor('text'),
+                color: historyFilter === opt.value ? 'var(--mac-bg-primary)' : getColor('text'),
                 cursor: 'pointer',
                 fontSize: getFontSize('sm'),
                 fontWeight: 'var(--mac-font-weight-medium)',

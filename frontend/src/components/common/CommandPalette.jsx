@@ -377,7 +377,7 @@ export function CommandPalette({ profile, navigate }) {
                     ? 'var(--mac-accent-blue, #007aff)'
                     : 'transparent',
                   color: isSelected
-                    ? '#ffffff'
+                    ? 'var(--mac-bg-primary)'
                     : 'var(--mac-text-primary, #1a1a1a)',
                   transition: 'background-color 0.1s ease',
                 }}

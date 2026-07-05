@@ -21,7 +21,7 @@ const SidebarToggle = ({ isCollapsed, onToggle, className = '' }) => {
         height: '40px',
         borderRadius: '8px',
         border: 'none',
-        backgroundColor: isDark ? '#334155' : '#f1f5f9',
+        backgroundColor: isDark ? 'var(--mac-text-primary)' : '#f1f5f9',
         color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
@@ -36,7 +36,7 @@ const SidebarToggle = ({ isCollapsed, onToggle, className = '' }) => {
         e.target.style.transform = 'scale(1.05)';
       }}
       onMouseLeave={(e) => {
-        e.target.style.backgroundColor = isDark ? '#334155' : '#f1f5f9';
+        e.target.style.backgroundColor = isDark ? 'var(--mac-text-primary)' : '#f1f5f9';
         e.target.style.transform = 'scale(1)';
       }}
       title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}

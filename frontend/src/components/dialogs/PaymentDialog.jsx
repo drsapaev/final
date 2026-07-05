@@ -167,8 +167,8 @@ const PaymentDialog = ({
               justifyContent: 'center',
               background:
                 theme === 'dark' ? 'rgba(16, 185, 129, 0.14)' : 'var(--mac-success-bg)',
-              color: '#10b981',
-              border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#a7f3d0'}`,
+              color: 'var(--mac-success)',
+              border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 60%))'}`,
             }}
           >
             <Check size={28} />
@@ -392,7 +392,7 @@ const PaymentDialog = ({
                             : 'white',
                       color:
                         paymentMethod === method.value
-                          ? '#1d4ed8'
+                          ? 'var(--mac-accent-blue-hover)'
                           : getColor('textPrimary'),
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',

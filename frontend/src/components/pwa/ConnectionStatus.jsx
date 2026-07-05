@@ -110,7 +110,7 @@ const styles = {
     right: 0,
     zIndex: 1400,
     background: 'var(--mac-warning, #ff9500)',
-    color: '#fff',
+    color: 'var(--mac-bg-primary)',
     padding: '6px 16px',
     textAlign: 'center'
   },

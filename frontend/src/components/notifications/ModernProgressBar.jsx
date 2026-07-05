@@ -68,7 +68,7 @@ const ModernProgressBar = ({
 
   // Стили
   const containerStyles = {
-    backgroundColor: backgroundColor || (theme === 'dark' ? '#374151' : '#e5e7eb')
+    backgroundColor: backgroundColor || (theme === 'dark' ? 'var(--mac-text-primary)' : 'var(--mac-border)')
   };
 
   const barStyles = {
@@ -190,7 +190,7 @@ export const CircularProgressBar = ({
   };
 
   const progressColor = getVariantColor();
-  const bgColor = backgroundColor || (theme === 'dark' ? '#374151' : '#e5e7eb');
+  const bgColor = backgroundColor || (theme === 'dark' ? 'var(--mac-text-primary)' : 'var(--mac-border)');
   const percentage = Math.min(Math.max((animatedValue / max) * 100, 0), 100);
   
   // Расчеты для SVG

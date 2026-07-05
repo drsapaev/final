@@ -124,9 +124,9 @@ const fileTypeColors = {
   video: 'var(--mac-accent-purple)',
   audio: 'var(--mac-accent-blue)',
   document: '#ff9500',
-  archive: '#8e8e93',
+  archive: 'var(--mac-text-tertiary)',
   xray: '#ff3b30',
-  other: '#8e8e93'
+  other: 'var(--mac-text-tertiary)'
 };
 
 const FileManager = () => {

@@ -190,7 +190,7 @@ const DoctorCalendar = ({
     title: {
       fontSize: '18px',
       fontWeight: '600',
-      color: isDark ? 'var(--mac-text-primary)' : '#1d1d1f',
+      color: isDark ? 'var(--mac-text-primary)' : 'var(--mac-text-primary)',
       display: 'flex',
       alignItems: 'center',
       gap: '10px'
@@ -200,7 +200,7 @@ const DoctorCalendar = ({
       borderRadius: '8px',
       border: 'none',
       backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-      color: isDark ? 'var(--mac-text-primary)' : '#1d1d1f',
+      color: isDark ? 'var(--mac-text-primary)' : 'var(--mac-text-primary)',
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
@@ -245,7 +245,7 @@ const DoctorCalendar = ({
       fontSize: '14px',
       fontWeight: '500',
       marginBottom: '8px',
-      color: isDark ? 'var(--mac-text-primary)' : '#1d1d1f'
+      color: isDark ? 'var(--mac-text-primary)' : 'var(--mac-text-primary)'
     },
     dayNumberToday: {
       width: '28px',

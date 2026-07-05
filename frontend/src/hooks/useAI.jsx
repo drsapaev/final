@@ -672,7 +672,7 @@ export const AIAssistant = ({
             }}
             onMouseEnter={(e) => {
               if (!loading && !prefersReducedMotion) {
-                e.target.style.backgroundColor = '#2563eb';
+                e.target.style.backgroundColor = 'var(--mac-accent-blue-hover)';
               }
             }}
             onMouseLeave={(e) => {

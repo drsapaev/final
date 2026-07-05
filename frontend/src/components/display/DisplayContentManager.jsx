@@ -308,7 +308,7 @@ const DisplayContentManager = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-      { id: 'light', name: 'Светлая', preview: '#f8fafc' },
+      { id: 'light', name: 'Светлая', preview: 'var(--mac-bg-secondary)' },
       { id: 'dark', name: 'Темная', preview: '#1a202c' },
       { id: 'medical', name: 'Медицинская', preview: '#f0fff4' }].
       map((theme) =>

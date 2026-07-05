@@ -33,7 +33,7 @@ export default function NotificationBell({ unreadCount = 0, onClick }) {
             height: 18,
             padding: '0 5px',
             borderRadius: 10,
-            background: '#ef4444',
+            background: 'var(--mac-error)',
             color: 'white',
             fontSize: 11,
             lineHeight: '18px',

@@ -42,7 +42,7 @@ const MedicalCard = ({
       className={`${baseClasses} ${darkClasses}`}
       style={{
         backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
-        borderColor: isDark ? '#334155' : 'var(--mac-border)',
+        borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)',
         backdropFilter: 'blur(10px)',
         boxShadow: isDark ?
         '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' :

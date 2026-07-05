@@ -50,15 +50,15 @@ const AppointmentContextMenu = ({
 
   const isDark = theme === 'dark';
   const colors = {
-    bg: isDark ? '#1f2937' : '#ffffff',
-    border: isDark ? '#4b5563' : '#e5e7eb',
-    text: isDark ? '#f9fafb' : '#111827',
-    textSecondary: isDark ? '#d1d5db' : '#6b7280',
-    hover: isDark ? '#374151' : '#f3f4f6',
-    accent: '#3b82f6',
-    success: '#10b981',
-    warning: '#f59e0b',
-    error: '#ef4444'
+    bg: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
+    border: isDark ? '#4b5563' : 'var(--mac-border)',
+    text: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+    textSecondary: isDark ? 'var(--mac-border)' : 'var(--mac-text-secondary)',
+    hover: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)',
+    accent: 'var(--mac-accent-blue)',
+    success: 'var(--mac-success)',
+    warning: 'var(--mac-warning)',
+    error: 'var(--mac-error)'
   };
 
   useEffect(() => {

@@ -52,11 +52,11 @@ const FormGroup = ({
         style={{
           fontSize: isMobile ? '14px' : '16px',
           fontWeight: '500',
-          color: '#374151'
+          color: 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: '#ef4444', marginLeft: '4px' }}>*</span>}
+          {required && <span style={{ color: 'var(--mac-error)', marginLeft: '4px' }}>*</span>}
         </label>
       }
       {children}
@@ -64,7 +64,7 @@ const FormGroup = ({
       <span
         style={{
           fontSize: isMobile ? '12px' : '14px',
-          color: '#ef4444'
+          color: 'var(--mac-error)'
         }}>
         
           {error}
@@ -108,11 +108,11 @@ const FormInput = ({
         ...style
       }}
       onFocus={(e) => {
-        e.target.style.borderColor = '#3b82f6';
+        e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
       onBlur={(e) => {
-        e.target.style.borderColor = '#d1d5db';
+        e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }} />);
 
@@ -150,11 +150,11 @@ const FormSelect = ({
         ...style
       }}
       onFocus={(e) => {
-        e.target.style.borderColor = '#3b82f6';
+        e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
       onBlur={(e) => {
-        e.target.style.borderColor = '#d1d5db';
+        e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }}>
       
@@ -199,11 +199,11 @@ const FormTextarea = ({
         ...style
       }}
       onFocus={(e) => {
-        e.target.style.borderColor = '#3b82f6';
+        e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
       onBlur={(e) => {
-        e.target.style.borderColor = '#d1d5db';
+        e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }} />);
 

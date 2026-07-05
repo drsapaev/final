@@ -213,7 +213,7 @@ const ForceMajeureModal = ({
             ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.2))'
             : 'linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.16))',
           border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.18)'}`,
-          color: '#d97706',
+          color: 'var(--mac-warning-hover, var(--mac-warning))',
           boxShadow: '0 10px 24px rgba(245, 158, 11, 0.12)'
         }}>
           <AlertTriangle size={20} />
@@ -313,7 +313,7 @@ const ForceMajeureModal = ({
               gap: '8px',
               fontSize: '14px',
               fontWeight: 600,
-              color: activeTab === 'transfer' ? '#1d4ed8' : getColor('textSecondary'),
+              color: activeTab === 'transfer' ? 'var(--mac-accent-blue-hover)' : getColor('textSecondary'),
               background: activeTab === 'transfer'
                 ? (theme === 'dark' ? 'rgba(59, 130, 246, 0.16)' : 'white')
                 : 'transparent',
@@ -481,7 +481,7 @@ const ForceMajeureModal = ({
           <p style={{ margin: '0 0 10px', fontSize: '14px', color: '#991b1b', fontWeight: 600 }}>
             ⚠️ Это действие нельзя отменить!
           </p>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: theme === 'dark' ? '#fca5a5' : '#7f1d1d' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: theme === 'dark' ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : '#7f1d1d' }}>
             Введите <strong>ПОДТВЕРЖДАЮ</strong> для продолжения:
           </label>
           <input
@@ -493,7 +493,7 @@ const ForceMajeureModal = ({
             style={{
               width: '100%',
               padding: '10px 12px',
-              border: `1px solid ${isConfirmValid ? 'var(--mac-success)' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : '#fca5a5'}`,
+              border: `1px solid ${isConfirmValid ? 'var(--mac-success)' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
               borderRadius: '12px',
               fontSize: '14px',
               fontWeight: 600,

@@ -39,10 +39,10 @@ function getPasswordStrength(password) {
   if (/[^a-zA-Z0-9]/.test(password)) score += 1;
   score = Math.min(score, 4);
   const labels = [
-    { label: 'Очень слабый', color: '#dc2626', percent: 25 },
+    { label: 'Очень слабый', color: 'var(--mac-error)', percent: 25 },
     { label: 'Слабый', color: '#ea580c', percent: 50 },
-    { label: 'Средний', color: '#f59e0b', percent: 75 },
-    { label: 'Хороший', color: '#22c55e', percent: 100 },
+    { label: 'Средний', color: 'var(--mac-warning)', percent: 75 },
+    { label: 'Хороший', color: 'var(--mac-success)', percent: 100 },
     { label: 'Сильный', color: '#16a34a', percent: 100 },
   ];
   return { score, ...labels[score] };

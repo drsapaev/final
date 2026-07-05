@@ -21,8 +21,8 @@ const MetricCard = ({
 
   const colorClasses = {
     blue: {
-      bg: isDark ? '#1e3a8a' : 'var(--mac-accent-bg)',
-      text: isDark ? '#93c5fd' : '#1d4ed8',
+      bg: isDark ? 'var(--mac-accent-blue-active)' : 'var(--mac-accent-bg)',
+      text: isDark ? 'var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 60%))' : 'var(--mac-accent-blue-hover)',
       icon: isDark ? '#60a5fa' : 'var(--mac-accent-blue)'
     },
     green: {
@@ -36,13 +36,13 @@ const MetricCard = ({
       icon: isDark ? '#a855f7' : 'var(--mac-accent-purple)'
     },
     orange: {
-      bg: isDark ? '#9a3412' : '#fed7aa',
+      bg: isDark ? '#9a3412' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-warning), transparent 50%))',
       text: isDark ? '#fdba74' : '#ea580c',
       icon: isDark ? '#fb923c' : '#f97316'
     },
     red: {
       bg: isDark ? '#7f1d1d' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
-      text: isDark ? '#fca5a5' : 'var(--mac-error)',
+      text: isDark ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-error)',
       icon: isDark ? '#f87171' : 'var(--mac-error)'
     }
   };

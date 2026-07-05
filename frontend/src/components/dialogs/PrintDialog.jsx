@@ -307,7 +307,7 @@ const PrintDialog = ({
               borderRadius: '14px',
               backgroundColor:
                 theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'var(--mac-accent-bg)',
-              border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.24)' : '#bfdbfe'}`,
+              border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.24)' : 'var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 70%))'}`,
               color: 'var(--color-text-primary)',
             }}
           >
@@ -384,7 +384,7 @@ const PrintDialog = ({
                       theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
                     border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.24)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
                     borderRadius: '14px',
-                    color: theme === 'dark' ? '#fca5a5' : 'var(--mac-error)',
+                    color: theme === 'dark' ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-error)',
                   }}
                 >
                   <AlertCircle size={20} />
@@ -544,7 +544,7 @@ const PrintDialog = ({
                           fontWeight: '500',
                           color:
                             printer.status === 'online'
-                              ? '#10b981'
+                              ? 'var(--mac-success)'
                               : printer.status
                                 ? 'var(--mac-error)'
                                 : '#64748b',
