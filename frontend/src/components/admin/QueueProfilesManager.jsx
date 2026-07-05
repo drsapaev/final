@@ -42,7 +42,7 @@ import logger from '../../utils/logger';
 import {
   Select,
   Input,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 

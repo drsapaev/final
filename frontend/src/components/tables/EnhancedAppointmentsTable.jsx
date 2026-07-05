@@ -29,7 +29,7 @@ import {
   Button,
   Badge,
   Select,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import './EnhancedAppointmentsTable.css';
 
 import { QueueActionButtons } from '../queue/QueueManagementCard';

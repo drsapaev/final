@@ -16,7 +16,7 @@ import EMRTextField from '../EMRTextField';
 import TeethChart from '../../../dental/TeethChart';
 import './DentistrySection.css';
 import { Input,
-  Checkbox} from '../../../ui/macos';
+  Checkbox } from '../../../ui/macos';
 
 /**
  * DentistrySection Component

@@ -306,8 +306,8 @@ const PrintDialog = ({
               padding: 'var(--mac-spacing-4)',
               borderRadius: '14px',
               backgroundColor:
-                theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'var(--mac-accent-bg)',
-              border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.24)' : 'var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 70%))'}`,
+                theme === 'dark' ? 'color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 92%)' : 'var(--mac-accent-bg)',
+              border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 76%)' : 'var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 70%))'}`,
               color: 'var(--color-text-primary)',
             }}
           >
@@ -381,8 +381,8 @@ const PrintDialog = ({
                     gap: 'var(--mac-spacing-3)',
                     padding: 'var(--mac-spacing-4)',
                     backgroundColor:
-                      theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
-                    border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.24)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
+                      theme === 'dark' ? 'color-mix(in srgb, var(--mac-error, #ef4444), transparent 90%)' : 'var(--mac-error-bg)',
+                    border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, var(--mac-error, #ef4444), transparent 76%)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
                     borderRadius: '14px',
                     color: theme === 'dark' ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-error)',
                   }}
@@ -454,7 +454,7 @@ const PrintDialog = ({
                         backgroundColor:
                           selectedPrinter === printer.id
                             ? theme === 'dark'
-                              ? 'rgba(59, 130, 246, 0.16)'
+                              ? 'color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 84%)'
                               : 'var(--mac-accent-bg)'
                             : theme === 'dark'
                               ? 'color-mix(in srgb, white, transparent 96%)'

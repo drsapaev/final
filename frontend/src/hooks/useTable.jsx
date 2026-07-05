@@ -8,7 +8,7 @@ import PropTypes from 'prop-types';
 
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { Input,
-  Checkbox} from '../../ui/macos';
+  Checkbox } from '../../ui/macos';
 
 // Хук для управления таблицей
 export const useTable = (data = [], options = {}) => {

@@ -3,7 +3,7 @@ import { api } from '../api/client';
 import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { Input,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 
 const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }) => {
   const [loading, setLoading] = useState(false);

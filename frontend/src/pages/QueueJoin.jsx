@@ -18,7 +18,7 @@ import {
 } from '../api/queue';
 import { formatRegistrarTime } from '../utils/dateUtils';
 import { Input,
-  Checkbox} from '../components/ui/macos';
+  Checkbox } from '../components/ui/macos';
 
 const formatSpecialistLabel = (specialist) => {
   const doctorName =

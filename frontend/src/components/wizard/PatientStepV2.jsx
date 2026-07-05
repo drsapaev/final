@@ -12,7 +12,7 @@
 import PropTypes from 'prop-types';
 import { Search, Phone, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
 import { Input,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
 

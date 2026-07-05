@@ -200,14 +200,14 @@ const PaymentDialog = ({
             style={{
               padding: '14px',
               backgroundColor:
-                theme === 'dark' ? 'rgba(16, 185, 129, 0.08)' : '#f0fdf4',
+                'color-mix(in srgb, var(--mac-success, #10b981), transparent 92%)',
               borderRadius: 'var(--mac-radius-lg)',
-              border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#bbf7d0'}`,
+              border: `1px solid ${'color-mix(in srgb, var(--mac-success, #10b981), transparent 76%)'}`,
             }}
           >
             <p
               style={{
-                color: theme === 'dark' ? '#6ee7b7' : '#065f46',
+                color: 'var(--mac-success)',
                 fontSize: 'var(--mac-font-size-base)',
                 margin: 0,
                 lineHeight: 1.5,
@@ -315,7 +315,7 @@ const PaymentDialog = ({
                 onFocus={(e) => {
                   e.target.style.borderColor = 'var(--mac-accent-blue)';
                   e.target.style.boxShadow =
-                    '0 0 0 3px rgba(59, 130, 246, 0.12)';
+                    '0 0 0 3px color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 88%)';
                 }}
                 onBlur={(e) => {
                   e.target.style.borderColor = errors.amount
@@ -386,7 +386,7 @@ const PaymentDialog = ({
                       backgroundColor:
                         paymentMethod === method.value
                           ? theme === 'dark'
-                            ? 'rgba(59, 130, 246, 0.16)'
+                            ? 'color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 84%)'
                             : 'var(--mac-accent-bg)'
                           : theme === 'dark'
                             ? 'color-mix(in srgb, white, transparent 96%)'

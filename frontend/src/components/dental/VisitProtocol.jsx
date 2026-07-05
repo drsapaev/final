@@ -3,7 +3,7 @@ import logger from '../../utils/logger';
 import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { Input,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 
 /**
  * Протокол лечения по визитам для стоматологической ЭМК

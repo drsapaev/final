@@ -13,7 +13,7 @@ import {
   DialogContent,
   DialogTitle,
   Input,
-  Checkbox} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Baby,
   Phone,

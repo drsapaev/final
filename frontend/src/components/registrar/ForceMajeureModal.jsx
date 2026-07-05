@@ -52,25 +52,13 @@ const ForceMajeureModal = ({
     if (!specialistId) return;
 
     try {
-      const token = getAuthToken();
-      const response = await fetch(
-        `/force-majeure/pending-entries?specialist_id=${specialistId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setDryRunResult({
-          count: data.length,
-          entries: data,
-          totalAmount: data.reduce((sum, e) => sum + (e.total_amount || 0), 0)
-        });
-      }
+      const response = await api.get(`/force-majeure/pending-entries?specialist_id=${specialistId}`);
+      const data = response.data;
+      setDryRunResult({
+        count: data.length,
+        entries: data,
+        totalAmount: data.reduce((sum, e) => sum + (e.total_amount || 0), 0)
+      });
     } catch (err) {
       logger.error('[ForceMajeureModal] Error loading pending entries:', err);
     }
@@ -104,29 +92,16 @@ const ForceMajeureModal = ({
     setError(null);
 
     try {
-      const token = getAuthToken();
-      const response = await fetch('/force-majeure/transfer', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const response = await api.post('/force-majeure/transfer', {
           specialist_id: specialistId,
           reason: reason,
           send_notifications: true
-        })
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setSuccess(`Перенесено записей: ${result.transferred || 0}`);
-        logger.log('[ForceMajeureModal] Transfer successful:', result);
-        if (onSuccess) onSuccess('transfer', result);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка переноса');
-      }
+      const result = response.data;
+      setSuccess(`Перенесено записей: ${result.transferred || 0}`);
+      logger.log('[ForceMajeureModal] Transfer successful:', result);
+      if (onSuccess) onSuccess('transfer', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Transfer error:', err);
       setError(err.message || 'Ошибка сети');
@@ -151,30 +126,17 @@ const ForceMajeureModal = ({
     setError(null);
 
     try {
-      const token = getAuthToken();
-      const response = await fetch('/force-majeure/cancel-with-refund', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          specialist_id: specialistId,
-          reason: reason,
-          refund_type: refundType,
-          send_notifications: true
-        })
+      const response = await api.post('/force-majeure/cancel-with-refund', {
+        specialist_id: specialistId,
+        reason: reason,
+        refund_type: refundType,
+        send_notifications: true
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setSuccess(`Отменено записей: ${result.cancelled || 0}, возвратов: ${result.refunds_created || 0}`);
-        logger.log('[ForceMajeureModal] Cancel successful:', result);
-        if (onSuccess) onSuccess('cancel', result);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка отмены');
-      }
+      const result = response.data;
+      setSuccess(`Отменено записей: ${result.cancelled || 0}, возвратов: ${result.refunds_created || 0}`);
+      logger.log('[ForceMajeureModal] Cancel successful:', result);
+      if (onSuccess) onSuccess('cancel', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Cancel error:', err);
       setError(err.message || 'Ошибка сети');
