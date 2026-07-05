@@ -10,7 +10,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
   const { theme, getColor } = useTheme();
   const surfaceStyle = {
     backgroundColor: 'var(--mac-bg-secondary)',
-    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+    border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
     borderRadius: '14px',
   };
   const [reason, setReason] = useState('');
@@ -267,12 +267,12 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                 error
                   ? 'var(--mac-error)'
                   : theme === 'dark'
-                    ? 'rgba(255,255,255,0.10)'
+                    ? 'color-mix(in srgb, white, transparent 90%)'
                     : 'var(--mac-border)'
               }`,
               borderRadius: '12px',
               backgroundColor:
-                theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
+                theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
               color: getColor('textPrimary'),
               fontSize: '14px',
               resize: 'vertical',
@@ -291,7 +291,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
               e.target.style.borderColor = error
                 ? 'var(--mac-error)'
                 : theme === 'dark'
-                  ? 'rgba(255,255,255,0.10)'
+                  ? 'color-mix(in srgb, white, transparent 90%)'
                   : 'var(--mac-border)';
               e.target.style.boxShadow = 'none';
             }}

@@ -59,7 +59,7 @@ const ModernAlert = ({
         color: getColor('danger'),
         bgColor: theme === 'dark' 
           ? 'rgba(239, 68, 68, 0.15)' 
-          : 'rgba(239, 68, 68, 0.1)',
+          : 'var(--mac-error-bg)',
         borderColor: getColor('danger')
       },
       warning: {

@@ -492,7 +492,7 @@ export default function DisplayBoardUnified({
   // Темы оформления (новое)
   const themes = {
     light: {
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      background: 'linear-gradient(135deg, var(--mac-bg-secondary) 0%, var(--mac-border) 100%)',
       cardBg: 'var(--mac-bg-primary)',
       textPrimary: '#1a202c',
       textSecondary: '#4a5568',
@@ -506,7 +506,7 @@ export default function DisplayBoardUnified({
       border: '#4a5568'
     },
     medical: {
-      background: 'linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%)',
+      background: 'linear-gradient(135deg, #f0fff4 0%, var(--mac-success-bg) 100%)',
       cardBg: 'var(--mac-bg-primary)',
       textPrimary: '#1a202c',
       textSecondary: '#4a5568',
@@ -558,7 +558,7 @@ export default function DisplayBoardUnified({
         <div className="displayboard-flex-center-20">
           {/* Статус соединения */}
           <div className="displayboard-flex-center-8">
-            {connected ? <Wifi size={20} color="#10b981" /> : <WifiOff size={20} color="#dc3545" />}
+            {connected ? <Wifi size={20} color="var(--mac-success)" /> : <WifiOff size={20} color="#dc3545" />}
             <span className="displayboard-conn-status">
               {connected ? 'Подключено' : 'Отключено'}
             </span>

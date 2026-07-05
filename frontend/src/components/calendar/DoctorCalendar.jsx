@@ -184,7 +184,7 @@ const DoctorCalendar = ({
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: '16px 20px',
-      borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+      borderBottom: `1px solid ${isDark ? 'color-mix(in srgb, white, transparent 90%)' : 'rgba(0,0,0,0.08)'}`,
       backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'
     },
     title: {
@@ -199,7 +199,7 @@ const DoctorCalendar = ({
       padding: '8px',
       borderRadius: '8px',
       border: 'none',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+      backgroundColor: isDark ? 'color-mix(in srgb, white, transparent 92%)' : 'rgba(0,0,0,0.05)',
       color: isDark ? 'var(--mac-text-primary)' : 'var(--mac-text-primary)',
       cursor: 'pointer',
       display: 'flex',
@@ -222,7 +222,7 @@ const DoctorCalendar = ({
       display: 'grid',
       gridTemplateColumns: 'repeat(7, 1fr)',
       gap: '1px',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'
+      backgroundColor: isDark ? 'color-mix(in srgb, white, transparent 90%)' : 'rgba(0,0,0,0.08)'
     },
     dayHeader: {
       padding: '12px 8px',
@@ -239,7 +239,7 @@ const DoctorCalendar = ({
       position: 'relative'
     },
     dayCellToday: {
-      backgroundColor: isDark ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)'
+      backgroundColor: isDark ? 'var(--mac-accent-bg)' : 'rgba(0, 122, 255, 0.05)'
     },
     dayNumber: {
       fontSize: '14px',
@@ -285,7 +285,7 @@ const DoctorCalendar = ({
       justifyContent: 'center',
       alignItems: 'center',
       padding: '20px',
-      color: '#ff3b30',
+      color: 'var(--mac-error)',
       backgroundColor: isDark ? 'rgba(255, 59, 48, 0.1)' : 'rgba(255, 59, 48, 0.05)',
       margin: '16px',
       borderRadius: '8px'

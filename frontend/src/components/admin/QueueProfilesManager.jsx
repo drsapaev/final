@@ -651,7 +651,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                     <span
                                         className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn" style={{ '--admin-bgc0': profile.is_active !== false
                                                 ? 'rgba(16, 185, 129, 0.1)'
-                                                : 'rgba(239, 68, 68, 0.1)', '--admin-col1': profile.is_active !== false ? 'var(--mac-success)' : '#EF4444' }}
+                                                : 'var(--mac-error-bg)', '--admin-col1': profile.is_active !== false ? 'var(--mac-success)' : 'var(--mac-error)' }}
                                     >
                                         {profile.is_active !== false ? 'Активен' : 'Скрыт'}
                                     </span>
@@ -851,7 +851,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                     <button
                                         key={icon.name}
                                         type="button"
-                                        className="admin-p-12-bd-2px-solid-var-mac-bo-radius-8-bgc-transparent-cur-pointer-d-flex-fd-column-ai-center-gap-4-tr-all-0-2s-bd-c-dyn-bgc-dyn" style={{ '--admin-bd-c0': isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)', '--admin-bgc1': isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent' }}
+                                        className="admin-p-12-bd-2px-solid-var-mac-bo-radius-8-bgc-transparent-cur-pointer-d-flex-fd-column-ai-center-gap-4-tr-all-0-2s-bd-c-dyn-bgc-dyn" style={{ '--admin-bd-c0': isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)', '--admin-bgc1': isSelected ? 'var(--mac-accent-bg)' : 'transparent' }}
                                         onClick={() => setFormData({ ...formData, icon: icon.name })}
                                     >
                                         <IconComponent size={24} className="admin-col-dyn" style={{ '--admin-col0': formData.color }} />

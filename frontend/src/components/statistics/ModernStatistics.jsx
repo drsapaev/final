@@ -226,7 +226,7 @@ const ModernStatistics = ({
     title: t.pendingPayments,
     value: animatedValues.pendingPayments || 0,
     iconName: 'creditcard',
-    color: '#ff9500',
+    color: 'var(--mac-warning)',
     trend: statistics.trends.pendingPayments,
     trendValue: statistics.trendValues.pendingPayments,
     suffix: ''
@@ -265,9 +265,9 @@ const ModernStatistics = ({
   // Получение цвета тренда
   const getTrendColor = (trend, isGoodWhenDown = false) => {
     if (isGoodWhenDown) {
-      return trend === 'down' ? 'var(--mac-success)' : '#ff3b30';
+      return trend === 'down' ? 'var(--mac-success)' : 'var(--mac-error)';
     }
-    return trend === 'up' ? 'var(--mac-success)' : '#ff3b30';
+    return trend === 'up' ? 'var(--mac-success)' : 'var(--mac-error)';
   };
 
   return (

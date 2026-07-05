@@ -264,10 +264,10 @@ export default function Header() {
         [data-theme="dark"] .app-header-2025 button,
         [data-theme="dark"] .app-header-2025 select,
         [data-theme="dark"] .app-header-2025 input {
-          color: #f8fafc !important;
+          color: var(--mac-bg-secondary) !important;
         }
         [data-theme="dark"] .app-header-2025 .role-badge {
-          color: #e2e8f0 !important;
+          color: var(--mac-border) !important;
         }
         /* Современная типографика кнопок */
         .app-header-2025 button,

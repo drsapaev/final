@@ -62,7 +62,7 @@ const styles = {
     border: '2px dashed',
     borderColor: active ? 'var(--mac-accent-blue)' : 'var(--mac-border)',
     borderRadius: 'var(--mac-radius-lg)',
-    background: active ? 'rgba(0, 122, 255, 0.08)' : 'var(--mac-card-bg)',
+    background: active ? 'var(--mac-accent-bg)' : 'var(--mac-card-bg)',
     cursor: 'pointer',
     transition: 'border-color 160ms ease, background 160ms ease',
     textAlign: 'center',

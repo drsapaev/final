@@ -257,7 +257,7 @@ export default function HeaderNew() {
             flexShrink: 0,
             color: active ?
             'white' :
-            theme === 'dark' ? 'rgba(255,255,255,0.9)' : 'var(--mac-text-primary)'
+            theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : 'var(--mac-text-primary)'
           }}>
 
             <Icon name={item.icon} size="small" style={{ color: active ? 'white' : theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
@@ -274,7 +274,7 @@ export default function HeaderNew() {
         title="Главная"
         onClick={() => navigate('/registrar/welcome')}
         className="hdr-hide-md"
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
+        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
 
             <Icon name="house" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : undefined }} />
             <span className="hdr-hide-md">Главная</span>
@@ -285,7 +285,7 @@ export default function HeaderNew() {
         title="Онлайн‑записи"
         onClick={() => navigate('/registrar/queue')}
         className="hdr-hide-xs"
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
+        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
 
             <Icon name="bell" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
             <span className="hdr-hide-sm">Онлайн‑записи</span>
@@ -325,7 +325,7 @@ export default function HeaderNew() {
       style={{
         width: 1,
         alignSelf: 'stretch',
-        background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-separator)'
+        background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-separator)'
       }} />
 
       {/* 1) Язык */}

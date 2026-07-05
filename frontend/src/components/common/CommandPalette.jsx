@@ -384,7 +384,7 @@ export function CommandPalette({ profile, navigate }) {
               >
                 {isRecent && (
                   <Clock size={14} style={{
-                    color: isSelected ? 'rgba(255,255,255,0.7)' : 'var(--mac-text-secondary, #6b7280)',
+                    color: isSelected ? 'color-mix(in srgb, white, transparent 30%)' : 'var(--mac-text-secondary, #6b7280)',
                     flexShrink: 0,
                   }} />
                 )}
@@ -401,7 +401,7 @@ export function CommandPalette({ profile, navigate }) {
                   {item.description && (
                     <div style={{
                       fontSize: '12px',
-                      color: isSelected ? 'rgba(255,255,255,0.7)' : 'var(--mac-text-secondary, #6b7280)',
+                      color: isSelected ? 'color-mix(in srgb, white, transparent 30%)' : 'var(--mac-text-secondary, #6b7280)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -411,7 +411,7 @@ export function CommandPalette({ profile, navigate }) {
                   )}
                 </div>
                 {isSelected && (
-                  <ArrowRight size={14} style={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }} />
+                  <ArrowRight size={14} style={{ color: 'color-mix(in srgb, white, transparent 30%)', flexShrink: 0 }} />
                 )}
               </div>
             );

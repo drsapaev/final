@@ -144,7 +144,7 @@ function ToastItem({ toast, onRemove }) {
         color: 'var(--color-success)'
       },
       error: {
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        backgroundColor: 'var(--mac-error-bg)',
         borderLeft: '4px solid var(--color-danger)',
         color: 'var(--color-danger)'
       },

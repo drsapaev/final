@@ -16,7 +16,7 @@ const PaymentDialog = ({
   const { theme, getColor } = useTheme();
   const surfaceStyle = {
     backgroundColor: 'var(--mac-bg-secondary)',
-    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+    border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
     borderRadius: '14px',
   };
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -300,12 +300,12 @@ const PaymentDialog = ({
                     errors.amount
                       ? 'var(--mac-error)'
                       : theme === 'dark'
-                        ? 'rgba(255,255,255,0.10)'
+                        ? 'color-mix(in srgb, white, transparent 90%)'
                         : 'var(--mac-border)'
                   }`,
                   borderRadius: '12px',
                   backgroundColor:
-                    theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
+                    theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
                   color: getColor('textPrimary'),
                   fontSize: '16px',
                   transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
@@ -320,7 +320,7 @@ const PaymentDialog = ({
                   e.target.style.borderColor = errors.amount
                     ? 'var(--mac-error)'
                     : theme === 'dark'
-                      ? 'rgba(255,255,255,0.10)'
+                      ? 'color-mix(in srgb, white, transparent 90%)'
                       : 'var(--mac-border)';
                   e.target.style.boxShadow = 'none';
                 }}
@@ -378,7 +378,7 @@ const PaymentDialog = ({
                         paymentMethod === method.value
                           ? 'var(--mac-accent-blue)'
                           : theme === 'dark'
-                            ? 'rgba(255,255,255,0.10)'
+                            ? 'color-mix(in srgb, white, transparent 90%)'
                             : 'var(--mac-border)'
                       }`,
                       borderRadius: '12px',
@@ -388,7 +388,7 @@ const PaymentDialog = ({
                             ? 'rgba(59, 130, 246, 0.16)'
                             : 'var(--mac-accent-bg)'
                           : theme === 'dark'
-                            ? 'rgba(255,255,255,0.04)'
+                            ? 'color-mix(in srgb, white, transparent 96%)'
                             : 'white',
                       color:
                         paymentMethod === method.value

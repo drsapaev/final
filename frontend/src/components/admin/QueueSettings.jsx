@@ -328,15 +328,15 @@ const QueueSettings = () => {
         <MacOSCard
           className="admin-dev-mode-card"
           style={{
-            '--admin-card-bg': settings.dev_mode_enabled ? 'rgba(239, 68, 68, 0.1)' : 'var(--mac-bg-secondary)',
-            '--admin-card-border': settings.dev_mode_enabled ? 'rgba(239, 68, 68, 0.3)' : 'var(--mac-border)'
+            '--admin-card-bg': settings.dev_mode_enabled ? 'var(--mac-error-bg)' : 'var(--mac-bg-secondary)',
+            '--admin-card-border': settings.dev_mode_enabled ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-border)'
           }}
         >
           <div className="flex items-center justify-between">
             <div className="admin-flex-center-12">
               <Zap
                 className="admin-icon-24-dynamic"
-                style={{ '--admin-icon-color': settings.dev_mode_enabled ? '#EF4444' : 'var(--mac-text-tertiary)' }}
+                style={{ '--admin-icon-color': settings.dev_mode_enabled ? 'var(--mac-error)' : 'var(--mac-text-tertiary)' }}
               />
               <div>
                 <div className="admin-span-sm-semi-primary">
@@ -355,7 +355,7 @@ const QueueSettings = () => {
               aria-label={settings.dev_mode_enabled ? 'Отключить режим разработки очереди' : 'Включить режим разработки очереди'}
               className="admin-dev-mode-btn"
               style={{
-                '--admin-btn-bg': settings.dev_mode_enabled ? '#EF4444' : 'var(--mac-bg-tertiary)',
+                '--admin-btn-bg': settings.dev_mode_enabled ? 'var(--mac-error)' : 'var(--mac-bg-tertiary)',
                 '--admin-btn-color': settings.dev_mode_enabled ? 'white' : 'var(--mac-text-primary)'
               }}>
               

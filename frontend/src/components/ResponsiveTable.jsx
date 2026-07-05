@@ -76,7 +76,7 @@ const ResponsiveTable = ({
               borderRadius: '12px',
               padding: '16px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              border: selectedRows.has(index) ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+              border: selectedRows.has(index) ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
               cursor: onRowClick ? 'pointer' : 'default'
             }}
             onClick={() => onRowClick?.(row, index)}
@@ -200,12 +200,12 @@ const ResponsiveTable = ({
             display: table-cell !important;
             visibility: visible !important;
             opacity: 1 !important;
-            background: #f8fafc !important;
-            color: #374151 !important;
+            background: var(--mac-bg-secondary) !important;
+            color: var(--mac-text-primary) !important;
             font-weight: 600 !important;
             font-size: 14px !important;
             padding: 12px !important;
-            border-bottom: 2px solid #e5e7eb !important;
+            border-bottom: 2px solid var(--mac-border) !important;
             position: relative !important;
             z-index: 10 !important;
           }
@@ -214,7 +214,7 @@ const ResponsiveTable = ({
             display: table-row !important;
             visibility: visible !important;
             opacity: 1 !important;
-            background: #f8fafc !important;
+            background: var(--mac-bg-secondary) !important;
           }
           
           .responsive-table thead {
@@ -226,7 +226,7 @@ const ResponsiveTable = ({
         <thead>
           <tr style={{
             background: 'var(--mac-bg-secondary)',
-            borderBottom: '2px solid #e5e7eb',
+            borderBottom: '2px solid var(--mac-border)',
             position: 'relative',
             zIndex: 10
           }}>
@@ -235,14 +235,14 @@ const ResponsiveTable = ({
               padding: '12px',
               textAlign: 'center',
               width: '50px',
-              background: '#f8fafc !important',
+              background: 'var(--mac-bg-secondary) !important',
               position: 'sticky',
               top: 0,
               zIndex: 11,
               display: 'table-cell !important',
               visibility: 'visible !important',
               opacity: '1 !important',
-              color: '#374151 !important'
+              color: 'var(--mac-text-primary) !important'
             }} aria-label="Row selection">
                 <input
                 type="checkbox"
@@ -263,16 +263,16 @@ const ResponsiveTable = ({
                     textAlign: column.align || 'left',
                     fontWeight: '600',
                     fontSize: '14px',
-                    color: '#374151 !important',
+                    color: 'var(--mac-text-primary) !important',
                     cursor: column.sortable ? 'pointer' : 'default',
                     userSelect: 'none',
                     minWidth: column.minWidth || '120px',
-                    background: '#f8fafc !important',
+                    background: 'var(--mac-bg-secondary) !important',
                     position: column.fixed ? 'sticky' : 'relative',
                     left: column.fixed ? leftOffsets[index] : 'auto',
                     top: 0,
                     zIndex: column.fixed ? 12 : 11,
-                    borderBottom: '2px solid #e5e7eb',
+                    borderBottom: '2px solid var(--mac-border)',
                     display: 'table-cell !important',
                     visibility: 'visible !important',
                     opacity: '1 !important'
@@ -295,15 +295,15 @@ const ResponsiveTable = ({
               padding: '12px',
               textAlign: 'center',
               width: '200px',
-              background: '#f8fafc !important',
+              background: 'var(--mac-bg-secondary) !important',
               position: 'sticky',
               top: 0,
               zIndex: 11,
-              borderBottom: '2px solid #e5e7eb',
+              borderBottom: '2px solid var(--mac-border)',
               display: 'table-cell !important',
               visibility: 'visible !important',
               opacity: '1 !important',
-              color: '#374151 !important'
+              color: 'var(--mac-text-primary) !important'
             }}>
                 Действия
               </th>
@@ -315,7 +315,7 @@ const ResponsiveTable = ({
           <tr
             key={index}
             style={{
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid var(--mac-border)',
               cursor: onRowClick ? 'pointer' : 'default',
               background: selectedRows.has(index) ? 'var(--mac-accent-bg)' : 'white',
               transition: 'background-color 0.2s ease'

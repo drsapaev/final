@@ -124,11 +124,11 @@ const ResponsiveModal = ({
         <div
           style={{
             padding: isMobile ? '16px' : '24px',
-            borderBottom: '1px solid #e5e7eb',
+            borderBottom: '1px solid var(--mac-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            background: 'linear-gradient(135deg, var(--mac-accent-blue) 0%, var(--mac-accent-blue-hover) 100%)',
             color: 'white'
           }}>
           
@@ -176,7 +176,7 @@ const ResponsiveModal = ({
         <div
           style={{
             padding: '16px',
-            borderTop: '1px solid #e5e7eb',
+            borderTop: '1px solid var(--mac-border)',
             background: 'var(--mac-bg-secondary)'
           }}>
           

@@ -213,7 +213,7 @@ export function TreatmentSection({
         style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'color-mix(in srgb, black, transparent 50%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -259,7 +259,7 @@ export function TreatmentSection({
                 alignItems: 'stretch',
                 gap: '8px',
                 padding: '8px',
-                background: t.is_pinned ? '#fff8e1' : '#f9f9f9',
+                background: t.is_pinned ? 'var(--mac-bg-primary)8e1' : '#f9f9f9',
                 border: t.is_pinned ? '2px solid #ffb300' : '1px solid #e0e0e0',
                 borderRadius: '6px'
               }}>
@@ -402,7 +402,7 @@ export function TreatmentSection({
         style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'color-mix(in srgb, black, transparent 50%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -456,7 +456,7 @@ export function TreatmentSection({
               style={{
                 flex: 1,
                 padding: '10px',
-                background: '#fff3e0',
+                background: 'var(--mac-bg-primary)3e0',
                 border: '1px solid #ff9800',
                 borderRadius: '4px',
                 cursor: 'pointer',

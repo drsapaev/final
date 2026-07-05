@@ -169,7 +169,7 @@ export const AnimatedButton = ({
     // Варианты
     const variants = {
       primary: {
-        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+        background: 'linear-gradient(135deg, var(--mac-accent-blue) 0%, var(--mac-accent-blue-hover) 100%)',
         color: 'white',
         boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)'
       },
@@ -179,12 +179,12 @@ export const AnimatedButton = ({
         boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
       },
       success: {
-        background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+        background: 'linear-gradient(135deg, var(--mac-success) 0%, var(--mac-success) 100%)',
         color: 'white',
         boxShadow: '0 4px 14px 0 rgba(34, 197, 94, 0.3)'
       },
       danger: {
-        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+        background: 'linear-gradient(135deg, var(--mac-error) 0%, var(--mac-error) 100%)',
         color: 'white',
         boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
       }

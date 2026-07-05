@@ -295,7 +295,7 @@ const ForceMajeureModal = ({
           gap: '8px',
           padding: '6px',
           borderRadius: '14px',
-          background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(148, 163, 184, 0.12)',
+          background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'rgba(148, 163, 184, 0.12)',
           border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(148, 163, 184, 0.16)'}`
         }}>
           <button
@@ -350,8 +350,8 @@ const ForceMajeureModal = ({
 
         {dryRunResult &&
         <div style={{
-          background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'var(--mac-bg-secondary)',
-          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+          background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'var(--mac-bg-secondary)',
+          border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
           borderRadius: '14px',
           padding: '16px',
           display: 'flex',
@@ -403,13 +403,13 @@ const ForceMajeureModal = ({
             style={{
               width: '100%',
               padding: '12px 14px',
-              border: `1px solid ${error ? 'var(--mac-error)' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'var(--mac-border)'}`,
+              border: `1px solid ${error ? 'var(--mac-error)' : theme === 'dark' ? 'color-mix(in srgb, white, transparent 90%)' : 'var(--mac-border)'}`,
               borderRadius: '12px',
               fontSize: '14px',
               minHeight: '96px',
               resize: 'vertical',
               color: getColor('textPrimary'),
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
+              backgroundColor: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
               fontFamily: 'inherit',
               outline: 'none'
             }} />
@@ -434,10 +434,10 @@ const ForceMajeureModal = ({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
             <label style={{
               padding: '12px',
-              border: refundType === 'deposit' ? '1px solid #3b82f6' : `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+              border: refundType === 'deposit' ? '1px solid var(--mac-accent-blue)' : `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
               borderRadius: '12px',
               cursor: 'pointer',
-              background: refundType === 'deposit' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
+              background: refundType === 'deposit' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white')
             }}>
               <input
                 type="radio"
@@ -452,10 +452,10 @@ const ForceMajeureModal = ({
             </label>
             <label style={{
               padding: '12px',
-              border: refundType === 'bank_transfer' ? '1px solid #3b82f6' : `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+              border: refundType === 'bank_transfer' ? '1px solid var(--mac-accent-blue)' : `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
               borderRadius: '12px',
               cursor: 'pointer',
-              background: refundType === 'bank_transfer' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
+              background: refundType === 'bank_transfer' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white')
             }}>
               <input
                 type="radio"
@@ -493,14 +493,14 @@ const ForceMajeureModal = ({
             style={{
               width: '100%',
               padding: '10px 12px',
-              border: `1px solid ${isConfirmValid ? 'var(--mac-success)' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
+              border: `1px solid ${isConfirmValid ? 'var(--mac-success)' : theme === 'dark' ? 'color-mix(in srgb, white, transparent 90%)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
               borderRadius: '12px',
               fontSize: '14px',
               fontWeight: 600,
               textAlign: 'center',
               letterSpacing: '2px',
               color: getColor('textPrimary'),
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
+              backgroundColor: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
               outline: 'none'
             }} />
         </div>
@@ -521,7 +521,7 @@ const ForceMajeureModal = ({
         {success &&
         <div style={{
           background: theme === 'dark' ? 'rgba(16, 185, 129, 0.10)' : '#f0fdf4',
-          color: '#16a34a',
+          color: 'var(--mac-success)',
           padding: '12px 14px',
           borderRadius: '12px',
           fontSize: '14px',

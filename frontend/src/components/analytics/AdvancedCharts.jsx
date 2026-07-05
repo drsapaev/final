@@ -84,7 +84,7 @@ const AdvancedCharts = ({
                 backgroundColor: 'rgba(0, 0, 0, 0.8)',
                 titleColor: 'white',
                 bodyColor: 'white',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderColor: 'color-mix(in srgb, white, transparent 90%)',
                 borderWidth: 1,
                 cornerRadius: 8,
                 displayColors: true,

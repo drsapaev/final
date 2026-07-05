@@ -228,7 +228,7 @@ const MacOSDemo = () => {
               aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
               title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
 
-                  <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? '#ff9500' : '#5ac8fa' }} />
+                  <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? 'var(--mac-warning)' : '#5ac8fa' }} />
                 </Button>
               </div>
             </header>
@@ -328,11 +328,11 @@ const MacOSDemo = () => {
                     Success
                   </Button>
                   <Button variant="warning" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="exclamationmark.triangle" size="small" style={{ color: '#ff9500' }} />
+                    <Icon name="exclamationmark.triangle" size="small" style={{ color: 'var(--mac-warning)' }} />
                     Warning
                   </Button>
                   <Button variant="danger" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="trash" size="small" style={{ color: '#ff3b30' }} />
+                    <Icon name="trash" size="small" style={{ color: 'var(--mac-error)' }} />
                     Danger
                   </Button>
                 </div>
