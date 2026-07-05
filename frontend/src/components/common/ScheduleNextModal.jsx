@@ -4,8 +4,8 @@ import PropTypes from 'prop-types';
 import logger from '../../utils/logger';
 import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
-import {
 import { Input } from '../ui/macos';
+import {
   Calendar,
   Clock,
   User,
