@@ -589,7 +589,7 @@ const QueueJoin = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" style={{
             borderColor: 'var(--mac-accent-blue)'
           }}></div>
-          <h2 style={titleStyle}>Юкланмоқда...</h2>
+          <h2 style={titleStyle}>Загрузка...</h2>
           <p style={bodyTextStyle}>Информация об очереди</p>
         </div>
       </div>
@@ -610,7 +610,7 @@ const QueueJoin = () => {
           <h2 id="queue-join-error-title" style={{
             ...titleStyle,
             marginBottom: 'var(--mac-spacing-3)',
-          }}>Хатолик</h2>
+          }}>Ошибка</h2>
           <p style={{
             ...bodyTextStyle,
             marginBottom: 'var(--mac-spacing-6)',
@@ -624,14 +624,14 @@ const QueueJoin = () => {
               }}
               style={primaryRecoveryButtonStyle}
             >
-              Қайта уриниш
+              Попробовать снова
             </button>
             <button
               type="button"
               onClick={() => navigate('/')}
               style={dangerRecoveryButtonStyle}
             >
-              Асосий саҳифа
+              Главная страница
             </button>
           </div>
         </div>
@@ -729,14 +729,14 @@ const QueueJoin = () => {
             }}>
               <div className="flex items-center">
                 <Calendar style={{ width: '18px', height: '18px', color: 'var(--mac-accent-blue)', marginRight: 'var(--mac-spacing-2)' }} />
-                <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>Қабул куни</span>
+                <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>День приёма</span>
               </div>
               <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-accent-blue)' }}>
-                {queueInfo?.target_date ? new Date(queueInfo.target_date).toLocaleDateString('uz-UZ', {
+                {queueInfo?.target_date ? new Date(queueInfo.target_date).toLocaleDateString('ru-RU', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric'
-                }) : 'Бугун'}
+                }) : 'Сегодня'}
               </span>
             </div>
           </div>
@@ -748,8 +748,8 @@ const QueueJoin = () => {
             textAlign: 'center',
             lineHeight: '1.5'
           }}>
-            <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>📱 Бу саҳифани очиқ қолдиринг</p>
-            <p>Ёзилиш очилганда сизни автоматик равишда йўналтирамиз</p>
+            <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>Не закрывайте эту страницу</p>
+            <p>Когда запись откроется, вы будете автоматически перенаправлены</p>
           </div>
 
           <div className="flex gap-3">
@@ -770,7 +770,7 @@ const QueueJoin = () => {
               onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
               onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
             >
-              Асосий саҳифа
+              Главная страница
             </button>
             <button
               onClick={loadTokenInfo}
@@ -868,13 +868,13 @@ const QueueJoin = () => {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
-                        <span style={{ fontSize: 'var(--mac-font-size-3xl)' }}>{entry.icon || '👨‍⚕️'}</span>
+                        <span style={{ fontSize: 'var(--mac-font-size-3xl)' }}>{entry.icon || null}</span>
                         <div>
                           <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                             {entry.specialist_name || entry.department || `Специалист ${idx + 1}`}
                           </div>
                           <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: 'var(--mac-spacing-1)' }}>
-                            Вақт: {entry.queue_time ? formatRegistrarTime(entry.queue_time, 'uz-UZ') : '—'}
+                            Время: {entry.queue_time ? formatRegistrarTime(entry.queue_time, 'ru-RU') : '—'}
                           </div>
                         </div>
                       </div>
@@ -893,10 +893,10 @@ const QueueJoin = () => {
                 marginBottom: 'var(--mac-spacing-6)',
                 lineHeight: '1.5'
               }}>
-                <p>Илтимос, қабулга тайёр бўлинг.</p>
+                <p>Пожалуйста, будьте готовы к приёму.</p>
                 <p>Мы сообщим вам, когда подойдёт ваша очередь.</p>
                 <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
-                  💡 Ёзилмаларни мутахассислар вкладкаларида кўришингиз мумкин
+                  Записи можно посмотреть во вкладках специалистов
                 </p>
               </div>
             </>
@@ -979,10 +979,10 @@ const QueueJoin = () => {
                 marginBottom: 'var(--mac-spacing-6)',
                 lineHeight: '1.5'
               }}>
-                <p>Илтимос, қабулга тайёр бўлинг.</p>
+                <p>Пожалуйста, будьте готовы к приёму.</p>
                 <p>Мы сообщим вам, когда подойдёт ваша очередь.</p>
                 <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
-                  💡 Ёзилмани {departmentName} вкладкасида кўришингиз мумкин
+                  Запись можно посмотреть во вкладке «{departmentName}»
                 </p>
               </div>
             </>
@@ -1060,7 +1060,7 @@ const QueueJoin = () => {
                   fontWeight: 'var(--mac-font-weight-medium)',
                   lineHeight: '1.4'
                 }}>
-                  Қабул куни: {new Date(queueInfo.target_date).toLocaleDateString('uz-UZ', {
+                  День приёма: {new Date(queueInfo.target_date).toLocaleDateString('ru-RU', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric'
