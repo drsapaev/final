@@ -6,6 +6,7 @@ import {
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText, ClipboardList, Save, Send } from 'lucide-react';
 import PropTypes from 'prop-types';
+import logger from '../utils/logger';
 import { api } from '../api/client';
 import './patient.css';
 
@@ -908,15 +909,35 @@ const PatientPanel = () => {
   const [formsStatus, setFormsStatus] = useState('idle');
   const [formsError, setFormsError] = useState('');
   const [formsInitData, setFormsInitData] = useState('');
-  // P0 fix: was hardcoded empty arrays. Added TODO for API integration.
-  // These should fetch from /patients/:id/appointments and /patients/:id/results
+  // P1 fix: implemented API calls for patient appointments and results.
+  // Backend endpoints: GET /patients/appointments, GET /patients/results (Patient role)
   const [appointments, setAppointments] = useState([]);
   const [results, setResults] = useState([]);
 
   useEffect(() => {
-    // TODO: implement API calls
-    // api.get(`/patients/${patientId}/appointments`).then(...)
-    // api.get(`/patients/${patientId}/results`).then(...)
+    if (!patientId) return;
+    let cancelled = false;
+
+    async function loadPatientData() {
+      try {
+        const [apptRes, resultsRes] = await Promise.allSettled([
+          api.get('/patients/appointments'),
+          api.get('/patients/results'),
+        ]);
+        if (cancelled) return;
+        if (apptRes.status === 'fulfilled') {
+          setAppointments(Array.isArray(apptRes.value.data) ? apptRes.value.data : []);
+        }
+        if (resultsRes.status === 'fulfilled') {
+          setResults(Array.isArray(resultsRes.value.data) ? resultsRes.value.data : []);
+        }
+      } catch (error) {
+        logger.error('Error loading patient data:', error);
+      }
+    }
+
+    loadPatientData();
+    return () => { cancelled = true; };
   }, [patientId]);
   const hasPatientData = appointments.length > 0 || results.length > 0;
 
