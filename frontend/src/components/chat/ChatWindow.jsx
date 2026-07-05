@@ -2,6 +2,7 @@
  * Главное окно чата
  */
 
+import { api } from '../../api/client';
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';

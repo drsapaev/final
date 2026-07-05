@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
 import { Card, Button } from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
