@@ -25,7 +25,7 @@ import {
 'lucide-react';
 import {
   MacOSCard, Button, Select,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';

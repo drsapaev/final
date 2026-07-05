@@ -16,7 +16,7 @@ import {
   MacOSCard,
   Button,
   Checkbox,
-  Input} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import './cardiology.css';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';

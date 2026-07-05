@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
 import { printService } from '../../services/print';
 import logger from '../../utils/logger';

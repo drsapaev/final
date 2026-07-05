@@ -9,7 +9,7 @@ import {
   CardContent,
   Badge,
   Skeleton,
-  Input} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 // R-14: AnimatedTransition moved from native/ to macos/ kit.
 import AnimatedTransition from '../components/ui/macos/AnimatedTransition';
 import { useTheme } from '../contexts/ThemeContext';

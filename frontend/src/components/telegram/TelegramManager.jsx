@@ -1,7 +1,7 @@
 import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
 import { Card, Button,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
 import {
   MessageSquare,

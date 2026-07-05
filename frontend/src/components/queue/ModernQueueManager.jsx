@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import {
   Button, CardContent, Badge, Select,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
 // UX Audit Stage 3 (Queue issue 7.1):

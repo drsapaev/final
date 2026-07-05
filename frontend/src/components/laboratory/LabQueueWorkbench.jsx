@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { useState } from 'react';
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   formatLabStatus,
   formatPaymentStatus,

@@ -1630,7 +1630,7 @@ const QueueJoin = () => {
                   onMouseEnter={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue-hover)')}
                   onMouseLeave={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue)')}
                 >
-                  {loading ? 'Қўшилмоқда...' : 'Қўшилиш'}
+                  {loading ? 'Присоединяемся...' : 'Присоединиться'}
                 </button>
               </div>
             </form>

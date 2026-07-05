@@ -15,7 +15,7 @@ import {
   Monitor } from
 'lucide-react';
 import { Card, Button, Badge,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';

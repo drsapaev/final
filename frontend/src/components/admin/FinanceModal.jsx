@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { X, Save, DollarSign, Calendar, AlertCircle, Receipt } from 'lucide-react';
 import { MacOSCard, Button,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   Select,
 } from '../ui/macos';

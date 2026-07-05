@@ -12,7 +12,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   Baby,
   Phone,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, Button,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   Download,
   FileText,

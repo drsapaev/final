@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, Button, Badge,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { useAppData } from '../../contexts/AppDataContext';
