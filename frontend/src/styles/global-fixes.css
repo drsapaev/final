@@ -151,7 +151,7 @@ body {
 .form-input-conflict-fix {
   border-width: 1px !important;
   border-style: solid !important;
-  border-color: #d1d5db !important;
+  border-color: var(--mac-border) !important;
   border-radius: 4px !important;
 }
 
