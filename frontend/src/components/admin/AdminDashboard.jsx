@@ -239,7 +239,7 @@ const AdminDashboard = () => {
 
   return (
     <ErrorBoundary>
-      <div className="admin-flex-col-24">
+      <div className="flex flex-col gap-6">
         <AdminRouteSwitcher current="dashboard" />
 
         {statsLoading ? (
@@ -280,7 +280,7 @@ const AdminDashboard = () => {
             <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
               <h3 className="admin-fs-lg-fw-semi-primary-m-0">Активность системы</h3>
               <Button variant="outline" size="sm" onClick={handleExportActivity} disabled={!activityChartData?.data?.length}>
-                <Download className="admin-icon-16-mr-8" aria-hidden="true" />
+                <Download className="w-4 h-4 mr-2" aria-hidden="true" />
                 Экспорт
               </Button>
             </div>
@@ -320,7 +320,7 @@ const AdminDashboard = () => {
               </div>
             ) : (
               <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
-                <div className="admin-text-center">
+                <div className="text-center">
                   <Activity className="admin-w-48-h-48-m-0-auto-16px-auto-col-dyn" style={{ '--admin-col0': adminTextSecondary }} />
                   <p className="admin-col-dyn" style={{ '--admin-col0': adminTextSecondary }}>Нет данных за выбранный период</p>
                 </div>
@@ -332,16 +332,16 @@ const AdminDashboard = () => {
             <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
               <h3 className="admin-fs-lg-fw-semi-primary-m-0">Последние действия</h3>
               <Button variant="outline" size="sm" onClick={handleViewAllActivities} disabled={recentActivities.length === 0}>
-                <Eye className="admin-icon-16-mr-8" aria-hidden="true" />
+                <Eye className="w-4 h-4 mr-2" aria-hidden="true" />
                 Все
               </Button>
             </div>
             {recentActivitiesLoading ? (
-              <div className="admin-p-16">
+              <div className="p-4">
                 <Skeleton type="text" count={4} />
               </div>
             ) : recentActivitiesError ? (
-              <div className="admin-p-16">
+              <div className="p-4">
                 <MacOSEmptyState
                   icon={AlertTriangle}
                   title="Ошибка загрузки"
@@ -350,10 +350,10 @@ const AdminDashboard = () => {
               </div>
             ) : recentActivities.length === 0 ? (
               <div className="admin-p-16-ta-center">
-                <p className="admin-text-secondary">Нет последних действий</p>
+                <p className="text-[var(--mac-text-secondary)]">Нет последних действий</p>
               </div>
             ) : (
-              <div className="admin-flex-col-16">
+              <div className="flex flex-col gap-4">
                 {recentActivities.map((activity) => (
                   <div key={activity.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminInsetSurface, '--admin-bd1': adminBorder }}>
                     {getStatusIcon(activity.status)}
@@ -374,11 +374,11 @@ const AdminDashboard = () => {
             <Badge variant="warning">{systemAlerts.length}</Badge>
           </div>
           {systemAlertsLoading ? (
-            <div className="admin-p-16">
+            <div className="p-4">
               <Skeleton type="text" count={3} />
             </div>
           ) : systemAlertsError ? (
-            <div className="admin-p-16">
+            <div className="p-4">
               <MacOSEmptyState
                 icon={AlertTriangle}
                 title="Ошибка загрузки"
@@ -387,10 +387,10 @@ const AdminDashboard = () => {
             </div>
           ) : systemAlerts.length === 0 ? (
             <div className="admin-p-16-ta-center">
-              <p className="admin-text-secondary">Нет системных уведомлений</p>
+              <p className="text-[var(--mac-text-secondary)]">Нет системных уведомлений</p>
             </div>
           ) : (
-            <div className="admin-flex-col-16">
+            <div className="flex flex-col gap-4">
               {systemAlerts.map((alert) => (
                 <div key={alert.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bd-dyn-bg-dyn" style={{ '--admin-bd0': adminBorder, '--admin-bg1': adminInsetSurface }}>
                   <AlertTriangle className="admin-w-20-h-20-warning" />

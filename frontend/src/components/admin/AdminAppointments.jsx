@@ -149,7 +149,7 @@ const getDoctorOptionLabel = (doctor) => {
 };
 
 const StatCard = ({ label, value, icon: Icon, color }) => (
-  <MacOSCard className="admin-p-24">
+  <MacOSCard className="p-6">
     <div className="admin-d-flex-ai-center-jc-between-gap-16">
       <div>
         <p
@@ -265,7 +265,7 @@ const AdminAppointments = () => {
   };
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       <div
         className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16"
       >
@@ -497,7 +497,7 @@ const AdminAppointments = () => {
                         {reason.length > 50 ? `${reason.substring(0, 50)}...` : reason || 'Не указана'}
                       </td>
                       <td aria-label={`Действия для записи ${patientName} - ${doctorName}`} className="admin-p-12-16">
-                        <div className="admin-flex-center-8">
+                        <div className="flex items-center justify-center gap-2">
                           <IconButton label="Редактировать запись" onClick={() => handleEditAppointment(appointment)}>
                             <Edit size={16} />
                           </IconButton>
