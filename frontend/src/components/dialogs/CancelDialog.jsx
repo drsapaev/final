@@ -229,7 +229,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                     fontWeight: 'var(--mac-font-weight-medium)',
                   }}
                 >
-                  {appointment.cost.toLocaleString()} ₽
+                  {new Intl.NumberFormat('ru-RU').format(appointment.cost)} сум
                 </span>
               </div>
             )}

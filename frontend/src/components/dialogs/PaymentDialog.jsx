@@ -40,7 +40,7 @@ const PaymentDialog = ({
   const validateForm = () => {
     const newErrors = {};
 
-    if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+    if (!paymentAmount || !Number.isFinite(parseFloat(paymentAmount)) || parseFloat(paymentAmount) <= 0) {
       newErrors.amount = 'Укажите корректную сумму';
     }
 
@@ -192,7 +192,7 @@ const PaymentDialog = ({
             }}
           >
             Сумма:{' '}
-            <strong>{parseFloat(paymentAmount).toLocaleString()} ₽</strong>
+            <strong>{new Intl.NumberFormat('ru-RU').format(parseFloat(paymentAmount))} сум</strong>
             <br />
             Способ: <strong>{paymentMethod}</strong>
           </p>
