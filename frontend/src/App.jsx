@@ -60,7 +60,6 @@ const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess.jsx'));
 const PaymentCancel = lazy(() => import('./pages/PaymentCancel.jsx'));
 const PaymentTest = lazy(() => import('./pages/PaymentTest.jsx'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage.jsx'));
-const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired.jsx'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView.jsx'));
 const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
@@ -89,7 +88,6 @@ const UnifiedReports = lazy(() => import('./components/admin/UnifiedReports.jsx'
 const UnifiedNotifications = lazy(() => import('./components/admin/UnifiedNotifications.jsx'));
 const UnifiedIntegrations = lazy(() => import('./components/admin/UnifiedIntegrations.jsx'));
 const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
-const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
 const UnifiedUserManagement = lazy(() => import('./components/admin/UnifiedUserManagement.jsx'));
 const AllFreeApproval = lazy(() => import('./components/admin/AllFreeApproval.jsx'));
@@ -126,8 +124,6 @@ const ROUTE_COMPONENTS = {
   Appointments,
   Search,
   UserProfile,
-  SecurityPage,
-  TwoFactorManager,
   VisitDetails,
   PatientPickupView,
   MediLabDemo,

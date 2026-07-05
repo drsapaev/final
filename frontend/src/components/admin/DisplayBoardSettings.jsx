@@ -496,7 +496,7 @@ const DisplayBoardSettings = () => {
 
           <div className="text-center">
             <Button
-              onClick={() => window.open('/display?board=main_board', '_blank')}
+              onClick={() => window.open('/display-board', '_blank')}
               className="w-full mb-2"
               variant="outline">
               

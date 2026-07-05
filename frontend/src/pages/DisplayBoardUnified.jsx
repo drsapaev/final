@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Volume2,
   VolumeX,
@@ -51,7 +52,7 @@ const extractBoardStats = (source) => ({
  * - Темы оформления (новое)
  */
 export default function DisplayBoardUnified({
-  department = 'Reg',
+  department: departmentProp,
   dateStr = todayStr(),
   refreshMs = 15000,
   announcement = '',

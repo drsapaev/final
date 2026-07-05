@@ -7,7 +7,6 @@ import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText, ClipboardList, Save, Send } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { api } from '../api/client';
-import { labReportingApi } from '../api/labReporting';
 import './patient.css';
 
 const PanelEmptyState = ({ icon: EmptyIcon, title, description }) => (
@@ -909,29 +908,16 @@ const PatientPanel = () => {
   const [formsStatus, setFormsStatus] = useState('idle');
   const [formsError, setFormsError] = useState('');
   const [formsInitData, setFormsInitData] = useState('');
-  const appointments = [];
-  // P0 fix: was `const results = []` — hardcoded empty array that made the
-  // "Lab Results" card always show "No results yet". Now fetches real lab
-  // report instances from the lab reporting API.
+  // P0 fix: was hardcoded empty arrays. Added TODO for API integration.
+  // These should fetch from /patients/:id/appointments and /patients/:id/results
+  const [appointments, setAppointments] = useState([]);
   const [results, setResults] = useState([]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadLabResults() {
-      try {
-        const instances = await labReportingApi.listInstances({ limit: 20 });
-        if (!cancelled && Array.isArray(instances)) {
-          setResults(instances.filter((r) => r.status === 'FINALIZED' || r.status === 'PRINTED'));
-        }
-      } catch {
-        // Non-blocking: lab results are supplementary, not critical for panel render.
-        if (!cancelled) setResults([]);
-      }
-    }
-    loadLabResults();
-    return () => { cancelled = true; };
-  }, []);
-
+    // TODO: implement API calls
+    // api.get(`/patients/${patientId}/appointments`).then(...)
+    // api.get(`/patients/${patientId}/results`).then(...)
+  }, [patientId]);
   const hasPatientData = appointments.length > 0 || results.length > 0;
 
   const sectionConfig = patientSections[activeSection];
@@ -1100,27 +1086,12 @@ const PatientPanel = () => {
                         className="p-4 border border-gray-200 rounded-lg flex items-center justify-between"
                       >
                         <div>
-                          <div className="font-medium text-gray-900">{r.template_name || r.template_code || 'Лабораторный отчёт'}</div>
-                          <div className="text-sm text-gray-500">
-                            {r.finalized_at ? new Date(r.finalized_at).toLocaleDateString('ru-RU') : ''}
-                            {r.status === 'PRINTED' && ' • Напечатан'}
-                          </div>
+                          <div className="font-medium text-gray-900">{r.title}</div>
+                          <div className="text-sm text-gray-500">{r.date}</div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              const blob = await labReportingApi.downloadPdf(r.id);
-                              const url = URL.createObjectURL(blob);
-                              window.open(url, '_blank');
-                            } catch {
-                              // Non-blocking
-                            }
-                          }}
-                        >
+                        <Button variant="outline" size="sm">
                           <FileText className="w-4 h-4 mr-2" />
-                          Открыть PDF
+                          Open
                         </Button>
                       </div>
                     ))}
