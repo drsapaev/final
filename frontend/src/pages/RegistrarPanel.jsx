@@ -1603,7 +1603,7 @@ const RegistrarPanel = () => {
                 logger.info('Открыть детали записи:', row);
                 // Здесь можно открыть модальное окно с деталями записи
               }}
-              onActionClick={(action, row, event) => {
+              onActionClick={async (action, row, event) => {
                 switch (action) {
                   case 'view':
                     logger.info('Просмотр записи:', row);
@@ -1617,26 +1617,42 @@ const RegistrarPanel = () => {
                     logger.info('Открытие модального окна оплаты для записи:', row);
                     setPaymentDialog({ open: true, row, paid: false, source: 'table' });
                     break;
-                  case 'in_cabinet':
-                    // UX Audit Registrar #15: confirmation перед отправкой в кабинет.
-                    if (!window.confirm(`Отправить пациента "${row.patient_fio || row.patient_name || ''}" в кабинет?`)) {
-                      break;
-                    }
+                  case 'in_cabinet': {
+                    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+                    // Раньше: if (!window.confirm(`Отправить пациента "..." в кабинет?`)) break;
+                    // Теперь: macOS-style ConfirmDialog через useConfirm.
+                    const inCabinetName = row.patient_fio || row.patient_name || '';
+                    const inCabinetOk = await confirm({
+                      title: 'Отправить в кабинет',
+                      message: `Отправить пациента «${inCabinetName}» в кабинет?`,
+                      confirmLabel: 'Отправить',
+                      cancelLabel: 'Отмена',
+                      intent: 'primary',
+                    });
+                    if (!inCabinetOk) break;
                     logger.info('Отправка пациента в кабинет:', row);
                     updateAppointmentStatus(row.id, 'in_cabinet', '', row);
                     break;
+                  }
                   case 'call':
                     logger.info('Вызов пациента:', row);
                     handleStartVisit(row);
                     break;
-                  case 'complete':
-                    // UX Audit Registrar #15: confirmation перед завершением приёма.
-                    if (!window.confirm(`Завершить приём пациента "${row.patient_fio || row.patient_name || ''}"?`)) {
-                      break;
-                    }
+                  case 'complete': {
+                    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+                    const completeName = row.patient_fio || row.patient_name || '';
+                    const completeOk = await confirm({
+                      title: 'Завершение приёма',
+                      message: `Завершить приём пациента «${completeName}»?`,
+                      confirmLabel: 'Завершить',
+                      cancelLabel: 'Отмена',
+                      intent: 'primary',
+                    });
+                    if (!completeOk) break;
                     logger.info('Завершение приёма:', row);
                     updateAppointmentStatus(row.id, 'done', '', row);
                     break;
+                  }
                   case 'print':
                     logger.info('Печать талона:', row);
                     setPrintDialog({ open: true, type: 'ticket', data: row });
