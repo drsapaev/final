@@ -1,0 +1,168 @@
+/**
+ * CancelDialog Styles
+ *
+ * UX Audit Registrar #5: все inline-стили из CancelDialog.jsx перенесены сюда.
+ * Использует macos design tokens (--mac-*) + [data-theme="dark"] для light/dark support.
+ */
+
+/* Dialog background */
+.cancel-dialog--styled {
+    background-color: var(--mac-bg-primary);
+}
+
+/* Warning block (вверху диалога) */
+.cancel-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--mac-spacing-3);
+    padding: var(--mac-spacing-4);
+    background-color: var(--mac-error-bg);
+    border: 1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-warning), transparent 50%));
+    border-radius: 14px;
+    margin-bottom: var(--mac-spacing-6);
+}
+
+[data-theme="dark"] .cancel-warning {
+    background-color: rgba(245, 158, 11, 0.10);
+    border-color: rgba(245, 158, 11, 0.24);
+}
+
+.cancel-warning-icon {
+    color: var(--mac-warning);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.cancel-warning-title {
+    color: var(--mac-warning);
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-semibold);
+    margin: 0 0 4px 0;
+}
+
+.cancel-warning-text {
+    color: var(--mac-warning);
+    font-size: var(--mac-font-size-sm);
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Info card (appointment details) */
+.cancel-info-card {
+    margin-bottom: var(--mac-spacing-6);
+    padding: var(--mac-spacing-4);
+    background-color: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: 14px;
+}
+
+[data-theme="dark"] .cancel-info-card {
+    border-color: color-mix(in srgb, white, transparent 92%);
+}
+
+.cancel-info-title {
+    color: var(--mac-text-primary);
+    margin: 0 0 12px 0;
+    font-size: var(--mac-font-size-lg);
+    font-weight: var(--mac-font-weight-semibold);
+}
+
+.cancel-info-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-2);
+}
+
+.cancel-info-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.cancel-info-label {
+    color: var(--mac-text-secondary);
+    font-size: var(--mac-font-size-base);
+}
+
+.cancel-info-value {
+    color: var(--mac-text-primary);
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+}
+
+.cancel-info-value--right {
+    color: var(--mac-text-primary);
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+    text-align: right;
+    max-width: 60%;
+}
+
+/* Reason textarea field */
+.cancel-reason-label {
+    display: block;
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+    margin-bottom: var(--mac-spacing-2);
+    color: var(--mac-text-primary);
+}
+
+.cancel-reason-textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    background-color: white;
+    color: var(--mac-text-primary);
+    font-size: var(--mac-font-size-base);
+    resize: vertical;
+    min-height: 100px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-family: inherit;
+    outline: none;
+}
+
+[data-theme="dark"] .cancel-reason-textarea {
+    background-color: color-mix(in srgb, white, transparent 96%);
+    border-color: color-mix(in srgb, white, transparent 90%);
+}
+
+.cancel-reason-textarea--error {
+    border-color: var(--mac-error);
+}
+
+.cancel-reason-textarea:focus {
+    border-color: var(--mac-accent-blue);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 88%);
+}
+
+.cancel-reason-textarea--error:focus {
+    border-color: var(--mac-error);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--mac-error), transparent 88%);
+}
+
+/* Counter + error row */
+.cancel-reason-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--mac-spacing-2);
+}
+
+.cancel-reason-error {
+    color: var(--mac-error);
+    font-size: var(--mac-font-size-xs);
+    margin: 0;
+}
+
+.cancel-reason-counter {
+    color: var(--mac-text-secondary);
+    font-size: var(--mac-font-size-xs);
+}
+
+/* Hint */
+.cancel-reason-hint {
+    color: var(--mac-text-secondary);
+    font-size: var(--mac-font-size-xs);
+    margin: 8px 0 0 0;
+    font-style: italic;
+}

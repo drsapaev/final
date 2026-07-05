@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { CreditCard, DollarSign, Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
-import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
+// UX Audit Registrar #5: все inline-стили перенесены в PaymentDialog.css.
+// useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
+// Также: emoji в заголовке (✅/💳) заменены на text-only (иконки и так есть в actions).
+import './PaymentDialog.css';
 
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
@@ -14,12 +17,6 @@ const PaymentDialog = ({
   onPaymentSuccess,
   onPrintTicket,
 }) => {
-  const { theme, getColor } = useTheme();
-  const surfaceStyle = {
-    backgroundColor: 'var(--mac-bg-secondary)',
-    border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
-    borderRadius: '14px',
-  };
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Карта');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -59,16 +56,7 @@ const PaymentDialog = ({
 
     try {
       // UX Audit Registrar: убрана 1.5-секундная «имитация» (setTimeout).
-      // Раньше здесь был `await new Promise(resolve => setTimeout(resolve, 1500))`
-      // — искусственная задержка, которая тратила ~60 сек/день регистратора.
-      //
-      // Теперь: onPaymentSuccess callback делает РЕАЛЬНЫЙ API-запрос
-      // (api.post('/registrar/records/actions', {action: 'mark_paid', ...}))
-      // в useRegistrarActions.handlePayment(). Мы await'им этот callback
-      // и показываем loading state до реального завершения.
-      //
-      // Если callback не передан — просто отмечаем как оплачено (fallback
-      // для тестов/демо без backend).
+      // Теперь: onPaymentSuccess callback делает РЕАЛЬНЫЙ API-запрос.
       if (onPaymentSuccess) {
         await onPaymentSuccess({
           appointmentId: appointment.id,
@@ -83,7 +71,6 @@ const PaymentDialog = ({
     } catch (error) {
       logger.error('Payment error:', error);
       toast.error(error?.message || 'Ошибка при обработке платежа');
-      // Не меняем isPaid — диалог остаётся в режиме ввода оплаты.
     } finally {
       setIsProcessing(false);
     }
@@ -143,76 +130,36 @@ const PaymentDialog = ({
         },
       ];
 
+  // UX Audit Registrar #5: emoji в заголовке (✅/💳) заменены на text-only.
+  // Иконки есть в actions (Printer/Check) и в success state (CheckCircle2).
+  const dialogTitle = isPaid ? 'Оплата завершена' : 'Оплата услуг';
+
   return (
     <ModernDialog
       isOpen={isOpen}
       onClose={onClose}
-      title={isPaid ? '✅ Оплата завершена' : '💳 Оплата услуг'}
+      title={dialogTitle}
       actions={actions}
-      dialogStyle={{
-        backgroundColor: 'var(--mac-bg-primary)',
-      }}
+      dialogClassName="payment-dialog--styled"
       closeOnBackdrop={!isProcessing}
       closeOnEscape={!isProcessing}
     >
       {isPaid ? (
-        <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              margin: '0 auto 16px',
-              borderRadius: 'var(--mac-radius-xl)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background:
-                theme === 'dark' ? 'rgba(16, 185, 129, 0.14)' : 'var(--mac-success-bg)',
-              color: 'var(--mac-success)',
-              border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 60%))'}`,
-            }}
-          >
+        <div className="payment-success">
+          <div className="payment-success-icon">
             <Check size={28} />
           </div>
-          <h4
-            style={{
-              color: getColor('textPrimary'),
-              marginBottom: 'var(--mac-spacing-2)',
-              fontSize: 'var(--mac-font-size-xl)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-            }}
-          >
+          <h4 className="payment-success-title">
             Оплата успешно завершена
           </h4>
-          <p
-            style={{
-              color: getColor('textSecondary'),
-              marginBottom: 'var(--mac-spacing-4)',
-              lineHeight: 1.5,
-            }}
-          >
+          <p className="payment-success-details">
             Сумма:{' '}
             <strong>{new Intl.NumberFormat('ru-RU').format(parseFloat(paymentAmount))} сум</strong>
             <br />
             Способ: <strong>{paymentMethod}</strong>
           </p>
-          <div
-            style={{
-              padding: '14px',
-              backgroundColor:
-                'color-mix(in srgb, var(--mac-success, #10b981), transparent 92%)',
-              borderRadius: 'var(--mac-radius-lg)',
-              border: `1px solid ${'color-mix(in srgb, var(--mac-success, #10b981), transparent 76%)'}`,
-            }}
-          >
-            <p
-              style={{
-                color: 'var(--mac-success)',
-                fontSize: 'var(--mac-font-size-base)',
-                margin: 0,
-                lineHeight: 1.5,
-              }}
-            >
+          <div className="payment-success-cta">
+            <p className="payment-success-cta-text">
               Теперь вы можете распечатать талон для пациента
             </p>
           </div>
@@ -220,40 +167,15 @@ const PaymentDialog = ({
       ) : (
         <div>
           {/* Информация о пациенте */}
-          <div
-            style={{
-              marginBottom: 'var(--mac-spacing-6)',
-              padding: 'var(--mac-spacing-4)',
-              ...surfaceStyle,
-            }}
-          >
-            <h4
-              style={{
-                color: getColor('textPrimary'),
-                margin: '0 0 8px 0',
-                fontSize: 'var(--mac-font-size-lg)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-              }}
-            >
+          <div className="payment-patient-card">
+            <h4 className="payment-patient-title">
               Пациент
             </h4>
-            <p
-              style={{
-                color: getColor('textSecondary'),
-                margin: 0,
-                fontSize: 'var(--mac-font-size-base)',
-              }}
-            >
+            <p className="payment-patient-name">
               {appointment.patient_fio}
             </p>
             {appointment.services && (
-              <p
-                style={{
-                  color: getColor('textSecondary'),
-                  margin: '4px 0 0 0',
-                  fontSize: 'var(--mac-font-size-xs)',
-                }}
-              >
+              <p className="payment-patient-services">
                 Услуги:{' '}
                 {Array.isArray(appointment.services)
                   ? appointment.services.join(', ')
@@ -263,21 +185,10 @@ const PaymentDialog = ({
           </div>
 
           {/* Форма оплаты */}
-          <div
-            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-5)' }}
-          >
+          <div className="payment-form">
             {/* Сумма */}
             <div>
-              <label
-                htmlFor="payment-amount"
-                style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-base)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  marginBottom: 'var(--mac-spacing-2)',
-                  color: getColor('textPrimary'),
-                }}
-              >
+              <label htmlFor="payment-amount" className="payment-field-label">
                 Сумма к оплате *
               </label>
               <Input
@@ -294,47 +205,10 @@ const PaymentDialog = ({
                   }
                 }}
                 placeholder="Введите сумму"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: `1px solid ${
-                    errors.amount
-                      ? 'var(--mac-error)'
-                      : theme === 'dark'
-                        ? 'color-mix(in srgb, white, transparent 90%)'
-                        : 'var(--mac-border)'
-                  }`,
-                  borderRadius: 'var(--mac-radius-lg)',
-                  backgroundColor:
-                    theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
-                  color: getColor('textPrimary'),
-                  fontSize: 'var(--mac-font-size-lg)',
-                  transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                  outline: 'none',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--mac-accent-blue)';
-                  e.target.style.boxShadow =
-                    '0 0 0 3px color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 88%)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = errors.amount
-                    ? 'var(--mac-error)'
-                    : theme === 'dark'
-                      ? 'color-mix(in srgb, white, transparent 90%)'
-                      : 'var(--mac-border)';
-                  e.target.style.boxShadow = 'none';
-                }}
+                className={`payment-amount-input ${errors.amount ? 'payment-amount-input--error' : ''}`}
               />
               {errors.amount && (
-                <p
-                  id="payment-amount-error"
-                  style={{
-                    color: 'var(--mac-error)',
-                    fontSize: 'var(--mac-font-size-xs)',
-                    margin: '4px 0 0 0',
-                  }}
-                >
+                <p id="payment-amount-error" className="payment-field-error">
                   {errors.amount}
                 </p>
               )}
@@ -342,24 +216,10 @@ const PaymentDialog = ({
 
             {/* Способ оплаты */}
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-base)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  marginBottom: 'var(--mac-spacing-2)',
-                  color: getColor('textPrimary'),
-                }}
-              >
+              <label className="payment-field-label">
                 Способ оплаты *
               </label>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--mac-spacing-2)',
-                }}
-              >
+              <div className="payment-methods-grid">
                 {paymentMethods.map((method) => (
                   <button
                     key={method.value}
@@ -370,36 +230,7 @@ const PaymentDialog = ({
                         setErrors((prev) => ({ ...prev, method: null }));
                       }
                     }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--mac-spacing-2)',
-                      padding: '12px 14px',
-                      border: `1px solid ${
-                        paymentMethod === method.value
-                          ? 'var(--mac-accent-blue)'
-                          : theme === 'dark'
-                            ? 'color-mix(in srgb, white, transparent 90%)'
-                            : 'var(--mac-border)'
-                      }`,
-                      borderRadius: 'var(--mac-radius-lg)',
-                      backgroundColor:
-                        paymentMethod === method.value
-                          ? theme === 'dark'
-                            ? 'color-mix(in srgb, var(--mac-accent-blue, #3b82f6), transparent 84%)'
-                            : 'var(--mac-accent-bg)'
-                          : theme === 'dark'
-                            ? 'color-mix(in srgb, white, transparent 96%)'
-                            : 'white',
-                      color:
-                        paymentMethod === method.value
-                          ? 'var(--mac-accent-blue-hover)'
-                          : getColor('textPrimary'),
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      fontSize: 'var(--mac-font-size-base)',
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                    }}
+                    className={`payment-method-btn ${paymentMethod === method.value ? 'payment-method-btn--selected' : ''}`}
                   >
                     {method.icon}
                     {method.label}
@@ -407,13 +238,7 @@ const PaymentDialog = ({
                 ))}
               </div>
               {errors.method && (
-                <p
-                  style={{
-                    color: 'var(--mac-error)',
-                    fontSize: 'var(--mac-font-size-xs)',
-                    margin: '4px 0 0 0',
-                  }}
-                >
+                <p className="payment-field-error">
                   {errors.method}
                 </p>
               )}
