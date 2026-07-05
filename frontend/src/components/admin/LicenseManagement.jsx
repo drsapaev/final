@@ -239,19 +239,19 @@ const LicenseManagement = () => {
         </div>
         {stats &&
         <div className="admin-flex-gap-24-wrap">
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-2xl-bold-blue-mb-4">
                 {stats.total_licenses}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Всего лицензий
               </div>
             </div>
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-2xl-bold-success-mb-4">
                 {stats.active_licenses}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Активных
               </div>
             </div>
@@ -269,7 +269,7 @@ const LicenseManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <div className="admin-flex-col-gap-16-wrap">
           <div className="admin-flex-1-pos-relative">
             <Input
@@ -307,7 +307,7 @@ const LicenseManagement = () => {
               onClick={() => setShowAddForm(true)}
               className="admin-flex-ai-center-gap-8-bg-blue-bd-none-p-8px16">
               
-              <Plus aria-hidden="true" className="admin-icon-16" />
+              <Plus aria-hidden="true" className="w-4 h-4" />
               <span>Добавить лицензию</span>
             </Button>
           </div>
@@ -330,13 +330,13 @@ const LicenseManagement = () => {
               setEditingLicense(null);
               resetForm();
             }}
-            className="admin-p-8">
+            className="p-2">
             
-              <X aria-hidden="true" className="admin-icon-16" />
+              <X aria-hidden="true" className="w-4 h-4" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} className="admin-flex-col-16">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
@@ -481,7 +481,7 @@ const LicenseManagement = () => {
                   </> :
 
               <>
-                    <Save aria-hidden="true" className="admin-icon-16" />
+                    <Save aria-hidden="true" className="w-4 h-4" />
                     {editingLicense ? 'Обновить' : 'Добавить'}
                   </>
               }
@@ -495,7 +495,7 @@ const LicenseManagement = () => {
       {loading ?
       <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24-overflow-hidden">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} className="admin-p-24">
+        <MacOSCard key={i} className="p-6">
               <Skeleton height="200px" />
             </MacOSCard>
         )}
@@ -507,7 +507,7 @@ const LicenseManagement = () => {
         description={licenseEmptyDescription}
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" focusable="false" className="admin-icon-16-mr-8" />
+              <Plus aria-hidden="true" focusable="false" className="w-4 h-4 mr-2" />
               Добавить лицензию
             </Button>
         } /> :
@@ -515,7 +515,7 @@ const LicenseManagement = () => {
 
       <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24-overflow-hidden">
           {filteredLicenses.map((license) =>
-        <MacOSCard key={license.id} className="admin-p-24">
+        <MacOSCard key={license.id} className="p-6">
               <div className="admin-flex-jc-between-ai-start-mb-16">
                 <div>
                   <h3 className="admin-lg-semi-primary-m-004px0">
@@ -533,7 +533,7 @@ const LicenseManagement = () => {
 
               <div className="admin-flex-col-gap-8-mb-16">
                 <div className="admin-flex-ai-center-gap-8-sm-secondary">
-                  <Key aria-hidden="true" className="admin-icon-16" />
+                  <Key aria-hidden="true" className="w-4 h-4" />
                   <span className="admin-fontfamily-e89ae9-bg-bg-secondary-p-2px6-radius-4-xs">
                     {showKeys[license.id] ? license.license_key : '••••••••••••••••'}
                   </span>
@@ -562,27 +562,27 @@ const LicenseManagement = () => {
                 </div>
                 {license.cost > 0 &&
             <div className="admin-flex-ai-center-gap-8-sm-secondary">
-                    <DollarSign aria-hidden="true" className="admin-icon-16" />
+                    <DollarSign aria-hidden="true" className="w-4 h-4" />
                     <span>{license.cost.toLocaleString()} сум</span>
                   </div>
             }
                 <div className="admin-flex-ai-center-gap-8-sm-secondary">
-                  <Shield aria-hidden="true" className="admin-icon-16" />
+                  <Shield aria-hidden="true" className="w-4 h-4" />
                   <span>{license.seats} мест</span>
                 </div>
                 {license.expiry_date &&
             <div className="admin-flex-ai-center-gap-8-sm" style={{ '--admin-color': isExpiringSoon(license.expiry_date) ? 'var(--mac-warning)' : 'var(--mac-text-secondary)' }}>
-                    <Calendar aria-hidden="true" className="admin-icon-16" />
+                    <Calendar aria-hidden="true" className="w-4 h-4" />
                     <span>Истекает: {new Date(license.expiry_date).toLocaleDateString()}</span>
                     {isExpiringSoon(license.expiry_date) &&
-              <AlertTriangle aria-hidden="true" className="admin-icon-14" />
+              <AlertTriangle aria-hidden="true" className="w-3.5 h-3.5" />
               }
                   </div>
             }
               </div>
 
               {license.description &&
-          <div className="admin-mb-16">
+          <div className="mb-4">
                   <p className="admin-sm-secondary-m-0-lh-14">
                     {license.description}
                   </p>
@@ -597,7 +597,7 @@ const LicenseManagement = () => {
               onClick={() => handleEdit(license)}
               className="admin-p-6px12">
               
-                  <Edit aria-hidden="true" className="admin-icon-16" />
+                  <Edit aria-hidden="true" className="w-4 h-4" />
                 </Button>
                 <Button
               type="button"
@@ -606,7 +606,7 @@ const LicenseManagement = () => {
               onClick={() => handleDelete(license.id)}
               className="admin-p-6px12-error-bd-error">
               
-                  <Trash2 aria-hidden="true" className="admin-icon-16" />
+                  <Trash2 aria-hidden="true" className="w-4 h-4" />
                 </Button>
               </div>
             </MacOSCard>

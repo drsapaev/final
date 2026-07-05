@@ -604,7 +604,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                     </button>
                                 </td>
                                 <td className="admin-qp-td">
-                                    <span className="admin-text-secondary">
+                                    <span className="text-[var(--mac-text-secondary)]">
                                         {profile.order}
                                     </span>
                                 </td>

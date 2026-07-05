@@ -198,7 +198,7 @@ const QueueCabinetManagement = () => {
             </div>
           ),
           queue_tag: (
-            <span className="admin-text-primary">
+            <span className="text-[var(--mac-text-primary)]">
               {queue.queue_tag || '—'}
             </span>
           ),
@@ -213,12 +213,12 @@ const QueueCabinetManagement = () => {
             </div>
           ),
           cabinet_floor: (
-            <span className="admin-text-primary">
+            <span className="text-[var(--mac-text-primary)]">
               {queue.cabinet_floor ?? '—'}
             </span>
           ),
           cabinet_building: (
-            <span className="admin-text-primary">
+            <span className="text-[var(--mac-text-primary)]">
               {queue.cabinet_building || '—'}
             </span>
           ),
@@ -285,8 +285,8 @@ const QueueCabinetManagement = () => {
 
   return (
     <div className="admin-p-0-bgc-bg-primary">
-      <MacOSCard className="admin-p-0">
-        <div className="admin-p-24">
+      <MacOSCard className="p-0">
+        <div className="p-6">
           <div
             className="admin-d-flex-ai-start-jc-between-gap-16-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
             <div>
@@ -306,14 +306,14 @@ const QueueCabinetManagement = () => {
                 onClick={() => loadData(appliedFilters)}
                 variant="outline"
                 className="admin-d-inline-flex-ai-center-gap-8">
-                <RefreshCw className="admin-icon-16" />
+                <RefreshCw className="w-4 h-4" />
                 Обновить
               </Button>
               <Button
                 onClick={syncFromDoctors}
                 disabled={syncing}
                 className="admin-d-inline-flex-ai-center-gap-8-bgc-blue-bd-none-1">
-                <Sparkles className="admin-icon-16" />
+                <Sparkles className="w-4 h-4" />
                 {syncing ? 'Синхронизация...' : 'Синхронизировать из врачей'}
               </Button>
             </div>
@@ -408,14 +408,14 @@ const QueueCabinetManagement = () => {
                 <Button
                   onClick={applyFilters}
                   className="admin-d-inline-flex-ai-center-gap-8-bgc-blue-bd-none">
-                  <Search className="admin-icon-16" />
+                  <Search className="w-4 h-4" />
                   Применить
                 </Button>
                 <Button
                   onClick={resetFilters}
                   variant="outline"
                   className="admin-d-inline-flex-ai-center-gap-8">
-                  <X className="admin-icon-16" />
+                  <X className="w-4 h-4" />
                   Сбросить
                 </Button>
               </div>
@@ -431,7 +431,7 @@ const QueueCabinetManagement = () => {
                 <Button
                   onClick={() => loadData(appliedFilters)}
                   className="admin-d-inline-flex-ai-center-gap-8">
-                  <RefreshCw className="admin-icon-16" />
+                  <RefreshCw className="w-4 h-4" />
                   Повторить загрузку
                 </Button>
               }

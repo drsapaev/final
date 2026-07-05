@@ -261,7 +261,7 @@ const QueueSettings = () => {
 
   return (
     <div className="admin-outer-container-p-0">
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         {/* Заголовок */}
         <div className="admin-header-flex-between-pb-24-border-bottom">
           <div>
@@ -281,7 +281,7 @@ const QueueSettings = () => {
               disabled={loading}
               className="admin-action-btn">
               
-              <RefreshCw className="admin-icon-16" />
+              <RefreshCw className="w-4 h-4" />
               Обновить
             </Button>
             <Button
@@ -292,7 +292,7 @@ const QueueSettings = () => {
               {saving ?
               <RefreshCw className="admin-icon-16-spin" /> :
 
-              <Save className="admin-icon-16" />
+              <Save className="w-4 h-4" />
               }
               Сохранить
             </Button>
@@ -302,13 +302,13 @@ const QueueSettings = () => {
         {/* Сообщения */}
         {message.text &&
         <MacOSCard
-          className="admin-dynamic-banner-p-16 admin-mb-24"
+          className="admin-dynamic-banner-p-16 mb-6"
           style={{
             '--admin-banner-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
             '--admin-banner-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
           }}
         >
-            <div className="admin-flex-center-8">
+            <div className="flex items-center justify-center gap-2">
               {message.type === 'success' ?
             <CheckCircle className="admin-icon-20-success" /> :
 
@@ -332,7 +332,7 @@ const QueueSettings = () => {
             '--admin-card-border': settings.dev_mode_enabled ? 'rgba(239, 68, 68, 0.3)' : 'var(--mac-border)'
           }}
         >
-          <div className="admin-flex-between">
+          <div className="flex items-center justify-between">
             <div className="admin-flex-center-12">
               <Zap
                 className="admin-icon-24-dynamic"
@@ -361,12 +361,12 @@ const QueueSettings = () => {
               
               {settings.dev_mode_enabled ?
               <>
-                  <ToggleRight className="admin-icon-18" />
+                  <ToggleRight className="w-4.5 h-4.5" />
                   Включён
                 </> :
 
               <>
-                  <ToggleLeft className="admin-icon-18" />
+                  <ToggleLeft className="w-4.5 h-4.5" />
                   Выключен
                 </>
               }
@@ -377,16 +377,16 @@ const QueueSettings = () => {
         <div className="admin-grid-auto-400-24-mb-24">
 
           {/* Общие настройки */}
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
               <Settings className="admin-icon-20-blue" />
               Общие настройки
             </h3>
 
-            <div className="admin-flex-col-16">
+            <div className="flex flex-col gap-4">
               <div>
                 <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
-                  <Clock className="admin-icon-16" />
+                  <Clock className="w-4 h-4" />
                   Час начала онлайн-очереди
                 </label>
                 <Select
@@ -396,7 +396,7 @@ const QueueSettings = () => {
                     value: i,
                     label: `${String(i).padStart(2, '0')}:00`
                   }))}
-                  className="admin-w-full"></Select>
+                  className="w-full"></Select>
                 
                 <p className="admin-p-xs-tertiary-mt-4">
                   С этого времени доступна онлайн-запись через QR-код
@@ -404,14 +404,14 @@ const QueueSettings = () => {
               </div>
 
               <div>
-                <label className="admin-form-label">
+                <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                   Время автозакрытия
                 </label>
                 <Input
                   type="time"
                   value={settings.auto_close_time}
                   onChange={(e) => handleSettingChange('auto_close_time', e.target.value)}
-                  className="admin-w-full" />
+                  className="w-full" />
                 
                 <p className="admin-p-xs-tertiary-mt-4">
                   Автоматическое закрытие онлайн-записи (опционально)
@@ -419,27 +419,27 @@ const QueueSettings = () => {
               </div>
 
               <div>
-                <label className="admin-form-label">
+                <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                   Часовой пояс
                 </label>
                 <Select
                   value={settings.timezone}
                   onChange={(value) => handleSettingChange('timezone', value)}
                   options={TIMEZONE_OPTIONS}
-                  className="admin-w-full"></Select>
+                  className="w-full"></Select>
                 
               </div>
             </div>
           </MacOSCard>
 
           {/* Тестирование */}
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
               <TestTube className="admin-icon-20-success" />
               Тестирование очереди
             </h3>
 
-            <div className="admin-flex-col-16">
+            <div className="flex flex-col gap-4">
               <p className="admin-p-sm-secondary-m0">
                 Протестируйте генерацию QR-кода для каждой специальности
               </p>
@@ -468,7 +468,7 @@ const QueueSettings = () => {
                     {testing ?
                   <RefreshCw className="admin-icon-14-spin" /> :
 
-                  <Play className="admin-icon-14" />
+                  <Play className="w-3.5 h-3.5" />
                   }
                   </Button>
                 </div>
@@ -506,10 +506,10 @@ const QueueSettings = () => {
                 {specialty.name}
               </h3>
 
-              <div className="admin-flex-col-16">
+              <div className="flex flex-col gap-4">
                 <div>
                   <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
-                    <Hash className="admin-icon-16" />
+                    <Hash className="w-4 h-4" />
                     Стартовый номер
                 </label>
                   <Input
@@ -518,7 +518,7 @@ const QueueSettings = () => {
                   max="100"
                   value={getNumberSetting(settings.start_numbers, specialty.key, 1)}
                   onChange={(e) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
-                  className="admin-w-full" />
+                  className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
                     С какого номера начинается онлайн-очередь
@@ -527,7 +527,7 @@ const QueueSettings = () => {
 
                 <div>
                   <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
-                    <Users className="admin-icon-16" />
+                    <Users className="w-4 h-4" />
                     Лимит в день
                 </label>
                   <Input
@@ -536,7 +536,7 @@ const QueueSettings = () => {
                   max="100"
                   value={getNumberSetting(settings.max_per_day, specialty.key, 1)}
                   onChange={(e) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
-                  className="admin-w-full" />
+                  className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
                     Максимум онлайн-записей в день
@@ -546,7 +546,7 @@ const QueueSettings = () => {
                 {/* Текущие настройки */}
                 <div className="admin-section-divider-pt-16-border-top">
                   <div className="admin-flex-between-sm">
-                    <span className="admin-text-secondary">Диапазон номеров:</span>
+                    <span className="text-[var(--mac-text-secondary)]">Диапазон номеров:</span>
                     <div className="admin-range-badge">
                       {getNumberSetting(settings.start_numbers, specialty.key, 1)} - {getNumberSetting(settings.start_numbers, specialty.key, 1) + getNumberSetting(settings.max_per_day, specialty.key, 1) - 1}
                     </div>
@@ -560,7 +560,7 @@ const QueueSettings = () => {
         {/* Информационная панель */}
         <MacOSCard className="admin-card-info-p-24">
           <h3 className="admin-h3-lg-semi-info-mb-12-flex">
-            <QrCode className="admin-icon-20" />
+            <QrCode className="w-5 h-5" />
             Как работает онлайн-очередь
           </h3>
           <div className="admin-div-sm-info-flex-col-8">

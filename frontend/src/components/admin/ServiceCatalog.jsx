@@ -360,7 +360,7 @@ const ServiceCatalog = () => {
     return (
       <MacOSCard
         variant="default"
-        className="admin-p-24">
+        className="p-6">
 
         <div className="admin-flex-center-justify">
           <RefreshCw className="admin-spinner-20-mr-8" size={20} />
@@ -371,9 +371,9 @@ const ServiceCatalog = () => {
   }
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       {/* Заголовок */}
-      <div className="admin-flex-between">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="admin-page-h2-xl-semi-primary-m0">
             Справочник услуг
@@ -390,16 +390,16 @@ const ServiceCatalog = () => {
               onClick={() => setShowBatchEdit(true)}
               className="admin-btn-filter-active-catalog"
             >
-              <CheckSquare size={16} className="admin-mr-8" />
+              <CheckSquare size={16} className="mr-2" />
               Редактировать ({selectedServiceIds.size})
             </Button>
           )}
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw size={16} className="admin-mr-8" />
+            <RefreshCw size={16} className="mr-2" />
             Обновить
           </Button>
           <Button onClick={() => setShowAddForm(true)}>
-            <Plus size={16} className="admin-mr-8" />
+            <Plus size={16} className="mr-2" />
             Добавить услугу
           </Button>
         </div>
@@ -417,7 +417,7 @@ const ServiceCatalog = () => {
       {/* Фильтры */}
       <MacOSCard
         variant="default"
-        className="admin-p-24">
+        className="p-6">
 
         <div className="admin-grid-auto-250-12">
           <div>
@@ -488,9 +488,9 @@ const ServiceCatalog = () => {
       <div className="admin-grid-auto-200">
         <MacOSCard
           variant="default"
-          className="admin-p-24">
+          className="p-6">
 
-          <div className="admin-text-center">
+          <div className="text-center">
             <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-info)' }}>
               {services.length}
             </div>
@@ -501,9 +501,9 @@ const ServiceCatalog = () => {
         </MacOSCard>
         <MacOSCard
           variant="default"
-          className="admin-p-24">
+          className="p-6">
 
-          <div className="admin-text-center">
+          <div className="text-center">
             <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-success)' }}>
               {services.filter((s) => s.active).length}
             </div>
@@ -514,9 +514,9 @@ const ServiceCatalog = () => {
         </MacOSCard>
         <MacOSCard
           variant="default"
-          className="admin-p-24">
+          className="p-6">
 
-          <div className="admin-text-center">
+          <div className="text-center">
             <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>
               {categories.length}
             </div>
@@ -527,9 +527,9 @@ const ServiceCatalog = () => {
         </MacOSCard>
         <MacOSCard
           variant="default"
-          className="admin-p-24">
+          className="p-6">
 
-          <div className="admin-text-center">
+          <div className="text-center">
             <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>
               {filteredServices.length}
             </div>
@@ -589,7 +589,7 @@ const ServiceCatalog = () => {
                 className="admin-checkbox-cursor-pointer"
               />,
               service:
-              <div className="admin-flex-center">
+              <div className="flex items-center justify-center">
                   <SpecialtyIcon
                   size={20}
                   className="admin-specialty-icon-20"
@@ -682,7 +682,7 @@ const ServiceCatalog = () => {
                 'Добавьте первую услугу в справочник'}
                 action={
                 <Button onClick={() => setShowAddForm(true)}>
-                      <Plus className="admin-icon-16-mr-8" />
+                      <Plus className="w-4 h-4 mr-2" />
                       Добавить услугу
                     </Button>
                 } />
@@ -924,7 +924,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
 
   return (
-    <MacOSCard variant="default" className="admin-p-24">
+    <MacOSCard variant="default" className="p-6">
       <h3 className="admin-h3-18-600-primary-mb-20">
         {service ? 'Редактирование услуги' : 'Добавление услуги'}
       </h3>
@@ -953,7 +953,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         })}
       </div>
 
-      <form onSubmit={handleSubmit} className="admin-flex-col-16">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
         {/* TAB: Основное */}
         {activeTab === 'basic' &&
@@ -1088,7 +1088,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
         {/* TAB: Очередь */}
         {activeTab === 'queue' &&
-        <div className="admin-flex-col-16">
+        <div className="flex flex-col gap-4">
             <div className="admin-info-banner-catalog">
               <p className="admin-p-14-secondary-m0">
                 Выберите вкладку регистратуры, на которой будет отображаться эта услуга.
@@ -1126,7 +1126,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
         {/* TAB: Опции */}
         {activeTab === 'options' &&
-        <div className="admin-flex-col-16">
+        <div className="flex flex-col gap-4">
             <div className="admin-grid-auto-200-12">
               <Checkbox
               id="active"
@@ -1176,11 +1176,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
           </div>
           <div className="admin-form-row-gap-12">
             <Button type="button" variant="outline" onClick={onCancel}>
-              <X size={16} className="admin-mr-8" />
+              <X size={16} className="mr-2" />
               Отменить
             </Button>
             <Button type="submit">
-              <Save size={16} className="admin-mr-8" />
+              <Save size={16} className="mr-2" />
               Сохранить
             </Button>
           </div>

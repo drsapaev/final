@@ -178,9 +178,9 @@ const AllFreeApproval = () => {void
       variant="default"
       padding="default">
       
-      <div className="admin-flex-col-24">
+      <div className="flex flex-col gap-6">
         {/* Header */}
-        <div className="admin-flex-between">
+        <div className="flex items-center justify-between">
           <div>
             <h2 className="admin-fs-24-fw-700-primary-d-flex-ai-center-gap-8-m-0">
               <Bell size={24} className="admin-warning" />
@@ -198,7 +198,7 @@ const AllFreeApproval = () => {void
           
           <div className="admin-flex-center-12">
             {/* Фильтр по статусу */}
-            <div className="admin-flex-center-8">
+            <div className="flex items-center justify-center gap-2">
               <Filter size={16} className="admin-tertiary" />
               <Select
                 aria-label="Фильтр заявок All Free по статусу"

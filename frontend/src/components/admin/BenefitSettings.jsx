@@ -103,8 +103,8 @@ const BenefitSettings = () => {
   if (loading) {
     return (
       <div className="admin-benefit-container">
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-center-12 admin-mb-24">
+        <MacOSCard className="p-6">
+          <div className="admin-flex-center-12 mb-6">
             <Settings className="admin-icon-32-blue" />
             <h2 className="admin-benefit-h2">
               Настройки льгот
@@ -120,8 +120,8 @@ const BenefitSettings = () => {
   if (error && !settings.updated_at) {
     return (
       <div className="admin-benefit-container">
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-center-12 admin-mb-24">
+        <MacOSCard className="p-6">
+          <div className="admin-flex-center-12 mb-6">
             <Settings className="admin-icon-32-blue" />
             <h2 className="admin-benefit-h2">
               Настройки льгот
@@ -133,7 +133,7 @@ const BenefitSettings = () => {
             description="Проверьте подключение к серверу и попробуйте обновить страницу"
             action={
               <Button onClick={loadSettings} variant="primary">
-                <RefreshCw className="admin-icon-16-mr-8" />
+                <RefreshCw className="w-4 h-4 mr-2" />
                 Попробовать снова
               </Button>
             }
@@ -145,8 +145,8 @@ const BenefitSettings = () => {
 
   return (
     <div className="admin-benefit-container">
-      <MacOSCard className="admin-p-24">
-        <div className="admin-flex-col-24">
+      <MacOSCard className="p-6">
+        <div className="flex flex-col gap-6">
           {/* Критическая ошибка */}
           {error && (
             <Alert
@@ -214,10 +214,10 @@ const BenefitSettings = () => {
                 </div>
               </div>
 
-              <div className="admin-flex-col-16">
+              <div className="flex flex-col gap-4">
                 {/* Окно повторного визита */}
                 <div>
-                  <label className="admin-form-label">
+                  <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                     Окно повторного визита (дней)
                   </label>
                   <div className="admin-flex-center-12">
@@ -244,7 +244,7 @@ const BenefitSettings = () => {
 
                 {/* Скидка на повторный визит */}
                 <div>
-                  <label className="admin-form-label">
+                  <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                     Скидка на повторный визит (%)
                   </label>
                   <div className="admin-flex-center-12">
@@ -312,7 +312,7 @@ const BenefitSettings = () => {
                 </div>
               </div>
 
-              <div className="admin-flex-col-16">
+              <div className="flex flex-col gap-4">
                 {/* Льготные консультации бесплатны */}
                 <div>
                   <div className="admin-info-row">
@@ -387,10 +387,10 @@ const BenefitSettings = () => {
 
           {/* Действия */}
           <div className="admin-actions-bar">
-            <div className="admin-flex-center-8">
+            <div className="flex items-center justify-center gap-2">
               {hasChanges() && (
                 <div className="admin-unsaved-badge">
-                  <AlertCircle className="admin-icon-14" />
+                  <AlertCircle className="w-3.5 h-3.5" />
                   Есть несохранённые изменения
                 </div>
               )}
@@ -416,7 +416,7 @@ const BenefitSettings = () => {
                 {saving ? (
                   <RefreshCw className="admin-icon-16-spin-mr-8 admin-mr-0" />
                 ) : (
-                  <Save className="admin-icon-16" />
+                  <Save className="w-4 h-4" />
                 )}
                 {saving ? 'Сохранение...' : 'Сохранить настройки'}
               </Button>
@@ -468,27 +468,27 @@ const BenefitSettings = () => {
               Текущие настройки:
             </h4>
             <div className="admin-preview-grid">
-              <div className="admin-flex-center-8">
+              <div className="flex items-center justify-center gap-2">
                 <Calendar className="admin-icon-14-tertiary" />
-                <span className="admin-text-secondary">
+                <span className="text-[var(--mac-text-secondary)]">
                   Окно: {settings.repeat_visit_days} дней
                 </span>
               </div>
-              <div className="admin-flex-center-8">
+              <div className="flex items-center justify-center gap-2">
                 <DollarSign className="admin-icon-14-tertiary" />
-                <span className="admin-text-secondary">
+                <span className="text-[var(--mac-text-secondary)]">
                   Скидка: {settings.repeat_visit_discount}%
                 </span>
               </div>
-              <div className="admin-flex-center-8">
+              <div className="flex items-center justify-center gap-2">
                 <CheckCircle className="admin-icon-14-color" style={{ '--admin-icon-color': settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
-                <span className="admin-text-secondary">
+                <span className="text-[var(--mac-text-secondary)]">
                   Льготы: {settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
                 </span>
               </div>
-              <div className="admin-flex-center-8">
+              <div className="flex items-center justify-center gap-2">
                 <Shield className="admin-icon-14-color" style={{ '--admin-icon-color': settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-text-tertiary)' }} />
-                <span className="admin-text-secondary">
+                <span className="text-[var(--mac-text-secondary)]">
                   All Free: {settings.all_free_auto_approve ? 'Автоодобрение' : 'Ручное одобрение'}
                 </span>
               </div>
@@ -504,7 +504,7 @@ const BenefitSettings = () => {
         title="Подтверждение изменений"
         size="sm"
       >
-        <div className="admin-p-24">
+        <div className="p-6">
           <p className="admin-confirm-p">
             Вы собираетесь сохранить изменения в настройках льгот.
             Это повлияет на всех пользователей системы.
@@ -531,7 +531,7 @@ const BenefitSettings = () => {
                 </>
               ) : (
                 <>
-                  <Save className="admin-icon-16-mr-8" />
+                  <Save className="w-4 h-4 mr-2" />
                   Подтвердить
                 </>
               )}

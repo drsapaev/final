@@ -201,7 +201,7 @@ const SecuritySettings = ({
 
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       {/* Вкладки */}
       <SegmentedControl
         value={activeTab}
@@ -210,7 +210,7 @@ const SecuritySettings = ({
           value: id,
           label: (
             <span className="admin-inline-flex-ai-center-gap-6">
-              <TabIcon className="admin-icon-14" />
+              <TabIcon className="w-3.5 h-3.5" />
               {label}
             </span>
           )
@@ -219,14 +219,14 @@ const SecuritySettings = ({
         className="admin-wrap-rgap-4" />
       
 
-      <form onSubmit={handleSubmit} className="admin-flex-col-24">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         {/* Смена пароля */}
         {activeTab === 'password' &&
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
               Смена пароля
             </h3>
-            <div className="admin-flex-col-16">
+            <div className="flex flex-col gap-4">
               <div>
                 <label className="admin-block-sm-med-mb-8-primary">
                   Текущий пароль *
@@ -247,12 +247,12 @@ const SecuritySettings = ({
                   aria-label={showPasswords.current ? 'Скрыть текущий пароль' : 'Показать текущий пароль'}
                   className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
-                    {showPasswords.current ? <EyeOff className="admin-icon-16" /> : <Eye className="admin-icon-16" />}
+                    {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 {errors.currentPassword &&
               <p className="admin-sm-danger-mt-4-flex-ai-center-gap-4">
-                    <AlertCircle className="admin-icon-16" />
+                    <AlertCircle className="w-4 h-4" />
                     {errors.currentPassword}
                   </p>
               }
@@ -278,12 +278,12 @@ const SecuritySettings = ({
                   aria-label={showPasswords.new ? 'Скрыть новый пароль' : 'Показать новый пароль'}
                   className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
-                    {showPasswords.new ? <EyeOff className="admin-icon-16" /> : <Eye className="admin-icon-16" />}
+                    {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 {errors.newPassword &&
               <p className="admin-sm-danger-mt-4-flex-ai-center-gap-4">
-                    <AlertCircle className="admin-icon-16" />
+                    <AlertCircle className="w-4 h-4" />
                     {errors.newPassword}
                   </p>
               }
@@ -309,12 +309,12 @@ const SecuritySettings = ({
                   aria-label={showPasswords.confirm ? 'Скрыть подтверждение пароля' : 'Показать подтверждение пароля'}
                   className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
-                    {showPasswords.confirm ? <EyeOff className="admin-icon-16" /> : <Eye className="admin-icon-16" />}
+                    {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 {errors.confirmPassword &&
               <p className="admin-sm-danger-mt-4-flex-ai-center-gap-4">
-                    <AlertCircle className="admin-icon-16" />
+                    <AlertCircle className="w-4 h-4" />
                     {errors.confirmPassword}
                   </p>
               }
@@ -325,11 +325,11 @@ const SecuritySettings = ({
 
         {/* Двухфакторная аутентификация */}
         {activeTab === 'two-factor' &&
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
               Двухфакторная аутентификация
             </h3>
-            <div className="admin-flex-col-16">
+            <div className="flex flex-col gap-4">
               <div className="admin-flex-ai-center-jc-between-p-16-radius-var--mac-radius-md-bd-1solidvar-mac--d38da58b">
                 <div>
                   <h4 className="admin-base-med-primary-mb-4">
@@ -368,7 +368,7 @@ const SecuritySettings = ({
 
         {/* Активные сессии */}
         {activeTab === 'sessions' &&
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
             <div className="admin-flex-ai-center-jc-between-mb-20">
               <h3 className="admin-lg-semi-primary-m-0">
                 Активные сессии
@@ -379,12 +379,12 @@ const SecuritySettings = ({
               disabled={activeSessions.length === 0}
               size="sm">
               
-                <Trash2 className="admin-icon-16-mr-8" />
+                <Trash2 className="w-4 h-4 mr-2" />
                 Завершить все остальные
               </Button>
             </div>
 
-            <div className="admin-flex-col-12">
+            <div className="flex flex-col gap-3">
               {activeSessions.length === 0 &&
               <p className="admin-sm-secondary-m-0">
                 Нет backend-данных об активных сессиях.
@@ -421,7 +421,7 @@ const SecuritySettings = ({
                 aria-label="Terminate this session"
                 className="admin-danger-bd-danger">
                 
-                      <Trash2 className="admin-icon-16" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
               }
                 </div>
@@ -432,7 +432,7 @@ const SecuritySettings = ({
 
         {/* Настройки безопасности */}
         {activeTab === 'security' &&
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
               Настройки безопасности
             </h3>
@@ -490,7 +490,7 @@ const SecuritySettings = ({
               </div>
             </div>
 
-            <div className="admin-flex-col-16">
+            <div className="flex flex-col gap-4">
               <Checkbox
               checked={formData.passwordRequireUppercase}
               onChange={(checked) => handleChange('passwordRequireUppercase', checked)}
@@ -520,12 +520,12 @@ const SecuritySettings = ({
 
         {/* Логи безопасности */}
         {activeTab === 'audit' &&
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
               Логи безопасности
             </h3>
 
-            <div className="admin-flex-col-12">
+            <div className="flex flex-col gap-3">
               {securityLogs.length === 0 &&
               <p className="admin-sm-secondary-m-0">
                 Нет backend-данных о событиях безопасности.
@@ -550,7 +550,7 @@ const SecuritySettings = ({
                       </div>
                     </div>
 
-                    <div className="admin-flex-center-8">
+                    <div className="flex items-center justify-center gap-2">
                       <Badge
                       variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}
                       size="sm">
@@ -570,7 +570,7 @@ const SecuritySettings = ({
 
         {/* Кнопки действий */}
         <div className="admin-flex-ai-center-jc-between-pt-24-bordertop-6787ca">
-          <div className="admin-text-sm admin-text-secondary">
+          <div className="text-sm text-[var(--mac-text-secondary)]">
             Настройки безопасности сохраняются после нажатия «Сохранить»
           </div>
 
@@ -584,7 +584,7 @@ const SecuritySettings = ({
               }}
               disabled={isSubmitting}>
               
-              <RefreshCw className="admin-icon-16-mr-8" />
+              <RefreshCw className="w-4 h-4 mr-2" />
               Сбросить
             </Button>
 
@@ -593,7 +593,7 @@ const SecuritySettings = ({
               disabled={isSubmitting || loading}
               loading={isSubmitting}>
               
-              <Save className="admin-icon-16-mr-8" />
+              <Save className="w-4 h-4 mr-2" />
               Сохранить настройки
             </Button>
           </div>

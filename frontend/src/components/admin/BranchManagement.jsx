@@ -256,19 +256,19 @@ const BranchManagement = () => {
         </div>
         {stats &&
         <div className="admin-d-flex-gap-24-fw-wrap-1">
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-blue-mb-4-1">
                 {stats.total_branches}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Всего филиалов
               </div>
             </div>
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-success-mb-4-1">
                 {stats.active_branches}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Активных
               </div>
             </div>
@@ -286,7 +286,7 @@ const BranchManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <div className="admin-d-flex-fd-column-gap-16-fw-wrap-1">
           <div className="admin-flex-1-pos-relative">
             <Input
@@ -314,7 +314,7 @@ const BranchManagement = () => {
               onClick={() => setShowAddForm(true)}
               className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px-1">
               
-              <Plus aria-hidden="true" className="admin-icon-16" />
+              <Plus aria-hidden="true" className="w-4 h-4" />
               <span>Добавить филиал</span>
             </Button>
           </div>
@@ -337,13 +337,13 @@ const BranchManagement = () => {
               setEditingBranch(null);
               resetForm();
             }}
-            className="admin-p-8">
+            className="p-2">
 
-              <X aria-hidden="true" className="admin-icon-16" />
+              <X aria-hidden="true" className="w-4 h-4" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} className="admin-flex-col-16">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-1">
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-17">
@@ -490,7 +490,7 @@ const BranchManagement = () => {
                   </> :
 
               <>
-                    <Save aria-hidden="true" className="admin-icon-16" />
+                    <Save aria-hidden="true" className="w-4 h-4" />
                     {editingBranch ? 'Обновить' : 'Создать'}
                   </>
               }
@@ -504,7 +504,7 @@ const BranchManagement = () => {
       {loading ?
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-3">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} className="admin-p-24">
+        <MacOSCard key={i} className="p-6">
               <Skeleton height="200px" />
             </MacOSCard>
         )}
@@ -516,7 +516,7 @@ const BranchManagement = () => {
         description={branchEmptyDescription}
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" focusable="false" className="admin-icon-16-mr-8" />
+              <Plus aria-hidden="true" focusable="false" className="w-4 h-4 mr-2" />
               Добавить филиал
             </Button>
         } /> :
@@ -524,7 +524,7 @@ const BranchManagement = () => {
 
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-2">
           {filteredBranches.map((branch) =>
-        <MacOSCard key={branch.id} className="admin-p-24">
+        <MacOSCard key={branch.id} className="p-6">
               <div className="admin-d-flex-jc-between-ai-start-mb-16-1">
                 <div>
                   <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0-1">
@@ -543,30 +543,30 @@ const BranchManagement = () => {
               <div className="admin-d-flex-fd-column-gap-8-mb-16-1">
                 {branch.address &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-7">
-                    <MapPin aria-hidden="true" className="admin-icon-16" />
+                    <MapPin aria-hidden="true" className="w-4 h-4" />
                     <span>{branch.address}</span>
                   </div>
             }
                 {branch.phone &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-6">
-                    <Phone aria-hidden="true" className="admin-icon-16" />
+                    <Phone aria-hidden="true" className="w-4 h-4" />
                     <span>{formatBranchPhone(branch.phone)}</span>
                   </div>
             }
                 {branch.email &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-5">
-                    <Mail aria-hidden="true" className="admin-icon-16" />
+                    <Mail aria-hidden="true" className="w-4 h-4" />
                     <span>{branch.email}</span>
                   </div>
             }
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-4">
-                  <Users aria-hidden="true" className="admin-icon-16" />
+                  <Users aria-hidden="true" className="w-4 h-4" />
                   <span>Вместимость: {branch.capacity}</span>
                 </div>
               </div>
 
               {branch.services_available && branch.services_available.length > 0 &&
-          <div className="admin-mb-16">
+          <div className="mb-4">
                   <p className="admin-fs-sm-fw-med-primary-mb-8">
                     Услуги:
                   </p>
@@ -594,7 +594,7 @@ const BranchManagement = () => {
               onClick={() => handleEdit(branch)}
               className="admin-p-6px-12px-1">
 
-                  <Edit aria-hidden="true" className="admin-icon-16" />
+                  <Edit aria-hidden="true" className="w-4 h-4" />
                 </Button>
                 <Button
               type="button"
@@ -603,7 +603,7 @@ const BranchManagement = () => {
               onClick={() => handleDelete(branch.id)}
               className="admin-p-6px-12px-error-bd-c-error-1">
               
-                  <Trash2 aria-hidden="true" className="admin-icon-16" />
+                  <Trash2 aria-hidden="true" className="w-4 h-4" />
                 </Button>
               </div>
             </MacOSCard>

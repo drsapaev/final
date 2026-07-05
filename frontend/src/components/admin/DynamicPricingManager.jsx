@@ -380,9 +380,9 @@ const DynamicPricingManager = () => {
   };
 
   const renderRulesTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Заголовок и кнопки */}
-      <div className="admin-flex-between">
+      <div className="flex items-center justify-between">
         <div>
           <h3 className="admin-section-h3">
             Правила ценообразования
@@ -395,14 +395,14 @@ const DynamicPricingManager = () => {
           <Button
           onClick={handleUpdateDynamicPrices}
           variant="outline"
-          className="admin-flex-center-8">
+          className="flex items-center justify-center gap-2">
           
             <TrendingUp size={16} />
             Обновить цены
           </Button>
           <Button
           onClick={() => setShowCreateRule(true)}
-          className="admin-flex-center-8">
+          className="flex items-center justify-center gap-2">
           
             <Plus size={16} />
             Создать правило
@@ -419,14 +419,14 @@ const DynamicPricingManager = () => {
         description="В системе пока нет созданных правил ценообразования"
         action={
         <Button onClick={() => setShowCreateRule(true)}>
-                <Plus size={16} className="admin-mr-8" />
+                <Plus size={16} className="mr-2" />
                 Создать первое правило
               </Button>
         } /> :
 
 
       pricingRules.map((rule) =>
-      <MacOSCard key={rule.id} className="admin-p-0">
+      <MacOSCard key={rule.id} className="p-0">
               <div className="admin-card-header-flex-start">
                 <div className="admin-flex-1">
                   <div className="admin-card-title-badges">
@@ -509,7 +509,7 @@ const DynamicPricingManager = () => {
 
       {/* Форма создания правила */}
       {showCreateRule &&
-    <MacOSCard className="admin-p-24">
+    <MacOSCard className="p-6">
           <div className="admin-card-header-between">
             <h4 className="admin-section-h3-m0">
               Создать правило ценообразования
@@ -526,7 +526,7 @@ const DynamicPricingManager = () => {
 
           <div className="admin-grid-form-2col">
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Название
               </label>
               <Input
@@ -537,7 +537,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Тип правила
               </label>
               <Select
@@ -548,7 +548,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Тип скидки
               </label>
               <Select
@@ -559,7 +559,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Размер скидки
               </label>
               <Input
@@ -571,7 +571,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Время начала
               </label>
               <Input
@@ -582,7 +582,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Время окончания
               </label>
               <Input
@@ -593,7 +593,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Минимальное количество
               </label>
               <Input
@@ -605,7 +605,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Приоритет
               </label>
               <Input
@@ -617,7 +617,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div className="admin-grid-span-2">
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Описание
               </label>
               <Textarea
@@ -628,7 +628,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div className="admin-grid-span-2">
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Услуги
               </label>
               <ServiceChecklist
@@ -644,7 +644,7 @@ const DynamicPricingManager = () => {
               Отмена
             </Button>
             <Button onClick={handleCreateRule}>
-              <Save size={16} className="admin-mr-8" />
+              <Save size={16} className="mr-2" />
               Создать
             </Button>
           </div>
@@ -654,9 +654,9 @@ const DynamicPricingManager = () => {
 
 
   const renderPackagesTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Заголовок и кнопки */}
-      <div className="admin-flex-between">
+      <div className="flex items-center justify-between">
         <div>
           <h3 className="admin-section-h3">
             Пакеты услуг
@@ -667,7 +667,7 @@ const DynamicPricingManager = () => {
         </div>
         <Button
         onClick={() => setShowCreatePackage(true)}
-        className="admin-flex-center-8">
+        className="flex items-center justify-center gap-2">
         
           <Plus size={16} />
           Создать пакет
@@ -683,14 +683,14 @@ const DynamicPricingManager = () => {
         description="В системе пока нет созданных пакетов услуг"
         action={
         <Button onClick={() => setShowCreatePackage(true)}>
-                <Plus size={16} className="admin-mr-8" />
+                <Plus size={16} className="mr-2" />
                 Создать первый пакет
               </Button>
         } /> :
 
 
       servicePackages.map((pkg) =>
-      <MacOSCard key={pkg.id} className="admin-p-0">
+      <MacOSCard key={pkg.id} className="p-0">
               <div className="admin-card-header-flex-start">
                 <div className="admin-flex-1">
                   <div className="admin-card-title-badges">
@@ -721,7 +721,7 @@ const DynamicPricingManager = () => {
                         Экономия {pkg.savings_percentage.toFixed(0)}%
                       </Badge>
               }
-                    <span className="admin-text-secondary">
+                    <span className="text-[var(--mac-text-secondary)]">
                       Покупок: {pkg.current_purchases || 0}
                       {pkg.max_purchases && ` / ${pkg.max_purchases}`}
                     </span>
@@ -766,7 +766,7 @@ const DynamicPricingManager = () => {
 
       {/* Форма создания пакета */}
       {showCreatePackage &&
-    <MacOSCard className="admin-p-24">
+    <MacOSCard className="p-6">
           <div className="admin-card-header-between">
             <h4 className="admin-section-h3-m0">
               Создать пакет услуг
@@ -783,7 +783,7 @@ const DynamicPricingManager = () => {
 
           <div className="admin-grid-form-2col">
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Название
               </label>
               <Input
@@ -794,7 +794,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Цена пакета
               </label>
               <Input
@@ -806,7 +806,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Действует с
               </label>
               <Input
@@ -817,7 +817,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Действует до
               </label>
               <Input
@@ -828,7 +828,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div className="admin-grid-span-2">
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Описание
               </label>
               <Textarea
@@ -839,7 +839,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div className="admin-grid-span-2">
-              <label className="admin-form-label">
+              <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
                 Услуги в пакете
               </label>
               <ServiceChecklist
@@ -855,7 +855,7 @@ const DynamicPricingManager = () => {
               Отмена
             </Button>
             <Button onClick={handleCreatePackage}>
-              <Save size={16} className="admin-mr-8" />
+              <Save size={16} className="mr-2" />
               Создать
             </Button>
           </div>
@@ -865,7 +865,7 @@ const DynamicPricingManager = () => {
 
 
   const renderAnalyticsTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       <div>
         <h3 className="admin-section-h3">
           Аналитика ценообразования
@@ -877,7 +877,7 @@ const DynamicPricingManager = () => {
 
       {analytics ?
     <div className="admin-grid-auto-300">
-          <MacOSCard className="admin-p-0">
+          <MacOSCard className="p-0">
             <div className="admin-card-title-badges">
               <TrendingUp size={20} color="var(--mac-accent)" />
               <h4 className="admin-rule-header">
@@ -893,7 +893,7 @@ const DynamicPricingManager = () => {
             </p>
           </MacOSCard>
 
-          <MacOSCard className="admin-p-0">
+          <MacOSCard className="p-0">
             <div className="admin-card-title-badges">
               <Settings size={20} color="var(--mac-purple)" />
               <h4 className="admin-rule-header">
@@ -908,7 +908,7 @@ const DynamicPricingManager = () => {
             </p>
           </MacOSCard>
 
-          <MacOSCard className="admin-p-0">
+          <MacOSCard className="p-0">
             <div className="admin-card-title-badges">
               <Package size={20} color="var(--mac-orange)" />
               <h4 className="admin-rule-header">
@@ -932,21 +932,21 @@ const DynamicPricingManager = () => {
     }
 
       {analytics?.rules_statistics &&
-    <MacOSCard className="admin-p-16">
-          <h4 className="admin-rule-header admin-mb-16">
+    <MacOSCard className="p-4">
+          <h4 className="admin-rule-header mb-4">
             Статистика правил
           </h4>
-          <div className="admin-flex-col-8">
+          <div className="flex flex-col gap-2">
             {analytics.rules_statistics.map((rule, index) =>
         <div key={index} className="admin-stat-list-row">
                 <span className="admin-text-med-primary">
                   {rule.name}
                 </span>
                 <div className="admin-flex-center-16-sm">
-                  <span className="admin-text-secondary">
+                  <span className="text-[var(--mac-text-secondary)]">
                     Использований: {rule.uses}
                   </span>
-                  <span className="admin-text-success">
+                  <span className="text-[var(--mac-success)]">
                     Экономия: {rule.total_savings?.toLocaleString() || 0} ₽
                   </span>
                 </div>
@@ -957,21 +957,21 @@ const DynamicPricingManager = () => {
     }
 
       {analytics?.packages_statistics &&
-    <MacOSCard className="admin-p-16">
-          <h4 className="admin-rule-header admin-mb-16">
+    <MacOSCard className="p-4">
+          <h4 className="admin-rule-header mb-4">
             Статистика пакетов
           </h4>
-          <div className="admin-flex-col-8">
+          <div className="flex flex-col gap-2">
             {analytics.packages_statistics.map((pkg, index) =>
         <div key={index} className="admin-stat-list-row">
                 <span className="admin-text-med-primary">
                   {pkg.name}
                 </span>
                 <div className="admin-flex-center-16-sm">
-                  <span className="admin-text-secondary">
+                  <span className="text-[var(--mac-text-secondary)]">
                     Покупок: {pkg.purchases}
                   </span>
-                  <span className="admin-text-success">
+                  <span className="text-[var(--mac-success)]">
                     Экономия: {pkg.total_savings?.toLocaleString() || 0} ₽
                   </span>
                 </div>
@@ -991,7 +991,7 @@ const DynamicPricingManager = () => {
 
   return (
     <div className="admin-p-0-max-1400">
-      <div className="admin-flex-center-16 admin-mb-24">
+      <div className="admin-flex-center-16 mb-6">
         <Package size={24} color="var(--mac-accent)" />
         <div>
           <h2 className="admin-page-title">
