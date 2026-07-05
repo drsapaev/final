@@ -377,7 +377,7 @@ const AIAssistant = ({
               <Typography variant="subtitle2" gutterBottom>Коды МКБ-10:</Typography>
               <div>
                 {result.suggestions.map((item, idx) =>
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--mac-spacing-2) 0', borderBottom: '1px solid var(--mac-border)' }}>
                     <div>
                       {`${item.code} - ${item.name || item.description}`}
                       {item.relevance &&
@@ -413,7 +413,7 @@ const AIAssistant = ({
     return (
       <div>
         {result.map((item, idx) =>
-        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
+        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--mac-spacing-2) 0', borderBottom: '1px solid var(--mac-border)' }}>
             <div>
               {`${item.code} - ${item.name || item.description}`}
               {item.relevance &&
