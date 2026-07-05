@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Heart,

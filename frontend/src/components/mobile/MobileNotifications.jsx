@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellOff, Settings, Check } from 'lucide-react';
 import { Button, Card, Badge } from '../ui/macos';

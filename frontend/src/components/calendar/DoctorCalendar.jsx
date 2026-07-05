@@ -3,6 +3,7 @@
  * Календарь врача для просмотра расписания и записей на приём
  * Интегрируется с schedule API endpoints
  */
+import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar,

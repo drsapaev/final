@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
 import { Card, Button } from '../ui/macos';
 import {
@@ -55,7 +56,7 @@ const SMSEmail2FA = ({
     setSuccess('');
 
     try {
-      const response = await fetch('/api/v1/2fa/send-code', {
+      const response = await api.post('/2fa/send-code', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -95,7 +96,7 @@ const SMSEmail2FA = ({
     setError('');
 
     try {
-      const response = await fetch('/api/v1/2fa/verify-code', {
+      const response = await api.post('/2fa/verify-code', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

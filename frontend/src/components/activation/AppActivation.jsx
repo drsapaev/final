@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useState } from 'react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -30,7 +31,7 @@ const AppActivation = () => {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/v1/activation/activate', {
+      const response = await api.post('/activation/activate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

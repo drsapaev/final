@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useState } from 'react';
 import { Card, Button } from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
@@ -80,7 +81,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/2fa/setup', {
+      const response = await api.post('/2fa/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +121,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/2fa/verify-setup', {
+      const response = await api.post('/2fa/verify-setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
