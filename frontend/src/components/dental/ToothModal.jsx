@@ -79,15 +79,15 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px',
+    gap: 'var(--mac-spacing-3)',
   },
   title: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '17px',
+    fontSize: 'var(--mac-font-size-xl)',
     fontWeight: 600,
   },
   content: {
@@ -103,16 +103,16 @@ const styles = {
   sectionTitle: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '15px',
+    fontSize: 'var(--mac-font-size-lg)',
     fontWeight: 600,
   },
   buttonGrid: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
   },
   twoColumnGrid: {
     display: 'grid',
@@ -121,7 +121,7 @@ const styles = {
   },
   list: {
     display: 'grid',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     margin: 0,
     padding: 0,
     listStyle: 'none',
@@ -155,13 +155,13 @@ const styles = {
   itemTitle: {
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '14px',
+    fontSize: 'var(--mac-font-size-base)',
     fontWeight: 600,
   },
   itemMeta: {
     margin: '3px 0 0',
     color: 'var(--mac-text-secondary)',
-    fontSize: '12px',
+    fontSize: 'var(--mac-font-size-xs)',
   },
   iconButton: {
     display: 'inline-flex',
@@ -181,7 +181,7 @@ const styles = {
     gap: '10px',
     alignItems: 'center',
     color: 'var(--mac-text-primary)',
-    fontSize: '13px',
+    fontSize: 'var(--mac-font-size-sm)',
   },
   divider: {
     height: '1px',
@@ -190,14 +190,14 @@ const styles = {
   totalTitle: {
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '17px',
+    fontSize: 'var(--mac-font-size-xl)',
     fontWeight: 600,
   },
   totalCaption: {
     display: 'block',
     marginTop: '6px',
     color: 'var(--mac-text-secondary)',
-    fontSize: '12px',
+    fontSize: 'var(--mac-font-size-xs)',
   },
 };
 

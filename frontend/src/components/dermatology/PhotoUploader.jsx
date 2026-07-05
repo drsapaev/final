@@ -384,7 +384,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   padding: 4,
                   backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
                   color: 'white',
-                  fontSize: '12px',
+                  fontSize: 'var(--mac-font-size-xs)',
                   borderRadius: '0 0 8px 8px'
                 }}>
                       {photo.metadata.zone || 'Без зоны'}
@@ -493,7 +493,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   padding: 4,
                   backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
                   color: 'white',
-                  fontSize: '12px',
+                  fontSize: 'var(--mac-font-size-xs)',
                   borderRadius: '0 0 8px 8px'
                 }}>
                       {photo.metadata.zone || 'Без зоны'}

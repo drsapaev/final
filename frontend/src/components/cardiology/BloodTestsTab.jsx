@@ -90,7 +90,7 @@ export function BloodTestsTab({
           placeholder={placeholder}
         />
         {isError && (
-          <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: '500' }}>
+          <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-medium)' }}>
             {warning.message}
           </div>
         )}
@@ -99,11 +99,11 @@ export function BloodTestsTab({
   };
 
   return (
-    <div className="cardio-flex-col-visible" style={{ gap: '24px' }}>
+    <div className="cardio-flex-col-visible" style={{ gap: 'var(--mac-spacing-6)' }}>
       {/* Header */}
       <MacOSCard className="cardio-card-padded">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('lg') }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', fontSize: getFontSize('lg'), fontWeight: '500', color: getColor('text') }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', fontSize: getFontSize('lg'), fontWeight: 'var(--mac-font-weight-medium)', color: getColor('text') }}>
             <TestTube size={20} style={{ marginRight: getSpacing('sm'), color: getColor('secondary', 600) }} />
             Анализы крови
           </h3>
@@ -122,7 +122,7 @@ export function BloodTestsTab({
                 border: `1px solid ${it.critical ? 'var(--mac-danger)' : getColor('border')}`,
                 backgroundColor: it.critical ? 'var(--mac-error-bg)' : getColor('surface'),
                 color: getColor('text'),
-                borderRadius: '8px',
+                borderRadius: 'var(--mac-radius-md)',
               }}>
                 <div style={{ fontSize: getFontSize('sm'), color: it.critical ? 'var(--mac-danger)' : getColor('textSecondary'), marginBottom: getSpacing('xs') }}>
                   {it.label}
@@ -142,15 +142,15 @@ export function BloodTestsTab({
         {bloodTests.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
             {bloodTests.map((test) => (
-              <div key={test.id} style={{ padding: getSpacing('lg'), border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), borderRadius: '8px' }}>
+              <div key={test.id} style={{ padding: getSpacing('lg'), border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), borderRadius: 'var(--mac-radius-md)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: getSpacing('sm') }}>
-                  <h4 style={{ fontSize: getFontSize('base'), fontWeight: '500', color: getColor('text') }}>Анализ #{test.id}</h4>
+                  <h4 style={{ fontSize: getFontSize('base'), fontWeight: 'var(--mac-font-weight-medium)', color: getColor('text') }}>Анализ #{test.id}</h4>
                   <Badge variant="info">{test.test_date}</Badge>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: getSpacing('lg'), fontSize: getFontSize('sm'), color: getColor('textSecondary'), marginBottom: getSpacing('sm') }}>
                   <div>🩸 Холестерин: {test.cholesterol_total} мг/дл</div>
                   <div>HDL: {test.cholesterol_hdl}</div>
-                  <div style={isLdlCritical(test.cholesterol_ldl) ? { color: 'var(--mac-error)', fontWeight: '600' } : undefined}>
+                  <div style={isLdlCritical(test.cholesterol_ldl) ? { color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-semibold)' } : undefined}>
                     LDL: {test.cholesterol_ldl}
                     {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>⚠ критический</span>}
                   </div>
@@ -162,7 +162,7 @@ export function BloodTestsTab({
                   <div>Тропонин: {test.troponin} нг/мл</div>
                 </div>
                 {test.interpretation && (
-                  <div style={{ marginTop: getSpacing('sm'), padding: getSpacing('sm'), background: getColor('surfaceSecondary'), borderRadius: '4px', fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
+                  <div style={{ marginTop: getSpacing('sm'), padding: getSpacing('sm'), background: getColor('surfaceSecondary'), borderRadius: 'var(--mac-radius-sm)', fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
                     {test.interpretation}
                   </div>
                 )}
@@ -183,7 +183,7 @@ export function BloodTestsTab({
       {/* Blood test form */}
       {showFormOpen && (
         <MacOSCard className="cardio-card-padded">
-          <h3 style={{ fontSize: getFontSize('lg'), fontWeight: '500', marginBottom: getSpacing('lg'), color: getColor('text') }}>
+          <h3 style={{ fontSize: getFontSize('lg'), fontWeight: 'var(--mac-font-weight-medium)', marginBottom: getSpacing('lg'), color: getColor('text') }}>
             Новый анализ крови
           </h3>
           <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
@@ -221,7 +221,7 @@ export function BloodTestsTab({
                   placeholder="<100"
                 />
                 {isLdlCritical(bloodTestForm.cholesterol_ldl) && (
-                  <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: '500' }}>
+                  <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                     LDL превышает порог {settings?.ldlThreshold ?? 100} мг/дл — рекомендуется интенсивная терапия статинами.
                   </div>
                 )}

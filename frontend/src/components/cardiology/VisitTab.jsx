@@ -33,7 +33,7 @@ export function VisitTab({
           title="Выберите визит"
           description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
           action={
-            <Button variant="outline" onClick={onGoToAppointments} style={{ marginTop: '16px' }}>
+            <Button variant="outline" onClick={onGoToAppointments} style={{ marginTop: 'var(--mac-spacing-4)' }}>
               Перейти к записям
             </Button>
           }
@@ -43,7 +43,7 @@ export function VisitTab({
   }
 
   return (
-    <div className="cardio-flex-col-visible" style={{ gap: '24px' }}>
+    <div className="cardio-flex-col-visible" style={{ gap: 'var(--mac-spacing-6)' }}>
       {/* Patient info card */}
       <MacOSCard className="cardio-card-padded">
         <h3 className="cardio-section-heading">
@@ -71,21 +71,21 @@ export function VisitTab({
         {/* P-019: EMR audit badge */}
         {emr && (
           <div className="cardio-emr-audit-badge" style={{
-            marginTop: '12px',
+            marginTop: 'var(--mac-spacing-3)',
             padding: '8px 12px',
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
-            gap: '12px',
+            gap: 'var(--mac-spacing-3)',
             fontSize: getFontSize('sm'),
             color: getColor('textSecondary'),
             background: emr.status === 'signed' ? 'var(--mac-success-bg, #f0fdf4)' : 'var(--mac-surface-secondary, #f8fafc)',
             border: `1px solid ${emr.status === 'signed' ? 'var(--mac-success-border, #bbf7d0)' : getColor('border')}`,
-            borderRadius: '8px',
+            borderRadius: 'var(--mac-radius-md)',
           }}>
-            <span style={{ fontWeight: '600', color: getColor('text') }}>EMR #{emr.id ?? '—'}</span>
+            <span style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: getColor('text') }}>EMR #{emr.id ?? '—'}</span>
             <span style={{
-              padding: '2px 8px', borderRadius: '4px', fontWeight: '600', fontSize: '11px',
+              padding: '2px 8px', borderRadius: 'var(--mac-radius-sm)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-xs)',
               textTransform: 'uppercase', letterSpacing: '0.5px',
               background: emr.status === 'signed' ? 'var(--mac-success)' : emr.status === 'amended' ? '#ca8a04' : '#6b7280',
               color: '#ffffff',
@@ -123,7 +123,7 @@ export function VisitTab({
 
       {/* Action buttons */}
       <MacOSCard className="cardio-card-padded">
-        <div className="flex justify-end" style={{ gap: '12px' }}>
+        <div className="flex justify-end" style={{ gap: 'var(--mac-spacing-3)' }}>
           <Button variant="outline" onClick={onCancel}>Отменить</Button>
           <Button onClick={onComplete} disabled={loading}>
             {loading ? <RefreshCw size={16} className="cardio-icon-mr" /> : <Save size={16} className="cardio-icon-mr" />}
