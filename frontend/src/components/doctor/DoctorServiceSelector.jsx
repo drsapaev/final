@@ -18,7 +18,7 @@ import {
 'lucide-react';
 import {
   MacOSCard, Button, Skeleton,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';

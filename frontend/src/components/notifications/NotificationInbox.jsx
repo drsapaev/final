@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   Select,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
 

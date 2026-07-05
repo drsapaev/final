@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { CheckCircle, XCircle } from 'lucide-react';
 import {
   Button,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import notify from '../../services/notify';
 
 /**

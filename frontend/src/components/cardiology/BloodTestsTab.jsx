@@ -18,7 +18,7 @@
 import PropTypes from 'prop-types';
 import { TestTube, Plus, Save } from 'lucide-react';
 import { Button, Textarea, Badge, MacOSCard,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 
 /**
  * @param {Object} props

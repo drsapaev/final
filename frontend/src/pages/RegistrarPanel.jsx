@@ -6,7 +6,7 @@ import AppointmentContextMenu from '../components/tables/AppointmentContextMenu'
 import ModernTabs from '../components/navigation/ModernTabs';
 import {
   Button, Badge, Icon,
-  Input} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import { AnimatedLoader } from '../components/ui';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';

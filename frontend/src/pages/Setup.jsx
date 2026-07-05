@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Check, X, ArrowLeft, AlertTriangle } from 'lucide-react';
 import {
   Button, MacOSCard,
-  Input} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import { initializeSetup } from '../api/setup';
 import { getCanonicalRouteById } from '../routing/routeSelectors';
 import logger from '../utils/logger';

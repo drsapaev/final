@@ -9,7 +9,7 @@ import {
   CardContent,
   Typography,
   Badge,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   ArrowLeftRight,
 

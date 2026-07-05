@@ -116,7 +116,7 @@ describe('QueueJoin Accessibility & UX', () => {
 
     fireEvent.change(screen.getByLabelText(/фио/i), { target: { value: 'Тест Пациент' } });
     fireEvent.change(screen.getByLabelText(/номер телефона/i), { target: { value: '+998 (90)' } });
-    fireEvent.click(screen.getByRole('button', { name: /қўшилиш/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Присоединиться/i }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/телефон указан не полностью/i);
@@ -194,7 +194,7 @@ describe('QueueJoin Accessibility & UX', () => {
     fireEvent.change(screen.getByLabelText(/номер телефона/i), {
       target: { value: '+998 (90) 123-45-67' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /қўшилиш/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Присоединиться/i }));
 
     await screen.findByText(/Вы в очереди!/i);
     expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledWith(

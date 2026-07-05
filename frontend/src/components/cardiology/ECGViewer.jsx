@@ -15,7 +15,7 @@ import {
   DialogContent,
   DialogTitle,
   Progress,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   AlertTriangle,
   BrainCircuit,

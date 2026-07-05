@@ -5,7 +5,7 @@ import Button from '../ui/macos/Button';
 import Checkbox from '../ui/macos/Checkbox';
 import {
   Select,
-  Input} from '../ui/macos';
+  Input } from '../ui/macos';
 import { useRoles } from '../../hooks/useRoles';
 
 import logger from '../../utils/logger';

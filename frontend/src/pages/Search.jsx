@@ -4,7 +4,7 @@ import { api } from '../api';
 import { getVisit } from '../api/visits';
 import {
   AppEmpty, AppError, Button,
-  Input} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors.js';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');

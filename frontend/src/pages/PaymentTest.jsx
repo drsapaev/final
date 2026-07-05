@@ -7,7 +7,7 @@ import { CreditCard, FlaskConical } from 'lucide-react';
 
 import {
   Alert, Button, Card, CardContent, Typography,
-  Input} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import PaymentWidget from '../components/payment/PaymentWidget';
 import { getApiOrigin, setToken, getToken } from '../api/client';
 

@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt } from 'lucide-react';
 import {
   Card, Badge, Button,
-  Input} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import Tooltip from '../components/ui/macos/Tooltip';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
