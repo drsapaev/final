@@ -1,27 +1,18 @@
 import logger from '../utils/logger';
-import { buildApiUrl } from './runtime';
+// UX Audit Setup bugfix: миграция с raw fetch() на api/client.js.
+// Раньше здесь было 2 raw fetch() вызова к /setup/status и /setup/initialize
+// с ручным JSON-parsing и error-handling.
+// Теперь auth/CSRF/refresh-token обрабатываются централизованно через
+// axios-interceptor в api/client.js. Это особенно важно для /setup/initialize,
+// потому что это pre-auth endpoint, но всё равно нужен unified error handling
+// (network errors, 500s, timeout).
+import { api } from './client';
 
 const SETUP_STATUS_CACHE_MS = 30_000;
 
 let setupStatusCache = null;
 let setupStatusCacheAt = 0;
 let setupStatusRequestPromise = null;
-
-async function parseJsonResponse(response) {
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
-
-  if (!response.ok) {
-    const detail = payload?.detail || payload?.message || 'Setup request failed';
-    throw new Error(detail);
-  }
-
-  return payload;
-}
 
 export function clearSetupStatusCache() {
   setupStatusCache = null;
@@ -44,8 +35,10 @@ export async function fetchSetupStatus() {
 
   setupStatusRequestPromise = (async () => {
     try {
-      const response = await fetch(buildApiUrl('/setup/status'));
-      const payload = await parseJsonResponse(response);
+      // UX Audit Setup bugfix: raw fetch() → api.get().
+      // Axios сам парсит JSON и бросает Error с detail при не-2xx.
+      const response = await api.get('/setup/status');
+      const payload = response.data;
       setupStatusCache = payload;
       setupStatusCacheAt = Date.now();
       return payload;
@@ -56,7 +49,9 @@ export async function fetchSetupStatus() {
         });
         return setupStatusCache;
       }
-      throw error;
+      // Нормализуем error message из axios response.
+      const detail = error?.response?.data?.detail || error?.message || 'Setup status request failed';
+      throw new Error(detail);
     } finally {
       setupStatusRequestPromise = null;
     }
@@ -66,15 +61,15 @@ export async function fetchSetupStatus() {
 }
 
 export async function initializeSetup(payload) {
-  const response = await fetch(buildApiUrl('/setup/initialize'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const result = await parseJsonResponse(response);
-  clearSetupStatusCache();
-  return result;
+  // UX Audit Setup bugfix: raw fetch() POST → api.post().
+  // Axios автоматически ставит Content-Type: application/json и парсит ответ.
+  try {
+    const response = await api.post('/setup/initialize', payload);
+    clearSetupStatusCache();
+    return response.data;
+  } catch (error) {
+    // Нормализуем error message из axios response.
+    const detail = error?.response?.data?.detail || error?.message || 'Setup request failed';
+    throw new Error(detail);
+  }
 }
