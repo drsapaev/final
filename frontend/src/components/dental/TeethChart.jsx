@@ -195,7 +195,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
             <div style={{ display: 'flex', border: '1px solid var(--mac-border)', borderRadius: 8, overflow: 'hidden' }}>
               <button
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: viewMode === 'adult' ? 'var(--mac-accent-blue)' : 'transparent',
                   color: viewMode === 'adult' ? 'white' : 'var(--mac-text-primary)',
@@ -207,7 +207,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
               </button>
               <button
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: viewMode === 'child' ? 'var(--mac-accent-blue)' : 'transparent',
                   color: viewMode === 'child' ? 'white' : 'var(--mac-text-primary)',
@@ -225,7 +225,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
                 onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
                 aria-label="Уменьшить зубную карту"
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
@@ -240,7 +240,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
                 onClick={() => setZoom(Math.min(2, zoom + 0.1))}
                 aria-label="Увеличить зубную карту"
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
@@ -281,7 +281,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
                 color: selectedStatus === status ? 'white' : STATUS_COLORS[status],
                 border: `2px solid ${STATUS_COLORS[status]}`,
                 cursor: 'pointer',
-                padding: '8px 12px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                 borderRadius: 4
               }}
               onClick={() => setSelectedStatus(status)}>
@@ -392,7 +392,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
             <Badge key={status} variant="info" style={{
               backgroundColor: STATUS_COLORS[status],
               color: 'white',
-              padding: '4px 8px',
+              padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
               borderRadius: 6
             }}>
                   {`${STATUS_NAMES[status]}: ${count}`}

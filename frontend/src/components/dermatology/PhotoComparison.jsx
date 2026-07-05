@@ -117,7 +117,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             <div style={{ display: 'flex', border: '1px solid var(--mac-border)', borderRadius: 8, overflow: 'hidden' }}>
               <button
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: viewMode === 'slider' ? 'var(--mac-accent-blue)' : 'transparent',
                   color: viewMode === 'slider' ? 'white' : 'var(--mac-text-primary)',
@@ -134,7 +134,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               </button>
               <button
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: viewMode === 'side-by-side' ? 'var(--mac-accent-blue)' : 'transparent',
                   color: viewMode === 'side-by-side' ? 'white' : 'var(--mac-text-primary)',
@@ -151,7 +151,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               </button>
               <button
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: viewMode === 'overlay' ? 'var(--mac-accent-blue)' : 'transparent',
                   color: viewMode === 'overlay' ? 'white' : 'var(--mac-text-primary)',
@@ -357,7 +357,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             left: 10,
             backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
             color: 'white',
-            padding: '4px 8px',
+            padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
             borderRadius: 4,
             fontSize: 'var(--mac-font-size-base)'
           }}>
@@ -369,7 +369,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             right: 10,
             backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
             color: 'white',
-            padding: '4px 8px',
+            padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
             borderRadius: 4,
             fontSize: 'var(--mac-font-size-base)'
           }}>
@@ -465,7 +465,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               style={{
                 width: '100%',
                 height: '4px',
-                borderRadius: '2px',
+                borderRadius: 'var(--mac-radius-sm)',
                 background: 'color-mix(in srgb, white, transparent 70%)',
                 outline: 'none',
                 appearance: 'none'

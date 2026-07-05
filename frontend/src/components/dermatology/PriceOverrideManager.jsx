@@ -184,7 +184,7 @@ const PriceOverrideManager = ({
             <p style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
-              marginTop: '4px'
+              marginTop: 'var(--mac-spacing-1)'
             }}>
               {serviceName} • Базовая цена: {formatPrice(originalPrice)}
             </p>
@@ -511,7 +511,7 @@ const PriceOverrideManager = ({
                       })
                     }}>
                           {getStatusIcon(override.status)}
-                          <span style={{ marginLeft: '4px' }}>{getStatusText(override.status)}</span>
+                          <span style={{ marginLeft: 'var(--mac-spacing-1)' }}>{getStatusText(override.status)}</span>
                         </span>
                       </div>
                       <span style={{
@@ -560,7 +560,7 @@ const PriceOverrideManager = ({
                     </div>
                     
                     {override.details &&
-                <div style={{ marginTop: '4px' }}>
+                <div style={{ marginTop: 'var(--mac-spacing-1)' }}>
                         <span style={{
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'

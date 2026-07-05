@@ -72,7 +72,7 @@ export function VisitTab({
         {emr && (
           <div className="cardio-emr-audit-badge" style={{
             marginTop: 'var(--mac-spacing-3)',
-            padding: '8px 12px',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',

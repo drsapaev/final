@@ -131,7 +131,7 @@ const styles = {
   criticalList: {
     display: 'grid',
     gap: '3px',
-    marginTop: '6px',
+    marginTop: 'var(--mac-spacing-2)',
   },
   actionRow: {
     display: 'flex',
@@ -521,7 +521,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                 ? 'Отпустите файлы здесь...'
                 : 'Перетащите ЭКГ файлы или нажмите для выбора'}
             </p>
-            <p style={{ ...styles.caption, marginTop: '6px' }}>
+            <p style={{ ...styles.caption, marginTop: 'var(--mac-spacing-2)' }}>
               Поддерживаются: PDF, SCP, XML, JPG, PNG
             </p>
           </div>
@@ -563,7 +563,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         )}
                       </div>
 
-                      <p style={{ ...styles.caption, marginTop: '4px' }}>
+                      <p style={{ ...styles.caption, marginTop: 'var(--mac-spacing-1)' }}>
                         {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleString()}
                       </p>
 
