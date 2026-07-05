@@ -194,7 +194,7 @@ const TwoFactorSettings = () => {
 
       {error &&
       <div style={{
-        background: '#FEE2E2',
+        background: 'var(--mac-error-bg)',
         border: '1px solid #FCA5A5',
         borderRadius: '8px',
         padding: '16px',
@@ -202,7 +202,7 @@ const TwoFactorSettings = () => {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        color: '#DC2626'
+        color: 'var(--mac-error)'
       }}>
           <AlertCircle size={20} />
           <span>{error}</span>
@@ -244,8 +244,8 @@ const TwoFactorSettings = () => {
           </h3>
           <div style={{
             padding: '4px 12px',
-            background: status.enabled ? '#D1FAE5' : '#FEE2E2',
-            color: status.enabled ? '#059669' : '#DC2626',
+            background: status.enabled ? '#D1FAE5' : 'var(--mac-error-bg)',
+            color: status.enabled ? '#059669' : 'var(--mac-error)',
             borderRadius: '20px',
             fontSize: '12px',
             fontWeight: '500'
@@ -412,7 +412,7 @@ const TwoFactorSettings = () => {
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '12px',
-            background: '#FEF3C7',
+            background: 'var(--mac-warning-bg)',
             borderRadius: '6px',
             border: '1px solid #F59E0B'
           }}>
@@ -431,7 +431,7 @@ const TwoFactorSettings = () => {
               onClick={downloadBackupCodes}
               style={{
                 padding: '4px 8px',
-                background: '#F59E0B',
+                background: 'var(--mac-warning)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
@@ -507,8 +507,8 @@ const TwoFactorSettings = () => {
               onClick={() => handleUntrustDevice(device.id)}
               style={{
                 padding: '8px 12px',
-                background: '#FEE2E2',
-                color: '#DC2626',
+                background: 'var(--mac-error-bg)',
+                color: 'var(--mac-error)',
                 border: '1px solid #FCA5A5',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -564,8 +564,8 @@ const TwoFactorSettings = () => {
             disabled={loading}
             style={{
               padding: '12px 24px',
-              background: '#FEE2E2',
-              color: '#DC2626',
+              background: 'var(--mac-error-bg)',
+              color: 'var(--mac-error)',
               border: '1px solid #FCA5A5',
               borderRadius: '8px',
               cursor: loading ? 'not-allowed' : 'pointer',

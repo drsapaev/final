@@ -72,16 +72,16 @@ export const QueueActionButtons = ({
       justifyContent: 'center',
       marginRight: '4px'
     },
-    dangerColor = '#ef4444',
-    successColor = '#22c55e',
-    warningColor = '#f59e0b',
-    infoColor = '#3b82f6',
+    dangerColor = 'var(--mac-error)',
+    successColor = 'var(--mac-success)',
+    warningColor = 'var(--mac-warning)',
+    infoColor = 'var(--mac-accent-blue)',
     getColor = (color, shade) => {
       const colors = {
-        danger: { 100: '#fee2e2', 500: '#ef4444' },
-        success: { 100: '#dcfce7', 500: '#22c55e' },
-        warning: { 100: '#fef3c7', 500: '#f59e0b' },
-        info: { 100: '#dbeafe', 500: '#3b82f6' }
+        danger: { 100: 'var(--mac-error-bg)', 500: 'var(--mac-error)' },
+        success: { 100: 'var(--mac-success-bg)', 500: 'var(--mac-success)' },
+        warning: { 100: 'var(--mac-warning-bg)', 500: 'var(--mac-warning)' },
+        info: { 100: 'var(--mac-accent-bg)', 500: 'var(--mac-accent-blue)' }
       };
       return colors[color]?.[shade] || '#666';
     }
@@ -356,7 +356,7 @@ export const QueueActionButtons = ({
 
       case 'cancelled':
         return (
-          <span style={{ color: '#6b7280', fontSize: '12px' }}>Отменён</span>);
+          <span style={{ color: 'var(--mac-text-secondary)', fontSize: '12px' }}>Отменён</span>);
 
 
       default:
@@ -381,9 +381,9 @@ export const QueueActionButtons = ({
 export const QueueStatsBar = ({ stats, getColor }) => {
   const defaultGetColor = (color, shade) => {
     const colors = {
-      warning: { 500: '#f59e0b' },
-      primary: { 500: '#3b82f6' },
-      success: { 500: '#22c55e' }
+      warning: { 500: 'var(--mac-warning)' },
+      primary: { 500: 'var(--mac-accent-blue)' },
+      success: { 500: 'var(--mac-success)' }
     };
     return colors[color]?.[shade] || '#666';
   };
@@ -425,21 +425,21 @@ export const QueueStatsBar = ({ stats, getColor }) => {
  */
 export const getQueueStatusInfo = (status) => {
   const statusMap = {
-    waiting: { label: 'Ожидает', variant: 'warning', color: '#f59e0b' },
-    called: { label: 'Вызван', variant: 'primary', color: '#3b82f6' },
-    calling: { label: 'Вызывается', variant: 'primary', color: '#3b82f6' },
+    waiting: { label: 'Ожидает', variant: 'warning', color: 'var(--mac-warning)' },
+    called: { label: 'Вызван', variant: 'primary', color: 'var(--mac-accent-blue)' },
+    calling: { label: 'Вызывается', variant: 'primary', color: 'var(--mac-accent-blue)' },
     in_cabinet: { label: 'В кабинете', variant: 'info', color: '#06b6d4' },
     in_service: { label: 'На приёме', variant: 'info', color: '#06b6d4' },
-    diagnostics: { label: 'На обследовании', variant: 'info', color: '#8b5cf6' },
-    served: { label: 'Обслужен', variant: 'success', color: '#22c55e' },
-    completed: { label: 'Завершён', variant: 'success', color: '#22c55e' },
-    done: { label: 'Завершён', variant: 'success', color: '#22c55e' },
-    incomplete: { label: 'Не завершён', variant: 'danger', color: '#ef4444' },
-    no_show: { label: 'Не явился', variant: 'danger', color: '#ef4444' },
-    cancelled: { label: 'Отменён', variant: 'secondary', color: '#6b7280' }
+    diagnostics: { label: 'На обследовании', variant: 'info', color: 'var(--mac-accent-purple)' },
+    served: { label: 'Обслужен', variant: 'success', color: 'var(--mac-success)' },
+    completed: { label: 'Завершён', variant: 'success', color: 'var(--mac-success)' },
+    done: { label: 'Завершён', variant: 'success', color: 'var(--mac-success)' },
+    incomplete: { label: 'Не завершён', variant: 'danger', color: 'var(--mac-error)' },
+    no_show: { label: 'Не явился', variant: 'danger', color: 'var(--mac-error)' },
+    cancelled: { label: 'Отменён', variant: 'secondary', color: 'var(--mac-text-secondary)' }
   };
 
-  return statusMap[status] || { label: status, variant: 'default', color: '#6b7280' };
+  return statusMap[status] || { label: status, variant: 'default', color: 'var(--mac-text-secondary)' };
 };
 
 const queueEntryShape = PropTypes.shape({

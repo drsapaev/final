@@ -306,7 +306,7 @@ const PrintDialog = ({
               padding: '16px',
               borderRadius: '14px',
               backgroundColor:
-                theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : '#eff6ff',
+                theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'var(--mac-accent-bg)',
               border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.24)' : '#bfdbfe'}`,
               color: 'var(--color-text-primary)',
             }}
@@ -381,10 +381,10 @@ const PrintDialog = ({
                     gap: '12px',
                     padding: '16px',
                     backgroundColor:
-                      theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
-                    border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.24)' : '#fecaca'}`,
+                      theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
+                    border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.24)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
                     borderRadius: '14px',
-                    color: theme === 'dark' ? '#fca5a5' : '#dc2626',
+                    color: theme === 'dark' ? '#fca5a5' : 'var(--mac-error)',
                   }}
                 >
                   <AlertCircle size={20} />
@@ -445,7 +445,7 @@ const PrintDialog = ({
                         padding: '12px 14px',
                         border: `1px solid ${
                           selectedPrinter === printer.id
-                            ? '#3b82f6'
+                            ? 'var(--mac-accent-blue)'
                             : theme === 'dark'
                               ? 'rgba(255,255,255,0.10)'
                               : 'var(--mac-border)'
@@ -455,7 +455,7 @@ const PrintDialog = ({
                           selectedPrinter === printer.id
                             ? theme === 'dark'
                               ? 'rgba(59, 130, 246, 0.16)'
-                              : '#eff6ff'
+                              : 'var(--mac-accent-bg)'
                             : theme === 'dark'
                               ? 'rgba(255,255,255,0.04)'
                               : 'white',
@@ -473,10 +473,10 @@ const PrintDialog = ({
                           width: '16px',
                           height: '16px',
                           borderRadius: '50%',
-                          border: `2px solid ${selectedPrinter === printer.id ? '#3b82f6' : '#9ca3af'}`,
+                          border: `2px solid ${selectedPrinter === printer.id ? 'var(--mac-accent-blue)' : 'var(--mac-text-tertiary)'}`,
                           backgroundColor:
                             selectedPrinter === printer.id
-                              ? '#3b82f6'
+                              ? 'var(--mac-accent-blue)'
                               : 'transparent',
                           display: 'flex',
                           alignItems: 'center',
@@ -546,7 +546,7 @@ const PrintDialog = ({
                             printer.status === 'online'
                               ? '#10b981'
                               : printer.status
-                                ? '#ef4444'
+                                ? 'var(--mac-error)'
                                 : '#64748b',
                         }}
                       >

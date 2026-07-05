@@ -214,8 +214,8 @@ export const TableHeader = ({
             textAlign: column.align || 'left',
             fontSize: '14px',
             fontWeight: '600',
-            color: '#374151',
-            backgroundColor: '#f9fafb',
+            color: 'var(--mac-text-primary)',
+            backgroundColor: 'var(--mac-bg-secondary)',
             borderBottom: '1px solid #e5e7eb',
             cursor: sortable && column.sortable !== false ? 'pointer' : 'default',
             userSelect: 'none',
@@ -224,12 +224,12 @@ export const TableHeader = ({
           onClick={() => sortable && column.sortable !== false && onSort(column.key)}
           onMouseEnter={(e) => {
             if (sortable && column.sortable !== false && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f3f4f6';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (!prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}>
           
@@ -288,7 +288,7 @@ export const TableRow = ({
     <tr
       className={`table-row ${selected ? 'selected' : ''} ${expanded ? 'expanded' : ''} ${className}`}
       style={{
-        backgroundColor: selected ? '#eff6ff' : '#ffffff',
+        backgroundColor: selected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)',
         borderBottom: '1px solid #e5e7eb',
         cursor: onClick ? 'pointer' : 'default',
         transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
@@ -296,12 +296,12 @@ export const TableRow = ({
       onClick={handleClick}
       onMouseEnter={(e) => {
         if (onClick && !prefersReducedMotion) {
-          e.target.style.backgroundColor = '#f9fafb';
+          e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
         }
       }}
       onMouseLeave={(e) => {
         if (onClick && !prefersReducedMotion) {
-          e.target.style.backgroundColor = selected ? '#eff6ff' : '#ffffff';
+          e.target.style.backgroundColor = selected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)';
         }
       }}
       {...props}>
@@ -334,14 +334,14 @@ export const TableRow = ({
             border: 'none',
             fontSize: '16px',
             cursor: 'pointer',
-            color: '#6b7280',
+            color: 'var(--mac-text-secondary)',
             padding: '4px',
             borderRadius: '4px',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (!prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f3f4f6';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
@@ -364,7 +364,7 @@ export const TableRow = ({
           padding: '12px 16px',
           textAlign: column.align || 'left',
           fontSize: '14px',
-          color: '#374151',
+          color: 'var(--mac-text-primary)',
           borderBottom: '1px solid #e5e7eb'
         }}>
         
@@ -436,13 +436,13 @@ export const TablePagination = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '16px 20px',
-        backgroundColor: '#f9fafb',
+        backgroundColor: 'var(--mac-bg-secondary)',
         borderTop: '1px solid #e5e7eb'
       }}
       {...props}>
       
       {/* Информация о странице */}
-      <div style={{ fontSize: '14px', color: '#6b7280' }}>
+      <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
         Показано {startItem}-{endItem} из {totalItems} записей
       </div>
 
@@ -457,19 +457,19 @@ export const TablePagination = ({
             fontSize: '14px',
             border: '1px solid #d1d5db',
             borderRadius: '6px',
-            backgroundColor: currentPage === 1 ? '#f3f4f6' : '#ffffff',
-            color: currentPage === 1 ? '#9ca3af' : '#374151',
+            backgroundColor: currentPage === 1 ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+            color: currentPage === 1 ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#ffffff';
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -490,20 +490,20 @@ export const TablePagination = ({
                   fontWeight: pageNumber === currentPage ? '600' : '400',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  backgroundColor: pageNumber === currentPage ? '#3b82f6' : '#ffffff',
-                  color: pageNumber === currentPage ? '#ffffff' : '#374151',
+                  backgroundColor: pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)',
+                  color: pageNumber === currentPage ? 'var(--mac-bg-primary)' : 'var(--mac-text-primary)',
                   cursor: 'pointer',
                   minWidth: '40px',
                   transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
                 }}
                 onMouseEnter={(e) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = pageNumber === currentPage ? '#2563eb' : '#f9fafb';
+                    e.target.style.backgroundColor = pageNumber === currentPage ? '#2563eb' : 'var(--mac-bg-secondary)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = pageNumber === currentPage ? '#3b82f6' : '#ffffff';
+                    e.target.style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
                   }
                 }}>
                 
@@ -522,19 +522,19 @@ export const TablePagination = ({
             fontSize: '14px',
             border: '1px solid #d1d5db',
             borderRadius: '6px',
-            backgroundColor: currentPage === totalPages ? '#f3f4f6' : '#ffffff',
-            color: currentPage === totalPages ? '#9ca3af' : '#374151',
+            backgroundColor: currentPage === totalPages ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+            color: currentPage === totalPages ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#ffffff';
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -560,7 +560,7 @@ export const TableSearch = ({
       className={`table-search ${className}`}
       style={{
         padding: '16px 20px',
-        backgroundColor: '#f9fafb',
+        backgroundColor: 'var(--mac-bg-secondary)',
         borderBottom: '1px solid #e5e7eb',
         display: 'flex',
         alignItems: 'center',
@@ -568,7 +568,7 @@ export const TableSearch = ({
       }}
       {...props}>
       
-      <div style={{ fontSize: '16px', color: '#6b7280' }}>🔍</div>
+      <div style={{ fontSize: '16px', color: 'var(--mac-text-secondary)' }}>🔍</div>
       <input
         type="text"
         aria-label={placeholder || 'Table search'}
@@ -581,19 +581,19 @@ export const TableSearch = ({
           fontSize: '14px',
           border: '1px solid #d1d5db',
           borderRadius: '6px',
-          backgroundColor: '#ffffff',
-          color: '#374151',
+          backgroundColor: 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-primary)',
           outline: 'none',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease'
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = '#3b82f6';
+            e.target.style.borderColor = 'var(--mac-accent-blue)';
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = '#d1d5db';
+            e.target.style.borderColor = 'var(--mac-border)';
           }
         }} />
       
@@ -650,7 +650,7 @@ export const Table = ({
     <div
       className={`table ${className}`}
       style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid #e5e7eb',
         borderRadius: '8px',
         overflow: 'hidden',
@@ -709,7 +709,7 @@ export const Table = ({
         style={{
           padding: '40px',
           textAlign: 'center',
-          color: '#6b7280',
+          color: 'var(--mac-text-secondary)',
           fontSize: '14px'
         }}>
         
@@ -722,7 +722,7 @@ export const Table = ({
         style={{
           padding: '40px',
           textAlign: 'center',
-          color: '#ef4444',
+          color: 'var(--mac-error)',
           fontSize: '14px'
         }}>
         
@@ -735,7 +735,7 @@ export const Table = ({
         style={{
           padding: '40px',
           textAlign: 'center',
-          color: '#6b7280',
+          color: 'var(--mac-text-secondary)',
           fontSize: '14px'
         }}>
         

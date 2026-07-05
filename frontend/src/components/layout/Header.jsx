@@ -77,8 +77,8 @@ export default function Header() {
     justifyContent: 'space-between',
     padding: `${getSpacing('md')} ${getSpacing('xl')}`,
     background: theme === 'light' ?
-    'rgba(255, 255, 255, 0.9)' :
-    'rgba(15, 23, 42, 0.9)',
+    'color-mix(in srgb, white, transparent 10%)' :
+    'color-mix(in srgb, var(--mac-text-primary), transparent 10%)',
     backdropFilter: 'blur(20px)',
     borderBottom: `1px solid ${borderColor}`,
     position: 'sticky',
@@ -249,7 +249,7 @@ export default function Header() {
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid',
         transition: 'all 0.2s ease',
-        backgroundColor: theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 23, 42, 0.9)',
+        backgroundColor: theme === 'light' ? 'color-mix(in srgb, white, transparent 10%)' : 'color-mix(in srgb, var(--mac-text-primary), transparent 10%)',
         borderColor: theme === 'light' ? getColor('gray', 200) : getColor('gray', 700),
         boxShadow: theme === 'light' ?
         '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' :

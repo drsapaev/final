@@ -354,7 +354,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
   const renderStep3 = () =>
   <div style={{ maxWidth: '600px', margin: '0 auto' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <CheckCircle size={48} style={{ color: '#10B981', marginBottom: '16px' }} />
+        <CheckCircle size={48} style={{ color: 'var(--mac-success)', marginBottom: '16px' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
           2FA успешно настроена!
         </h2>
@@ -446,7 +446,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         
         <div style={{
         padding: '12px',
-        background: '#FEF3C7',
+        background: 'var(--mac-warning-bg)',
         borderRadius: '6px',
         border: '1px solid #F59E0B'
       }}>
@@ -493,7 +493,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
   if (error) {
     return (
       <div style={{
-        background: '#FEE2E2',
+        background: 'var(--mac-error-bg)',
         border: '1px solid #FCA5A5',
         borderRadius: '8px',
         padding: '16px',
@@ -501,7 +501,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        color: '#DC2626'
+        color: 'var(--mac-error)'
       }}>
         <AlertCircle size={20} />
         <span>{error}</span>

@@ -437,7 +437,7 @@ export const AIAssistant = ({
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid #e5e7eb',
         borderRadius: '8px',
         overflow: 'hidden'
@@ -449,7 +449,7 @@ export const AIAssistant = ({
         className="ai-assistant-header"
         style={{
           padding: '16px 20px',
-          backgroundColor: '#f8fafc',
+          backgroundColor: 'var(--mac-bg-secondary)',
           borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           alignItems: 'center',
@@ -458,7 +458,7 @@ export const AIAssistant = ({
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ fontSize: '20px' }}>🤖</div>
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#374151' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
             ИИ Помощник
           </h3>
         </div>
@@ -472,20 +472,20 @@ export const AIAssistant = ({
               fontSize: '12px',
               border: '1px solid #d1d5db',
               borderRadius: '6px',
-              backgroundColor: isListening ? '#dbeafe' : '#ffffff',
-              color: '#374151',
+              backgroundColor: isListening ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
               cursor: loading || isListening ? 'not-allowed' : 'pointer',
               opacity: loading || isListening ? 0.6 : 1,
               transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
             }}
             onMouseEnter={(e) => {
               if (!loading && !isListening && !prefersReducedMotion) {
-                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
               }
             }}
             onMouseLeave={(e) => {
               if (!loading && !isListening && !prefersReducedMotion) {
-                e.target.style.backgroundColor = '#ffffff';
+                e.target.style.backgroundColor = 'var(--mac-bg-primary)';
               }
             }}>
             
@@ -500,22 +500,22 @@ export const AIAssistant = ({
               fontSize: '12px',
               border: '1px solid #d1d5db',
               borderRadius: '6px',
-              backgroundColor: '#ffffff',
-              color: '#374151',
+              backgroundColor: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
               cursor: loading || messages.length === 0 ? 'not-allowed' : 'pointer',
               opacity: loading || messages.length === 0 ? 0.6 : 1,
               transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
             }}
             onMouseEnter={(e) => {
               if (!loading && messages.length > 0 && !prefersReducedMotion) {
-                e.target.style.backgroundColor = '#fef2f2';
-                e.target.style.borderColor = '#fecaca';
+                e.target.style.backgroundColor = 'var(--mac-error-bg)';
+                e.target.style.borderColor = 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))';
               }
             }}
             onMouseLeave={(e) => {
               if (!loading && messages.length > 0 && !prefersReducedMotion) {
-                e.target.style.backgroundColor = '#ffffff';
-                e.target.style.borderColor = '#d1d5db';
+                e.target.style.backgroundColor = 'var(--mac-bg-primary)';
+                e.target.style.borderColor = 'var(--mac-border)';
               }
             }}>
             
@@ -537,7 +537,7 @@ export const AIAssistant = ({
         <div
           style={{
             textAlign: 'center',
-            color: '#6b7280',
+            color: 'var(--mac-text-secondary)',
             fontSize: '14px',
             marginTop: '40px'
           }}>
@@ -556,14 +556,14 @@ export const AIAssistant = ({
             maxWidth: '80%',
             ...(message.role === 'user' ?
             {
-              backgroundColor: '#3b82f6',
-              color: '#ffffff',
+              backgroundColor: 'var(--mac-accent-blue)',
+              color: 'var(--mac-bg-primary)',
               marginLeft: 'auto',
               borderBottomRightRadius: '4px'
             } :
             {
-              backgroundColor: '#f3f4f6',
-              color: '#374151',
+              backgroundColor: 'var(--mac-bg-secondary)',
+              color: 'var(--mac-text-primary)',
               borderBottomLeftRadius: '4px'
             })
 
@@ -592,17 +592,17 @@ export const AIAssistant = ({
         style={{
           padding: '16px 20px',
           borderTop: '1px solid #e5e7eb',
-          backgroundColor: '#f8fafc'
+          backgroundColor: 'var(--mac-bg-secondary)'
         }}>
         
         {error &&
         <div
           style={{
-            color: '#ef4444',
+            color: 'var(--mac-error)',
             fontSize: '12px',
             marginBottom: '8px',
             padding: '4px 8px',
-            backgroundColor: '#fef2f2',
+            backgroundColor: 'var(--mac-error-bg)',
             borderRadius: '4px',
             border: '1px solid #fecaca'
           }}>
@@ -634,19 +634,19 @@ export const AIAssistant = ({
               fontSize: '14px',
               border: '1px solid #d1d5db',
               borderRadius: '6px',
-              backgroundColor: '#ffffff',
-              color: '#374151',
+              backgroundColor: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
               outline: 'none',
               transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease'
             }}
             onFocus={(e) => {
               if (!prefersReducedMotion) {
-                e.target.style.borderColor = '#3b82f6';
+                e.target.style.borderColor = 'var(--mac-accent-blue)';
               }
             }}
             onBlur={(e) => {
               if (!prefersReducedMotion) {
-                e.target.style.borderColor = '#d1d5db';
+                e.target.style.borderColor = 'var(--mac-border)';
               }
             }} />
           
@@ -661,8 +661,8 @@ export const AIAssistant = ({
               fontWeight: '500',
               border: '1px solid #3b82f6',
               borderRadius: '6px',
-              backgroundColor: '#3b82f6',
-              color: '#ffffff',
+              backgroundColor: 'var(--mac-accent-blue)',
+              color: 'var(--mac-bg-primary)',
               cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.6 : 1,
               transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
@@ -677,7 +677,7 @@ export const AIAssistant = ({
             }}
             onMouseLeave={(e) => {
               if (!loading && !prefersReducedMotion) {
-                e.target.style.backgroundColor = '#3b82f6';
+                e.target.style.backgroundColor = 'var(--mac-accent-blue)';
               }
             }}>
             
@@ -718,7 +718,7 @@ export const AISuggestions = ({
     <div
       className={`ai-suggestions ${className}`}
       style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid #e5e7eb',
         borderRadius: '8px',
         overflow: 'hidden'
@@ -729,7 +729,7 @@ export const AISuggestions = ({
       <div
         style={{
           padding: '16px 20px',
-          backgroundColor: '#f8fafc',
+          backgroundColor: 'var(--mac-bg-secondary)',
           borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           alignItems: 'center',
@@ -738,7 +738,7 @@ export const AISuggestions = ({
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ fontSize: '18px' }}>💡</div>
-          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#374151' }}>
+          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
             ИИ Предложения
           </h4>
         </div>
@@ -751,20 +751,20 @@ export const AISuggestions = ({
             fontSize: '12px',
             border: '1px solid #d1d5db',
             borderRadius: '6px',
-            backgroundColor: '#ffffff',
-            color: '#374151',
+            backgroundColor: 'var(--mac-bg-primary)',
+            color: 'var(--mac-text-primary)',
             cursor: loading ? 'not-allowed' : 'pointer',
             opacity: loading ? 0.6 : 1,
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (!loading && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (!loading && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#ffffff';
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -777,11 +777,11 @@ export const AISuggestions = ({
         {error &&
         <div
           style={{
-            color: '#ef4444',
+            color: 'var(--mac-error)',
             fontSize: '12px',
             marginBottom: '12px',
             padding: '8px',
-            backgroundColor: '#fef2f2',
+            backgroundColor: 'var(--mac-error-bg)',
             borderRadius: '4px',
             border: '1px solid #fecaca'
           }}>
@@ -794,7 +794,7 @@ export const AISuggestions = ({
         <div
           style={{
             textAlign: 'center',
-            color: '#6b7280',
+            color: 'var(--mac-text-secondary)',
             fontSize: '14px',
             padding: '20px'
           }}>
@@ -812,8 +812,8 @@ export const AISuggestions = ({
               textAlign: 'left',
               border: '1px solid #e5e7eb',
               borderRadius: '6px',
-              backgroundColor: '#ffffff',
-              color: '#374151',
+              backgroundColor: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
               cursor: 'pointer',
               transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
               fontSize: '14px',
@@ -821,14 +821,14 @@ export const AISuggestions = ({
             }}
             onMouseEnter={(e) => {
               if (!prefersReducedMotion) {
-                e.target.style.backgroundColor = '#f8fafc';
-                e.target.style.borderColor = '#d1d5db';
+                e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                e.target.style.borderColor = 'var(--mac-border)';
               }
             }}
             onMouseLeave={(e) => {
               if (!prefersReducedMotion) {
-                e.target.style.backgroundColor = '#ffffff';
-                e.target.style.borderColor = '#e5e7eb';
+                e.target.style.backgroundColor = 'var(--mac-bg-primary)';
+                e.target.style.borderColor = 'var(--mac-border)';
               }
             }}>
             
@@ -839,7 +839,7 @@ export const AISuggestions = ({
             <div
               style={{
                 fontSize: '11px',
-                color: '#6b7280',
+                color: 'var(--mac-text-secondary)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px'
@@ -847,7 +847,7 @@ export const AISuggestions = ({
               
                     <span>Уверенность: {Math.round(suggestion.confidence * 100)}%</span>
                     {suggestion.category &&
-              <span style={{ backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '10px' }}>
+              <span style={{ backgroundColor: 'var(--mac-border)', padding: '2px 6px', borderRadius: '10px' }}>
                         {suggestion.category}
                       </span>
               }

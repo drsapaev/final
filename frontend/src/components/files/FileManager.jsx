@@ -119,9 +119,9 @@ const fileTypeLabels = {
 };
 
 const fileTypeColors = {
-  image: '#34c759',
-  video: '#af52de',
-  audio: '#007aff',
+  image: 'var(--mac-success)',
+  video: 'var(--mac-accent-purple)',
+  audio: 'var(--mac-accent-blue)',
   document: '#ff9500',
   archive: '#8e8e93',
   xray: '#ff3b30',

@@ -81,7 +81,7 @@ const ResponsiveModal = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: isMobile ? 'flex-end' : 'center',
@@ -177,7 +177,7 @@ const ResponsiveModal = ({
           style={{
             padding: '16px',
             borderTop: '1px solid #e5e7eb',
-            background: '#f9fafb'
+            background: 'var(--mac-bg-secondary)'
           }}>
           
             <Button

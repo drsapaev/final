@@ -148,7 +148,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     gap: isCollapsed ? '0' : '12px',
     padding: isCollapsed ? '0' : '12px 16px',
     borderRadius: isCollapsed ? '8px' : '12px',
-    color: isActive ? '#ffffff' : 'var(--mac-text-secondary)',
+    color: isActive ? 'var(--mac-bg-primary)' : 'var(--mac-text-secondary)',
     background: isActive ? 'var(--accent)' : 'transparent',
     textShadow: isActive ? '0 1px 2px rgba(0, 0, 0, 0.35)' : 'none',
     backgroundColor: isActive ? 'transparent' : 'transparent',
@@ -217,7 +217,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             style={{
               fontSize: '24px',
               fontWeight: '700',
-              color: isDark ? '#f8fafc' : '#1e293b',
+              color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
               margin: 0
             }}>
 
@@ -229,7 +229,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             style={{
               width: '28px',
               height: '28px',
-              backgroundColor: '#3b82f6',
+              backgroundColor: 'var(--mac-accent-blue)',
               borderRadius: '6px',
               display: 'flex',
               alignItems: 'center',
@@ -249,7 +249,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           className="sidebar-toggle-button"
           onClick={onToggle}
           style={{
-            color: isDark ? '#9ca3af' : '#6b7280',
+            color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)',
             padding: '6px',
             display: 'flex',
             alignItems: 'center',
@@ -262,7 +262,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.color = isDark ? '#9ca3af' : '#6b7280';
+            e.target.style.color = isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)';
             e.target.style.filter = 'brightness(1)';
           }}
           title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
@@ -379,7 +379,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           style={{
             flex: 1,
             padding: isCollapsed ? '8px' : '8px',
-            color: isDark ? '#f8fafb' : '#374151',
+            color: isDark ? '#f8fafb' : 'var(--mac-text-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -394,7 +394,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.color = isDark ? '#f8fafb' : '#374151';
+            e.target.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
             e.target.style.filter = 'brightness(1)';
           }}
           title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
@@ -410,7 +410,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           style={{
             flex: 1,
             padding: isCollapsed ? '8px' : '8px',
-            color: isDark ? '#f8fafb' : '#374151',
+            color: isDark ? '#f8fafb' : 'var(--mac-text-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -425,7 +425,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.color = isDark ? '#f8fafb' : '#374151';
+            e.target.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
             e.target.style.filter = 'brightness(1)';
           }}
           title={`Switch to ${language === 'en' ? 'Russian' : 'English'}`}>
@@ -451,7 +451,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             alignItems: 'center',
             gap: isCollapsed ? '0' : '12px',
             padding: isCollapsed ? '8px' : '12px 16px',
-            color: isDark ? '#f8fafc' : '#1e293b',
+            color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
             fontSize: '14px',
             fontWeight: '500',
             minWidth: isCollapsed ? '40px' : 'auto',
@@ -459,11 +459,11 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             justifyContent: 'center'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = '#ef4444';
+            e.target.style.color = 'var(--mac-error)';
             e.target.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.color = isDark ? '#f8fafc' : '#1e293b';
+            e.target.style.color = isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)';
             e.target.style.filter = 'brightness(1)';
           }}
           onClick={() => {

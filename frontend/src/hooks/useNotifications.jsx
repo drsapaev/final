@@ -213,13 +213,13 @@ export const Notification = ({
 
   const typeConfig = {
     [notificationTypes.SUCCESS]: { icon: '✅', color: '#10b981', bgColor: '#d1fae5' },
-    [notificationTypes.ERROR]: { icon: '❌', color: '#ef4444', bgColor: '#fee2e2' },
-    [notificationTypes.WARNING]: { icon: '⚠️', color: '#f59e0b', bgColor: '#fef3c7' },
-    [notificationTypes.INFO]: { icon: 'ℹ️', color: '#3b82f6', bgColor: '#dbeafe' },
+    [notificationTypes.ERROR]: { icon: '❌', color: 'var(--mac-error)', bgColor: '#fee2e2' },
+    [notificationTypes.WARNING]: { icon: '⚠️', color: 'var(--mac-warning)', bgColor: '#fef3c7' },
+    [notificationTypes.INFO]: { icon: 'ℹ️', color: 'var(--mac-accent-blue)', bgColor: 'var(--mac-accent-bg)' },
     [notificationTypes.MEDICAL]: { icon: '🏥', color: '#8b5cf6', bgColor: '#e9d5ff' },
     [notificationTypes.APPOINTMENT]: { icon: '📅', color: '#06b6d4', bgColor: '#cffafe' },
     [notificationTypes.PAYMENT]: { icon: '💳', color: '#10b981', bgColor: '#d1fae5' },
-    [notificationTypes.EMERGENCY]: { icon: '🚨', color: '#ef4444', bgColor: '#fee2e2' }
+    [notificationTypes.EMERGENCY]: { icon: '🚨', color: 'var(--mac-error)', bgColor: '#fee2e2' }
   };
 
   const config = typeConfig[notification.type] || typeConfig[notificationTypes.INFO];
@@ -302,7 +302,7 @@ export const Notification = ({
           <div
             style={{
               fontSize: '14px',
-              color: '#374151',
+              color: 'var(--mac-text-primary)',
               lineHeight: '1.4'
             }}>
             
@@ -330,7 +330,7 @@ export const Notification = ({
                 border: `1px solid ${config.color}`,
                 borderRadius: '6px',
                 backgroundColor: config.color,
-                color: '#ffffff',
+                color: 'var(--mac-bg-primary)',
                 cursor: 'pointer',
                 transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
               }}
