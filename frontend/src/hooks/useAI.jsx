@@ -10,6 +10,7 @@ import { mcpAPI } from '../utils/mcp';
 import { validateAIChatMessage, detectPromptInjection } from '../utils/aiValidator';
 
 import logger from '../utils/logger';
+import { Input } from '../../ui/macos';
 // Основные настройки ИИ
 const AI_CONFIG = {
   defaultProvider: 'mcp',
@@ -622,7 +623,7 @@ export const AIAssistant = ({
           }}
           style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
           
-          <input
+          <Input
             type="text"
             name="message"
             placeholder="Задайте вопрос ИИ помощнику..."

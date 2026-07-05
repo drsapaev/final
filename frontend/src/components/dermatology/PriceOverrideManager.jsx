@@ -15,6 +15,7 @@ import notify from '../../services/notify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 /**
  * Компонент для управления изменениями цен дерматологом
@@ -233,7 +234,7 @@ const PriceOverrideManager = ({
                   transform: 'translateY(-50%)',
                   color: 'var(--mac-text-tertiary)'
                 }} />
-                <input
+                <Input
                   type="text"
                   aria-label="Новая цена процедуры"
                   value={newPrice}
@@ -309,7 +310,7 @@ const PriceOverrideManager = ({
               </select>
               
               {reason === 'custom' &&
-              <input
+              <Input
                 type="text"
                 aria-label="Другая причина изменения цены"
                 value={reason}

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   Select,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
 
@@ -292,7 +292,7 @@ export default function NotificationInbox({ userRole, onClose }) {
           }}
         >
           <Search size={16} />
-          <input
+          <Input
             type="search"
             aria-label="Поиск по уведомлениям"
             value={searchText}

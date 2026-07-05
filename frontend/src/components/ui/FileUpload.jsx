@@ -5,6 +5,7 @@ import logger from '../../utils/logger';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import '../../styles/animations.css';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 const FileUpload = ({
   onFilesSelected,
@@ -144,7 +145,7 @@ const FileUpload = ({
   return (
     <div className={className}>
             <div {...getRootProps()} style={containerStyle} aria-label="File upload dropzone">
-                <input
+                <Input
                   {...getInputProps()}
                   aria-describedby={error ? 'file-upload-error' : undefined}
                 />

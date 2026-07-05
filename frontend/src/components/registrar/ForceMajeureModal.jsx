@@ -24,6 +24,7 @@ import { tokenManager } from '../../utils/tokenManager';
 import ModernDialog from '../dialogs/ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 const ForceMajeureModal = ({
   isOpen,
@@ -484,7 +485,7 @@ const ForceMajeureModal = ({
           <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: theme === 'dark' ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : '#7f1d1d' }}>
             Введите <strong>ПОДТВЕРЖДАЮ</strong> для продолжения:
           </label>
-          <input
+          <Input
             type="text"
             aria-label="Type confirmation phrase"
             value={confirmText}

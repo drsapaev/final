@@ -6,7 +6,7 @@ import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   Button, Badge, Card,
-} from '../components/ui/macos';
+  Input} from '../components/ui/macos';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth.js';
 import { apiClient } from '../api/client';
@@ -2240,7 +2240,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата осмотра *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата осмотра"
                     value={examinationForm.examination_date}
@@ -2315,7 +2315,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Отсутствующие зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Отсутствующие зубы"
                     value={examinationForm.missing_teeth}
@@ -2414,7 +2414,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата лечения *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата лечения"
                     value={treatmentForm.treatment_date}
@@ -2445,7 +2445,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Вовлеченные зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Зубы в лечении"
                     value={treatmentForm.teeth_involved}
@@ -2456,7 +2456,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
-                    <input
+                    <Input
                     type="number"
                     aria-label="Стоимость лечения"
                     value={treatmentForm.cost}
@@ -2482,7 +2482,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Материалы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Использованные материалы"
                     value={treatmentForm.materials_used}
@@ -2510,7 +2510,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Осложнения</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Осложнения лечения"
                     value={treatmentForm.complications}
@@ -2521,7 +2521,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата контроля</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата повторного приёма"
                     value={treatmentForm.follow_up_date}
@@ -2581,7 +2581,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата протезирования *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата протезирования"
                     value={prostheticForm.prosthetic_date}
@@ -2612,7 +2612,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Заменяемые зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Замещённые зубы"
                     value={prostheticForm.teeth_replaced}
@@ -2641,7 +2641,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Оттенок</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Оттенок протеза"
                     value={prostheticForm.shade}
@@ -2652,7 +2652,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
-                    <input
+                    <Input
                     type="number"
                     aria-label="Стоимость протеза"
                     value={prostheticForm.cost}
@@ -2697,7 +2697,7 @@ const DentistPanelUnified = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Гарантийный период</label>
-                  <input
+                  <Input
                   type="text"
                   aria-label="Гарантийный срок"
                   value={prostheticForm.warranty_period}

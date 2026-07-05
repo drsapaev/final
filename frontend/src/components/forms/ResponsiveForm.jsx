@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { useBreakpoint } from '../../hooks/useEnhancedMediaQuery';
+import { Input } from '../ui/macos';
 
 
 const ResponsiveForm = ({
@@ -88,7 +89,7 @@ const FormInput = ({
   const { isMobile } = useBreakpoint();
 
   return (
-    <input
+    <Input
       type={type}
       placeholder={placeholder}
       aria-label={placeholder || 'Form input'}

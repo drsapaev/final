@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt } from 'lucide-react';
 import {
   Card, Badge, Button,
-} from '../components/ui/macos';
+  Input} from '../components/ui/macos';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import Tooltip from '../components/ui/macos/Tooltip';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
@@ -12,7 +12,6 @@ import PaymentWidget from '../components/payment/PaymentWidget';
 import CashPaymentModal from '../components/payment/CashPaymentModal';
 import MacOSTab from '../components/ui/macos/MacOSTab';
 import SegmentedControl from '../components/ui/macos/SegmentedControl';
-import Input from '../components/ui/macos/Input';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';
@@ -993,7 +992,7 @@ const CashierPanel = () => {
               {/* Поиск */}
               <div className="cashier-search-wrap">
                 <Search className="cashier-search-icon" />
-                <input
+                <Input
                   aria-label="Search cashier payments"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -1599,7 +1598,7 @@ const CashierPanel = () => {
                 </Typography>
                 <Box>
                   <Typography variant="body2" gutterBottom>Сумма возврата:</Typography>
-                  <input
+                  <Input
                     type="number"
                     aria-label="Refund amount"
                     value={refundAmount}

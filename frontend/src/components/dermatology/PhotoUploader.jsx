@@ -309,7 +309,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                 transition: 'all 0.3s'
               }}>
               
-              <input {...getBeforeInputProps()} />
+              <Input {...getBeforeInputProps()} />
               <Upload style={{ width: 48, height: 48, color: 'var(--mac-text-secondary)', marginBottom: 8 }} />
               <Typography variant="body1" color="textSecondary">
                 {isBeforeDragActive ?
@@ -418,7 +418,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                 transition: 'all 0.3s'
               }}>
               
-              <input {...getAfterInputProps()} />
+              <Input {...getAfterInputProps()} />
               <Upload style={{ width: 48, height: 48, color: 'var(--mac-text-secondary)', marginBottom: 8 }} />
               <Typography variant="body1" color="textSecondary">
                 {isAfterDragActive ?

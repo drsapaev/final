@@ -19,6 +19,7 @@ import {
   Send } from
 'lucide-react';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 /**
  * Форма диагнозов и назначений для стоматологической ЭМК
@@ -243,7 +244,7 @@ const DiagnosisForm = ({
       <div className="space-y-4">
         {formData.generalDiagnoses.map((diagnosis, index) =>
       <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-            <input
+            <Input
           type="text"
           aria-label={`Общий диагноз ${index + 1}`}
           value={diagnosis}
@@ -300,7 +301,7 @@ const DiagnosisForm = ({
         <div className="space-y-2">
           {formData.treatmentPlan.immediate.map((item, index) =>
         <div key={index} className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <input
+              <Input
             type="text"
             aria-label={`Срочная мера лечения ${index + 1}`}
             value={item}
@@ -345,7 +346,7 @@ const DiagnosisForm = ({
         <div className="space-y-2">
           {formData.treatmentPlan.shortTerm.map((item, index) =>
         <div key={index} className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-              <input
+              <Input
             type="text"
             aria-label={`Краткосрочная процедура ${index + 1}`}
             value={item}
@@ -390,7 +391,7 @@ const DiagnosisForm = ({
         <div className="space-y-2">
           {formData.treatmentPlan.longTerm.map((item, index) =>
         <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <input
+              <Input
             type="text"
             aria-label={`Долгосрочная процедура ${index + 1}`}
             value={item}
@@ -446,7 +447,7 @@ const DiagnosisForm = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Название препарата
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Название препарата ${index + 1}`}
               value={prescription.medication || ''}
@@ -465,7 +466,7 @@ const DiagnosisForm = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Дозировка
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Дозировка препарата ${index + 1}`}
               value={prescription.dosage || ''}
@@ -484,7 +485,7 @@ const DiagnosisForm = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Способ применения
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Способ применения препарата ${index + 1}`}
               value={prescription.administration || ''}
@@ -503,7 +504,7 @@ const DiagnosisForm = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Продолжительность
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Продолжительность приема препарата ${index + 1}`}
               value={prescription.duration || ''}
@@ -650,7 +651,7 @@ const DiagnosisForm = ({
             </div>
             
             <div className="flex items-center justify-between">
-              <input
+              <Input
             type="text"
             aria-label={`Дополнительные указания к направлению ${index + 1}`}
             value={referral.notes || ''}

@@ -25,6 +25,7 @@ import {
 import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
+import { Input } from '../ui/macos';
 
 // ============================================================================
 // PASSWORD STRENGTH (shared with Setup.jsx — same logic)
@@ -518,7 +519,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
         <div>
           <label style={labelStyle}>{method === 'phone' ? t.phoneLabel : t.emailLabel}</label>
-          <input
+          <Input
             type={method === 'phone' ? 'tel' : 'email'}
             aria-label={method === 'phone' ? t.phoneLabel : t.emailLabel}
             value={contact}
@@ -586,7 +587,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         <div>
           <label style={labelStyle}>{t.codeLabel}</label>
-          <input
+          <Input
             type="text"
             aria-label={t.codeLabel}
             value={verificationCode}
@@ -709,7 +710,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         <div>
           <label style={labelStyle}>{t.newPassword}</label>
           <div style={{ position: 'relative' }}>
-            <input
+            <Input
               type={showNewPassword ? 'text' : 'password'}
               aria-label={t.newPassword}
               value={newPassword}
@@ -765,7 +766,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         <div>
           <label style={labelStyle}>{t.confirmPassword}</label>
           <div style={{ position: 'relative' }}>
-            <input
+            <Input
               type={showConfirmPassword ? 'text' : 'password'}
               aria-label={t.confirmPassword}
               value={confirmPassword}

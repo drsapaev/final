@@ -12,7 +12,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import {
   Baby,
   Phone,
@@ -495,7 +495,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         <div style={styles.searchRow}>
           <label style={styles.fieldGroup}>
             <span style={styles.label}>Поиск по ФИО или телефону</span>
-            <input
+            <Input
               aria-label="Search patient by name or phone"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}

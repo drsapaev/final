@@ -35,6 +35,7 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, AlertOctagon, CheckCircle2 } from 'lucide-react';
 import Modal from '../ui/macos/Modal.jsx';
 import Button from '../ui/macos/Button.jsx';
+import { Input } from '../ui/macos';
 
 const INTENT_CONFIG = {
   danger: {
@@ -171,7 +172,7 @@ export function ConfirmDialog({
                   fontSize: 'var(--mac-font-size-xs)',
                 }}>{requireText}</code> для подтверждения:
               </label>
-              <input
+              <Input
                 id="confirm-dialog-require-text"
                 type="text"
                 value={typedText}

@@ -15,7 +15,7 @@ import {
   DialogContent,
   DialogTitle,
   Progress,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import {
   AlertTriangle,
   BrainCircuit,
@@ -514,7 +514,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
           </h3>
 
           <div {...getRootProps()} style={styles.dropzone(isDragActive)}>
-            <input {...getInputProps()} />
+            <Input {...getInputProps()} />
             <CloudUpload size={48} color="var(--mac-text-secondary)" aria-hidden="true" />
             <p style={{ ...styles.mutedText, marginTop: 'var(--mac-spacing-2)' }}>
               {isDragActive

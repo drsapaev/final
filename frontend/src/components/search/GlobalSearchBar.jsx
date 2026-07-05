@@ -10,6 +10,7 @@ import auth from '../../stores/auth';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors.js';
+import { Input } from '../ui/macos';
 
 const patientSearchRouteByRole = {
   registrar: getRoleHomeRoute('registrar'),
@@ -371,7 +372,7 @@ export default function GlobalSearchBar({ className = '' }) {
     <div style={styles.container} className={className} ref={containerRef}>
             <div style={styles.inputWrapper}>
                 <span style={styles.searchIcon}>🔍</span>
-                <input
+                <Input
           ref={inputRef}
           type="text"
           value={query}

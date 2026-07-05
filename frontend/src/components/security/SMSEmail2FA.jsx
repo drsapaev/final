@@ -1,6 +1,7 @@
 import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
-import { Card, Button } from '../ui/macos';
+import { Card, Button,
+  Input} from '../ui/macos';
 import {
   Mail,
   Phone,
@@ -202,7 +203,7 @@ const SMSEmail2FA = ({
               Код подтверждения
             </label>
             <div className="relative">
-              <input
+              <Input
                 type={showCode ? 'text' : 'password'}
                 aria-label="Код подтверждения"
                 value={code}

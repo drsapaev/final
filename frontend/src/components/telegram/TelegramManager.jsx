@@ -1,6 +1,7 @@
 import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
-import { Card, Button } from '../ui/macos';
+import { Card, Button,
+  Input} from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
 import {
   MessageSquare,
@@ -389,7 +390,7 @@ const TelegramManager = () => {
               Токен бота
             </label>
             <div className="flex space-x-2">
-              <input
+              <Input
               type="password"
               aria-label="Telegram bot token"
               value={settings.bot_token || ''}
@@ -415,7 +416,7 @@ const TelegramManager = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Webhook URL
             </label>
-            <input
+            <Input
             type="url"
             aria-label="Telegram webhook URL"
             value={settings.webhook_url || ''}
@@ -677,7 +678,7 @@ const TelegramManager = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Chat ID
                 </label>
-                <input
+                <Input
                 type="number"
                 aria-label="Telegram test chat ID"
                 value={testChatId}

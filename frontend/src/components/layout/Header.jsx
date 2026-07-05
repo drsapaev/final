@@ -6,6 +6,7 @@ import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSele
 import '../../styles/cursor-effects.css';
 import '../../styles/animations.css';
 import '../ui/animations.css';
+import { Input } from '../ui/macos';
 import {
   Hospital,
   Sun,
@@ -415,7 +416,7 @@ export default function Header() {
               {/* История (календарь+поиск) в контексте кнопки "Главная" */}
               {view === 'welcome' &&
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)', marginLeft: '24px' }}>
-                  <input
+                  <Input
                 type="date"
                 aria-label="Filter appointment history by date"
                 className="interactive-element focus-ring"
@@ -450,7 +451,7 @@ export default function Header() {
                     color: theme === 'light' ? getColor('gray', 600) : getColor('gray', 300)
                   }} />
                 
-                    <input
+                    <Input
                   type="search"
                   aria-label="Search appointment history"
                   placeholder="Поиск по ФИО, телефону, услугам или ID записи..."

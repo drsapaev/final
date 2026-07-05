@@ -9,7 +9,7 @@ import {
   CardContent,
   Typography,
   Badge,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import {
   ArrowLeftRight,
 
@@ -455,7 +455,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               <Typography variant="caption" color="white" style={{ marginBottom: 8, display: 'block' }}>
                 Прозрачность
               </Typography>
-              <input
+              <Input
               type="range"
               aria-label="Настроить прозрачность наложения фото"
               min="0"

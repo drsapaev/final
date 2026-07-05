@@ -23,6 +23,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useToast } from '../../components/common/Toast';
 import logger from '../../utils/logger';
 import './Chat.css';
+import { Input } from '../ui/macos';
 
 const groupReactions = (reactions) => {
   if (!reactions) return {};
@@ -704,7 +705,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                     {showNewChat &&
           <>
                             <div className="user-search-container">
-                                <input
+                                <Input
                 type="text"
                 className="user-search-input"
                 placeholder="Поиск..."
@@ -775,7 +776,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                             <div className="chat-search-bar" style={{ padding: 'var(--mac-spacing-2) var(--mac-spacing-3)', display: 'flex', gap: 8 }}>
                                 <div style={{ position: 'relative', flex: 1 }}>
                                     <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-tertiary)' }} />
-                                    <input
+                                    <Input
                   value={convSearchQuery}
                   onChange={(e) => setConvSearchQuery(e.target.value)}
                   placeholder="Поиск..."
@@ -905,7 +906,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 background: 'var(--mac-bg-primary)',
                 borderBottom: '1px solid var(--mac-border)'
               }}>
-                                        <input
+                                        <Input
                   value={msgSearchQuery}
                   onChange={(e) => setMsgSearchQuery(e.target.value)}
                   placeholder="Поиск по сообщениям..."

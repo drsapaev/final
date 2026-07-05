@@ -6,6 +6,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
+import { Input } from '../ui/macos';
 const PaymentDialog = ({
   isOpen,
   onClose,
@@ -279,7 +280,7 @@ const PaymentDialog = ({
               >
                 Сумма к оплате *
               </label>
-              <input
+              <Input
                 id="payment-amount"
                 type="number"
                 aria-label="Сумма к оплате"

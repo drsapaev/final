@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { X, Save, DollarSign, Calendar, AlertCircle, Receipt } from 'lucide-react';
-import { MacOSCard, Button } from '../ui/macos';
+import { MacOSCard, Button,
+  Input} from '../ui/macos';
 import {
   Select,
 } from '../ui/macos';
@@ -305,7 +306,7 @@ const FinanceModal = ({
                   </label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
-                    <input
+                    <Input
                       type="number"
                       aria-label="Finance transaction amount"
                       value={formData.amount}
@@ -339,7 +340,7 @@ const FinanceModal = ({
                   </label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
-                    <input
+                    <Input
                       type="date"
                       aria-label="Finance transaction date"
                       value={formData.transactionDate}
@@ -473,7 +474,7 @@ const FinanceModal = ({
                   </label>
                   <div className="relative">
                     <Receipt className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
-                    <input
+                    <Input
                       type="text"
                       aria-label="Finance card or transaction reference"
                       value={formData.reference}

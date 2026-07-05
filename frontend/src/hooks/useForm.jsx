@@ -9,6 +9,7 @@ import { useAnimation } from './useAnimation';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
 import logger from '../utils/logger';
+import { Input } from '../../ui/macos';
 // Валидаторы для медицинских форм
 export const validators = {
   required: (value) => {
@@ -314,7 +315,7 @@ export const FormField = ({
         </label>
       }
 
-      <input
+      <Input
         id={name}
         name={name}
         type={type}

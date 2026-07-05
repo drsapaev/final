@@ -17,7 +17,8 @@
 
 import PropTypes from 'prop-types';
 import { TestTube, Plus, Save } from 'lucide-react';
-import { Button, Textarea, Badge, MacOSCard } from '../ui/macos';
+import { Button, Textarea, Badge, MacOSCard,
+  Input} from '../ui/macos';
 
 /**
  * @param {Object} props
@@ -76,7 +77,7 @@ export function BloodTestsTab({
     return (
       <div>
         <label className="cardio-form-label">{label}</label>
-        <input
+        <Input
           type="number"
           aria-label={ariaLabel}
           value={bloodTestForm[fieldName]}
@@ -190,7 +191,7 @@ export function BloodTestsTab({
             <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
               <div>
                 <label className="cardio-form-label">Дата анализа *</label>
-                <input
+                <Input
                   type="date"
                   required
                   aria-label="Дата анализа"
@@ -207,7 +208,7 @@ export function BloodTestsTab({
             <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
               <div>
                 <label className="cardio-form-label">LDL холестерин (мг/дл)</label>
-                <input
+                <Input
                   type="number"
                   aria-label="LDL cholesterol"
                   value={bloodTestForm.cholesterol_ldl}

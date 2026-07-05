@@ -27,6 +27,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 /**
  * Архив фото и рентгенов для стоматологической ЭМК
@@ -646,7 +647,7 @@ const PhotoArchive = ({
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
+                <Input
                   type="text"
                   aria-label="Поиск файлов фотоархива"
                   placeholder="Поиск файлов..."
@@ -682,7 +683,7 @@ const PhotoArchive = ({
                 )}
               </select>
               
-              <input
+              <Input
                 type="date"
                 aria-label="Фильтр фотоархива: дата с"
                 value={formData.filters.dateFrom}
@@ -691,7 +692,7 @@ const PhotoArchive = ({
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               
               
-              <input
+              <Input
                 type="date"
                 aria-label="Фильтр фотоархива: дата до"
                 value={formData.filters.dateTo}

@@ -15,6 +15,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import './ModernFilters.css';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 const ModernFilters = ({
   searchParams,
@@ -89,7 +90,7 @@ const ModernFilters = ({
       <div className="filters-main-panel">
         <div className="search-container">
           <Search className="search-icon" size={20} />
-          <input
+          <Input
             ref={searchInputRef}
             type="text"
             aria-label="Search appointments"
@@ -119,7 +120,7 @@ const ModernFilters = ({
           {/* Быстрый фильтр по дате */}
           <div className="date-filter">
             <Calendar className="filter-icon" size={18} />
-            <input
+            <Input
               type="date"
               aria-label="Filter appointments by date"
               value={dateValue}

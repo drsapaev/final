@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 /**
  * Протокол лечения по визитам для стоматологической ЭМК
@@ -218,7 +219,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Зубы
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Зубы для процедуры ${index + 1}`}
               value={procedure.teeth || ''}
@@ -233,7 +234,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Время начала
                 </label>
-                <input
+                <Input
               type="time"
               aria-label={`Время начала процедуры ${index + 1}`}
               value={procedure.startTime || ''}
@@ -247,7 +248,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Время окончания
                 </label>
-                <input
+                <Input
               type="time"
               aria-label={`Время окончания процедуры ${index + 1}`}
               value={procedure.endTime || ''}
@@ -352,7 +353,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Название материала
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Название материала ${index + 1}`}
               value={material.name || ''}
@@ -367,7 +368,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Количество
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Количество материала ${index + 1}`}
               value={material.quantity || ''}
@@ -382,7 +383,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Партия/Срок годности
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Партия или срок годности материала ${index + 1}`}
               value={material.batch || ''}
@@ -453,7 +454,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Препарат
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Препарат анестезии ${index + 1}`}
               value={anesthesia.drug || ''}
@@ -468,7 +469,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Доза
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Доза анестезии ${index + 1}`}
               value={anesthesia.dose || ''}
@@ -502,7 +503,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Область
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Область анестезии ${index + 1}`}
               value={anesthesia.area || ''}
@@ -668,7 +669,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Область
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Область рентгена ${index + 1}`}
               value={radiograph.area || ''}
@@ -738,7 +739,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Препарат
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Препарат назначения ${index + 1}`}
               value={prescription.medication || ''}
@@ -753,7 +754,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Дозировка
                 </label>
-                <input
+                <Input
               type="text"
               aria-label={`Дозировка назначения ${index + 1}`}
               value={prescription.dosage || ''}
@@ -827,7 +828,7 @@ const VisitProtocol = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Дата
             </label>
-            <input
+            <Input
             type="date"
             aria-label="Дата следующего визита"
             value={formData.nextVisit.date || ''}
@@ -841,7 +842,7 @@ const VisitProtocol = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Время
             </label>
-            <input
+            <Input
             type="time"
             aria-label="Время следующего визита"
             value={formData.nextVisit.time || ''}
@@ -855,7 +856,7 @@ const VisitProtocol = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Цель визита
             </label>
-            <input
+            <Input
             type="text"
             aria-label="Цель следующего визита"
             value={formData.nextVisit.purpose || ''}

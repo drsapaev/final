@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { CheckCircle, XCircle } from 'lucide-react';
 import {
   Button,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import notify from '../../services/notify';
 
 /**
@@ -104,7 +104,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                         <label htmlFor="cash-payment-amount" style={{ display: 'block', fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', marginBottom: 'var(--mac-spacing-1)' }}>
                             Сумма (сум)
                         </label>
-                        <input
+                        <Input
                             id="cash-payment-amount"
                             type="number"
                             aria-label="Сумма оплаты"

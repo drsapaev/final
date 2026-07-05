@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import logger from '../../utils/logger';
 import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
+import { Input } from '../ui/macos';
 import {
   Calendar,
   Clock,
@@ -482,7 +483,7 @@ const ScheduleNextModal = ({
                 <Calendar size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
                 Дата визита
               </label>
-              <input
+              <Input
                 id="schedule-next-visit-date"
                 type="date"
                 aria-label="Schedule next visit date"
@@ -499,7 +500,7 @@ const ScheduleNextModal = ({
                 <Clock size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
                 Время
               </label>
-              <input
+              <Input
                 id="schedule-next-visit-time"
                 type="time"
                 aria-label="Schedule next visit time"
@@ -538,7 +539,7 @@ const ScheduleNextModal = ({
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <input
+                  <Input
                   id={`schedule-next-service-quantity-${index}`}
                   type="number"
                   aria-label={`Schedule next visit service ${index + 1} quantity`}

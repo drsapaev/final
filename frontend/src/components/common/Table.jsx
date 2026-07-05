@@ -2,6 +2,7 @@
 import PropTypes from 'prop-types';
 import { useState, useMemo, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { Input } from '../ui/macos';
 
 /**
  * Компонент таблицы
@@ -217,7 +218,7 @@ export function Table({
               {columns.map((column) => (
                 <th key={`filter-${column.key}`} style={headerCellStyle}>
                   {column.filterable !== false && (
-                    <input
+                    <Input
                       type="text"
                       aria-label={`Filter ${column.title}`}
                       placeholder={`Фильтр по ${column.title.toLowerCase()}`}

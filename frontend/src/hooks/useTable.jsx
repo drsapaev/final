@@ -7,6 +7,7 @@ import { useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 import { useReducedMotion } from './useEnhancedMediaQuery';
+import { Input } from '../../ui/macos';
 
 // Хук для управления таблицей
 export const useTable = (data = [], options = {}) => {
@@ -569,7 +570,7 @@ export const TableSearch = ({
       {...props}>
       
       <div style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)' }}>🔍</div>
-      <input
+      <Input
         type="text"
         aria-label={placeholder || 'Table search'}
         value={searchTerm}
