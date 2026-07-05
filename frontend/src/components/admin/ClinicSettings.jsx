@@ -228,7 +228,7 @@ const ClinicSettings = () => {
 
   return (
     <div className="admin-p-0-bg-bg-primary">
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         {/* Заголовок */}
         <div className="admin-flex-ai-center-jc-between-mb-24-pb-24-borderbottom-0a48a6">
           <div>
@@ -248,7 +248,7 @@ const ClinicSettings = () => {
               disabled={loading}
               className="admin-flex-ai-center-gap-8-p-8px16"
             >
-              <RefreshCw className="admin-icon-16" />
+              <RefreshCw className="w-4 h-4" />
               Обновить
             </Button>
             <Button
@@ -259,7 +259,7 @@ const ClinicSettings = () => {
               {saving ? (
                 <RefreshCw className="admin-w-16-h-16-anim-spin1slinearinfinite" />
               ) : (
-                <Save className="admin-icon-16" />
+                <Save className="w-4 h-4" />
               )}
               Сохранить
             </Button>
@@ -269,7 +269,7 @@ const ClinicSettings = () => {
         {/* Сообщения */}
         {message.text && (
           <MacOSCard className="admin-p-16-mb-24" style={{ '--admin-backgroundColor': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' }}>
-            <div className="admin-flex-center-8">
+            <div className="flex items-center justify-center gap-2">
               {message.type === 'success' ? (
                 <CheckCircle className="admin-w-20-h-20-success" />
               ) : (
@@ -284,13 +284,13 @@ const ClinicSettings = () => {
 
         <div className="admin-grid-gtc-rauto-fitcminmax400pxc1fr-gap-24-mb-24">
           {/* Основная информация */}
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-primary-mb-16-flex-ai-center-gap-8">
               <Building2 className="admin-w-20-h-20-blue" />
               Основная информация
             </h3>
 
-            <div className="admin-flex-col-16">
+            <div className="flex flex-col gap-4">
               <div>
                 <label className="admin-block-sm-med-primary-mb-8">
                   Название клиники
@@ -300,13 +300,13 @@ const ClinicSettings = () => {
                   value={settings.clinic_name || ''}
                   onChange={(e) => handleInputChange('clinic_name', e.target.value)}
                   placeholder="Название медицинского учреждения"
-                  className="admin-w-full"
+                  className="w-full"
                 />
               </div>
 
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
-                  <MapPin className="admin-icon-16" />
+                  <MapPin className="w-4 h-4" />
                   Адрес
                 </label>
                 <Textarea
@@ -314,13 +314,13 @@ const ClinicSettings = () => {
                   onChange={(e) => handleInputChange('address', e.target.value)}
                   rows={2}
                   placeholder="Полный адрес клиники"
-                  className="admin-w-full"
+                  className="w-full"
                 />
               </div>
 
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
-                  <Phone className="admin-icon-16" />
+                  <Phone className="w-4 h-4" />
                   Телефон
                 </label>
                 <Input
@@ -328,13 +328,13 @@ const ClinicSettings = () => {
                   value={settings.phone || ''}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   placeholder="+998 (90) 123-45-67"
-                  className="admin-w-full"
+                  className="w-full"
                 />
               </div>
 
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
-                  <Mail className="admin-icon-16" />
+                  <Mail className="w-4 h-4" />
                   Email
                 </label>
                 <Input
@@ -342,23 +342,23 @@ const ClinicSettings = () => {
                   value={settings.email || ''}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="info@clinic.com"
-                  className="admin-w-full"
+                  className="w-full"
                 />
               </div>
             </div>
           </MacOSCard>
 
           {/* Системные настройки */}
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-primary-mb-16-flex-ai-center-gap-8">
               <Globe className="admin-w-20-h-20-success" />
               Системные настройки
             </h3>
 
-            <div className="admin-flex-col-16">
+            <div className="flex flex-col gap-4">
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
-                  <Clock className="admin-icon-16" />
+                  <Clock className="w-4 h-4" />
                   Часовой пояс
                 </label>
                 <Select
@@ -367,7 +367,7 @@ const ClinicSettings = () => {
                   onChange={(value) => handleInputChange('timezone', value)}
                   options={timezones}
                   size="large"
-                  className="admin-w-full"
+                  className="w-full"
                 />
                 <p className="admin-xs-tertiary-mt-4-m-4px000">
                   Используется для расписания и онлайн-очереди
@@ -377,13 +377,13 @@ const ClinicSettings = () => {
               {/* Логотип */}
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
-                  <Image className="admin-icon-16" />
+                  <Image className="w-4 h-4" />
                   Логотип клиники
                 </label>
 
                 {/* Текущий логотип */}
                 {(settings.logo_url || logoPreview) && (
-                  <div className="admin-mb-12">
+                  <div className="mb-3">
                     <div className="admin-w-128-h-80-bd-2dashedvar-mac-border-radius-var--mac-radius-md-flex-ai-cent-5f1cf18b">
                       <img
                         src={logoPreview || settings.logo_url}
@@ -425,7 +425,7 @@ const ClinicSettings = () => {
                       e.target.style.borderColor = 'var(--mac-border)';
                     }}
                   >
-                    <Upload className="admin-icon-16-mr-8" />
+                    <Upload className="w-4 h-4 mr-2" />
                     Выбрать файл
                   </label>
                 </div>
@@ -437,7 +437,7 @@ const ClinicSettings = () => {
           </MacOSCard>
         </div>
 
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <div className="admin-flex-ai-center-jc-between-gap-16-mb-20-pb-20-borderbottom-0a48a6">
             <div>
               <h3 className="admin-lg-semi-primary-m-008px0-flex-ai-center-gap-8">
@@ -459,7 +459,7 @@ const ClinicSettings = () => {
                 disabled={ticketPrintLoading}
                 className="admin-flex-ai-center-gap-8-p-8px16"
               >
-                <RefreshCw className="admin-icon-16" />
+                <RefreshCw className="w-4 h-4" />
                 Обновить
               </Button>
               <Button
@@ -470,7 +470,7 @@ const ClinicSettings = () => {
                 {ticketPrintSaving ? (
                   <RefreshCw className="admin-w-16-h-16-anim-spin1slinearinfinite" />
                 ) : (
-                  <Save className="admin-icon-16" />
+                  <Save className="w-4 h-4" />
                 )}
                 Сохранить
               </Button>
@@ -479,7 +479,7 @@ const ClinicSettings = () => {
 
           {ticketPrintMessage.text && (
             <MacOSCard className="admin-p-16-mb-20" style={{ '--admin-backgroundColor': ticketPrintMessage.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': ticketPrintMessage.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' }}>
-              <div className="admin-flex-center-8">
+              <div className="flex items-center justify-center gap-2">
                 {ticketPrintMessage.type === 'success' ? (
                   <CheckCircle className="admin-w-20-h-20-success" />
                 ) : (

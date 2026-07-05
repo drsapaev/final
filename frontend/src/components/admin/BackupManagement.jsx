@@ -238,27 +238,27 @@ const BackupManagement = () => {
         </div>
         {stats &&
         <div className="admin-d-flex-gap-24-fw-wrap-2">
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-blue-mb-4-2">
                 {stats.total_backups}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Всего копий
               </div>
             </div>
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-success-mb-4-2">
                 {stats.completed_backups}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Завершено
               </div>
             </div>
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-warning-mb-4">
                 {formatFileSize(stats.total_size)}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Общий размер
               </div>
             </div>
@@ -276,7 +276,7 @@ const BackupManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <div className="admin-d-flex-fd-column-gap-16-fw-wrap-2">
           <div className="admin-flex-1-pos-relative">
             <Input
@@ -314,7 +314,7 @@ const BackupManagement = () => {
               onClick={() => setShowAddForm(true)}
               className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px-2">
               
-              <Plus aria-hidden="true" className="admin-icon-16" />
+              <Plus aria-hidden="true" className="w-4 h-4" />
               <span>Создать копию</span>
             </Button>
             <Button
@@ -322,8 +322,8 @@ const BackupManagement = () => {
               aria-label="Очистить просроченные резервные копии"
               onClick={handleCleanupExpired}
               variant="outline"
-              className="admin-flex-center-8">
-              <RefreshCw aria-hidden="true" className="admin-icon-16" />
+              className="flex items-center justify-center gap-2">
+              <RefreshCw aria-hidden="true" className="w-4 h-4" />
               <span>Очистить просроченные</span>
             </Button>
           </div>
@@ -346,13 +346,13 @@ const BackupManagement = () => {
               setEditingBackup(null);
               resetForm();
             }}
-            className="admin-p-8">
+            className="p-2">
             
-              <X aria-hidden="true" className="admin-icon-16" />
+              <X aria-hidden="true" className="w-4 h-4" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} className="admin-flex-col-16">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-4">
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-21">
@@ -414,7 +414,7 @@ const BackupManagement = () => {
             
             </div>
 
-            <div className="admin-flex-col-12">
+            <div className="flex flex-col gap-3">
               <div className="admin-flex-center-12">
                 <Checkbox
                 checked={formData.compression}
@@ -461,7 +461,7 @@ const BackupManagement = () => {
                   </> :
 
               <>
-                    <Save aria-hidden="true" className="admin-icon-16" />
+                    <Save aria-hidden="true" className="w-4 h-4" />
                     {editingBackup ? 'Обновить' : 'Создать'}
                   </>
               }
@@ -475,7 +475,7 @@ const BackupManagement = () => {
       {loading ?
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-5">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} className="admin-p-24">
+        <MacOSCard key={i} className="p-6">
               <Skeleton height="200px" />
             </MacOSCard>
         )}
@@ -487,7 +487,7 @@ const BackupManagement = () => {
         description={backupEmptyDescription}
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" focusable="false" className="admin-icon-16-mr-8" />
+              <Plus aria-hidden="true" focusable="false" className="w-4 h-4 mr-2" />
               Создать копию
             </Button>
         } /> :
@@ -495,7 +495,7 @@ const BackupManagement = () => {
 
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-4">
           {filteredBackups.map((backup) =>
-        <MacOSCard key={backup.id} className="admin-p-24">
+        <MacOSCard key={backup.id} className="p-6">
               <div className="admin-d-flex-jc-between-ai-start-mb-16-2">
                 <div>
                   <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0-2">
@@ -513,15 +513,15 @@ const BackupManagement = () => {
 
               <div className="admin-d-flex-fd-column-gap-8-mb-16-2">
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-11">
-                  <HardDrive aria-hidden="true" className="admin-icon-16" />
+                  <HardDrive aria-hidden="true" className="w-4 h-4" />
                   <span>{formatFileSize(backup.file_size)}</span>
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-10">
-                  <Calendar aria-hidden="true" className="admin-icon-16" />
+                  <Calendar aria-hidden="true" className="w-4 h-4" />
                   <span>{new Date(backup.created_at).toLocaleString()}</span>
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-9">
-                  <Clock aria-hidden="true" className="admin-icon-16" />
+                  <Clock aria-hidden="true" className="w-4 h-4" />
                   <span>Хранение: {backup.retention_days} дней</span>
                 </div>
                 {backup.file_path &&
@@ -532,7 +532,7 @@ const BackupManagement = () => {
               </div>
 
               {backup.notes &&
-          <div className="admin-mb-16">
+          <div className="mb-4">
                   <p className="admin-fs-sm-secondary-m-0-lh-1p4-1">
                     {backup.notes}
                   </p>
@@ -547,7 +547,7 @@ const BackupManagement = () => {
               onClick={() => handleEdit(backup)}
               className="admin-p-6px-12px-2">
               
-                  <Edit aria-hidden="true" className="admin-icon-16" />
+                  <Edit aria-hidden="true" className="w-4 h-4" />
                 </Button>
                 <Button
               type="button"
@@ -556,7 +556,7 @@ const BackupManagement = () => {
               onClick={() => handleDelete(backup.id)}
               className="admin-p-6px-12px-error-bd-c-error-2">
               
-                  <Trash2 aria-hidden="true" className="admin-icon-16" />
+                  <Trash2 aria-hidden="true" className="w-4 h-4" />
                 </Button>
               </div>
             </MacOSCard>

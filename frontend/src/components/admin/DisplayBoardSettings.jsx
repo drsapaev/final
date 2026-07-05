@@ -295,7 +295,7 @@ const DisplayBoardSettings = () => {
                   label: theme.display_name
                 }))}
                 size="large"
-                className="admin-w-full" />
+                className="w-full" />
             </div>
 
             <div>
@@ -311,7 +311,7 @@ const DisplayBoardSettings = () => {
                   label: `${option.label} - ${option.description}`
                 }))}
                 size="large"
-                className="admin-w-full" />
+                className="w-full" />
               <p className="text-sm text-gray-500 mt-1">
                 Уровень конфиденциальности для пациентов
               </p>
@@ -445,7 +445,7 @@ const DisplayBoardSettings = () => {
                     label: lang.label
                   }))}
                   size="large"
-                  className="admin-w-full" />
+                  className="w-full" />
                 </div>
 
                 <div>
