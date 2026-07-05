@@ -91,6 +91,9 @@ import { api } from '../api/client';
 
 // ✅ Форс-мажор модальное окно
 import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
+// UX Audit Registrar #14: extracted DataSourceIndicator and CSV utilities.
+import DataSourceIndicator from './registrar/DataSourceIndicator';
+import { generateCSV, downloadCSV } from './registrar/registrarCsv';
 
 const RegistrarPanel = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
@@ -1280,113 +1283,8 @@ const RegistrarPanel = () => {
   filteredAppointmentsRef.current = filteredAppointments;
 
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
-  const DataSourceIndicator = memo(({ count }) => {
-    // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
-    // DS-3: inline styles replaced with .registrar-ds-* CSS classes
-    if (dataSource === 'error') {
-      return (
-        <div className="registrar-ds-indicator registrar-ds-error">
-          <Icon name="exclamationmark.triangle" size="small" className="registrar-text-white" />
-          <span>Не удалось загрузить записи. Проверьте подключение к серверу.</span>
-          <button
-            onClick={() => loadAppointments({ source: 'error_refresh_button', force: true })}
-            className="registrar-ds-retry-btn">
-
-            Повторить
-          </button>
-        </div>);
-
-    }
-
-    if (dataSource === 'api') {
-      return (
-        <div className="registrar-ds-indicator registrar-ds-success">
-          <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
-          <span>Данные загружены с сервера</span>
-          <span className="registrar-ds-count">
-            {count} из {paginationInfo.total} записей
-          </span>
-        </div>);
-
-    }
-
-    if (dataSource === 'loading') {
-      return (
-        <div className="registrar-ds-indicator registrar-ds-loading">
-          <Icon name="arrow.up.arrow.down" size="small" className="registrar-text-white" />
-          <span>Загрузка данных...</span>
-        </div>);
-
-    }
-
-    return null;
-  });
-
-  DataSourceIndicator.displayName = 'DataSourceIndicator';
-  DataSourceIndicator.propTypes = {
-    count: PropTypes.number.isRequired,
-  };
-
-  // Функция генерации CSV
-  const generateCSV = (data) => {
-    const headers = ['№', 'ФИО', 'Год рождения', 'Телефон', 'Услуги', 'Тип обращения', 'Вид оплаты', 'Стоимость', 'Статус'];
-    const rows = data.map((row, index) => [
-    index + 1,
-    row.patient_fio || '',
-    row.patient_birth_year || '',
-    // R-05 fix: маскируем телефон в CSV-экспорте
-    maskPhoneForCSV(row.patient_phone || ''),
-    Array.isArray(row.services) ? row.services.join('; ') : row.services || '',
-    row.visit_type || '',
-    row.payment_type || '',
-    row.cost || '',
-    row.status || '']
-    );
-
-    // R-23 fix: CSV injection protection (CWE-1236).
-    // Экранируем двойные кавычки (CSV standard: " → "")
-    // и префиксируем опасные символы (=, +, -, @) одинарной кавычкой,
-    // чтобы Excel/LibreOffice не интерпретировали их как формулы.
-    const escapeCSVCell = (value) => {
-      const str = String(value ?? '');
-      let escaped = str.replace(/"/g, '""');
-      if (/^[=+\-@]/.test(escaped)) {
-        escaped = '\'' + escaped;
-      }
-      return `"${escaped}"`;
-    };
-
-    const csvContent = [
-    headers.join(','),
-    ...rows.map((row) => row.map(escapeCSVCell).join(','))].
-    join('\n');
-
-    return csvContent;
-  };
-
-  // R-05 fix: маскирование телефона для CSV-экспорта.
-  function maskPhoneForCSV(phone) {
-    if (!phone) return '';
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length < 4) return '***';
-    const lastTwo = digits.slice(-2);
-    const countryMatch = phone.match(/^\+\d{1,3}/);
-    const country = countryMatch ? countryMatch[0] : '+';
-    return `${country} ***-**-${lastTwo}`;
-  }
-
-  // Функция скачивания CSV
-  const downloadCSV = (content, filename) => {
-    const blob = new Blob(['\ufeff' + content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  // UX Audit Registrar #14: DataSourceIndicator, generateCSV, downloadCSV
+  // extracted to ./registrar/DataSourceIndicator.jsx and ./registrar/registrarCsv.js.
 
 
   // Обработчик действий контекстного меню
@@ -1579,7 +1477,14 @@ const RegistrarPanel = () => {
             handleStartVisit={handleStartVisit}
             generateCSV={generateCSV}
             downloadCSV={downloadCSV}
-            DataSourceIndicator={DataSourceIndicator}
+            DataSourceIndicator={() => (
+              <DataSourceIndicator
+                dataSource={dataSource}
+                count={appointments.length}
+                paginationInfo={paginationInfo}
+                onRetry={loadAppointments}
+              />
+            )}
           />
         )}
 
