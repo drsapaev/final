@@ -70,7 +70,7 @@ function denyBox(have, need) {
 
 const box = {
   border: '1px solid #fecaca',
-  background: '#fef2f2',
+  background: 'var(--mac-error-bg)',
   color: '#7f1d1d',
   borderRadius: 8,
   padding: 12,

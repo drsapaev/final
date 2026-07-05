@@ -337,7 +337,7 @@ const ForceMajeureModal = ({
               gap: '8px',
               fontSize: '14px',
               fontWeight: 600,
-              color: activeTab === 'cancel' ? '#dc2626' : getColor('textSecondary'),
+              color: activeTab === 'cancel' ? 'var(--mac-error)' : getColor('textSecondary'),
               background: activeTab === 'cancel'
                 ? (theme === 'dark' ? 'rgba(239, 68, 68, 0.14)' : 'white')
                 : 'transparent',
@@ -358,7 +358,7 @@ const ForceMajeureModal = ({
           alignItems: 'center',
           gap: '16px'
         }}>
-          <Users size={32} color={theme === 'dark' ? '#9ca3af' : '#6b7280'} />
+          <Users size={32} color={theme === 'dark' ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)'} />
           <div style={{ minWidth: 0 }}>
             <p style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: getColor('textPrimary') }}>
               {dryRunResult.count} записей
@@ -403,7 +403,7 @@ const ForceMajeureModal = ({
             style={{
               width: '100%',
               padding: '12px 14px',
-              border: `1px solid ${error ? '#ef4444' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'var(--mac-border)'}`,
+              border: `1px solid ${error ? 'var(--mac-error)' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'var(--mac-border)'}`,
               borderRadius: '12px',
               fontSize: '14px',
               minHeight: '96px',
@@ -414,7 +414,7 @@ const ForceMajeureModal = ({
               outline: 'none'
             }} />
           {!isReasonValid && reason.length > 0 &&
-          <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#ef4444' }}>
+          <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--mac-error)' }}>
             Минимум 5 символов
           </p>
           }
@@ -437,7 +437,7 @@ const ForceMajeureModal = ({
               border: refundType === 'deposit' ? '1px solid #3b82f6' : `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
               borderRadius: '12px',
               cursor: 'pointer',
-              background: refundType === 'deposit' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : '#eff6ff') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
+              background: refundType === 'deposit' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
             }}>
               <input
                 type="radio"
@@ -455,7 +455,7 @@ const ForceMajeureModal = ({
               border: refundType === 'bank_transfer' ? '1px solid #3b82f6' : `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
               borderRadius: '12px',
               cursor: 'pointer',
-              background: refundType === 'bank_transfer' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : '#eff6ff') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
+              background: refundType === 'bank_transfer' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
             }}>
               <input
                 type="radio"
@@ -473,8 +473,8 @@ const ForceMajeureModal = ({
         }
 
         <div style={{
-          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
-          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : '#fecaca'}`,
+          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
+          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
           borderRadius: '14px',
           padding: '16px'
         }}>
@@ -493,7 +493,7 @@ const ForceMajeureModal = ({
             style={{
               width: '100%',
               padding: '10px 12px',
-              border: `1px solid ${isConfirmValid ? '#22c55e' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : '#fca5a5'}`,
+              border: `1px solid ${isConfirmValid ? 'var(--mac-success)' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : '#fca5a5'}`,
               borderRadius: '12px',
               fontSize: '14px',
               fontWeight: 600,
@@ -507,12 +507,12 @@ const ForceMajeureModal = ({
 
         {error &&
         <div style={{
-          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
-          color: '#dc2626',
+          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
+          color: 'var(--mac-error)',
           padding: '12px 14px',
           borderRadius: '12px',
           fontSize: '14px',
-          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : '#fecaca'}`
+          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`
         }}>
           {error}
         </div>

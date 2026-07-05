@@ -163,8 +163,8 @@ export const Tab = ({
         padding: '12px 16px',
         fontSize: '14px',
         fontWeight: active ? '600' : '400',
-        color: active ? '#3b82f6' : disabled ? '#9ca3af' : '#374151',
-        backgroundColor: active ? '#eff6ff' : 'transparent',
+        color: active ? 'var(--mac-accent-blue)' : disabled ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
+        backgroundColor: active ? 'var(--mac-accent-bg)' : 'transparent',
         border: 'none',
         borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
         cursor: disabled ? 'not-allowed' : 'pointer',
@@ -174,7 +174,7 @@ export const Tab = ({
       }}
       onMouseEnter={(e) => {
         if (!active && !disabled && !prefersReducedMotion) {
-          e.target.style.backgroundColor = '#f9fafb';
+          e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
         }
       }}
       onMouseLeave={(e) => {
@@ -204,7 +204,7 @@ export const Tabs = ({
         style={{
           display: 'flex',
           borderBottom: '1px solid #e5e7eb',
-          backgroundColor: '#f9fafb'
+          backgroundColor: 'var(--mac-bg-secondary)'
         }}>
         
         {React.Children.map(children, (child, index) =>
@@ -234,7 +234,7 @@ export const TabPanel = ({
       className={`tab-panel ${animationClasses} ${className}`}
       style={{
         padding: '20px',
-        backgroundColor: '#ffffff'
+        backgroundColor: 'var(--mac-bg-primary)'
       }}
       {...props}>
       
@@ -282,8 +282,8 @@ export const NavigationMenu = ({
           padding: isHorizontal ? '12px 16px' : '8px 16px',
           fontSize: '14px',
           fontWeight: activeItem === item.id ? '600' : '400',
-          color: activeItem === item.id ? '#3b82f6' : item.disabled ? '#9ca3af' : '#374151',
-          backgroundColor: activeItem === item.id ? '#eff6ff' : 'transparent',
+          color: activeItem === item.id ? 'var(--mac-accent-blue)' : item.disabled ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
+          backgroundColor: activeItem === item.id ? 'var(--mac-accent-bg)' : 'transparent',
           border: 'none',
           borderRadius: isHorizontal ? '0' : '6px',
           cursor: item.disabled ? 'not-allowed' : 'pointer',
@@ -299,7 +299,7 @@ export const NavigationMenu = ({
         }}
         onMouseEnter={(e) => {
           if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
-            e.target.style.backgroundColor = '#f9fafb';
+            e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
           }
         }}
         onMouseLeave={(e) => {
@@ -316,8 +316,8 @@ export const NavigationMenu = ({
             marginLeft: 'auto',
             padding: '2px 6px',
             fontSize: '11px',
-            backgroundColor: '#ef4444',
-            color: '#ffffff',
+            backgroundColor: 'var(--mac-error)',
+            color: 'var(--mac-bg-primary)',
             borderRadius: '10px',
             minWidth: '18px',
             textAlign: 'center'
@@ -347,17 +347,17 @@ export const Breadcrumbs = ({
         alignItems: 'center',
         gap: '8px',
         fontSize: '14px',
-        color: '#6b7280'
+        color: 'var(--mac-text-secondary)'
       }}
       {...props}>
       
       {items.map((item, index) =>
       <React.Fragment key={item.id || index}>
           {index > 0 &&
-        <span style={{ color: '#9ca3af' }}>{separator}</span>
+        <span style={{ color: 'var(--mac-text-tertiary)' }}>{separator}</span>
         }
           {index === items.length - 1 ?
-        <span style={{ color: '#374151', fontWeight: '500' }}>
+        <span style={{ color: 'var(--mac-text-primary)', fontWeight: '500' }}>
               {item.label}
             </span> :
 
@@ -366,7 +366,7 @@ export const Breadcrumbs = ({
           style={{
             background: 'none',
             border: 'none',
-            color: '#3b82f6',
+            color: 'var(--mac-accent-blue)',
             cursor: 'pointer',
             textDecoration: 'none',
             padding: '0',
@@ -448,7 +448,7 @@ export const Pagination = ({
       {...props}>
       
       {/* Информация о странице */}
-      <div style={{ fontSize: '14px', color: '#6b7280' }}>
+      <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
         Страница {currentPage} из {totalPages}
       </div>
 
@@ -463,19 +463,19 @@ export const Pagination = ({
             fontSize: '14px',
             border: '1px solid #d1d5db',
             borderRadius: '6px',
-            backgroundColor: currentPage === 1 ? '#f3f4f6' : '#ffffff',
-            color: currentPage === 1 ? '#9ca3af' : '#374151',
+            backgroundColor: currentPage === 1 ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+            color: currentPage === 1 ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#ffffff';
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -496,20 +496,20 @@ export const Pagination = ({
               fontWeight: page === currentPage ? '600' : '400',
               border: '1px solid #d1d5db',
               borderRadius: '6px',
-              backgroundColor: page === currentPage ? '#3b82f6' : page === '...' ? 'transparent' : '#ffffff',
-              color: page === currentPage ? '#ffffff' : page === '...' ? 'transparent' : '#374151',
+              backgroundColor: page === currentPage ? 'var(--mac-accent-blue)' : page === '...' ? 'transparent' : 'var(--mac-bg-primary)',
+              color: page === currentPage ? 'var(--mac-bg-primary)' : page === '...' ? 'transparent' : 'var(--mac-text-primary)',
               cursor: page === '...' ? 'default' : 'pointer',
               minWidth: '40px',
               transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
             }}
             onMouseEnter={(e) => {
               if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
-                e.target.style.backgroundColor = page === currentPage ? '#2563eb' : '#f9fafb';
+                e.target.style.backgroundColor = page === currentPage ? '#2563eb' : 'var(--mac-bg-secondary)';
               }
             }}
             onMouseLeave={(e) => {
               if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
-                e.target.style.backgroundColor = page === currentPage ? '#3b82f6' : '#ffffff';
+                e.target.style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
               }
             }}>
             
@@ -528,19 +528,19 @@ export const Pagination = ({
             fontSize: '14px',
             border: '1px solid #d1d5db',
             borderRadius: '6px',
-            backgroundColor: currentPage === totalPages ? '#f3f4f6' : '#ffffff',
-            color: currentPage === totalPages ? '#9ca3af' : '#374151',
+            backgroundColor: currentPage === totalPages ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+            color: currentPage === totalPages ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#ffffff';
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -551,7 +551,7 @@ export const Pagination = ({
       {/* Выбор размера страницы */}
       {showPageSize &&
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14px', color: '#6b7280' }}>Показывать:</span>
+          <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Показывать:</span>
           <select
           value={pageSize}
           onChange={(e) => onPageSizeChange && onPageSizeChange(Number(e.target.value))}
@@ -560,8 +560,8 @@ export const Pagination = ({
             fontSize: '14px',
             border: '1px solid #d1d5db',
             borderRadius: '4px',
-            backgroundColor: '#ffffff',
-            color: '#374151'
+            backgroundColor: 'var(--mac-bg-primary)',
+            color: 'var(--mac-text-primary)'
           }}>
           
             {pageSizeOptions.map((size) =>

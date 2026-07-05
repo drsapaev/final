@@ -172,7 +172,7 @@ const DoctorCalendar = ({
   // Стили
   const styles = {
     container: {
-      backgroundColor: isDark ? 'var(--mac-bg-secondary)' : '#ffffff',
+      backgroundColor: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
       borderRadius: '12px',
       boxShadow: isDark ?
       '0 4px 20px rgba(0, 0, 0, 0.3)' :
@@ -211,8 +211,8 @@ const DoctorCalendar = ({
       padding: '8px 16px',
       borderRadius: '8px',
       border: 'none',
-      backgroundColor: '#007aff',
-      color: '#ffffff',
+      backgroundColor: 'var(--mac-accent-blue)',
+      color: 'var(--mac-bg-primary)',
       fontSize: '13px',
       fontWeight: '500',
       cursor: 'pointer',
@@ -235,7 +235,7 @@ const DoctorCalendar = ({
     dayCell: {
       minHeight: compact ? '80px' : '120px',
       padding: '8px',
-      backgroundColor: isDark ? 'var(--mac-bg-primary)' : '#ffffff',
+      backgroundColor: isDark ? 'var(--mac-bg-primary)' : 'var(--mac-bg-primary)',
       position: 'relative'
     },
     dayCellToday: {
@@ -251,8 +251,8 @@ const DoctorCalendar = ({
       width: '28px',
       height: '28px',
       borderRadius: '50%',
-      backgroundColor: '#007aff',
-      color: '#ffffff',
+      backgroundColor: 'var(--mac-accent-blue)',
+      color: 'var(--mac-bg-primary)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center'

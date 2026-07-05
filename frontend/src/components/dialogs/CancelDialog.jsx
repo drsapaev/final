@@ -265,7 +265,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
               padding: '12px 14px',
               border: `1px solid ${
                 error
-                  ? '#ef4444'
+                  ? 'var(--mac-error)'
                   : theme === 'dark'
                     ? 'rgba(255,255,255,0.10)'
                     : 'var(--mac-border)'
@@ -283,13 +283,13 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             }}
             onFocus={(e) => {
               if (!error) {
-                e.target.style.borderColor = '#3b82f6';
+                e.target.style.borderColor = 'var(--mac-accent-blue)';
                 e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
               }
             }}
             onBlur={(e) => {
               e.target.style.borderColor = error
-                ? '#ef4444'
+                ? 'var(--mac-error)'
                 : theme === 'dark'
                   ? 'rgba(255,255,255,0.10)'
                   : 'var(--mac-border)';
@@ -312,7 +312,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                 <p
                   id="cancel-reason-error"
                   style={{
-                    color: '#ef4444',
+                    color: 'var(--mac-error)',
                     fontSize: '12px',
                     margin: 0,
                   }}

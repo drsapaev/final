@@ -123,9 +123,9 @@ const MedicalTable = ({
     <div 
       className={`medical-table ${className}`}
       style={{
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+        backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
         borderRadius: '8px',
-        border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        border: `1px solid ${isDark ? '#334155' : 'var(--mac-border)'}`,
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
       }}
@@ -135,7 +135,7 @@ const MedicalTable = ({
         <table className="w-full">
           <thead 
             style={{
-              backgroundColor: isDark ? '#334155' : '#f8fafc'
+              backgroundColor: isDark ? '#334155' : 'var(--mac-bg-secondary)'
             }}
           >
             <tr>
@@ -146,8 +146,8 @@ const MedicalTable = ({
                     sortable ? 'cursor-pointer hover:bg-gray-100 interactive-element hover-lift ripple-effect magnetic-hover focus-ring' : ''
                   }`}
                   style={{
-                    color: isDark ? '#f8fafc' : '#374151',
-                    backgroundColor: isDark ? '#334155' : '#f8fafc'
+                    color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+                    backgroundColor: isDark ? '#334155' : 'var(--mac-bg-secondary)'
                   }}
                   onClick={() => handleSort(column.key)}
                 >
@@ -161,8 +161,8 @@ const MedicalTable = ({
                 <th 
                   className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                   style={{
-                    color: isDark ? '#f8fafc' : '#374151',
-                    backgroundColor: isDark ? '#334155' : '#f8fafc'
+                    color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+                    backgroundColor: isDark ? '#334155' : 'var(--mac-bg-secondary)'
                   }}
                 >
                   Actions
@@ -173,8 +173,8 @@ const MedicalTable = ({
           <tbody 
             className="divide-y"
             style={{
-              backgroundColor: isDark ? '#1e293b' : '#ffffff',
-              borderColor: isDark ? '#334155' : '#e2e8f0'
+              backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
+              borderColor: isDark ? '#334155' : 'var(--mac-border)'
             }}
           >
             {paginatedData.map((row, index) => (
@@ -182,20 +182,20 @@ const MedicalTable = ({
                 key={index}
                 className="hover:bg-gray-50 transition-colors interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
                 style={{
-                  backgroundColor: isDark ? '#1e293b' : '#ffffff'
+                  backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = isDark ? '#475569' : '#f8fafc';
+                  e.target.style.backgroundColor = isDark ? '#475569' : 'var(--mac-bg-secondary)';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = isDark ? '#1e293b' : '#ffffff';
+                  e.target.style.backgroundColor = isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)';
                 }}
               >
                 {columns.map((column) => (
                   <td
                     key={column.key}
                     className="px-6 py-4 whitespace-nowrap text-sm"
-                    style={{ color: isDark ? '#f8fafc' : '#374151' }}
+                    style={{ color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)' }}
                   >
                     {column.render ? column.render(row[column.key], row, index) : row[column.key]}
                   </td>
@@ -216,13 +216,13 @@ const MedicalTable = ({
         <div 
           className="px-6 py-3 border-t flex items-center justify-between"
           style={{
-            backgroundColor: isDark ? '#1e293b' : '#ffffff',
-            borderColor: isDark ? '#334155' : '#e2e8f0'
+            backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
+            borderColor: isDark ? '#334155' : 'var(--mac-border)'
           }}
         >
           <div 
             className="text-sm"
-            style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+            style={{ color: isDark ? 'var(--mac-text-tertiary)' : '#64748b' }}
           >
             Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length} results
           </div>
@@ -233,9 +233,9 @@ const MedicalTable = ({
               disabled={currentPage === 1}
               className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
               style={{
-                color: isDark ? '#f8fafc' : '#374151',
-                borderColor: isDark ? '#334155' : '#d1d5db',
-                backgroundColor: isDark ? '#1e293b' : '#ffffff'
+                color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+                borderColor: isDark ? '#334155' : 'var(--mac-border)',
+                backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
               }}
             >
               Previous
@@ -249,9 +249,9 @@ const MedicalTable = ({
                   page === currentPage ? 'bg-blue-500 text-white border-blue-500' : 'hover:bg-gray-50'
                 }`}
                 style={{
-                  color: page === currentPage ? '#ffffff' : (isDark ? '#f8fafc' : '#374151'),
-                  borderColor: page === currentPage ? '#3b82f6' : (isDark ? '#334155' : '#d1d5db'),
-                  backgroundColor: page === currentPage ? '#3b82f6' : (isDark ? '#1e293b' : '#ffffff')
+                  color: page === currentPage ? 'var(--mac-bg-primary)' : (isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)'),
+                  borderColor: page === currentPage ? 'var(--mac-accent-blue)' : (isDark ? '#334155' : 'var(--mac-border)'),
+                  backgroundColor: page === currentPage ? 'var(--mac-accent-blue)' : (isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)')
                 }}
               >
                 {page}
@@ -263,9 +263,9 @@ const MedicalTable = ({
               disabled={currentPage === totalPages}
               className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
               style={{
-                color: isDark ? '#f8fafc' : '#374151',
-                borderColor: isDark ? '#334155' : '#d1d5db',
-                backgroundColor: isDark ? '#1e293b' : '#ffffff'
+                color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+                borderColor: isDark ? '#334155' : 'var(--mac-border)',
+                backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
               }}
             >
               Next

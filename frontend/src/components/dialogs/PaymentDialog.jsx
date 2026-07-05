@@ -166,7 +166,7 @@ const PaymentDialog = ({
               alignItems: 'center',
               justifyContent: 'center',
               background:
-                theme === 'dark' ? 'rgba(16, 185, 129, 0.14)' : '#ecfdf5',
+                theme === 'dark' ? 'rgba(16, 185, 129, 0.14)' : 'var(--mac-success-bg)',
               color: '#10b981',
               border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#a7f3d0'}`,
             }}
@@ -298,7 +298,7 @@ const PaymentDialog = ({
                   padding: '12px 14px',
                   border: `1px solid ${
                     errors.amount
-                      ? '#ef4444'
+                      ? 'var(--mac-error)'
                       : theme === 'dark'
                         ? 'rgba(255,255,255,0.10)'
                         : 'var(--mac-border)'
@@ -312,13 +312,13 @@ const PaymentDialog = ({
                   outline: 'none',
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = '#3b82f6';
+                  e.target.style.borderColor = 'var(--mac-accent-blue)';
                   e.target.style.boxShadow =
                     '0 0 0 3px rgba(59, 130, 246, 0.12)';
                 }}
                 onBlur={(e) => {
                   e.target.style.borderColor = errors.amount
-                    ? '#ef4444'
+                    ? 'var(--mac-error)'
                     : theme === 'dark'
                       ? 'rgba(255,255,255,0.10)'
                       : 'var(--mac-border)';
@@ -329,7 +329,7 @@ const PaymentDialog = ({
                 <p
                   id="payment-amount-error"
                   style={{
-                    color: '#ef4444',
+                    color: 'var(--mac-error)',
                     fontSize: '12px',
                     margin: '4px 0 0 0',
                   }}
@@ -376,7 +376,7 @@ const PaymentDialog = ({
                       padding: '12px 14px',
                       border: `1px solid ${
                         paymentMethod === method.value
-                          ? '#3b82f6'
+                          ? 'var(--mac-accent-blue)'
                           : theme === 'dark'
                             ? 'rgba(255,255,255,0.10)'
                             : 'var(--mac-border)'
@@ -386,7 +386,7 @@ const PaymentDialog = ({
                         paymentMethod === method.value
                           ? theme === 'dark'
                             ? 'rgba(59, 130, 246, 0.16)'
-                            : '#eff6ff'
+                            : 'var(--mac-accent-bg)'
                           : theme === 'dark'
                             ? 'rgba(255,255,255,0.04)'
                             : 'white',
@@ -408,7 +408,7 @@ const PaymentDialog = ({
               {errors.method && (
                 <p
                   style={{
-                    color: '#ef4444',
+                    color: 'var(--mac-error)',
                     fontSize: '12px',
                     margin: '4px 0 0 0',
                   }}

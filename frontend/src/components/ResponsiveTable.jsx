@@ -123,7 +123,7 @@ const ResponsiveTable = ({
 
                 return (
                   <div key={colIndex} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                        <span style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
                           {column.label}:
                         </span>
                         <span style={{ fontWeight: '500', fontSize: '14px' }}>
@@ -225,7 +225,7 @@ const ResponsiveTable = ({
         `}</style>
         <thead>
           <tr style={{
-            background: '#f8fafc',
+            background: 'var(--mac-bg-secondary)',
             borderBottom: '2px solid #e5e7eb',
             position: 'relative',
             zIndex: 10
@@ -317,13 +317,13 @@ const ResponsiveTable = ({
             style={{
               borderBottom: '1px solid #e5e7eb',
               cursor: onRowClick ? 'pointer' : 'default',
-              background: selectedRows.has(index) ? '#eff6ff' : 'white',
+              background: selectedRows.has(index) ? 'var(--mac-accent-bg)' : 'white',
               transition: 'background-color 0.2s ease'
             }}
             onClick={() => onRowClick?.(row, index)}
             onMouseEnter={(e) => {
               if (!selectedRows.has(index)) {
-                e.target.style.background = '#f9fafb';
+                e.target.style.background = 'var(--mac-bg-secondary)';
               }
             }}
             onMouseLeave={(e) => {
@@ -374,7 +374,7 @@ const ResponsiveTable = ({
                     padding: '12px',
                     textAlign: column.align || 'left',
                     fontSize: '14px',
-                    color: '#374151',
+                    color: 'var(--mac-text-primary)',
                     cursor: column.clickable ? 'pointer' : 'inherit',
                     textDecoration: column.clickable ? 'underline' : 'none',
                     position: column.fixed ? 'sticky' : 'relative',

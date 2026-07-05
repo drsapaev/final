@@ -306,11 +306,11 @@ export const FormField = ({
           marginBottom: '4px',
           fontSize: '14px',
           fontWeight: '500',
-          color: error ? '#ef4444' : '#374151'
+          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: '#ef4444' }}> *</span>}
+          {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
       }
 
@@ -327,22 +327,22 @@ export const FormField = ({
           width: '100%',
           padding: '8px 12px',
           fontSize: '14px',
-          border: `1px solid ${error ? '#ef4444' : '#d1d5db'}`,
+          border: `1px solid ${error ? 'var(--mac-error)' : 'var(--mac-border)'}`,
           borderRadius: '6px',
-          backgroundColor: disabled ? '#f9fafb' : '#ffffff',
-          color: '#374151',
+          backgroundColor: disabled ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-primary)',
           outline: 'none',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#3b82f6';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? '#fef2f2' : '#dbeafe'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#d1d5db';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
             e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
@@ -356,7 +356,7 @@ export const FormField = ({
         style={{
           marginTop: '4px',
           fontSize: '12px',
-          color: '#ef4444'
+          color: 'var(--mac-error)'
         }}>
         
           {error}
@@ -399,11 +399,11 @@ export const FormTextarea = ({
           marginBottom: '4px',
           fontSize: '14px',
           fontWeight: '500',
-          color: error ? '#ef4444' : '#374151'
+          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: '#ef4444' }}> *</span>}
+          {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
       }
 
@@ -421,23 +421,23 @@ export const FormTextarea = ({
           padding: '8px 12px',
           fontSize: '14px',
           fontFamily: 'inherit',
-          border: `1px solid ${error ? '#ef4444' : '#d1d5db'}`,
+          border: `1px solid ${error ? 'var(--mac-error)' : 'var(--mac-border)'}`,
           borderRadius: '6px',
-          backgroundColor: disabled ? '#f9fafb' : '#ffffff',
-          color: '#374151',
+          backgroundColor: disabled ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-primary)',
           outline: 'none',
           resize: 'vertical',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#3b82f6';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? '#fef2f2' : '#dbeafe'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#d1d5db';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
             e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
@@ -450,7 +450,7 @@ export const FormTextarea = ({
         style={{
           marginTop: '4px',
           fontSize: '12px',
-          color: '#ef4444'
+          color: 'var(--mac-error)'
         }}>
         
           {error}
@@ -493,11 +493,11 @@ export const FormSelect = ({
           marginBottom: '4px',
           fontSize: '14px',
           fontWeight: '500',
-          color: error ? '#ef4444' : '#374151'
+          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: '#ef4444' }}> *</span>}
+          {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
       }
 
@@ -512,23 +512,23 @@ export const FormSelect = ({
           width: '100%',
           padding: '8px 12px',
           fontSize: '14px',
-          border: `1px solid ${error ? '#ef4444' : '#d1d5db'}`,
+          border: `1px solid ${error ? 'var(--mac-error)' : 'var(--mac-border)'}`,
           borderRadius: '6px',
-          backgroundColor: disabled ? '#f9fafb' : '#ffffff',
-          color: '#374151',
+          backgroundColor: disabled ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-primary)',
           outline: 'none',
           cursor: disabled ? 'not-allowed' : 'pointer',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#3b82f6';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? '#fef2f2' : '#dbeafe'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#d1d5db';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
             e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
@@ -552,7 +552,7 @@ export const FormSelect = ({
         style={{
           marginTop: '4px',
           fontSize: '12px',
-          color: '#ef4444'
+          color: 'var(--mac-error)'
         }}>
         
           {error}

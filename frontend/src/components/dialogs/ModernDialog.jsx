@@ -112,7 +112,7 @@ const ModernDialog = ({
       className={`modern-dialog-backdrop ${className}`}
       role="presentation"
       style={{
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
         backdropFilter: 'blur(4px)'
       }}
       {...props}>
@@ -178,8 +178,8 @@ const ModernDialog = ({
         <div
           className="modern-dialog-actions"
           style={{
-            backgroundColor: theme === 'dark' ? '#1f2937' : '#f9fafb',
-            borderTop: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
+            backgroundColor: theme === 'dark' ? '#1f2937' : 'var(--mac-bg-secondary)',
+            borderTop: `1px solid ${theme === 'dark' ? 'var(--mac-text-primary)' : 'var(--mac-border)'}`
           }}>
           
             {actions.map((action, index) =>

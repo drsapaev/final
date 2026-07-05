@@ -204,7 +204,7 @@ export const Modal = ({
         ref={modalRef}
         className={`modal-content ${sizes[size]} ${className}`}
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--mac-bg-primary)',
           borderRadius: '12px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           maxHeight: '90vh',
@@ -233,7 +233,7 @@ export const Modal = ({
                 margin: 0,
                 fontSize: '18px',
                 fontWeight: '600',
-                color: '#374151'
+                color: 'var(--mac-text-primary)'
               }}
             >
               {title}
@@ -247,14 +247,14 @@ export const Modal = ({
                   border: 'none',
                   fontSize: '24px',
                   cursor: 'pointer',
-                  color: '#6b7280',
+                  color: 'var(--mac-text-secondary)',
                   padding: '4px',
                   borderRadius: '4px',
                   transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
                 }}
                 onMouseEnter={(e) => {
                   if (!prefersReducedMotion) {
-                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
                   }
                 }}
                 onMouseLeave={(e) => {

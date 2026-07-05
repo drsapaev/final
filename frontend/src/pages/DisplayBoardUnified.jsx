@@ -493,10 +493,10 @@ export default function DisplayBoardUnified({
   const themes = {
     light: {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      cardBg: '#ffffff',
+      cardBg: 'var(--mac-bg-primary)',
       textPrimary: '#1a202c',
       textSecondary: '#4a5568',
-      border: '#e2e8f0'
+      border: 'var(--mac-border)'
     },
     dark: {
       background: 'linear-gradient(135deg, #1a202c 0%, #2d3748 100%)',
@@ -507,7 +507,7 @@ export default function DisplayBoardUnified({
     },
     medical: {
       background: 'linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%)',
-      cardBg: '#ffffff',
+      cardBg: 'var(--mac-bg-primary)',
       textPrimary: '#1a202c',
       textSecondary: '#4a5568',
       border: '#c6f6d5'
