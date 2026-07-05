@@ -257,11 +257,57 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const validatePhone = (phone) => /^\+998\d{9}$/.test(phone);
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+  // UX Audit ForgotPassword #1: formatPhone переписан с нуля.
+  //
+  // Прошлый formatPhone имел 4 бага:
+  //   1. НЕЛЬЗЯ БЫЛО СТЕРЕТЬ номер: при `+9989` (digits='9989') не попадал
+  //      ни в одно условие → return value → поле «залипало» на +9989.
+  //   2. НЕЛЬЗЯ БЫЛО СТЕРЕТЬ префикс +998: digits='998' → return '+998'
+  //      всегда возвращало +998, стереть было нельзя.
+  //   3. При вводе 12+ цифр, начинающихся на 9, не форматировалось.
+  //   4. При вставке номера с префиксом 8 (РФ-стиль) не обрабатывалось.
+  //
+  // Новый форматтер:
+  //   - принимает ЛЮБОЙ ввод (включая пустую строку — возвращает '');
+  //   - нормализует к формату +998XXXXXXXXX (12 цифр с +);
+  //   - поддерживает ввод: 9XXXXXXXXX (10 цифр), 998XXXXXXXXX (12 цифр),
+  //     +998XXXXXXXXX, 8XXXXXXXXX (РФ-стиль, считается опечаткой);
+  //   - ограничивает длину до 12 цифр (защита от paste-атак);
+  //   - всегда возвращает либо '', либо строку, начинающуюся с '+998'.
   const formatPhone = (value) => {
-    const digits = value.replace(/\D/g, '');
-    if (digits.startsWith('9') && digits.length <= 9) return `+998${digits}`;
-    if (digits.startsWith('998')) return `+${digits}`;
-    return value;
+    if (!value) return '';
+    const digits = String(value).replace(/\D/g, '');
+
+    // Пустой ввод → пустая строка (старый код здесь возвращал `value`,
+    // из-за чего поле показывало '+', '+' или '998').
+    if (digits.length === 0) return '';
+
+    // Нормализуем к 12-значному узбекскому номеру.
+    let normalized = digits;
+
+    // Если ввели 10 цифр начиная с 9 — это локальный UZ номер без кода страны.
+    if (normalized.length <= 10 && normalized.startsWith('9')) {
+      normalized = '998' + normalized;
+    }
+    // Если ввели 11 цифр начиная с 8 (РФ-стиль, частая опечатка) —
+    // считаем что имелся в виду +998, берём последние 9 цифр.
+    else if (normalized.length === 11 && normalized.startsWith('8')) {
+      normalized = '998' + normalized.slice(2);
+    }
+    // Если ввели номер с кодом 998 — оставляем как есть.
+    else if (normalized.startsWith('998')) {
+      // уже в нужном формате
+    }
+    // Любой другой случай (например, 7-значный городской) —
+    // не форматируем, оставляем как есть (пусть валидация покажет ошибку).
+    else {
+      return value;
+    }
+
+    // Ограничиваем до 12 цифр (998 + 9 цифр номера).
+    normalized = normalized.slice(0, 12);
+
+    return '+' + normalized;
   };
 
   const startResendCountdown = useCallback(() => {
@@ -493,7 +539,14 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             <button
               key={key}
               type="button"
-              onClick={() => setMethod(key)}
+              onClick={() => {
+                // UX Audit ForgotPassword #2: при переключении method phone↔email
+                // очищаем поле contact и ошибку, чтобы пользователь не видел
+                // «телефон в поле email» или наоборот.
+                setMethod(key);
+                setContact('');
+                setInlineError('');
+              }}
               style={{
                 padding: 'var(--mac-spacing-4)',
                 display: 'flex',
@@ -529,6 +582,15 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
               setInlineError('');
             }}
             placeholder={method === 'phone' ? '+998XXXXXXXXX' : 'example@domain.com'}
+            // UX Audit ForgotPassword #3: maxLength для телефона = 13 символов
+            // (+998 + 9 цифр = 13), для email — стандартный 254 (RFC 5321).
+            maxLength={method === 'phone' ? 13 : 254}
+            // UX Audit ForgotPassword #4: autocomplete для UX — браузер предложит
+            // сохранённый телефон/email.
+            autoComplete={method === 'phone' ? 'tel' : 'email'}
+            // UX Audit ForgotPassword #5: inputMode — показывает цифровую клавиатуру
+            // на мобильных для телефона.
+            inputMode={method === 'phone' ? 'numeric' : 'email'}
             disabled={loading}
             style={{
               ...inputStyle,
