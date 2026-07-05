@@ -15,7 +15,7 @@ import {
   Input,
   Select,
   Textarea,
-  Checkbox } from '../ui/macos';
+} from '../ui/macos';
 import {
   Activity,
   CheckCircle,
@@ -28,6 +28,14 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import notify from '../../services/notify';
+import {
+  TOOTH_PROCEDURES,
+  MATERIALS,
+  getToothName as ssotGetToothName,
+  computeToothTotalPrice,
+  isProstheticProcedure,
+} from './dentalConstants';
 
 const iconSize = 15;
 
@@ -79,20 +87,20 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 'var(--mac-spacing-3)',
+    gap: '12px',
   },
   title: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 'var(--mac-spacing-2)',
+    gap: '8px',
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: 'var(--mac-font-size-xl)',
-    fontWeight: 'var(--mac-font-weight-semibold)',
+    fontSize: '17px',
+    fontWeight: 600,
   },
   content: {
     display: 'grid',
-    gap: 'var(--mac-spacing-5)',
+    gap: '20px',
     maxHeight: '72vh',
     overflow: 'auto',
   },
@@ -103,16 +111,16 @@ const styles = {
   sectionTitle: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 'var(--mac-spacing-2)',
+    gap: '8px',
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: 'var(--mac-font-size-lg)',
-    fontWeight: 'var(--mac-font-weight-semibold)',
+    fontSize: '15px',
+    fontWeight: 600,
   },
   buttonGrid: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: 'var(--mac-spacing-2)',
+    gap: '8px',
   },
   twoColumnGrid: {
     display: 'grid',
@@ -121,7 +129,7 @@ const styles = {
   },
   list: {
     display: 'grid',
-    gap: 'var(--mac-spacing-2)',
+    gap: '8px',
     margin: 0,
     padding: 0,
     listStyle: 'none',
@@ -131,7 +139,7 @@ const styles = {
     gridTemplateColumns: '28px minmax(0, 1fr) auto',
     gap: '10px',
     alignItems: 'center',
-    padding: 'var(--mac-spacing-2) 0',
+    padding: '8px 0',
     borderBottom: '1px solid var(--mac-border)',
   },
   listItemStatic: {
@@ -139,7 +147,7 @@ const styles = {
     gridTemplateColumns: '28px minmax(0, 1fr)',
     gap: '10px',
     alignItems: 'start',
-    padding: 'var(--mac-spacing-2) 0',
+    padding: '8px 0',
     borderBottom: '1px solid var(--mac-border)',
   },
   listIcon: {
@@ -150,18 +158,18 @@ const styles = {
     height: '28px',
     borderRadius: '50%',
     color: 'var(--mac-accent-blue)',
-    background: 'var(--mac-accent-bg)',
+    background: 'rgba(0, 122, 255, 0.08)',
   },
   itemTitle: {
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: 'var(--mac-font-size-base)',
-    fontWeight: 'var(--mac-font-weight-semibold)',
+    fontSize: '14px',
+    fontWeight: 600,
   },
   itemMeta: {
     margin: '3px 0 0',
     color: 'var(--mac-text-secondary)',
-    fontSize: 'var(--mac-font-size-xs)',
+    fontSize: '12px',
   },
   iconButton: {
     display: 'inline-flex',
@@ -181,7 +189,7 @@ const styles = {
     gap: '10px',
     alignItems: 'center',
     color: 'var(--mac-text-primary)',
-    fontSize: 'var(--mac-font-size-sm)',
+    fontSize: '13px',
   },
   divider: {
     height: '1px',
@@ -190,14 +198,14 @@ const styles = {
   totalTitle: {
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: 'var(--mac-font-size-xl)',
-    fontWeight: 'var(--mac-font-weight-semibold)',
+    fontSize: '17px',
+    fontWeight: 600,
   },
   totalCaption: {
     display: 'block',
-    marginTop: 'var(--mac-spacing-2)',
+    marginTop: '6px',
     color: 'var(--mac-text-secondary)',
-    fontSize: 'var(--mac-font-size-xs)',
+    fontSize: '12px',
   },
 };
 
@@ -219,29 +227,17 @@ const COPY = {
   cancelAction: 'Отмена',
   saveAction: 'Сохранить',
   deleteAction: 'Удалить',
+  // Phase 4A: prosthetic-specific fields (shown only when a prosthetic
+  // procedure — Crown / Bridge / Implant / Veneer — is selected).
+  prostheticSectionTitle: 'Параметры протеза',
+  shadeLabel: 'Оттенок (VITA)',
+  fitQualityLabel: 'Качество посадки',
+  warrantyPeriodLabel: 'Гарантия (мес.)',
+  patientSatisfactionLabel: 'Удовлетворённость пациента',
+  shadePlaceholder: 'Напр. A1, A2, B2...',
+  noShade: 'Не указан',
 };
-// Процедуры для зуба
-const TOOTH_PROCEDURES = {
-  EXAMINATION: { id: 'examination', name: 'Осмотр', price: 20000 },
-  CLEANING: { id: 'cleaning', name: 'Чистка', price: 50000 },
-  FILLING: { id: 'filling', name: 'Пломба', price: 150000 },
-  ROOT_CANAL: { id: 'root_canal', name: 'Лечение каналов', price: 300000 },
-  CROWN: { id: 'crown', name: 'Коронка', price: 500000 },
-  EXTRACTION: { id: 'extraction', name: 'Удаление', price: 100000 },
-  IMPLANT: { id: 'implant', name: 'Имплантация', price: 1500000 },
-  BRIDGE: { id: 'bridge', name: 'Мостовидный протез', price: 800000 },
-  VENEER: { id: 'veneer', name: 'Винир', price: 600000 },
-};
-
-// Материалы
-const MATERIALS = {
-  COMPOSITE: { id: 'composite', name: 'Композит', price: 50000 },
-  CERAMIC: { id: 'ceramic', name: 'Керамика', price: 200000 },
-  METAL_CERAMIC: { id: 'metal_ceramic', name: 'Металлокерамика', price: 150000 },
-  ZIRCONIA: { id: 'zirconia', name: 'Цирконий', price: 300000 },
-  GOLD: { id: 'gold', name: 'Золото', price: 500000 },
-};
-
+// H6 fix: TOOTH_PROCEDURES and MATERIALS now imported from dentalConstants.js (SSOT).
 const ToothModal = ({
   open,
   onClose,
@@ -258,6 +254,13 @@ const ToothModal = ({
     price: 0,
     nextVisitDate: '',
     requiresFollowUp: false,
+    // Phase 4A: prosthetic-specific fields. Persisted into EMR JSONB
+    // alongside other tooth data; populated only when a prosthetic
+    // procedure is in the procedures list.
+    shade: '',
+    fitQuality: '',
+    warrantyPeriod: '',
+    patientSatisfaction: '',
   });
   
   const [history, setHistory] = useState([]);
@@ -273,6 +276,10 @@ const ToothModal = ({
         price: toothData.price || 0,
         nextVisitDate: toothData.nextVisitDate || '',
         requiresFollowUp: toothData.requiresFollowUp || false,
+        shade: toothData.shade || '',
+        fitQuality: toothData.fitQuality || toothData.fit_quality || '',
+        warrantyPeriod: toothData.warrantyPeriod || toothData.warranty_period || '',
+        patientSatisfaction: toothData.patientSatisfaction || toothData.patient_satisfaction || '',
       });
 
       setHistory([]);
@@ -309,19 +316,15 @@ const ToothModal = ({
     });
   };
 
-  // Расчет общей стоимости
-  const calculateTotalPrice = () => {
-    let total = formData.procedures.reduce((sum, proc) => sum + (proc.price || 0), 0);
-    
-    if (formData.material) {
-      const material = MATERIALS[formData.material];
-      if (material) {
-        total += material.price;
-      }
-    }
-    
-    return total;
-  };
+  // Расчет общей стоимости — H6 fix: delegates to SSOT helper.
+  const calculateTotalPrice = () =>
+    computeToothTotalPrice({ procedures: formData.procedures, materialId: formData.material });
+
+  // Phase 4A: detect prosthetic mode — when true, show shade / fit_quality /
+  // warranty_period / patient_satisfaction fields below the material select.
+  const hasProstheticProcedure = formData.procedures.some(
+    (proc) => isProstheticProcedure(proc.id) || proc.isProsthetic === true,
+  );
 
   // Сохранение данных
   const handleSave = async () => {
@@ -348,27 +351,14 @@ const ToothModal = ({
       
     } catch (error) {
       logger.error('Ошибка сохранения данных зуба:', error);
+      notify.error('Не удалось сохранить данные зуба. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Название зуба
-  const getToothName = (number) => {
-    const names = {
-      11: 'Центральный резец',
-      12: 'Боковой резец',
-      13: 'Клык',
-      14: 'Первый премоляр',
-      15: 'Второй премоляр',
-      16: 'Первый моляр',
-      17: 'Второй моляр',
-      18: 'Третий моляр (зуб мудрости)',
-    };
-    
-    const baseNumber = parseInt(number.toString().slice(1));
-    return names[`1${baseNumber}`] || `Зуб №${number}`;
-  };
+  // H6 fix: getToothName now delegates to SSOT (dentalConstants.getToothName).
+  const getToothName = (number) => ssotGetToothName(number);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -452,6 +442,59 @@ const ToothModal = ({
           />
         </div>
 
+        {hasProstheticProcedure && (
+          <section style={styles.section}>
+            <div style={styles.divider} />
+            <h3 style={styles.sectionTitle}>
+              {COPY.prostheticSectionTitle}
+            </h3>
+            <div style={styles.twoColumnGrid}>
+              <Input
+                type="text"
+                label={COPY.shadeLabel}
+                value={formData.shade}
+                onChange={(e) => setFormData({ ...formData, shade: e.target.value })}
+                placeholder={COPY.shadePlaceholder}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+              <Select
+                label={COPY.fitQualityLabel}
+                value={formData.fitQuality}
+                onChange={(value) => setFormData({ ...formData, fitQuality: value })}
+                options={[
+                  { value: '', label: '—' },
+                  { value: 'excellent', label: 'Отлично' },
+                  { value: 'good', label: 'Хорошо' },
+                  { value: 'satisfactory', label: 'Удовлетворительно' },
+                  { value: 'poor', label: 'Плохо' },
+                ]}
+              />
+              <Input
+                type="number"
+                label={COPY.warrantyPeriodLabel}
+                value={formData.warrantyPeriod}
+                onChange={(e) => setFormData({ ...formData, warrantyPeriod: e.target.value })}
+                placeholder="Напр. 60"
+                min="0"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+              <Select
+                label={COPY.patientSatisfactionLabel}
+                value={formData.patientSatisfaction}
+                onChange={(value) => setFormData({ ...formData, patientSatisfaction: value })}
+                options={[
+                  { value: '', label: '—' },
+                  { value: '5', label: '5 — Отлично' },
+                  { value: '4', label: '4 — Хорошо' },
+                  { value: '3', label: '3 — Удовлетворительно' },
+                  { value: '2', label: '2 — Плохо' },
+                  { value: '1', label: '1 — Очень плохо' },
+                ]}
+              />
+            </div>
+          </section>
+        )}
+
         <Textarea
           label={COPY.notesLabel}
           value={formData.notes}
@@ -462,7 +505,11 @@ const ToothModal = ({
         />
 
         <label style={styles.checkboxRow}>
-          <Checkbox aria-label={COPY.followUpLabel} checked={formData.requiresFollowUp} onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
+          <input
+            type="checkbox"
+            aria-label={COPY.followUpLabel}
+            checked={formData.requiresFollowUp}
+            onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
           />
           <span>{COPY.followUpLabel}</span>
         </label>

@@ -17,8 +17,7 @@
 
 import PropTypes from 'prop-types';
 import { TestTube, Plus, Save } from 'lucide-react';
-import { Button, Textarea, Badge, MacOSCard,
-  Input } from '../ui/macos';
+import { Button, Textarea, Badge, MacOSCard } from '../ui/macos';
 
 /**
  * @param {Object} props
@@ -77,21 +76,21 @@ export function BloodTestsTab({
     return (
       <div>
         <label className="cardio-form-label">{label}</label>
-        <Input
+        <input
           type="number"
           aria-label={ariaLabel}
           value={bloodTestForm[fieldName]}
           onChange={(e) => setBloodTestForm({ ...bloodTestForm, [fieldName]: e.target.value })}
           className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
           style={{
-            border: `1px solid ${isError ? 'var(--mac-error)' : getColor('border')}`,
-            backgroundColor: isError ? 'var(--mac-error-bg)' : getColor('surface'),
-            color: isError ? 'var(--mac-error)' : getColor('text'),
+            border: `1px solid ${isError ? '#dc2626' : getColor('border')}`,
+            backgroundColor: isError ? '#fef2f2' : getColor('surface'),
+            color: isError ? '#dc2626' : getColor('text'),
           }}
           placeholder={placeholder}
         />
         {isError && (
-          <div role="alert" style={{ marginTop: 'var(--mac-spacing-1)', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-medium)' }}>
+          <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
             {warning.message}
           </div>
         )}
@@ -100,11 +99,11 @@ export function BloodTestsTab({
   };
 
   return (
-    <div className="cardio-flex-col-visible" style={{ gap: 'var(--mac-spacing-6)' }}>
+    <div className="cardio-flex-col-visible" style={{ gap: '24px' }}>
       {/* Header */}
       <MacOSCard className="cardio-card-padded">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('lg') }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', fontSize: getFontSize('lg'), fontWeight: 'var(--mac-font-weight-medium)', color: getColor('text') }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', fontSize: getFontSize('lg'), fontWeight: '500', color: getColor('text') }}>
             <TestTube size={20} style={{ marginRight: getSpacing('sm'), color: getColor('secondary', 600) }} />
             Анализы крови
           </h3>
@@ -123,7 +122,7 @@ export function BloodTestsTab({
                 border: `1px solid ${it.critical ? 'var(--mac-danger)' : getColor('border')}`,
                 backgroundColor: it.critical ? 'var(--mac-error-bg)' : getColor('surface'),
                 color: getColor('text'),
-                borderRadius: 'var(--mac-radius-md)',
+                borderRadius: '8px',
               }}>
                 <div style={{ fontSize: getFontSize('sm'), color: it.critical ? 'var(--mac-danger)' : getColor('textSecondary'), marginBottom: getSpacing('xs') }}>
                   {it.label}
@@ -131,7 +130,7 @@ export function BloodTestsTab({
                 <div className="cardio-stat-value" style={{ color: it.critical ? 'var(--mac-danger)' : getColor('text') }}>
                   {it.value} {typeof it.value === 'number' ? it.unit : ''}
                   {it.critical && (
-                    <span className="cardio-critical-warn">⚠ {it.value} &gt; {settings?.ldlThreshold ?? 100}</span>
+                    <span className="cardio-critical-warn">{it.value} &gt; {settings?.ldlThreshold ?? 100}</span>
                   )}
                 </div>
               </div>
@@ -143,27 +142,27 @@ export function BloodTestsTab({
         {bloodTests.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
             {bloodTests.map((test) => (
-              <div key={test.id} style={{ padding: getSpacing('lg'), border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), borderRadius: 'var(--mac-radius-md)' }}>
+              <div key={test.id} style={{ padding: getSpacing('lg'), border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: getSpacing('sm') }}>
-                  <h4 style={{ fontSize: getFontSize('base'), fontWeight: 'var(--mac-font-weight-medium)', color: getColor('text') }}>Анализ #{test.id}</h4>
+                  <h4 style={{ fontSize: getFontSize('base'), fontWeight: '500', color: getColor('text') }}>Анализ #{test.id}</h4>
                   <Badge variant="info">{test.test_date}</Badge>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: getSpacing('lg'), fontSize: getFontSize('sm'), color: getColor('textSecondary'), marginBottom: getSpacing('sm') }}>
-                  <div>🩸 Холестерин: {test.cholesterol_total} мг/дл</div>
+                  <div>Холестерин: {test.cholesterol_total} мг/дл</div>
                   <div>HDL: {test.cholesterol_hdl}</div>
-                  <div style={isLdlCritical(test.cholesterol_ldl) ? { color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-semibold)' } : undefined}>
+                  <div style={isLdlCritical(test.cholesterol_ldl) ? { color: '#dc2626', fontWeight: '600' } : undefined}>
                     LDL: {test.cholesterol_ldl}
-                    {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: 'var(--mac-spacing-1)', fontSize: getFontSize('xs') }}>⚠ критический</span>}
+                    {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>критический</span>}
                   </div>
                   <div>Триглицериды: {test.triglycerides}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: getSpacing('lg'), fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
-                  <div>🍬 Глюкоза: {test.glucose} мг/дл</div>
+                  <div>Глюкоза: {test.glucose} мг/дл</div>
                   <div>CRP: {test.crp} мг/л</div>
                   <div>Тропонин: {test.troponin} нг/мл</div>
                 </div>
                 {test.interpretation && (
-                  <div style={{ marginTop: getSpacing('sm'), padding: getSpacing('sm'), background: getColor('surfaceSecondary'), borderRadius: 'var(--mac-radius-sm)', fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
+                  <div style={{ marginTop: getSpacing('sm'), padding: getSpacing('sm'), background: getColor('surfaceSecondary'), borderRadius: '4px', fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
                     {test.interpretation}
                   </div>
                 )}
@@ -184,14 +183,14 @@ export function BloodTestsTab({
       {/* Blood test form */}
       {showFormOpen && (
         <MacOSCard className="cardio-card-padded">
-          <h3 style={{ fontSize: getFontSize('lg'), fontWeight: 'var(--mac-font-weight-medium)', marginBottom: getSpacing('lg'), color: getColor('text') }}>
+          <h3 style={{ fontSize: getFontSize('lg'), fontWeight: '500', marginBottom: getSpacing('lg'), color: getColor('text') }}>
             Новый анализ крови
           </h3>
           <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
             <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
               <div>
                 <label className="cardio-form-label">Дата анализа *</label>
-                <Input
+                <input
                   type="date"
                   required
                   aria-label="Дата анализа"
@@ -201,39 +200,39 @@ export function BloodTestsTab({
                   style={{ border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), color: getColor('text') }}
                 />
               </div>
-              {renderField('cholesterol_total', 'Общий холестерин (мг/дл)', '<200', 'Total cholesterol')}
-              {renderField('cholesterol_hdl', 'HDL холестерин (мг/дл)', '>40', 'HDL cholesterol')}
+              {renderField('cholesterol_total', 'Общий холестерин (мг/дл)', '<200', 'Общий холестерин')}
+              {renderField('cholesterol_hdl', 'HDL холестерин (мг/дл)', '>40', 'Холестерин HDL')}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
               <div>
                 <label className="cardio-form-label">LDL холестерин (мг/дл)</label>
-                <Input
+                <input
                   type="number"
                   aria-label="LDL cholesterol"
                   value={bloodTestForm.cholesterol_ldl}
                   onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
                   className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                   style={{
-                    border: `1px solid ${isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error)' : getColor('border')}`,
-                    backgroundColor: isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error-bg)' : getColor('surface'),
-                    color: isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error)' : getColor('text'),
+                    border: `1px solid ${isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#dc2626' : getColor('border')}`,
+                    backgroundColor: isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#fef2f2' : getColor('surface'),
+                    color: isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#dc2626' : getColor('text'),
                   }}
                   placeholder="<100"
                 />
                 {isLdlCritical(bloodTestForm.cholesterol_ldl) && (
-                  <div role="alert" style={{ marginTop: 'var(--mac-spacing-1)', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-medium)' }}>
+                  <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
                     LDL превышает порог {settings?.ldlThreshold ?? 100} мг/дл — рекомендуется интенсивная терапия статинами.
                   </div>
                 )}
               </div>
-              {renderField('triglycerides', 'Триглицериды (мг/дл)', '<150', 'Triglycerides')}
-              {renderField('glucose', 'Глюкоза (мг/дл)', '70-100', 'Glucose')}
+              {renderField('triglycerides', 'Триглицериды (мг/дл)', '<150', 'Триглицериды')}
+              {renderField('glucose', 'Глюкоза (мг/дл)', '70-100', 'Глюкоза')}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: getSpacing('lg') }}>
               {renderField('crp', 'CRP (мг/л)', '<3.0', 'CRP')}
-              {renderField('troponin', 'Тропонин (нг/мл)', '<0.04', 'Troponin')}
+              {renderField('troponin', 'Тропонин (нг/мл)', '<0.04', 'Тропонин')}
             </div>
 
             <div>

@@ -27,7 +27,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
-import { Input } from '../ui/macos';
+import notify from '../../services/notify';
 
 /**
  * Архив фото и рентгенов для стоматологической ЭМК
@@ -175,6 +175,7 @@ const PhotoArchive = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось загрузить фото. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }
@@ -647,7 +648,7 @@ const PhotoArchive = ({
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
+                <input
                   type="text"
                   aria-label="Поиск файлов фотоархива"
                   placeholder="Поиск файлов..."
@@ -683,7 +684,7 @@ const PhotoArchive = ({
                 )}
               </select>
               
-              <Input
+              <input
                 type="date"
                 aria-label="Фильтр фотоархива: дата с"
                 value={formData.filters.dateFrom}
@@ -692,7 +693,7 @@ const PhotoArchive = ({
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               
               
-              <Input
+              <input
                 type="date"
                 aria-label="Фильтр фотоархива: дата до"
                 value={formData.filters.dateTo}

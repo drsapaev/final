@@ -3,7 +3,7 @@
  * Поддерживает провайдеры: Click, Payme, Kaspi
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Badge,
@@ -31,14 +31,29 @@ import {
 
 // API клиент
 import { api as apiClient, getToken } from '../../api/client';
-// UX Audit Registrar #4: useTheme удалён — больше не нужен (theme?.palette?.primary?.main
-// заменён на var(--mac-accent-blue) через CSS-класс .pw-header-icon).
+import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-// UX Audit Registrar #4: inline-стили перенесены в PaymentWidget.css.
-// Provider brand colors (Click/Payme/Kaspi) теперь в CSS-классах .pw-provider-icon--{click,payme,kaspi}.
-import './PaymentWidget.css';
+
+const dividerStyle = {
+  height: 1,
+  marginBottom: 24,
+  background: 'var(--mac-border)'
+};
+
+const providerOptionStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  width: '100%',
+  gap: 8
+};
+
+const providerNameStyle = {
+  textTransform: 'capitalize',
+  flex: '1 1 auto',
+  minWidth: 0
+};
 
 const PaymentWidget = ({
   visitId,
@@ -49,7 +64,7 @@ const PaymentWidget = ({
   onError,
   onCancel
 }) => {
-  // UX Audit Registrar #4: useTheme() удалён — больше не нужен.
+  const theme = useTheme();
 
   // Icon aliases
   const CreditCardIcon = CreditCard;
@@ -73,11 +88,28 @@ const PaymentWidget = ({
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  // Иконки провайдеров — UX Audit Registrar #4: brand colors в CSS-классах.
+  // HIGH #7 fix: auto-polling for online payment status.
+  // Previously the cashier had to click "Проверить статус" manually.
+  // Now we poll every 5 seconds for up to 5 minutes (60 attempts),
+  // matching the behavior of PaymentClick/PaymentPayMe.
+  const MAX_POLLING_ATTEMPTS = 60;
+  const POLLING_INTERVAL_MS = 5000;
+  const pollingRef = useRef(null);
+  const attemptsRef = useRef(0);
+  const [pollingAttempts, setPollingAttempts] = useState(0);
+
+  // Иконки провайдеров
   const providerIcons = {
-    click: <CreditCardIcon className="pw-provider-icon--click" />,
-    payme: <PaymentIcon className="pw-provider-icon--payme" />,
-    kaspi: <BankIcon className="pw-provider-icon--kaspi" />
+    click: <CreditCardIcon style={{ color: '#00AAFF' }} />,
+    payme: <PaymentIcon style={{ color: '#00C851' }} />,
+    kaspi: <BankIcon style={{ color: '#FF6B35' }} />
+  };
+
+  // Цвета провайдеров
+  const providerColors = {
+    click: '#00AAFF',
+    payme: '#00C851',
+    kaspi: '#FF6B35'
   };
 
   const loadProviders = useCallback(async () => {
@@ -111,6 +143,63 @@ const PaymentWidget = ({
     loadProviders();
   }, [loadProviders]);
 
+  // HIGH #7: cleanup polling on unmount.
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
+  // HIGH #7: stop polling automatically when payment reaches a terminal state.
+  useEffect(() => {
+    if (
+      paymentStatus === 'paid' ||
+      paymentStatus === 'failed' ||
+      paymentStatus === 'cancelled' ||
+      paymentStatus === 'canceled' ||
+      paymentStatus === 'refunded'
+    ) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }
+  }, [paymentStatus]);
+
+  const clearPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    attemptsRef.current = 0;
+    setPollingAttempts(0);
+  }, []);
+
+  const startPolling = useCallback(() => {
+    // Don't start if already polling.
+    if (pollingRef.current) return;
+    attemptsRef.current = 0;
+    setPollingAttempts(0);
+
+    pollingRef.current = setInterval(async () => {
+      attemptsRef.current += 1;
+      setPollingAttempts(attemptsRef.current);
+      try {
+        await checkPaymentStatus();
+      } catch (err) {
+        logger.error('Polling error:', err);
+      }
+      if (attemptsRef.current >= MAX_POLLING_ATTEMPTS) {
+        clearPolling();
+        setError('Время ожидания оплаты истекло. Проверьте статус платежа вручную.');
+        setPaymentStatus('failed');
+      }
+    }, POLLING_INTERVAL_MS);
+  }, [clearPolling]);
+
   // Инициализация платежа
   const initializePayment = async () => {
     if (!selectedProvider || !visitId || !amount) {
@@ -120,10 +209,9 @@ const PaymentWidget = ({
 
     // Проверяем наличие токена авторизации
     const token = getToken();
-    logger.log('🔑 Проверяем токен для платежа:', {
+    logger.log('Checking auth token for payment', {
       hasToken: !!token,
       tokenLength: token ? token.length : 0,
-      tokenStart: token ? token.substring(0, 20) + '...' : 'null'
     });
 
     if (!token) {
@@ -153,13 +241,11 @@ const PaymentWidget = ({
       const isTestToken = currentToken === 'demo_token_for_ui_testing';
       const endpoint = isTestToken ? '/payments/test-init' : '/payments/init';
 
-      logger.log('📤 Отправляем запрос платежа:', {
+      logger.log('Sending payment request', {
         endpoint,
         isTestToken,
         hasAuthHeader: !!apiClient.defaults.headers.common['Authorization'],
-        authHeader: apiClient.defaults.headers.common['Authorization'] ? '[redacted]' : 'none',
         authHeaderLength: apiClient.defaults.headers.common['Authorization']?.length || 0,
-        paymentRequest
       });
 
       const response = await apiClient.post(endpoint, paymentRequest);
@@ -206,6 +292,12 @@ const PaymentWidget = ({
 
           window.open(response.data.payment_url, '_blank');
           setPaymentStatus('redirected');
+          // HIGH #7: auto-start polling 10s after redirect (matches
+          // PaymentClick/PaymentPayMe UX — gives the user time to land
+          // on the provider page before we start pinging).
+          setTimeout(() => {
+            startPolling();
+          }, 10000);
         }
       } else {
         throw new Error(
@@ -256,6 +348,7 @@ const PaymentWidget = ({
 
   // Отмена платежа
   const cancelPayment = () => {
+    clearPolling();
     setPaymentData(null);
     setPaymentStatus('pending');
     setError(null);
@@ -298,14 +391,36 @@ const PaymentWidget = ({
       case 'processing':
         return (
           <Alert severity="info" icon={<InfoIcon />}>
-            Перенаправление на страницу оплаты...
-            <Button
-              size="small"
-              onClick={checkPaymentStatus}
-              className="pw-status-check-button">
-              
-              Проверить статус
-            </Button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span>Перенаправление на страницу оплаты...</span>
+              {pollingRef.current && (
+                <span style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
+                  Автоматическая проверка статуса: попытка {pollingAttempts} из {MAX_POLLING_ATTEMPTS}
+                </span>
+              )}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Button
+                  size="small"
+                  onClick={checkPaymentStatus}>
+                  Проверить статус
+                </Button>
+                {pollingRef.current ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={clearPolling}>
+                    Остановить отслеживание
+                  </Button>
+                ) : (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={startPolling}>
+                    Начать отслеживание
+                  </Button>
+                )}
+              </div>
+            </div>
           </Alert>);
 
       case 'paid':
@@ -326,13 +441,13 @@ const PaymentWidget = ({
       case 'void':
         return (
           <Alert severity="warning" icon={<ErrorIcon />}>
-            Status: {paymentStatus}
+            Статус: {paymentStatus}
           </Alert>);
 
       default:
         return paymentStatus ? (
           <Alert severity="info" icon={<InfoIcon />}>
-            Status: {paymentStatus}
+            Статус: {paymentStatus}
           </Alert>) : null;
     }
   };
@@ -341,9 +456,9 @@ const PaymentWidget = ({
     return (
       <Card>
         <CardContent>
-          <Box display="flex" justifyContent="center" alignItems="center" className="pw-loading-box">
+          <Box display="flex" justifyContent="center" alignItems="center" style={{ padding: 24 }}>
             <CircularProgress />
-            <Typography variant="body1" className="pw-loading-text">
+            <Typography variant="body1" style={{ marginLeft: 16 }}>
               Загрузка способов оплаты...
             </Typography>
           </Box>
@@ -368,25 +483,25 @@ const PaymentWidget = ({
     <Card elevation={3}>
       <CardContent>
         {/* Заголовок */}
-        <Box display="flex" alignItems="center" className="pw-header">
-          <PaymentIcon className="pw-header-icon" />
+        <Box display="flex" alignItems="center" style={{ marginBottom: 24 }}>
+          <PaymentIcon style={{ marginRight: 8, color: theme?.palette?.primary?.main || '#007AFF' }} />
           <Typography variant="h6" component="h2">
             Оплата услуг
           </Typography>
         </Box>
 
         {/* Информация о платеже */}
-        <Box className="pw-payment-info">
-          <div className="pw-payment-info-row">
-            <div className="pw-payment-info-cell">
+        <Box style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ flex: '1 1 200px' }}>
               <Typography variant="body2" color="textSecondary">
                 Сумма к оплате:
               </Typography>
-              <Typography variant="h5" color="primary" className="pw-amount-text">
+              <Typography variant="h5" color="primary" style={{ fontWeight: 'bold' }}>
                 {formatAmount(amount, currency)}
               </Typography>
             </div>
-            <div className="pw-payment-info-cell">
+            <div style={{ flex: '1 1 200px' }}>
               <Typography variant="body2" color="textSecondary">
                 Описание:
               </Typography>
@@ -397,7 +512,7 @@ const PaymentWidget = ({
           </div>
         </Box>
 
-        <div className="pw-divider" />
+        <div style={dividerStyle} />
 
         {/* Выбор провайдера */}
         <Select
@@ -406,19 +521,23 @@ const PaymentWidget = ({
           value={selectedProvider}
           onChange={(value) => setSelectedProvider(value)}
           disabled={loading}
-          className="pw-provider-select"
+          style={{ marginBottom: 24 }}
           options={providers.map((provider) => ({
             value: provider.code,
             label: (
-              <span className="pw-provider-option">
+              <span style={providerOptionStyle}>
                 {providerIcons[provider.code]}
-                <span className="pw-provider-name">
+                <span style={providerNameStyle}>
                   {provider.name}
                 </span>
                 <Badge
                   size="small"
                   variant="outline"
-                  className={`pw-currency-badge--${provider.code}`}
+                  style={{
+                    marginLeft: 'auto',
+                    backgroundColor: providerColors[provider.code] + '20',
+                    color: providerColors[provider.code]
+                  }}
                 >
                   {provider.supported_currencies.join(', ')}
                 </Badge>
@@ -432,13 +551,13 @@ const PaymentWidget = ({
 
         {/* Ошибки */}
         {error &&
-        <Alert severity="error" className="pw-error-alert">
+        <Alert severity="error" style={{ marginBottom: 24 }}>
             {error}
           </Alert>
         }
 
         {/* Кнопки действий */}
-        <Box display="flex" className="pw-actions-row">
+        <Box display="flex" style={{ gap: 16, marginTop: 24 }}>
           <Button
             variant="contained"
             color="primary"
@@ -449,7 +568,7 @@ const PaymentWidget = ({
             
             {loading ?
             <>
-                <CircularProgress size={20} className="pw-submit-icon" />
+                <CircularProgress size={20} style={{ marginRight: 8 }} />
                 Обработка...
               </> :
 
@@ -477,7 +596,7 @@ const PaymentWidget = ({
             <Typography variant="body1" gutterBottom>
               Вы собираетесь оплатить:
             </Typography>
-            <Box className="pw-confirm-amount-box">
+            <Box style={{ padding: 16, backgroundColor: '#f5f5f5', borderRadius: 4, marginBottom: 16 }}>
               <Typography variant="h6" color="primary">
                 {formatAmount(amount, currency)}
               </Typography>

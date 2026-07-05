@@ -1,7 +1,7 @@
 /**
  * Echo Form Component
  * Форма для ввода результатов ЭхоКГ
- * Согласно MASTER_TODO_LIST строка 248
+ * Phase 3: stale MASTER_TODO_LIST reference removed.
  */
 import { useState, useEffect } from 'react';
 import {
@@ -15,14 +15,12 @@ import {
 } from '../ui/macos';
 import {
   Heart,
-
   Save,
   ChevronDown,
   ChevronRight,
-
   AlertTriangle,
-  CheckCircle } from
-'lucide-react';
+  CheckCircle,
+} from 'lucide-react';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';

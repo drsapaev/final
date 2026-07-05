@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
 import PropTypes from 'prop-types';
-import { Input,
-  Checkbox } from '../ui/macos';
+import notify from '../../services/notify';
 
 /**
  * Протокол лечения по визитам для стоматологической ЭМК
@@ -152,6 +151,7 @@ const VisitProtocol = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось сохранить протокол визита. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }
@@ -220,7 +220,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Зубы
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Зубы для процедуры ${index + 1}`}
               value={procedure.teeth || ''}
@@ -235,7 +235,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Время начала
                 </label>
-                <Input
+                <input
               type="time"
               aria-label={`Время начала процедуры ${index + 1}`}
               value={procedure.startTime || ''}
@@ -249,7 +249,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Время окончания
                 </label>
-                <Input
+                <input
               type="time"
               aria-label={`Время окончания процедуры ${index + 1}`}
               value={procedure.endTime || ''}
@@ -278,7 +278,11 @@ const VisitProtocol = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2">
-                  <Checkbox aria-label={`Процедура ${index + 1} завершена`} checked={procedure.completed || false} onChange={(e) => handleArrayUpdate('procedures', index, { completed: e.target.checked })}
+                  <input
+                type="checkbox"
+                aria-label={`Процедура ${index + 1} завершена`}
+                checked={procedure.completed || false}
+                onChange={(e) => handleArrayUpdate('procedures', index, { completed: e.target.checked })}
                 disabled={!isEditing}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               
@@ -286,7 +290,11 @@ const VisitProtocol = ({
                 </label>
                 
                 <label className="flex items-center gap-2">
-                  <Checkbox aria-label={`У процедуры ${index + 1} были осложнения`} checked={procedure.complications || false} onChange={(e) => handleArrayUpdate('procedures', index, { complications: e.target.checked })}
+                  <input
+                type="checkbox"
+                aria-label={`У процедуры ${index + 1} были осложнения`}
+                checked={procedure.complications || false}
+                onChange={(e) => handleArrayUpdate('procedures', index, { complications: e.target.checked })}
                 disabled={!isEditing}
                 className="rounded border-gray-300 text-red-600 focus:ring-red-500" />
               
@@ -346,7 +354,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Название материала
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Название материала ${index + 1}`}
               value={material.name || ''}
@@ -361,7 +369,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Количество
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Количество материала ${index + 1}`}
               value={material.quantity || ''}
@@ -376,7 +384,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Партия/Срок годности
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Партия или срок годности материала ${index + 1}`}
               value={material.batch || ''}
@@ -447,7 +455,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Препарат
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Препарат анестезии ${index + 1}`}
               value={anesthesia.drug || ''}
@@ -462,7 +470,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Доза
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Доза анестезии ${index + 1}`}
               value={anesthesia.dose || ''}
@@ -496,7 +504,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Область
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Область анестезии ${index + 1}`}
               value={anesthesia.area || ''}
@@ -511,7 +519,11 @@ const VisitProtocol = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2">
-                  <Checkbox aria-label={`Анестезия ${index + 1} эффективна`} checked={anesthesia.effective || false} onChange={(e) => handleArrayUpdate('anesthesia', index, { effective: e.target.checked })}
+                  <input
+                type="checkbox"
+                aria-label={`Анестезия ${index + 1} эффективна`}
+                checked={anesthesia.effective || false}
+                onChange={(e) => handleArrayUpdate('anesthesia', index, { effective: e.target.checked })}
                 disabled={!isEditing}
                 className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
               
@@ -519,7 +531,11 @@ const VisitProtocol = ({
                 </label>
                 
                 <label className="flex items-center gap-2">
-                  <Checkbox aria-label={`У анестезии ${index + 1} были осложнения`} checked={anesthesia.complications || false} onChange={(e) => handleArrayUpdate('anesthesia', index, { complications: e.target.checked })}
+                  <input
+                type="checkbox"
+                aria-label={`У анестезии ${index + 1} были осложнения`}
+                checked={anesthesia.complications || false}
+                onChange={(e) => handleArrayUpdate('anesthesia', index, { complications: e.target.checked })}
                 disabled={!isEditing}
                 className="rounded border-gray-300 text-red-600 focus:ring-red-500" />
               
@@ -654,7 +670,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Область
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Область рентгена ${index + 1}`}
               value={radiograph.area || ''}
@@ -724,7 +740,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Препарат
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Препарат назначения ${index + 1}`}
               value={prescription.medication || ''}
@@ -739,7 +755,7 @@ const VisitProtocol = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Дозировка
                 </label>
-                <Input
+                <input
               type="text"
               aria-label={`Дозировка назначения ${index + 1}`}
               value={prescription.dosage || ''}
@@ -813,7 +829,7 @@ const VisitProtocol = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Дата
             </label>
-            <Input
+            <input
             type="date"
             aria-label="Дата следующего визита"
             value={formData.nextVisit.date || ''}
@@ -827,7 +843,7 @@ const VisitProtocol = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Время
             </label>
-            <Input
+            <input
             type="time"
             aria-label="Время следующего визита"
             value={formData.nextVisit.time || ''}
@@ -841,7 +857,7 @@ const VisitProtocol = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Цель визита
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Цель следующего визита"
             value={formData.nextVisit.purpose || ''}

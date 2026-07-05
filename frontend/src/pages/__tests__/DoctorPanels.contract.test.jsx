@@ -122,15 +122,25 @@ describe('Doctor panels SSOT contract', () => {
     const cardiologyVisitTab = read('components/cardiology/VisitTab.jsx');
     const dermatology = read('pages/DermatologistPanelUnified.jsx');
 
-    // R-15: visit tab extracted to VisitTab.jsx — check both files
+    // R-15: visit tab extracted to VisitTab.jsx — check both files.
+    // Phase 4+: sidebar reduced — 'appointments' merged into 'patients' tab.
+    // Back-compat: 'appointments' case still renders, but 'patients' is the
+    // new canonical tab name.
     const cardiologySource = cardiology + '\n' + cardiologyVisitTab;
     expect(cardiologySource).toContain('activeTab === \'visit\'');
     expect(cardiologySource).toContain('title="Выберите визит"');
-    expect(cardiologySource).toContain('goToTab(\'appointments\')');
+    // Must redirect to a tab that exists in the sidebar (patients or appointments alias).
+    expect(
+      cardiologySource.includes('goToTab(\'patients\')') ||
+      cardiologySource.includes('goToTab(\'appointments\')')
+    ).toBe(true);
 
     expect(dermatology).toContain('activeTab === \'visit\' && !currentAppointment && !selectedPatient');
     expect(dermatology).toContain('title="Выберите визит"');
-    expect(dermatology).toContain('handleTabChange(\'appointments\')');
+    expect(
+      dermatology.includes('handleTabChange(\'patients\')') ||
+      dermatology.includes('handleTabChange(\'appointments\')')
+    ).toBe(true);
   });
 
   it('keeps dermatology prescription availability backend-owned', () => {

@@ -17,7 +17,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
-import { Input } from '../ui/macos';
+import notify from '../../services/notify';
 
 /**
  * Форма объективного осмотра для стоматологической ЭМК
@@ -168,6 +168,7 @@ const ExaminationForm = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось сохранить осмотр. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }
@@ -281,7 +282,7 @@ const ExaminationForm = ({
             OHI-S (Упрощенный индекс гигиены)
           </label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
             type="number"
             aria-label="Индекс гигиены OHI-S"
             step="0.1"
@@ -306,7 +307,7 @@ const ExaminationForm = ({
             PLI (Индекс зубного налета)
           </label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
             type="number"
             aria-label="Индекс зубного налета PLI"
             step="0.1"
@@ -332,7 +333,7 @@ const ExaminationForm = ({
             CPI (Коммунальный пародонтальный индекс)
           </label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
             type="number"
             aria-label="Пародонтальный индекс CPI"
             step="0.1"
@@ -359,7 +360,7 @@ const ExaminationForm = ({
             Индекс кровоточивости
           </label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
             type="number"
             aria-label="Индекс кровоточивости"
             step="0.1"
@@ -397,7 +398,7 @@ const ExaminationForm = ({
                 <span className="w-8 text-sm font-medium">{toothId}</span>
                 <div className="flex gap-1">
                   {['M', 'B', 'L', 'D'].map((position) =>
-              <Input
+              <input
                 key={position}
                 type="number"
                 aria-label={`Пародонтальный карман зуб ${toothId}, позиция ${position}`}
@@ -426,7 +427,7 @@ const ExaminationForm = ({
                 <span className="w-8 text-sm font-medium">{toothId}</span>
                 <div className="flex gap-1">
                   {['M', 'B', 'L', 'D'].map((position) =>
-              <Input
+              <input
                 key={position}
                 type="number"
                 aria-label={`Пародонтальный карман зуб ${toothId}, позиция ${position}`}
@@ -470,7 +471,7 @@ const ExaminationForm = ({
             Overjet (Горизонтальное перекрытие)
           </label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
             type="number"
             aria-label="Overjet в миллиметрах"
             step="0.1"
@@ -488,7 +489,7 @@ const ExaminationForm = ({
             Overbite (Вертикальное перекрытие)
           </label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
             type="number"
             aria-label="Overbite в миллиметрах"
             step="0.1"
@@ -543,7 +544,7 @@ const ExaminationForm = ({
             Открытый прикус
           </label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
             type="number"
             aria-label="Открытый прикус в миллиметрах"
             step="0.1"
@@ -732,7 +733,7 @@ const ExaminationForm = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Ортопантомограмма
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Ортопантомограмма"
             value={formData.radiographs.panoramic || ''}
@@ -747,7 +748,7 @@ const ExaminationForm = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               КЛКТ
             </label>
-            <Input
+            <input
             type="text"
             aria-label="КЛКТ"
             value={formData.radiographs.cbct || ''}

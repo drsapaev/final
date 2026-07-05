@@ -34,7 +34,7 @@ from app.services.telegram_templates import get_telegram_templates_service
 
 router = APIRouter()
 
-PROTECTED_LAB_RESULTS_URL = "https://clinic.example.com/patient/lab-results"
+PROTECTED_LAB_RESULTS_URL = "/patient/lab-results"  # P3 fix: relative URL, not example.com
 PROTECTED_DOCTOR_CONTACT_REFERENCE = "assigned"
 PROTECTED_PAYMENT_HISTORY_PATH = PATIENT_PAYMENT_ENTRY_ROUTE
 PROTECTED_PAYMENT_REFERENCE = "available-in-protected-account"

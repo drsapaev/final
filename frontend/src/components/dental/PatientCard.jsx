@@ -20,7 +20,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
-import { Input } from '../ui/macos';
+import notify from '../../services/notify';
 
 /**
  * Расширенная карточка пациента для стоматологической ЭМК
@@ -164,6 +164,7 @@ const PatientCard = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось сохранить данные пациента. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }
@@ -193,7 +194,7 @@ const PatientCard = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Фамилия *
           </label>
-          <Input
+          <input
           type="text"
           aria-label="Фамилия пациента"
           value={formData.surname || ''}
@@ -208,7 +209,7 @@ const PatientCard = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Имя *
           </label>
-          <Input
+          <input
           type="text"
           aria-label="Имя пациента"
           value={formData.name || ''}
@@ -223,7 +224,7 @@ const PatientCard = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Отчество
           </label>
-          <Input
+          <input
           type="text"
           aria-label="Отчество пациента"
           value={formData.patronymic || ''}
@@ -237,7 +238,7 @@ const PatientCard = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Дата рождения *
           </label>
-          <Input
+          <input
           type="date"
           aria-label="Дата рождения"
           value={formData.birthDate || ''}
@@ -269,7 +270,7 @@ const PatientCard = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Возраст
           </label>
-          <Input
+          <input
           type="text"
           aria-label="Возраст"
           value={formData.birthDate ?
@@ -291,7 +292,7 @@ const PatientCard = ({
             </label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
+              <input
               type="tel"
               aria-label="Телефон пациента"
               value={formData.phone || ''}
@@ -309,7 +310,7 @@ const PatientCard = ({
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
+              <input
               type="email"
               aria-label="Email пациента"
               value={formData.email || ''}
@@ -356,7 +357,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Серия
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Серия паспорта"
             value={formData.passport.series || ''}
@@ -371,7 +372,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Номер
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Номер паспорта"
             value={formData.passport.number || ''}
@@ -386,7 +387,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Выдан
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Кем выдан паспорт"
             value={formData.passport.issuedBy || ''}
@@ -401,7 +402,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Дата выдачи
             </label>
-            <Input
+            <input
             type="date"
             aria-label="Дата выдачи паспорта"
             value={formData.passport.issueDate || ''}
@@ -424,7 +425,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Номер полиса
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Номер страхового полиса"
             value={formData.insurance.policyNumber || ''}
@@ -439,7 +440,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Страховая компания
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Страховая компания"
             value={formData.insurance.company || ''}
@@ -454,7 +455,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Действует до
             </label>
-            <Input
+            <input
             type="date"
             aria-label="Действителен до"
             value={formData.insurance.validUntil || ''}
@@ -510,7 +511,7 @@ const PatientCard = ({
         <div className="space-y-2">
           {formData.medicalHistory.somaticDiseases.map((disease, index) =>
         <div key={index} className="flex items-center gap-2">
-              <Input
+              <input
             type="text"
             value={disease}
             onChange={(e) => {
@@ -556,7 +557,7 @@ const PatientCard = ({
         <div className="space-y-2">
           {formData.medicalHistory.allergies.map((allergy, index) =>
         <div key={index} className="flex items-center gap-2">
-              <Input
+              <input
             type="text"
             value={allergy}
             onChange={(e) => {
@@ -602,7 +603,7 @@ const PatientCard = ({
         <div className="space-y-2">
           {formData.medicalHistory.currentMedications.map((medication, index) =>
         <div key={index} className="flex items-center gap-2">
-              <Input
+              <input
             type="text"
             value={medication}
             onChange={(e) => {
@@ -712,7 +713,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               ФИО контактного лица
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Имя контактного лица"
             value={formData.emergencyContact.name || ''}
@@ -748,7 +749,7 @@ const PatientCard = ({
             </label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
+              <input
               type="tel"
               aria-label="Телефон контактного лица"
               value={formData.emergencyContact.phone || ''}
@@ -764,7 +765,7 @@ const PatientCard = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Адрес
             </label>
-            <Input
+            <input
             type="text"
             aria-label="Адрес контактного лица"
             value={formData.emergencyContact.address || ''}

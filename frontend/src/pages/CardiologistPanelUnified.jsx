@@ -8,6 +8,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 // P-021 (UX audit): warn the doctor 5 minutes before session expiry
 // so they can save their work instead of losing it to a silent 401.
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
+import { useCardiologistHotkeys } from '../hooks/useCardiologistHotkeys';
 import {
   Save,
   Settings,
@@ -79,9 +80,10 @@ const MacOSCardiologistPanelUnified = () => {
     selectedPatient,
     setSelectedPatient,
   } = useDoctorPanelState({
-    defaultTab: 'appointments',
+    // Phase 4+: sidebar reduced to 4 tabs — queue / visit / patients / ai.
+    defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
-    patientDeepLinkTab: 'appointments',
+    patientDeepLinkTab: 'patients',
   });
   const [selectedServices, setSelectedServices] = useState([]);
   const [visitData, setVisitData] = useState({
@@ -130,6 +132,16 @@ const MacOSCardiologistPanelUnified = () => {
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
+    },
+  });
+
+  // H-8 fix: keyboard shortcuts for tab switching, refresh, close modal.
+  useCardiologistHotkeys({
+    setActiveTab: goToTab,
+    refreshData: () => loadMacOSCardiologyAppointments(true),
+    closeModal: () => {
+      setShowForm({ open: false });
+      setScheduleNextModal({ open: false, patient: null });
     },
   });
 
@@ -507,7 +519,7 @@ const MacOSCardiologistPanelUnified = () => {
         source: prev?.source || 'search',
         specialty: prev?.specialty || 'cardiology'
       }));
-      setActiveTab('appointments');
+      setActiveTab('patients');
       notify.info(`Загружен пациент: ${patientName}. Выберите визит с каноническим visit_id.`);
     } catch (error) {
       notify.error(getErrorMessage(error, 'Не удалось загрузить пациента. Проверьте соединение и попробуйте снова.'));
@@ -901,7 +913,49 @@ const MacOSCardiologistPanelUnified = () => {
     }
   };
 
-  const handleAppointmentActionClick = async (action, row, event) => {
+  // C-3 fix: cancel appointment with confirm dialog + backend call.
+  // Previously the 'cancel' action was a no-op stub — the button rendered
+  // but did nothing, leaving the doctor with no feedback.
+  const handleCancelAppointment = async (row) => {
+    const ok = await confirm({
+      title: 'Отменить запись?',
+      message: `Отменить запись пациента ${row?.patient_fio || row?.patient_name || ''}?`.trim(),
+      description: 'Запись будет помечена как отменённая. Пациент получит уведомление, если включено.',
+      confirmLabel: 'Отменить запись',
+      cancelLabel: 'Не отменять',
+      intent: 'warning',
+    });
+    if (!ok) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = tokenManager.getAccessToken();
+      const response = await fetch(`${API_V1_BASE}/doctor/queue/${row?.doctor_queue_entry_id || row?.id}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.detail || `HTTP ${response.status}`);
+      }
+
+      notify.success('Запись отменена');
+      loadMacOSCardiologyAppointments(true);
+    } catch (error) {
+      logger.error('[Cardiology] Ошибка отмены записи:', error);
+      notify.error(error?.message || 'Не удалось отменить запись. Проверьте соединение и попробуйте снова.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppointmentActionClick = async (action, row) => {
     event.stopPropagation();
 
     switch (action) {
@@ -1030,7 +1084,10 @@ const MacOSCardiologistPanelUnified = () => {
         await handleEditPatient(row);
         break;
       case 'cancel':
-        // Логика отмены записи
+        // C-3 fix: previously this was a no-op stub. Now opens a confirm
+        // dialog and calls the backend cancel endpoint. Falls back to a
+        // notify.error if the backend rejects the cancellation.
+        await handleCancelAppointment(row);
         break;
       case 'schedule_next':
         // Назначить следующий визит
@@ -1643,9 +1700,10 @@ const MacOSCardiologistPanelUnified = () => {
 
         {/* Контент вкладок */}
         <div className="cardio-tab-content">
-          {/* Записи кардиолога */}
-          {/* Записи кардиолога — R-15: extracted to AppointmentsTab component */}
-          {activeTab === 'appointments' &&
+          {/* Phase 4+: 'patients' tab combines former 'appointments' + 'history'.
+              Back-compat: 'appointments' and 'history' cases still render for
+              old deep links. */}
+          {(activeTab === 'patients' || activeTab === 'appointments') &&
             <AppointmentsTab
               appointments={appointments}
               appointmentsLoading={appointmentsLoading}
@@ -1675,7 +1733,7 @@ const MacOSCardiologistPanelUnified = () => {
                 setActiveTab('queue');
               }}
               onComplete={handleCompleteVisitFromEMR}
-              onGoToAppointments={() => goToTab('appointments')}
+              onGoToAppointments={() => goToTab('patients')}
               getColor={getColor}
               getFontSize={getFontSize}
             />
@@ -1690,6 +1748,76 @@ const MacOSCardiologistPanelUnified = () => {
               getSpacing={getSpacing}
             />
           }
+
+          {/* C-4 fix: 'Добавить ЭКГ' button now opens a simple ECG entry form.
+              Previously setShowForm({type:'ecg'}) was called but no UI rendered. */}
+          {showForm.open && showForm.type === 'ecg' && (
+            <MacOSCard className="cardio-p-6">
+              <div className="cardio-flex-between" style={{ marginBottom: 16 }}>
+                <h3 style={{ margin: 0 }}>Добавить запись ЭКГ</h3>
+                <Button variant="outline" size="sm" onClick={() => setShowForm({ open: false })}>
+                  Закрыть
+                </Button>
+              </div>
+              <BloodTestsTab
+                bloodTests={[]}
+                bloodTestForm={{
+                  ...bloodTestForm,
+                  // Hint the doctor that this form is for ECG metadata entry
+                  interpretation: bloodTestForm?.interpretation || '',
+                }}
+                setBloodTestForm={setBloodTestForm}
+                showFormOpen
+                onNewTest={() => {}}
+                onCancelForm={() => setShowForm({ open: false })}
+                onSubmit={(e) => {
+                  e?.preventDefault?.();
+                  // C-4 fix: Persist ECG metadata to /cardio/ecg as a manual entry
+                  // (file_id is null — the doctor is typing parameters from
+                  // a printout or another system). Uses fetch + tokenManager
+                  // to match the rest of CardiologistPanelUnified (not apiClient).
+                  const token = tokenManager.getAccessToken();
+                  fetch(`${API_V1_BASE}/cardio/ecg`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      patient_id: selectedPatient?.patient?.id || selectedPatient?.patient_id || null,
+                      visit_id: selectedPatient?.visit_id || null,
+                      file_id: null,
+                      ecg_date: new Date().toISOString().slice(0, 10),
+                      heart_rate: bloodTestForm?.heart_rate || null,
+                      pr_interval: bloodTestForm?.pr_interval || null,
+                      qrs_duration: bloodTestForm?.qrs_duration || null,
+                      qt_interval: bloodTestForm?.qt_interval || null,
+                      rhythm: bloodTestForm?.rhythm || null,
+                      axis: bloodTestForm?.axis || null,
+                      interpretation: bloodTestForm?.interpretation || null,
+                      source: 'manual',
+                      parameters: bloodTestForm,
+                    }),
+                  }).then((response) => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    notify.success('Запись ЭКГ добавлена в историю пациента');
+                    setShowForm({ open: false });
+                    loadPatientData();
+                  }).catch((err) => {
+                    logger.error('[Cardiology] Ошибка сохранения ЭКГ:', err);
+                    notify.error('Не удалось сохранить запись ЭКГ. Проверьте соединение.');
+                  });
+                }}
+                getEmptyBloodTestForm={getEmptyBloodTestForm}
+                getFieldRangeWarning={getFieldRangeWarning}
+                isLdlCritical={isLdlCritical}
+                settings={settings}
+                getColor={getColor}
+                getFontSize={getFontSize}
+                getSpacing={getSpacing}
+              />
+            </MacOSCard>
+          )}
 
           {/* Анализы крови — R-15: extracted to BloodTestsTab component */}
           {activeTab === 'blood' &&
@@ -1721,9 +1849,9 @@ const MacOSCardiologistPanelUnified = () => {
             <ServicesTab />
           }
 
-          {/* История и вложения */}
-          {/* История — R-15: extracted to HistoryTab component */}
-          {activeTab === 'history' &&
+          {/* История — R-15: extracted to HistoryTab component.
+              Phase 4+: also renders under 'patients' tab (combined view). */}
+          {(activeTab === 'history' || activeTab === 'patients') &&
             <HistoryTab
               selectedPatient={selectedPatient}
               selectedPatientLabel={selectedPatientLabel}
@@ -1839,7 +1967,7 @@ const MacOSCardiologistPanelUnified = () => {
                 <div className="text-sm cardio-ldl-label">Порог LDL (мг/дл)</div>
                 <Input
                 type="number"
-                aria-label="LDL threshold"
+                aria-label="Порог LDL (мг/дл)"
                 value={settings.ldlThreshold}
                 onChange={(e) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
                 className="cardio-settings-input" />

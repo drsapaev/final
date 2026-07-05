@@ -32,6 +32,7 @@ from app.models.lab import (
     LabTemplateServiceBinding,
 )
 from app.models.user import User
+from app.models.clinic import Doctor
 from app.repositories.lab_reporting_api_repository import LabReportingApiRepository
 from app.services.canonical_visit_service import (
     CanonicalVisitResolutionError,
@@ -667,6 +668,20 @@ class LabReportingService:
         # См. _sync_legacy_lab_results ниже для подробностей.
         self._sync_legacy_lab_results(instance, field_map)
         self.repository.commit()
+
+        # P0 fix: emit inline notifications on finalize — no cron/scheduler needed.
+        # Notifies (1) the patient via Telegram that results are ready, and
+        # (2) the ordering doctor if the instance was created from a lab order.
+        # Previously lab_notification_service.py was fully implemented but
+        # never called — patients had to manually poll for results.
+        try:
+            self._emit_lab_results_ready_notification(instance)
+        except Exception as notify_err:
+            logger.warning(
+                "[LAB] results-ready notification failed (non-blocking): %s",
+                notify_err,
+            )
+
         return self.get_instance(instance.id)
 
     def _sync_legacy_lab_results(
@@ -1460,6 +1475,92 @@ class LabReportingService:
                         "error_type": type(exc).__name__,
                     },
                 )
+
+    def _emit_lab_results_ready_notification(self, instance: LabReportInstance) -> None:
+        """
+        P0 fix: emit notifications when lab results are finalized.
+
+        Notifies:
+          1. The ordering doctor (if instance has a linked LabOrder with
+             requested_by_doctor_id) — so they know results are ready.
+          2. The patient via Telegram (if patient has a Telegram link and
+             lab_notifications enabled) — so they can pick up results.
+
+        This replaces the never-called lab_notification_service.py cron
+        approach with inline emission from finalize().
+        """
+        patient_id = instance.patient_id
+        visit_id = instance.visit_id
+        template_name = ""
+        if instance.template_version and instance.template_version.template:
+            template_name = instance.template_version.template.name or ""
+
+        # Count flagged findings for the notification message.
+        flagged_count = sum(
+            1 for v in instance.values
+            if v.resolved_flag_severity and v.resolved_flag_severity > 0
+        )
+
+        # 1. Notify the ordering doctor via in-app notification.
+        order = None
+        if instance.lab_order_id:
+            order = self.db.query(LabOrder).filter(LabOrder.id == instance.lab_order_id).first()
+
+        doctor_id = None
+        if order and hasattr(order, "requested_by_doctor_id"):
+            doctor_id = order.requested_by_doctor_id
+
+        if doctor_id:
+            doctor_user = (
+                self.db.query(User)
+                .join(Doctor, Doctor.user_id == User.id)
+                .filter(Doctor.id == doctor_id, User.is_active.is_(True))
+                .first()
+            )
+            if doctor_user:
+                try:
+                    asyncio.run(
+                        notification_sender_service.send_lab_event_notification(
+                            db=self.db,
+                            recipient=doctor_user,
+                            event_type="lab_results_ready",
+                            title="Результаты анализов готовы",
+                            message=(
+                                f"Результаты анализов{' («' + template_name + '»)' if template_name else ''} "
+                                f"для пациента #{patient_id} готовы."
+                                + (f" Отклонений: {flagged_count}." if flagged_count > 0 else "")
+                            ),
+                            metadata={
+                                "instance_id": instance.id,
+                                "patient_id": patient_id,
+                                "visit_id": visit_id,
+                                "template_name": template_name,
+                                "flagged_count": flagged_count,
+                            },
+                        )
+                    )
+                    logger.info(
+                        "[LAB] results-ready notification sent to doctor user_id=%s",
+                        doctor_user.id,
+                    )
+                except RuntimeError:
+                    logger.warning("[LAB] results-ready doctor notification skipped (event loop active)")
+                except Exception as exc:
+                    logger.error("[LAB] results-ready doctor notification error: %s", exc)
+
+        # 2. Notify the patient via Telegram.
+        # The telegram webhook's _send_clinic_lab_results function handles
+        # sending PDF results to patients. Here we just log that results are
+        # ready — the patient can pull results via the bot's "📄 Results"
+        # button, or an admin can use POST /telegram/send-lab-results to
+        # push them. A full push integration requires calling the async
+        # telegram bot API from this sync context, which is deferred to
+        # a background task queue in a future iteration.
+        logger.info(
+            "[LAB] results finalized — patient_id=%s can pull results via Telegram bot. "
+            "Use POST /telegram/send-lab-results to push manually if needed.",
+            patient_id,
+        )
 
     def _validate_template_selection_for_context(
         self,

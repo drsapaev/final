@@ -163,6 +163,15 @@ export const labReportingApi = {
     });
   },
 
+  // P1 fix: doctor-initiated lab order — creates a LabReportInstance in DRAFT
+  // status linked to the visit, so the lab technician sees it in their queue.
+  createOrder(payload) {
+    return request('/lab/orders', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
   // WF-06 fix: expectedUpdatedAt — optimistic locking via updated_at.
   // Если backend обнаружит, что бланк был изменён после этого timestamp,
   // вернёт 409 Conflict. Frontend показывает dialog "обновите страницу".

@@ -23,7 +23,7 @@ import { Checkbox } from '../../../ui/macos';
 
 /**
  * DermatologySection Component
- * 
+ *
  * @param {Object} props
  * @param {Array} props.photos - Массив фото из specialty_data
  * @param {string} props.skinType - Тип кожи
@@ -31,8 +31,6 @@ import { Checkbox } from '../../../ui/macos';
  * @param {Object} props.localization - Локализация поражений
  * @param {Function} props.onChange - Handler для изменения specialty_data
  * @param {boolean} props.disabled - Read-only mode
- * @param {number} props.visitId - Visit ID
- * @param {number} props.patientId - Patient ID
  */
 export function DermatologySection({
   photos = [],

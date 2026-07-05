@@ -1,21 +1,23 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import './cashier.css';
 import { useLocation } from 'react-router-dom';
 import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt } from 'lucide-react';
 import {
   Card, Badge, Button,
-  Input } from '../components/ui/macos';
+} from '../components/ui/macos';
 import { useConfirm } from '../components/common/ConfirmDialog';
-import { Tooltip } from '../components/ui/macos';
-import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
+import Tooltip from '../components/ui/macos/Tooltip';
 import PaymentWidget from '../components/payment/PaymentWidget';
 import CashPaymentModal from '../components/payment/CashPaymentModal';
-import { MacOSTab } from '../components/ui/macos';
-import { SegmentedControl } from '../components/ui/macos';
+import MacOSTab from '../components/ui/macos/MacOSTab';
+import SegmentedControl from '../components/ui/macos/SegmentedControl';
+import Input from '../components/ui/macos/Input';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';
 import { usePayments } from '../hooks/usePayments';
+import { useDebouncedValue } from '../hooks/useDebouncedCallback';
+import { useHotkeys } from '../hooks/useHotkeys';
 import { getApiOrigin } from '../api/runtime';
 import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
@@ -46,31 +48,7 @@ const getLocalDateString = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-// Вспомогательная функция для создания прозрачного цвета
-
-
-
-
-
-
-
-// Custom debounce hook
-const useDebounce = (value, delay) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
-
+// Вспомогательная функция для создания прозрачного цвета была удалена (MEDIUM #14 dead code cleanup)
 const PAYMENT_METHOD_LABELS = {
   cash: 'Наличные',
   card: 'Карта',
@@ -178,6 +156,9 @@ const buildReceiptPrintPayload = (paymentRow) => {
   const services = buildReceiptServices(paymentRow, totalAmount);
   const { date, time } = extractReceiptDateTime(paymentRow);
   const methodCode = resolvePaymentMethodCode(paymentRow?.method);
+  // HIGH #9 fix: use real change_due if provided by CashPaymentModal, otherwise 0.
+  const changeDue = Number(paymentRow?.change_due || paymentRow?.change || 0);
+  const receivedAmount = Number(paymentRow?.received_amount || totalAmount);
 
   return {
     payment: {
@@ -191,8 +172,8 @@ const buildReceiptPrintPayload = (paymentRow) => {
       method: methodCode,
       method_name: resolvePaymentMethodLabel(paymentRow?.method),
       status: paymentRow?.status ?? null,
-      paid_amount: totalAmount,
-      change: 0
+      paid_amount: receivedAmount,
+      change: changeDue
     },
     patient: {
       full_name: paymentRow?.patient || paymentRow?.patient_name || 'Пациент',
@@ -206,12 +187,12 @@ const buildReceiptPrintPayload = (paymentRow) => {
 const getPaymentStatusMeta = (status) => {
   const normalizedStatus = String(status || '').trim().toLowerCase();
   const statusMap = {
-    paid: { variant: 'success', ariaLabel: 'Payment status: paid' },
-    partial: { variant: 'info', ariaLabel: 'Payment status: partially paid' },
-    cancelled: { variant: 'danger', ariaLabel: 'Payment status: cancelled' },
-    refunded: { variant: 'danger', ariaLabel: 'Payment status: refunded' },
-    pending: { variant: 'warning', ariaLabel: 'Payment status: pending' },
-    unknown: { variant: 'secondary', ariaLabel: 'Payment status: unknown' },
+    paid: { variant: 'success', ariaLabel: 'Статус оплаты: оплачено' },
+    partial: { variant: 'info', ariaLabel: 'Статус оплаты: частично оплачено' },
+    cancelled: { variant: 'danger', ariaLabel: 'Статус оплаты: отменён' },
+    refunded: { variant: 'danger', ariaLabel: 'Статус оплаты: возвращён' },
+    pending: { variant: 'warning', ariaLabel: 'Статус оплаты: ожидает' },
+    unknown: { variant: 'secondary', ariaLabel: 'Статус оплаты: неизвестно' },
   };
 
   return statusMap[normalizedStatus] || statusMap.unknown;
@@ -231,20 +212,9 @@ const getPaymentStatusLabel = (status) => {
   return statusMap[normalizedStatus] || statusMap.unknown;
 };
 
-const getPaymentActionContext = (paymentRow) => {
-  const paymentId = resolvePaymentId(paymentRow) || 'unknown';
-  const patientName = paymentRow?.patient || paymentRow?.patient_name || 'unknown patient';
-  return `payment ${paymentId} for ${patientName}`;
-};
-
-const getAppointmentPaymentActionContext = (appointment) => {
-  const appointmentId = appointment?.visit_id || appointment?.patient_id || 'unknown';
-  const patientName = appointment?.patient_name ||
-    (appointment?.patient_last_name && appointment?.patient_first_name
-      ? `${appointment.patient_last_name} ${appointment.patient_first_name}`
-      : 'unknown patient');
-  return `appointment ${appointmentId} for ${patientName}`;
-};
+// P-018 fix: getPaymentActionContext / getAppointmentPaymentActionContext helpers
+// were removed — they leaked patient names (PHI) into aria-labels, and after
+// localization all action buttons now use static Russian aria-labels instead.
 
 const resolveCashierVisitIds = (appointment) => {
   const paymentVisitIds = Array.isArray(appointment?.payment_visit_ids)
@@ -350,7 +320,6 @@ const hasBackendPaymentAction = (paymentRow, action) => {
 };
 
 const CashierPanel = () => {
-  useBreakpoint();
   // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
   // The hook returns [confirm, dialogNode]; dialogNode must be rendered once
   // in the component tree (we render it at the end of the JSX below).
@@ -370,7 +339,7 @@ const CashierPanel = () => {
     const patientId = new URLSearchParams(window.location.search).get('patientId');
     return patientId ? `patient:${patientId}` : '';
   });
-  const debouncedQuery = useDebounce(query, 500); // 500ms debounce
+  const debouncedQuery = useDebouncedValue(query, 500); // 500ms debounce
 
   // ✅ Эффект для загрузки пациента из URL
   useEffect(() => {
@@ -391,7 +360,7 @@ const CashierPanel = () => {
             const patientData = await response.json();
             const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
             setQuery(patientName);
-            logger.info('[Cashier] Загружен пациент из URL:', { patientId: patientData?.id });
+            logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });
           }
         } catch (error) {
           logger.error('[Cashier] Не удалось загрузить пациента:', error);
@@ -467,7 +436,6 @@ const CashierPanel = () => {
 
   // Load Data Effect
   // ✅ v2.1: Отдельные loading состояния для каждой секции
-  const [, setStatsLoading] = useState(false);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -477,7 +445,6 @@ const CashierPanel = () => {
       const { date_from, date_to } = getDateParams();
       logger.log('Loading stats with params:', { date_from, date_to });
 
-      setStatsLoading(true);
       try {
         const statsResult = await getStats({
           date_from: date_from || undefined,
@@ -498,7 +465,6 @@ const CashierPanel = () => {
           cancelled_count: 0
         });
       }
-      setStatsLoading(false);
     };
 
     loadStats();
@@ -508,7 +474,7 @@ const CashierPanel = () => {
   useEffect(() => {
     const loadPending = async () => {
       const { date_from, date_to } = getDateParams();
-      logger.info(' Loading pending payments:', { date_from, date_to, page: pendingPage });
+      logger.info('Loading pending payments:', { date_from, date_to, page: pendingPage });
 
       setPendingLoading(true);
       try {
@@ -529,7 +495,7 @@ const CashierPanel = () => {
             setPendingTotalItems(pendingResult.pagination.total);
           }
         } else {
-          logger.warn('⚠️ Error loading pending payments:', pendingResult.error);
+          logger.warn('Error loading pending payments:', pendingResult.error);
           setAppointments([]);
         }
       } catch (error) {
@@ -546,7 +512,7 @@ const CashierPanel = () => {
   useEffect(() => {
     const loadHistory = async () => {
       const { date_from, date_to } = getDateParams();
-      logger.info(' Loading payment history:', { date_from, date_to, page: currentPage, status });
+      logger.info('Loading payment history:', { date_from, date_to, page: currentPage, status });
 
       setHistoryLoading(true);
       try {
@@ -571,7 +537,7 @@ const CashierPanel = () => {
             setTotalItems(paymentsData.length);
           }
         } else {
-          logger.warn('⚠️ Error loading payment history:', paymentsResult.error);
+          logger.warn('Error loading payment history:', paymentsResult.error);
           setPayments([]);
           setTotalPages(1);
         }
@@ -585,9 +551,6 @@ const CashierPanel = () => {
     loadHistory();
   }, [currentPage, debouncedQuery, status, getDateParams, refreshKey, getPayments]);
 
-  // ✅ v2.1: Вычисляемое общее состояние загрузки
-
-
   // Reset page when date or search changes
   useEffect(() => {
     setCurrentPage(1);
@@ -600,6 +563,30 @@ const CashierPanel = () => {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
+  // MEDIUM #15: CashierPanel hotkeys — focus search (Ctrl+F), refresh (F5 / Ctrl+R), export (Ctrl+E).
+  // Only triggers when not focused in input/textarea to avoid hijacking text entry.
+  // Note: handlers use lazy references via refs because some callbacks (exportToCSV)
+  // are defined further down in the component body.
+  const handlersRef = useRef({});
+  useHotkeys({
+    'ctrl+f': (e) => {
+      e.preventDefault();
+      const node = document.getElementById('cashier-search-input');
+      if (node) node.focus();
+    },
+    'f5': (e) => {
+      e.preventDefault();
+      handlersRef.current.refresh?.();
+    },
+    'ctrl+r': (e) => {
+      e.preventDefault();
+      handlersRef.current.refresh?.();
+    },
+    'ctrl+e': (e) => {
+      e.preventDefault();
+      handlersRef.current.export?.();
+    },
+  });
 
   const format = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' сум';
 
@@ -607,28 +594,7 @@ const CashierPanel = () => {
   const handlePaymentSuccess = (paymentData) => {
     setPaymentSuccess(paymentData);
     paymentWidget.closeModal();
-
-    // Force reload to get fresh data
-
-
-
-
-
-
-
-
-    // For now, let's just create a quick local update for UX responsiveness while assuming background fetch works
-    // But since pagination is server-side, local update is complex. 
-    // Best to just re-trigger the main load effect.
-    // We can do this by toggling a 'trigger' state or just calling the load function if we extracted it.
-    // For simplicity in this refactor, I'll rely on the user refreshing or explicit refresh button, 
-    // OR we can make the `load` function available here. 
-    // Actually, let's just reload the page for full consistency as a "safe" move for now, or assume the user sees the success modal.
-
-    // Quick Fix: Let's refetch data by touching a state that triggers useEffect? No.
-    // Let's just update local lists simply for immediate feedback if possible, but with server-side pagination it's tricky.
-    // Correct approach: Call loadData. Since loadData is inside useEffect, we can't call it directly.
-    // Triggering a reload of data:
+    // Force reload to get fresh data after successful payment.
     triggerDataReload();
   };
 
@@ -644,7 +610,7 @@ const CashierPanel = () => {
 
   const openPaymentWidget = (appointment) => {
     if (!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)) {
-      const message = 'Невозможно начать онлайн-оплату: групповые платежи должны использовать бэкенд-контракт.';
+      const message = 'Онлайн-оплата недоступна для групповых платежей. Используйте кнопку «Касса».';
       setPaymentError(message);
       notify.error(message);
       return;
@@ -765,6 +731,10 @@ const CashierPanel = () => {
   const handleRefresh = () => {
     triggerDataReload();
   };
+
+  // Sync hotkey handlers ref (MEDIUM #15)
+  handlersRef.current.refresh = handleRefresh;
+  handlersRef.current.export = exportToCSV;
 
   // ✅ v2.0: Состояние для возврата
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
@@ -992,8 +962,9 @@ const CashierPanel = () => {
               {/* Поиск */}
               <div className="cashier-search-wrap">
                 <Search className="cashier-search-icon" />
-                <Input
-                  aria-label="Search cashier payments"
+                <input
+                  id="cashier-search-input"
+                  aria-label="Поиск платежей кассира"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="cashier-text-sm cashier-text-primary"
@@ -1080,7 +1051,7 @@ const CashierPanel = () => {
           {/* ✅ УЛУЧШЕНИЕ: Статистика платежей из API */}
           <Card variant="outline" className="cashier-stats-card">
             <div className="cashier-stats-grid">
-              {/* Conditional Stats based on Active Tab */}
+              {/* LOW #20: Stats grid stays stable across tabs — same column count, different content. */}
               {activeTab === 'history' ?
               <>
                   <div className="cashier-text-center">
@@ -1127,6 +1098,7 @@ const CashierPanel = () => {
                 }
                 </> :
 
+              <>
               <div className="cashier-text-center">
                   <div className="cashier-stat-num-lg cashier-stat-orange">
                     {format(stats.pending_amount || 0)}
@@ -1135,6 +1107,19 @@ const CashierPanel = () => {
                     Ожидает оплаты ({stats.pending_count} заявок)
                   </div>
                 </div>
+                <div className="cashier-text-center" aria-hidden="true" style={{ visibility: 'hidden' }}>
+                  <div className="cashier-stat-num cashier-stat-green">0</div>
+                  <div className="cashier-stat-cap">Наличные</div>
+                </div>
+                <div className="cashier-text-center" aria-hidden="true" style={{ visibility: 'hidden' }}>
+                  <div className="cashier-stat-num cashier-stat-blue">0</div>
+                  <div className="cashier-stat-cap">Карта</div>
+                </div>
+                <div className="cashier-text-center" aria-hidden="true" style={{ visibility: 'hidden' }}>
+                  <div className="cashier-stat-num cashier-stat-purple">0</div>
+                  <div className="cashier-stat-cap">Оплачено</div>
+                </div>
+              </>
               }
               <div className="cashier-refresh-row">
                 <Button
@@ -1201,7 +1186,7 @@ const CashierPanel = () => {
               <Skeleton className="cashier-skeleton-h" /> :
               appointments.length > 0 ?
               <div className="cashier-table-scroll">
-                    <div className="admin-table-wrapper"><table className="cashier-table">
+                    <table className="cashier-table">
                       <thead>
                         <tr className="cashier-table-row">
                           <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
@@ -1219,7 +1204,7 @@ const CashierPanel = () => {
                       className="cashier-table-row">
 
                             <td
-                              aria-label="Pending appointment date and time"
+                              aria-label="Дата и время ожидаемого приёма"
                               className="cashier-text-sm cashier-text-primary">
                               <div className="cashier-date-stack">
                                 <span className="cashier-date-main">
@@ -1252,7 +1237,7 @@ const CashierPanel = () => {
                               <Badge
                                 variant="warning"
                                 role="status"
-                                aria-label="Payment status: pending">
+                                aria-label="Статус оплаты: ожидает">
                                 Ожидает оплаты
                               </Badge>
                             </td>
@@ -1263,7 +1248,8 @@ const CashierPanel = () => {
                             variant="outline"
                             onClick={() => openPaymentWidget(appointment)}
                             disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}
-                            aria-label={`Start online payment for ${getAppointmentPaymentActionContext(appointment)}`}>
+                            aria-label="Начать онлайн-оплату"
+                            title={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment) ? 'Онлайн-оплата недоступна для этой записи' : 'Оплата онлайн'}>
 
                                   Онлайн
                                 </Button>
@@ -1273,7 +1259,8 @@ const CashierPanel = () => {
                               paymentModal.openModal(appointment);
                             }}
                             disabled={!canCreateCashierPayment(appointment)}
-                            aria-label={`Take cash payment for ${getAppointmentPaymentActionContext(appointment)}`}>
+                            aria-label="Принять оплату через кассу"
+                            title={!canCreateCashierPayment(appointment) ? 'Приём оплаты недоступен для этой записи' : 'Принять оплату через кассу'}>
 
                                   Касса
                                 </Button>
@@ -1282,7 +1269,7 @@ const CashierPanel = () => {
                           </tr>
                     )}
                       </tbody>
-                    </table></div>
+                    </table>
 
                     {/* ✅ v2.0: Пагинация для ожидающих оплаты */}
                     {pendingTotalPages > 1 &&
@@ -1323,7 +1310,7 @@ const CashierPanel = () => {
               <Skeleton className="cashier-skeleton-h" /> :
 
               <div className="cashier-table-scroll">
-                    <div className="admin-table-wrapper"><table className="cashier-table">
+                    <table className="cashier-table">
                       <thead>
                         <tr className="cashier-table-row">
                           <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
@@ -1341,7 +1328,7 @@ const CashierPanel = () => {
                     <tr key={`payment-${row.id || row.payment_id || index}`} className="cashier-table-row">
 
                               <td
-                                aria-label="Payment history date and time"
+                                aria-label="Дата и время платежа в истории"
                                 className="cashier-text-sm cashier-text-primary">
                                 <div className="cashier-date-stack">
                                   <span className="cashier-date-main">{row.date || '—'}</span>
@@ -1381,7 +1368,7 @@ const CashierPanel = () => {
                                   variant="success"
                                   onClick={() => confirmPayment(row.id)}
                                   disabled={!hasBackendPaymentAction(row, 'confirm')}
-                                  aria-label={`Confirm ${getPaymentActionContext(row)}`}>
+                                  aria-label="Подтвердить платёж">
                                   <CheckCircle size={14} /> Принять
                                 </Button>
                                 <Button
@@ -1389,7 +1376,7 @@ const CashierPanel = () => {
                                   variant="danger"
                                   onClick={() => openCancelDialog(row.id)}
                                   disabled={!hasBackendPaymentAction(row, 'cancel')}
-                                  aria-label={`Cancel ${getPaymentActionContext(row)}`}>
+                                  aria-label="Отменить платёж">
                                   <XCircle size={14} /> Отмена
                                 </Button>
                                 {/* ✅ v2.0: Кнопка возврата */}
@@ -1398,7 +1385,7 @@ const CashierPanel = () => {
                                   variant="warning"
                                   onClick={() => openRefundDialog(row)}
                                   disabled={!hasBackendPaymentAction(row, 'refund')}
-                                  aria-label={`Refund ${getPaymentActionContext(row)}`}
+                                  aria-label="Оформить возврат"
                                   title="Возврат средств">
                                   <Undo2 size={14} /> Возврат
                                 </Button>
@@ -1408,7 +1395,7 @@ const CashierPanel = () => {
                                   variant="ghost"
                                   onClick={() => handlePrintReceipt(row)}
                                   disabled={!hasBackendPaymentAction(row, 'print_receipt')}
-                                  aria-label={`Print receipt for ${getPaymentActionContext(row)}`}
+                                  aria-label="Распечатать чек"
                                   title="Печать чека">
                                   <Receipt size={14} /> Чек
                                 </Button>
@@ -1423,7 +1410,7 @@ const CashierPanel = () => {
                           </tr>
                     }
                       </tbody>
-                    </table></div>
+                    </table>
 
                     {/* ✅ УЛУЧШЕНИЕ: Пагинация c Server-Side логикой */}
                     {totalPages > 1 &&
@@ -1476,7 +1463,7 @@ const CashierPanel = () => {
                 Вы уверены, что хотите отменить платёж #{confirmingPaymentId}?
               </Typography>
               <textarea
-                aria-label="Payment cancel reason"
+                aria-label="Причина отмены платежа"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Причина отмены (необязательно)"
@@ -1565,8 +1552,18 @@ const CashierPanel = () => {
               {paymentSuccess &&
               <Box>
                   <Typography variant="body1" gutterBottom>
-                    Платеж успешно обработан
+                    Платёж успешно обработан
                   </Typography>
+                  {paymentSuccess.amount !== undefined &&
+                  <Typography variant="body2" color="textSecondary">
+                    Сумма: {format(Number(paymentSuccess.amount) || 0)}
+                  </Typography>
+                  }
+                  {paymentSuccess.change_due > 0 &&
+                  <Typography variant="body2" color="textSecondary">
+                    Сдача: {format(Number(paymentSuccess.change_due))}
+                  </Typography>
+                  }
                   <Typography variant="body2" color="textSecondary">
                     ID платежа: {paymentSuccess.payment_id}
                   </Typography>
@@ -1598,9 +1595,9 @@ const CashierPanel = () => {
                 </Typography>
                 <Box>
                   <Typography variant="body2" gutterBottom>Сумма возврата:</Typography>
-                  <Input
+                  <input
                     type="number"
-                    aria-label="Refund amount"
+                    aria-label="Сумма возврата"
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(e.target.value)}
                     className="cashier-refund-input"
@@ -1611,7 +1608,7 @@ const CashierPanel = () => {
                 <Box>
                   <Typography variant="body2" gutterBottom>Причина возврата:</Typography>
                   <textarea
-                    aria-label="Refund reason"
+                    aria-label="Причина возврата"
                     value={refundReason}
                     onChange={(e) => setRefundReason(e.target.value)}
                     placeholder="Укажите причину возврата (минимум 3 символа)"
@@ -1641,11 +1638,11 @@ const CashierPanel = () => {
                 {hourlyStats.filter((h) => h.count > 0).length > 0 ?
                 hourlyStats.filter((h) => h.count > 0).map((h) =>
                 <Box key={h.hour} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Typography sx={{ width: 60, fontWeight: 'var(--mac-font-weight-semibold)' }}>{h.hour}:00</Typography>
+                      <Typography sx={{ width: 60, fontWeight: 600 }}>{h.hour}:00</Typography>
                       <Box sx={{
                     flex: 1,
                     height: 24,
-                    backgroundColor: 'var(--mac-success-bg)',
+                    backgroundColor: 'rgba(52, 199, 89, 0.2)',
                     borderRadius: 4,
                     position: 'relative'
                   }}>
