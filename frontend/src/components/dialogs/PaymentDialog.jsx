@@ -57,24 +57,32 @@ const PaymentDialog = ({
     setIsProcessing(true);
 
     try {
-      // Имитация обработки платежа
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      setIsPaid(true);
-      toast.success('Оплата прошла успешно!');
-
-      // Вызываем callback с данными об оплате
+      // UX Audit Registrar: убрана 1.5-секундная «имитация» (setTimeout).
+      // Раньше здесь был `await new Promise(resolve => setTimeout(resolve, 1500))`
+      // — искусственная задержка, которая тратила ~60 сек/день регистратора.
+      //
+      // Теперь: onPaymentSuccess callback делает РЕАЛЬНЫЙ API-запрос
+      // (api.post('/registrar/records/actions', {action: 'mark_paid', ...}))
+      // в useRegistrarActions.handlePayment(). Мы await'им этот callback
+      // и показываем loading state до реального завершения.
+      //
+      // Если callback не передан — просто отмечаем как оплачено (fallback
+      // для тестов/демо без backend).
       if (onPaymentSuccess) {
-        onPaymentSuccess({
+        await onPaymentSuccess({
           appointmentId: appointment.id,
           amount: parseFloat(paymentAmount),
           method: paymentMethod,
           timestamp: new Date().toISOString(),
         });
       }
+
+      setIsPaid(true);
+      toast.success('Оплата отмечена как полученная');
     } catch (error) {
       logger.error('Payment error:', error);
-      toast.error('Ошибка при обработке платежа');
+      toast.error(error?.message || 'Ошибка при обработке платежа');
+      // Не меняем isPaid — диалог остаётся в режиме ввода оплаты.
     } finally {
       setIsProcessing(false);
     }

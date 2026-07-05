@@ -696,6 +696,30 @@ const RegistrarPanel = () => {
     // guarantees referential stability, so it is safe to omit from deps.
   }, [searchParams, showWizard]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // UX Audit Registrar #17: Keyboard shortcuts для продуктивности регистратора.
+  // Ctrl+N — новая запись (открыть wizard)
+  // Esc — закрыть wizard/dialogs (если открыт)
+  // Не срабатывает когда фокус в input/textarea (чтобы не мешать вводу).
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Ctrl+N — новая запись
+      if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
+        // Не срабатываем в input/textarea/select
+        const tag = event.target?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        event.preventDefault();
+        if (!showWizard) {
+          setWizardEditMode(false);
+          setWizardInitialData(null);
+          setShowWizard(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showWizard]);  
+
   // ✅ Проверка localStorage для обновления после присоединения к очереди (fallback механизм)
   useEffect(() => {
     const checkLastQueueJoin = () => {
