@@ -326,7 +326,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
       formData.append('recipient_id', activeConversation);
 
       const token = auth.getState().token;
-      const response = await fetch('/api/v1/messages/send-voice', {
+      const response = await fetch('/messages/send-voice', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

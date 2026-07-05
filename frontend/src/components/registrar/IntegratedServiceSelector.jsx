@@ -130,7 +130,7 @@ const IntegratedServiceSelector = ({
         const params = new URLSearchParams();
         // Исключаем фильтрацию по specialty, чтобы не терять группы
         const API_BASE = getApiOrigin();
-        const response = await fetch(`${API_BASE}/api/v1/registrar/services?${params}`, {
+        const response = await fetch(`registrar/services?${params}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

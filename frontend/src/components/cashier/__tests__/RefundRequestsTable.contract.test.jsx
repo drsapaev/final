@@ -13,12 +13,12 @@ describe('RefundRequestsTable command contract', () => {
   });
 
   it('uses the existing backend process command instead of invented action URLs', () => {
-    expect(source).toContain('/api/v1/force-majeure/refund-requests/${requestId}/process');
+    expect(source).toContain('/force-majeure/refund-requests/${requestId}/process');
     expect(source).toContain('body: JSON.stringify({ action, ...extraPayload })');
 
-    expect(source).not.toContain('/api/v1/force-majeure/refund-requests/${requestId}/approve');
-    expect(source).not.toContain('/api/v1/force-majeure/refund-requests/${requestId}/reject');
-    expect(source).not.toContain('/api/v1/force-majeure/refund-requests/${requestId}/complete');
+    expect(source).not.toContain('/force-majeure/refund-requests/${requestId}/approve');
+    expect(source).not.toContain('/force-majeure/refund-requests/${requestId}/reject');
+    expect(source).not.toContain('/force-majeure/refund-requests/${requestId}/complete');
   });
 
   it('renders refund commands only from backend-provided availability', () => {

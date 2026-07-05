@@ -166,7 +166,7 @@ const FileManager = () => {
 
   const loadStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/files/statistics', {
+      const response = await fetch('/files/statistics', {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -190,7 +190,7 @@ const FileManager = () => {
       if (searchQuery) params.append('search', searchQuery);
 
       const query = params.toString();
-      const response = await fetch(`/api/v1/files/${query ? `?${query}` : ''}`, {
+      const response = await fetch(`/files/${query ? `?${query}` : ''}`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -288,7 +288,7 @@ const FileManager = () => {
       }
 
       try {
-        const response = await fetch('/api/v1/files/upload', {
+        const response = await fetch('/files/upload', {
           method: 'POST',
           headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
           body: formData
@@ -313,7 +313,7 @@ const FileManager = () => {
 
   const handleDownload = async (fileId, filename) => {
     try {
-      const response = await fetch(`/api/v1/files/${fileId}/download`, {
+      const response = await fetch(`/files/${fileId}/download`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
 
@@ -335,7 +335,7 @@ const FileManager = () => {
 
   const handlePreview = async (fileId) => {
     try {
-      const response = await fetch(`/api/v1/files/${fileId}/preview`, {
+      const response = await fetch(`/files/${fileId}/preview`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
 
@@ -362,7 +362,7 @@ const FileManager = () => {
     if (!ok) return;
 
     try {
-      const response = await fetch(`/api/v1/files/${fileId}`, {
+      const response = await fetch(`/files/${fileId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
