@@ -78,7 +78,7 @@ const DoctorServiceSelector = ({
       setError('');
 
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`/api/v1/doctor/${specialty}/services`, {
+      const response = await fetch(`/doctor/${specialty}/services`, {
         headers: { 'Authorization': `Bearer ${token || ''}` }
       });
 

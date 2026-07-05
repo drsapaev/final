@@ -64,7 +64,7 @@ const TelegramManager = () => {
 
   const loadBotStatus = async () => {
     try {
-      const response = await fetch('/api/v1/telegram/bot-status', {
+      const response = await fetch('/telegram/bot-status', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -78,7 +78,7 @@ const TelegramManager = () => {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/v1/admin/telegram/settings', {
+      const response = await fetch('/admin/telegram/settings', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -92,7 +92,7 @@ const TelegramManager = () => {
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch('/api/v1/admin/telegram/templates?language=ru', {
+      const response = await fetch('/admin/telegram/templates?language=ru', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -106,7 +106,7 @@ const TelegramManager = () => {
 
   const loadUsers = async () => {
     try {
-      const response = await fetch('/api/v1/telegram/users?limit=50', {
+      const response = await fetch('/telegram/users?limit=50', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -120,7 +120,7 @@ const TelegramManager = () => {
 
   const loadStats = async () => {
     try {
-      const response = await fetch('/api/v1/admin/telegram/stats?days_back=30', {
+      const response = await fetch('/admin/telegram/stats?days_back=30', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -137,7 +137,7 @@ const TelegramManager = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/test-bot', {
+      const response = await fetch('/admin/telegram/test-bot', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
@@ -169,7 +169,7 @@ const TelegramManager = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/send-test-message', {
+      const response = await fetch('/admin/telegram/send-test-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -203,7 +203,7 @@ const TelegramManager = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/settings', {
+      const response = await fetch('/admin/telegram/settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -232,7 +232,7 @@ const TelegramManager = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/set-webhook', {
+      const response = await fetch('/admin/telegram/set-webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -53,7 +53,7 @@ const ForceMajeureModal = ({
     try {
       const token = getAuthToken();
       const response = await fetch(
-        `/api/v1/force-majeure/pending-entries?specialist_id=${specialistId}`,
+        `/force-majeure/pending-entries?specialist_id=${specialistId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -104,7 +104,7 @@ const ForceMajeureModal = ({
 
     try {
       const token = getAuthToken();
-      const response = await fetch('/api/v1/force-majeure/transfer', {
+      const response = await fetch('/force-majeure/transfer', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -151,7 +151,7 @@ const ForceMajeureModal = ({
 
     try {
       const token = getAuthToken();
-      const response = await fetch('/api/v1/force-majeure/cancel-with-refund', {
+      const response = await fetch('/force-majeure/cancel-with-refund', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

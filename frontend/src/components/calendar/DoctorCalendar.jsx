@@ -117,7 +117,7 @@ const DoctorCalendar = ({
       }
 
       const response = await fetch(
-        `${API_BASE}/api/v1/schedule/weekly?${params}`,
+        `schedule/weekly?${params}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

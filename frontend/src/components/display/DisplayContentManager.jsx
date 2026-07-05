@@ -47,7 +47,7 @@ const DisplayContentManager = ({
       setLoading(true);
 
       // Загружаем контент для табло
-      const response = await fetch(`/api/v1/admin/display-boards/${boardId}/content`, {
+      const response = await fetch(`/admin/display-boards/${boardId}/content`, {
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
@@ -90,7 +90,7 @@ const DisplayContentManager = ({
 
   const handleDeleteContent = async (contentId) => {
     try {
-      const response = await fetch(`/api/v1/admin/display-boards/content/${contentId}`, {
+      const response = await fetch(`/admin/display-boards/content/${contentId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });

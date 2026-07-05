@@ -589,7 +589,7 @@ const DepartmentManagement = () => {
 
       // Импорт данных
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk`, {
+      const response = await fetch('admin/departments/bulk', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -654,7 +654,7 @@ const DepartmentManagement = () => {
 
     try {
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk-delete`, {
+      const response = await fetch('admin/departments/bulk-delete', {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -687,7 +687,7 @@ const DepartmentManagement = () => {
 
     try {
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk-activate`, {
+      const response = await fetch('admin/departments/bulk-activate', {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

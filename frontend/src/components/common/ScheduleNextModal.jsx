@@ -104,7 +104,7 @@ const ScheduleNextModal = ({
     try {
       const token = tokenManager.getAccessToken();
       const apiBase = getApiOrigin();
-      const response = await fetch(`${apiBase}/api/v1/patients/`, {
+      const response = await fetch('patients/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -124,7 +124,7 @@ const ScheduleNextModal = ({
     try {
       const token = tokenManager.getAccessToken();
       const apiBase = getApiOrigin();
-      const response = await fetch(`${apiBase}/api/v1/services`, {
+      const response = await fetch('services', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -185,7 +185,7 @@ const ScheduleNextModal = ({
 
       const token = tokenManager.getAccessToken();
       const apiBase = getApiOrigin();
-      const response = await fetch(`${apiBase}/api/v1/doctor/visits/schedule-next`, {
+      const response = await fetch('doctor/visits/schedule-next', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

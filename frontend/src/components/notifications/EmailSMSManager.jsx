@@ -133,7 +133,7 @@ const EmailSMSManager = () => {
   const loadStatistics = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/email-sms/statistics', {
+      const response = await fetch('/email-sms/statistics', {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -149,7 +149,7 @@ const EmailSMSManager = () => {
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch('/api/v1/email-sms/templates', {
+      const response = await fetch('/email-sms/templates', {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -164,7 +164,7 @@ const EmailSMSManager = () => {
   const sendTestEmail = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/email-sms/test-email', {
+      const response = await fetch('/email-sms/test-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ const EmailSMSManager = () => {
   const sendTestSMS = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/email-sms/test-sms', {
+      const response = await fetch('/email-sms/test-sms', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -214,7 +214,7 @@ const EmailSMSManager = () => {
     try {
       setLoading(true);
       const endpoint = bulkForm.type === 'email' ? 'send-bulk-email' : 'send-bulk-sms';
-      const response = await fetch(`/api/v1/email-sms/${endpoint}`, {
+      const response = await fetch(`/email-sms/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ const EmailSMSManager = () => {
   const resetStatistics = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/email-sms/reset-statistics', {
+      const response = await fetch('/email-sms/reset-statistics', {
         method: 'POST',
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
