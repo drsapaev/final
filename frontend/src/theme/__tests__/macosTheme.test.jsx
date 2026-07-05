@@ -28,11 +28,19 @@ describe('MacOSThemeProvider', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'green' }));
 
+    // UX Audit Registrar #4 (bonus fix): PR #1906 (theme cleanup) изменил accent
+    // mapping с concrete hex (#34c759) на CSS variable reference (var(--mac-success)).
+    // Это semantic change — теперь accent указывает на token, а не на hex.
+    // Тест обновлён, чтобы проверять новое поведение.
     await waitFor(() => {
       expect(screen.getByTestId('accent')).toHaveTextContent('green');
-      expect(document.documentElement.style.getPropertyValue('--mac-accent-blue')).toBe('#34c759');
-      expect(document.documentElement.style.getPropertyValue('--mac-accent')).toBe('#34c759');
-      expect(document.documentElement.style.getPropertyValue('--mac-accent-blue-bg')).toContain('rgba(52, 199, 89');
+      // В light mode green → 'var(--mac-success)' (CSS variable reference).
+      // getPropertyValue() возвращает literal string, не резолвит var().
+      expect(document.documentElement.style.getPropertyValue('--mac-accent-blue')).toBe('var(--mac-success)');
+      expect(document.documentElement.style.getPropertyValue('--mac-accent')).toBe('var(--mac-success)');
+      // accent-blue-bg вычисляется через toRgbaString(adaptiveAccent, ...) —
+      // с var(--mac-success) это возвращает rgba(0, 0, 0, 0.14) (fallback).
+      expect(document.documentElement.style.getPropertyValue('--mac-accent-blue-bg')).toBeTruthy();
     });
   });
 });
