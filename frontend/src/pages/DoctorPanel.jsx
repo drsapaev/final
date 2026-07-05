@@ -9,7 +9,7 @@ import {
   CardContent,
   Badge,
   Skeleton,
-} from '../components/ui/macos';
+  Input} from '../components/ui/macos';
 // R-14: AnimatedTransition moved from native/ to macos/ kit.
 import AnimatedTransition from '../components/ui/macos/AnimatedTransition';
 import { useTheme } from '../contexts/ThemeContext';
@@ -862,7 +862,7 @@ const DoctorPanel = () => {
                   <div className="doctor-section-actions">
                     <div className="doctor-search-wrap">
                       <Search size={20} className="doctor-search-icon" />
-                      <input
+                      <Input
                       aria-label="Search patients"
                       type="text"
                       placeholder="Поиск пациентов..."
@@ -1009,7 +1009,7 @@ const DoctorPanel = () => {
                   <div className="doctor-section-actions">
                     <div className="doctor-search-wrap">
                       <Search size={20} className="doctor-search-icon" />
-                      <input
+                      <Input
                       aria-label="Search appointments"
                       type="text"
                       placeholder="Поиск записей..."

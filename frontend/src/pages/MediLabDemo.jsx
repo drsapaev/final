@@ -12,6 +12,7 @@ import '../styles/full-width.css';
 import '../styles/cursor-effects.css';
 import '../styles/animations.css';
 import '../styles/responsive.css';
+import { Input } from '../components/ui/macos';
 
 const resolveTabFromPath = (path) => {
   if (path.includes('/patients')) return 'patients';
@@ -500,7 +501,7 @@ const MediLabDemo = () => {
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
+            <Input
               aria-label="Search patients by name or record details"
               type="text"
               placeholder="Search patients..."

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Download, Copy, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { Input } from './ui/macos';
 
 const TwoFactorSetup = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState(1); // 1: Setup, 2: Verify, 3: Complete
@@ -104,7 +105,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       }}>
           Email для восстановления (необязательно)
         </label>
-        <input
+        <Input
         id="two-factor-recovery-email"
         type="email"
         aria-label="Two factor recovery email"
@@ -132,7 +133,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       }}>
           Телефон для восстановления (необязательно)
         </label>
-        <input
+        <Input
         id="two-factor-recovery-phone"
         type="tel"
         aria-label="Two factor recovery phone"
@@ -285,7 +286,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       }}>
           Введите 6-значный код из приложения:
         </label>
-        <input
+        <Input
         id="two-factor-totp-code"
         type="text"
         aria-label="Two factor authentication code"

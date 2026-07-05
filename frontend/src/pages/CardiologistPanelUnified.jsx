@@ -16,7 +16,7 @@ import {
   MacOSCard,
   Button,
   Checkbox,
-} from '../components/ui/macos';
+  Input} from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import './cardiology.css';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
@@ -1837,7 +1837,7 @@ const MacOSCardiologistPanelUnified = () => {
               </label>
               <div>
                 <div className="text-sm cardio-ldl-label">Порог LDL (мг/дл)</div>
-                <input
+                <Input
                 type="number"
                 aria-label="LDL threshold"
                 value={settings.ldlThreshold}

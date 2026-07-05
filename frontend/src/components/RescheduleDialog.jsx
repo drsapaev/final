@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { rescheduleVisit, rescheduleTomorrow } from '../api/visits';
 import PropTypes from 'prop-types';
+import { Input } from './ui/macos';
 
 /**
  * Диалог переноса визита.
@@ -100,7 +101,7 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
         <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
           <label style={{ display: 'grid', gap: 6 }}>
             <span>Новая дата</span>
-            <input
+            <Input
               type="date"
               aria-label="Новая дата визита"
               value={d}

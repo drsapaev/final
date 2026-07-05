@@ -17,6 +17,7 @@ import {
   completeQueueJoinSession,
 } from '../api/queue';
 import { formatRegistrarTime } from '../utils/dateUtils';
+import { Input } from '../components/ui/macos';
 
 const formatSpecialistLabel = (specialist) => {
   const doctorName =
@@ -1400,7 +1401,7 @@ const QueueJoin = () => {
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
-                  <input
+                  <Input
                     id="queue-patient-name"
                     name="patient_name"
                     type="text"
@@ -1457,7 +1458,7 @@ const QueueJoin = () => {
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
-                  <input
+                  <Input
                     id="queue-phone"
                     name="phone"
                     type="tel"
@@ -1543,7 +1544,7 @@ const QueueJoin = () => {
                 <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-2)' }}>
                   Telegramда хабардор қилиш учун
                 </div>
-                <input
+                <Input
                   id="queue-telegram-id"
                   name="telegram_id"
                   type="number"

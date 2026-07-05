@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { Input } from './ui/macos';
 /**
  * TimeInput — контрол ввода времени HH:MM с простейшей валидацией.
  * Props:
@@ -41,7 +42,7 @@ export default function TimeInput({
   };
 
   return (
-    <input
+    <Input
       aria-label={ariaLabel}
       type="text"
       placeholder="HH:MM"

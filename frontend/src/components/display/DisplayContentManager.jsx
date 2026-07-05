@@ -14,7 +14,8 @@ import {
 
   Monitor } from
 'lucide-react';
-import { Card, Button, Badge } from '../ui/macos';
+import { Card, Button, Badge,
+  Input} from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
@@ -382,7 +383,7 @@ const DisplayContentManager = ({
                   <label htmlFor="display-content-title" className="block text-sm font-medium text-gray-700 mb-2">
                     Название:
                   </label>
-                  <input
+                  <Input
                   id="display-content-title"
                   type="text"
                   aria-label="Display content title"

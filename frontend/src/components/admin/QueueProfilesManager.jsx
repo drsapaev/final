@@ -41,7 +41,7 @@ import api from '../../services/api';
 import logger from '../../utils/logger';
 import {
   Select,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
@@ -444,7 +444,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         {/* Search */}
                         <div className="admin-qp-search-wrapper">
                             <Search size={16} className="admin-qp-search-icon" />
-                            <input
+                            <Input
                                 className="admin-qp-search-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-secondary)' }}
                                 aria-label="Поиск профилей очереди"
                                 placeholder="Поиск..."
@@ -776,7 +776,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {!isEdit && (
                         <div className="admin-qp-field">
                             <label className="admin-qp-label">Уникальный ключ *</label>
-                            <input
+                            <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                                 aria-label="Уникальный ключ вкладки очереди"
                                 value={formData.key}
@@ -793,7 +793,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     <div className="admin-qp-row">
                         <div className="admin-mb-16-flex-1-1">
                             <label className="admin-qp-label">Название (EN) *</label>
-                            <input
+                            <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                                 aria-label="Название вкладки очереди на английском"
                                 value={formData.title}
@@ -804,7 +804,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         </div>
                         <div className="admin-mb-16-flex-1">
                             <label className="admin-qp-label">Название (RU)</label>
-                            <input
+                            <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                                 aria-label="Название вкладки очереди на русском"
                                 value={formData.title_ru}
@@ -817,7 +817,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* Queue Tags */}
                     <div className="admin-qp-field">
                         <label className="admin-qp-label">Queue Tags</label>
-                        <input
+                        <Input
                             className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                             aria-label="Queue Tags"
                             value={formData.queue_tags}
@@ -830,7 +830,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* Order */}
                     <div className="admin-qp-field">
                         <label className="admin-qp-label">Порядок отображения</label>
-                        <input
+                        <Input
                             className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                             type="number"
                             aria-label="Порядок отображения вкладки очереди"
@@ -878,7 +878,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                     title={color}
                                 />
                             ))}
-                            <input
+                            <Input
                                 type="color"
                                 aria-label="Пользовательский цвет вкладки очереди"
                                 value={formData.color}

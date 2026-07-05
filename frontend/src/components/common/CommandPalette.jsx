@@ -21,6 +21,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, ArrowRight, Clock } from 'lucide-react';
 import { getCanonicalRoutes, isRouteAccessibleToProfile } from '../../routing/routeSelectors';
+import { Input } from '../ui/macos';
 
 const MAX_RESULTS = 8;
 const MAX_RECENT = 5;
@@ -307,7 +308,7 @@ export function CommandPalette({ profile, navigate }) {
           borderBottom: '1px solid var(--mac-border, rgba(0,0,0,0.08))',
         }}>
           <Search size={18} style={{ color: 'var(--mac-text-secondary, #6b7280)', flexShrink: 0 }} />
-          <input
+          <Input
             ref={inputRef}
             type="text"
             value={query}

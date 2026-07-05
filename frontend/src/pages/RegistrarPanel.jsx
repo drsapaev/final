@@ -6,7 +6,7 @@ import AppointmentContextMenu from '../components/tables/AppointmentContextMenu'
 import ModernTabs from '../components/navigation/ModernTabs';
 import {
   Button, Badge, Icon,
-} from '../components/ui/macos';
+  Input} from '../components/ui/macos';
 import { AnimatedLoader } from '../components/ui';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
@@ -1984,7 +1984,7 @@ const RegistrarPanel = () => {
             // QW-02 fix: previously called window.prompt('Введите дату переноса (YYYY-MM-DD):', currentVal)
             // — a jarring native browser dialog that blocks the tab, has no date picker,
             // no min-date guard, and breaks the macOS-style visual language of the app.
-            // Now the date is captured via the inline <input type="date"> rendered in the
+            // Now the date is captured via the inline <Input type="date"> rendered in the
             // dialog body (see customRescheduleDate state + date input below). This action
             // validates the captured date and performs the reschedule.
             onClick: async () => {
@@ -2073,7 +2073,7 @@ const RegistrarPanel = () => {
             <label htmlFor="reschedule-custom-date" className="registrar-reschedule-label registrar-reschedule-label-text">
               Дата переноса
             </label>
-            <input
+            <Input
               id="reschedule-custom-date"
               type="date"
               value={customRescheduleDate}
@@ -2086,7 +2086,7 @@ const RegistrarPanel = () => {
             <label htmlFor="reschedule-custom-time" className="registrar-reschedule-label registrar-reschedule-label-block">
               Время переноса (необязательно)
             </label>
-            <input
+            <Input
               id="reschedule-custom-time"
               type="time"
               value={customRescheduleTime}

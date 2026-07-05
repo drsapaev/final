@@ -18,7 +18,7 @@ import {
 'lucide-react';
 import {
   MacOSCard, Button, Skeleton,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -332,7 +332,7 @@ const DoctorServiceSelector = ({
 
                   {/* Цена */}
                   {canEditPrices ?
-              <input
+              <Input
                 type="number"
                 aria-label={`Цена услуги ${service.name}`}
                 value={service.price}

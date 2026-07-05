@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
 import { printService } from '../../services/print';
 import logger from '../../utils/logger';
@@ -677,7 +677,7 @@ export default function LabReportWorkbench({
                 {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
                   <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <span>{signerFieldLabels[key] || key}</span>
-                    <input
+                    <Input
                       className="macos-input"
                       aria-label={signerFieldLabels[key] || key}
                       value={signerSnapshot?.[key] || ''}
@@ -791,7 +791,7 @@ export default function LabReportWorkbench({
                                 disabled={!canEditActiveInstance}
                               />
                             ) : (
-                              <input
+                              <Input
                                 className="macos-input"
                                 aria-label={`Lab result for ${field.label}`}
                                 value={currentValue}

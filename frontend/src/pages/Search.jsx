@@ -4,7 +4,7 @@ import { api } from '../api';
 import { getVisit } from '../api/visits';
 import {
   AppEmpty, AppError, Button,
-} from '../components/ui/macos';
+  Input} from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors.js';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
@@ -212,7 +212,7 @@ export default function Search() {
           <label htmlFor={searchInputId} style={styles.visuallyHidden}>
             Поиск пациентов и визитов
           </label>
-          <input
+          <Input
             id={searchInputId}
             type="text"
             value={query}

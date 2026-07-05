@@ -35,7 +35,7 @@ function Row({ k, v, onSave }) {
   return (
     <div style={row}>
       <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{k}</div>
-      <input aria-label={`Setting value for ${k}`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
+      <Input aria-label={`Setting value for ${k}`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
       <button onClick={() => onSave(k, val)} style={btn}>Сохранить</button>
     </div>);
 
@@ -282,7 +282,7 @@ export default function Settings() {void
                 <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Активация сервера</div>
                 {errAct && <div style={errBox}>{String(errAct)}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input
+                  <Input
                   placeholder="Вставьте ключ активации"
                   aria-label="Activation key"
                   value={key}
@@ -550,7 +550,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Название *</label>
-            <input
+            <Input
               type="text"
               aria-label="Provider name"
               value={formData.name}
@@ -569,7 +569,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
 
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Код *</label>
-            <input
+            <Input
               type="text"
               aria-label="Provider code"
               value={formData.code}
@@ -607,7 +607,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
 
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Секретный ключ *</label>
-            <input
+            <Input
               type="password"
               aria-label="Provider secret key"
               value={formData.secret_key}
@@ -626,7 +626,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
 
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Webhook URL</label>
-            <input
+            <Input
               type="url"
               aria-label="Provider webhook URL"
               value={formData.webhook_url}
@@ -644,7 +644,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
 
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>API URL</label>
-            <input
+            <Input
               type="url"
               aria-label="Provider API URL"
               value={formData.api_url}
@@ -762,7 +762,7 @@ function KVField({ label, defKey, items, onSave }) {
   return (
     <div style={row}>
       <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{label}</div>
-      <input aria-label={`${label} setting value`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
+      <Input aria-label={`${label} setting value`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
       <button onClick={() => onSave(defKey, val)} style={btn}>Сохранить</button>
     </div>);
 
@@ -777,7 +777,7 @@ function RoleMapItem({ role, items, onSave }) {
   return (
     <div style={row}>
       <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{role}</div>
-      <input
+      <Input
         aria-label={`Route target for ${role}`}
         value={val}
         onChange={(e) => setVal(e.target.value)}

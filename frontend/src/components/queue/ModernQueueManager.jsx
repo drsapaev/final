@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import {
   Button, CardContent, Badge, Select,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
 // UX Audit Stage 3 (Queue issue 7.1):
@@ -391,7 +391,7 @@ const ModernQueueManager = ({
               <label className="mqm-label" htmlFor="modern-queue-date">
                 Дата
               </label>
-              <input
+              <Input
                 id="modern-queue-date"
                 type="date"
                 aria-label="Дата очереди"

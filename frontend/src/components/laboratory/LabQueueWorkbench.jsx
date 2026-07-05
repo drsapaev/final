@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { useState } from 'react';
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import {
   formatLabStatus,
   formatPaymentStatus,
@@ -223,7 +223,7 @@ export default function LabQueueWorkbench({
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <Input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

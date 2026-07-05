@@ -15,6 +15,7 @@ import EMRSection from '../EMRSection';
 import EMRTextField from '../EMRTextField';
 import TeethChart from '../../../dental/TeethChart';
 import './DentistrySection.css';
+import { Input } from '../../../ui/macos';
 
 /**
  * DentistrySection Component
@@ -185,7 +186,7 @@ export function DentistrySection({
                                 return (
                                     <div key={toothNum} className={`periodontal-tooth ${severityClass}`}>
                                         <span className="tooth-number">{toothNum}</span>
-                                        <input
+                                        <Input
                                             type="number"
                                             aria-label={`Periodontal pocket depth for tooth ${toothNum}`}
                                             min="0"
@@ -215,7 +216,7 @@ export function DentistrySection({
                                 return (
                                     <div key={toothNum} className={`periodontal-tooth ${severityClass}`}>
                                         <span className="tooth-number">{toothNum}</span>
-                                        <input
+                                        <Input
                                             type="number"
                                             aria-label={`Periodontal pocket depth for tooth ${toothNum}`}
                                             min="0"

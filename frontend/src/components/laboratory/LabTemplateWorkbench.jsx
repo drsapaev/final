@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
 
 const blankField = () => ({
@@ -484,9 +484,9 @@ export default function LabTemplateWorkbench({
         </CardHeader>
         <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)', display: 'grid', gap: 'var(--mac-spacing-4)' }}>
           <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
-            <input className="macos-input" aria-label="Код шаблона" placeholder="Код шаблона" value={newTemplate.code} onChange={(event) => setNewTemplate((prev) => ({ ...prev, code: event.target.value }))} />
-            <input className="macos-input" aria-label="Название шаблона" placeholder="Название" value={newTemplate.name} onChange={(event) => setNewTemplate((prev) => ({ ...prev, name: event.target.value }))} />
-            <input className="macos-input" aria-label="Семейство шаблона" placeholder="Семейство" value={newTemplate.family} onChange={(event) => setNewTemplate((prev) => ({ ...prev, family: event.target.value }))} />
+            <Input className="macos-input" aria-label="Код шаблона" placeholder="Код шаблона" value={newTemplate.code} onChange={(event) => setNewTemplate((prev) => ({ ...prev, code: event.target.value }))} />
+            <Input className="macos-input" aria-label="Название шаблона" placeholder="Название" value={newTemplate.name} onChange={(event) => setNewTemplate((prev) => ({ ...prev, name: event.target.value }))} />
+            <Input className="macos-input" aria-label="Семейство шаблона" placeholder="Семейство" value={newTemplate.family} onChange={(event) => setNewTemplate((prev) => ({ ...prev, family: event.target.value }))} />
             <textarea className="macos-input" aria-label="Описание шаблона" rows={3} placeholder="Описание" value={newTemplate.description} onChange={(event) => setNewTemplate((prev) => ({ ...prev, description: event.target.value }))} />
             <Button variant="primary" onClick={handleCreateTemplate} disabled={saving}>
               <Icon name="plus" size={16} />
@@ -496,7 +496,7 @@ export default function LabTemplateWorkbench({
 
           {/* WF-21 fix: search для консистентности с LabQueueWorkbench */}
           <div style={{ position: 'relative', marginBottom: 'var(--mac-spacing-2)' }}>
-            <input
+            <Input
               type="search"
               value={templateSearch}
               onChange={(e) => setTemplateSearch(e.target.value)}
@@ -620,7 +620,7 @@ export default function LabTemplateWorkbench({
                 {['document_title', 'document_subtitle', 'clinic_name', 'address', 'phone', 'logo_url'].map((key) => (
                   <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <span>{brandingFieldLabels[key] || key}</span>
-                    <input className="macos-input" aria-label={brandingFieldLabels[key] || key} value={draftVersion.branding_overrides?.[key] || ''} onChange={(event) => updateBranding(key, event.target.value)} />
+                    <Input className="macos-input" aria-label={brandingFieldLabels[key] || key} value={draftVersion.branding_overrides?.[key] || ''} onChange={(event) => updateBranding(key, event.target.value)} />
                   </label>
                 ))}
               </div>
@@ -629,7 +629,7 @@ export default function LabTemplateWorkbench({
                 {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
                   <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <span>{signerFieldLabels[key] || key}</span>
-                    <input className="macos-input" aria-label={signerFieldLabels[key] || key} value={draftVersion.signer_defaults?.[key] || ''} onChange={(event) => updateSigner(key, event.target.value)} />
+                    <Input className="macos-input" aria-label={signerFieldLabels[key] || key} value={draftVersion.signer_defaults?.[key] || ''} onChange={(event) => updateSigner(key, event.target.value)} />
                   </label>
                 ))}
               </div>
@@ -648,11 +648,11 @@ export default function LabTemplateWorkbench({
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 'var(--mac-spacing-2)', alignItems: 'end' }}>
                       <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                         <span>Ключ секции</span>
-                        <input className="macos-input" aria-label="Ключ секции" value={section.key} onChange={(event) => updateSection(sectionIndex, 'key', event.target.value)} />
+                        <Input className="macos-input" aria-label="Ключ секции" value={section.key} onChange={(event) => updateSection(sectionIndex, 'key', event.target.value)} />
                       </label>
                       <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                         <span>Заголовок секции</span>
-                        <input className="macos-input" aria-label="Заголовок секции" value={section.title || ''} onChange={(event) => updateSection(sectionIndex, 'title', event.target.value)} />
+                        <Input className="macos-input" aria-label="Заголовок секции" value={section.title || ''} onChange={(event) => updateSection(sectionIndex, 'title', event.target.value)} />
                       </label>
                       <Button variant="outline" onClick={() => removeSection(sectionIndex)}>
                         <Icon name="trash" size={16} />
@@ -666,11 +666,11 @@ export default function LabTemplateWorkbench({
                           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 0.8fr 0.8fr auto', gap: 'var(--mac-spacing-2)', alignItems: 'end' }}>
                             <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Ключ поля</span>
-                              <input className="macos-input" aria-label="Ключ поля" value={field.field_key} onChange={(event) => updateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
+                              <Input className="macos-input" aria-label="Ключ поля" value={field.field_key} onChange={(event) => updateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
                             </label>
                             <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Название поля</span>
-                              <input className="macos-input" aria-label="Название поля" value={field.label} onChange={(event) => updateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
+                              <Input className="macos-input" aria-label="Название поля" value={field.label} onChange={(event) => updateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
                             </label>
                             <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Тип значения</span>
@@ -682,7 +682,7 @@ export default function LabTemplateWorkbench({
                             </label>
                             <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Единица измерения</span>
-                              <input className="macos-input" aria-label="Единица измерения" value={field.unit || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
+                              <Input className="macos-input" aria-label="Единица измерения" value={field.unit || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
                             </label>
                             <Button variant="outline" onClick={() => removeField(sectionIndex, fieldIndex)}>
                               <Icon name="minus" size={16} />
@@ -693,7 +693,7 @@ export default function LabTemplateWorkbench({
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.8fr 1.2fr auto', gap: 'var(--mac-spacing-2)', alignItems: 'end' }}>
                             <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Код анализируемого показателя</span>
-                              <input
+                              <Input
                                 className="macos-input"
                                 aria-label="Код анализируемого показателя"
                                 list="lab-analyte-catalog"
@@ -703,7 +703,7 @@ export default function LabTemplateWorkbench({
                             </label>
                             <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Код единицы измерения</span>
-                              <input
+                              <Input
                                 className="macos-input"
                                 aria-label="Код единицы измерения"
                                 list="lab-unit-catalog"
@@ -721,7 +721,7 @@ export default function LabTemplateWorkbench({
                             </label>
                             <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                               <span>Текст нормы</span>
-                              <input className="macos-input" aria-label="Текст нормы" value={field.reference_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
+                              <Input className="macos-input" aria-label="Текст нормы" value={field.reference_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
                             </label>
                             <label style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', paddingBottom: '8px' }}>
                               <input type="checkbox" aria-label="Обязательное поле" checked={Boolean(field.required)} onChange={(event) => updateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />

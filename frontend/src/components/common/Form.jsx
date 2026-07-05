@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
+import { Input } from '../ui/macos';
 
 /**
  * Контекст для форм
@@ -326,7 +327,7 @@ export function FormField({
         </label>
       }
       
-      <input
+      <Input
         id={inputId}
         type={type}
         name={name}

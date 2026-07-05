@@ -20,6 +20,7 @@ import { validators, validateForm } from '../../utils/errorHandler';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import { Input } from '../ui/macos';
 // ❌ СТАРЫЙ ПОДХОД - НЕ ИСПОЛЬЗУЙТЕ
 function OldPatientComponent() {
   const [, setPatients] = useState([]);
@@ -160,7 +161,7 @@ function NewPatientComponent() {
 
       {/* Форма создания пациента */}
       <form onSubmit={handleSubmit} className="patient-form">
-        <input type="text"
+        <Input type="text"
       aria-label="Patient full name"
       placeholder="ФИО пациента"
       value={formData.full_name}
@@ -168,7 +169,7 @@ function NewPatientComponent() {
       disabled={submitting} />
         
 
-        <input
+        <Input
         type="tel"
         aria-label="Patient phone"
         placeholder="Телефон"
@@ -177,7 +178,7 @@ function NewPatientComponent() {
         disabled={submitting} />
         
 
-        <input
+        <Input
         type="email"
         aria-label="Patient email"
         placeholder="Email"
@@ -186,7 +187,7 @@ function NewPatientComponent() {
         disabled={submitting} />
         
 
-        <input
+        <Input
         type="date"
         aria-label="Patient birth date"
         value={formData.birth_date}

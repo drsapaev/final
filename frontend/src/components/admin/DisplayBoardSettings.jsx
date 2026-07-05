@@ -25,7 +25,7 @@ import {
 'lucide-react';
 import {
   MacOSCard, Button, Select,
-} from '../ui/macos';
+  Input} from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -272,7 +272,7 @@ const DisplayBoardSettings = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Расположение
               </label>
-              <input
+              <Input
                 type="text"
                 aria-label="Display board location"
                 value={selectedBoard.location || ''}
@@ -322,7 +322,7 @@ const DisplayBoardSettings = () => {
                 <Users size={16} className="inline mr-1" />
                 Количество номеров в очереди
               </label>
-              <input
+              <Input
                 type="number"
                 aria-label="Displayed queue number count"
                 min="1"
@@ -396,7 +396,7 @@ const DisplayBoardSettings = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Длительность показа вызова (сек)
               </label>
-              <input
+              <Input
                 type="number"
                 aria-label="Call display duration seconds"
                 min="5"
@@ -452,7 +452,7 @@ const DisplayBoardSettings = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Громкость: {selectedBoard.volume_level}%
                   </label>
-                  <input
+                  <Input
                   type="range"
                   aria-label="Volume level"
                   min="0"

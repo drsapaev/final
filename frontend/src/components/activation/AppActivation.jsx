@@ -3,6 +3,7 @@ import { useState } from 'react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import {
+import { Input } from '../ui/macos';
   Key,
   Shield,
   CheckCircle,
@@ -176,7 +177,7 @@ const AppActivation = () => {
         </label>
         <div style={{ position: 'relative' }}>
           <Key size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)' }} />
-          <input
+          <Input
             id="activation-key"
             type="text"
             aria-label="Ключ активации"

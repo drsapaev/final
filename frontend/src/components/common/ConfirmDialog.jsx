@@ -171,7 +171,7 @@ export function ConfirmDialog({
                   fontSize: 'var(--mac-font-size-xs)',
                 }}>{requireText}</code> для подтверждения:
               </label>
-              <input
+              <Input
                 id="confirm-dialog-require-text"
                 type="text"
                 value={typedText}

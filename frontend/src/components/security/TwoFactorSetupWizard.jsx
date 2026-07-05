@@ -1,6 +1,7 @@
 import { api } from '../../api/client';
 import { useState } from 'react';
-import { Card, Button } from '../ui/macos';
+import { Card, Button,
+  Input} from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
 import {
   Shield,
@@ -264,7 +265,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {selectedMethod === 'sms' ? 'Номер телефона' : 'Email адрес'}
             </label>
-            <input
+            <Input
           type={selectedMethod === 'sms' ? 'tel' : 'email'}
           aria-label={selectedMethod === 'sms' ? '2FA setup phone number' : '2FA setup email address'}
           value={selectedMethod === 'sms' ? recoveryPhone : recoveryEmail}
@@ -285,7 +286,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email для восстановления (опционально)
           </label>
-          <input
+          <Input
           type="email"
           aria-label="Recovery email"
           value={recoveryEmail}
@@ -299,7 +300,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Телефон для восстановления (опционально)
           </label>
-          <input
+          <Input
           type="tel"
           aria-label="Recovery phone"
           value={recoveryPhone}
@@ -390,7 +391,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Код подтверждения
         </label>
-        <input
+        <Input
         type="text"
         aria-label="2FA verification code"
         value={verificationCode}

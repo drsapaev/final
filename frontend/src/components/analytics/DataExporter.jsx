@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Card, Button } from '../ui/macos';
+import { Card, Button,
+  Input} from '../ui/macos';
 import {
   Download,
   FileText,
@@ -273,7 +274,7 @@ const DataExporter = ({
 
               {emailExport &&
             <div className="ml-6">
-                  <input
+                  <Input
                 type="email"
                 aria-label="Export email address"
                 value={emailAddress}

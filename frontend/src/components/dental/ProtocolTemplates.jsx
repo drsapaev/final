@@ -22,6 +22,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 /**
  * Шаблоны протоколов для стоматологической ЭМК
@@ -573,7 +574,7 @@ const ProtocolTemplates = ({
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
+                <Input
                   type="text"
                   placeholder="Поиск шаблонов..."
                   aria-label="Поиск шаблонов протоколов"

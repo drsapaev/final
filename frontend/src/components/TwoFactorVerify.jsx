@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { Input } from './ui/macos';
 
 const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }) => {
   const [loading, setLoading] = useState(false);
@@ -84,7 +85,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       }}>
           Код аутентификатора:
         </label>
-        <input
+        <Input
         type="text"
         aria-label="Authenticator code"
         value={totpCode}
@@ -131,7 +132,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       }}>
           Backup код:
         </label>
-        <input
+        <Input
         type="text"
         aria-label="Backup code"
         value={backupCode}
@@ -178,7 +179,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       }}>
           Токен восстановления:
         </label>
-        <input
+        <Input
         type="text"
         aria-label="Recovery token"
         value={recoveryToken}
