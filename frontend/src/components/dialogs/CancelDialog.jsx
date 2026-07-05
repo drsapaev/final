@@ -108,8 +108,8 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             gap: '12px',
             padding: '16px',
             backgroundColor:
-              theme === 'dark' ? 'rgba(245, 158, 11, 0.10)' : '#fff7ed',
-            border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.24)' : '#fed7aa'}`,
+              theme === 'dark' ? 'rgba(245, 158, 11, 0.10)' : 'var(--mac-error-bg)',
+            border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.24)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-warning), transparent 50%))'}`,
             borderRadius: '14px',
             marginBottom: '24px',
           }}
@@ -117,7 +117,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
           <AlertTriangle
             size={20}
             style={{
-              color: theme === 'dark' ? '#fbbf24' : '#d97706',
+              color: theme === 'dark' ? 'var(--mac-warning)' : 'var(--mac-warning-hover, var(--mac-warning))',
               flexShrink: 0,
               marginTop: '2px',
             }}
@@ -125,7 +125,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
           <div>
             <h4
               style={{
-                color: theme === 'dark' ? '#fbbf24' : '#92400e',
+                color: theme === 'dark' ? 'var(--mac-warning)' : '#92400e',
                 fontSize: '14px',
                 fontWeight: '600',
                 margin: '0 0 4px 0',

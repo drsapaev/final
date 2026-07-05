@@ -178,7 +178,7 @@ const ModernDialog = ({
         <div
           className="modern-dialog-actions"
           style={{
-            backgroundColor: theme === 'dark' ? '#1f2937' : 'var(--mac-bg-secondary)',
+            backgroundColor: theme === 'dark' ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)',
             borderTop: `1px solid ${theme === 'dark' ? 'var(--mac-text-primary)' : 'var(--mac-border)'}`
           }}>
           

@@ -212,14 +212,14 @@ export const Notification = ({
   if (!shouldRender) return null;
 
   const typeConfig = {
-    [notificationTypes.SUCCESS]: { icon: '✅', color: '#10b981', bgColor: '#d1fae5' },
-    [notificationTypes.ERROR]: { icon: '❌', color: 'var(--mac-error)', bgColor: '#fee2e2' },
-    [notificationTypes.WARNING]: { icon: '⚠️', color: 'var(--mac-warning)', bgColor: '#fef3c7' },
+    [notificationTypes.SUCCESS]: { icon: '✅', color: 'var(--mac-success)', bgColor: 'var(--mac-success-bg)' },
+    [notificationTypes.ERROR]: { icon: '❌', color: 'var(--mac-error)', bgColor: 'var(--mac-error-bg)' },
+    [notificationTypes.WARNING]: { icon: '⚠️', color: 'var(--mac-warning)', bgColor: 'var(--mac-warning-bg)' },
     [notificationTypes.INFO]: { icon: 'ℹ️', color: 'var(--mac-accent-blue)', bgColor: 'var(--mac-accent-bg)' },
-    [notificationTypes.MEDICAL]: { icon: '🏥', color: '#8b5cf6', bgColor: '#e9d5ff' },
+    [notificationTypes.MEDICAL]: { icon: '🏥', color: 'var(--mac-accent-purple)', bgColor: '#e9d5ff' },
     [notificationTypes.APPOINTMENT]: { icon: '📅', color: '#06b6d4', bgColor: '#cffafe' },
-    [notificationTypes.PAYMENT]: { icon: '💳', color: '#10b981', bgColor: '#d1fae5' },
-    [notificationTypes.EMERGENCY]: { icon: '🚨', color: 'var(--mac-error)', bgColor: '#fee2e2' }
+    [notificationTypes.PAYMENT]: { icon: '💳', color: 'var(--mac-success)', bgColor: 'var(--mac-success-bg)' },
+    [notificationTypes.EMERGENCY]: { icon: '🚨', color: 'var(--mac-error)', bgColor: 'var(--mac-error-bg)' }
   };
 
   const config = typeConfig[notification.type] || typeConfig[notificationTypes.INFO];

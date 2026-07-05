@@ -196,7 +196,7 @@ const ModernStatistics = ({
     title: t.totalPatients,
     value: animatedValues.totalPatients || 0,
     iconName: 'person',
-    color: '#007aff',
+    color: 'var(--mac-accent-blue)',
     trend: statistics.trends.patients,
     trendValue: statistics.trendValues.patients,
     suffix: ''
@@ -206,7 +206,7 @@ const ModernStatistics = ({
     title: t.todayAppointments,
     value: animatedValues.todayAppointments || 0,
     iconName: 'calendar',
-    color: '#34c759',
+    color: 'var(--mac-success)',
     trend: statistics.trends.appointments,
     trendValue: statistics.trendValues.appointments,
     suffix: ''
@@ -236,7 +236,7 @@ const ModernStatistics = ({
     title: t.revenue,
     value: animatedValues.revenue || 0,
     iconName: 'creditcard',
-    color: '#34c759',
+    color: 'var(--mac-success)',
     trend: statistics.trends.revenue,
     trendValue: statistics.trendValues.revenue,
     suffix: ' ' + t.sum,
@@ -265,9 +265,9 @@ const ModernStatistics = ({
   // Получение цвета тренда
   const getTrendColor = (trend, isGoodWhenDown = false) => {
     if (isGoodWhenDown) {
-      return trend === 'down' ? '#34c759' : '#ff3b30';
+      return trend === 'down' ? 'var(--mac-success)' : '#ff3b30';
     }
-    return trend === 'up' ? '#34c759' : '#ff3b30';
+    return trend === 'up' ? 'var(--mac-success)' : '#ff3b30';
   };
 
   return (

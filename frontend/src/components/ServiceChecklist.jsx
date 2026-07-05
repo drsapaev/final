@@ -46,7 +46,7 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
       </div>
       {groups.map(group => (
         <div key={group} style={{ marginBottom: '8px' }}>
-          <div style={{ fontWeight: 500, fontSize: '12px', color: '#666', marginBottom: '4px' }}>{group}</div>
+          <div style={{ fontWeight: 500, fontSize: '12px', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>{group}</div>
           {depServices.filter(s => s.group === group).map(service => (
             <label key={service.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <input
@@ -61,7 +61,7 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
                 }}
               />
               <span style={{ fontSize: '12px', flex: 1 }}>{service.name}</span>
-              <span style={{ fontSize: '12px', color: '#666' }}>{service.price.toLocaleString()} UZS</span>
+              <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{service.price.toLocaleString()} UZS</span>
             </label>
           ))}
         </div>

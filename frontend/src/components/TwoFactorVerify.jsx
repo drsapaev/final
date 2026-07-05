@@ -249,7 +249,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
 
       {success &&
       <div style={{
-        background: '#D1FAE5',
+        background: 'var(--mac-success-bg)',
         border: '1px solid #6EE7B7',
         borderRadius: '8px',
         padding: '12px',

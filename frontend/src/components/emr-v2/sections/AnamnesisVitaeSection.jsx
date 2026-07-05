@@ -69,7 +69,7 @@ export function AnamnesisVitaeSection({
         >
             {/* Vitals Widget */}
             <div style={{ marginBottom: '16px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#666', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginBottom: '8px' }}>
                     Витальные показатели
                 </h4>
                 <VitalsWidget

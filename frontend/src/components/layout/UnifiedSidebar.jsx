@@ -258,7 +258,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             minHeight: '28px'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = isDark ? '#fbbf24' : '#1e40af';
+            e.target.style.color = isDark ? 'var(--mac-warning)' : 'var(--mac-accent-blue-active)';
             e.target.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
@@ -390,7 +390,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             width: isCollapsed ? '32px' : 'auto'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = isDark ? '#fbbf24' : '#1e40af';
+            e.target.style.color = isDark ? 'var(--mac-warning)' : 'var(--mac-accent-blue-active)';
             e.target.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
@@ -421,7 +421,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             width: isCollapsed ? '32px' : 'auto'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = isDark ? '#10b981' : '#059669';
+            e.target.style.color = isDark ? 'var(--mac-success)' : '#059669';
             e.target.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {

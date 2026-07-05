@@ -197,7 +197,7 @@ export function TreatmentSection({
 
             {/* Structured Prescriptions */}
             <div style={{ marginTop: '16px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#666', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginBottom: '8px' }}>
                     Лекарственные назначения
                 </h4>
                 <PrescriptionEditor
@@ -245,7 +245,7 @@ export function TreatmentSection({
                             📜 Мой опыт по {icd10Code}
                         </h3>
                         {myExperienceTemplates.length === 0 ?
-          <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+          <p style={{ color: 'var(--mac-text-secondary)', textAlign: 'center', padding: '20px' }}>
                                 Нет сохранённых шаблонов для этого диагноза.<br />
                                 <small>Они появятся после подписания EMR с этим кодом.</small>
                             </p> :

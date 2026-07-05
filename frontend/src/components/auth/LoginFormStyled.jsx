@@ -621,7 +621,7 @@ const LoginFormStyled = () => {
                     padding: '6px 10px',
                     fontSize: 12,
                     fontWeight: 600,
-                    color: '#b45309',
+                    color: 'var(--mac-warning-active, var(--mac-warning))',
                     background: 'rgba(245, 158, 11, 0.12)',
                     border: '1px solid rgba(245, 158, 11, 0.3)',
                     borderRadius: 8,

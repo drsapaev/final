@@ -504,7 +504,7 @@ export const Pagination = ({
             }}
             onMouseEnter={(e) => {
               if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
-                e.target.style.backgroundColor = page === currentPage ? '#2563eb' : 'var(--mac-bg-secondary)';
+                e.target.style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
               }
             }}
             onMouseLeave={(e) => {

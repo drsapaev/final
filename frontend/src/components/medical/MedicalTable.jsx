@@ -125,7 +125,7 @@ const MedicalTable = ({
       style={{
         backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
         borderRadius: '8px',
-        border: `1px solid ${isDark ? '#334155' : 'var(--mac-border)'}`,
+        border: `1px solid ${isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'}`,
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
       }}
@@ -135,7 +135,7 @@ const MedicalTable = ({
         <table className="w-full">
           <thead 
             style={{
-              backgroundColor: isDark ? '#334155' : 'var(--mac-bg-secondary)'
+              backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
             }}
           >
             <tr>
@@ -147,7 +147,7 @@ const MedicalTable = ({
                   }`}
                   style={{
                     color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
-                    backgroundColor: isDark ? '#334155' : 'var(--mac-bg-secondary)'
+                    backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
                   }}
                   onClick={() => handleSort(column.key)}
                 >
@@ -162,7 +162,7 @@ const MedicalTable = ({
                   className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                   style={{
                     color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
-                    backgroundColor: isDark ? '#334155' : 'var(--mac-bg-secondary)'
+                    backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
                   }}
                 >
                   Actions
@@ -174,7 +174,7 @@ const MedicalTable = ({
             className="divide-y"
             style={{
               backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
-              borderColor: isDark ? '#334155' : 'var(--mac-border)'
+              borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'
             }}
           >
             {paginatedData.map((row, index) => (
@@ -217,7 +217,7 @@ const MedicalTable = ({
           className="px-6 py-3 border-t flex items-center justify-between"
           style={{
             backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
-            borderColor: isDark ? '#334155' : 'var(--mac-border)'
+            borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'
           }}
         >
           <div 
@@ -234,7 +234,7 @@ const MedicalTable = ({
               className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
               style={{
                 color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
-                borderColor: isDark ? '#334155' : 'var(--mac-border)',
+                borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)',
                 backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
               }}
             >
@@ -250,7 +250,7 @@ const MedicalTable = ({
                 }`}
                 style={{
                   color: page === currentPage ? 'var(--mac-bg-primary)' : (isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)'),
-                  borderColor: page === currentPage ? 'var(--mac-accent-blue)' : (isDark ? '#334155' : 'var(--mac-border)'),
+                  borderColor: page === currentPage ? 'var(--mac-accent-blue)' : (isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'),
                   backgroundColor: page === currentPage ? 'var(--mac-accent-blue)' : (isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)')
                 }}
               >
@@ -264,7 +264,7 @@ const MedicalTable = ({
               className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
               style={{
                 color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
-                borderColor: isDark ? '#334155' : 'var(--mac-border)',
+                borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)',
                 backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
               }}
             >

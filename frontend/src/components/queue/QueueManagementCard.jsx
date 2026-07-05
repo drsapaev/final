@@ -83,7 +83,7 @@ export const QueueActionButtons = ({
         warning: { 100: 'var(--mac-warning-bg)', 500: 'var(--mac-warning)' },
         info: { 100: 'var(--mac-accent-bg)', 500: 'var(--mac-accent-blue)' }
       };
-      return colors[color]?.[shade] || '#666';
+      return colors[color]?.[shade] || 'var(--mac-text-secondary)';
     }
   } = styles;
 
@@ -385,7 +385,7 @@ export const QueueStatsBar = ({ stats, getColor }) => {
       primary: { 500: 'var(--mac-accent-blue)' },
       success: { 500: 'var(--mac-success)' }
     };
-    return colors[color]?.[shade] || '#666';
+    return colors[color]?.[shade] || 'var(--mac-text-secondary)';
   };
 
   const gc = getColor || defaultGetColor;

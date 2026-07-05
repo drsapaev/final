@@ -211,7 +211,7 @@ const TwoFactorSettings = () => {
 
       {success &&
       <div style={{
-        background: '#D1FAE5',
+        background: 'var(--mac-success-bg)',
         border: '1px solid #6EE7B7',
         borderRadius: '8px',
         padding: '16px',
@@ -244,7 +244,7 @@ const TwoFactorSettings = () => {
           </h3>
           <div style={{
             padding: '4px 12px',
-            background: status.enabled ? '#D1FAE5' : 'var(--mac-error-bg)',
+            background: status.enabled ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
             color: status.enabled ? '#059669' : 'var(--mac-error)',
             borderRadius: '20px',
             fontSize: '12px',

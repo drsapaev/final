@@ -87,8 +87,8 @@ export function VisitTab({
             <span style={{
               padding: '2px 8px', borderRadius: 'var(--mac-radius-sm)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-xs)',
               textTransform: 'uppercase', letterSpacing: '0.5px',
-              background: emr.status === 'signed' ? 'var(--mac-success)' : emr.status === 'amended' ? '#ca8a04' : '#6b7280',
-              color: '#ffffff',
+              background: emr.status === 'signed' ? 'var(--mac-success)' : emr.status === 'amended' ? 'var(--mac-warning)' : 'var(--mac-text-secondary)',
+              color: 'var(--mac-bg-primary)',
             }}>
               {emr.status || 'draft'}
             </span>
