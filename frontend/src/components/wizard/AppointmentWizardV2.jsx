@@ -12,6 +12,10 @@ import {
   ArrowRight,
   Trash2,
   AlertCircle,
+  Stethoscope,
+  FlaskConical,
+  Syringe,
+  ClipboardList,
 
 
 
@@ -2649,7 +2653,12 @@ const AppointmentWizardV2 = ({
           }
         }}>
 
-            <span style={{ fontSize: 'var(--mac-font-size-lg)' }}>{cat.icon}</span>
+            <span style={{ fontSize: 'var(--mac-font-size-lg)', display: 'inline-flex', alignItems: 'center' }}>
+            {cat.icon === 'stethoscope' ? <Stethoscope size={16} /> :
+             cat.icon === 'flask' ? <FlaskConical size={16} /> :
+             cat.icon === 'syringe' ? <Syringe size={16} /> :
+             cat.icon === 'clipboard' ? <ClipboardList size={16} /> : null}
+          </span>
             {cat.label}
           </button>
       )}

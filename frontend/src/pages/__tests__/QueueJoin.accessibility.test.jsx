@@ -228,7 +228,7 @@ describe('QueueJoin Accessibility & UX', () => {
 
     renderQueueJoin('retry-token');
     expect(await screen.findByRole('alert')).toHaveTextContent(/qr-токен не найден/i);
-    const retryButton = await screen.findByRole('button', { name: /қайта уриниш/i });
+    const retryButton = await screen.findByRole('button', { name: /Попробовать снова/i });
     fireEvent.click(retryButton);
 
     expect(await screen.findByRole('button', { name: /давом этиш/i })).toBeInTheDocument();
