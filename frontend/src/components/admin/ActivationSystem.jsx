@@ -208,9 +208,9 @@ const ActivationSystem = () => {
   }
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       {/* Заголовок */}
-      <div className="admin-flex-between">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="admin-h2-2xl-semi-primary-mb-4">
             Система активации
@@ -222,11 +222,11 @@ const ActivationSystem = () => {
 
         <div className="admin-form-row-gap-12">
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw className="admin-icon-16-mr-8" />
+            <RefreshCw className="w-4 h-4 mr-2" />
             Обновить
           </Button>
           <Button onClick={() => setShowCreateForm(true)}>
-            <Plus className="admin-icon-16-mr-8" />
+            <Plus className="w-4 h-4 mr-2" />
             Создать ключ
           </Button>
         </div>
@@ -241,7 +241,7 @@ const ActivationSystem = () => {
           <Badge variant={serverStatus.ok ? 'success' : 'warning'}>
             {serverStatus.ok ? 'Сервер активирован' : 'Сервер не активирован'}
           </Badge>
-          <span className="admin-text-sm">
+          <span className="text-sm">
             {serverStatus.ok ?
             `Ключ ${serverStatus.key || 'не указан'}` :
             (serverStatus.reason || 'Статус активации требует проверки')}
@@ -257,9 +257,9 @@ const ActivationSystem = () => {
         '--admin-banner-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
       }}>
           {message.type === 'success' ?
-        <CheckCircle className="admin-icon-20-mr-8" /> :
+        <CheckCircle className="w-5 h-5 mr-2" /> :
 
-        <AlertCircle className="admin-icon-20-mr-8" />
+        <AlertCircle className="w-5 h-5 mr-2" />
         }
           {message.text}
         </div>
@@ -302,7 +302,7 @@ const ActivationSystem = () => {
       </div>
 
       {/* Фильтры */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <div className="admin-grid-auto-300">
           <div>
             <label className="admin-label-block-sm-med-primary-mb-8">
@@ -314,7 +314,7 @@ const ActivationSystem = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Ключ или ID устройства..."
-              className="admin-w-full" />
+              className="w-full" />
           </div>
 
           <div>
@@ -334,21 +334,21 @@ const ActivationSystem = () => {
               { value: 'revoked', label: 'Отозванные' }]
               }
               size="large"
-              className="admin-w-full" />
+              className="w-full" />
           </div>
         </div>
       </MacOSCard>
 
       {/* Таблица активаций */}
       <MacOSCard className="admin-card-p-0-overflow-hidden">
-        <div className="admin-p-16">
+        <div className="p-4">
           <Table
             columns={[
             {
               key: 'key',
               title: 'Ключ активации',
               render: (activation) =>
-              <div className="admin-flex-center">
+              <div className="flex items-center justify-center">
                     <Key className="admin-icon-16-mr-8-blue" />
                     <div>
                       <div className="admin-key-field">
@@ -370,7 +370,7 @@ const ActivationSystem = () => {
               key: 'device',
               title: 'Устройство',
               render: (activation) =>
-              <div className="admin-flex-center">
+              <div className="flex items-center justify-center">
                     <Smartphone className="admin-icon-16-mr-8-tertiary" />
                     <div>
                       <div className="admin-device-title">
@@ -435,7 +435,7 @@ const ActivationSystem = () => {
                   title="Продлить активацию"
                   aria-label={`Продлить активацию ${(activation || {}).key || ''}`.trim()}>
                   
-                      <Calendar aria-hidden="true" className="admin-icon-14" />
+                      <Calendar aria-hidden="true" className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                   size="sm"
@@ -446,7 +446,7 @@ const ActivationSystem = () => {
                   title="Отозвать активацию"
                   aria-label={`Отозвать активацию ${(activation || {}).key || ''}`.trim()}>
                   
-                      <Shield aria-hidden="true" className="admin-icon-14" />
+                      <Shield aria-hidden="true" className="w-3.5 h-3.5" />
                     </Button>
                   </div>
 
@@ -482,7 +482,7 @@ const ActivationSystem = () => {
       {/* Информация */}
       <MacOSCard className="admin-card-info-bg">
         <h3 className="admin-shield-h3-info">
-          <Shield className="admin-icon-20-mr-8" />
+          <Shield className="w-5 h-5 mr-2" />
           Как работает система активации
         </h3>
         <div className="admin-info-list-secondary">
@@ -531,12 +531,12 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
   };
 
   return (
-    <MacOSCard className="admin-p-24">
+    <MacOSCard className="p-6">
       <h3 className="admin-h3-lg-med-primary-mb-16">
         Создание ключа активации
       </h3>
 
-      <form onSubmit={handleSubmit} className="admin-flex-col-16">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="admin-grid-auto-250">
           <div>
             <label className="admin-label-block-sm-med-primary-mb-8">
@@ -551,7 +551,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               { value: 'enterprise', label: 'Корпоративная' }]
               }
               size="large"
-              className="admin-w-full" />
+              className="w-full" />
           </div>
 
           <div>
@@ -564,7 +564,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               max="3650"
               value={formData.duration_days}
               onChange={(e) => handleChange('duration_days', parseInt(e.target.value))}
-              className="admin-w-full" />
+              className="w-full" />
           </div>
 
           <div>
@@ -577,7 +577,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               max="100"
               value={formData.max_devices}
               onChange={(e) => handleChange('max_devices', parseInt(e.target.value))}
-              className="admin-w-full" />
+              className="w-full" />
           </div>
 
           <div>
@@ -589,7 +589,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
               placeholder="Клиника №1, основная лицензия"
-              className="admin-w-full" />
+              className="w-full" />
           </div>
         </div>
 
@@ -603,7 +603,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               <Checkbox
                 checked={formData.features.full_access}
                 onChange={(e) => handleFeatureChange('full_access', e.target.checked)}
-                className="admin-mr-8" />
+                className="mr-2" />
               <span className="admin-span-sm-primary">Полный доступ</span>
             </label>
 
@@ -611,7 +611,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               <Checkbox
                 checked={formData.features.ai_features}
                 onChange={(e) => handleFeatureChange('ai_features', e.target.checked)}
-                className="admin-mr-8" />
+                className="mr-2" />
               <span className="admin-span-sm-primary">AI функции</span>
             </label>
 
@@ -619,7 +619,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               <Checkbox
                 checked={formData.features.telegram_integration}
                 onChange={(e) => handleFeatureChange('telegram_integration', e.target.checked)}
-                className="admin-mr-8" />
+                className="mr-2" />
               <span className="admin-span-sm-primary">Telegram интеграция</span>
             </label>
 
@@ -627,7 +627,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               <Checkbox
                 checked={formData.features.print_system}
                 onChange={(e) => handleFeatureChange('print_system', e.target.checked)}
-                className="admin-mr-8" />
+                className="mr-2" />
               <span className="admin-span-sm-primary">Система печати</span>
             </label>
           </div>
@@ -638,7 +638,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             Отменить
           </Button>
           <Button type="submit">
-            <Key className="admin-icon-16-mr-8" />
+            <Key className="w-4 h-4 mr-2" />
             Создать ключ
           </Button>
         </div>

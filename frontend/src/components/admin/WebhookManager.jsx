@@ -212,7 +212,7 @@ const WebhookManager = () => {
 
   if (loading) {
     return (
-      <div className="admin-flex-col-16">
+      <div className="flex flex-col gap-4">
         <Skeleton className="admin-h-32-w-256" />
         <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
           <Skeleton className="admin-h-128" />
@@ -225,15 +225,15 @@ const WebhookManager = () => {
   }
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       {/* Заголовок */}
       <div className="admin-flex-jc-between-ai-center">
         <div>
           <h1 className="admin-2xl-bold-primary-m-0">Управление webhook-ами</h1>
           <p className="admin-secondary-base-m-4px000">Настройка и мониторинг внешних интеграций</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} className="admin-flex-center-8">
-          <Plus className="admin-icon-16" />
+        <Button onClick={() => setShowCreateModal(true)} className="flex items-center justify-center gap-2">
+          <Plus className="w-4 h-4" />
           Создать Webhook
         </Button>
       </div>
@@ -276,9 +276,9 @@ const WebhookManager = () => {
         value={activeTab}
         onChange={setActiveTab}
         options={[
-        { value: 'webhooks', label: <span className="admin-inline-flex-ai-center-gap-6"><Globe className="admin-icon-14" />Webhook&apos;{'\u0438'}</span> },
-        { value: 'calls', label: <span className="admin-inline-flex-ai-center-gap-6"><Activity className="admin-icon-14" />{'\u0412\u044b\u0437\u043e\u0432\u044b'}</span> },
-        { value: 'events', label: <span className="admin-inline-flex-ai-center-gap-6"><Clock className="admin-icon-14" />{'\u0421\u043e\u0431\u044b\u0442\u0438\u044f'}</span> }]
+        { value: 'webhooks', label: <span className="admin-inline-flex-ai-center-gap-6"><Globe className="w-3.5 h-3.5" />Webhook&apos;{'\u0438'}</span> },
+        { value: 'calls', label: <span className="admin-inline-flex-ai-center-gap-6"><Activity className="w-3.5 h-3.5" />{'\u0412\u044b\u0437\u043e\u0432\u044b'}</span> },
+        { value: 'events', label: <span className="admin-inline-flex-ai-center-gap-6"><Clock className="w-3.5 h-3.5" />{'\u0421\u043e\u0431\u044b\u0442\u0438\u044f'}</span> }]
         }
         size="large"
         className="admin-wrap-rgap-4" />
@@ -286,9 +286,9 @@ const WebhookManager = () => {
 
       {/* Контент табов */}
       {activeTab === 'webhooks' &&
-      <div className="admin-flex-col-16">
+      <div className="flex flex-col gap-4">
           {/* Фильтры */}
-          <MacOSCard className="admin-p-16">
+          <MacOSCard className="p-4">
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
@@ -342,7 +342,7 @@ const WebhookManager = () => {
                 <Button
                 onClick={() => setFilters({ status: '', event_type: '', search: '' })}
                 variant="outline"
-                className="admin-w-full">
+                className="w-full">
 
                   Сбросить
                 </Button>
@@ -351,9 +351,9 @@ const WebhookManager = () => {
           </MacOSCard>
 
           {/* Список webhook'ов */}
-          <div className="admin-flex-col-16">
+          <div className="flex flex-col gap-4">
             {filteredWebhooks.map((webhook) =>
-          <MacOSCard key={webhook.id} className="admin-p-24">
+          <MacOSCard key={webhook.id} className="p-6">
                 <div className="admin-flex-ai-start-jc-between">
                   <div className="admin-flex-1">
                     <div className="admin-flex-ai-center-gap-12-mb-8">
@@ -370,16 +370,16 @@ const WebhookManager = () => {
                 }
                     
                     <div className="admin-flex-ai-center-gap-16-sm-tertiary-mb-12">
-                      <span className="admin-flex-center admin-gap-4">
-                        <Globe className="admin-icon-16" />
+                      <span className="flex items-center justify-center admin-gap-4">
+                        <Globe className="w-4 h-4" />
                         {webhook.url}
                       </span>
-                      <span className="admin-flex-center admin-gap-4">
-                        <Activity className="admin-icon-16" />
+                      <span className="flex items-center justify-center admin-gap-4">
+                        <Activity className="w-4 h-4" />
                         {webhook.total_calls} вызовов
                       </span>
-                      <span className="admin-flex-center admin-gap-4">
-                        <CheckCircle className="admin-icon-16" />
+                      <span className="flex items-center justify-center admin-gap-4">
+                        <CheckCircle className="w-4 h-4" />
                         {(webhook.successful_calls / webhook.total_calls * 100 || 0).toFixed(1)}% успешных
                       </span>
                     </div>
@@ -405,7 +405,7 @@ const WebhookManager = () => {
                     loadWebhookCalls(webhook.id);
                   }}>
 
-                      <Eye aria-hidden="true" className="admin-icon-16" />
+                      <Eye aria-hidden="true" className="w-4 h-4" />
                     </Button>
                     
                     <Button
@@ -419,7 +419,7 @@ const WebhookManager = () => {
                     setShowTestModal(true);
                   }}>
 
-                      <TestTube aria-hidden="true" className="admin-icon-16" />
+                      <TestTube aria-hidden="true" className="w-4 h-4" />
                     </Button>
                     
                     <Button
@@ -433,7 +433,7 @@ const WebhookManager = () => {
                     setShowEditModal(true);
                   }}>
 
-                      <Edit aria-hidden="true" className="admin-icon-16" />
+                      <Edit aria-hidden="true" className="w-4 h-4" />
                     </Button>
                     
                     {webhook.is_active ?
@@ -445,7 +445,7 @@ const WebhookManager = () => {
                   aria-label={`Приостановить webhook ${webhook.name || webhook.id}`}
                   onClick={() => handleDeactivateWebhook(webhook.id)}>
 
-                        <Pause aria-hidden="true" className="admin-icon-16" />
+                        <Pause aria-hidden="true" className="w-4 h-4" />
                       </Button> :
 
                 <Button
@@ -456,7 +456,7 @@ const WebhookManager = () => {
                   aria-label={`Активировать webhook ${webhook.name || webhook.id}`}
                   onClick={() => handleActivateWebhook(webhook.id)}>
 
-                        <Play aria-hidden="true" className="admin-icon-16" />
+                        <Play aria-hidden="true" className="w-4 h-4" />
                       </Button>
                 }
                     
@@ -469,7 +469,7 @@ const WebhookManager = () => {
                   onClick={() => handleDeleteWebhook(webhook.id)}
                   className="admin-error">
 
-                      <Trash2 aria-hidden="true" className="admin-icon-16" />
+                      <Trash2 aria-hidden="true" className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -500,8 +500,8 @@ const WebhookManager = () => {
       }
 
       {activeTab === 'calls' &&
-      <div className="admin-flex-col-16">
-          <div className="admin-flex-between">
+      <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
             <h2 className="admin-lg-semi-primary-m-0">
               Все вызовы webhook-ов
             </h2>
@@ -513,13 +513,13 @@ const WebhookManager = () => {
             variant="outline"
             size="sm">
 
-              <RefreshCw className="admin-icon-16-mr-8" />
+              <RefreshCw className="w-4 h-4 mr-2" />
               Обновить
             </Button>
           </div>
 
           {/* Фильтры для вызовов */}
-          <MacOSCard className="admin-p-16">
+          <MacOSCard className="p-4">
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
@@ -559,10 +559,10 @@ const WebhookManager = () => {
           </MacOSCard>
 
           {/* Список вызовов */}
-          <div className="admin-flex-col-8">
+          <div className="flex flex-col gap-2">
             {calls.map((call) =>
-          <MacOSCard key={call.id} className="admin-p-16">
-                <div className="admin-flex-between">
+          <MacOSCard key={call.id} className="p-4">
+                <div className="flex items-center justify-between">
                   <div className="admin-flex-1">
                     <div className="admin-flex-ai-center-gap-12-mb-8">
                       <span className="admin-med-primary">
@@ -582,8 +582,8 @@ const WebhookManager = () => {
                     </div>
                     
                     <div className="admin-flex-ai-center-gap-16-sm-tertiary">
-                      <span className="admin-flex-center admin-gap-4">
-                        <Clock className="admin-icon-16" />
+                      <span className="flex items-center justify-center admin-gap-4">
+                        <Clock className="w-4 h-4" />
                         {new Date(call.created_at).toLocaleString()}
                       </span>
                       {call.duration_ms &&
@@ -615,8 +615,8 @@ const WebhookManager = () => {
       }
 
       {activeTab === 'events' &&
-      <div className="admin-flex-col-16">
-          <div className="admin-flex-between">
+      <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
             <h2 className="admin-lg-semi-primary-m-0">
               Типы событий
             </h2>
@@ -628,7 +628,7 @@ const WebhookManager = () => {
             variant="outline"
             size="sm">
 
-              <RefreshCw className="admin-icon-16-mr-8" />
+              <RefreshCw className="w-4 h-4 mr-2" />
               Обновить
             </Button>
           </div>
@@ -665,7 +665,7 @@ const WebhookManager = () => {
           </div>
 
           {/* Список типов событий */}
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-primary-m-0016px0">
               Доступные типы событий
             </h3>
@@ -748,7 +748,7 @@ const WebhookManager = () => {
                       {event.description}
                     </p>
                     
-                    <div className="admin-flex-between">
+                    <div className="flex items-center justify-between">
                       <span className="admin-xs-tertiary">
                         {webhookCount} webhook{webhookCount === 1 ? '' : webhookCount < 5 ? 'а' : 'ов'} используют это событие
                       </span>
@@ -774,7 +774,7 @@ const WebhookManager = () => {
         title="Создать Webhook"
         size="lg">
 
-          <div className="admin-p-24">
+          <div className="p-6">
             <p className="admin-secondary-sm-mb-16">
               Функционал создания webhook-а будет добавлен в следующей итерации
             </p>
