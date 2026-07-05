@@ -267,6 +267,8 @@ const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, 
         style={{ display: 'none' }}
         onClick={onAISuggestion}
         aria-hidden="true"
+        aria-label="AI suggest ICD-10 trigger"
+        tabIndex={-1}
       />
     </div>
   </div>

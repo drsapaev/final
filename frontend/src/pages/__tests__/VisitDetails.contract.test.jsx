@@ -17,6 +17,32 @@ vi.mock('../../components/RescheduleDialog', () => ({
   default: () => null,
 }));
 
+// PR #1913 bugfix: VisitDetails теперь использует MacOSCard который требует
+// ThemeProvider (useTheme). Добавляем mock для useTheme, чтобы тест рендерился.
+vi.mock('../../contexts/ThemeContext', () => ({
+  useTheme: () => ({
+    theme: 'light',
+    getColor: (key) => {
+      const colors = {
+        textPrimary: '#1d1d1f',
+        textSecondary: '#86868b',
+        textTertiary: '#aeaeb2',
+        cardBg: '#ffffff',
+        bgPrimary: '#ffffff',
+        bgSecondary: '#f5f5f7',
+        bgTertiary: '#e5e5ea',
+        border: '#d1d1d6',
+        accent: '#007aff',
+        success: '#34c759',
+        warning: '#ff9500',
+        error: '#ff3b30',
+      };
+      return colors[key] || '#000000';
+    },
+  }),
+  ThemeProvider: ({ children }) => children,
+}));
+
 import VisitDetails from '../VisitDetails.jsx';
 
 function renderVisitDetails() {
