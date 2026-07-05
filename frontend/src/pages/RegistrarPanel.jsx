@@ -433,7 +433,11 @@ const RegistrarPanel = () => {
 
               // ⭐ SSOT: session_id for visual grouping (presentation only)
               // DO NOT parse this value - it's an opaque string from backend
-              session_id: fullEntry.session_id || null
+              session_id: fullEntry.session_id || null,
+
+              // P1 fix: pass through lab report summary so registrar can see
+              // if lab results are ready for this patient's visit.
+              latest_lab_report: fullEntry.latest_lab_report ?? null,
             };
           };
 

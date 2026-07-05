@@ -33,6 +33,7 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import notify from '../../services/notify';
 
 const iconSize = 15;
 
@@ -318,6 +319,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
       onUpdate && onUpdate(treatmentPlan);
     } catch (error) {
       logger.error('Ошибка сохранения плана:', error);
+      notify.error('Не удалось сохранить план лечения. Проверьте соединение и попробуйте снова.');
     }
   };
 

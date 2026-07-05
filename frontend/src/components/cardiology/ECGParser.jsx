@@ -1,64 +1,50 @@
 /**
  * ECG Parser Component
  * Парсинг SCP/XML форматов ЭКГ
- * Согласно MASTER_TODO_LIST строка 249
+ * Phase 3: stale MASTER_TODO_LIST reference removed.
  */
 import logger from '../../utils/logger';
 // Парсер для SCP формата
+// C-1 fix: previously this returned hardcoded fake parameters (heartRate: 75,
+// prInterval: 160, etc.) regardless of file contents. Those fake values were
+// then persisted to cardio_ecg_records via POST /cardio/ecg — a patient-safety
+// risk because doctors could make clinical decisions based on fabricated data.
+//
+// Until a real SCP-ECG library is integrated, we hard-fail: return success=false
+// so the caller (ECGViewer.parseECGFileData) shows a clear warning to the doctor
+// and does NOT persist fake parameters to the database.
 export const parseSCPFile = async (file) => {
-  // SCP (Standard Communications Protocol for ECG) парсер
-  // Это упрощенная версия - в реальности нужна полная библиотека
-
   try {
     const buffer = await file.arrayBuffer();
-    const view = new DataView(buffer);
 
-    // SCP файл начинается с CRC и длины
-    void view.getUint16(0, true);void
-    view.getUint32(2, true);
+    // Minimal SCP-ECG validation: file must be at least 6 bytes
+    // (CRC uint16 + length uint32 header). Files smaller than this are
+    // definitely not valid SCP-ECG.
+    if (buffer.byteLength < 6) {
+      return {
+        success: false,
+        error: 'Файл слишком мал для SCP-ECG формата (минимум 6 байт)',
+      };
+    }
 
-    // Извлекаем основные параметры (упрощенно)
-    const parameters = {
-      heartRate: 75, // Обычно в секции 3
-      prInterval: 160,
-      qrsInterval: 90,
-      qtInterval: 400,
-      axis: 45,
-
-      // Дополнительные поля SCP
-      patientInfo: {
-        age: null,
-        sex: null
-      },
-      deviceInfo: {
-        manufacturer: 'Unknown',
-        model: 'Unknown'
-      },
-      recordingDate: new Date().toISOString()
-    };
-
-    // В реальном парсере здесь бы был разбор всех секций SCP
-    // Секция 0: Pointers
-    // Секция 1: Header
-    // Секция 2: Huffman tables
-    // Секция 3: ECG leads definition
-    // Секция 4: QRS locations
-    // Секция 5: Reference beat
-    // Секция 6: Rhythm data
-    // и т.д.
+    // Real SCP-ECG parsing requires a dedicated library (e.g. ecg-scp).
+    // Until integrated, we refuse to fabricate parameters — see C-1 fix note.
+    logger.warn('[ECGParser] SCP-ECG parsing not implemented — refusing to fabricate parameters', {
+      fileName: file?.name,
+      fileSize: buffer.byteLength,
+    });
 
     return {
-      success: true,
-      parameters,
+      success: false,
+      error: 'Парсинг SCP-ECG формата не реализован. Загрузите файл в формате XML/HL7 aECG или обратитесь к администратору для интеграции SCP-библиотеки.',
       format: 'SCP',
-      raw: buffer
+      raw: buffer,
     };
-
   } catch (error) {
     logger.error('Ошибка парсинга SCP:', error);
     return {
       success: false,
-      error: 'Не удалось распарсить SCP файл'
+      error: 'Не удалось прочитать SCP файл',
     };
   }
 };

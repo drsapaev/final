@@ -1,15 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Info } from 'lucide-react';
 import {
   Button,
+  Input,
+  Select,
+  Textarea,
+  Label,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Typography,
+  Box,
 } from '../ui/macos';
 import notify from '../../services/notify';
+import formatCurrency from '../../utils/formatCurrency';
 
 /**
  * Cash Payment Modal Component
- * Extracted from CashierPanel for better code organization
+ * Extracted from CashierPanel for better code organization.
+ *
+ * Refactored to use macOS UI kit components (was 100% inline styles, HIGH #6),
+ * adds change-due calculation for cash payments (HIGH #9),
+ * unified payment method options (MEDIUM #16),
+ * and uses consistent Russian aria-labels (HIGH #8).
  */
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'cash', label: 'Наличные' },
+  { value: 'card', label: 'Карта' },
+  { value: 'click', label: 'Click' },
+  { value: 'payme', label: 'PayMe' },
+];
+
 const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
     // Auto-fill amount from appointment data
     const defaultAmount = appointment?.total_amount ||
@@ -19,6 +42,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
 
     const [paymentData, setPaymentData] = useState({
         amount: defaultAmount,
+        receivedAmount: '',
         method: 'cash',
         note: ''
     });
@@ -29,160 +53,189 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
             appointment?.remaining_amount ||
             appointment?.payment_amount ||
             '';
-        setPaymentData(prev => ({ ...prev, amount: newAmount }));
+        setPaymentData(prev => ({ ...prev, amount: newAmount, receivedAmount: '' }));
     }, [appointment]);
+
+    const numericAmount = Number(paymentData.amount) || 0;
+    const numericReceived = Number(paymentData.receivedAmount) || 0;
+    const changeDue = useMemo(() => {
+        if (paymentData.method !== 'cash') return 0;
+        if (numericReceived <= 0) return 0;
+        return Math.max(0, numericReceived - numericAmount);
+    }, [paymentData.method, numericReceived, numericAmount]);
+
+    const insufficientCash = useMemo(() => {
+        if (paymentData.method !== 'cash') return false;
+        if (numericReceived <= 0) return false;
+        return numericReceived < numericAmount;
+    }, [paymentData.method, numericReceived, numericAmount]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!paymentData.amount || paymentData.amount <= 0) {
+        if (!paymentData.amount || Number(paymentData.amount) <= 0) {
             notify.warning('Введите корректную сумму');
             return;
         }
-        onProcessPayment(appointment, paymentData);
+        if (insufficientCash) {
+            notify.warning('Полученная сумма меньше суммы к оплате');
+            return;
+        }
+        // Pass change due up to parent for receipt printing (HIGH #9 fix).
+        onProcessPayment(appointment, {
+            ...paymentData,
+            amount: Number(paymentData.amount),
+            change_due: changeDue,
+            received_amount: paymentData.method === 'cash' ? numericReceived : numericAmount,
+        });
     };
 
-    const formatAmount = (n) => new Intl.NumberFormat('ru-RU').format(n);
-
     return (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-        }}>
-            <div style={{
-                backgroundColor: 'var(--mac-bg-secondary)',
-                borderRadius: 'var(--mac-radius-md)',
-                padding: '24px',
-                width: '100%',
-                maxWidth: '400px',
-                margin: '16px',
-                border: '1px solid var(--mac-border)',
-                boxShadow: 'var(--mac-shadow-lg)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>Обработка оплаты</h3>
-                    <button onClick={onClose} aria-label="Закрыть окно обработки оплаты" style={{ color: 'var(--mac-text-secondary)', cursor: 'pointer', border: 'none', background: 'none' }}>
-                        <XCircle style={{ width: '24px', height: '24px' }} />
-                    </button>
-                </div>
+        <Dialog
+            open
+            onClose={onClose}
+            maxWidth="sm"
+            fullWidth
+            aria-label="Диалог обработки оплаты">
+            <DialogTitle>
+                <Box
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    style={{ width: '100%' }}>
+                    <span>Обработка оплаты</span>
+                    <Button
+                        variant="ghost"
+                        size="small"
+                        onClick={onClose}
+                        aria-label="Закрыть окно обработки оплаты">
+                        <XCircle size={20} aria-hidden="true" />
+                    </Button>
+                </Box>
+            </DialogTitle>
 
-                <div style={{ marginBottom: '16px' }}>
-                    <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '8px' }}>Пациент:</p>
-                    <p style={{ fontSize: '16px', fontWeight: '500', color: 'var(--mac-text-primary)' }}>
+            <DialogContent>
+                <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary" style={{ marginBottom: 4 }}>
+                        Пациент:
+                    </Typography>
+                    <Typography variant="body1" style={{ fontWeight: 500 }}>
                         {appointment?.patient_name || `Пациент #${appointment?.patient_id}`}
-                    </p>
-                    <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
                         {appointment?.department} • {appointment?.appointment_date} {appointment?.appointment_time}
-                    </p>
-                    {/* Recommended amount hint */}
+                    </Typography>
                     {defaultAmount > 0 && (
-                        <p style={{
-                            fontSize: '13px',
-                            color: '#007AFF',
-                            marginTop: '8px',
-                            padding: '8px 12px',
-                            backgroundColor: 'rgba(0, 122, 255, 0.1)',
-                            borderRadius: 'var(--mac-radius-sm)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }}>
-                            💡 Сумма к оплате: {formatAmount(defaultAmount)} сум
-                        </p>
+                        <Box
+                            mt={1}
+                            px={1.5}
+                            py={1}
+                            display="flex"
+                            alignItems="center"
+                            gap={1}
+                            style={{
+                                backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                                borderRadius: 'var(--mac-radius-sm)',
+                                color: '#007AFF',
+                                fontSize: '13px',
+                            }}>
+                            <Info size={14} aria-hidden="true" />
+                            Сумма к оплате: {formatCurrency(defaultAmount)}
+                        </Box>
                     )}
-                </div>
+                </Box>
 
-                <form onSubmit={handleSubmit}>
-                    <div style={{ marginBottom: '16px' }}>
-                        <label htmlFor="cash-payment-amount" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                <form onSubmit={handleSubmit} id="cash-payment-form">
+                    <Box mb={2}>
+                        <Label htmlFor="cash-payment-amount" style={{ display: 'block', marginBottom: 4 }}>
                             Сумма (сум)
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                             id="cash-payment-amount"
                             type="number"
                             aria-label="Сумма оплаты"
                             value={paymentData.amount}
                             onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
-                            style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                border: '1px solid var(--mac-border)',
-                                borderRadius: 'var(--mac-radius-sm)',
-                                fontSize: '16px',
-                                backgroundColor: 'var(--mac-bg-primary)',
-                                color: 'var(--mac-text-primary)'
-                            }}
                             placeholder="Введите сумму"
                             required
                         />
-                    </div>
+                    </Box>
 
-                    <div style={{ marginBottom: '16px' }}>
-                        <label htmlFor="cash-payment-method" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                    <Box mb={2}>
+                        <Label htmlFor="cash-payment-method" style={{ display: 'block', marginBottom: 4 }}>
                             Способ оплаты
-                        </label>
-                        <select
+                        </Label>
+                        <Select
                             id="cash-payment-method"
+                            aria-label="Способ оплаты"
                             value={paymentData.method}
-                            onChange={(e) => setPaymentData(prev => ({ ...prev, method: e.target.value }))}
-                            style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                border: '1px solid var(--mac-border)',
-                                borderRadius: 'var(--mac-radius-sm)',
-                                fontSize: '16px',
-                                backgroundColor: 'var(--mac-bg-primary)',
-                                color: 'var(--mac-text-primary)'
-                            }}
-                        >
-                            <option value="cash">Наличные</option>
-                            <option value="card">Карта</option>
-                        </select>
-                    </div>
+                            onChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
+                            options={PAYMENT_METHOD_OPTIONS}
+                            style={{ width: '100%' }}
+                        />
+                    </Box>
 
-                    <div style={{ marginBottom: '24px' }}>
-                        <label htmlFor="cash-payment-note" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                    {paymentData.method === 'cash' && (
+                        <Box mb={2}>
+                            <Label htmlFor="cash-payment-received" style={{ display: 'block', marginBottom: 4 }}>
+                                Получено от пациента (сум)
+                            </Label>
+                            <Input
+                                id="cash-payment-received"
+                                type="number"
+                                aria-label="Полученная сумма от пациента"
+                                value={paymentData.receivedAmount}
+                                onChange={(e) => setPaymentData(prev => ({ ...prev, receivedAmount: e.target.value }))}
+                                placeholder="Введите полученную сумму"
+                                error={insufficientCash}
+                            />
+                            {insufficientCash && (
+                                <Typography variant="caption" style={{ color: 'var(--mac-error)', marginTop: 4, display: 'block' }}>
+                                    Недостаточно средств. Нужно ещё: {formatCurrency(numericAmount - numericReceived)}
+                                </Typography>
+                            )}
+                            {changeDue > 0 && (
+                                <Box
+                                    mt={1}
+                                    px={1.5}
+                                    py={1}
+                                    style={{
+                                        backgroundColor: 'rgba(52, 199, 89, 0.12)',
+                                        borderRadius: 'var(--mac-radius-sm)',
+                                        color: 'var(--mac-success)',
+                                        fontWeight: 600,
+                                    }}>
+                                    Сдача: {formatCurrency(changeDue)}
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+
+                    <Box mb={1}>
+                        <Label htmlFor="cash-payment-note" style={{ display: 'block', marginBottom: 4 }}>
                             Примечание (необязательно)
-                        </label>
-                        <textarea
+                        </Label>
+                        <Textarea
                             id="cash-payment-note"
                             aria-label="Примечание к оплате"
                             value={paymentData.note}
                             onChange={(e) => setPaymentData(prev => ({ ...prev, note: e.target.value }))}
-                            style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                border: '1px solid var(--mac-border)',
-                                borderRadius: 'var(--mac-radius-sm)',
-                                fontSize: '16px',
-                                minHeight: '80px',
-                                resize: 'vertical',
-                                backgroundColor: 'var(--mac-bg-primary)',
-                                color: 'var(--mac-text-primary)'
-                            }}
                             placeholder="Дополнительная информация"
+                            minRows={3}
                         />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                        <Button type="submit" variant="primary">
-                            <CheckCircle style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-                            Обработать оплату
-                        </Button>
-                        <Button type="button" variant="outline" onClick={onClose}>
-                            Отмена
-                        </Button>
-                    </div>
+                    </Box>
                 </form>
-            </div>
-        </div>
+            </DialogContent>
+
+            <DialogActions>
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Отмена
+                </Button>
+                <Button type="submit" variant="primary" form="cash-payment-form">
+                    <CheckCircle size={16} style={{ marginRight: 8 }} aria-hidden="true" />
+                    Обработать оплату
+                </Button>
+            </DialogActions>
+        </Dialog>
     );
 };
 

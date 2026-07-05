@@ -17,6 +17,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
+import notify from '../../services/notify';
 
 /**
  * Форма объективного осмотра для стоматологической ЭМК
@@ -167,6 +168,7 @@ const ExaminationForm = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось сохранить осмотр. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }

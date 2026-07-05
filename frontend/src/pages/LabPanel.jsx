@@ -11,6 +11,9 @@ import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
+import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
+import { useLabHotkeys } from '../hooks/useLabHotkeys';
+import notify from '../services/notify';
 import './lab.css';
 
 // P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
@@ -110,6 +113,21 @@ export default function LabPanel() {
   const dismissMessage = useCallback(() => {
     setMessage({ type: '', text: '', retryAction: null, retryLabel: '' });
   }, []);
+
+  // H-1 fix: session timeout warning — prevents silent JWT expiry while
+  // a lab technician is mid-fill on a long report. Mirrors the pattern
+  // used in CardiologistPanel/DentistPanel/DermatologistPanel.
+  const [sessionWarning, setSessionWarning] = useState(null);
+  useSessionTimeoutWarning({
+    onWarning: () => setSessionWarning({ active: true }),
+    onExpired: () => {
+      setSessionWarning(null);
+      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    },
+  });
 
   const mergeResolvedVisitIntoState = useCallback((appointmentId, visitId) => {
     if (!appointmentId || !visitId) {
@@ -217,6 +235,13 @@ export default function LabPanel() {
     }
   }, [notify]);
 
+  // H-2 fix: keyboard shortcuts for tab switching, refresh, clear selection.
+  useLabHotkeys({
+    switchTab,
+    refreshData: loadLabAppointments,
+    clearSelection: () => setSelectedAppointment(null),
+  });
+
   const loadTemplates = useCallback(async (preferredTemplateId = null) => {
     try {
       const summary = await labReportingApi.listTemplates();
@@ -242,7 +267,11 @@ export default function LabPanel() {
         { retryAction: () => loadTemplates(), retryLabel: 'Загрузить снова' }
       );
     }
-  }, [notify, selectedTemplate?.id]);
+  // M-5 fix: removed selectedTemplate?.id from deps — it caused triple
+  // re-fetch (loadLabAppointments + loadRecentReports + loadTemplates) every
+  // time the user clicked a different template. Now reads selectedTemplate
+  // via ref, so identity is stable and mount effect doesn't re-fire.
+  }, [notify]);
 
   const loadReportHistory = useCallback(async (patientId) => {
     if (!patientId) {
@@ -622,7 +651,40 @@ export default function LabPanel() {
         />
       </section>
 
-      <RoleNotificationCenter userRole="lab" />
+              {/* H-1 fix: session timeout warning dialog */}
+        {sessionWarning && (
+          <div
+            role="alertdialog"
+            aria-label="Предупреждение об истечении сессии"
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.5)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+            }}
+          >
+            <div style={{
+              background: 'var(--mac-surface, white)', border: '1px solid var(--mac-border, #d8dde8)',
+              borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '90%',
+            }}>
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--mac-text-primary, #1a1d29)' }}>
+                Сессия скоро истечёт
+              </h3>
+              <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--mac-text-secondary, #6b7280)', lineHeight: 1.5 }}>
+                Ваша сессия истекает. Несохранённые данные могут быть потеряны.
+                Сохраните текущий отчёт или продлите сессию.
+              </p>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button onClick={() => setSessionWarning(null)} style={{ padding: '8px 16px', border: '1px solid var(--mac-border, #d8dde8)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontSize: '14px' }}>
+                  Позже
+                </button>
+                <button onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', background: 'var(--mac-accent, #dc2626)', color: 'white', cursor: 'pointer', fontSize: '14px' }}>
+                  Продлить сессию
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <RoleNotificationCenter userRole="lab" />
     </main>
   );
 }

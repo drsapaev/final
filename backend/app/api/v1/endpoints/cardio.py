@@ -341,16 +341,21 @@ async def create_blood_test(
         _raise_cardio_internal_error("create_blood_test", e)
 
 
-@router.get("/risk-assessment", summary="Оценка рисков")
+@router.get("/risk-assessment", summary="Оценка рисков (deprecated)")
 async def get_risk_assessment(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*CARDIO_ROLES)),
     patient_id: int | None = None,
 ) -> dict[str, Any]:
     """
-    Получить оценку кардиологических рисков
+    Deprecated: risk assessment is now calculated client-side via the SCORE2
+    calculator in CardiologySection.jsx (frontend). This endpoint is kept for
+    backward compatibility but returns 410 Gone.
+
+    H-9 fix: previously returned a stub message "will be available in next
+    version" — misleading because the feature IS available, just client-side.
     """
-    try:
-        return {"message": "Модуль оценки рисков будет доступен в следующей версии"}
-    except Exception as e:
-        _raise_cardio_internal_error("get_risk_assessment", e)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Risk assessment is now calculated client-side via SCORE2 calculator. This endpoint is deprecated.",
+    )

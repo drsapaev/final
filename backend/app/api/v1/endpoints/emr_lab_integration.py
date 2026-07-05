@@ -306,7 +306,7 @@ async def notify_doctor_about_lab_result(
         )
 
 
-@router.get("/lab-results/statistics")
+@router.get("/lab-results/statistics", deprecated=True)
 async def get_lab_results_statistics(
     date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
     date_to: str | None = Query(None, description="Дата окончания (YYYY-MM-DD)"),
@@ -314,44 +314,15 @@ async def get_lab_results_statistics(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
-    """Получить статистику лабораторных результатов"""
-    try:
-        # Парсим даты
-        parsed_date_from = None
-        parsed_date_to = None
-
-        if date_from:
-            parsed_date_from = datetime.fromisoformat(date_from)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
-        if date_to:
-            parsed_date_to = datetime.fromisoformat(date_to)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
-
-        # Здесь будет реальная статистика
-        # Пока возвращаем заглушку
-        statistics = {
-            "total_tests": 1250,
-            "abnormal_tests": 180,
-            "abnormal_percentage": 14.4,
-            "most_common_abnormal": [
-                {"test_type": "glucose", "count": 45, "percentage": 25.0},
-                {"test_type": "cholesterol", "count": 38, "percentage": 21.1},
-                {"test_type": "hemoglobin", "count": 32, "percentage": 17.8},
-            ],
-            "average_processing_time": "2.5 hours",
-            "period": {
-                "from": date_from or "2024-01-01",
-                "to": date_to or "2024-12-31",
-            },
-        }
-
-        return statistics
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
-        )
-
+    """
+    Deprecated: returns hardcoded stub data. Use /lab/report-instances for real data.
+    P2 fix: this endpoint previously returned fake statistics (total_tests: 1250, etc.)
+    which was misleading. Now returns a 410 Gone deprecation notice.
+    """
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is deprecated. Use GET /lab/report-instances for real lab data.",
+    )
 
 @router.get("/lab-results/trends")
 async def get_lab_results_trends(

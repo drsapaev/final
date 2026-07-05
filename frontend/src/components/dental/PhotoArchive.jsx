@@ -27,6 +27,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
+import notify from '../../services/notify';
 
 /**
  * Архив фото и рентгенов для стоматологической ЭМК
@@ -174,6 +175,7 @@ const PhotoArchive = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось загрузить фото. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }

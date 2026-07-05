@@ -2,6 +2,9 @@
  * Teeth Chart Component
  * Интерактивная зубная карта
  * Согласно MASTER_TODO_LIST строка 284
+ *
+ * H6 fix: status / color / label / FDI-number constants now imported
+ * from dentalConstants.js (SSOT) instead of being redefined here.
  */
 import { useState } from 'react';
 import {
@@ -27,58 +30,13 @@ import {
   ZoomOut } from
 'lucide-react';
 import PropTypes from 'prop-types';
-
-// Статусы зубов
-const TOOTH_STATUS = {
-  HEALTHY: 'healthy',
-  CARIES: 'caries',
-  FILLED: 'filled',
-  CROWN: 'crown',
-  IMPLANT: 'implant',
-  MISSING: 'missing',
-  ROOT: 'root',
-  BRIDGE: 'bridge'
-};
-
-// Цвета для статусов
-const STATUS_COLORS = {
-  [TOOTH_STATUS.HEALTHY]: '#4caf50',
-  [TOOTH_STATUS.CARIES]: '#f44336',
-  [TOOTH_STATUS.FILLED]: '#2196f3',
-  [TOOTH_STATUS.CROWN]: '#ff9800',
-  [TOOTH_STATUS.IMPLANT]: '#9c27b0',
-  [TOOTH_STATUS.MISSING]: '#9e9e9e',
-  [TOOTH_STATUS.ROOT]: '#795548',
-  [TOOTH_STATUS.BRIDGE]: '#00bcd4'
-};
-
-// Названия статусов
-const STATUS_NAMES = {
-  [TOOTH_STATUS.HEALTHY]: 'Здоров',
-  [TOOTH_STATUS.CARIES]: 'Кариес',
-  [TOOTH_STATUS.FILLED]: 'Пломба',
-  [TOOTH_STATUS.CROWN]: 'Коронка',
-  [TOOTH_STATUS.IMPLANT]: 'Имплант',
-  [TOOTH_STATUS.MISSING]: 'Отсутствует',
-  [TOOTH_STATUS.ROOT]: 'Корень',
-  [TOOTH_STATUS.BRIDGE]: 'Мост'
-};
-
-// Нумерация зубов по FDI (международная)
-const TEETH_NUMBERS = {
-  upperRight: [18, 17, 16, 15, 14, 13, 12, 11],
-  upperLeft: [21, 22, 23, 24, 25, 26, 27, 28],
-  lowerLeft: [38, 37, 36, 35, 34, 33, 32, 31],
-  lowerRight: [41, 42, 43, 44, 45, 46, 47, 48]
-};
-
-// Молочные зубы
-const DECIDUOUS_TEETH = {
-  upperRight: [55, 54, 53, 52, 51],
-  upperLeft: [61, 62, 63, 64, 65],
-  lowerLeft: [75, 74, 73, 72, 71],
-  lowerRight: [81, 82, 83, 84, 85]
-};
+import {
+  TOOTH_STATUS,
+  TOOTH_STATUS_COLORS as STATUS_COLORS,
+  TOOTH_STATUS_LABELS as STATUS_NAMES,
+  ADULT_TEETH as TEETH_NUMBERS,
+  DECIDUOUS_TEETH,
+} from './dentalConstants';
 
 const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
   const [teethData, setTeethData] = useState(initialData);

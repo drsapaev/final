@@ -19,7 +19,7 @@ vi.mock('../../../api/labReporting', () => ({
     createInstance: vi.fn(),
     updateInstance: vi.fn(),
     bulkSaveValues: vi.fn(),
-    markReady: vi.fn(),
+    // L-1 fix: markReady removed — endpoint was dead code (WF-round5).
     finalize: vi.fn(),
     revise: vi.fn(),
     downloadPdf: vi.fn(),

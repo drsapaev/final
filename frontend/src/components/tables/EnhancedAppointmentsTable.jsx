@@ -1885,6 +1885,39 @@ const EnhancedAppointmentsTable = ({
                     )}
                     </td>
 
+                    {/* P1 fix: Lab results badge — shows if lab results are ready */}
+                    {row.latest_lab_report && (
+                      <td style={{
+                        padding: '12px 8px',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                      }}>
+                        {(() => {
+                          const labStatus = row.latest_lab_report.status || '';
+                          const isReady = labStatus === 'FINALIZED' || labStatus === 'PRINTED';
+                          const flagCount = row.latest_lab_report.flagged_findings_count || 0;
+                          return (
+                            <span
+                              title={`${row.latest_lab_report.template_name || 'Лабораторный отчёт'} — ${isReady ? 'Готов' : 'В работе'}${flagCount > 0 ? `, отклонений: ${flagCount}` : ''}`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                background: isReady ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)',
+                                color: isReady ? 'var(--mac-success)' : 'var(--mac-warning)',
+                              }}>
+                              {isReady ? '🔬 Готов' : '🔬 В работе'}
+                              {flagCount > 0 && ` ⚠${flagCount}`}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    )}
+
                     {/* Дата и время регистрации */}
                     <td style={{
                     padding: '12px 8px',
