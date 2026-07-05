@@ -770,13 +770,13 @@ export function FrontendAuditDisplay() {
   const containerStyle = {
     padding: getSpacing('lg'),
     backgroundColor: getColor('background', 'primary'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     marginBottom: getSpacing('md')
   };
 
   const titleStyle = {
     fontSize: getFontSize('xl'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('lg')
   };
@@ -791,20 +791,20 @@ export function FrontendAuditDisplay() {
   const statCardStyle = {
     padding: getSpacing('md'),
     backgroundColor: getColor('background', 'secondary'),
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     border: `1px solid ${getColor('border', 'light')}`
   };
 
   const statTitleStyle = {
     fontSize: getFontSize('sm'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: getColor('text', 'secondary'),
     marginBottom: getSpacing('xs')
   };
 
   const statValueStyle = {
     fontSize: getFontSize('lg'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary')
   };
 
@@ -815,14 +815,14 @@ export function FrontendAuditDisplay() {
   const issueItemStyle = {
     padding: getSpacing('sm'),
     backgroundColor: getColor('background', 'secondary'),
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     marginBottom: getSpacing('xs'),
     borderLeft: `4px solid ${getColor('warning', 'main')}`
   };
 
   const issuePathStyle = {
     fontSize: getFontSize('sm'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('xs')
   };
@@ -842,7 +842,7 @@ export function FrontendAuditDisplay() {
 
   const folderTitleStyle = {
     fontSize: getFontSize('md'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('sm')
   };

@@ -53,9 +53,9 @@ const useSettings = () => {
     
     // Брендинг
     logo: null,
-    primaryColor: '#3B82F6',
+    primaryColor: 'var(--mac-accent-blue)',
     secondaryColor: 'var(--mac-success)',
-    accentColor: '#F59E0B',
+    accentColor: 'var(--mac-warning)',
     
     // Безопасность
     twoFactorEnabled: false,

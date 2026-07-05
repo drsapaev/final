@@ -2329,7 +2329,7 @@ const miniAppKickerStyle = {
 
 const miniAppTitleStyle = {
   margin: 0,
-  fontSize: '28px',
+  fontSize: 'var(--mac-font-size-3xl)',
   lineHeight: 1.15,
   fontWeight: 800,
   color: 'var(--mac-text-primary, #111827)',

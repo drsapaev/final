@@ -43,7 +43,7 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
     minHeight: '100vh',
     width: '100%',
     maxWidth: '100%',
-    backgroundColor: isDark ? '#0f172a' : 'var(--mac-bg-secondary)',
+    backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)',
     transition: 'margin-left 0.3s ease',
     padding: 'var(--mac-spacing-5)',
     overflow: 'auto' // Разрешаем скролл для просмотра всего контента
@@ -60,7 +60,7 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
       style={{
         display: 'flex',
         minHeight: '100vh',
-        backgroundColor: isDark ? '#0f172a' : 'var(--mac-bg-secondary)'
+        backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
       }}>
       
       

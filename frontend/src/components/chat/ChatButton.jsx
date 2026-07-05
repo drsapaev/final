@@ -48,7 +48,7 @@ const ChatButton = () => {
                         position: 'absolute',
                         top: '-4px',
                         right: '-4px',
-                        backgroundColor: '#FF3B30',
+                        backgroundColor: 'var(--mac-error)',
                         color: 'white',
                         fontSize: 'var(--mac-font-size-xs)',
                         fontWeight: 'var(--mac-font-weight-bold)',

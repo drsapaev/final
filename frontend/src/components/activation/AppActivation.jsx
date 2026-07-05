@@ -114,7 +114,7 @@ const AppActivation = () => {
           Приложение активировано. Перезагрузка...
         </p>
 
-        <div className="info-panel" style={{ textAlign: 'left', background: 'rgba(52, 199, 89, 0.05)', borderColor: 'rgba(52, 199, 89, 0.2)' }}>
+        <div className="info-panel" style={{ textAlign: 'left', background: 'rgba(52, 199, 89, 0.05)', borderColor: 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 80%))' }}>
           <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-2)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>
             <CheckCircle size={16} /> Доступные функции:
           </div>

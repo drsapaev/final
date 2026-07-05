@@ -67,7 +67,7 @@ export default function Health() {
       minWidth: 0,
     },
     title: {
-      fontSize: '28px',
+      fontSize: 'var(--mac-font-size-3xl)',
       fontWeight: 'var(--mac-font-weight-bold)',
       lineHeight: 1.2,
       margin: 0,

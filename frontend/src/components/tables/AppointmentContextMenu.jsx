@@ -238,7 +238,7 @@ const AppointmentContextMenu = ({
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
           minWidth: '180px',
           maxWidth: '220px',
-          padding: '8px 0',
+          padding: 'var(--mac-spacing-2) 0',
           transform: isVisible ? 'scale(1)' : 'scale(0.95)',
           opacity: isVisible ? 1 : 0,
           transition: 'all 0.15s ease-out',

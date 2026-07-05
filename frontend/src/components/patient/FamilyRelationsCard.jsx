@@ -81,7 +81,7 @@ const styles = {
     gridTemplateColumns: '28px minmax(0, 1fr) auto',
     gap: '10px',
     alignItems: 'start',
-    padding: '10px 0',
+    padding: 'var(--mac-spacing-3) 0',
     borderBottom: '1px solid var(--mac-border)'
   },
   relationIcon: {

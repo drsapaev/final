@@ -32,7 +32,7 @@ const SidebarToggle = ({ isCollapsed, onToggle, className = '' }) => {
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
       }}
       onMouseEnter={(e) => {
-        e.target.style.backgroundColor = isDark ? '#475569' : 'var(--mac-border)';
+        e.target.style.backgroundColor = isDark ? 'var(--mac-text-secondary)' : 'var(--mac-border)';
         e.target.style.transform = 'scale(1.05)';
       }}
       onMouseLeave={(e) => {

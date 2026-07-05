@@ -184,7 +184,7 @@ const DoctorCalendar = ({
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: '16px 20px',
-      borderBottom: `1px solid ${isDark ? 'color-mix(in srgb, white, transparent 90%)' : 'rgba(0,0,0,0.08)'}`,
+      borderBottom: `1px solid ${isDark ? 'color-mix(in srgb, white, transparent 90%)' : 'color-mix(in srgb, black, transparent 92%)'}`,
       backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'
     },
     title: {
@@ -222,7 +222,7 @@ const DoctorCalendar = ({
       display: 'grid',
       gridTemplateColumns: 'repeat(7, 1fr)',
       gap: '1px',
-      backgroundColor: isDark ? 'color-mix(in srgb, white, transparent 90%)' : 'rgba(0,0,0,0.08)'
+      backgroundColor: isDark ? 'color-mix(in srgb, white, transparent 90%)' : 'color-mix(in srgb, black, transparent 92%)'
     },
     dayHeader: {
       padding: '12px 8px',
@@ -266,7 +266,7 @@ const DoctorCalendar = ({
       transition: 'all 0.2s'
     },
     slotAvailable: {
-      backgroundColor: isDark ? 'rgba(52, 199, 89, 0.2)' : 'rgba(52, 199, 89, 0.1)',
+      backgroundColor: isDark ? 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 80%))' : 'rgba(52, 199, 89, 0.1)',
       color: isDark ? '#32d74b' : '#248a3d'
     },
     slotBooked: {
@@ -305,7 +305,7 @@ const DoctorCalendar = ({
 
     if (daySchedule.length === 0) {
       return (
-        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: isDark ? '#999' : '#999', fontStyle: 'italic' }}>
+        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-tertiary)', fontStyle: 'italic' }}>
                     Нет записей
                 </div>);
 
