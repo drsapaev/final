@@ -26,7 +26,7 @@ import {
   Zap } from
 'lucide-react';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 const WaitTimeAnalytics = () => {
