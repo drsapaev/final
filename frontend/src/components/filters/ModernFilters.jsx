@@ -15,7 +15,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import './ModernFilters.css';
 import PropTypes from 'prop-types';
-import { Input } from '../ui/macos';
+import { Input,
+  Checkbox} from '../ui/macos';
 
 const ModernFilters = ({
   searchParams,
@@ -260,11 +261,7 @@ const ModernFilters = ({
             <div className="filters-controls">
               {/* Автообновление */}
               <label className="auto-refresh-toggle">
-                <input
-                type="checkbox"
-                aria-label="Toggle auto refresh"
-                checked={autoRefresh}
-                onChange={(e) => onAutoRefreshChange(e.target.checked)} />
+                <Checkbox aria-label="Toggle auto refresh" checked={autoRefresh} onChange={(e) => onAutoRefreshChange(e.target.checked)} />
               
                 <RefreshCw size={16} className={autoRefresh ? 'spinning' : ''} />
                 <span>Автообновление</span>

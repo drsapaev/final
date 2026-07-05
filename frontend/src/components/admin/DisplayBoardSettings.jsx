@@ -25,7 +25,8 @@ import {
 'lucide-react';
 import {
   MacOSCard, Button, Select,
-  Input } from '../ui/macos';
+  Input,
+  Checkbox} from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -338,44 +339,28 @@ const DisplayBoardSettings = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Show doctor photos"
-                  checked={selectedBoard.show_doctor_photos}
-                  onChange={(e) => handleBoardSettingChange('show_doctor_photos', e.target.checked)}
+                <Checkbox aria-label="Show doctor photos" checked={selectedBoard.show_doctor_photos} onChange={(e) => handleBoardSettingChange('show_doctor_photos', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Фото врачей</span>
               </label>
 
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Show announcements"
-                  checked={selectedBoard.show_announcements}
-                  onChange={(e) => handleBoardSettingChange('show_announcements', e.target.checked)}
+                <Checkbox aria-label="Show announcements" checked={selectedBoard.show_announcements} onChange={(e) => handleBoardSettingChange('show_announcements', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Объявления</span>
               </label>
 
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Show banners"
-                  checked={selectedBoard.show_banners}
-                  onChange={(e) => handleBoardSettingChange('show_banners', e.target.checked)}
+                <Checkbox aria-label="Show banners" checked={selectedBoard.show_banners} onChange={(e) => handleBoardSettingChange('show_banners', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Баннеры</span>
               </label>
 
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Show videos"
-                  checked={selectedBoard.show_videos}
-                  onChange={(e) => handleBoardSettingChange('show_videos', e.target.checked)}
+                <Checkbox aria-label="Show videos" checked={selectedBoard.show_videos} onChange={(e) => handleBoardSettingChange('show_videos', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Видеоролики</span>
@@ -409,22 +394,14 @@ const DisplayBoardSettings = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Enable sound signals"
-                  checked={selectedBoard.sound_enabled}
-                  onChange={(e) => handleBoardSettingChange('sound_enabled', e.target.checked)}
+                <Checkbox aria-label="Enable sound signals" checked={selectedBoard.sound_enabled} onChange={(e) => handleBoardSettingChange('sound_enabled', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Звуковые сигналы</span>
               </label>
 
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Enable voice announcements"
-                  checked={selectedBoard.voice_announcements}
-                  onChange={(e) => handleBoardSettingChange('voice_announcements', e.target.checked)}
+                <Checkbox aria-label="Enable voice announcements" checked={selectedBoard.voice_announcements} onChange={(e) => handleBoardSettingChange('voice_announcements', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Голосовые объявления</span>

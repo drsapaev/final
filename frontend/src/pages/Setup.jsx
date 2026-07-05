@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Check, X, ArrowLeft, AlertTriangle } from 'lucide-react';
 import {
   Button, MacOSCard,
-  Input } from '../components/ui/macos';
+  Input,
+  Checkbox} from '../components/ui/macos';
 import { initializeSetup } from '../api/setup';
 import { getCanonicalRouteById } from '../routing/routeSelectors';
 import logger from '../utils/logger';
@@ -463,12 +464,7 @@ export default function Setup() {
 
             {/* UX Audit Stage 2 (Setup issue 2.2): чекбокс авто-копирования. */}
             <label className="setup-checkbox-row">
-              <input
-                type="checkbox"
-                checked={branchSameAsClinic}
-                onChange={handleBranchSameAsClinicChange}
-                aria-label="Адрес, телефон, email и часовой пояс филиала совпадают с клиникой"
-              />
+              <Checkbox checked={branchSameAsClinic} onChange={handleBranchSameAsClinicChange} aria-label="Адрес, телефон, email и часовой пояс филиала совпадают с клиникой" />
               <span>Адрес, телефон, email и часовой пояс филиала совпадают с клиникой</span>
             </label>
 

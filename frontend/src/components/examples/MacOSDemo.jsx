@@ -21,7 +21,7 @@ import {
   Textarea,
   Toast,
 } from '../ui/macos';
-import AccentPicker from '../ui/macos/AccentPicker.jsx';
+import { AccentPicker } from '../ui/macos';
 
 /**
  * macOS UI Demo Component

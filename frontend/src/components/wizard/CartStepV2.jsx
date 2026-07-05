@@ -12,7 +12,8 @@
 import { useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AlertCircle, X } from 'lucide-react';
-import { Button, Tooltip } from '../ui/macos';
+import { Button, Tooltip,
+  Checkbox} from '../ui/macos';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
 
@@ -235,11 +236,7 @@ const CartStepV2 = ({
                 key={service.id}
                 className={`compact-service-card ${isInCart ? 'selected' : ''}`}>
 
-                <input
-                  type="checkbox"
-                  aria-label={`Select service ${service.name || service.service_code || service.id}`}
-                  checked={isInCart}
-                  onChange={() => handleServiceToggle(service)}
+                <Checkbox aria-label={`Select service ${service.name || service.service_code || service.id}`} checked={isInCart} onChange={() => handleServiceToggle(service)}
                   style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, margin: 0 }} />
 
                 <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '0px' }}>

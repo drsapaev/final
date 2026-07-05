@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
 import PropTypes from 'prop-types';
-import { Input } from '../ui/macos';
+import { Input,
+  Checkbox} from '../ui/macos';
 
 /**
  * Протокол лечения по визитам для стоматологической ЭМК
@@ -277,11 +278,7 @@ const VisitProtocol = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2">
-                  <input
-                type="checkbox"
-                aria-label={`Процедура ${index + 1} завершена`}
-                checked={procedure.completed || false}
-                onChange={(e) => handleArrayUpdate('procedures', index, { completed: e.target.checked })}
+                  <Checkbox aria-label={`Процедура ${index + 1} завершена`} checked={procedure.completed || false} onChange={(e) => handleArrayUpdate('procedures', index, { completed: e.target.checked })}
                 disabled={!isEditing}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               
@@ -289,11 +286,7 @@ const VisitProtocol = ({
                 </label>
                 
                 <label className="flex items-center gap-2">
-                  <input
-                type="checkbox"
-                aria-label={`У процедуры ${index + 1} были осложнения`}
-                checked={procedure.complications || false}
-                onChange={(e) => handleArrayUpdate('procedures', index, { complications: e.target.checked })}
+                  <Checkbox aria-label={`У процедуры ${index + 1} были осложнения`} checked={procedure.complications || false} onChange={(e) => handleArrayUpdate('procedures', index, { complications: e.target.checked })}
                 disabled={!isEditing}
                 className="rounded border-gray-300 text-red-600 focus:ring-red-500" />
               
@@ -518,11 +511,7 @@ const VisitProtocol = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2">
-                  <input
-                type="checkbox"
-                aria-label={`Анестезия ${index + 1} эффективна`}
-                checked={anesthesia.effective || false}
-                onChange={(e) => handleArrayUpdate('anesthesia', index, { effective: e.target.checked })}
+                  <Checkbox aria-label={`Анестезия ${index + 1} эффективна`} checked={anesthesia.effective || false} onChange={(e) => handleArrayUpdate('anesthesia', index, { effective: e.target.checked })}
                 disabled={!isEditing}
                 className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
               
@@ -530,11 +519,7 @@ const VisitProtocol = ({
                 </label>
                 
                 <label className="flex items-center gap-2">
-                  <input
-                type="checkbox"
-                aria-label={`У анестезии ${index + 1} были осложнения`}
-                checked={anesthesia.complications || false}
-                onChange={(e) => handleArrayUpdate('anesthesia', index, { complications: e.target.checked })}
+                  <Checkbox aria-label={`У анестезии ${index + 1} были осложнения`} checked={anesthesia.complications || false} onChange={(e) => handleArrayUpdate('anesthesia', index, { complications: e.target.checked })}
                 disabled={!isEditing}
                 className="rounded border-gray-300 text-red-600 focus:ring-red-500" />
               

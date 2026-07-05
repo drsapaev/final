@@ -15,7 +15,7 @@ import {
   Input,
   Select,
   Textarea,
-} from '../ui/macos';
+  Checkbox} from '../ui/macos';
 import {
   Activity,
   CheckCircle,
@@ -462,11 +462,7 @@ const ToothModal = ({
         />
 
         <label style={styles.checkboxRow}>
-          <input
-            type="checkbox"
-            aria-label={COPY.followUpLabel}
-            checked={formData.requiresFollowUp}
-            onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
+          <Checkbox aria-label={COPY.followUpLabel} checked={formData.requiresFollowUp} onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
           />
           <span>{COPY.followUpLabel}</span>
         </label>

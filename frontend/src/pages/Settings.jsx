@@ -5,7 +5,7 @@ import { api } from '../api/client.js';
 import { useTheme } from '../contexts/ThemeContext';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import ColorSchemeSelector from '../components/admin/ColorSchemeSelector.jsx';
-import AccentPicker from '../components/ui/macos/AccentPicker.jsx';
+import { AccentPicker } from '../components/ui/macos';
 
 import PhoneVerification from '../components/auth/PhoneVerification';
 
@@ -13,7 +13,8 @@ import logger from '../utils/logger';
 import NotificationSystemStatus from '../components/settings/NotificationSystemStatus.jsx';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
-import { Input } from '../components/ui/macos';
+import { Input,
+  Checkbox} from '../components/ui/macos';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
@@ -662,12 +663,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              id="is_active"
-              aria-label="Provider active"
-              checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
+            <Checkbox id="is_active" aria-label="Provider active" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
             
             <label htmlFor="is_active" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Активен</label>
           </div>

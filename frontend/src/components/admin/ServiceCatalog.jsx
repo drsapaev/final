@@ -550,10 +550,7 @@ const ServiceCatalog = () => {
           {
             key: 'select',
             title: (
-              <input
-                type="checkbox"
-                aria-label="Select all filtered services"
-                checked={selectedServiceIds.size === filteredServices.length && filteredServices.length > 0}
+              <Checkbox aria-label="Select all filtered services" checked={selectedServiceIds.size === filteredServices.length && filteredServices.length > 0}
                 onChange={toggleSelectAll}
                 className="admin-checkbox-cursor-pointer"
               />
@@ -581,11 +578,7 @@ const ServiceCatalog = () => {
             return {
               id: service.id,
               select:
-              <input
-                type="checkbox"
-                aria-label={`Select service ${service.name || service.id}`}
-                checked={selectedServiceIds.has(service.id)}
-                onChange={() => toggleServiceSelection(service.id)}
+              <Checkbox aria-label={`Select service ${service.name || service.id}`} checked={selectedServiceIds.has(service.id)} onChange={() => toggleServiceSelection(service.id)}
                 className="admin-checkbox-cursor-pointer"
               />,
               service:

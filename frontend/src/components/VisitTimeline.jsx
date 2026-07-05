@@ -1,6 +1,6 @@
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
 import PropTypes from 'prop-types';
-import { Card, Badge } from './ui/macos';
+import { Card, Badge } from 'ui/macos';
 import { 
   APPOINTMENT_STATUS, 
   STATUS_LABELS, 

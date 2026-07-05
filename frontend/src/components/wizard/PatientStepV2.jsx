@@ -11,7 +11,8 @@
 
 import PropTypes from 'prop-types';
 import { Search, Phone, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
-import { Input } from '../ui/macos';
+import { Input,
+  Checkbox} from '../ui/macos';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
 
@@ -553,11 +554,7 @@ const PatientStepV2 = ({
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
 
-            <input
-              type="checkbox"
-              aria-label="Request all services free approval"
-              checked={cart?.all_free}
-              onChange={(e) => onUpdateCart('all_free', e.target.checked)}
+            <Checkbox aria-label="Request all services free approval" checked={cart?.all_free} onChange={(e) => onUpdateCart('all_free', e.target.checked)}
               style={{ margin: 0 }} />
 
             <span style={{

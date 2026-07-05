@@ -11,7 +11,7 @@ import {
   Skeleton,
   MacOSEmptyState,
   Select,
-} from '../ui/macos';
+  Checkbox} from '../ui/macos';
 import {
   Percent,
   Plus,
@@ -347,31 +347,19 @@ const DiscountBenefitsManager = () => {
       </div>
       <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Discount applies to services"
-              checked={discountForm.applies_to_services}
-              onChange={(e) => setDiscountForm({ ...discountForm, applies_to_services: e.target.checked })}
+            <Checkbox aria-label="Discount applies to services" checked={discountForm.applies_to_services} onChange={(e) => setDiscountForm({ ...discountForm, applies_to_services: e.target.checked })}
               className="mr-2" />
         
           Применяется к услугам
         </label>
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Discount applies to appointments"
-              checked={discountForm.applies_to_appointments}
-              onChange={(e) => setDiscountForm({ ...discountForm, applies_to_appointments: e.target.checked })}
+            <Checkbox aria-label="Discount applies to appointments" checked={discountForm.applies_to_appointments} onChange={(e) => setDiscountForm({ ...discountForm, applies_to_appointments: e.target.checked })}
               className="mr-2" />
         
           Применяется к записям
         </label>
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Discount can combine with other discounts"
-              checked={discountForm.can_combine_with_others}
-              onChange={(e) => setDiscountForm({ ...discountForm, can_combine_with_others: e.target.checked })}
+            <Checkbox aria-label="Discount can combine with other discounts" checked={discountForm.can_combine_with_others} onChange={(e) => setDiscountForm({ ...discountForm, can_combine_with_others: e.target.checked })}
               className="mr-2" />
         
           Можно комбинировать с другими
@@ -484,31 +472,19 @@ const DiscountBenefitsManager = () => {
       </div>
       <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Benefit requires documents"
-              checked={benefitForm.requires_document}
-              onChange={(e) => setBenefitForm({ ...benefitForm, requires_document: e.target.checked })}
+            <Checkbox aria-label="Benefit requires documents" checked={benefitForm.requires_document} onChange={(e) => setBenefitForm({ ...benefitForm, requires_document: e.target.checked })}
               className="mr-2" />
         
           Требует документы
         </label>
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Benefit applies to services"
-              checked={benefitForm.applies_to_services}
-              onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_services: e.target.checked })}
+            <Checkbox aria-label="Benefit applies to services" checked={benefitForm.applies_to_services} onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_services: e.target.checked })}
               className="mr-2" />
         
           Применяется к услугам
         </label>
           <label className="flex items-center">
-            <input
-              type="checkbox"
-              aria-label="Benefit applies to appointments"
-              checked={benefitForm.applies_to_appointments}
-              onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_appointments: e.target.checked })}
+            <Checkbox aria-label="Benefit applies to appointments" checked={benefitForm.applies_to_appointments} onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_appointments: e.target.checked })}
               className="mr-2" />
         
           Применяется к записям

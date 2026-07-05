@@ -9,7 +9,7 @@ import {
   Textarea,
   AppEmpty,
   Modal,
-} from '../ui/macos';
+  Checkbox} from '../ui/macos';
 import {
   Printer,
   RefreshCw,
@@ -442,23 +442,13 @@ const CloudPrintingManager = () => {
               
               </div>
               <div className="flex items-center justify-center gap-2">
-                <input
-                type="checkbox"
-                id="color"
-                aria-label="Enable color printing"
-                checked={printForm.color}
-                onChange={(e) => setPrintForm({ ...printForm, color: e.target.checked })}
+                <Checkbox id="color" aria-label="Enable color printing" checked={printForm.color} onChange={(e) => setPrintForm({ ...printForm, color: e.target.checked })}
                 className="admin-checkbox-m0" />
               
                 <label className="admin-label-block-sm-primary" htmlFor="color">Цветная</label>
               </div>
               <div className="flex items-center justify-center gap-2">
-                <input
-                type="checkbox"
-                id="duplex"
-                aria-label="Enable duplex printing"
-                checked={printForm.duplex}
-                onChange={(e) => setPrintForm({ ...printForm, duplex: e.target.checked })}
+                <Checkbox id="duplex" aria-label="Enable duplex printing" checked={printForm.duplex} onChange={(e) => setPrintForm({ ...printForm, duplex: e.target.checked })}
                 className="admin-checkbox-m0" />
               
                 <label className="admin-label-block-sm-primary" htmlFor="duplex">Двусторонняя</label>
