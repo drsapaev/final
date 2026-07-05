@@ -29,7 +29,7 @@ import {
   Button,
   Badge,
   Select,
-} from '../ui/macos';
+  Checkbox} from '../ui/macos';
 import './EnhancedAppointmentsTable.css';
 
 import { QueueActionButtons } from '../queue/QueueManagementCard';
@@ -1360,10 +1360,7 @@ const EnhancedAppointmentsTable = ({
                 color: 'var(--mac-text-primary)'
               }}
               aria-label={t.selectAll}>
-                  <input
-                  type="checkbox"
-                  aria-label={t.selectAll}
-                  checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
+                  <Checkbox aria-label={t.selectAll} checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
                   onChange={(e) => handleSelectAll(e.target.checked)}
                   style={{ cursor: 'pointer' }} />
 
@@ -1680,11 +1677,7 @@ const EnhancedAppointmentsTable = ({
                   <td
                     style={{ padding: '12px 8px' }}
                     aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`}>
-                        <input
-                      type="checkbox"
-                      aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`}
-                      checked={selectedRows.has(row.id)}
-                      onChange={(e) => {
+                        <Checkbox aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(e) => {
                         e.stopPropagation();
                         handleRowSelect(row.id, e.target.checked);
                       }}

@@ -24,9 +24,9 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import MacOSEmptyState from '../ui/macos/MacOSEmptyState.jsx';
-import Skeleton from '../ui/macos/Skeleton.jsx';
-import Button from '../ui/macos/Button.jsx';
+import { MacOSEmptyState } from '../ui/macos';
+import { Skeleton } from '../ui/macos';
+import { Button } from '../ui/macos';
 
 const DEFAULT_SKELETON_ROWS = 4;
 

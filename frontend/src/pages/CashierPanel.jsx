@@ -6,12 +6,12 @@ import {
   Card, Badge, Button,
   Input } from '../components/ui/macos';
 import { useConfirm } from '../components/common/ConfirmDialog';
-import Tooltip from '../components/ui/macos/Tooltip';
+import { Tooltip } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import PaymentWidget from '../components/payment/PaymentWidget';
 import CashPaymentModal from '../components/payment/CashPaymentModal';
-import MacOSTab from '../components/ui/macos/MacOSTab';
-import SegmentedControl from '../components/ui/macos/SegmentedControl';
+import { MacOSTab } from '../components/ui/macos';
+import { SegmentedControl } from '../components/ui/macos';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';

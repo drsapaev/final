@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-  Input } from '../ui/macos';
+  Input,
+  Checkbox} from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
 
 const blankField = () => ({
@@ -724,7 +725,7 @@ export default function LabTemplateWorkbench({
                               <Input className="macos-input" aria-label="Текст нормы" value={field.reference_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
                             </label>
                             <label style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', paddingBottom: '8px' }}>
-                              <input type="checkbox" aria-label="Обязательное поле" checked={Boolean(field.required)} onChange={(event) => updateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
+                              <Checkbox aria-label="Обязательное поле" checked={Boolean(field.required)} onChange={(event) => updateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
                               Обязательное поле
                             </label>
                           </div>

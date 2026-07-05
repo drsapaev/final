@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
 import PropTypes from 'prop-types';
+import { Checkbox } from 'ui/macos';
 
 const ResponsiveTable = ({
   data = [],
@@ -93,11 +94,7 @@ const ResponsiveTable = ({
                   {row.name || row.fio || `Запись ${index + 1}`}
                 </div>
                 {onRowSelect &&
-              <input
-                type="checkbox"
-                aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}
-                checked={selectedRows.has(index)}
-                onChange={(e) => onRowSelect(index, e.target.checked)}
+              <Checkbox aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`} checked={selectedRows.has(index)} onChange={(e) => onRowSelect(index, e.target.checked)}
                 style={{ transform: 'scale(1.2)' }} />
 
               }
@@ -244,10 +241,7 @@ const ResponsiveTable = ({
               opacity: '1 !important',
               color: 'var(--mac-text-primary) !important'
             }} aria-label="Row selection">
-                <input
-                type="checkbox"
-                aria-label="Select all rows"
-                checked={selectedRows.size === data.length && data.length > 0}
+                <Checkbox aria-label="Select all rows" checked={selectedRows.size === data.length && data.length > 0}
                 onChange={(e) => {
                   data.forEach((_, index) => onRowSelect(index, e.target.checked));
                 }} />
@@ -334,11 +328,7 @@ const ResponsiveTable = ({
 
               {onRowSelect &&
             <td style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center' }} aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}>
-                  <input
-                type="checkbox"
-                aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}
-                checked={selectedRows.has(index)}
-                onChange={(e) => {
+                  <Checkbox aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`} checked={selectedRows.has(index)} onChange={(e) => {
                   e.stopPropagation();
                   onRowSelect(index, e.target.checked);
                 }} />

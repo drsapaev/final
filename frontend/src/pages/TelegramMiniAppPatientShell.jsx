@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert, Badge, Button, Card, CardContent, Input, Textarea,
-} from '../components/ui/macos';
+  Checkbox} from '../components/ui/macos';
 import { api } from '../api/client.js';
 
 const MINI_APP_LANGUAGE_RU = 'ru';
@@ -2147,13 +2147,7 @@ function TelegramMiniAppPatientShell() {
                     {(form.fields || []).map((field) => (
                       field.type === 'boolean' ? (
                         <label key={field.key} style={miniAppCheckboxRowStyle}>
-                          <input
-                            type="checkbox"
-                            aria-label={field.label || field.key}
-                            checked={getMiniAppFormFieldValue(formAnswers, form.id, field)}
-                            onChange={handlePatientFormFieldChange(form.id, field)}
-                            style={miniAppCheckboxStyle}
-                          />
+                          <Checkbox aria-label={field.label || field.key} checked={getMiniAppFormFieldValue(formAnswers, form.id, field)} onChange={handlePatientFormFieldChange(form.id, field)} style={miniAppCheckboxStyle} />
                           <span>{field.label}</span>
                         </label>
                       ) : (

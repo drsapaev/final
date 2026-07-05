@@ -41,7 +41,8 @@ import api from '../../services/api';
 import logger from '../../utils/logger';
 import {
   Select,
-  Input } from '../ui/macos';
+  Input,
+  Checkbox} from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
@@ -891,11 +892,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* Active */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <input
-                                type="checkbox"
-                                aria-label="Активная вкладка очереди"
-                                checked={formData.is_active}
-                                onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                            <Checkbox aria-label="Активная вкладка очереди" checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                             />
                             <span className="admin-qp-label">Активная вкладка (видна пользователям)</span>
                         </label>
@@ -904,11 +901,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* ⭐ NEW: Show on QR Page */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <input
-                                type="checkbox"
-                                aria-label="Показывать вкладку на QR-странице"
-                                checked={formData.show_on_qr_page}
-                                onChange={e => setFormData({ ...formData, show_on_qr_page: e.target.checked })}
+                            <Checkbox aria-label="Показывать вкладку на QR-странице" checked={formData.show_on_qr_page} onChange={e => setFormData({ ...formData, show_on_qr_page: e.target.checked })}
                             />
                             <span className="admin-qp-label">Показывать на QR-странице (самозапись пациентов)</span>
                         </label>

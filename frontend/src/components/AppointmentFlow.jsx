@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { CreditCard, User, FileText, Pill, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, Badge } from './ui/macos';
+import { Card, Badge } from 'ui/macos';
 import {
   APPOINTMENT_STATUS,
   STATUS_LABELS,

@@ -4,7 +4,7 @@ import {
   Alert,
   Paper,
 } from '../ui/macos';
-import { Divider } from '../ui/macos/List';
+import { Divider } from '../ui/macos';
 import {
   Hospital,
   Info,

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import PropTypes from 'prop-types';
-import { Input } from './ui/macos';
+import { Input,
+  Checkbox} from '../ui/macos';
 
 const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }) => {
   const [loading, setLoading] = useState(false);
@@ -216,11 +217,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
           cursor: 'pointer',
           color: 'var(--text-primary)'
         }}>
-            <input
-            type="checkbox"
-            aria-label="Remember this device for 30 days"
-            checked={rememberDevice}
-            onChange={(e) => setRememberDevice(e.target.checked)}
+            <Checkbox aria-label="Remember this device for 30 days" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)}
             style={{ margin: 0 }} />
 
             <span style={{ fontSize: 'var(--mac-font-size-base)' }}>

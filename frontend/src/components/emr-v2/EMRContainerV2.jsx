@@ -55,7 +55,7 @@ import './EMRContainerV2.css';
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
 import notify from '../../services/notify';
-import Button from '../ui/macos/Button';
+import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
 // (consistent with the rest of the app + screen-reader friendly via aria-label).

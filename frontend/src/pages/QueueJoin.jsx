@@ -17,7 +17,8 @@ import {
   completeQueueJoinSession,
 } from '../api/queue';
 import { formatRegistrarTime } from '../utils/dateUtils';
-import { Input } from '../components/ui/macos';
+import { Input,
+  Checkbox} from '../components/ui/macos';
 
 const formatSpecialistLabel = (specialist) => {
   const doctorName =
@@ -1175,11 +1176,7 @@ const QueueJoin = () => {
                         userSelect: 'none'
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        aria-label={`Select specialist: ${formatSpecialistLabel(specialist)}`}
-                        checked={isSelected}
-                        onChange={() => {
+                      <Checkbox aria-label={`Select specialist: ${formatSpecialistLabel(specialist)}`} checked={isSelected} onChange={() => {
                           if (error) {
                             setError(null);
                           }

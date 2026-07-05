@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { Checkbox } from 'ui/macos';
 const ServiceChecklist = ({ value = [], onChange, department }) => {
   const services = {
     cardio: [
@@ -49,11 +50,7 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
           <div style={{ fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>{group}</div>
           {depServices.filter(s => s.group === group).map(service => (
             <label key={service.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-1)' }}>
-              <input
-                type="checkbox"
-                aria-label={`Выбрать услугу: ${service.name}`}
-                checked={value.includes(service.id)}
-                onChange={(e) => {
+              <Checkbox aria-label={`Выбрать услугу: ${service.name}`} checked={value.includes(service.id)} onChange={(e) => {
                   const newValue = e.target.checked 
                     ? [...value, service.id]
                     : value.filter(id => id !== service.id);

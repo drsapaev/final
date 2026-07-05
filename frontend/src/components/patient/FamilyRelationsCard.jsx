@@ -12,7 +12,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Input } from '../ui/macos';
+  Input,
+  Checkbox} from '../ui/macos';
 import {
   Baby,
   Phone,
@@ -564,11 +565,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         </label>
 
         <label style={styles.checkboxRow}>
-          <input
-            type="checkbox"
-            aria-label="Mark as primary contact"
-            checked={isPrimaryContact}
-            onChange={(event) => setIsPrimaryContact(event.target.checked)}
+          <Checkbox aria-label="Mark as primary contact" checked={isPrimaryContact} onChange={(event) => setIsPrimaryContact(event.target.checked)}
           />
           <span style={styles.checkboxText}>
             <span>Основной контакт</span>

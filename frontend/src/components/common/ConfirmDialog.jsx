@@ -33,8 +33,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, AlertOctagon, CheckCircle2 } from 'lucide-react';
-import Modal from '../ui/macos/Modal.jsx';
-import Button from '../ui/macos/Button.jsx';
+import { Modal } from '../ui/macos';
+import { Button } from '../ui/macos';
 import { Input } from '../ui/macos';
 
 const INTENT_CONFIG = {

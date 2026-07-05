@@ -15,7 +15,8 @@ import EMRSection from '../EMRSection';
 import EMRTextField from '../EMRTextField';
 import TeethChart from '../../../dental/TeethChart';
 import './DentistrySection.css';
-import { Input } from '../../../ui/macos';
+import { Input,
+  Checkbox} from '../../../ui/macos';
 
 /**
  * DentistrySection Component
@@ -302,21 +303,13 @@ export function DentistrySection({
                         />
                         <div className="dentistry-checkbox-group">
                             <label className="dentistry-checkbox">
-                                <input
-                                    type="checkbox"
-                                    aria-label="Crossbite measurement"
-                                    checked={measurements?.crossbite || false}
-                                    onChange={(e) => handleMeasurementChange('crossbite', e.target.checked)}
+                                <Checkbox aria-label="Crossbite measurement" checked={measurements?.crossbite || false} onChange={(e) => handleMeasurementChange('crossbite', e.target.checked)}
                                     disabled={disabled}
                                 />
                                 <span>Перекрестный прикус</span>
                             </label>
                             <label className="dentistry-checkbox">
-                                <input
-                                    type="checkbox"
-                                    aria-label="Open bite measurement"
-                                    checked={measurements?.openBite || false}
-                                    onChange={(e) => handleMeasurementChange('openBite', e.target.checked)}
+                                <Checkbox aria-label="Open bite measurement" checked={measurements?.openBite || false} onChange={(e) => handleMeasurementChange('openBite', e.target.checked)}
                                     disabled={disabled}
                                 />
                                 <span>Открытый прикус</span>

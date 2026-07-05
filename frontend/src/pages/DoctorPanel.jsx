@@ -11,7 +11,7 @@ import {
   Skeleton,
   Input } from '../components/ui/macos';
 // R-14: AnimatedTransition moved from native/ to macos/ kit.
-import AnimatedTransition from '../components/ui/macos/AnimatedTransition';
+import { AnimatedTransition } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import './doctor.css';
 import '../styles/animations.css';

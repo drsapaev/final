@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from '../hooks/useTranslation';
 import {
   Button, Icon,
-} from './ui/macos';
+} from 'ui/macos';
 import PropTypes from 'prop-types';
 
 const LanguageSwitcher = ({ compact = false }) => {

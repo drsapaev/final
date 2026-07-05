@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
 import { Card, Button, Badge,
-  Input } from './ui/macos';
+  Input} from 'ui/macos';
 import logger from '../utils/logger';
 const createEmptyPrescription = () => ({
   medications: [], // Список препаратов

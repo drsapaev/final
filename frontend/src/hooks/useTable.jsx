@@ -7,7 +7,8 @@ import { useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 import { useReducedMotion } from './useEnhancedMediaQuery';
-import { Input } from '../../ui/macos';
+import { Input,
+  Checkbox} from '../../ui/macos';
 
 // Хук для управления таблицей
 export const useTable = (data = [], options = {}) => {
@@ -310,16 +311,7 @@ export const TableRow = ({
       {/* Чекбокс для выбора */}
       {selectable &&
       <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', width: '40px' }}>
-          <input
-          type="checkbox"
-          aria-label={selected ? 'Deselect table row' : 'Select table row'}
-          checked={selected}
-          onChange={handleSelect}
-          style={{
-            width: '16px',
-            height: '16px',
-            cursor: 'pointer'
-          }} />
+          <Checkbox aria-label={selected ? 'Deselect table row' : 'Select table row'} checked={selected} onChange={handleSelect} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
         
         </td>
       }

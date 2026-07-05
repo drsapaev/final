@@ -19,6 +19,7 @@ import { useEMRAI } from '../../ai/useEMRAI';
 import { MCP_PROVIDERS } from '../../../../constants/ai';
 import logger from '../../../../utils/logger';
 import './DermatologySection.css';
+import { Checkbox } from '../../../ui/macos';
 
 /**
  * DermatologySection Component
@@ -153,11 +154,7 @@ export function DermatologySection({
                 <div className="dermatology-conditions">
                     {['Акне', 'Розацеа', 'Экзема', 'Псориаз', 'Пигментация', 'Морщины'].map((condition) =>
           <label key={condition} className="dermatology-checkbox">
-                            <input
-              type="checkbox"
-              aria-label={`Состояние кожи: ${condition}`}
-              checked={conditions.includes(condition)}
-              onChange={(e) => {
+                            <Checkbox aria-label={`Состояние кожи: ${condition}`} checked={conditions.includes(condition)} onChange={(e) => {
                 if (e.target.checked) {
                   handleConditionAdd(condition);
                 } else {
