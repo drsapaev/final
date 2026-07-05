@@ -66,6 +66,9 @@ export default function DisplayBoardUnified({
   useTheme();
 
   // Параметры из URL или пропсов
+  // PR #1910 bugfix: department destructured as departmentProp, но использовался
+  // как department — ReferenceError. Возвращаем корректное имя.
+  const department = departmentProp;
   const qs = useMemo(
     () => ({ department: String(department).trim(), d: String(dateStr).trim() }),
     [department, dateStr]

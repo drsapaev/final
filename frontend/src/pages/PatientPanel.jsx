@@ -915,7 +915,9 @@ const PatientPanel = () => {
   const [results, setResults] = useState([]);
 
   useEffect(() => {
-    if (!patientId) return;
+    // P1 fix: backend endpoints /patients/appointments and /patients/results
+    // are patient-role scoped — patient_id берётся из JWT токена на backend.
+    // Frontend не нужен patientId (он был артефактом копирования из FormsPanel).
     let cancelled = false;
 
     async function loadPatientData() {
@@ -938,7 +940,7 @@ const PatientPanel = () => {
 
     loadPatientData();
     return () => { cancelled = true; };
-  }, [patientId]);
+  }, []);
   const hasPatientData = appointments.length > 0 || results.length > 0;
 
   const sectionConfig = patientSections[activeSection];
