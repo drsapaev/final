@@ -14,12 +14,14 @@ import { Search, Phone, Calendar, AlertCircle } from 'lucide-react';
 import { Input } from '../ui/macos';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
+import { RefreshCw } from 'lucide-react';
 
 const PatientStepV2 = ({
   data = {}, // ✅ Default empty object to prevent crash
   errors,
   suggestions,
   showSuggestions,
+  isSearching = false, // UX Audit Registrar #11
   onSearch,
   onSelectPatient,
   onUpdate,
@@ -119,6 +121,31 @@ const PatientStepV2 = ({
               <AlertCircle size={14} />
               {errors.fio}
             </span>
+          }
+
+          {/* UX Audit Registrar #11: loading indicator во время поиска пациентов. */}
+          {isSearching &&
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            marginTop: '4px',
+            padding: 'var(--mac-spacing-3)',
+            background: 'var(--mac-bg-primary)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            boxShadow: 'var(--mac-shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: 'var(--mac-text-secondary)',
+            fontSize: '13px',
+          }}>
+            <RefreshCw size={14} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+            Поиск пациентов...
+          </div>
           }
 
           {/* Саджесты */}
