@@ -343,7 +343,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: 'white',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                boxShadow: 'var(--mac-shadow-md)'
               }}>
               
                 <ArrowLeftRight style={{ width: 20, height: 20 }} />
@@ -355,7 +355,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             position: 'absolute',
             top: 10,
             left: 10,
-            backgroundColor: 'rgba(0,0,0,0.7)',
+            backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
             color: 'white',
             padding: '4px 8px',
             borderRadius: 4,
@@ -367,7 +367,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             position: 'absolute',
             top: 10,
             right: 10,
-            backgroundColor: 'rgba(0,0,0,0.7)',
+            backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
             color: 'white',
             padding: '4px 8px',
             borderRadius: 4,
@@ -466,7 +466,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 width: '100%',
                 height: '4px',
                 borderRadius: '2px',
-                background: 'rgba(255,255,255,0.3)',
+                background: 'color-mix(in srgb, white, transparent 70%)',
                 outline: 'none',
                 appearance: 'none'
               }} />

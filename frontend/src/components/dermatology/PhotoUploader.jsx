@@ -365,7 +365,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   top: 4,
                   right: 4,
                   padding: 4,
-                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
                   borderRadius: 4
                 }}>
                       <button
@@ -382,7 +382,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   left: 0,
                   right: 0,
                   padding: 4,
-                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
                   color: 'white',
                   fontSize: '12px',
                   borderRadius: '0 0 8px 8px'
@@ -474,7 +474,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   top: 4,
                   right: 4,
                   padding: 4,
-                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
                   borderRadius: 4
                 }}>
                       <button
@@ -491,7 +491,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   left: 0,
                   right: 0,
                   padding: 4,
-                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
                   color: 'white',
                   fontSize: '12px',
                   borderRadius: '0 0 8px 8px'

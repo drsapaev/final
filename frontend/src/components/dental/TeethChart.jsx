@@ -42,11 +42,11 @@ const TOOTH_STATUS = {
 
 // Цвета для статусов
 const STATUS_COLORS = {
-  [TOOTH_STATUS.HEALTHY]: '#4caf50',
-  [TOOTH_STATUS.CARIES]: '#f44336',
-  [TOOTH_STATUS.FILLED]: '#2196f3',
-  [TOOTH_STATUS.CROWN]: '#ff9800',
-  [TOOTH_STATUS.IMPLANT]: '#9c27b0',
+  [TOOTH_STATUS.HEALTHY]: 'var(--mac-success)',
+  [TOOTH_STATUS.CARIES]: 'var(--mac-error)',
+  [TOOTH_STATUS.FILLED]: 'var(--mac-accent-blue)',
+  [TOOTH_STATUS.CROWN]: 'var(--mac-warning)',
+  [TOOTH_STATUS.IMPLANT]: 'var(--mac-accent-purple)',
   [TOOTH_STATUS.MISSING]: '#9e9e9e',
   [TOOTH_STATUS.ROOT]: '#795548',
   [TOOTH_STATUS.BRIDGE]: '#00bcd4'
