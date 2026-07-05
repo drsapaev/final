@@ -90,7 +90,7 @@ export function BloodTestsTab({
           placeholder={placeholder}
         />
         {isError && (
-          <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-medium)' }}>
+          <div role="alert" style={{ marginTop: 'var(--mac-spacing-1)', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-medium)' }}>
             {warning.message}
           </div>
         )}
@@ -152,7 +152,7 @@ export function BloodTestsTab({
                   <div>HDL: {test.cholesterol_hdl}</div>
                   <div style={isLdlCritical(test.cholesterol_ldl) ? { color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-semibold)' } : undefined}>
                     LDL: {test.cholesterol_ldl}
-                    {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>⚠ критический</span>}
+                    {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: 'var(--mac-spacing-1)', fontSize: getFontSize('xs') }}>⚠ критический</span>}
                   </div>
                   <div>Триглицериды: {test.triglycerides}</div>
                 </div>
@@ -221,7 +221,7 @@ export function BloodTestsTab({
                   placeholder="<100"
                 />
                 {isLdlCritical(bloodTestForm.cholesterol_ldl) && (
-                  <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-medium)' }}>
+                  <div role="alert" style={{ marginTop: 'var(--mac-spacing-1)', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: 'var(--mac-font-weight-medium)' }}>
                     LDL превышает порог {settings?.ldlThreshold ?? 100} мг/дл — рекомендуется интенсивная терапия статинами.
                   </div>
                 )}

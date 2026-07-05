@@ -85,7 +85,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 'var(--mac-spacing-3)',
-    marginBottom: '20px',
+    marginBottom: 'var(--mac-spacing-5)',
   },
   title: {
     display: 'inline-flex',
@@ -105,7 +105,7 @@ const styles = {
   fieldGrid: {
     display: 'grid',
     gap: '14px',
-    marginBottom: '20px',
+    marginBottom: 'var(--mac-spacing-5)',
   },
   twoColumnGrid: {
     display: 'grid',
@@ -117,7 +117,7 @@ const styles = {
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: 'var(--mac-spacing-3)',
     padding: '14px',
-    marginBottom: '20px',
+    marginBottom: 'var(--mac-spacing-5)',
     border: '1px solid var(--mac-border)',
     borderRadius: 'var(--mac-radius-lg)',
     background: 'var(--mac-bg-secondary)',
@@ -128,13 +128,13 @@ const styles = {
   metricValue: {
     display: 'block',
     color: 'var(--mac-text-primary)',
-    fontSize: '24px',
+    fontSize: 'var(--mac-font-size-3xl)',
     fontWeight: 700,
     lineHeight: 1.1,
   },
   metricLabel: {
     display: 'block',
-    marginTop: '4px',
+    marginTop: 'var(--mac-spacing-1)',
     color: 'var(--mac-text-secondary)',
     fontSize: 'var(--mac-font-size-xs)',
   },
@@ -179,7 +179,7 @@ const styles = {
   },
   stageMeta: {
     display: 'flex',
-    gap: '6px',
+    gap: 'var(--mac-spacing-2)',
     flexWrap: 'wrap',
     marginTop: 'var(--mac-spacing-2)',
   },
@@ -198,17 +198,17 @@ const styles = {
   saveRow: {
     display: 'flex',
     justifyContent: 'center',
-    marginTop: '20px',
+    marginTop: 'var(--mac-spacing-5)',
   },
   dialogGrid: {
     display: 'grid',
     gap: '14px',
-    marginTop: '4px',
+    marginTop: 'var(--mac-spacing-1)',
   },
   badgeIcon: {
     width: '13px',
     height: '13px',
-    marginRight: '4px',
+    marginRight: 'var(--mac-spacing-1)',
   },
 };
 

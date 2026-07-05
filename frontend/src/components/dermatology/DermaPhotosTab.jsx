@@ -32,7 +32,7 @@ export function DermaPhotosTab({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: '20px', color: 'var(--mac-text-primary)' }}>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           Загрузка фото
         </h3>
         <PhotoUploader
@@ -43,7 +43,7 @@ export function DermaPhotosTab({
       </MacOSCard>
 
       <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: '20px', color: 'var(--mac-text-primary)' }}>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           AI анализ кожи
         </h3>
         <SkinAnalysis
@@ -57,7 +57,7 @@ export function DermaPhotosTab({
       </MacOSCard>
 
       <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: '20px', color: 'var(--mac-text-primary)' }}>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           Сравнение «до» и «после»
         </h3>
         <PhotoComparison

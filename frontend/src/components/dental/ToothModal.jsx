@@ -92,7 +92,7 @@ const styles = {
   },
   content: {
     display: 'grid',
-    gap: '20px',
+    gap: 'var(--mac-spacing-5)',
     maxHeight: '72vh',
     overflow: 'auto',
   },
@@ -195,7 +195,7 @@ const styles = {
   },
   totalCaption: {
     display: 'block',
-    marginTop: '6px',
+    marginTop: 'var(--mac-spacing-2)',
     color: 'var(--mac-text-secondary)',
     fontSize: 'var(--mac-font-size-xs)',
   },

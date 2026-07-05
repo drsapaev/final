@@ -155,7 +155,7 @@ export function HistoryTab({
                     {entry.subtitle}
                   </div>
                   {entry.meta && (
-                    <div style={{ fontSize: getFontSize('xs'), color: getColor('textSecondary'), marginTop: '4px' }}>
+                    <div style={{ fontSize: getFontSize('xs'), color: getColor('textSecondary'), marginTop: 'var(--mac-spacing-1)' }}>
                       {entry.meta}
                     </div>
                   )}
