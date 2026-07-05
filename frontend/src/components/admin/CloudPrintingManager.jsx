@@ -264,7 +264,7 @@ const CloudPrintingManager = () => {
     <>
       <div className="admin-grid-auto-300">
         {list.map((printer) =>
-          <MacOSCard key={`${printer.provider}-${printer.id}`} className="admin-p-16">
+          <MacOSCard key={`${printer.provider}-${printer.id}`} className="p-4">
             <div className="admin-flex-between-flex-start-mb-12">
               <div>
                 <h4 className="admin-h4-semi-mb-4-primary">{printer.name}</h4>
@@ -290,7 +290,7 @@ const CloudPrintingManager = () => {
                 onClick={() => testPrinter(printer.provider, printer.id)}
                 disabled={printer.status !== 'online'}>
 
-                <TestTube size={16} className="admin-mr-4" />
+                <TestTube size={16} className="mr-1" />
                 Тест
               </Button>
               <Button
@@ -298,7 +298,7 @@ const CloudPrintingManager = () => {
                 variant="outline"
                 onClick={() => setSelectedPrinter(printer)}>
 
-                <Eye size={16} className="admin-mr-4" />
+                <Eye size={16} className="mr-1" />
                 Подробнее
               </Button>
             </div>
@@ -315,34 +315,34 @@ const CloudPrintingManager = () => {
     </>;
 
   const renderPrintersTab = () =>
-  <div className="admin-flex-col-24">
-      <div className="admin-flex-between">
+  <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
         <h3 className="admin-section-h3-m0">Принтеры</h3>
         <Button onClick={loadPrinters} disabled={loading}>
-          <RefreshCw size={16} className="admin-mr-8" />
+          <RefreshCw size={16} className="mr-2" />
           {loading ? 'Загрузка...' : 'Обновить'}
         </Button>
       </div>
 
         {statistics &&
     <div className="admin-grid-auto-200-mb-24-printing">
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>{statistics.total_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">Всего принтеров</div>
           </MacOSCard>
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-success)' }}>{statistics.online_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">В сети</div>
           </MacOSCard>
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-destructive)' }}>{statistics.offline_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">Не в сети</div>
           </MacOSCard>
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>{statistics.providers_count}</div>
             <div className="admin-stat-label-sm-secondary-block">Провайдеров</div>
           </MacOSCard>
-          <MacOSCard className="admin-p-24">
+          <MacOSCard className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>{localPrinters.length}</div>
             <div className="admin-stat-label-sm-secondary-block">Локальных ОС-принтеров</div>
           </MacOSCard>
@@ -364,14 +364,14 @@ const CloudPrintingManager = () => {
 
 
   const renderPrintTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       <h3 className="admin-section-h3-m0">Печать документа</h3>
       
       <div className="admin-grid-auto-400-24">
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <h4 className="admin-h4-lg-semi-primary-mb-16">Настройки печати</h4>
           
-          <div className="admin-flex-col-16">
+          <div className="flex flex-col gap-4">
             <div>
               <label className="admin-label-block-sm-med-primary-mb-8" htmlFor="provider">Провайдер</label>
               <Select
@@ -441,7 +441,7 @@ const CloudPrintingManager = () => {
                 onChange={(e) => setPrintForm({ ...printForm, copies: parseInt(e.target.value) })} />
               
               </div>
-              <div className="admin-flex-center-8">
+              <div className="flex items-center justify-center gap-2">
                 <input
                 type="checkbox"
                 id="color"
@@ -452,7 +452,7 @@ const CloudPrintingManager = () => {
               
                 <label className="admin-label-block-sm-primary" htmlFor="color">Цветная</label>
               </div>
-              <div className="admin-flex-center-8">
+              <div className="flex items-center justify-center gap-2">
                 <input
                 type="checkbox"
                 id="duplex"
@@ -467,7 +467,7 @@ const CloudPrintingManager = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <h4 className="admin-h4-lg-semi-primary-mb-16">Содержимое документа</h4>
           
           <Textarea
@@ -475,7 +475,7 @@ const CloudPrintingManager = () => {
           onChange={(e) => setPrintForm({ ...printForm, content: e.target.value })}
           placeholder="Введите содержимое документа (HTML, текст или base64 для PDF)"
           rows={15}
-          className="admin-w-full" />
+          className="w-full" />
         
           
           <Button
@@ -483,7 +483,7 @@ const CloudPrintingManager = () => {
           className="admin-btn-w-full-mt-16"
           disabled={!printForm.printer_id || !printForm.title || !printForm.content}>
           
-            <Printer size={16} className="admin-mr-8" />
+            <Printer size={16} className="mr-2" />
             Печать
           </Button>
         </MacOSCard>
@@ -492,14 +492,14 @@ const CloudPrintingManager = () => {
 
 
   const renderMedicalTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       <h3 className="admin-section-h3-m0">Печать медицинских документов</h3>
       
       <div className="admin-grid-auto-400-24">
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <h4 className="admin-h4-md-semi-primary-mb-16">Основные настройки</h4>
           
-          <div className="admin-flex-col-16">
+          <div className="flex flex-col gap-4">
             <div>
               <label htmlFor="med-provider" className="admin-label-block-sm-med-primary-mb-8">Провайдер</label>
               <Select
@@ -585,10 +585,10 @@ const CloudPrintingManager = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard className="admin-p-24">
+        <MacOSCard className="p-6">
           <h4 className="admin-h4-md-semi-primary-mb-16">Данные шаблона</h4>
           
-          <div className="admin-flex-col-16">
+          <div className="flex flex-col gap-4">
             {medicalForm.document_type === 'prescription' &&
           <>
                 <div>
@@ -785,11 +785,11 @@ const CloudPrintingManager = () => {
         onClose={() => setSelectedPrinter(null)}
         title="Подробности принтера">
         
-          <div className="admin-flex-col-12">
+          <div className="flex flex-col gap-3">
             <div><strong>Название:</strong> {selectedPrinter.name}</div>
             <div><strong>Описание:</strong> {selectedPrinter.description}</div>
             <div><strong>Провайдер:</strong> {selectedPrinter.provider}</div>
-            <div className="admin-flex-center-8">
+            <div className="flex items-center justify-center gap-2">
               <strong>Статус:</strong> 
               <Badge variant={getStatusBadgeVariant(selectedPrinter.status)}>
                 {getStatusText(selectedPrinter.status)}
@@ -813,14 +813,14 @@ const CloudPrintingManager = () => {
             onClick={() => testPrinter(selectedPrinter.provider, selectedPrinter.id)}
             disabled={selectedPrinter.status !== 'online'}>
             
-              <TestTube size={16} className="admin-mr-8" />
+              <TestTube size={16} className="mr-2" />
               Тестовая печать
             </Button>
             <Button
             variant="outline"
             onClick={() => setSelectedPrinter(null)}>
             
-              <X size={16} className="admin-mr-8" />
+              <X size={16} className="mr-2" />
               Закрыть
             </Button>
           </div>

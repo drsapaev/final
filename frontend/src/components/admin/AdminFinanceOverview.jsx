@@ -172,10 +172,10 @@ const AdminFinanceOverview = () => {
   const activeDoctors = allDoctors?.length ? allDoctors : doctors;
 
   return (
-    <div className="admin-flex-col-24">
+    <div className="flex flex-col gap-6">
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-between">
+        <MacOSCard className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
                 Общий доход
@@ -188,8 +188,8 @@ const AdminFinanceOverview = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-between">
+        <MacOSCard className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
                 Общие расходы
@@ -202,8 +202,8 @@ const AdminFinanceOverview = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-between">
+        <MacOSCard className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
                 Чистая прибыль
@@ -216,8 +216,8 @@ const AdminFinanceOverview = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-between">
+        <MacOSCard className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
                 Всего транзакций
@@ -237,7 +237,7 @@ const AdminFinanceOverview = () => {
             Финансовый учет
           </h2>
           <Button onClick={handleCreateTransaction}>
-            <Plus className="admin-icon-16-mr-8" />
+            <Plus className="w-4 h-4 mr-2" />
             Добавить транзакцию
           </Button>
         </div>
@@ -301,7 +301,7 @@ const AdminFinanceOverview = () => {
               description="Не удалось загрузить список транзакций"
               action={(
                 <Button onClick={refreshFinance}>
-                  <RefreshCw className="admin-icon-16-mr-8" />
+                  <RefreshCw className="w-4 h-4 mr-2" />
                   Обновить
                 </Button>
               )}
@@ -315,14 +315,14 @@ const AdminFinanceOverview = () => {
                 : 'В системе пока нет транзакций'}
               action={(
                 <Button onClick={handleCreateTransaction}>
-                  <Plus className="admin-icon-16-mr-8" />
+                  <Plus className="w-4 h-4 mr-2" />
                   Добавить первую транзакцию
                 </Button>
               )}
             />
           ) : (
             <div className="admin-table-wrapper">
-            <table className="admin-w-full" aria-label="Таблица транзакций">
+            <table className="w-full" aria-label="Таблица транзакций">
               <thead>
                 <tr className="admin-bd-b-1px-solid-var-mac-se">
                   {['Тип', 'Категория', 'Сумма', 'Описание', 'Дата', 'Статус', 'Действия'].map((heading) => (
@@ -406,7 +406,7 @@ const AdminFinanceOverview = () => {
                           aria-label="Редактировать транзакцию"
                           title="Редактировать"
                         >
-                          <Edit className="admin-icon-16" />
+                          <Edit className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
@@ -421,7 +421,7 @@ const AdminFinanceOverview = () => {
                           aria-label="Удалить транзакцию"
                           title="Удалить"
                         >
-                          <Trash2 className="admin-icon-16" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
