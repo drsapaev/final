@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { Input } from 'ui/macos';
+import { Input } from './ui/macos';
 /**
  * TimeInput — контрол ввода времени HH:MM с простейшей валидацией.
  * Props:

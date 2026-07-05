@@ -42,7 +42,6 @@ import { getViewFromPath } from './registrar/registrarNavigation';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
-  API_BASE,
   REGISTRAR_TAB_LABEL_KEYS,
   REGISTRAR_STATUS_LABEL_KEYS,
   normalizePatientGender,
@@ -86,6 +85,9 @@ import { toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver
 
 // API client
 import { api } from '../api/client';
+// UX Audit Registrar #1: getPatient() — централизованный доступ к /patients/{id}.
+// Раньше здесь был raw fetch() с ручным Authorization-хедером.
+import { getPatient } from '../api/patients';
 // ⭐ BATCH API: Для атомарных операций с записями пациента (см. BATCH_UPDATE_ARCHITECTURE.md)
 
 
@@ -164,28 +166,27 @@ const RegistrarPanel = () => {
       if (!patientIdFromUrl) return;
 
       try {
-        const token = tokenManager.getAccessToken();
-        if (!token) return;
+        // UX Audit Registrar #1: raw fetch() с ручным Authorization-хедером
+        // заменён на getPatient() из api/patients.
+        // Auth-token добавляется автоматически axios-interceptor'ом в api/client.js.
+        // 401/403 обрабатываются интерсептором (redirect to login или refresh).
+        const patientData = await getPatient(patientIdFromUrl);
+        const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
 
-        const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        // Устанавливаем поисковый запрос с именем пациента
+        setSearchParams((prev) => {
+          const newParams = new URLSearchParams(prev);
+          newParams.set('q', patientName);
+          return newParams;
         });
 
-        if (response.ok) {
-          const patientData = await response.json();
-          const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
-
-          // Устанавливаем поисковый запрос с именем пациента
-          setSearchParams((prev) => {
-            const newParams = new URLSearchParams(prev);
-            newParams.set('q', patientName);
-            return newParams;
-          });
-
-          logger.info('[Registrar] Загружен пациент из URL:', patientName);
-        }
+        logger.info('[Registrar] Загружен пациент из URL:', patientName);
       } catch (error) {
-        logger.error('[Registrar] Не удалось загрузить пациента:', error);
+        // 404 — пациент не найден, не логируем как error.
+        const status = error?.response?.status;
+        if (status !== 404) {
+          logger.error('[Registrar] Не удалось загрузить пациента:', error);
+        }
       }
     };
 

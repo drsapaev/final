@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Download, Copy, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import PropTypes from 'prop-types';
-import { Input } from 'ui/macos';
+import { Input } from './ui/macos';
 
 const TwoFactorSetup = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState(1); // 1: Setup, 2: Verify, 3: Complete

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
 import PropTypes from 'prop-types';
-import { Checkbox } from 'ui/macos';
+import { Checkbox } from './ui/macos';
 
 const ResponsiveTable = ({
   data = [],

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Button, Card, CardContent, Typography, Box,
-} from 'ui/macos';
+} from './ui/macos';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
 
 import logger from '../utils/logger';

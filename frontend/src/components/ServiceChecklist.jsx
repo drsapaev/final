@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { Checkbox } from 'ui/macos';
+import { Checkbox } from './ui/macos';
 const ServiceChecklist = ({ value = [], onChange, department }) => {
   const services = {
     cardio: [

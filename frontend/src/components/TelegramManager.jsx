@@ -19,7 +19,7 @@ import {
   Grid,
   List,
   Table,
-} from 'ui/macos';
+} from './ui/macos';
 import {
   TableHead,
   TableBody,
