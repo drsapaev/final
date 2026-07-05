@@ -166,7 +166,7 @@ export default function HeaderNew() {
   };
 
   // QW-05 fix: global Back button. Previously navigate(-1) was used only in 2 of ~50
-  // pages, leaving users on detail screens (VisitDetails, PatientPickupView, etc.)
+  // pages, leaving users on detail screens (PatientPickupView, etc.)
   // to rely on the browser back button. The header now renders an ArrowLeft button
   // whenever the user is not on a top-level surface (landing, login, role home).
   // Heuristic: hide on the root path and on each role's home route, where "back"
