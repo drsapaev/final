@@ -6,8 +6,8 @@ import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSele
 import '../../styles/cursor-effects.css';
 import '../../styles/animations.css';
 import '../ui/animations.css';
-import {
 import { Input } from '../ui/macos';
+import {
   Hospital,
   Sun,
   Moon,

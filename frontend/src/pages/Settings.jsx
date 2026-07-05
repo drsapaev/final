@@ -13,6 +13,7 @@ import logger from '../utils/logger';
 import NotificationSystemStatus from '../components/settings/NotificationSystemStatus.jsx';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
+import { Input } from '../components/ui/macos';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
