@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
 import Modal from '../ui/macos/Modal';
-import Input from '../ui/macos/Input';
 import Button from '../ui/macos/Button';
 import Checkbox from '../ui/macos/Checkbox';
 import {

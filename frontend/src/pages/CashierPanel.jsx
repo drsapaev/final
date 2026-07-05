@@ -12,7 +12,6 @@ import PaymentWidget from '../components/payment/PaymentWidget';
 import CashPaymentModal from '../components/payment/CashPaymentModal';
 import MacOSTab from '../components/ui/macos/MacOSTab';
 import SegmentedControl from '../components/ui/macos/SegmentedControl';
-import Input from '../components/ui/macos/Input';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';
