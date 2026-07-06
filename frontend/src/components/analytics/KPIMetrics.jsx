@@ -111,7 +111,8 @@ const KPIMetrics = ({
   const formatValue = (value, type) => {
     switch (type) {
       case 'revenue':
-        return `₽${value.toLocaleString()}`;
+        // UX Audit: валюта — узбекский сум (не рубль ₽).
+        return `${value.toLocaleString('ru-RU')} сум`;
       case 'percentage':
         return `${value.toFixed(1)}%`;
       case 'time':

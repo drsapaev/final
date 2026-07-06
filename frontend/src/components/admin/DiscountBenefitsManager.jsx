@@ -654,7 +654,7 @@ const DiscountBenefitsManager = () => {
                       {discountTypes[discount.discount_type]}
                     </Badge>
                     <Badge variant="warning">
-                      {discount.discount_type === 'percentage' ? `${discount.value}%` : `${discount.value} руб.`}
+                      {discount.discount_type === 'percentage' ? `${discount.value}%` : `${discount.value} сум`}
                     </Badge>
                   </div>
                 </div>
@@ -737,9 +737,9 @@ const DiscountBenefitsManager = () => {
                   </div>
                 </div>
                 <div className="admin-text-right text-sm text-[var(--mac-text-secondary)]">
-                  {benefit.monthly_limit && <div>Месячный лимит: {benefit.monthly_limit} руб.</div>}
-                  {benefit.yearly_limit && <div>Годовой лимит: {benefit.yearly_limit} руб.</div>}
-                  {benefit.max_discount_amount && <div>Макс. скидка: {benefit.max_discount_amount} руб.</div>}
+                  {benefit.monthly_limit && <div>Месячный лимит: {benefit.monthly_limit} сум</div>}
+                  {benefit.yearly_limit && <div>Годовой лимит: {benefit.yearly_limit} сум</div>}
+                  {benefit.max_discount_amount && <div>Макс. скидка: {benefit.max_discount_amount} сум</div>}
                 </div>
               </div>
             </MacOSCard>
@@ -803,10 +803,10 @@ const DiscountBenefitsManager = () => {
                       {program.is_active ? 'Активна' : 'Неактивна'}
                     </Badge>
                     <Badge variant="info">
-                      {program.points_per_ruble} балл/руб.
+                      {program.points_per_ruble} балл/сум
                     </Badge>
                     <Badge variant="warning">
-                      {program.ruble_per_point} руб./балл
+                      {program.ruble_per_point} сум/балл
                     </Badge>
                   </div>
                 </div>
@@ -842,7 +842,7 @@ const DiscountBenefitsManager = () => {
                   Всего применений: <span className="admin-text-med-primary">{analytics.discounts.total_applications}</span>
                 </div>
                 <div className="text-sm text-[var(--mac-text-secondary)]">
-                  Общая сумма скидок: <span className="admin-text-med-primary">{analytics.discounts.total_discount_amount?.toFixed(2)} руб.</span>
+                  Общая сумма скидок: <span className="admin-text-med-primary">{analytics.discounts.total_discount_amount?.toFixed(2)} сум</span>
                 </div>
                 <div className="text-sm text-[var(--mac-text-secondary)]">
                   Средний процент скидки: <span className="admin-text-med-primary">{analytics.discounts.average_discount_percentage?.toFixed(1)}%</span>
@@ -863,7 +863,7 @@ const DiscountBenefitsManager = () => {
                   Всего применений: <span className="admin-text-med-primary">{analytics.benefits.total_applications}</span>
                 </div>
                 <div className="text-sm text-[var(--mac-text-secondary)]">
-                  Общая сумма льгот: <span className="admin-text-med-primary">{analytics.benefits.total_benefit_amount?.toFixed(2)} руб.</span>
+                  Общая сумма льгот: <span className="admin-text-med-primary">{analytics.benefits.total_benefit_amount?.toFixed(2)} сум</span>
                 </div>
                 <div className="text-sm text-[var(--mac-text-secondary)]">
                   Средний процент льготы: <span className="admin-text-med-primary">{analytics.benefits.average_benefit_percentage?.toFixed(1)}%</span>
