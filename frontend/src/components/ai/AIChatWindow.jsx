@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Send, Bot, RefreshCw, Copy, Sparkles } from 'lucide-react';
 import { apiClient } from '../../api/client';
-import { useSnackbar } from 'notistack';
+import { notify } from '../../services/notify.js';
 import logger from '../../utils/logger';
 import './AIChatWindow.css';
 import PropTypes from 'prop-types';
@@ -45,7 +45,6 @@ const AIChatWindow = ({ isOpen, onClose, contextData = {} }) => {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const { enqueueSnackbar } = useSnackbar();
 
   // scroll to bottom
   useEffect(() => {
@@ -92,7 +91,7 @@ const AIChatWindow = ({ isOpen, onClose, contextData = {} }) => {
       setMessages((prev) => [...prev, aiMsg]);
     } catch (error) {
       logger.error('AI Chat Error:', error);
-      enqueueSnackbar('Ошибка связи с AI сервисом', { variant: 'error' });
+      notify.error('Ошибка связи с AI сервисом');
 
       // Add error message to chat
       setMessages((prev) => [...prev, {
@@ -149,7 +148,7 @@ const AIChatWindow = ({ isOpen, onClose, contextData = {} }) => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    enqueueSnackbar('Скопировано', { variant: 'success' });
+    notify.success('Скопировано');
   };
 
   if (!isOpen) return null;

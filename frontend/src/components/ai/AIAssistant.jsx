@@ -4,7 +4,7 @@ import {
   Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
 } from '../ui/macos';
 import { ChevronDown, ChevronUp, Brain, CheckCircle, Copy, RefreshCw } from 'lucide-react';
-import { useSnackbar } from 'notistack';
+import { notify } from '../../services/notify.js';
 import { apiClient } from '../../api/client';
 import { mcpAPI } from '../../api/mcpClient';
 import { sanitizeAIContent } from '../../utils/sanitizer';
@@ -112,7 +112,6 @@ const AIAssistant = ({
   const [provider, setProvider] = useState('deepseek');
   const [retryCount, setRetryCount] = useState(0);
   const [isOpen, setIsOpen] = useState(expanded);
-  const { enqueueSnackbar } = useSnackbar();
 
   // X-1 (UX audit): If specialty is provided, auto-configure analysisType and data
   // so the AI tab works without the parent having to pass analysisType explicitly.
@@ -259,7 +258,7 @@ const AIAssistant = ({
       const sanitizedData = sanitizeAIResponse(response.data);
       setResult(sanitizedData);
       if (onResult) onResult(sanitizedData);
-      enqueueSnackbar('AI анализ завершен', { variant: 'success' });
+      notify.success('AI анализ завершен');
       logger.log('AI response sanitized and validated');
       setRetryCount(0);
     } catch (err) {
@@ -267,7 +266,7 @@ const AIAssistant = ({
         err.response?.data?.detail || err.response?.data?.error || err.message
       );
       setError(errorMsg);
-      enqueueSnackbar(`Ошибка AI анализа: ${errorMsg}`, { variant: 'error' });
+      notify.error(`Ошибка AI анализа: ${errorMsg}`);
       setRetryCount((prev) => prev + 1);
     } finally {
       setLoading(false);
@@ -276,7 +275,7 @@ const AIAssistant = ({
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    enqueueSnackbar('Скопировано в буфер обмена', { variant: 'info' });
+    notify.info('Скопировано в буфер обмена');
   };
 
   const Pill = ({ children, color = 'default' }) => {
@@ -395,7 +394,7 @@ const AIAssistant = ({
                     {onSuggestionSelect && (
                     <Button variant="primary" onClick={() => {
                       onSuggestionSelect('icd10', item.code);
-                      enqueueSnackbar('Код МКБ-10 добавлен в форму', { variant: 'success' });
+                      notify.success('Код МКБ-10 добавлен в форму');
                     }}>
                       <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />Использовать
                     </Button>
@@ -431,7 +430,7 @@ const AIAssistant = ({
             {onSuggestionSelect && (
             <Button variant="primary" onClick={() => {
               onSuggestionSelect('icd10', item.code);
-              enqueueSnackbar('Код МКБ-10 добавлен в форму', { variant: 'success' });
+              notify.success('Код МКБ-10 добавлен в форму');
             }}>
               <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />Использовать
             </Button>

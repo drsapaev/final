@@ -15,6 +15,7 @@ import NotificationSystemStatus from '../components/settings/NotificationSystemS
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Input,
   Checkbox } from '../components/ui/macos';
+import { notify } from '../services/notify.js';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
@@ -187,7 +188,7 @@ export default function Settings() {void
       await api.put('/settings', { category, key, value });
       await loadCat(category);
     } catch (e) {
-      alert(e?.data?.detail || e?.message || 'Ошибка сохранения');
+      notify.error(e?.data?.detail || e?.message || 'Ошибка сохранения');
     }
   }
 
@@ -424,7 +425,7 @@ export default function Settings() {void
                 <PhoneVerification
                 showPhoneInput={true}
                 title="Верификация телефона"
-                onVerified={() => alert('Телефон успешно подтверждён!')} />
+                onVerified={() => notify.success('Телефон успешно подтверждён!')} />
 
               </div>
             </div>
@@ -506,7 +507,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
     try {
       await onSave(formData);
     } catch (error) {
-      alert('Ошибка сохранения: ' + (error.message || 'Неизвестная ошибка'));
+      notify.error('Ошибка сохранения: ' + (error.message || 'Неизвестная ошибка'));
     }
   };
 

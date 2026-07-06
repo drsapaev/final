@@ -18,6 +18,7 @@ import { api as apiClient } from '../api/client';
 
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
+import { notify } from '../services/notify.js';
 
 const pageStyle = {
   maxWidth: '960px',
@@ -239,7 +240,7 @@ const PaymentSuccess = () => {
     } else {
       // Fallback - копируем в буфер обмена
       navigator.clipboard.writeText(window.location.href);
-      alert('Ссылка скопирована в буфер обмена');
+      notify.info('Ссылка скопирована в буфер обмена');
     }
   };
 

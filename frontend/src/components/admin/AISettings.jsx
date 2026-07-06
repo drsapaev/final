@@ -27,6 +27,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { notify } from '../../services/notify.js';
 const AISettings = () => {
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState([]);
@@ -465,7 +466,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
     e.preventDefault();
 
     if (!formData.name || !formData.display_name) {
-      alert('Заполните обязательные поля');
+      notify.warning('Заполните обязательные поля');
       return;
     }
 
