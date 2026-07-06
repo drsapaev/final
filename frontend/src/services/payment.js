@@ -118,14 +118,18 @@ export const paymentService = {
 
   /**
    * Форматирование суммы
+   *
+   * PAY-REAUDIT-28 P1-9: убрано деление на 100. Backend хранит amount в
+   * основной валюте (som/tenge), не в тийинах/копейках. Раньше все суммы
+   * отображались в 100 раз меньше реальной (15000 UZS → "150 сум").
    */
   formatAmount(amount, currency = 'UZS') {
-    const numAmount = parseFloat(amount);
-    
+    const numAmount = parseFloat(amount) || 0;
+
     if (currency === 'UZS') {
-      return `${(numAmount / 100).toLocaleString('ru-RU')} сум`;
+      return `${numAmount.toLocaleString('ru-RU')} сум`;
     } else if (currency === 'KZT') {
-      return `${(numAmount / 100).toLocaleString('ru-RU')} тенге`;
+      return `${numAmount.toLocaleString('ru-RU')} тенге`;
     } else {
       return `${numAmount} ${currency}`;
     }
@@ -147,12 +151,20 @@ export const paymentService = {
    * Получение статуса платежа (локализованный)
    */
   getStatusText(status) {
+    // PAY-REAUDIT-28 P1-10: добавлены отсутствовавшие статусы `paid`,
+    // `refunded`, `void`, `canceled`. Backend использует `paid` как
+    // основной статус успеха (PaymentStatus.PAID.value), но фронтенд
+    // показывал сырую английскую строку "paid".
     const texts = {
       pending: 'Ожидает',
       processing: 'Обработка',
-      completed: 'Завершен',
+      paid: 'Оплачено',
+      completed: 'Завершён',
       failed: 'Неудачно',
-      cancelled: 'Отменен',
+      cancelled: 'Отменён',
+      canceled: 'Отменён',
+      refunded: 'Возвращён',
+      void: 'Аннулирован',
       initialized: 'Инициализирован'
     };
     return texts[status] || status;

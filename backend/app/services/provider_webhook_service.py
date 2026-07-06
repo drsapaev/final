@@ -75,7 +75,16 @@ class ProviderWebhookService:
     def process_click_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
         """Webhook для Click платежной системы."""
         try:
-            logger.info("Click webhook received: %s", webhook_data)
+            # PAY-REAUDIT-28 P1-2: PII-safe logging — только идентификаторы,
+            # не весь payload (webhook_data содержит order_id с payment_id).
+            logger.info(
+                "Click webhook received",
+                extra={
+                    "click_trans_id": webhook_data.get("click_trans_id"),
+                    "merchant_trans_id": webhook_data.get("merchant_trans_id"),
+                    "action": webhook_data.get("action"),
+                },
+            )
 
             manager = get_payment_manager()
             signature = webhook_data.get("sign_string")
@@ -236,7 +245,14 @@ class ProviderWebhookService:
         """Webhook для Payme платежной системы (JSON-RPC)."""
         request_id = webhook_data.get("id")
         try:
-            logger.info("Payme webhook received: %s", webhook_data)
+            # PAY-REAUDIT-28 P1-2: PII-safe logging
+            logger.info(
+                "Payme webhook received",
+                extra={
+                    "method": webhook_data.get("method"),
+                    "rpc_id": (webhook_data.get("id") if isinstance(webhook_data, dict) else None),
+                },
+            )
 
             method = webhook_data.get("method")
             params = webhook_data.get("params", {})
