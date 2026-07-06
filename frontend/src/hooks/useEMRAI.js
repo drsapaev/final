@@ -4,7 +4,8 @@ import { mcpAPI } from '../api/mcpClient';
 import {
   validateICD10Suggestions,
   validateClinicalRecommendations,
-  validateAIResponse
+  validateAIResponse,
+  detectPromptInjection
 } from '../utils/aiValidator';
 
 import logger from '../utils/logger';
@@ -20,6 +21,13 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
 
   // Получение AI подсказок для МКБ-10 через MCP
   const getICD10Suggestions = useCallback(async (symptoms, diagnosis, specialty = null) => {
+    // Prompt injection check
+    const inputText = (symptoms?.join(' ') || '') + ' ' + (diagnosis || '');
+    if (detectPromptInjection(inputText)) {
+      setError('Обнаружена попытка prompt injection.');
+      logger.warn('EMR AI: prompt injection detected in ICD10 suggestions');
+      return;
+    }
     if (!symptoms && !diagnosis) {
       setError('Необходимо указать симптомы или диагноз');
       return [];
@@ -85,6 +93,13 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
 
   // Анализ жалоб пациента через MCP
   const analyzeComplaints = useCallback(async (complaintsData) => {
+    // Prompt injection check
+    const complaintText = complaintsData?.complaint || complaintsData?.complaints || '';
+    if (detectPromptInjection(complaintText)) {
+      setError('Обнаружена попытка prompt injection.');
+      logger.warn('EMR AI: prompt injection detected in complaint analysis');
+      return null;
+    }
     setLoading(true);
     setError('');
 
