@@ -112,6 +112,11 @@ class TwoFactorService:
 
         return f"data:image/png;base64,{img_str}"
 
+    @staticmethod
+    def _hash_backup_code(code: str) -> str:
+        """Hash a backup code with SHA-256 for secure storage."""
+        return hashlib.sha256(code.encode()).hexdigest()
+
     def generate_backup_codes(self, count: int = None) -> list[str]:
         """Генерирует backup коды"""
         if count is None:
@@ -203,7 +208,9 @@ class TwoFactorService:
             # Сохраняем backup коды
             for code in backup_codes:
                 backup_code = TwoFactorBackupCode(
-                    two_factor_auth_id=two_factor_auth.id, code=code, used=False
+                    two_factor_auth_id=two_factor_auth.id,
+                    code=self._hash_backup_code(code),
+                    used=False
                 )
                 db.add(backup_code)
 
@@ -307,13 +314,14 @@ class TwoFactorService:
 
             # Проверяем backup код
             elif backup_code:
+                backup_code_hash = self._hash_backup_code(backup_code)
                 backup_code_obj = (
                     db.query(TwoFactorBackupCode)
                     .filter(
                         and_(
                             TwoFactorBackupCode.two_factor_auth_id
                             == two_factor_auth.id,
-                            TwoFactorBackupCode.code == backup_code,
+                            TwoFactorBackupCode.code == backup_code_hash,
                             TwoFactorBackupCode.used == False,
                         )
                     )
@@ -668,7 +676,9 @@ class TwoFactorService:
 
             for code in backup_codes:
                 backup_code = TwoFactorBackupCode(
-                    two_factor_auth_id=two_factor_auth.id, code=code, used=False
+                    two_factor_auth_id=two_factor_auth.id,
+                    code=self._hash_backup_code(code),
+                    used=False
                 )
                 db.add(backup_code)
 

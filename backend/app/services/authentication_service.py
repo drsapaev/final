@@ -809,13 +809,23 @@ class AuthenticationService:
         user_agent: str = None,
         metadata: dict[str, Any] = None,
     ):
-        """Логирует активность пользователя"""
+        """Логирует активность пользователя в БД (UserActivity table)."""
         try:
-            # Временно отключено из-за проблем с БД
-            logger.debug("Would log activity: %s for user %d", activity_type, user_id)
-            pass
+            from app.models.authentication import UserActivity
+            import json as _json
+            activity = UserActivity(
+                user_id=user_id,
+                activity_type=activity_type,
+                description=description,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                extra_data=_json.dumps(metadata) if metadata else None,
+            )
+            db.add(activity)
+            db.flush()  # Don't commit — caller controls transaction
         except Exception as e:
-            logger.error("Error logging user activity: %s", e, exc_info=True)
+            # Non-blocking: log warning but don't fail the auth operation
+            logger.warning("Failed to log user activity: %s (type=%s, user=%d)", e, activity_type, user_id)
 
     def _log_security_event(
         self,
