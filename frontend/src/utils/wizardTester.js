@@ -1,6 +1,6 @@
 import logger from '../utils/logger';
-import tokenManager from '../utils/tokenManager';
-import { getApiOrigin } from '../api/runtime';
+// UX Audit: миграция 5 raw fetch() → api/client.js.
+import { api } from '../api/client';
 
 /**
  * Утилиты для тестирования мастера регистрации
@@ -8,31 +8,14 @@ import { getApiOrigin } from '../api/runtime';
  */
 
 class WizardTester {
-  constructor() {
-    this.API_BASE = getApiOrigin();
-    this.token = tokenManager.getAccessToken();
-  }
-
-  // Получить заголовки для API запросов
-  getHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.token}`
-    };
-  }
-
   // Тест 1: Проверка настроек мастера
   async testWizardSettings() {
     logger.log('🧪 Тестирование настроек мастера...');
 
     try {
-      const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/wizard-settings`, {
-        headers: this.getHeaders()
-      });
-
-      const data = await response.json();
-      logger.log('✅ Настройки мастера:', data);
-      return data;
+      const response = await api.get('/registrar-wizard/admin/wizard-settings');
+      logger.log('✅ Настройки мастера:', response.data);
+      return response.data;
     } catch (error) {
       logger.error('❌ Ошибка получения настроек:', error);
       return null;
@@ -68,21 +51,9 @@ class WizardTester {
     const data = testData || defaultTestData;
 
     try {
-      const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/registrar/cart`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(data)
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        logger.log('✅ Корзина создана успешно:', result);
-        return result;
-      } else {
-        logger.error('❌ Ошибка создания корзины:', result);
-        return null;
-      }
+      const response = await api.post('/registrar-wizard/registrar/cart', data);
+      logger.log('✅ Корзина создана успешно:', response.data);
+      return response.data;
     } catch (error) {
       logger.error('❌ Ошибка запроса:', error);
       return null;
@@ -94,13 +65,9 @@ class WizardTester {
     logger.log('🧪 Тестирование настроек льгот...');
 
     try {
-      const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/benefit-settings`, {
-        headers: this.getHeaders()
-      });
-
-      const data = await response.json();
-      logger.log('✅ Настройки льгот:', data);
-      return data;
+      const response = await api.get('/registrar-wizard/admin/benefit-settings');
+      logger.log('✅ Настройки льгот:', response.data);
+      return response.data;
     } catch (error) {
       logger.error('❌ Ошибка получения настроек льгот:', error);
       return null;
@@ -112,13 +79,9 @@ class WizardTester {
     logger.log('🧪 Тестирование заявок All Free...');
 
     try {
-      const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/all-free-requests`, {
-        headers: this.getHeaders()
-      });
-
-      const data = await response.json();
-      logger.log('✅ Заявки All Free:', data);
-      return data;
+      const response = await api.get('/registrar-wizard/admin/all-free-requests');
+      logger.log('✅ Заявки All Free:', response.data);
+      return response.data;
     } catch (error) {
       logger.error('❌ Ошибка получения заявок All Free:', error);
       return null;
@@ -130,13 +93,9 @@ class WizardTester {
     logger.log('🧪 Тестирование изменений цен...');
 
     try {
-      const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/registrar/price-overrides`, {
-        headers: this.getHeaders()
-      });
-
-      const data = await response.json();
-      logger.log('✅ Изменения цен:', data);
-      return data;
+      const response = await api.get('/registrar-wizard/registrar/price-overrides');
+      logger.log('✅ Изменения цен:', response.data);
+      return response.data;
     } catch (error) {
       logger.error('❌ Ошибка получения изменений цен:', error);
       return null;

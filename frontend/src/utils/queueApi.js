@@ -1,41 +1,26 @@
 /**
  * API утилиты для работы с очередями
+ *
+ * UX Audit: миграция 4 raw fetch() → api/client.js (axios).
+ * Удалены: getApiBaseUrl, tokenManager, getAuthToken, createHeaders —
+ * всё это обрабатывается централизованно через axios-interceptor.
  */
 
 import { useState } from 'react';
-
-import { getApiBaseUrl } from '../api/runtime';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
-import { tokenManager } from '../utils/tokenManager';
-const API_BASE = getApiBaseUrl();
-
-/**
- * Получить токен авторизации (через централизованный tokenManager)
- */
-const getAuthToken = () => tokenManager.getAccessToken();
-
-/**
- * Создать заголовки для API запросов
- */
-const createHeaders = () => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${getAuthToken()}`
-});
+import { api } from '../api/client';
 
 /**
  * Получить состояние очереди по ID
  */
 export const getQueueStatus = async (queueId) => {
-  const response = await fetch(`${API_BASE}/queue/status/${queueId}`, {
-    headers: createHeaders()
-  });
-
-  if (!response.ok) {
+  try {
+    const response = await api.get(`/queue/status/${queueId}`);
+    return response.data;
+  } catch (error) {
     throw new Error('Не удалось получить статус очереди. Проверьте соединение и попробуйте снова.');
   }
-
-  return response.json();
 };
 
 /**
@@ -43,58 +28,44 @@ export const getQueueStatus = async (queueId) => {
  */
 export const getQueueStatusBySpecialist = async (specialistId, day = null) => {
   const queryDay = day || new Date().toISOString().split('T')[0];
-  const response = await fetch(
-    `${API_BASE}/queue/status/by-specialist/?specialist_id=${specialistId}&day=${queryDay}`,
-    {
-      headers: createHeaders()
-    }
-  );
-
-  if (!response.ok) {
+  try {
+    const response = await api.get('/queue/status/by-specialist/', {
+      params: { specialist_id: specialistId, day: queryDay },
+    });
+    return response.data;
+  } catch (error) {
     throw new Error('Не удалось получить очередь специалиста. Проверьте соединение и попробуйте снова.');
   }
-
-  return response.json();
 };
 
 /**
  * Переместить запись в очереди на новую позицию
  */
 export const moveQueueEntry = async (entryId, newPosition) => {
-  const response = await fetch(`${API_BASE}/queue/move-entry`, {
-    method: 'PUT',
-    headers: createHeaders(),
-    body: JSON.stringify({
+  try {
+    const response = await api.put('/queue/move-entry', {
       entry_id: entryId,
-      new_position: newPosition
-    })
-  });
-
-  if (!response.ok) {
+      new_position: newPosition,
+    });
+    return response.data;
+  } catch (error) {
     throw new Error('Не удалось переместить запись в очереди. Проверьте соединение и попробуйте снова.');
   }
-
-  return response.json();
 };
 
 /**
  * Изменить порядок нескольких записей в очереди
  */
 export const reorderQueue = async (queueId, entryOrders) => {
-  const response = await fetch(`${API_BASE}/queue/reorder`, {
-    method: 'PUT',
-    headers: createHeaders(),
-    body: JSON.stringify({
+  try {
+    const response = await api.put('/queue/reorder', {
       queue_id: queueId,
-      entry_orders: entryOrders
-    })
-  });
-
-  if (!response.ok) {
+      entry_orders: entryOrders,
+    });
+    return response.data;
+  } catch (error) {
     throw new Error('Не удалось изменить порядок очереди. Проверьте соединение и попробуйте снова.');
   }
-
-  return response.json();
 };
 
 /**

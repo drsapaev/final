@@ -1,5 +1,6 @@
 import logger from '../utils/logger';
-import tokenManager from '../utils/tokenManager';
+// UX Audit: миграция raw fetch() → api/client.js.
+import { api } from '../api/client';
 
 /**
  * PWA утилиты для регистрации Service Worker и управления PWA функциями
@@ -111,20 +112,9 @@ export async function subscribeToPushNotifications() {
 // Отправка подписки на сервер
 async function sendSubscriptionToServer(subscription) {
   try {
-    const response = await fetch('/api/v1/mobile/notifications/subscribe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-      },
-      body: JSON.stringify(subscription)
-    });
-
-    if (response.ok) {
-      logger.log('Подписка отправлена на сервер');
-    } else {
-      logger.error('Ошибка отправки подписки на сервер');
-    }
+    // UX Audit: api.post() автоматически добавляет Authorization + Content-Type headers.
+    await api.post('/mobile/notifications/subscribe', subscription);
+    logger.log('Подписка отправлена на сервер');
   } catch (error) {
     logger.error('Ошибка отправки подписки:', error);
   }
