@@ -91,10 +91,10 @@ const Progress = React.forwardRef(({
   function getProgressColor(variant) {
     const colorMap = {
       default: 'var(--mac-accent-blue)',
-      primary: '#007aff',
-      success: '#34c759',
-      warning: '#ff9500',
-      danger: '#ff3b30'
+      primary: 'var(--mac-accent-blue)',
+      success: 'var(--mac-success)',
+      warning: 'var(--mac-warning)',
+      danger: 'var(--mac-error)'
     };
     return colorMap[variant] || colorMap.default;
   }
@@ -193,10 +193,10 @@ export const CircularProgress = React.forwardRef(({
   function getProgressColor(variant) {
     const colorMap = {
       default: 'var(--mac-accent-blue)',
-      primary: '#007aff',
-      success: '#34c759',
-      warning: '#ff9500',
-      danger: '#ff3b30'
+      primary: 'var(--mac-accent-blue)',
+      success: 'var(--mac-success)',
+      warning: 'var(--mac-warning)',
+      danger: 'var(--mac-error)'
     };
     return colorMap[variant] || colorMap.default;
   }

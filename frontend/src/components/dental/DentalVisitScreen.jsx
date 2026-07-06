@@ -195,7 +195,7 @@ const ToothSummary = ({ toothStatus }) => {
       {teeth.map(([toothNum, data]) => {
         const status = data?.status || 'healthy';
         const label = TOOTH_STATUS_LABELS[status] || status;
-        const color = TOOTH_STATUS_COLORS[status] || '#9e9e9e';
+        const color = TOOTH_STATUS_COLORS[status] || 'var(--mac-text-tertiary)';
         const procedures = Array.isArray(data?.procedures) ? data.procedures : [];
         return (
           <Badge

@@ -69,7 +69,7 @@ const Badge = React.forwardRef(({
       border: '1px solid var(--mac-danger)'
     },
     info: {
-      backgroundColor: '#5ac8fa',
+      backgroundColor: 'var(--mac-accent-blue-light)',
       color: 'white',
       border: '1px solid #5ac8fa'
     },

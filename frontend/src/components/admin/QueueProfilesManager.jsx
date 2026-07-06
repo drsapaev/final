@@ -74,7 +74,7 @@ const PRESET_COLORS = [
     '#DD6B20', // Orange
     '#718096', // Gray
     '#D53F8C', // Pink
-    '#4A5568', // Dark gray
+    'var(--mac-text-secondary)', // Dark gray
 ];
 
 const QueueProfilesManager = ({ theme = 'light' }) => {

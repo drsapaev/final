@@ -227,7 +227,7 @@ const MacOSDemo = () => {
               aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
               title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
 
-                  <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? 'var(--mac-warning)' : '#5ac8fa' }} />
+                  <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? 'var(--mac-warning)' : 'var(--mac-accent-blue-light)' }} />
                 </Button>
               </div>
             </header>

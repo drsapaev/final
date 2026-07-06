@@ -37,7 +37,7 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
     color: 'var(--mac-text-secondary)'
   };
 
-  const statusColor = status === 'online' ? '#34c759' : status === 'busy' ? '#ff3b30' : status === 'away' ? '#ffcc00' : null;
+  const statusColor = status === 'online' ? 'var(--mac-success)' : status === 'busy' ? 'var(--mac-error)' : status === 'away' ? 'var(--mac-warning)' : null;
 
   return (
     <div className={`mac-avatar ${className}`} style={{ ...containerStyle, ...style }} title={name}>

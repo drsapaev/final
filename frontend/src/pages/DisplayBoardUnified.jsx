@@ -499,7 +499,7 @@ export default function DisplayBoardUnified({
       background: 'linear-gradient(135deg, var(--mac-bg-secondary) 0%, var(--mac-border) 100%)',
       cardBg: 'var(--mac-bg-primary)',
       textPrimary: '#1a202c',
-      textSecondary: '#4a5568',
+      textSecondary: 'var(--mac-text-secondary)',
       border: 'var(--mac-border)'
     },
     dark: {
@@ -507,13 +507,13 @@ export default function DisplayBoardUnified({
       cardBg: '#2d3748',
       textPrimary: '#f7fafc',
       textSecondary: '#a0aec0',
-      border: '#4a5568'
+      border: 'var(--mac-text-secondary)'
     },
     medical: {
       background: 'linear-gradient(135deg, #f0fff4 0%, var(--mac-success-bg) 100%)',
       cardBg: 'var(--mac-bg-primary)',
       textPrimary: '#1a202c',
-      textSecondary: '#4a5568',
+      textSecondary: 'var(--mac-text-secondary)',
       border: '#c6f6d5'
     }
   };

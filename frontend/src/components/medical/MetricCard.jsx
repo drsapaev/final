@@ -37,7 +37,7 @@ const MetricCard = ({
     },
     orange: {
       bg: isDark ? '#9a3412' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-warning), transparent 50%))',
-      text: isDark ? '#fdba74' : '#ea580c',
+      text: isDark ? '#fdba74' : 'var(--mac-warning)',
       icon: isDark ? '#fb923c' : '#f97316'
     },
     red: {

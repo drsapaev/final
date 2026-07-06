@@ -68,7 +68,7 @@ const Button = React.forwardRef(({
         border: '1px solid rgba(0, 0, 0, 0.1)'
       },
       primary: {
-        backgroundColor: '#007aff',
+        backgroundColor: 'var(--mac-accent-blue)',
         color: 'white',
         border: '1px solid #007aff',
         boxShadow: '0 2px 8px rgba(0, 122, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.12)',
@@ -83,19 +83,19 @@ const Button = React.forwardRef(({
         WebkitBackdropFilter: 'blur(10px)'
       },
       success: {
-        backgroundColor: '#34c759',
+        backgroundColor: 'var(--mac-success)',
         color: 'white',
         border: '1px solid #34c759',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       warning: {
-        backgroundColor: '#ff9500',
+        backgroundColor: 'var(--mac-warning)',
         color: 'white',
         border: '1px solid #ff9500',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       danger: {
-        backgroundColor: '#ff3b30',
+        backgroundColor: 'var(--mac-error)',
         color: 'white',
         border: '1px solid #ff3b30',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
@@ -116,7 +116,7 @@ const Button = React.forwardRef(({
       },
       link: {
         backgroundColor: 'transparent',
-        color: '#007aff',
+        color: 'var(--mac-accent-blue)',
         border: 'none',
         padding: '4px 8px',
         textDecoration: 'none'

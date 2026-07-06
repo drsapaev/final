@@ -53,7 +53,7 @@ const SESSION_COLORS = [
   'var(--mac-error)', // red
   '#8B5CF6', // violet
   '#EC4899', // pink
-  '#06B6D4', // cyan
+  'var(--mac-accent-blue-light)', // cyan
   '#84CC16' // lime
 ];
 

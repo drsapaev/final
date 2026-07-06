@@ -146,7 +146,7 @@ const Select = React.forwardRef(({
   const item = (isActive) => ({
     padding: '8px 12px',
     fontSize: '13px',
-    color: isActive ? '#ffffff' : 'var(--mac-text-primary)',
+    color: isActive ? 'var(--mac-bg-primary)' : 'var(--mac-text-primary)',
     background: isActive ? 'var(--mac-accent-blue-600)' : 'transparent',
     cursor: 'pointer',
     display: 'block'

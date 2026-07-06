@@ -227,7 +227,7 @@ const DoctorCalendar = ({
     dayHeader: {
       padding: '12px 8px',
       textAlign: 'center',
-      backgroundColor: isDark ? 'var(--mac-bg-secondary)' : '#f5f5f7',
+      backgroundColor: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-secondary)',
       fontSize: 'var(--mac-font-size-xs)',
       fontWeight: 'var(--mac-font-weight-semibold)',
       color: isDark ? 'var(--mac-text-secondary)' : '#6e6e73'
@@ -271,7 +271,7 @@ const DoctorCalendar = ({
     },
     slotBooked: {
       backgroundColor: isDark ? 'rgba(255, 69, 58, 0.2)' : 'rgba(255, 69, 58, 0.1)',
-      color: isDark ? '#ff453a' : '#d70015'
+      color: isDark ? 'var(--mac-error)' : '#d70015'
     },
     loading: {
       display: 'flex',
