@@ -62,6 +62,18 @@ def test_dynamic_pricing_service_avoids_direct_orm_calls() -> None:
 
 
 def test_qr_queue_service_avoids_direct_session_calls() -> None:
+    # R-17: qr_queue_api_service.py удалён (мёртвый код — router не зарегистрирован,
+    # символы не импортируются). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "qr_queue_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("qr_queue_api_service.py was removed (R-17 dead code cleanup)")
+
     logic = _service_logic_block("qr_queue")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
@@ -92,6 +104,18 @@ def test_registrar_integration_service_avoids_direct_session_calls() -> None:
 
 
 def test_doctor_integration_service_avoids_direct_session_calls() -> None:
+    # R-17: doctor_integration_api_service.py удалён (мёртвый код — router не зарегистрирован,
+    # символы не импортируются). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "doctor_integration_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("doctor_integration_api_service.py was removed (R-17 dead code cleanup)")
+
     logic = _service_logic_block("doctor_integration")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
@@ -236,6 +260,18 @@ def test_analytics_simple_service_avoids_direct_session_calls() -> None:
 
 
 def test_payment_webhooks_service_avoids_direct_session_calls() -> None:
+    # R-17: payment_webhooks_api_service.py удалён (мёртвый код — router не зарегистрирован,
+    # символы не импортируются). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "payment_webhooks_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("payment_webhooks_api_service.py was removed (R-17 dead code cleanup)")
+
     logic = _service_logic_block("payment_webhooks")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
@@ -274,6 +310,18 @@ def test_appointment_flow_service_uses_patient_emr_iam_facades() -> None:
 
 
 def test_patients_service_avoids_direct_session_calls() -> None:
+    # R-17: patients_api_service.py удалён (мёртвый код — router не зарегистрирован,
+    # символы не импортируются). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "patients_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("patients_api_service.py was removed (R-17 dead code cleanup)")
+
     logic = _service_logic_block("patients")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
@@ -391,6 +439,18 @@ def test_authentication_service_avoids_direct_session_calls() -> None:
 
 
 def test_payment_settings_service_avoids_direct_session_calls() -> None:
+    # R-17: payment_settings_api_service.py удалён (мёртвый код — router не зарегистрирован,
+    # символы не импортируются). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "payment_settings_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("payment_settings_api_service.py was removed (R-17 dead code cleanup)")
+
     logic = _service_logic_block("payment_settings")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
@@ -418,6 +478,18 @@ def test_auth_service_avoids_direct_session_calls() -> None:
 
 
 def test_online_queue_new_service_avoids_direct_session_calls() -> None:
+    # R-17: online_queue_new_api_service.py удалён (мёртвый код — router не зарегистрирован,
+    # символы не импортируются). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "online_queue_new_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("online_queue_new_api_service.py was removed (R-17 dead code cleanup)")
+
     logic = _service_logic_block("online_queue_new")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
@@ -463,6 +535,18 @@ def test_ai_tracking_service_avoids_direct_session_calls() -> None:
 
 
 def test_simple_auth_service_avoids_direct_session_calls() -> None:
+    # R-17: simple_auth_api_service.py удалён (мёртвый код — router не зарегистрирован,
+    # символы не импортируются). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "simple_auth_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("simple_auth_api_service.py was removed (R-17 dead code cleanup)")
+
     logic = _service_logic_block("simple_auth")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
@@ -472,6 +556,18 @@ def test_simple_auth_service_avoids_direct_session_calls() -> None:
 
 
 def test_minimal_auth_service_avoids_direct_session_calls() -> None:
+    # R-17: minimal_auth_api_service.py удалён (мёртвый код — router не зарегистрирован,
+    # символы не импортируются). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "minimal_auth_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("minimal_auth_api_service.py was removed (R-17 dead code cleanup)")
+
     logic = _service_logic_block("minimal_auth")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
