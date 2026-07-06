@@ -134,6 +134,30 @@ async def generate_scheduled_report(ctx, *, report_type: str, filters: dict | No
     logger.info("job.generate_scheduled_report complete (stub)")
 
 
+async def run_lab_follow_up_reminders(ctx) -> None:
+    """Send lab follow-up reminders. See lab_notification_service.send_follow_up_reminders.
+
+    Runs daily — checks for lab orders with upcoming follow-up dates and
+    sends reminders to patients 3 days before the scheduled follow-up.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from app.services.lab_notification_service import LabNotificationService
+
+    logger.info("job.run_lab_follow_up_reminders starting")
+    engine = create_engine(str(settings.DATABASE_URL))
+    db = Session(engine)
+    try:
+        svc = LabNotificationService(db)
+        result = await svc.send_follow_up_reminders(days_before=3)
+        logger.info("job.run_lab_follow_up_reminders complete: %s", result)
+    except Exception:
+        db.rollback()
+        logger.exception("job.run_lab_follow_up_reminders failed")
+    finally:
+        db.close()
+
+
 # ---------------------------------------------------------------------------
 # Worker lifecycle
 # ---------------------------------------------------------------------------
@@ -194,7 +218,7 @@ class WorkerSettings:
         arq app.tasks.worker.WorkerSettings
     """
 
-    functions = [send_visit_reminder, run_data_retention, generate_scheduled_report]
+    functions = [send_visit_reminder, run_data_retention, generate_scheduled_report, run_lab_follow_up_reminders]
 
     on_startup = startup
     on_shutdown = shutdown
@@ -210,8 +234,9 @@ class WorkerSettings:
     # Cron jobs — run on the schedule, regardless of enqueues
     cron_jobs = [
         cron(run_data_retention, hour=3, minute=0),  # Daily 03:00 UTC
+        cron(run_lab_follow_up_reminders, hour=8, minute=0),  # Daily 08:00 UTC
     ]
 
 
 # Make functions importable from app.tasks (for scheduler.py)
-__all__ = ["send_visit_reminder", "run_data_retention", "generate_scheduled_report"]
+__all__ = ["send_visit_reminder", "run_data_retention", "generate_scheduled_report", "run_lab_follow_up_reminders"]
