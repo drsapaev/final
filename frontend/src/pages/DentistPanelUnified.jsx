@@ -56,6 +56,7 @@ import { printPanelTicket } from '../services/panelPrint';
 import notify from '../services/notify';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
+import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import {
   DENTIST_DOCUMENTS_STORAGE_KEY,
@@ -453,6 +454,13 @@ const DentistPanelUnified = () => {
         window.location.href = '/login';
       }
     },
+  });
+
+  // Deferred #2: keyboard shortcuts for tab switching, refresh, clear selection.
+  useDentalHotkeys({
+    handleTabChange,
+    refreshData: () => loadDentistryAppointments(true),
+    clearSelection: () => setSelectedPatient(null),
   });
 
   // Загрузка данных

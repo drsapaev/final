@@ -53,6 +53,7 @@ import tokenManager from '../utils/tokenManager';
 import notify from '../services/notify';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
+import { useDermaHotkeys } from '../hooks/useDermaHotkeys';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import {
   countAppointmentsByStatuses,
@@ -194,6 +195,16 @@ const DermatologistPanelUnified = () => {
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
+    },
+  });
+
+  // Deferred #2: keyboard shortcuts for tab switching, refresh, clear selection.
+  useDermaHotkeys({
+    handleTabChange,
+    refreshData: () => loadDermatologyAppointments(true),
+    clearSelection: () => {
+      setSelectedPatient(null);
+      setCurrentAppointment(null);
     },
   });
   const location = useLocation();
