@@ -68,7 +68,7 @@ class Settings(BaseSettings):
         description="Legacy JWT helper secret. Defaults to SECRET_KEY when unset.",
     )
     AUTH_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 minutes — use refresh tokens for longer sessions
     ENABLE_FALLBACK_AUTH: bool = Field(
         default=False,
         description="Enable legacy/fallback auth login endpoints. Keep false outside explicit break-glass/dev use.",
@@ -541,6 +541,21 @@ def get_settings() -> Settings:
                 warnings_list.append(
                     f"CORS origin '{origin}' should use HTTPS in production."
                 )
+
+        # 6. ENABLE_FALLBACK_AUTH must be False in production (2FA bypass risk)
+        if s.ENABLE_FALLBACK_AUTH:
+            errors.append(
+                "ENABLE_FALLBACK_AUTH must be False in production. "
+                "Legacy/fallback login endpoints bypass 2FA, account lockout, "
+                "and login-attempt logging. Set ENABLE_FALLBACK_AUTH=false."
+            )
+
+        # 7. DISABLE_2FA_REQUIREMENT must not be set in production
+        if os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes"):
+            errors.append(
+                "DISABLE_2FA_REQUIREMENT must not be set in production. "
+                "This env var disables 2FA enforcement for Admin/Cashier roles."
+            )
 
         # === OUTPUT WARNINGS ===
         for warning in warnings_list:
