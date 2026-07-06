@@ -14,7 +14,6 @@
  */
 
 // Hook
-export { useEMRAI } from './useEMRAI';
 
 // Sidebar panel
 export { AISuggestionCard } from './AISuggestionCard';

@@ -15,7 +15,7 @@ import { Camera, X, Image as ImageIcon, Sparkles } from 'lucide-react';
 import EMRSection from '../EMRSection';
 
 import EMRSmartFieldV2 from '../EMRSmartFieldV2';
-import { useEMRAI } from '../../ai/useEMRAI';
+import { useEMRAI } from '../../../../hooks/useEMRAI';
 import { MCP_PROVIDERS } from '../../../../constants/ai';
 import logger from '../../../../utils/logger';
 import './DermatologySection.css';
