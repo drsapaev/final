@@ -201,20 +201,11 @@ class RegistrarNotificationService:
                 roles=["registrar"],
                 deep_link="/registrar",
             )
-
-            # Отправляем уведомления
-            results = []
-            for registrar in registrars:
-                result = await self._send_notification_to_registrar(
-                    registrar, message, "new_appointment"
-                )
-                results.append(result)
-
             return {
                 "success": True,
                 "message": f"Уведомления отправлены {len(registrars)} регистраторам",
                 "canonical_created": canonical_created,
-                "results": results,
+                "results": [],  # canonical delivery handles fan-out
             }
 
         except Exception as e:
@@ -297,15 +288,6 @@ class RegistrarNotificationService:
                 roles=["registrar"],
                 deep_link="/registrar",
             )
-
-            # Отправляем уведомления
-            results = []
-            for registrar in registrars:
-                result = await self._send_notification_to_registrar(
-                    registrar, message, "price_change"
-                )
-                results.append(result)
-
             # Обновляем статус уведомления
             price_override.notification_sent = True
             price_override.notification_sent_at = datetime.utcnow()
@@ -315,7 +297,7 @@ class RegistrarNotificationService:
                 "success": True,
                 "message": f"Уведомления об изменении цены отправлены {len(registrars)} регистраторам",
                 "canonical_created": canonical_created,
-                "results": results,
+                "results": [],  # canonical delivery handles fan-out
             }
 
         except Exception as e:
@@ -411,20 +393,11 @@ class RegistrarNotificationService:
                 roles=["registrar"],
                 deep_link="/registrar",
             )
-
-            # Отправляем уведомления
-            results = []
-            for registrar in registrars:
-                result = await self._send_notification_to_registrar(
-                    registrar, message, "queue_status"
-                )
-                results.append(result)
-
             return {
                 "success": True,
                 "message": f"Уведомления о статусе очереди отправлены {len(registrars)} регистраторам",
                 "canonical_created": canonical_created,
-                "results": results,
+                "results": [],  # canonical delivery handles fan-out
             }
 
         except Exception as e:
@@ -486,20 +459,11 @@ class RegistrarNotificationService:
                 roles=["registrar", "admin"],
                 deep_link="/registrar",
             )
-
-            # Отправляем уведомления
-            results = []
-            for registrar in registrars:
-                result = await self._send_notification_to_registrar(
-                    registrar, formatted_message, "system_alert"
-                )
-                results.append(result)
-
             return {
                 "success": True,
                 "message": f"Системные уведомления отправлены {len(registrars)} регистраторам",
                 "canonical_created": canonical_created,
-                "results": results,
+                "results": [],  # canonical delivery handles fan-out
             }
 
         except Exception as e:
@@ -562,20 +526,11 @@ class RegistrarNotificationService:
                 roles=["registrar"],
                 deep_link="/registrar",
             )
-
-            # Отправляем сводку
-            results = []
-            for registrar in registrars:
-                result = await self._send_notification_to_registrar(
-                    registrar, message, "daily_summary"
-                )
-                results.append(result)
-
             return {
                 "success": True,
                 "message": f"Ежедневная сводка отправлена {len(registrars)} регистраторам",
                 "canonical_created": canonical_created,
-                "results": results,
+                "results": [],  # canonical delivery handles fan-out
             }
 
         except Exception as e:
@@ -665,43 +620,12 @@ class RegistrarNotificationService:
                 deep_link="/registrar",
             )
 
-            results = []
-            for registrar in registrars:
-                try:
-                    result = await self._send_notification_to_registrar(
-                        registrar=registrar,
-                        message=message,
-                        notification_type="services_assigned",
-                    )
-                    results.append(
-                        {
-                            "registrar_id": registrar.id,
-                            "registrar_name": (
-                                registrar.full_name
-                                if hasattr(registrar, 'full_name')
-                                else registrar.username
-                            ),
-                            **result,
-                        }
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Ошибка отправки уведомления регистратору {registrar.id}: {e}"
-                    )
-                    results.append(
-                        {
-                            "registrar_id": registrar.id,
-                            "success": False,
-                            "error": str(e),
-                        }
-                    )
-
-            success_count = sum(1 for r in results if r.get("success", False))
+            success_count = len(registrars)  # canonical delivery handles fan-out
 
             return {
                 "success": True,
                 "message": f"Уведомление отправлено {success_count} из {len(registrars)} регистраторов",
-                "results": results,
+                "results": [],  # canonical delivery handles fan-out
                 "canonical_created": canonical_created,
                 "appointment_id": appointment.id,
                 "patient_name": patient_name,
@@ -720,80 +644,6 @@ class RegistrarNotificationService:
 
     # ===================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====================
 
-    async def _send_notification_to_registrar(
-        self, registrar: User, message: str, notification_type: str
-    ) -> dict[str, Any]:
-        """Отправляет уведомление конкретному регистратору"""
-        try:
-            results = {"telegram": False, "email": False, "sms": False}
-
-            # Проверяем настройки уведомлений пользователя
-            notification_settings = getattr(registrar, 'notification_settings', None)
-
-            # Отправляем через Telegram
-            if hasattr(registrar, 'telegram_id') and registrar.telegram_id:
-                try:
-                    await self.telegram_service.send_message(
-                        user_id=registrar.telegram_id, text=message
-                    )
-                    results["telegram"] = True
-                except Exception as e:
-                    logger.error(
-                        f"Ошибка отправки Telegram уведомления регистратору {registrar.id}: {e}"
-                    )
-
-            # Отправляем email (если включено в настройках)
-            if (
-                registrar.email
-                and notification_settings
-                and getattr(notification_settings, 'email_system_updates', True)
-            ):
-                try:
-                    await self.email_sms_service.send_email(
-                        to_email=registrar.email,
-                        subject=f"Уведомление регистратуры - {notification_type}",
-                        body=message,
-                        is_html=False,
-                    )
-                    results["email"] = True
-                except Exception as e:
-                    logger.error(
-                        f"Ошибка отправки email уведомления регистратору {registrar.id}: {e}"
-                    )
-
-            # Отправляем SMS для критических уведомлений
-            if (
-                notification_type in ["system_alert", "price_change"]
-                and hasattr(registrar, 'phone')
-                and registrar.phone
-                and notification_settings
-                and getattr(notification_settings, 'sms_emergency', True)
-            ):
-                try:
-                    # Сокращаем сообщение для SMS
-                    sms_message = (
-                        message[:160] + "..." if len(message) > 160 else message
-                    )
-                    await self.email_sms_service.send_sms(
-                        phone_number=registrar.phone, message=sms_message
-                    )
-                    results["sms"] = True
-                except Exception as e:
-                    logger.error(
-                        f"Ошибка отправки SMS уведомления регистратору {registrar.id}: {e}"
-                    )
-
-            return {
-                "success": any(results.values()),
-                "registrar_id": registrar.id,
-                "channels": results,
-            }
-
-        except Exception as e:
-            logger.error(
-                f"Ошибка отправки уведомления регистратору {registrar.id}: {e}"
-            )
-            return {"success": False, "registrar_id": registrar.id, "error": str(e)}
 
     async def _collect_daily_stats(self, target_date: date) -> dict[str, Any]:
         """Собирает статистику за день"""
