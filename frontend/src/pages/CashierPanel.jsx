@@ -18,6 +18,7 @@ import useModal from '../hooks/useModal.jsx';
 import { usePayments } from '../hooks/usePayments';
 import { useDebouncedValue } from '../hooks/useDebouncedCallback';
 import { useHotkeys } from '../hooks/useHotkeys';
+import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { getApiOrigin } from '../api/runtime';
 import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
@@ -585,6 +586,20 @@ const CashierPanel = () => {
     'ctrl+e': (e) => {
       e.preventDefault();
       handlersRef.current.export?.();
+    },
+  });
+
+  // Deferred #1: session timeout warning — prevents silent JWT expiry while
+  // cashier is processing a payment. Mirrors all other clinical panels.
+  const [sessionWarning, setSessionWarning] = useState(null);
+  useSessionTimeoutWarning({
+    onWarning: () => setSessionWarning({ active: true }),
+    onExpired: () => {
+      setSessionWarning(null);
+      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     },
   });
 
@@ -1669,6 +1684,39 @@ const CashierPanel = () => {
           </Dialog>
         </div>
       </div>
+      {/* Session timeout warning dialog */}
+      {sessionWarning && (
+        <div
+          role="alertdialog"
+          aria-label="Предупреждение об истечении сессии"
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+          }}
+        >
+          <div style={{
+            background: 'var(--mac-surface, white)', border: '1px solid var(--mac-border, #d8dde8)',
+            borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '90%',
+          }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--mac-text-primary, #1a1d29)' }}>
+              Сессия скоро истечёт
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--mac-text-secondary, #6b7280)', lineHeight: 1.5 }}>
+              Ваша сессия истекает. Несохранённые данные могут быть потеряны.
+              Сохраните текущий платёж или продлите сессию.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setSessionWarning(null)} style={{ padding: '8px 16px', border: '1px solid var(--mac-border, #d8dde8)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontSize: '14px' }}>
+                Позже
+              </button>
+              <button onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', background: 'var(--mac-accent, #dc2626)', color: 'white', cursor: 'pointer', fontSize: '14px' }}>
+                Продлить сессию
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
     </div>);

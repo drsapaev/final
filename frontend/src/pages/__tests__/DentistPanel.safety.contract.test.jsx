@@ -49,11 +49,8 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
     expect(source).toContain('window.location.href = \'/login\'');
 
     // Warning dialog must be rendered when sessionWarning is truthy.
-    // PR #1910 extracted inline dialog to <SessionWarningModal /> component.
-    // Test updated to check for component usage instead of inline text.
-    expect(source).toMatch(/sessionWarning\s*&&\s*[{(]/);
-    expect(source).toContain('<SessionWarningModal');
-    expect(source).toContain('import SessionWarningModal');
+    expect(source).toMatch(/sessionWarning\s*&&\s*\(/);
+    expect(source).toContain('Предупреждение об истечении сессии');
   });
 
   it('C-3: defines CRITICAL_ICD10_CODES for dental K04/K10 diagnoses', () => {

@@ -100,16 +100,39 @@ export function BloodTestsTab({
 
   return (
     <div className="cardio-flex-col-visible" style={{ gap: '24px' }}>
+      {/* Legacy notice — CardioBloodTest is deprecated in favor of LabResultsSection */}
+      <div style={{
+        padding: '12px 16px',
+        background: 'rgba(255, 149, 0, 0.08)',
+        border: '1px solid rgba(255, 149, 0, 0.3)',
+        borderRadius: '10px',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '10px',
+      }}>
+        <TestTube size={18} style={{ color: 'var(--mac-warning)', flexShrink: 0, marginTop: '2px' }} />
+        <div>
+          <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-warning)' }}>
+            Ручной ввод анализов — устаревший режим
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
+            Для новых анализов используйте раздел «Результаты анализов» в карте приёма (EMR) —
+            кнопка «Заказать анализы» отправляет заказ напрямую в лабораторию.
+            Исторические данные остаются доступны ниже.
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <MacOSCard className="cardio-card-padded">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('lg') }}>
           <h3 style={{ display: 'flex', alignItems: 'center', fontSize: getFontSize('lg'), fontWeight: '500', color: getColor('text') }}>
             <TestTube size={20} style={{ marginRight: getSpacing('sm'), color: getColor('secondary', 600) }} />
-            Анализы крови
+            Анализы крови (история)
           </h3>
-          <Button onClick={onNewTest}>
+          <Button onClick={onNewTest} title="Ручной ввод — используйте только если лаборатория недоступна">
             <Plus size={16} className="cardio-icon-mr" />
-            Новый анализ
+            Ручной ввод
           </Button>
         </div>
 
