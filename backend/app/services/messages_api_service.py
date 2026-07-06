@@ -16,7 +16,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
-from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message
+from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message, can_send_message_with_clinic
 from app.core.messaging_contract import MessageEventType
 from app.models.file_system import File as FileModel
 from app.models.file_system import FileType
@@ -127,7 +127,13 @@ class MessagesApiService:
 
         sender_role = current_user.role or "Patient"
         recipient_role = recipient.role or "Patient"
-        if not can_send_message(sender_role, recipient_role):
+        # F-002: tenant-aware check
+        if not can_send_message_with_clinic(
+            sender_role,
+            recipient_role,
+            sender_clinic_id=getattr(current_user, "clinic_id", None),
+            recipient_clinic_id=getattr(recipient, "clinic_id", None),
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="Нет прав для отправки сообщения этому пользователю",
@@ -594,7 +600,8 @@ class MessagesApiService:
             ),
             sender_id=current_user.id,
         )
-        message_obj.content = f"/api/v1/messages/download/{safe_filename}?name={original_filename}"
+        # F-004: URL с message_id для прямой авторизации при скачивании
+        message_obj.content = f"/api/v1/messages/download/{message_obj.id}/{safe_filename}?name={original_filename}"
         message_obj.message_type = (
             "image" if (file.content_type or "").startswith("image") else "file"
         )
@@ -662,11 +669,22 @@ from app.schemas.message import (  # noqa: E402  # manual-review: conditional im
     UnreadCountResponse,
 )
 
+# F-005: Rate limiting на REST endpoints чата
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    _chat_limiter = Limiter(key_func=get_remote_address)
+except ImportError:
+    _chat_limiter = None
+    logger.warning("slowapi not installed, chat REST rate limiting disabled")
+
 router = APIRouter()
 
 
 @router.post("/send", response_model=MessageOut)
+@_chat_limiter.limit("10/minute") if _chat_limiter else (lambda f: f)
 async def send_message(
+    request: Request,
     request: Request,
     message_data: MessageCreate,
     db: Session = Depends(get_db),
@@ -681,7 +699,9 @@ async def send_message(
 
 
 @router.get("/conversations", response_model=ConversationListResponse)
+@_chat_limiter.limit("30/minute") if _chat_limiter else (lambda f: f)
 async def get_conversations(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -690,8 +710,10 @@ async def get_conversations(
 
 
 @router.get("/conversation/{user_id}", response_model=MessageListResponse)
+@_chat_limiter.limit("30/minute") if _chat_limiter else (lambda f: f)
 async def get_conversation(
     user_id: int,
+    request: Request,
     skip: int = Query(0, ge=0, description="Пропустить N сообщений"),
     limit: int = Query(50, ge=1, le=100, description="Лимит сообщений"),
     db: Session = Depends(get_db),
@@ -764,6 +786,7 @@ async def get_available_users(
 
 
 @router.post("/send-voice", response_model=MessageOut)
+@_chat_limiter.limit("5/minute") if _chat_limiter else (lambda f: f)
 async def send_voice_message(
     request: Request,
     recipient_id: int = Form(...),
@@ -788,12 +811,16 @@ async def stream_voice_message(
         message_id=message_id,
         current_user=current_user,
     )
+    # F-003: attachment вместо inline + security headers (anti MIME-sniffing XSS)
     return FileResponse(
         payload["path"],
         media_type=payload["media_type"],
         headers={
             "Accept-Ranges": "bytes",
-            "Content-Disposition": f'inline; filename="{payload["content_disposition_filename"]}"',
+            "Content-Disposition": 'attachment; filename="voice_message"',
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "Content-Security-Policy": "default-src 'none'",
         },
     )
 
@@ -822,38 +849,81 @@ async def upload_file_message(
 
 
 @router.get("/download/{filename}")
+@router.get("/download/{message_id}/{filename}")
 async def download_chat_file(
     filename: str,
+    message_id: int | None = None,
     name: str = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    filename = _safe_chat_storage_filename(filename)
-    file_record = db.query(FileModel).filter(FileModel.filename == filename).first()
-    if file_record:
-        candidate_messages = (
-            db.query(Message).filter(Message.file_id == file_record.id).all()
-        )
+    """
+    Скачать файловое вложение.
+
+    F-004: при передаче message_id выполняется прямая авторизация
+    (current_user должен быть отправителем или получателем message_id,
+    filename должен соответствовать этому сообщению).
+
+    Без message_id (legacy mode) сохраняется старое поведение с
+    substring-поиском по Message.content — будет удалено после
+    полного перехода фронтенда на новый URL.
+    """
+    safe_filename = _safe_chat_storage_filename(filename)
+
+    if message_id is not None:
+        # F-004: прямая авторизация через message_id
+        message = db.query(Message).filter(Message.id == message_id).first()
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+
+        if current_user.id != message.sender_id and current_user.id != message.recipient_id:
+            logger.warning(
+                "UNAUTHORIZED_FILE_ACCESS user_id=%s message_id=%s filename=%s",
+                current_user.id, message_id, safe_filename,
+            )
+            raise HTTPException(status_code=403, detail="Нет доступа к этому файлу")
+
+        # Проверяем, что filename соответствует этому сообщению
+        if safe_filename not in (message.content or ""):
+            raise HTTPException(
+                status_code=400,
+                detail="Файл не соответствует указанному сообщению"
+            )
     else:
-        candidate_messages = (
-            db.query(Message)
-            .filter(Message.content.contains(f"/download/{filename}"))
-            .all()
+        # Legacy mode (без message_id) — substring-поиск, как раньше
+        file_record = db.query(FileModel).filter(FileModel.filename == safe_filename).first()
+        if file_record:
+            candidate_messages = (
+                db.query(Message).filter(Message.file_id == file_record.id).all()
+            )
+        else:
+            candidate_messages = (
+                db.query(Message)
+                .filter(Message.content.contains(f"/download/{safe_filename}"))
+                .all()
+            )
+
+        message = next(
+            (
+                item
+                for item in candidate_messages
+                if current_user.id == item.sender_id or current_user.id == item.recipient_id
+            ),
+            None,
         )
 
-    message = next(
-        (
-            item
-            for item in candidate_messages
-            if current_user.id == item.sender_id or current_user.id == item.recipient_id
-        ),
-        None,
+        if not message:
+            raise HTTPException(status_code=403, detail="Нет доступа к этому файлу")
+
+    file_path = _find_chat_upload_file(safe_filename)
+    # F-003: security headers для file-ответов
+    return FileResponse(
+        path=str(file_path),
+        filename=name or file_path.name,
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+        },
     )
-
-    if not message:
-        raise HTTPException(status_code=403, detail="Нет доступа к этому файлу")
-
-    file_path = _find_chat_upload_file(filename)
-    return FileResponse(path=str(file_path), filename=name or file_path.name)
 
 

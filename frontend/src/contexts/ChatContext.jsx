@@ -352,7 +352,7 @@ export const ChatProvider = ({ children }) => {
 
       const wsBase = getWsBaseUrl();
 
-      const wsUrl = `${wsBase}/ws/chat?token=${latestToken}`;
+      const wsUrl = `${wsBase}/ws/chat`;
 
       const ws = new WebSocket(wsUrl);
       activeSocket = ws;
@@ -362,9 +362,15 @@ export const ChatProvider = ({ children }) => {
           ws.close(1000, 'Unmount before open');
           return;
         }
+        // F-001: send auth as first message (token no longer in URL)
+        ws.send(JSON.stringify({
+          type: 'auth',
+          token: latestToken,
+          contract_version: MESSAGING_CONTRACT_VERSION,
+        }));
         setIsConnected(true);
         retryCountRef.current = 0;
-        logger.info('[FIX:WS] Chat WebSocket connected');
+        logger.info('[FIX:WS] Chat WebSocket connected (auth via first message)');
         void syncChatSnapshot();
         if (activeConversationRef.current) {
           requestOnlineStatus([activeConversationRef.current]);
@@ -435,6 +441,14 @@ export const ChatProvider = ({ children }) => {
         setTypingUsers({});
         setOnlineUsers({});
         if (!isMounted) {
+          return;
+        }
+        // F-001: 4001 = auth rejected (invalid/expired token) — don't reconnect with same token
+        if (e.code === 4001) {
+          logger.warning('[FIX:WS] Chat WebSocket auth rejected (4001), invalidating token');
+          if (tokenManager && typeof tokenManager.invalidateAccessToken === 'function') {
+            tokenManager.invalidateAccessToken();
+          }
           return;
         }
         // Если не нормальное закрытие (1000) - пробуем переподключиться

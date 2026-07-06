@@ -42,3 +42,9 @@ arq>=0.26.0,<0.27
 
 # XML parsing security — defusedxml protects against XXE attacks
 defusedxml>=0.7.1,<0.8
+
+# F-005: Rate limiting for chat REST endpoints
+slowapi==0.1.9
+
+# F-003: Magic bytes validation for audio uploads
+python-magic==0.4.27

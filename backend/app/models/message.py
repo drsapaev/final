@@ -31,6 +31,17 @@ class Message(Base):
         index=True
     )
 
+    # F-002: Tenant isolation — clinic/branch this message belongs to.
+    # NULL для backward compat (single-clinic deployments / legacy rows);
+    # в multi-tenant режиме NOT NULL + FK на clinics.id.
+    clinic_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("clinics.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        comment="Tenant isolation: clinic/branch this message belongs to"
+    )
+
     # Тип сообщения: "text" или "voice"
     message_type: Mapped[str] = mapped_column(
         String(20),
