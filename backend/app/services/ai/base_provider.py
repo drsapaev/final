@@ -98,7 +98,7 @@ class BaseAIProvider(ABC):
     def _format_error(self, error: Exception) -> str:
         """Форматирование ошибки"""
         logger.error(f"{self.provider_name} error: {str(error)}")
-        return f"Ошибка {self.provider_name}: {str(error)}"
+        return f"Ошибка AI провайдера"  # sanitized — full error logged above
 
     @abstractmethod
     async def differential_diagnosis(

@@ -83,7 +83,7 @@ class DeepSeekProvider(BaseAIProvider):
             return AIResponse(
                 content="",
                 provider=self.provider_name,
-                error=f"DeepSeek API error: {str(e)}",
+                error="DeepSeek API error",  # sanitized
             )
 
     async def analyze_complaint(
@@ -321,7 +321,7 @@ class DeepSeekProvider(BaseAIProvider):
                 }
 
         except Exception as e:
-            return {"error": f"Ошибка анализа изображения: {str(e)}"}
+            return {"error": "Ошибка анализа изображения"}  # sanitized
 
     # Реализация недостающих абстрактных методов
     async def analyze_medical_image_generic(

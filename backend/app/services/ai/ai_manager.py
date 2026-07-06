@@ -14,8 +14,14 @@ from .gemini_provider import GeminiProvider
 from .grok_provider import GrokProvider
 from .mock_provider import MockProvider
 from .openai_provider import OpenAIProvider
+from .pii_anonymizer import PIIAnonymizer
 
 logger = logging.getLogger(__name__)
+
+# PII anonymizer — strips patient PII before sending to external AI APIs.
+# This was previously only in AIGateway, but AIManager is used directly by
+# MCP servers and legacy /ai/* endpoints, bypassing the gateway.
+_pii_anonymizer = PIIAnonymizer()
 
 
 class AIProviderType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
@@ -35,6 +41,20 @@ class AIManager:
         self.providers: dict[AIProviderType, BaseAIProvider] = {}
         self.default_provider: AIProviderType | None = None
         self._initialize_providers()
+
+    @staticmethod
+    def _anonymize_patient_info(patient_info: dict | None) -> dict | None:
+        """Strip PII from patient_info before sending to external AI."""
+        if not patient_info:
+            return patient_info
+        return _pii_anonymizer.anonymize(patient_info or {})
+
+    @staticmethod
+    def _anonymize_text(text: str) -> str:
+        """Strip PII patterns (phones, emails, IINs) from free text."""
+        if not text:
+            return text
+        return _pii_anonymizer.anonymize({'text': text}).get('text', text)
 
     def _initialize_providers(self):
         """Инициализация доступных провайдеров"""
@@ -151,6 +171,9 @@ class AIManager:
         if not provider:
             return {"error": "No AI provider available"}
 
+        # Anonymize PII before sending to external AI provider
+        complaint = self._anonymize_text(complaint)
+        patient_info = self._anonymize_patient_info(patient_info)
         return await provider.analyze_complaint(complaint, patient_info)
 
     async def suggest_icd10(
@@ -177,6 +200,8 @@ class AIManager:
         if not provider:
             return {"error": "No AI provider available"}
 
+        # Anonymize PII before sending to external AI provider
+        patient_info = self._anonymize_patient_info(patient_info)
         return await provider.interpret_lab_results(results, patient_info)
 
     async def analyze_skin(

@@ -2694,7 +2694,7 @@ class OpenAIProvider(BaseAIProvider):
 
         except Exception as e:
             return {
-                "error": f"Ошибка транскрипции: {str(e)}",
+                "error": "Ошибка транскрипции",  # sanitized
                 "text": "",
                 "confidence": 0.0,
             }

@@ -424,17 +424,22 @@ class AIService:
         response: str,
         input_tokens: int,
     ):
-        """Логирование использования AI"""
+        """Логирование использования AI — без сохранения PII.
+
+        Ранее сохранялись prompt[:1000] и response[:2000] — это могло
+        содержать ФИО пациентов, телефоны, ИИН, диагнозы. Теперь
+        сохраняем только метаданные (размер, тип задачи, провайдер).
+        """
         try:
             log_data = {
                 "provider_id": provider_id,
                 "task_type": task_type,
-                "input_text": prompt[:1000],  # Ограничиваем размер
-                "output_text": response[:2000],
+                "input_text": None,  # PII redacted
+                "output_text": None,  # PII redacted
                 "input_tokens": input_tokens,
                 "output_tokens": len(response),
                 "status": "completed",
-                "response_time_ms": 1000,  # Заглушка
+                "response_time_ms": 1000,
             }
 
             crud_ai.create_usage_log(self.db, log_data)

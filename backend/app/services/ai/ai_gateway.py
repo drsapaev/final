@@ -228,7 +228,7 @@ class AIGateway(IAIGateway):
                 provider="none",
                 model="none",
                 latency_ms=latency_ms,
-                error=str(e),
+                error="AI service temporarily unavailable",  # sanitized
                 request_id=request_id
             )
 
@@ -279,7 +279,7 @@ class AIGateway(IAIGateway):
 
         except Exception as e:
             logger.exception(f"Streaming error: {e}")
-            yield f"[ERROR] {str(e)}"
+            yield "[ERROR] AI service temporarily unavailable"  # sanitized
 
     async def _execute_with_fallback(
         self,
@@ -325,7 +325,7 @@ class AIGateway(IAIGateway):
                 )
 
             except Exception as e:
-                error_msg = f"{provider_type.value}: {str(e)}"
+                error_msg = f"{provider_type.value}: failed"  # sanitized
                 errors.append(error_msg)
                 logger.warning(f"[{request_id}] Provider {provider_type.value} failed: {e}")
                 self._circuit_breaker.record_failure(provider_type.value)
@@ -338,7 +338,7 @@ class AIGateway(IAIGateway):
             provider="none",
             model="none",
             latency_ms=0,
-            error=f"All providers failed: {'; '.join(errors)}"
+            error="All AI providers failed"  # sanitized
         )
 
     def _get_provider_instance(self, provider_type: AIProviderType):
