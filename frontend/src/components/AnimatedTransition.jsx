@@ -242,7 +242,7 @@ export const AnimatedCard = ({
       borderRadius: 'var(--mac-radius-xl)',
       padding: 'var(--mac-spacing-6)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      boxShadow: 'var(--mac-shadow-lg)',
       ...style
     };
 
@@ -250,7 +250,7 @@ export const AnimatedCard = ({
       return {
         ...baseStyle,
         transform: 'translateY(-4px) scale(1.02)',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+        boxShadow: 'var(--mac-shadow-xl)'
       };
     }
 

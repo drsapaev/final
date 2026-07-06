@@ -126,7 +126,7 @@ function ToastItem({ toast, onRemove }) {
     const baseStyle = {
       padding: '1rem',
       borderRadius: 'var(--mac-radius-md)',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      boxShadow: 'var(--mac-shadow-md)',
       display: 'flex',
       alignItems: 'flex-start',
       gap: '0.5rem',

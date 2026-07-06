@@ -59,7 +59,7 @@ const MacOSMetricCard = ({
       background: 'var(--mac-bg-primary)',
       border: '1px solid var(--mac-border)',
       borderRadius: 'var(--mac-radius-lg)',
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+      boxShadow: 'var(--mac-shadow-sm)'
     }
   };
 
@@ -81,7 +81,7 @@ const MacOSMetricCard = ({
     background: currentVariant.background,
     border: currentVariant.border,
     borderRadius: currentVariant.borderRadius,
-    boxShadow: (isHovered || isFocused) && onClick ? '0 4px 12px rgba(0, 0, 0, 0.15)' : (currentVariant.boxShadow || 'none'),
+    boxShadow: (isHovered || isFocused) && onClick ? 'var(--mac-shadow-md)' : (currentVariant.boxShadow || 'none'),
     cursor: onClick ? 'pointer' : 'default',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     position: 'relative',

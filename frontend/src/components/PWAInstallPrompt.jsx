@@ -79,7 +79,7 @@ const PWAInstallPrompt = () => {
         right: 16, 
         zIndex: 1000,
         maxWidth: 350,
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+        boxShadow: 'var(--mac-shadow-md)'
       }}
     >
       <CardContent>

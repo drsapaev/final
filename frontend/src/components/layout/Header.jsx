@@ -89,7 +89,7 @@ export default function Header() {
     width: '100%',
     zIndex: 1000,
     boxShadow: theme === 'light' ?
-    '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' :
+    'var(--mac-shadow-md)' :
     '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
     boxSizing: 'border-box'
   };void
@@ -253,7 +253,7 @@ export default function Header() {
         backgroundColor: theme === 'light' ? 'color-mix(in srgb, white, transparent 10%)' : 'color-mix(in srgb, var(--mac-text-primary), transparent 10%)',
         borderColor: theme === 'light' ? getColor('gray', 200) : getColor('gray', 700),
         boxShadow: theme === 'light' ?
-        '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' :
+        'var(--mac-shadow-md)' :
         '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
         fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif',
         fontFeatureSettings: '"calt" 1, "liga" 1',
