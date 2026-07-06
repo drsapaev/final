@@ -86,10 +86,12 @@ describe('CashierPanel payment action contract', () => {
 
   it('does not route grouped cashier rows through the single-visit online widget', () => {
     const source = readCashierPanelSource();
+    // P-018 fix: aria-labels were localized to Russian (PHI removed).
+    // The block now ends at the Cash-button aria-label instead of the English one.
     const onlineActionBlock = extractSourceBlock(
       source,
       'onClick={() => openPaymentWidget(appointment)}',
-      'aria-label={`Take cash payment',
+      'aria-label="Принять оплату через кассу"',
     );
     const paymentWidgetBlock = extractSourceBlock(
       source,

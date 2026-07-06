@@ -538,7 +538,7 @@ function PreferenceRow({ checked, description, disabled, label, onChange }) {
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+        <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
           {label}
         </div>
         <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
@@ -892,7 +892,7 @@ export default function NotificationPreferences() {
               }}
             >
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                   {field.label}
                 </div>
                 <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
@@ -1006,7 +1006,7 @@ export default function NotificationPreferences() {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                     Временно отключить realtime до
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
@@ -1038,7 +1038,7 @@ export default function NotificationPreferences() {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                     Snooze realtime до
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
@@ -1118,7 +1118,7 @@ export default function NotificationPreferences() {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                     Окно DND (start/end)
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
@@ -1216,7 +1216,7 @@ export default function NotificationPreferences() {
           }}
         >
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+            <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
               Итог по изменениям
             </div>
             <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>

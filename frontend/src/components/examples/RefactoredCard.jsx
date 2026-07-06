@@ -299,7 +299,7 @@ export function CardExamples() {
         footer={
           <div style={{ display: 'flex', gap: spacing[3], width: '100%' }}>
             <button style={{ flex: 1, padding: spacing[3] }}>Cancel</button>
-            <button style={{ flex: 1, padding: spacing[3], background: colors.primary[500], color: '#fff' }}>
+            <button style={{ flex: 1, padding: spacing[3], background: colors.primary[500], color: 'var(--mac-bg-primary)' }}>
               Save
             </button>
           </div>

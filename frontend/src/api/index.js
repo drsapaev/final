@@ -12,3 +12,6 @@ export * from './adminSettings';
 
 // Совместимость со старыми импортами (`./api/queue`):
 export * from './queue';
+
+// UX Audit Registrar #1: registrar api (price-overrides, doctors, queue-settings, services).
+export * from './registrar';

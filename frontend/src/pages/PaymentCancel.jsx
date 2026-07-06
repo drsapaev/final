@@ -106,7 +106,7 @@ const PaymentCancel = () => {
       {/* Информация об ошибке */}
       {error &&
       <Alert severity="error" role="alert" style={{ marginBottom: 12 }}>
-          <Typography variant="body1" style={{ fontWeight: 600 }}>
+          <Typography variant="body1" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
             Детали ошибки:
           </Typography>
           <Typography variant="body2">

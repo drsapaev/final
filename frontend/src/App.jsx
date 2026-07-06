@@ -41,7 +41,6 @@ const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Audit = lazy(() => import('./pages/Audit.jsx'));
 const Scheduler = lazy(() => import('./pages/Scheduler.jsx'));
 const Appointments = lazy(() => import('./pages/Appointments.jsx'));
-const VisitDetails = lazy(() => import('./pages/VisitDetails.jsx'));
 const RegistrarPanel = lazy(() => import('./pages/RegistrarPanel.jsx'));
 const DoctorPanel = lazy(() => import('./pages/DoctorPanel.jsx'));
 const CardiologistPanelUnified = lazy(() => import('./pages/CardiologistPanelUnified.jsx'));
@@ -60,7 +59,6 @@ const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess.jsx'));
 const PaymentCancel = lazy(() => import('./pages/PaymentCancel.jsx'));
 const PaymentTest = lazy(() => import('./pages/PaymentTest.jsx'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage.jsx'));
-const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired.jsx'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView.jsx'));
 const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
@@ -89,7 +87,6 @@ const UnifiedReports = lazy(() => import('./components/admin/UnifiedReports.jsx'
 const UnifiedNotifications = lazy(() => import('./components/admin/UnifiedNotifications.jsx'));
 const UnifiedIntegrations = lazy(() => import('./components/admin/UnifiedIntegrations.jsx'));
 const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
-const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
 const UnifiedUserManagement = lazy(() => import('./components/admin/UnifiedUserManagement.jsx'));
 const AllFreeApproval = lazy(() => import('./components/admin/AllFreeApproval.jsx'));
@@ -126,9 +123,6 @@ const ROUTE_COMPONENTS = {
   Appointments,
   Search,
   UserProfile,
-  SecurityPage,
-  TwoFactorManager,
-  VisitDetails,
   PatientPickupView,
   MediLabDemo,
   MacOSDemoPage,
@@ -165,7 +159,7 @@ const ROUTE_COMPONENTS = {
 
 function LoadingScreen() {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: 'var(--mac-font-size-xl)' }}>
       Загрузка...
     </div>
   );
@@ -214,7 +208,7 @@ function AppShell({ children }) {
   return (
     <div className="app-shell" style={macOSWrapStyle} data-route-id={chrome.route?.id || 'unknown'}>
       {!chrome.hideHeader && (
-        <div style={{ padding: '12px', backgroundColor: 'transparent', width: '100%', maxWidth: '100%' }}>
+        <div style={{ padding: 'var(--mac-spacing-3)', backgroundColor: 'transparent', width: '100%', maxWidth: '100%' }}>
           <HeaderNew />
         </div>
       )}
@@ -255,7 +249,7 @@ function AppShell({ children }) {
                   zIndex: 10,
                   width: '28px',
                   height: '28px',
-                  borderRadius: '8px',
+                  borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border, rgba(0,0,0,0.1))',
                   backgroundColor: 'var(--mac-bg-secondary, rgba(0,0,0,0.04))',
                   color: 'var(--mac-text-primary)',

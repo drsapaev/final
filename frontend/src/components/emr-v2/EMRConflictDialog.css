@@ -6,7 +6,7 @@
 .emr-conflict-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: color-mix(in srgb, black, transparent 50%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -16,9 +16,9 @@
 
 /* Dialog */
 .emr-conflict-dialog {
-    background: #fff;
+    background: var(--mac-bg-primary);
     border-radius: 12px;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 40px color-mix(in srgb, black, transparent 80%);
     max-width: 480px;
     width: 100%;
     overflow: hidden;
@@ -59,7 +59,7 @@
 
 /* Info box */
 .emr-conflict-dialog__info {
-    background: #f5f5f5;
+    background: var(--mac-bg-secondary);
     border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 16px;
@@ -73,7 +73,7 @@
 }
 
 .emr-conflict-dialog__info-label {
-    color: #666;
+    color: var(--mac-text-secondary);
 }
 
 .emr-conflict-dialog__info-value {
@@ -143,7 +143,7 @@
 
 /* Secondary - Reload */
 .emr-conflict-btn--secondary {
-    background: #f5f5f5;
+    background: var(--mac-bg-secondary);
     color: #333;
     border: 1px solid #ddd;
 }
@@ -208,6 +208,6 @@
 .emr-conflict-dialog__loading {
     padding: 12px 24px 20px;
     text-align: center;
-    color: #666;
+    color: var(--mac-text-secondary);
     font-size: 0.9rem;
 }

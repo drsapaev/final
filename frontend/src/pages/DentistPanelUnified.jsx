@@ -6,13 +6,14 @@ import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   Button, Badge, Card,
-} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth.js';
 import { apiClient } from '../api/client';
 import AIAssistant from '../components/ai/AIAssistant';
 import TeethChart from '../components/dental/TeethChart';
 import ToothModal from '../components/dental/ToothModal';
+import DentalVisitScreen from '../components/dental/DentalVisitScreen';
 import TreatmentPlanner from '../components/dental/TreatmentPlanner';
 import PatientCard from '../components/dental/PatientCard';
 import DentalPriceManager from '../components/dental/DentalPriceManager';
@@ -40,7 +41,6 @@ import {
   Plus,
   Edit,
   XCircle,
-  Smile as ToothIcon,
   Smile,
   BarChart3,
   Users,
@@ -175,9 +175,10 @@ const DentistPanelUnified = () => {
     selectedPatient,
     setSelectedPatient,
   } = useDoctorPanelState({
-    defaultTab: 'appointments',
+    // Phase 4: sidebar reduced to 4 tabs — queue / visit / patients / photos.
+    defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
-    patientDeepLinkTab: 'appointments',
+    patientDeepLinkTab: 'patients',
   });
 
   const handleCardKeyDown = useCallback((event, action) => {
@@ -700,7 +701,7 @@ const DentistPanelUnified = () => {
         source: 'appointments'
       };
       setSelectedPatient(patientData);
-      handleTabChange('visits');
+      handleTabChange('visit');
     }
   };
 
@@ -776,7 +777,7 @@ const DentistPanelUnified = () => {
           };
           logger.info('[Dentist] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
-          handleTabChange('visits');
+          handleTabChange('visit');
         } catch (error) {
           logger.error('[Dentist] Ошибка при завершении приёма:', error);
         }
@@ -967,7 +968,7 @@ const DentistPanelUnified = () => {
           };
 
           setSelectedPatient(patientObj);
-          handleTabChange(patientObj.visit_id ? 'visits' : 'appointments');
+          handleTabChange(patientObj.visit_id ? 'visit' : 'patients');
           logger.info('[Dentist] Загружен пациент из URL:', patientObj.patient_name);
           return;
         }
@@ -990,7 +991,7 @@ const DentistPanelUnified = () => {
           };
 
           setSelectedPatient(patientObj);
-          handleTabChange(visitIdFromUrl ? 'visits' : 'appointments');
+          handleTabChange(visitIdFromUrl ? 'visit' : 'patients');
           const fallbackLogKey = `${patientIdFromUrl || ''}:${visitIdFromUrl || ''}`;
           if (!dentistFallbackLoggedKeys.has(fallbackLogKey)) {
             dentistFallbackLoggedKeys.add(fallbackLogKey);
@@ -1016,12 +1017,12 @@ const DentistPanelUnified = () => {
     setSelectedPatient(normalizedPatient);
 
     if (normalizedPatient.visit_id) {
-      handleTabChange('visits');
+      handleTabChange('visit');
       return;
     }
 
-    notify.info('Выберите визит с каноническим visit_id во вкладке "Записи".');
-    handleTabChange('appointments');
+    notify.info('У пациента нет активного визита. Откройте вкладку «Пациенты» для поиска.');
+    handleTabChange('patients');
   };
 
   // Сохранение EMR
@@ -1076,6 +1077,32 @@ const DentistPanelUnified = () => {
   //   - НЕ использовать row.id / selectedPatient.id напрямую
   //   - НЕ использовать /registrar/queue/${...}/start-visit
   //   - использовать resolveDoctorQueueEntryId + /doctor/queue/${queueEntryId}/complete
+  // C-3 (UX audit, port of cardio P-020): critical ICD-10 codes that require
+  // secondary confirmation before the visit can be completed. These are
+  // dental diagnoses with high clinical stakes — an erroneous entry could
+  // trigger unnecessary surgical intervention, hospitalization, or IV
+  // antibiotics. The doctor must explicitly confirm when one of these codes
+  // is present in the visit's icd10 field.
+  const CRITICAL_ICD10_CODES = useRef({
+    'K04': 'Заболевания пульпы и периапикальных тканей (пульпит, периодонтит)',
+    'K10': 'Заболевания челюстей (остеомиелит, абсцесс, киста)',
+  }).current;
+
+  const getCriticalDiagnosisWarning = useCallback(
+    (icd10Code) => {
+      if (!icd10Code || typeof icd10Code !== 'string') return null;
+      const code = icd10Code.trim().toUpperCase();
+      // Match by prefix (e.g. "K04" matches "K04.0", "K04.9", "K049")
+      for (const [prefix, label] of Object.entries(CRITICAL_ICD10_CODES)) {
+        if (code.startsWith(prefix)) {
+          return { code: prefix, label, fullCode: code };
+        }
+      }
+      return null;
+    },
+    [CRITICAL_ICD10_CODES]
+  );
+
   const handleCompleteVisit = async () => {
     if (!selectedPatient) {
       notify.error('Не выбран пациент для завершения приёма');
@@ -1089,15 +1116,45 @@ const DentistPanelUnified = () => {
       return;
     }
 
-    // C-1 (UX audit): confirm before completing the visit — same pattern as cardio P-010
-    const ok = await confirm({
-      title: 'Завершить приём?',
-      message: 'Приём будет сохранён. Убедитесь, что диагноз, план лечения и протокол заполнены.',
-      description: 'После завершения изменения возможны только через поправку EMR.',
-      confirmLabel: 'Завершить приём',
-      cancelLabel: 'Отмена',
-      intent: 'primary',
-    });
+    // C-1 + C-3 (UX audit): tiered confirmation before completing the visit.
+    // C-3: if the ICD-10 code matches a critical dental diagnosis (K04 —
+    // pulp/periapical diseases, K10 — jaw diseases including osteomyelitis
+    // and abscess), we show the strongest warning (intent='danger') and
+    // require explicit confirmation. This prevents accidental entry of a
+    // diagnosis that could trigger unnecessary surgical intervention,
+    // hospitalization, or IV antibiotics.
+    const visitProtocol = selectedPatient?.visitData || null;
+    const icd10ForCheck = visitProtocol?.icd10 || visitProtocol?.icdCode || '';
+    const criticalWarning = getCriticalDiagnosisWarning(icd10ForCheck);
+
+    let confirmOptions;
+    if (criticalWarning) {
+      confirmOptions = {
+        title: `Критический диагноз: ${criticalWarning.label} (${criticalWarning.code})`,
+        message:
+          `Код МКБ-10 ${criticalWarning.fullCode} соответствует критическому стоматологическому диагнозу: ` +
+          `"${criticalWarning.label}". Подтвердите, что диагноз установлен корректно. ` +
+          'Ошибочный диагноз может привести к ненужному хирургическому вмешательству, ' +
+          'госпитализации или назначению IV антибиотиков.',
+        description:
+          'После завершения приёма EMR будет сохранена с этим диагнозом. ' +
+          'Изменение диагноза после подписания возможно только через поправку (amend).',
+        confirmLabel: 'Подтверждаю диагноз',
+        cancelLabel: 'Отмена — проверить диагноз',
+        intent: 'danger',
+      };
+    } else {
+      confirmOptions = {
+        title: 'Завершить приём?',
+        message: 'Приём будет сохранён. Убедитесь, что диагноз, план лечения и протокол заполнены.',
+        description: 'После завершения изменения возможны только через поправку EMR.',
+        confirmLabel: 'Завершить приём',
+        cancelLabel: 'Отмена',
+        intent: 'primary',
+      };
+    }
+
+    const ok = await confirm(confirmOptions);
     if (!ok) {
       return;
     }
@@ -1636,7 +1693,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label={`Open examination for ${resolvePatientName(patient)}`}
+          aria-label="Открыть осмотр пациента"
           className="dental-card-btn"
           onClick={() => handleExamination(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleExamination(patient))}
@@ -1680,7 +1737,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label={`Open diagnosis for ${resolvePatientName(patient)}`}
+          aria-label="Открыть диагноз пациента"
           className="dental-card-btn"
           onClick={() => handleDiagnosis(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleDiagnosis(patient))}
@@ -1711,36 +1768,19 @@ const DentistPanelUnified = () => {
 
   // Рендер протоколов визитов
   const renderVisits = () => {
-    // Если выбран пациент из очереди - показываем EMR
+    // Если выбран пациент из очереди - показываем минималистичный DentalVisitScreen
     if (selectedPatient) {
       return (
-        <div className="dental-flex-col dental-gap-24">
-          <Card padding="lg">
-            <div className="dental-flex-between-16">
-              <h3 className="dental-text-primary">
-                <Stethoscope size={20} />
-                Прием пациента: {selectedPatient.patient_name || selectedPatient.name || `№${selectedPatient.number}`}
-              </h3>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedPatient(null);
-                  handleTabChange('queue');
-                }}>
-
-                Вернуться в очередь
-              </Button>
-            </div>
-
-            {/* EMR System */}
-            <EMRContainerV2
-              visitId={selectedPatient.visit_id}
-              patientId={selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id}
-              specialty="dentistry" />
-
-          </Card>
-        </div>);
-
+        <DentalVisitScreen
+          patient={selectedPatient}
+          onCompleteVisit={handleCompleteVisit}
+          onBackToQueue={() => {
+            setSelectedPatient(null);
+            handleTabChange('queue');
+          }}
+          loading={loading}
+        />
+      );
     }
 
     // Иначе показываем список пациентов для выбора протокола
@@ -1758,7 +1798,7 @@ const DentistPanelUnified = () => {
               key={patient.id}
               role="button"
               tabIndex={0}
-              aria-label={`Open visit protocol for ${resolvePatientName(patient)}`}
+              aria-label="Открыть протокол визита"
               className="dental-card-btn"
               onClick={() => handleVisitProtocol(patient)}
               onKeyDown={(event) => handleCardKeyDown(event, () => handleVisitProtocol(patient))}
@@ -1803,7 +1843,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label={`Open photo archive for ${resolvePatientName(patient)}`}
+          aria-label="Открыть фотоархив пациента"
           className="dental-card-btn"
           onClick={() => handlePhotoArchive(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handlePhotoArchive(patient))}
@@ -1861,7 +1901,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label={`Open dental chart for ${resolvePatientName(patient)}`}
+          aria-label="Открыть схему зубов пациента"
           className="dental-card-btn"
           onClick={() => handleDentalChart(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleDentalChart(patient))}
@@ -1905,7 +1945,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label={`Open treatment planner for ${resolvePatientName(patient)}`}
+          aria-label="Открыть план лечения пациента"
           className="dental-card-btn"
           onClick={() => handleTreatmentPlanner(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleTreatmentPlanner(patient))}
@@ -1995,7 +2035,7 @@ const DentistPanelUnified = () => {
             onPatientSelect={handlePatientSelect}
             onStartVisit={(appointment) => {
               setSelectedPatient(appointment);
-              handleTabChange('visits');
+              handleTabChange('visit');
             }} />);
 
 
@@ -2007,7 +2047,10 @@ const DentistPanelUnified = () => {
         return renderExaminations();
       case 'diagnoses':
         return renderDiagnoses();
+      case 'visit':
       case 'visits':
+        // Phase 4: 'visit' is the new sidebar tab; 'visits' kept as
+        // alias for back-compat with deep links and old saved URLs.
         return renderVisits();
       case 'photos':
         return renderPhotos();
@@ -2240,7 +2283,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата осмотра *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата осмотра"
                     value={examinationForm.examination_date}
@@ -2315,7 +2358,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Отсутствующие зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Отсутствующие зубы"
                     value={examinationForm.missing_teeth}
@@ -2414,7 +2457,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата лечения *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата лечения"
                     value={treatmentForm.treatment_date}
@@ -2445,7 +2488,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Вовлеченные зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Зубы в лечении"
                     value={treatmentForm.teeth_involved}
@@ -2456,7 +2499,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
-                    <input
+                    <Input
                     type="number"
                     aria-label="Стоимость лечения"
                     value={treatmentForm.cost}
@@ -2482,7 +2525,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Материалы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Использованные материалы"
                     value={treatmentForm.materials_used}
@@ -2510,7 +2553,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Осложнения</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Осложнения лечения"
                     value={treatmentForm.complications}
@@ -2521,7 +2564,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата контроля</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата повторного приёма"
                     value={treatmentForm.follow_up_date}
@@ -2581,7 +2624,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата протезирования *</label>
-                    <input
+                    <Input
                     type="date"
                     aria-label="Дата протезирования"
                     value={prostheticForm.prosthetic_date}
@@ -2612,7 +2655,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Заменяемые зубы</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Замещённые зубы"
                     value={prostheticForm.teeth_replaced}
@@ -2641,7 +2684,7 @@ const DentistPanelUnified = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Оттенок</label>
-                    <input
+                    <Input
                     type="text"
                     aria-label="Оттенок протеза"
                     value={prostheticForm.shade}
@@ -2652,7 +2695,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
-                    <input
+                    <Input
                     type="number"
                     aria-label="Стоимость протеза"
                     value={prostheticForm.cost}
@@ -2697,7 +2740,7 @@ const DentistPanelUnified = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Гарантийный период</label>
-                  <input
+                  <Input
                   type="text"
                   aria-label="Гарантийный срок"
                   value={prostheticForm.warranty_period}

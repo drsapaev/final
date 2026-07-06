@@ -17,7 +17,7 @@ export default function Nav() {
 
   return (
     <div className="clinic-ops-nav-bar">
-      <div style={{ fontWeight: 700, marginRight: 12, opacity: 0.85 }} aria-hidden="true"> </div>
+      <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginRight: 12, opacity: 0.85 }} aria-hidden="true"> </div>
 
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
         {routes.map((route) => (
@@ -25,7 +25,7 @@ export default function Nav() {
             key={route.id}
             to={route.path}
             style={({ isActive }) => ({
-              padding: '8px 12px',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
               borderRadius: 10,
               border: `1px solid ${isActive ? 'var(--mac-nav-item-active-border)' : 'var(--mac-border)'}`,
               marginRight: 6,

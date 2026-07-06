@@ -38,9 +38,9 @@ export default function LabStatusStepper({ status }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '4px',
+        gap: 'var(--mac-spacing-1)',
         flexWrap: 'wrap',
-        marginTop: '8px',
+        marginTop: 'var(--mac-spacing-2)',
       }}
     >
       {LAB_REPORT_STEPS.map((step, index) => {
@@ -52,16 +52,16 @@ export default function LabStatusStepper({ status }) {
         return (
           <div
             key={step.key}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}
           >
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: 'var(--mac-spacing-2)',
                 padding: '4px 10px',
-                borderRadius: '12px',
-                fontSize: '12px',
+                borderRadius: 'var(--mac-radius-lg)',
+                fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: isCurrent ? 600 : 400,
                 background: isCurrent
                   ? 'var(--mac-accent)'

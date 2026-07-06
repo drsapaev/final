@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
 import PropTypes from 'prop-types';
+import notify from '../../services/notify';
 
 /**
  * Протокол лечения по визитам для стоматологической ЭМК
@@ -150,6 +151,7 @@ const VisitProtocol = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось сохранить протокол визита. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }

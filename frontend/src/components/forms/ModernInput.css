@@ -28,7 +28,7 @@
 }
 
 .required-mark {
-  color: #ef4444;
+  color: var(--mac-error);
   margin-left: 2px;
 }
 
@@ -57,15 +57,15 @@
 
 .input-container:hover:not(.disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px color-mix(in srgb, black, transparent 90%);
 }
 
 .input-container.focused {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 .input-container.error {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-error-bg);
 }
 
 .input-container.success {
@@ -96,7 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   pointer-events: none;
   transition: color 0.2s ease;
 }
@@ -107,15 +107,15 @@
 }
 
 .input-container.focused .input-icon {
-  color: #3b82f6;
+  color: var(--mac-accent-blue);
 }
 
 .input-container.error .input-icon {
-  color: #ef4444;
+  color: var(--mac-error);
 }
 
 .input-container.success .input-icon {
-  color: #22c55e;
+  color: var(--mac-success);
 }
 
 /* Поле ввода */
@@ -150,12 +150,12 @@
 }
 
 .input-field::placeholder {
-  color: #9ca3af;
+  color: var(--mac-text-tertiary);
   transition: color 0.2s ease;
 }
 
 .input-field:focus::placeholder {
-  color: #d1d5db;
+  color: var(--mac-border);
 }
 
 .input-field:disabled {
@@ -178,7 +178,7 @@
   height: 24px;
   border: none;
   background: none;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   cursor: pointer;
   border-radius: 4px;
   transition: all 0.2s ease;
@@ -186,16 +186,16 @@
 
 .input-action-btn:hover {
   background: rgba(0, 0, 0, 0.05);
-  color: #374151;
+  color: var(--mac-text-primary);
 }
 
 .dark .input-action-btn:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: #d1d5db;
+  color: var(--mac-border);
 }
 
 .input-action-btn:focus {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--mac-accent-blue);
   outline-offset: 2px;
 }
 
@@ -209,11 +209,11 @@
 }
 
 .input-status.error {
-  color: #ef4444;
+  color: var(--mac-error);
 }
 
 .input-status.success {
-  color: #22c55e;
+  color: var(--mac-success);
 }
 
 /* Подсказки */
@@ -226,7 +226,7 @@
   border: 1px solid;
   border-radius: 8px;
   background: white;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px color-mix(in srgb, black, transparent 90%);
   max-height: 200px;
   overflow-y: auto;
   animation: slideDown 0.2s ease-out;
@@ -252,7 +252,7 @@
 }
 
 .dark .suggestion-item:hover {
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--mac-accent-bg);
 }
 
 /* Сообщения */
@@ -267,11 +267,11 @@
 }
 
 .input-message.error {
-  color: #ef4444;
+  color: var(--mac-error);
 }
 
 .input-message.success {
-  color: #22c55e;
+  color: var(--mac-success);
 }
 
 /* Счетчик символов */
@@ -296,7 +296,7 @@
 
 /* Темная тема */
 .dark .input-container {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
 }
 
@@ -305,11 +305,11 @@
 }
 
 .dark .input-field {
-  color: #f9fafb;
+  color: var(--mac-bg-secondary);
 }
 
 .dark .input-field::placeholder {
-  color: #6b7280;
+  color: var(--mac-text-secondary);
 }
 
 .dark .input-field:focus::placeholder {
@@ -317,9 +317,9 @@
 }
 
 .dark .input-suggestions {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 25px color-mix(in srgb, black, transparent 70%);
 }
 
 /* Адаптивность */

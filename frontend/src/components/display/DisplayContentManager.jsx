@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Image,
@@ -13,7 +14,8 @@ import {
 
   Monitor } from
 'lucide-react';
-import { Card, Button, Badge } from '../ui/macos';
+import { Card, Button, Badge,
+  Input } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
@@ -46,7 +48,7 @@ const DisplayContentManager = ({
       setLoading(true);
 
       // Загружаем контент для табло
-      const response = await fetch(`/api/v1/admin/display-boards/${boardId}/content`, {
+      const response = await fetch(`/admin/display-boards/${boardId}/content`, {
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
@@ -89,7 +91,7 @@ const DisplayContentManager = ({
 
   const handleDeleteContent = async (contentId) => {
     try {
-      const response = await fetch(`/api/v1/admin/display-boards/content/${contentId}`, {
+      const response = await fetch(`/admin/display-boards/content/${contentId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
@@ -307,7 +309,7 @@ const DisplayContentManager = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-      { id: 'light', name: 'Светлая', preview: '#f8fafc' },
+      { id: 'light', name: 'Светлая', preview: 'var(--mac-bg-secondary)' },
       { id: 'dark', name: 'Темная', preview: '#1a202c' },
       { id: 'medical', name: 'Медицинская', preview: '#f0fff4' }].
       map((theme) =>
@@ -381,7 +383,7 @@ const DisplayContentManager = ({
                   <label htmlFor="display-content-title" className="block text-sm font-medium text-gray-700 mb-2">
                     Название:
                   </label>
-                  <input
+                  <Input
                   id="display-content-title"
                   type="text"
                   aria-label="Display content title"

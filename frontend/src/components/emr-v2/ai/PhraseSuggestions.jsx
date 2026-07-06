@@ -15,6 +15,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import './PhraseSuggestions.css';
+import { Checkbox } from '../../ui/macos';
 
 /**
  * Common clinical phrases by field
@@ -167,11 +168,7 @@ export function PhraseSuggestions({
                             key={idx}
                             className={`phrase-suggestions__item ${isSelected ? 'phrase-suggestions__item--selected' : ''}`}
                         >
-                            <input
-                                type="checkbox"
-                                aria-label={`Выбрать клиническую формулировку: ${phrase}`}
-                                checked={isSelected}
-                                onChange={() => togglePhrase(phrase)}
+                            <Checkbox aria-label={`Выбрать клиническую формулировку: ${phrase}`} checked={isSelected} onChange={() => togglePhrase(phrase)}
                                 disabled={disabled}
                             />
                             <span className="phrase-suggestions__text">{phrase}</span>

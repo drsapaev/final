@@ -8,7 +8,7 @@ import {
   Skeleton,
   MacOSEmptyState,
   Select,
-} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Plus,
 
@@ -426,21 +426,13 @@ const BillingManager = () => {
 
             <div className="admin-d-flex-ai-center-gap-16">
               <label className="admin-d-flex-ai-center-gap-8-fs-sm-primary-2">
-                <input
-              type="checkbox"
-              aria-label="Auto send invoice"
-              checked={invoiceForm.auto_send}
-              onChange={(e) => setInvoiceForm({ ...invoiceForm, auto_send: e.target.checked })}
+                <Checkbox aria-label="Auto send invoice" checked={invoiceForm.auto_send} onChange={(e) => setInvoiceForm({ ...invoiceForm, auto_send: e.target.checked })}
               className="admin-m-0" />
             
                 Автоотправка
               </label>
               <label className="admin-d-flex-ai-center-gap-8-fs-sm-primary-1">
-                <input
-              type="checkbox"
-              aria-label="Send payment reminders"
-              checked={invoiceForm.send_reminders}
-              onChange={(e) => setInvoiceForm({ ...invoiceForm, send_reminders: e.target.checked })}
+                <Checkbox aria-label="Send payment reminders" checked={invoiceForm.send_reminders} onChange={(e) => setInvoiceForm({ ...invoiceForm, send_reminders: e.target.checked })}
               className="admin-m-0" />
             
                 Напоминания

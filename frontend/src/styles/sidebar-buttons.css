@@ -37,7 +37,7 @@ aside .logout-button:hover,
   border: none !important;
   outline: none !important;
   transform: translateY(-3px) !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 10px 30px color-mix(in srgb, black, transparent 80%) !important;
 }
 
 /* Убираем все focus обводки */
@@ -72,5 +72,5 @@ aside .logout-button:active,
   border: none !important;
   outline: none !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 5px 15px color-mix(in srgb, black, transparent 90%) !important;
 }

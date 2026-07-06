@@ -3,7 +3,7 @@
  * Поддерживает провайдеры: Click, Payme, Kaspi
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Badge,
@@ -88,6 +88,16 @@ const PaymentWidget = ({
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
+  // HIGH #7 fix: auto-polling for online payment status.
+  // Previously the cashier had to click "Проверить статус" manually.
+  // Now we poll every 5 seconds for up to 5 minutes (60 attempts),
+  // matching the behavior of PaymentClick/PaymentPayMe.
+  const MAX_POLLING_ATTEMPTS = 60;
+  const POLLING_INTERVAL_MS = 5000;
+  const pollingRef = useRef(null);
+  const attemptsRef = useRef(0);
+  const [pollingAttempts, setPollingAttempts] = useState(0);
+
   // Иконки провайдеров
   const providerIcons = {
     click: <CreditCardIcon style={{ color: '#00AAFF' }} />,
@@ -133,6 +143,63 @@ const PaymentWidget = ({
     loadProviders();
   }, [loadProviders]);
 
+  // HIGH #7: cleanup polling on unmount.
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
+  // HIGH #7: stop polling automatically when payment reaches a terminal state.
+  useEffect(() => {
+    if (
+      paymentStatus === 'paid' ||
+      paymentStatus === 'failed' ||
+      paymentStatus === 'cancelled' ||
+      paymentStatus === 'canceled' ||
+      paymentStatus === 'refunded'
+    ) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }
+  }, [paymentStatus]);
+
+  const clearPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    attemptsRef.current = 0;
+    setPollingAttempts(0);
+  }, []);
+
+  const startPolling = useCallback(() => {
+    // Don't start if already polling.
+    if (pollingRef.current) return;
+    attemptsRef.current = 0;
+    setPollingAttempts(0);
+
+    pollingRef.current = setInterval(async () => {
+      attemptsRef.current += 1;
+      setPollingAttempts(attemptsRef.current);
+      try {
+        await checkPaymentStatus();
+      } catch (err) {
+        logger.error('Polling error:', err);
+      }
+      if (attemptsRef.current >= MAX_POLLING_ATTEMPTS) {
+        clearPolling();
+        setError('Время ожидания оплаты истекло. Проверьте статус платежа вручную.');
+        setPaymentStatus('failed');
+      }
+    }, POLLING_INTERVAL_MS);
+  }, [clearPolling]);
+
   // Инициализация платежа
   const initializePayment = async () => {
     if (!selectedProvider || !visitId || !amount) {
@@ -142,10 +209,9 @@ const PaymentWidget = ({
 
     // Проверяем наличие токена авторизации
     const token = getToken();
-    logger.log('🔑 Проверяем токен для платежа:', {
+    logger.log('Checking auth token for payment', {
       hasToken: !!token,
       tokenLength: token ? token.length : 0,
-      tokenStart: token ? token.substring(0, 20) + '...' : 'null'
     });
 
     if (!token) {
@@ -175,13 +241,11 @@ const PaymentWidget = ({
       const isTestToken = currentToken === 'demo_token_for_ui_testing';
       const endpoint = isTestToken ? '/payments/test-init' : '/payments/init';
 
-      logger.log('📤 Отправляем запрос платежа:', {
+      logger.log('Sending payment request', {
         endpoint,
         isTestToken,
         hasAuthHeader: !!apiClient.defaults.headers.common['Authorization'],
-        authHeader: apiClient.defaults.headers.common['Authorization'] ? '[redacted]' : 'none',
         authHeaderLength: apiClient.defaults.headers.common['Authorization']?.length || 0,
-        paymentRequest
       });
 
       const response = await apiClient.post(endpoint, paymentRequest);
@@ -228,6 +292,12 @@ const PaymentWidget = ({
 
           window.open(response.data.payment_url, '_blank');
           setPaymentStatus('redirected');
+          // HIGH #7: auto-start polling 10s after redirect (matches
+          // PaymentClick/PaymentPayMe UX — gives the user time to land
+          // on the provider page before we start pinging).
+          setTimeout(() => {
+            startPolling();
+          }, 10000);
         }
       } else {
         throw new Error(
@@ -278,6 +348,7 @@ const PaymentWidget = ({
 
   // Отмена платежа
   const cancelPayment = () => {
+    clearPolling();
     setPaymentData(null);
     setPaymentStatus('pending');
     setError(null);
@@ -320,14 +391,36 @@ const PaymentWidget = ({
       case 'processing':
         return (
           <Alert severity="info" icon={<InfoIcon />}>
-            Перенаправление на страницу оплаты...
-            <Button
-              size="small"
-              onClick={checkPaymentStatus}
-              style={{ marginLeft: 16 }}>
-              
-              Проверить статус
-            </Button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span>Перенаправление на страницу оплаты...</span>
+              {pollingRef.current && (
+                <span style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
+                  Автоматическая проверка статуса: попытка {pollingAttempts} из {MAX_POLLING_ATTEMPTS}
+                </span>
+              )}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Button
+                  size="small"
+                  onClick={checkPaymentStatus}>
+                  Проверить статус
+                </Button>
+                {pollingRef.current ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={clearPolling}>
+                    Остановить отслеживание
+                  </Button>
+                ) : (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={startPolling}>
+                    Начать отслеживание
+                  </Button>
+                )}
+              </div>
+            </div>
           </Alert>);
 
       case 'paid':
@@ -348,13 +441,13 @@ const PaymentWidget = ({
       case 'void':
         return (
           <Alert severity="warning" icon={<ErrorIcon />}>
-            Status: {paymentStatus}
+            Статус: {paymentStatus}
           </Alert>);
 
       default:
         return paymentStatus ? (
           <Alert severity="info" icon={<InfoIcon />}>
-            Status: {paymentStatus}
+            Статус: {paymentStatus}
           </Alert>) : null;
     }
   };

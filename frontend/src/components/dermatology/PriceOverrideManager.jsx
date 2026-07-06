@@ -15,6 +15,7 @@ import notify from '../../services/notify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 /**
  * Компонент для управления изменениями цен дерматологом
@@ -148,13 +149,13 @@ const PriceOverrideManager = ({
     <div style={{
       position: 'fixed',
       inset: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
       backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 50,
-      padding: '16px'
+      padding: 'var(--mac-spacing-4)'
     }}>
       <div style={{
         background: 'var(--mac-bg-primary)',
@@ -170,7 +171,7 @@ const PriceOverrideManager = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '24px',
+          padding: 'var(--mac-spacing-6)',
           borderBottom: '1px solid var(--mac-border)'
         }}>
           <div>
@@ -184,7 +185,7 @@ const PriceOverrideManager = ({
             <p style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
-              marginTop: '4px'
+              marginTop: 'var(--mac-spacing-1)'
             }}>
               {serviceName} • Базовая цена: {formatPrice(originalPrice)}
             </p>
@@ -198,7 +199,7 @@ const PriceOverrideManager = ({
               color: 'var(--mac-text-secondary)',
               cursor: 'pointer',
               transition: 'all var(--mac-duration-fast) var(--mac-ease)',
-              padding: '4px'
+              padding: 'var(--mac-spacing-1)'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = 'var(--mac-text-primary)';
@@ -212,16 +213,16 @@ const PriceOverrideManager = ({
         </div>
 
         {/* Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ padding: 'var(--mac-spacing-6)', display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
           {/* Форма изменения цены */}
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
             <div>
               <label style={{
                 display: 'block',
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-secondary)',
-                marginBottom: '8px'
+                marginBottom: 'var(--mac-spacing-2)'
               }}>
                 Новая цена (UZS)
               </label>
@@ -233,7 +234,7 @@ const PriceOverrideManager = ({
                   transform: 'translateY(-50%)',
                   color: 'var(--mac-text-tertiary)'
                 }} />
-                <input
+                <Input
                   type="text"
                   aria-label="Новая цена процедуры"
                   value={newPrice}
@@ -271,7 +272,7 @@ const PriceOverrideManager = ({
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-secondary)',
-                marginBottom: '8px'
+                marginBottom: 'var(--mac-spacing-2)'
               }}>
                 Причина изменения
               </label>
@@ -289,7 +290,7 @@ const PriceOverrideManager = ({
                   backgroundColor: 'var(--mac-bg-primary)',
                   color: 'var(--mac-text-primary)',
                   fontSize: 'var(--mac-font-size-base)',
-                  marginBottom: '8px',
+                  marginBottom: 'var(--mac-spacing-2)',
                   transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                 }}
                 onFocus={(e) => {
@@ -309,7 +310,7 @@ const PriceOverrideManager = ({
               </select>
               
               {reason === 'custom' &&
-              <input
+              <Input
                 type="text"
                 aria-label="Другая причина изменения цены"
                 value={reason}
@@ -346,7 +347,7 @@ const PriceOverrideManager = ({
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-secondary)',
-                marginBottom: '8px'
+                marginBottom: 'var(--mac-spacing-2)'
               }}>
                 Подробное описание (необязательно)
               </label>
@@ -423,10 +424,10 @@ const PriceOverrideManager = ({
                 height: '16px',
                 width: '16px',
                 borderBottom: '2px solid white',
-                marginRight: '8px'
+                marginRight: 'var(--mac-spacing-2)'
               }} /> :
 
-              <Save size={16} style={{ marginRight: '8px' }} />
+              <Save size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} />
               }
               {isLoading ? 'Отправка...' : 'Отправить на одобрение'}
             </button>
@@ -438,11 +439,11 @@ const PriceOverrideManager = ({
               fontSize: 'var(--mac-font-size-base)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '12px',
+              marginBottom: 'var(--mac-spacing-3)',
               display: 'flex',
               alignItems: 'center'
             }}>
-              <FileText size={16} style={{ marginRight: '8px' }} />
+              <FileText size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} />
               История изменений цен
             </h4>
             
@@ -469,21 +470,21 @@ const PriceOverrideManager = ({
                 Изменений цен пока нет
               </p> :
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
                 {priceOverrides.map((override) =>
               <div
                 key={override.id}
                 style={{
                   border: '1px solid var(--mac-border)',
                   borderRadius: 'var(--mac-radius-lg)',
-                  padding: '16px'
+                  padding: 'var(--mac-spacing-4)'
                 }}>
                 
                     <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: '8px'
+                  marginBottom: 'var(--mac-spacing-2)'
                 }}>
                       <div style={{
                     display: 'flex',
@@ -511,7 +512,7 @@ const PriceOverrideManager = ({
                       })
                     }}>
                           {getStatusIcon(override.status)}
-                          <span style={{ marginLeft: '4px' }}>{getStatusText(override.status)}</span>
+                          <span style={{ marginLeft: 'var(--mac-spacing-1)' }}>{getStatusText(override.status)}</span>
                         </span>
                       </div>
                       <span style={{
@@ -525,14 +526,14 @@ const PriceOverrideManager = ({
                     <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '16px',
+                  gap: 'var(--mac-spacing-4)',
                   fontSize: 'var(--mac-font-size-sm)',
-                  marginBottom: '8px'
+                  marginBottom: 'var(--mac-spacing-2)'
                 }}>
                       <div>
                         <span style={{ color: 'var(--mac-text-secondary)' }}>Было:</span>
                         <span style={{
-                      marginLeft: '8px',
+                      marginLeft: 'var(--mac-spacing-2)',
                       fontWeight: 'var(--mac-font-weight-medium)',
                       color: 'var(--mac-text-primary)'
                     }}>{formatPrice(override.original_price)}</span>
@@ -540,33 +541,33 @@ const PriceOverrideManager = ({
                       <div>
                         <span style={{ color: 'var(--mac-text-secondary)' }}>Стало:</span>
                         <span style={{
-                      marginLeft: '8px',
+                      marginLeft: 'var(--mac-spacing-2)',
                       fontWeight: 'var(--mac-font-weight-medium)',
                       color: 'var(--mac-accent-orange)'
                     }}>{formatPrice(override.new_price)}</span>
                       </div>
                     </div>
                     
-                    <div style={{ marginTop: '8px' }}>
+                    <div style={{ marginTop: 'var(--mac-spacing-2)' }}>
                       <span style={{
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Причина:</span>
                       <span style={{
-                    marginLeft: '8px',
+                    marginLeft: 'var(--mac-spacing-2)',
                     fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-primary)'
                   }}>{override.reason}</span>
                     </div>
                     
                     {override.details &&
-                <div style={{ marginTop: '4px' }}>
+                <div style={{ marginTop: 'var(--mac-spacing-1)' }}>
                         <span style={{
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Детали:</span>
                         <span style={{
-                    marginLeft: '8px',
+                    marginLeft: 'var(--mac-spacing-2)',
                     fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-primary)'
                   }}>{override.details}</span>

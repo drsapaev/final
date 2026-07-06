@@ -17,6 +17,8 @@ import {
   completeQueueJoinSession,
 } from '../api/queue';
 import { formatRegistrarTime } from '../utils/dateUtils';
+import { Input,
+  Checkbox } from '../components/ui/macos';
 
 const formatSpecialistLabel = (specialist) => {
   const doctorName =
@@ -589,8 +591,8 @@ const QueueJoin = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" style={{
             borderColor: 'var(--mac-accent-blue)'
           }}></div>
-          <h2 style={titleStyle}>Юкланмоқда...</h2>
-          <p style={bodyTextStyle}>Навбат ҳақида маълумот олиш</p>
+          <h2 style={titleStyle}>Загрузка...</h2>
+          <p style={bodyTextStyle}>Информация об очереди</p>
         </div>
       </div>
     );
@@ -610,7 +612,7 @@ const QueueJoin = () => {
           <h2 id="queue-join-error-title" style={{
             ...titleStyle,
             marginBottom: 'var(--mac-spacing-3)',
-          }}>Хатолик</h2>
+          }}>Ошибка</h2>
           <p style={{
             ...bodyTextStyle,
             marginBottom: 'var(--mac-spacing-6)',
@@ -624,14 +626,14 @@ const QueueJoin = () => {
               }}
               style={primaryRecoveryButtonStyle}
             >
-              Қайта уриниш
+              Попробовать снова
             </button>
             <button
               type="button"
               onClick={() => navigate('/')}
               style={dangerRecoveryButtonStyle}
             >
-              Асосий саҳифа
+              Главная страница
             </button>
           </div>
         </div>
@@ -652,24 +654,24 @@ const QueueJoin = () => {
             animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
           }} />
           <h2 style={{
-            fontSize: '24px',
+            fontSize: 'var(--mac-font-size-3xl)',
             fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             marginBottom: 'var(--mac-spacing-3)',
             letterSpacing: '-0.02em'
-          }}>Навбат тез орада очилади</h2>
+          }}>Очередь скоро откроется</h2>
           <p style={{
             ...bodyTextStyle,
             marginBottom: 'var(--mac-spacing-6)',
           }}>
-            Навбатга ёзилиш {queueInfo?.start_time}да очилади
+            Запись в очередь откроется в {queueInfo?.start_time}
           </p>
 
           {/* Обратный отсчет - macOS стиль */}
           <div style={{
             background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-warning), transparent 88%) 0%, color-mix(in srgb, var(--mac-warning), transparent 93%) 100%)',
-            borderRadius: '16px',
-            padding: '24px',
+            borderRadius: 'var(--mac-radius-xl)',
+            padding: 'var(--mac-spacing-6)',
             marginBottom: 'var(--mac-spacing-6)',
             border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 76%)'
           }}>
@@ -683,7 +685,7 @@ const QueueJoin = () => {
             }}>
               {formatCountdown(countdown)}
             </div>
-            <p style={mutedCaptionStyle}>ёзилиш очилишига қадар</p>
+            <p style={mutedCaptionStyle}>до открытия записи</p>
           </div>
 
           {/* Информация о враче и кабинете - macOS стиль */}
@@ -697,7 +699,7 @@ const QueueJoin = () => {
               borderRadius: 'var(--mac-radius-lg)'
             }}>
               <div className="flex items-center">
-                <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                 <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Специалист</span>
               </div>
               <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{queueInfo?.specialist_name}</span>
@@ -712,7 +714,7 @@ const QueueJoin = () => {
               borderRadius: 'var(--mac-radius-lg)'
             }}>
               <div className="flex items-center">
-                <MapPin style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                <MapPin style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                 <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Бўлим</span>
               </div>
               <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{queueInfo?.department_name}</span>
@@ -728,15 +730,15 @@ const QueueJoin = () => {
               border: '1px solid color-mix(in srgb, var(--mac-accent), transparent 76%)'
             }}>
               <div className="flex items-center">
-                <Calendar style={{ width: '18px', height: '18px', color: 'var(--mac-accent-blue)', marginRight: '8px' }} />
-                <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>Қабул куни</span>
+                <Calendar style={{ width: '18px', height: '18px', color: 'var(--mac-accent-blue)', marginRight: 'var(--mac-spacing-2)' }} />
+                <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>День приёма</span>
               </div>
               <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-accent-blue)' }}>
-                {queueInfo?.target_date ? new Date(queueInfo.target_date).toLocaleDateString('uz-UZ', {
+                {queueInfo?.target_date ? new Date(queueInfo.target_date).toLocaleDateString('ru-RU', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric'
-                }) : 'Бугун'}
+                }) : 'Сегодня'}
               </span>
             </div>
           </div>
@@ -748,8 +750,8 @@ const QueueJoin = () => {
             textAlign: 'center',
             lineHeight: '1.5'
           }}>
-            <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>📱 Бу саҳифани очиқ қолдиринг</p>
-            <p>Ёзилиш очилганда сизни автоматик равишда йўналтирамиз</p>
+            <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>Не закрывайте эту страницу</p>
+            <p>Когда запись откроется, вы будете автоматически перенаправлены</p>
           </div>
 
           <div className="flex gap-3">
@@ -770,7 +772,7 @@ const QueueJoin = () => {
               onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
               onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
             >
-              Асосий саҳифа
+              Главная страница
             </button>
             <button
               onClick={loadTokenInfo}
@@ -825,13 +827,13 @@ const QueueJoin = () => {
             margin: '0 auto 20px'
           }} aria-hidden="true" />
           <h2 id="queue-join-success-title" style={{
-            fontSize: '24px',
+            fontSize: 'var(--mac-font-size-3xl)',
             fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             marginBottom: 'var(--mac-spacing-6)',
             letterSpacing: '-0.02em'
           }}>
-            {isMultiple ? 'Сиз навбатларга рўйхатдан ўтдингиз!' : 'Сиз навбатда!'}
+            {isMultiple ? 'Вы зарегистрированы в очередях!' : 'Вы в очереди!'}
           </h2>
 
           {isMultiple ? (
@@ -839,8 +841,8 @@ const QueueJoin = () => {
             <>
               <div style={{
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
-                borderRadius: '16px',
-                padding: '24px',
+                borderRadius: 'var(--mac-radius-xl)',
+                padding: 'var(--mac-spacing-6)',
                 marginBottom: 'var(--mac-spacing-6)',
                 border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)'
               }}>
@@ -851,7 +853,7 @@ const QueueJoin = () => {
                   marginBottom: 'var(--mac-spacing-4)',
                   textAlign: 'center'
                 }}>
-                  Сиз {result.entries.length} навбатга рўйхатдан ўтдингиз:
+                  Вы зарегистрированы в {result.entries.length} очередях:
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
                   {result.entries.map((entry, idx) => (
@@ -861,26 +863,26 @@ const QueueJoin = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '16px',
+                        padding: 'var(--mac-spacing-4)',
                         background: 'color-mix(in srgb, var(--mac-card-bg), transparent 16%)',
                         borderRadius: 'var(--mac-radius-lg)',
                         border: '1px solid color-mix(in srgb, var(--mac-success), transparent 72%)'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
-                        <span style={{ fontSize: '24px' }}>{entry.icon || '👨‍⚕️'}</span>
+                        <span style={{ fontSize: 'var(--mac-font-size-3xl)' }}>{entry.icon || null}</span>
                         <div>
                           <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                             {entry.specialist_name || entry.department || `Специалист ${idx + 1}`}
                           </div>
-                          <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
-                            Вақт: {entry.queue_time ? formatRegistrarTime(entry.queue_time, 'uz-UZ') : '—'}
+                          <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: 'var(--mac-spacing-1)' }}>
+                            Время: {entry.queue_time ? formatRegistrarTime(entry.queue_time, 'ru-RU') : '—'}
                           </div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '28px', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>№{entry.queue_number || entry.number || '—'}</div>
-                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>навбатда</div>
+                        <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>№{entry.queue_number || entry.number || '—'}</div>
+                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>в очереди</div>
                       </div>
                     </div>
                   ))}
@@ -893,10 +895,10 @@ const QueueJoin = () => {
                 marginBottom: 'var(--mac-spacing-6)',
                 lineHeight: '1.5'
               }}>
-                <p>Илтимос, қабулга тайёр бўлинг.</p>
-                <p>Навбатингиз келганда сизга хабар берамиз.</p>
-                <p style={{ marginTop: '12px', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
-                  💡 Ёзилмаларни мутахассислар вкладкаларида кўришингиз мумкин
+                <p>Пожалуйста, будьте готовы к приёму.</p>
+                <p>Мы сообщим вам, когда подойдёт ваша очередь.</p>
+                <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
+                  Записи можно посмотреть во вкладках специалистов
                 </p>
               </div>
             </>
@@ -905,7 +907,7 @@ const QueueJoin = () => {
             <>
               <div style={{
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
-                borderRadius: '16px',
+                borderRadius: 'var(--mac-radius-xl)',
                 padding: 'var(--mac-spacing-8) var(--mac-spacing-6)',
                 marginBottom: 'var(--mac-spacing-6)',
                 border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)'
@@ -919,7 +921,7 @@ const QueueJoin = () => {
                 }}>
                   №{result.queue_number}
                 </div>
-                <p style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Навбатдаги рақамингиз</p>
+                <p style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Ваш номер в очереди</p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-6)' }}>
@@ -932,7 +934,7 @@ const QueueJoin = () => {
                   borderRadius: 'var(--mac-radius-lg)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                    <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                     <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Олдингизда</span>
                   </div>
                   <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{result.queue_number - 1} к.</span>
@@ -948,7 +950,7 @@ const QueueJoin = () => {
                     borderRadius: 'var(--mac-radius-lg)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                      <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                       <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Кутиш</span>
                     </div>
                     <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{formatWaitTime(result.estimated_wait_time)}</span>
@@ -965,7 +967,7 @@ const QueueJoin = () => {
                     borderRadius: 'var(--mac-radius-lg)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                      <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                       <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Специалист</span>
                     </div>
                     <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{result.specialist_name}</span>
@@ -979,10 +981,10 @@ const QueueJoin = () => {
                 marginBottom: 'var(--mac-spacing-6)',
                 lineHeight: '1.5'
               }}>
-                <p>Илтимос, қабулга тайёр бўлинг.</p>
-                <p>Навбатингиз келганда сизга хабар берамиз.</p>
-                <p style={{ marginTop: '12px', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
-                  💡 Ёзилмани {departmentName} вкладкасида кўришингиз мумкин
+                <p>Пожалуйста, будьте готовы к приёму.</p>
+                <p>Мы сообщим вам, когда подойдёт ваша очередь.</p>
+                <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
+                  Запись можно посмотреть во вкладке «{departmentName}»
                 </p>
               </div>
             </>
@@ -1026,7 +1028,7 @@ const QueueJoin = () => {
         <div className="text-white" style={{
           background: 'linear-gradient(135deg, var(--mac-accent) 0%, var(--mac-accent-purple) 100%)',
           borderRadius: '20px 20px 0 0',
-          padding: '24px'
+          padding: 'var(--mac-spacing-6)'
         }}>
           <h1 style={{
             fontSize: '26px',
@@ -1034,33 +1036,33 @@ const QueueJoin = () => {
             marginBottom: 'var(--mac-spacing-4)',
             letterSpacing: '-0.02em',
             lineHeight: '1.2'
-          }}>Навбатга қўшилиш</h1>
+          }}>Присоединиться к очереди</h1>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div className="flex items-center" style={{ opacity: 0.95 }}>
-              <MapPin style={{ width: '16px', height: '16px', marginRight: '8px', flexShrink: 0 }} />
+              <MapPin style={{ width: '16px', height: '16px', marginRight: 'var(--mac-spacing-2)', flexShrink: 0 }} />
               <span style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: '1.4' }}>{queueInfo?.department_name || 'Умумий амалиёт'}</span>
             </div>
 
             <div className="flex items-center" style={{ opacity: 0.9 }}>
-              <User style={{ width: '16px', height: '16px', marginRight: '8px', flexShrink: 0 }} />
+              <User style={{ width: '16px', height: '16px', marginRight: 'var(--mac-spacing-2)', flexShrink: 0 }} />
               <span style={{ fontSize: 'var(--mac-font-size-sm)', lineHeight: '1.4' }}>{queueInfo?.specialist_name}</span>
             </div>
 
             {queueInfo?.target_date && (
               <div className="flex items-center" style={{
-                marginTop: '8px',
+                marginTop: 'var(--mac-spacing-2)',
                 paddingTop: '12px',
                 borderTop: '1px solid color-mix(in srgb, var(--mac-text-on-accent), transparent 80%)',
                 opacity: 0.95
               }}>
-                <Calendar style={{ width: '16px', height: '16px', marginRight: '8px', flexShrink: 0 }} />
+                <Calendar style={{ width: '16px', height: '16px', marginRight: 'var(--mac-spacing-2)', flexShrink: 0 }} />
                 <span style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   fontWeight: 'var(--mac-font-weight-medium)',
                   lineHeight: '1.4'
                 }}>
-                  Қабул куни: {new Date(queueInfo.target_date).toLocaleDateString('uz-UZ', {
+                  День приёма: {new Date(queueInfo.target_date).toLocaleDateString('ru-RU', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric'
@@ -1072,13 +1074,13 @@ const QueueJoin = () => {
         </div>
 
         {step === 'select-specialists' && (
-          <div style={{ padding: '24px' }}>
+          <div style={{ padding: 'var(--mac-spacing-6)' }}>
             <div style={{
               marginBottom: 'var(--mac-spacing-6)',
               textAlign: 'center'
             }}>
               <h3 style={{
-                fontSize: '20px',
+                fontSize: 'var(--mac-font-size-2xl)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
                 color: 'var(--mac-text-primary)',
                 marginBottom: 'var(--mac-spacing-2)',
@@ -1108,7 +1110,7 @@ const QueueJoin = () => {
             }}>
               {isSpecialistsLoading ? (
                 <div style={{
-                  padding: '16px',
+                  padding: 'var(--mac-spacing-4)',
                   textAlign: 'center',
                   color: 'var(--mac-text-secondary)',
                   fontSize: 'var(--mac-font-size-lg)'
@@ -1163,7 +1165,7 @@ const QueueJoin = () => {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        padding: '16px',
+                        padding: 'var(--mac-spacing-4)',
                         borderRadius: 'var(--mac-radius-lg)',
                         border: `2px solid ${isSelected ? specialist.color : 'var(--mac-border)'}`,
                         background: isSelected ?
@@ -1174,11 +1176,7 @@ const QueueJoin = () => {
                         userSelect: 'none'
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        aria-label={`Select specialist: ${formatSpecialistLabel(specialist)}`}
-                        checked={isSelected}
-                        onChange={() => {
+                      <Checkbox aria-label={`Select specialist: ${formatSpecialistLabel(specialist)}`} checked={isSelected} onChange={() => {
                           if (error) {
                             setError(null);
                           }
@@ -1191,12 +1189,12 @@ const QueueJoin = () => {
                         style={{
                           width: '24px',
                           height: '24px',
-                          marginRight: '12px',
+                          marginRight: 'var(--mac-spacing-3)',
                           accentColor: specialist.color,
                           cursor: 'pointer'
                         }}
                       />
-                      <span style={{ fontSize: '24px', marginRight: '12px' }}>{specialist.icon}</span>
+                      <span style={{ fontSize: 'var(--mac-font-size-3xl)', marginRight: 'var(--mac-spacing-3)' }}>{specialist.icon}</span>
                       <span style={{
                         fontSize: 'var(--mac-font-size-xl)',
                         fontWeight: 'var(--mac-font-weight-semibold)',
@@ -1251,7 +1249,7 @@ const QueueJoin = () => {
 
             {error && (
               <div style={{
-                marginTop: '16px',
+                marginTop: 'var(--mac-spacing-4)',
                 padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                 borderRadius: 'var(--mac-radius-md)',
                 background: 'var(--mac-error-bg)',
@@ -1267,7 +1265,7 @@ const QueueJoin = () => {
         )}
 
         {step === 'info' && (
-          <div style={{ padding: '24px' }}>
+          <div style={{ padding: 'var(--mac-spacing-6)' }}>
             {/* Статус очереди - macOS стиль с правильным spacing */}
             <div style={{
               display: 'grid',
@@ -1277,7 +1275,7 @@ const QueueJoin = () => {
             }}>
               <div style={{
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-accent), transparent 88%) 0%, color-mix(in srgb, var(--mac-accent), transparent 93%) 100%)',
-                borderRadius: '16px',
+                borderRadius: 'var(--mac-radius-xl)',
                 padding: '24px 20px',
                 border: '1px solid color-mix(in srgb, var(--mac-accent), transparent 76%)',
                 display: 'flex',
@@ -1304,12 +1302,12 @@ const QueueJoin = () => {
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-tertiary)',
                   fontWeight: 'var(--mac-font-weight-medium)'
-                }}>навбатда</div>
+                }}>в очереди</div>
               </div>
 
               <div style={{
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
-                borderRadius: '16px',
+                borderRadius: 'var(--mac-radius-xl)',
                 padding: '24px 20px',
                 border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)',
                 display: 'flex',
@@ -1346,7 +1344,7 @@ const QueueJoin = () => {
               flexDirection: 'column',
               alignItems: 'center',
               textAlign: 'center',
-              gap: '20px'
+              gap: 'var(--mac-spacing-5)'
             }}>
               <p style={{
                 color: 'var(--mac-text-secondary)',
@@ -1355,7 +1353,7 @@ const QueueJoin = () => {
                 margin: 0,
                 maxWidth: '320px'
               }}>
-                Навбатга қўшилиш учун қуйидаги формани тўлдиринг
+                Заполните форму ниже, чтобы присоединиться к очереди
               </p>
               <button
                 onClick={() => setStep('form')}
@@ -1382,8 +1380,8 @@ const QueueJoin = () => {
         )}
 
         {step === 'form' && (
-          <div style={{ padding: '24px' }}>
-            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ padding: 'var(--mac-spacing-6)' }}>
+            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
               {/* ФИО - macOS стиль */}
               <div>
                 <label
@@ -1400,11 +1398,11 @@ const QueueJoin = () => {
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
-                  <input
+                  <Input
                     id="queue-patient-name"
                     name="patient_name"
                     type="text"
-                    aria-label="Patient full name"
+                    aria-label="ФИО пациента"
                     value={formData.patientName}
                     onChange={(e) => handleInputChange('patientName', e.target.value)}
                     style={{
@@ -1414,7 +1412,7 @@ const QueueJoin = () => {
                       paddingTop: '12px',
                       paddingBottom: '12px',
                       border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
-                      borderRadius: '10px',
+                      borderRadius: 'var(--mac-radius-lg)',
                       fontSize: 'var(--mac-font-size-xl)',
                       fontFamily: 'inherit',
                       background: 'var(--mac-bg-secondary)',
@@ -1430,7 +1428,7 @@ const QueueJoin = () => {
                       e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                       e.target.style.boxShadow = 'none';
                     }}
-                    placeholder="Фамилия исмингизни киритинг"
+                    placeholder="Введите фамилию и имя"
                     autoComplete="name"
                     autoFocus
                     aria-required="true"
@@ -1453,15 +1451,15 @@ const QueueJoin = () => {
                   marginBottom: 'var(--mac-spacing-2)'
                 }}
                 >
-                  Телефон рақами *
+                  Номер телефона *
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
-                  <input
+                  <Input
                     id="queue-phone"
                     name="phone"
                     type="tel"
-                    aria-label="Patient phone number"
+                    aria-label="Номер телефона пациента"
                     value={formData.phone}
                     onChange={handlePhoneChange}
                     onKeyDown={(e) => {
@@ -1496,7 +1494,7 @@ const QueueJoin = () => {
                       paddingTop: '12px',
                       paddingBottom: '12px',
                       border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
-                      borderRadius: '10px',
+                      borderRadius: 'var(--mac-radius-lg)',
                       fontSize: 'var(--mac-font-size-xl)',
                       fontFamily: 'inherit',
                       background: 'var(--mac-bg-secondary)',
@@ -1521,7 +1519,7 @@ const QueueJoin = () => {
                     required
                   />
                 </div>
-                <div id="queue-phone-hint" style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
+                <div id="queue-phone-hint" style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: 'var(--mac-spacing-1)' }}>
                   Формат: +998 (XX) XXX-XX-XX
                 </div>
               </div>
@@ -1541,20 +1539,20 @@ const QueueJoin = () => {
                   Telegram ID (ихтиёрий)
                 </label>
                 <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-2)' }}>
-                  Telegramда хабардор қилиш учун
+                  Для уведомлений в Telegram
                 </div>
-                <input
+                <Input
                   id="queue-telegram-id"
                   name="telegram_id"
                   type="number"
-                  aria-label="Telegram ID"
+                  aria-label="Telegram ID (необязательно)"
                   value={formData.telegramId}
                   onChange={(e) => handleInputChange('telegramId', e.target.value)}
                   style={{
                     width: '100%',
                     padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
                     border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
-                    borderRadius: '10px',
+                    borderRadius: 'var(--mac-radius-lg)',
                     fontSize: 'var(--mac-font-size-xl)',
                     fontFamily: 'inherit',
                     background: 'var(--mac-bg-secondary)',
@@ -1570,7 +1568,7 @@ const QueueJoin = () => {
                     e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                     e.target.style.boxShadow = 'none';
                   }}
-                  placeholder="Мажбурий эмас"
+                  placeholder="(необязательно)"
                 />
               </div>
 
@@ -1579,7 +1577,7 @@ const QueueJoin = () => {
                   background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-error), transparent 88%) 0%, color-mix(in srgb, var(--mac-error), transparent 93%) 100%)',
                   border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
                   borderRadius: 'var(--mac-radius-lg)',
-                  padding: '12px'
+                  padding: 'var(--mac-spacing-3)'
                 }} id="queue-join-error" role="alert" aria-live="assertive">
                   <div className="flex items-center">
                     <AlertCircle className="h-5 w-5 mr-2" style={{ color: 'var(--mac-error)' }} />
@@ -1629,7 +1627,7 @@ const QueueJoin = () => {
                   onMouseEnter={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue-hover)')}
                   onMouseLeave={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue)')}
                 >
-                  {loading ? 'Қўшилмоқда...' : 'Қўшилиш'}
+                  {loading ? 'Присоединяемся...' : 'Присоединиться'}
                 </button>
               </div>
             </form>

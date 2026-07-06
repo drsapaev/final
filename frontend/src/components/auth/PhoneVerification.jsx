@@ -9,7 +9,7 @@ import {
   RefreshCw,
   Send
 } from 'lucide-react';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';

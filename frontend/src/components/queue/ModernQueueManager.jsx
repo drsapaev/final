@@ -3,6 +3,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
+// UX Audit Registrar #2: useConfirm hook для замены window.confirm().
+import { useConfirm } from '../common/ConfirmDialog';
 // UX Audit Stage 3 (Queue issue 7.3):
 // Заменены SF Symbols (Icon) на lucide-react — единая библиотека иконок.
 // Раньше Queue был единственным экраном, использующим SF Symbols.
@@ -11,7 +13,7 @@ import {
 } from 'lucide-react';
 import {
   Button, CardContent, Badge, Select,
-} from '../ui/macos';
+  Input } from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
 // UX Audit Stage 3 (Queue issue 7.1):
@@ -51,6 +53,10 @@ const ModernQueueManager = ({
   const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
+  // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
+  const [confirm, confirmDialog] = useConfirm();
 
   // Переводы
   const t = {
@@ -214,13 +220,18 @@ const ModernQueueManager = ({
     }
 
     // Confirmation: открытие приёма закрывает онлайн-запись для новых пациентов.
+    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
     const doctorName = doctors.find((d) => String(d.id) === String(effectiveDoctor))?.full_name || 'выбранного врача';
-    const confirmed = window.confirm(
-      `Открыть приём для "${doctorName}"?\n\n` +
-      'После открытия приёма онлайн-запись через QR будет закрыта — ' +
-      'новые пациенты не смогут записаться онлайн.\n\n' +
-      'Нажмите «ОК» чтобы продолжить, или «Отмена» чтобы вернуться.'
-    );
+    const confirmed = await confirm({
+      title: 'Открыть приём',
+      message: `Открыть приём для «${doctorName}»?`,
+      description:
+        'После открытия приёма онлайн-запись через QR будет закрыта — ' +
+        'новые пациенты не смогут записаться онлайн.',
+      confirmLabel: 'Открыть приём',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
     if (!confirmed) {
       return;
     }
@@ -254,11 +265,16 @@ const ModernQueueManager = ({
       return;
     }
 
-    const confirmed = window.confirm(
-      'Закрыть приём?\n\n' +
-      'Онлайн-запись через QR будет открыта — новые пациенты смогут записаться онлайн.\n\n' +
-      'Нажмите «ОК» чтобы продолжить, или «Отмена» чтобы вернуться.'
-    );
+    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+    const confirmed = await confirm({
+      title: 'Закрыть приём',
+      message: 'Закрыть приём?',
+      description:
+        'Онлайн-запись через QR будет открыта — новые пациенты смогут записаться онлайн.',
+      confirmLabel: 'Закрыть приём',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
     if (!confirmed) {
       return;
     }
@@ -391,7 +407,7 @@ const ModernQueueManager = ({
               <label className="mqm-label" htmlFor="modern-queue-date">
                 Дата
               </label>
-              <input
+              <Input
                 id="modern-queue-date"
                 type="date"
                 aria-label="Дата очереди"
@@ -436,8 +452,7 @@ const ModernQueueManager = ({
                     label: opt.label
                   }))
                 ]}
-                className="mqm-select"
-                style={{ width: '100%' }}></Select>
+                className="mqm-select mqm-select-full"></Select>
             </div>
 
             <div className="mqm-actions">
@@ -461,7 +476,7 @@ const ModernQueueManager = ({
                 className="mqm-button-icon"
                 title="Генерировать общий QR код для всех специалистов клиники">
 
-                <Building2 size={16} style={{ color: 'var(--mac-text-primary)' }} aria-hidden="true" />
+                <Building2 size={16} className="mqm-icon-primary" aria-hidden="true" />
                 {t.clinicQr}
               </Button>
             </div>
@@ -506,7 +521,7 @@ const ModernQueueManager = ({
               </Button>
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+            <div className="mqm-inline-label">
               <Button
                 variant="outline"
                 size="default"
@@ -514,7 +529,7 @@ const ModernQueueManager = ({
                 disabled={!effectiveDoctor || loading}
                 className="mqm-button-icon">
 
-                <Settings size={16} style={{ color: 'var(--mac-text-primary)' }} aria-hidden="true" />
+                <Settings size={16} className="mqm-icon-primary" aria-hidden="true" />
                 {t.refreshQueue}
               </Button>
 
@@ -531,14 +546,7 @@ const ModernQueueManager = ({
 
               <button
                 type="button"
-                style={{
-                  cursor: 'pointer',
-                  border: 'none',
-                  background: 'transparent',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
+                className="mqm-auto-refresh-toggle"
                 onClick={() => setAutoRefresh(!autoRefresh)}
                 aria-label={autoRefresh ? 'Отключить автообновление очереди' : 'Включить автообновление очереди'}
                 title={autoRefresh ? 'Автообновление включено' : 'Автообновление выключено'}>
@@ -546,7 +554,7 @@ const ModernQueueManager = ({
                 <RefreshCw
                   size={20}
                   aria-hidden="true"
-                  style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
+                  className={autoRefresh ? 'mqm-auto-refresh-icon-on' : 'mqm-auto-refresh-icon-off'} />
 
               </button>
 
@@ -576,7 +584,7 @@ const ModernQueueManager = ({
                     gap: 4,
                     marginLeft: 8,
                     fontSize: 11,
-                    fontWeight: 600,
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     color: wsState === 'connected' ? 'var(--mac-success)' :
                            wsState === 'reconnecting' || wsState === 'connecting' ? 'var(--mac-warning)' :
                            'var(--mac-text-tertiary)',
@@ -602,7 +610,7 @@ const ModernQueueManager = ({
 
       {/* Текущая очередь */}
       <div className="mqm-card">
-        <CardContent style={{ padding: 'var(--mac-spacing-5)' }}>
+        <CardContent className="mqm-card-content-padded">
           <div className="mqm-queue-header">
             <h3 className="mqm-title">
               {t.currentQueue}
@@ -641,12 +649,12 @@ const ModernQueueManager = ({
           <div className="mqm-qr-badge-container">
             {qrData?.is_clinic_wide ?
             <Badge variant="primary" className="mqm-qr-badge">
-                <Building2 size={14} style={{ marginRight: '6px' }} aria-hidden="true" />
+                <Building2 size={14} className="mqm-icon-margin-right-6px" aria-hidden="true" />
                 Общий QR код клиники
               </Badge> :
 
             <Badge variant="success" className="mqm-qr-badge">
-                <User size={14} style={{ marginRight: '6px' }} aria-hidden="true" />
+                <User size={14} className="mqm-icon-margin-right-6px" aria-hidden="true" />
                 QR код специалиста
               </Badge>
             }
@@ -710,7 +718,7 @@ const ModernQueueManager = ({
               Отсканируйте камеру телефона для записи в очередь
             </p>
             <p className="mqm-qr-expiry">
-              <Clock size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} aria-hidden="true" />
+              <Clock size={14} className="mqm-icon-margin-right-1" aria-hidden="true" />
               Действует до: {qrData?.expires_at ? new Date(qrData.expires_at).toLocaleString('ru-RU', {
                 day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
               }) : '—'}
@@ -724,7 +732,7 @@ const ModernQueueManager = ({
               onClick={downloadQR}
               className="mqm-qr-action-btn">
 
-              <ArrowDownCircle size={14} style={{ marginRight: '8px' }} aria-hidden="true" />
+              <ArrowDownCircle size={14} className="mqm-icon-margin-right-2" aria-hidden="true" />
               {t.download}
             </Button>
             <Button
@@ -737,6 +745,9 @@ const ModernQueueManager = ({
           </div>
         </div>
       </ModernDialog>
+
+      {/* UX Audit Registrar #2: ConfirmDialog (useConfirm hook). */}
+      {confirmDialog}
     </div>);
 
 };

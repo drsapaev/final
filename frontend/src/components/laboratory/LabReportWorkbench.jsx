@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-} from '../ui/macos';
+  Input } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
+import { api } from '../../api/client';
 import { printService } from '../../services/print';
 import logger from '../../utils/logger';
 import {
@@ -395,6 +396,20 @@ export default function LabReportWorkbench({
 
   async function handleRevise() {
     if (!activeInstance) return;
+    // M-1 fix: Revise creates a new instance (old one preserved as FINALIZED),
+    // but it changes which instance is "active" and creates audit-trail entries.
+    // The comment at L52-55 promised a guard — now delivered.
+    const ok = await confirm({
+      title: 'Создание исправленной версии',
+      message: 'Будет создана новая версия отчёта на основе утверждённой.',
+      description: 'Старая версия останется в истории как утверждённая. ' +
+        'Новая версия станет активной и доступной для редактирования. ' +
+        'Это действие создаёт запись в аудите.',
+      confirmLabel: 'Создать версию',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) return;
     setSaving(true);
     setBusyAction('revise');
     try {
@@ -415,13 +430,14 @@ export default function LabReportWorkbench({
     if (!activeInstance) return;
     setSaving(true);
     setBusyAction('print');
+    // L-5 fix: use setPrintFeedback (inline Alert) as the single feedback
+    // channel. Previously handlePrint called notify() up to 5 times per
+    // print attempt, producing stacked toasts alongside the inline Alert.
     setPrintFeedback({
       severity: 'info',
       text: 'Отправляю лабораторный отчёт на печать...'
     });
     try {
-      notify('info', 'Пытаюсь отправить отчёт на принтер...');
-
       const printResult = await printService.printLabResults(
         buildLabPrintPayload(activeInstance, selectedAppointment)
       );
@@ -436,10 +452,6 @@ export default function LabReportWorkbench({
           severity: 'success',
           text: `Лабораторный отчёт отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
         });
-        notify(
-          'success',
-          `Лабораторный отчёт отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
-        );
         return;
       }
 
@@ -447,17 +459,11 @@ export default function LabReportWorkbench({
         instanceId: activeInstance.id,
         error: printResult.error
       });
-      notify('warning', 'Прямая печать недоступна, использую PDF-файл как запасной вариант.');
 
       const blob = await labReportingApi.downloadPdf(activeInstance.id);
       const url = URL.createObjectURL(blob);
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
       // WF-05 fix: не помечаем как PRINTED при неудаче popup.
-      // Раньше markPrinted вызывался безусловно → false audit trail:
-      // статус PRINTED, но PDF не открыт. Теперь:
-      //   - popup OK → markPrinted + success feedback
-      //   - popup blocked → НЕ markPrinted, warning feedback,
-      //     лаборант может retry после разрешения pop-up
       if (popup) {
         const printed = await labReportingApi.markPrinted(activeInstance.id);
         onInstanceChange(printed);
@@ -468,16 +474,13 @@ export default function LabReportWorkbench({
           severity: 'success',
           text: 'PDF открыт в новой вкладке. Статус печати обновлён.'
         });
-        notify('success', 'PDF открыт в новой вкладке и статус печати обновлён.');
       } else {
-        // PDF сформирован, но не открыт. Статус НЕ меняем.
         setPrintFeedback({
           severity: 'warning',
           text: 'PDF сформирован, но новая вкладка заблокирована. ' +
             'Разрешите pop-up для этого сайта и нажмите «Печать» снова, ' +
             'чтобы обновить статус отчёта.'
         });
-        notify('warning', 'PDF сформирован, но вкладка заблокирована. Статус печати не обновлён.');
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
@@ -492,16 +495,38 @@ export default function LabReportWorkbench({
     }
   }
 
+  // P1 fix: Notify patient via Telegram — sends lab results PDF to patient's
+  // Telegram chat via POST /telegram/send-lab-results backend endpoint.
+  async function handleNotifyPatient() {
+    if (!activeInstance) return;
+    setSaving(true);
+    setBusyAction('notify');
+    try {
+      const patientId = activeInstance.patient_id;
+      await api.post('/telegram/send-lab-results', {
+        patient_id: patientId,
+        instance_id: activeInstance.id,
+      });
+      notify('success', 'Результаты отправлены пациенту через Telegram.');
+    } catch (error) {
+      const msg = error?.response?.data?.detail || error?.message || 'Не удалось отправить результаты пациенту.';
+      notify('error', typeof msg === 'string' ? msg : 'Не удалось отправить результаты пациенту.');
+    } finally {
+      setSaving(false);
+      setBusyAction('');
+    }
+  }
+
   return (
-    <div style={{ display: 'grid', gap: '16px' }}>
+    <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
       <Card variant="filled" padding="none">
-        <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
-          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
+          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <Icon name="doc.text" size={20} />
             Редактор лабораторного отчёта
           </CardTitle>
         </CardHeader>
-        <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '16px' }}>
+        <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)', display: 'grid', gap: 'var(--mac-spacing-4)' }}>
           {!selectedAppointment && !activeInstance ? (
             <Alert severity="info">
               {recentReports.length > 0
@@ -509,16 +534,16 @@ export default function LabReportWorkbench({
                 : 'Выберите пациента из очереди или откройте уже существующий лабораторный отчёт.'}
             </Alert>
           ) : !activeInstance ? (
-            <div style={{ display: 'grid', gap: '12px' }}>
+            <div style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
               <div style={{ color: 'var(--mac-text-secondary)' }}>
                 Пациент: <strong style={{ color: 'var(--mac-text-primary)' }}>{selectedAppointment?.patient_fio}</strong>
               </div>
               {serviceContextItems.length > 0 && (
-                <div style={{ display: 'grid', gap: '8px' }}>
-                  <div style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
+                <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+                  <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
                     Услуги визита
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
                     {serviceContextItems.map((item) => (
                       <Badge key={item.key} variant="info">
                         {item.label}
@@ -546,7 +571,7 @@ export default function LabReportWorkbench({
                   Для выбранного визита не найдено ни одного допустимого отчёта.
                   Настройте mapping услуги к шаблону (требуется роль Admin)
                   или создайте отчёт без привязки к услугам.
-                  <div style={{ marginTop: '8px' }}>
+                  <div style={{ marginTop: 'var(--mac-spacing-2)' }}>
                     <Button
                       size="small"
                       variant="outline"
@@ -569,8 +594,8 @@ export default function LabReportWorkbench({
                   Единственный допустимый отчёт найден: <strong>{singleAllowedTemplate.name}</strong>. Нажмите «Создать отчёт», чтобы открыть его для заполнения.
                 </Alert>
               )}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'end' }}>
-                <label style={{ display: 'grid', gap: '6px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--mac-spacing-3)', alignItems: 'end' }}>
+                <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <span>{serviceContextPresent && !escapeHatchActive ? 'Допустимый отчёт' : 'Шаблон отчёта'}</span>
                   <select
                     className="macos-input"
@@ -597,23 +622,23 @@ export default function LabReportWorkbench({
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ display: 'grid', gap: '6px' }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+            <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-4)', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+                  <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                       {activeInstance.patient_snapshot?.full_name || `Пациент #${activeInstance.patient_id}`}
                     </div>
                     <Badge variant={getLabStatusVariant(activeInstance.status)}>{formatLabStatus(activeInstance.status)}</Badge>
                     <Badge variant="info">{activeInstance.template?.name}</Badge>
                   </div>
-                  <div style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
+                  <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
                     Визит: {activeInstance.visit_id || 'без визита'} | Отчёт #{activeInstance.id}
                     {/* WF-04 fix: показываем supersedes relationship для audit trail.
                         Если этот отчёт — ревизия другого, лаборант видит связь.
                         Backend поле: supersedes_instance_id (см. lab_reporting_service.py:785). */}
                     {activeInstance.supersedes_instance_id && (
-                      <span style={{ marginLeft: '8px', color: 'var(--mac-accent)' }}>
+                      <span style={{ marginLeft: 'var(--mac-spacing-2)', color: 'var(--mac-accent)' }}>
                         ← исправленная версия отчёта #{activeInstance.supersedes_instance_id}
                       </span>
                     )}
@@ -624,7 +649,7 @@ export default function LabReportWorkbench({
                 </div>
 
                 {/* P-04 fix: панель действий вынесена в LabReportActionsBar */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap', alignItems: 'center' }}>
                   <LabReportActionsBar
                     saving={saving}
                     busyAction={busyAction}
@@ -633,19 +658,22 @@ export default function LabReportWorkbench({
                     canFinalize={canFinalizeWithValidation}
                     canRevise={canRevise}
                     canPrint={canPrint}
+                    // P1 fix: Notify patient — only for finalized/printed reports.
+                    canNotify={activeInstance?.status === 'FINALIZED' || activeInstance?.status === 'PRINTED'}
                     onSaveDraft={handleSaveDraft}
                     onFinalize={handleFinalize}
                     onRevise={handleRevise}
                     onPrint={handlePrint}
+                    onNotify={handleNotifyPatient}
                   />
                   {/* WF-10 fix: inline-индикатор missing required fields.
                       Показываем сколько обязательных полей ещё не заполнено,
                       чтобы лаборант понимал, почему Finalize disabled. */}
                   {canFinalize && hasMissingRequired && (
                     <span style={{
-                      fontSize: '12px',
+                      fontSize: 'var(--mac-font-size-xs)',
                       color: 'var(--mac-accent-orange, #c2410c)',
-                      marginLeft: '8px',
+                      marginLeft: 'var(--mac-spacing-2)',
                     }}>
                       Не заполнено обязательных полей: {missingRequiredFields.length}
                     </span>
@@ -654,10 +682,10 @@ export default function LabReportWorkbench({
                       изменения. Предотвращает потерю данных при переключении. */}
                   {isDirty && canEditActiveInstance && (
                     <span style={{
-                      fontSize: '12px',
+                      fontSize: 'var(--mac-font-size-xs)',
                       color: 'var(--mac-accent-orange, #c2410c)',
-                      marginLeft: '8px',
-                      fontWeight: 500,
+                      marginLeft: 'var(--mac-spacing-2)',
+                      fontWeight: 'var(--mac-font-weight-medium)',
                     }}>
                       ● несохранённые изменения
                     </span>
@@ -673,11 +701,11 @@ export default function LabReportWorkbench({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--mac-spacing-3)' }}>
                 {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
-                  <label key={key} style={{ display: 'grid', gap: '6px' }}>
+                  <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <span>{signerFieldLabels[key] || key}</span>
-                    <input
+                    <Input
                       className="macos-input"
                       aria-label={signerFieldLabels[key] || key}
                       value={signerSnapshot?.[key] || ''}
@@ -696,7 +724,7 @@ export default function LabReportWorkbench({
 
               {activeInstance.critical_findings?.length > 0 && (
                 <Alert severity="error">
-                  <div style={{ display: 'grid', gap: '8px' }}>
+                  <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <strong>Критические результаты</strong>
                     {activeInstance.critical_findings.map((finding) => (
                       <div
@@ -704,13 +732,13 @@ export default function LabReportWorkbench({
                         style={{
                           display: 'grid',
                           gridTemplateColumns: 'minmax(180px, 1.4fr) minmax(110px, 0.7fr) minmax(110px, 0.7fr) minmax(100px, 0.6fr)',
-                          gap: '8px',
+                          gap: 'var(--mac-spacing-2)',
                           alignItems: 'center'
                         }}
                       >
-                        <div style={{ display: 'grid', gap: '2px' }}>
+                        <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
                           <strong>{finding.label}</strong>
-                          <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+                          <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
                             {finding.section_title || finding.section_key}
                           </span>
                         </div>
@@ -718,7 +746,7 @@ export default function LabReportWorkbench({
                           {finding.value_display}
                           {finding.unit ? ` ${finding.unit}` : ''}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
                           {finding.threshold_display || finding.reference_text || '—'}
                         </div>
                           <Badge variant={flagVariant(finding.resolved_flag, finding.resolved_flag_severity)}>
@@ -730,13 +758,13 @@ export default function LabReportWorkbench({
                 </Alert>
               )}
 
-              <div style={{ display: 'grid', gap: '16px' }}>
+              <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
                 {activeInstance.sections.map((section) => (
-                  <div key={section.key} style={{ border: '1px solid var(--mac-border)', borderRadius: '16px', overflow: 'hidden', background: 'var(--mac-bg-primary)' }}>
-                    <div style={{ padding: '12px 16px', background: 'var(--mac-bg-tertiary)', fontWeight: 600 }}>
+                  <div key={section.key} style={{ border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-xl)', overflow: 'hidden', background: 'var(--mac-bg-primary)' }}>
+                    <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', background: 'var(--mac-bg-tertiary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
                       {section.title || section.key}
                     </div>
-                    <div style={{ padding: '12px 16px', display: 'grid', gap: '10px' }}>
+                    <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', display: 'grid', gap: '10px' }}>
                       {section.fields.map((field) => {
                         const choiceOptions = field.choice_options || [];
                         const currentValue = draftValues[field.field_key] ?? '';
@@ -748,13 +776,13 @@ export default function LabReportWorkbench({
                               display: 'grid',
                               gridTemplateColumns:
                                 'minmax(220px, 1.2fr) minmax(140px, 0.9fr) minmax(80px, 0.5fr) minmax(90px, 0.7fr) minmax(70px, 0.4fr)',
-                              gap: '8px',
+                              gap: 'var(--mac-spacing-2)',
                               alignItems: 'center'
                             }}
                           >
-                            <div style={{ display: 'grid', gap: '4px' }}>
+                            <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
                               <strong style={{ color: 'var(--mac-text-primary)' }}>{field.label}</strong>
-                              <div style={{ display: 'grid', gap: '2px', color: 'var(--mac-text-secondary)', fontSize: '12px' }}>
+                              <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
                                 <span>Норма: {field.reference_text || 'не задана'}</span>
                                 {field.resolved_flag_meta?.matched_threshold && (
                                   <span>
@@ -784,22 +812,22 @@ export default function LabReportWorkbench({
                             ) : field.value_type === 'multiline' ? (
                               <textarea
                                 className="macos-input"
-                                aria-label={`Lab result for ${field.label}`}
+                                aria-label={`Результат: ${field.label}`}
                                 rows={3}
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
                                 disabled={!canEditActiveInstance}
                               />
                             ) : (
-                              <input
+                              <Input
                                 className="macos-input"
-                                aria-label={`Lab result for ${field.label}`}
+                                aria-label={`Результат: ${field.label}`}
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
                                 disabled={!canEditActiveInstance}
                               />
                             )}
-                            <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+                            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
                               {field.unit || '—'}
                             </div>
                             <Badge variant={flagVariant(field.resolved_flag, field.resolved_flag_severity)}>

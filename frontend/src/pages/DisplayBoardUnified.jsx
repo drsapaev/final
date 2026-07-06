@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Volume2,
   VolumeX,
@@ -51,7 +52,7 @@ const extractBoardStats = (source) => ({
  * - Темы оформления (новое)
  */
 export default function DisplayBoardUnified({
-  department = 'Reg',
+  department: departmentProp,
   dateStr = todayStr(),
   refreshMs = 15000,
   announcement = '',
@@ -65,6 +66,9 @@ export default function DisplayBoardUnified({
   useTheme();
 
   // Параметры из URL или пропсов
+  // PR #1910 bugfix: department destructured as departmentProp, но использовался
+  // как department — ReferenceError. Возвращаем корректное имя.
+  const department = departmentProp;
   const qs = useMemo(
     () => ({ department: String(department).trim(), d: String(dateStr).trim() }),
     [department, dateStr]
@@ -492,11 +496,11 @@ export default function DisplayBoardUnified({
   // Темы оформления (новое)
   const themes = {
     light: {
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      cardBg: '#ffffff',
+      background: 'linear-gradient(135deg, var(--mac-bg-secondary) 0%, var(--mac-border) 100%)',
+      cardBg: 'var(--mac-bg-primary)',
       textPrimary: '#1a202c',
       textSecondary: '#4a5568',
-      border: '#e2e8f0'
+      border: 'var(--mac-border)'
     },
     dark: {
       background: 'linear-gradient(135deg, #1a202c 0%, #2d3748 100%)',
@@ -506,8 +510,8 @@ export default function DisplayBoardUnified({
       border: '#4a5568'
     },
     medical: {
-      background: 'linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%)',
-      cardBg: '#ffffff',
+      background: 'linear-gradient(135deg, #f0fff4 0%, var(--mac-success-bg) 100%)',
+      cardBg: 'var(--mac-bg-primary)',
       textPrimary: '#1a202c',
       textSecondary: '#4a5568',
       border: '#c6f6d5'
@@ -558,7 +562,7 @@ export default function DisplayBoardUnified({
         <div className="displayboard-flex-center-20">
           {/* Статус соединения */}
           <div className="displayboard-flex-center-8">
-            {connected ? <Wifi size={20} color="#10b981" /> : <WifiOff size={20} color="#dc3545" />}
+            {connected ? <Wifi size={20} color="var(--mac-success)" /> : <WifiOff size={20} color="#dc3545" />}
             <span className="displayboard-conn-status">
               {connected ? 'Подключено' : 'Отключено'}
             </span>

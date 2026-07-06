@@ -94,7 +94,7 @@ export default function Activation() {void
               Повторить
             </Button>
           }
-          style={{ marginBottom: '16px' }}
+          style={{ marginBottom: 'var(--mac-spacing-4)' }}
         />
         }
 
@@ -127,7 +127,8 @@ export default function Activation() {void
             /> :
             filtered.length ?
             <div className="overflow-auto border border-gray-200 rounded">
-                <table className="min-w-full text-sm">
+                <div className="admin-table-wrapper">
+<table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="text-left px-3 py-2 border-b">ID</th>
@@ -149,6 +150,7 @@ export default function Activation() {void
                   )}
                   </tbody>
                 </table>
+</div>
               </div> :
 
             <AppEmpty

@@ -4,7 +4,7 @@ import { api } from '../api';
 import { getVisit } from '../api/visits';
 import {
   AppEmpty, AppError, Button,
-} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors.js';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
@@ -212,7 +212,7 @@ export default function Search() {
           <label htmlFor={searchInputId} style={styles.visuallyHidden}>
             Поиск пациентов и визитов
           </label>
-          <input
+          <Input
             id={searchInputId}
             type="text"
             value={query}
@@ -449,7 +449,7 @@ const styles = {
   container: {
     maxWidth: 1200,
     margin: '0 auto',
-    padding: '24px',
+    padding: 'var(--mac-spacing-6)',
     minHeight: '100vh',
     background: 'var(--mac-bg-secondary)',
   },
@@ -459,7 +459,7 @@ const styles = {
   },
   title: {
     fontSize: 32,
-    fontWeight: 700,
+    fontWeight: 'var(--mac-font-weight-bold)',
     color: 'var(--mac-text-primary)',
     margin: 0,
     display: 'flex',
@@ -503,14 +503,14 @@ const styles = {
     borderRadius: 12,
     outline: 'none',
     transition: 'all 0.2s',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--mac-bg-primary)',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
   },
   searchButton: {
     padding: '16px 32px',
     fontSize: 16,
-    fontWeight: 600,
-    color: '#fff',
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: 'var(--mac-bg-primary)',
     background: 'var(--mac-accent-blue)',
     border: 'none',
     borderRadius: 12,
@@ -531,10 +531,10 @@ const styles = {
     maxWidth: 800,
     margin: '0 auto 24px',
     padding: '16px 20px',
-    backgroundColor: '#fef2f2',
-    color: '#dc2626',
+    backgroundColor: 'var(--mac-error-bg)',
+    color: 'var(--mac-error)',
     borderRadius: 12,
-    border: '1px solid #fecaca',
+    border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
   },
   tabs: {
     display: 'flex',
@@ -546,16 +546,16 @@ const styles = {
   tab: {
     padding: '10px 20px',
     fontSize: 14,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: 'var(--mac-text-secondary)',
-    backgroundColor: '#fff',
-    border: '1px solid #e2e8f0',
+    backgroundColor: 'var(--mac-bg-primary)',
+    border: '1px solid var(--mac-border)',
     borderRadius: 8,
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
   tabActive: {
-    color: '#fff',
+    color: 'var(--mac-bg-primary)',
     backgroundColor: 'var(--mac-accent-blue, #3b82f6)',
     borderColor: 'var(--mac-accent-blue, #3b82f6)',
   },
@@ -568,7 +568,7 @@ const styles = {
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-primary)',
     marginBottom: 16,
     display: 'flex',
@@ -580,7 +580,7 @@ const styles = {
   },
   count: {
     fontSize: 14,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: 'var(--mac-text-secondary)',
     backgroundColor: '#f1f5f9',
     padding: '4px 10px',
@@ -594,9 +594,9 @@ const styles = {
   },
   card: {
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--mac-bg-primary)',
     borderRadius: 12,
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--mac-border)',
     cursor: 'pointer',
     transition: 'all 0.2s',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
@@ -609,18 +609,18 @@ const styles = {
   },
   patientId: {
     fontSize: 12,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-accent-blue, #3b82f6)',
-    backgroundColor: '#eff6ff',
-    padding: '4px 8px',
+    backgroundColor: 'var(--mac-accent-bg)',
+    padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
     borderRadius: 6,
   },
   visitId: {
     fontSize: 12,
-    fontWeight: 600,
-    color: '#8b5cf6',
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: 'var(--mac-accent-purple)',
     backgroundColor: '#f5f3ff',
-    padding: '4px 8px',
+    padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
     borderRadius: 6,
   },
   cardArrow: {
@@ -630,7 +630,7 @@ const styles = {
   },
   patientName: {
     fontSize: 16,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-primary)',
     marginBottom: 8,
   },
@@ -645,7 +645,7 @@ const styles = {
   },
   visitPatient: {
     fontSize: 15,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: 'var(--mac-text-primary)',
     marginBottom: 10,
   },
@@ -657,7 +657,7 @@ const styles = {
   },
   statusBadge: {
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: 'var(--mac-font-weight-medium)',
     padding: '4px 10px',
     borderRadius: 6,
   },
@@ -682,7 +682,7 @@ const styles = {
   },
   noResultsText: {
     fontSize: 20,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-secondary)',
     marginBottom: 8,
   },
@@ -700,7 +700,7 @@ const styles = {
   },
   initialText: {
     fontSize: 20,
-    fontWeight: 600,
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-text-secondary)',
     marginBottom: 8,
   },
@@ -712,10 +712,10 @@ const styles = {
   tips: {
     display: 'inline-block',
     textAlign: 'left',
-    backgroundColor: '#f8fafc',
-    padding: '16px 24px',
+    backgroundColor: 'var(--mac-bg-secondary)',
+    padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
     borderRadius: 12,
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--mac-border)',
   },
   tip: {
     fontSize: 14,

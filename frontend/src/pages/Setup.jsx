@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Check, X, ArrowLeft, AlertTriangle } from 'lucide-react';
 import {
   Button, MacOSCard,
-} from '../components/ui/macos';
+  Input,
+  Checkbox } from '../components/ui/macos';
 import { initializeSetup } from '../api/setup';
 import { getCanonicalRouteById } from '../routing/routeSelectors';
 import logger from '../utils/logger';
@@ -306,8 +307,11 @@ export default function Setup() {
   // UX Audit Stage 2 (Setup issue 2.2): toggle «Филиал = клиника».
   // При включении — копируем текущие значения клиники в филиал.
   // При выключении — оставляем скопированные значения как есть (не очищаем).
-  const handleBranchSameAsClinicChange = (event) => {
-    const checked = event.target.checked;
+  //
+  // UX Audit Setup bugfix: macos Checkbox вызывает onChange(boolean) напрямую,
+  // а не onChange(event). Раньше здесь было `event.target.checked` —
+  // это undefined, и чекбокс вообще не работал.
+  const handleBranchSameAsClinicChange = (checked) => {
     setBranchSameAsClinic(checked);
     if (checked) {
       setForm((prev) => ({
@@ -389,7 +393,7 @@ export default function Setup() {
             <div className="setup-grid">
               <label className="setup-label">
                 <span>Название клиники <span className="setup-required-marker">*</span></span>
-                <input
+                <Input
                   ref={setRequiredFieldRef('clinicName')}
                   className={fieldStyle('clinicName')}
                   name="clinicName"
@@ -403,7 +407,7 @@ export default function Setup() {
               </label>
               <label className="setup-label">
                 Телефон
-                <input
+                <Input
                   className="setup-field"
                   aria-label="Телефон клиники"
                   value={form.clinicPhone}
@@ -412,7 +416,7 @@ export default function Setup() {
               </label>
               <label className="setup-label">
                 Email
-                <input
+                <Input
                   className="setup-field"
                   type="email"
                   aria-label="Email клиники"
@@ -444,7 +448,7 @@ export default function Setup() {
               </label>
               <label className="setup-label setup-label--wide">
                 URL логотипа
-                <input
+                <Input
                   className="setup-field"
                   aria-label="URL логотипа клиники"
                   value={form.clinicLogoUrl}
@@ -463,19 +467,14 @@ export default function Setup() {
 
             {/* UX Audit Stage 2 (Setup issue 2.2): чекбокс авто-копирования. */}
             <label className="setup-checkbox-row">
-              <input
-                type="checkbox"
-                checked={branchSameAsClinic}
-                onChange={handleBranchSameAsClinicChange}
-                aria-label="Адрес, телефон, email и часовой пояс филиала совпадают с клиникой"
-              />
+              <Checkbox checked={branchSameAsClinic} onChange={handleBranchSameAsClinicChange} aria-label="Адрес, телефон, email и часовой пояс филиала совпадают с клиникой" />
               <span>Адрес, телефон, email и часовой пояс филиала совпадают с клиникой</span>
             </label>
 
             <div className="setup-grid">
               <label className="setup-label">
                 <span>Название филиала <span className="setup-required-marker">*</span></span>
-                <input
+                <Input
                   ref={setRequiredFieldRef('branchName')}
                   className={fieldStyle('branchName')}
                   name="branchName"
@@ -489,7 +488,7 @@ export default function Setup() {
               </label>
               <label className="setup-label">
                 Код филиала
-                <input
+                <Input
                   className="setup-field"
                   aria-label="Код филиала"
                   value={form.branchCode}
@@ -499,7 +498,7 @@ export default function Setup() {
               </label>
               <label className="setup-label">
                 Телефон филиала
-                <input
+                <Input
                   className="setup-field"
                   aria-label="Телефон филиала"
                   value={form.branchPhone}
@@ -510,7 +509,7 @@ export default function Setup() {
               </label>
               <label className="setup-label">
                 Email филиала
-                <input
+                <Input
                   className="setup-field"
                   type="email"
                   aria-label="Email филиала"
@@ -556,7 +555,7 @@ export default function Setup() {
             <div className="setup-grid">
               <label className="setup-label">
                 <span>Username <span className="setup-required-marker">*</span></span>
-                <input
+                <Input
                   ref={setRequiredFieldRef('adminUsername')}
                   className={fieldStyle('adminUsername')}
                   name="adminUsername"
@@ -573,7 +572,7 @@ export default function Setup() {
               </label>
               <label className="setup-label">
                 <span>Полное имя <span className="setup-required-marker">*</span></span>
-                <input
+                <Input
                   ref={setRequiredFieldRef('adminFullName')}
                   className={fieldStyle('adminFullName')}
                   name="adminFullName"
@@ -587,7 +586,7 @@ export default function Setup() {
               </label>
               <label className="setup-label">
                 <span>Email <span className="setup-required-marker">*</span></span>
-                <input
+                <Input
                   ref={setRequiredFieldRef('adminEmail')}
                   className={fieldStyle('adminEmail')}
                   type="email"
@@ -607,7 +606,7 @@ export default function Setup() {
               <label className="setup-label">
                 <span>Пароль <span className="setup-required-marker">*</span></span>
                 <div className="setup-password-field">
-                  <input
+                  <Input
                     ref={setRequiredFieldRef('adminPassword')}
                     className={`${fieldStyle('adminPassword')} setup-password-input`}
                     type={showPassword ? 'text' : 'password'}
@@ -663,7 +662,7 @@ export default function Setup() {
               <label className="setup-label">
                 <span>Повторите пароль <span className="setup-required-marker">*</span></span>
                 <div className="setup-password-field">
-                  <input
+                  <Input
                     ref={setRequiredFieldRef('adminPasswordConfirm')}
                     className={`${fieldStyle('adminPasswordConfirm')} setup-password-input`}
                     type={showPasswordConfirm ? 'text' : 'password'}
@@ -719,7 +718,7 @@ export default function Setup() {
             <div className="setup-grid">
               <label className="setup-label setup-label--wide">
                 Ключ активации
-                <input
+                <Input
                   className="setup-field"
                   aria-label="Ключ активации"
                   value={form.activationKey}

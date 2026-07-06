@@ -43,9 +43,9 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
     minHeight: '100vh',
     width: '100%',
     maxWidth: '100%',
-    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+    backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)',
     transition: 'margin-left 0.3s ease',
-    padding: '20px',
+    padding: 'var(--mac-spacing-5)',
     overflow: 'auto' // Разрешаем скролл для просмотра всего контента
   };
 
@@ -60,7 +60,7 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
       style={{
         display: 'flex',
         minHeight: '100vh',
-        backgroundColor: isDark ? '#0f172a' : '#f8fafc'
+        backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
       }}>
       
       
@@ -98,7 +98,7 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
           zIndex: 999
         }}
         onClick={() => setIsCollapsed(true)}

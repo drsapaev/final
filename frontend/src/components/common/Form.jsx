@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
+import { Input } from '../ui/macos';
 
 /**
  * Контекст для форм
@@ -288,7 +289,7 @@ export function FormField({
   const labelStyle = {
     display: 'block',
     fontSize: getFontSize('sm'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('xs')
   };
@@ -298,7 +299,7 @@ export function FormField({
     padding: getSpacing('sm'),
     fontSize: getFontSize('md'),
     border: `1px solid ${error && touched ? getColor('error', 'main') : getColor('border', 'main')}`,
-    borderRadius: '6px',
+    borderRadius: 'var(--mac-radius-sm)',
     backgroundColor: getColor('background', 'primary'),
     color: getColor('text', 'primary'),
     transition: 'border-color 0.2s ease',
@@ -326,7 +327,7 @@ export function FormField({
         </label>
       }
       
-      <input
+      <Input
         id={inputId}
         type={type}
         name={name}
@@ -414,7 +415,7 @@ export function FormTextArea({
   const labelStyle = {
     display: 'block',
     fontSize: getFontSize('sm'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('xs')
   };
@@ -424,7 +425,7 @@ export function FormTextArea({
     padding: getSpacing('sm'),
     fontSize: getFontSize('md'),
     border: `1px solid ${error && touched ? getColor('error', 'main') : getColor('border', 'main')}`,
-    borderRadius: '6px',
+    borderRadius: 'var(--mac-radius-sm)',
     backgroundColor: getColor('background', 'primary'),
     color: getColor('text', 'primary'),
     resize: 'vertical',
@@ -532,7 +533,7 @@ export function FormSelect({
   const labelStyle = {
     display: 'block',
     fontSize: getFontSize('sm'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('xs')
   };
@@ -542,7 +543,7 @@ export function FormSelect({
     padding: getSpacing('sm'),
     fontSize: getFontSize('md'),
     border: `1px solid ${error && touched ? getColor('error', 'main') : getColor('border', 'main')}`,
-    borderRadius: '6px',
+    borderRadius: 'var(--mac-radius-sm)',
     backgroundColor: getColor('background', 'primary'),
     color: getColor('text', 'primary'),
     transition: 'border-color 0.2s ease',
@@ -618,11 +619,11 @@ export function SubmitButton({
   const buttonStyle = {
     padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
     fontSize: getFontSize('md'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     backgroundColor: getColor('primary', 'main'),
     color: getColor('primary', 'contrast'),
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: 'var(--mac-radius-sm)',
     cursor: form?.isSubmitting ? 'not-allowed' : 'pointer',
     opacity: form?.isSubmitting ? 0.7 : 1,
     transition: 'all 0.2s ease',

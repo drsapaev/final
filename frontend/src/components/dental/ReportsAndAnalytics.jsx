@@ -98,8 +98,7 @@ const ReportsAndAnalytics = ({
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
-  const [dateRange, setDateRange] = useState('30d');void
-    useState('all');
+  const [dateRange, setDateRange] = useState('30d');
   const analyticsData = initialData || EMPTY_ANALYTICS_DATA;
   const reportHasData = hasAnalyticsData(analyticsData);
 
@@ -313,7 +312,8 @@ const ReportsAndAnalytics = ({
           <h3 className="text-lg font-semibold">Статистика врачей</h3>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <div className="admin-table-wrapper">
+<table className="w-full">
           <thead className="bg-gray-50">
             <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -385,6 +385,7 @@ const ReportsAndAnalytics = ({
             )}
             </tbody>
           </table>
+</div>
         </div>
         </div>
       </div>;

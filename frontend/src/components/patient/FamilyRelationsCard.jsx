@@ -12,7 +12,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-} from '../ui/macos';
+  Input,
+  Checkbox } from '../ui/macos';
 import {
   Baby,
   Phone,
@@ -39,7 +40,7 @@ const RELATION_TYPES = {
 
 const styles = {
   card: {
-    marginBottom: '16px'
+    marginBottom: 'var(--mac-spacing-4)'
   },
   loading: {
     display: 'flex',
@@ -50,27 +51,27 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px',
-    marginBottom: '16px'
+    gap: 'var(--mac-spacing-3)',
+    marginBottom: 'var(--mac-spacing-4)'
   },
   title: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '17px',
-    fontWeight: 600
+    fontSize: 'var(--mac-font-size-xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)'
   },
   sectionTitle: {
     margin: '0 0 8px',
     color: 'var(--mac-text-secondary)',
-    fontSize: '13px',
-    fontWeight: 600
+    fontSize: 'var(--mac-font-size-sm)',
+    fontWeight: 'var(--mac-font-weight-semibold)'
   },
   list: {
     display: 'grid',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     margin: 0,
     padding: 0,
     listStyle: 'none'
@@ -80,7 +81,7 @@ const styles = {
     gridTemplateColumns: '28px minmax(0, 1fr) auto',
     gap: '10px',
     alignItems: 'start',
-    padding: '10px 0',
+    padding: 'var(--mac-spacing-3) 0',
     borderBottom: '1px solid var(--mac-border)'
   },
   relationIcon: {
@@ -91,34 +92,34 @@ const styles = {
     height: '28px',
     borderRadius: '50%',
     color: 'var(--mac-accent-blue)',
-    background: 'rgba(0, 122, 255, 0.08)'
+    background: 'var(--mac-accent-bg)'
   },
   relationMain: {
     display: 'grid',
-    gap: '6px',
+    gap: 'var(--mac-spacing-2)',
     minWidth: 0
   },
   relationName: {
     display: 'flex',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     color: 'var(--mac-text-primary)',
-    fontSize: '14px',
-    fontWeight: 600
+    fontSize: 'var(--mac-font-size-base)',
+    fontWeight: 'var(--mac-font-weight-semibold)'
   },
   relationMeta: {
     display: 'flex',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     color: 'var(--mac-text-secondary)',
-    fontSize: '13px'
+    fontSize: 'var(--mac-font-size-sm)'
   },
   phone: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '4px'
+    gap: 'var(--mac-spacing-1)'
   },
   description: {
     color: 'var(--mac-text-tertiary)'
@@ -128,7 +129,7 @@ const styles = {
     margin: 0,
     textAlign: 'center',
     color: 'var(--mac-text-secondary)',
-    fontSize: '13px'
+    fontSize: 'var(--mac-font-size-sm)'
   },
   divider: {
     height: '1px',
@@ -149,13 +150,13 @@ const styles = {
   },
   fieldGroup: {
     display: 'grid',
-    gap: '6px',
+    gap: 'var(--mac-spacing-2)',
     marginBottom: '14px'
   },
   label: {
     color: 'var(--mac-text-secondary)',
-    fontSize: '12px',
-    fontWeight: 600
+    fontSize: 'var(--mac-font-size-xs)',
+    fontWeight: 'var(--mac-font-weight-semibold)'
   },
   input: {
     width: '100%',
@@ -181,18 +182,18 @@ const styles = {
   searchRow: {
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) auto',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     alignItems: 'end',
     marginBottom: '14px',
-    marginTop: '4px'
+    marginTop: 'var(--mac-spacing-1)'
   },
   searchResults: {
     display: 'grid',
-    gap: '4px',
+    gap: 'var(--mac-spacing-1)',
     maxHeight: '200px',
     overflow: 'auto',
     margin: '0 0 14px',
-    padding: '6px',
+    padding: 'var(--mac-spacing-2)',
     border: '1px solid var(--mac-border)',
     borderRadius: 'var(--mac-radius-md)',
     listStyle: 'none'
@@ -200,8 +201,8 @@ const styles = {
   searchResultButton: {
     width: '100%',
     display: 'grid',
-    gap: '2px',
-    padding: '8px',
+    gap: 'var(--mac-spacing-1)',
+    padding: 'var(--mac-spacing-2)',
     border: '1px solid transparent',
     borderRadius: 'var(--mac-radius-sm)',
     color: 'var(--mac-text-primary)',
@@ -211,30 +212,30 @@ const styles = {
   },
   resultPhone: {
     color: 'var(--mac-text-secondary)',
-    fontSize: '12px'
+    fontSize: 'var(--mac-font-size-xs)'
   },
   selectedPatient: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px'
+    gap: 'var(--mac-spacing-3)'
   },
   checkboxRow: {
     display: 'grid',
     gridTemplateColumns: 'auto minmax(0, 1fr)',
     gap: '10px',
     alignItems: 'start',
-    marginTop: '4px'
+    marginTop: 'var(--mac-spacing-1)'
   },
   checkboxText: {
     display: 'grid',
-    gap: '2px',
+    gap: 'var(--mac-spacing-1)',
     color: 'var(--mac-text-primary)',
-    fontSize: '13px'
+    fontSize: 'var(--mac-font-size-sm)'
   },
   helpText: {
     color: 'var(--mac-text-secondary)',
-    fontSize: '12px'
+    fontSize: 'var(--mac-font-size-xs)'
   },
   spinner: {
     width: '24px',
@@ -495,7 +496,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         <div style={styles.searchRow}>
           <label style={styles.fieldGroup}>
             <span style={styles.label}>Поиск по ФИО или телефону</span>
-            <input
+            <Input
               aria-label="Search patient by name or phone"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -564,11 +565,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         </label>
 
         <label style={styles.checkboxRow}>
-          <input
-            type="checkbox"
-            aria-label="Mark as primary contact"
-            checked={isPrimaryContact}
-            onChange={(event) => setIsPrimaryContact(event.target.checked)}
+          <Checkbox aria-label="Mark as primary contact" checked={isPrimaryContact} onChange={(event) => setIsPrimaryContact(event.target.checked)}
           />
           <span style={styles.checkboxText}>
             <span>Основной контакт</span>

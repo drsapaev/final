@@ -4,6 +4,9 @@ import {
   Alert,
   Paper,
 } from '../ui/macos';
+// UX Audit Registrar #1: P6 codemod в PR #1898 случайно заменил
+// `from '../ui/macos/List'` на `from '../ui/macos'`. Но `Divider`
+// экспортируется только из ./List, не из barrel-export. Возвращаем прямой путь.
 import { Divider } from '../ui/macos/List';
 import {
   Hospital,
@@ -89,11 +92,11 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
           <Alert
             key={idx}
             severity="success"
-            style={{ marginTop: '8px', marginBottom: '8px' }}>
+            style={{ marginTop: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-2)' }}>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
               <Hospital size={18} />
-              <Typography variant="body1" style={{ fontWeight: 'bold' }}>
+              <Typography variant="body1" style={{ fontWeight: 'var(--mac-font-weight-bold)' }}>
                 {item.content}
               </Typography>
             </div>
@@ -103,7 +106,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
       case 'subheading':
         return (
           <Box key={idx} mt={2} mb={1}>
-            <Typography variant="subtitle1" style={{ fontWeight: 'bold', color: 'var(--mac-accent-blue)' }}>
+            <Typography variant="subtitle1" style={{ fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-blue)' }}>
               {item.content}
             </Typography>
           </Box>);
@@ -111,8 +114,8 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
 
       case 'list':
         return (
-          <Box key={idx} display="flex" alignItems="flex-start" gap={1} style={{ marginLeft: '16px', marginTop: '4px', marginBottom: '4px' }}>
-            <CheckCircle size={16} style={{ marginTop: '4px', color: 'var(--mac-success)' }} />
+          <Box key={idx} display="flex" alignItems="flex-start" gap={1} style={{ marginLeft: 'var(--mac-spacing-4)', marginTop: 'var(--mac-spacing-1)', marginBottom: 'var(--mac-spacing-1)' }}>
+            <CheckCircle size={16} style={{ marginTop: 'var(--mac-spacing-1)', color: 'var(--mac-success)' }} />
             <Typography variant="body2">{item.content}</Typography>
           </Box>);
 
@@ -133,9 +136,9 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
         // Обнаруживаем "Когда использовать:"
         if (item.content.startsWith('Когда использовать:')) {
           return (
-            <Box key={idx} style={{ marginLeft: '16px', marginBottom: '8px' }}>
+            <Box key={idx} style={{ marginLeft: 'var(--mac-spacing-4)', marginBottom: 'var(--mac-spacing-2)' }}>
               <Typography variant="body2" style={{ color: 'var(--mac-text-secondary)' }}>
-                <Info size={16} style={{ verticalAlign: 'middle', marginRight: '4px', display: 'inline-block' }} />
+                <Info size={16} style={{ verticalAlign: 'middle', marginRight: 'var(--mac-spacing-1)', display: 'inline-block' }} />
                 {item.content}
               </Typography>
             </Box>);
@@ -145,7 +148,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
         // Обнаруживаем "Формулировка:"
         if (item.content.startsWith('Формулировка:')) {
           return (
-            <Paper key={idx} variant="outlined" style={{ padding: '12px', marginLeft: '16px', marginBottom: '8px', backgroundColor: 'var(--mac-bg-secondary)' }}>
+            <Paper key={idx} variant="outlined" style={{ padding: 'var(--mac-spacing-3)', marginLeft: 'var(--mac-spacing-4)', marginBottom: 'var(--mac-spacing-2)', backgroundColor: 'var(--mac-bg-secondary)' }}>
               <Typography variant="body2" style={{ fontStyle: 'italic' }}>
                 {item.content.replace('Формулировка:', '').trim()}
               </Typography>
@@ -160,7 +163,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
 
 
       case 'break':
-        return <Divider key={idx} style={{ marginTop: '16px', marginBottom: '16px' }} />;
+        return <Divider key={idx} style={{ marginTop: 'var(--mac-spacing-4)', marginBottom: 'var(--mac-spacing-4)' }} />;
 
       default:
         return null;
@@ -179,10 +182,10 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
     <Paper
       elevation={0}
       style={{
-        padding: '24px',
+        padding: 'var(--mac-spacing-6)',
         backgroundColor: variantBgColor,
         border: '1px solid var(--mac-border)',
-        borderRadius: '8px'
+        borderRadius: 'var(--mac-radius-md)'
       }}>
       
       {sections.map((section, sectionIdx) =>
@@ -190,7 +193,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
           {/* Заголовок секции */}
           {section.type === 'heading' &&
         <Box mb={2}>
-              <Typography variant="h6" style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+              <Typography variant="h6" style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 'var(--mac-spacing-2)' }}>
                 {section.content}
               </Typography>
               <Divider />

@@ -103,7 +103,7 @@
 .emr-section__badge {
     font-size: var(--mac-font-size-xs);
     font-weight: var(--mac-font-weight-semibold);
-    background: rgba(0, 122, 255, 0.12);
+    background: var(--mac-accent-bg);
     color: var(--mac-accent-blue);
     padding: var(--mac-spacing-1) var(--mac-spacing-2);
     border-radius: var(--mac-radius-full);

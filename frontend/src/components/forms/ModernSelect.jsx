@@ -11,6 +11,7 @@ import {
 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernSelect.css';
+import { Input } from '../ui/macos';
 
 const ModernSelect = ({
   label,
@@ -392,7 +393,7 @@ const ModernSelect = ({
           {searchable &&
         <div className="select-search">
               <Search size={16} className="search-icon" />
-              <input
+              <Input
             ref={searchInputRef}
             type="text"
             className="search-input"

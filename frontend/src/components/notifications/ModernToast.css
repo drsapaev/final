@@ -149,11 +149,11 @@
 }
 
 .toast-close:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: color-mix(in srgb, black, transparent 90%);
 }
 
 .dark .toast-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, white, transparent 90%);
 }
 
 /* Прогресс-бар */

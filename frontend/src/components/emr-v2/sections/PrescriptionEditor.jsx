@@ -12,6 +12,7 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Plus, Trash2, Pill } from 'lucide-react';
 import './PrescriptionEditor.css';
+import { Input } from '../../ui/macos';
 
 // Mock DB препаратов
 const MOCK_DRUGS = [
@@ -134,7 +135,7 @@ const PrescriptionEditor = ({
                             <div className="prescription-form__row" style={{ position: 'relative' }}>
                                 <div className="prescription-input-group">
                                     <label className="prescription-label">Препарат</label>
-                                    <input
+                                    <Input
                 className="prescription-input"
                 aria-label="Prescription medicine name"
                 value={newItem.name}
@@ -169,7 +170,7 @@ const PrescriptionEditor = ({
                             <div className="prescription-form__row">
                                 <div className="prescription-input-group prescription-input-group--small">
                                     <label className="prescription-label">Доза</label>
-                                    <input
+                                    <Input
                 className="prescription-input"
                 aria-label="Prescription dose"
                 value={newItem.dose}
@@ -179,7 +180,7 @@ const PrescriptionEditor = ({
                                 </div>
                                 <div className="prescription-input-group">
                                     <label className="prescription-label">Кратность</label>
-                                    <input
+                                    <Input
                 className="prescription-input"
                 aria-label="Prescription frequency"
                 value={newItem.frequency}
@@ -189,7 +190,7 @@ const PrescriptionEditor = ({
                                 </div>
                                 <div className="prescription-input-group prescription-input-group--small">
                                     <label className="prescription-label">Длит.</label>
-                                    <input
+                                    <Input
                 className="prescription-input"
                 aria-label="Prescription duration"
                 value={newItem.duration}

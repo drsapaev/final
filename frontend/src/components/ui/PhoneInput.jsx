@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 /**
  * Современный компонент для ввода телефона с маской
  * Заменяет react-input-mask для избежания findDOMNode warnings
@@ -135,7 +136,7 @@ const PhoneInput = ({
   };
 
   return (
-    <input
+    <Input
       ref={inputRef}
       type="tel"
       value={displayValue}
@@ -145,10 +146,10 @@ const PhoneInput = ({
       placeholder={placeholder}
       style={{
         width: '100%',
-        padding: '12px 16px',
-        border: '1px solid #d1d5db',
-        borderRadius: '8px',
-        fontSize: '16px',
+        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+        border: '1px solid var(--mac-border)',
+        borderRadius: 'var(--mac-radius-md)',
+        fontSize: 'var(--mac-font-size-lg)',
         fontFamily: 'inherit',
         outline: 'none',
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease',

@@ -19,10 +19,11 @@ import { useEMRAI } from '../../ai/useEMRAI';
 import { MCP_PROVIDERS } from '../../../../constants/ai';
 import logger from '../../../../utils/logger';
 import './DermatologySection.css';
+import { Checkbox } from '../../../ui/macos';
 
 /**
  * DermatologySection Component
- * 
+ *
  * @param {Object} props
  * @param {Array} props.photos - Массив фото из specialty_data
  * @param {string} props.skinType - Тип кожи
@@ -30,8 +31,6 @@ import './DermatologySection.css';
  * @param {Object} props.localization - Локализация поражений
  * @param {Function} props.onChange - Handler для изменения specialty_data
  * @param {boolean} props.disabled - Read-only mode
- * @param {number} props.visitId - Visit ID
- * @param {number} props.patientId - Patient ID
  */
 export function DermatologySection({
   photos = [],
@@ -153,11 +152,7 @@ export function DermatologySection({
                 <div className="dermatology-conditions">
                     {['Акне', 'Розацеа', 'Экзема', 'Псориаз', 'Пигментация', 'Морщины'].map((condition) =>
           <label key={condition} className="dermatology-checkbox">
-                            <input
-              type="checkbox"
-              aria-label={`Состояние кожи: ${condition}`}
-              checked={conditions.includes(condition)}
-              onChange={(e) => {
+                            <Checkbox aria-label={`Состояние кожи: ${condition}`} checked={conditions.includes(condition)} onChange={(e) => {
                 if (e.target.checked) {
                   handleConditionAdd(condition);
                 } else {

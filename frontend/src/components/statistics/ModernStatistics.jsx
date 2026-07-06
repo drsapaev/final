@@ -196,7 +196,7 @@ const ModernStatistics = ({
     title: t.totalPatients,
     value: animatedValues.totalPatients || 0,
     iconName: 'person',
-    color: '#007aff',
+    color: 'var(--mac-accent-blue)',
     trend: statistics.trends.patients,
     trendValue: statistics.trendValues.patients,
     suffix: ''
@@ -206,7 +206,7 @@ const ModernStatistics = ({
     title: t.todayAppointments,
     value: animatedValues.todayAppointments || 0,
     iconName: 'calendar',
-    color: '#34c759',
+    color: 'var(--mac-success)',
     trend: statistics.trends.appointments,
     trendValue: statistics.trendValues.appointments,
     suffix: ''
@@ -226,7 +226,7 @@ const ModernStatistics = ({
     title: t.pendingPayments,
     value: animatedValues.pendingPayments || 0,
     iconName: 'creditcard',
-    color: '#ff9500',
+    color: 'var(--mac-warning)',
     trend: statistics.trends.pendingPayments,
     trendValue: statistics.trendValues.pendingPayments,
     suffix: ''
@@ -236,7 +236,7 @@ const ModernStatistics = ({
     title: t.revenue,
     value: animatedValues.revenue || 0,
     iconName: 'creditcard',
-    color: '#34c759',
+    color: 'var(--mac-success)',
     trend: statistics.trends.revenue,
     trendValue: statistics.trendValues.revenue,
     suffix: ' ' + t.sum,
@@ -265,9 +265,9 @@ const ModernStatistics = ({
   // Получение цвета тренда
   const getTrendColor = (trend, isGoodWhenDown = false) => {
     if (isGoodWhenDown) {
-      return trend === 'down' ? '#34c759' : '#ff3b30';
+      return trend === 'down' ? 'var(--mac-success)' : 'var(--mac-error)';
     }
-    return trend === 'up' ? '#34c759' : '#ff3b30';
+    return trend === 'up' ? 'var(--mac-success)' : 'var(--mac-error)';
   };
 
   return (
@@ -333,8 +333,8 @@ const ModernStatistics = ({
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '32px', // 32px как у левой иконки
+                  gap: 'var(--mac-spacing-2)',
+                  fontSize: 'var(--mac-font-size-3xl)', // 32px как у левой иконки
                   fontWeight: 'var(--mac-font-weight-bold)',
                   color: getTrendColor(card.trend, isGoodWhenDown)
                 }}>
@@ -356,7 +356,7 @@ const ModernStatistics = ({
                   marginBottom: 'var(--mac-spacing-2)'
                 }}>
                   {formatValue(card.value, card.format)}
-                  <span style={{ fontSize: '28px', fontWeight: 'var(--mac-font-weight-semibold)', marginLeft: '8px' }}>
+                  <span style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginLeft: 'var(--mac-spacing-2)' }}>
                     {card.suffix}
                   </span>
                 </div>

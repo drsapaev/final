@@ -15,6 +15,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import './ModernFilters.css';
 import PropTypes from 'prop-types';
+import { Input,
+  Checkbox } from '../ui/macos';
 
 const ModernFilters = ({
   searchParams,
@@ -89,7 +91,7 @@ const ModernFilters = ({
       <div className="filters-main-panel">
         <div className="search-container">
           <Search className="search-icon" size={20} />
-          <input
+          <Input
             ref={searchInputRef}
             type="text"
             aria-label="Search appointments"
@@ -119,7 +121,7 @@ const ModernFilters = ({
           {/* Быстрый фильтр по дате */}
           <div className="date-filter">
             <Calendar className="filter-icon" size={18} />
-            <input
+            <Input
               type="date"
               aria-label="Filter appointments by date"
               value={dateValue}
@@ -259,11 +261,7 @@ const ModernFilters = ({
             <div className="filters-controls">
               {/* Автообновление */}
               <label className="auto-refresh-toggle">
-                <input
-                type="checkbox"
-                aria-label="Toggle auto refresh"
-                checked={autoRefresh}
-                onChange={(e) => onAutoRefreshChange(e.target.checked)} />
+                <Checkbox aria-label="Toggle auto refresh" checked={autoRefresh} onChange={(e) => onAutoRefreshChange(e.target.checked)} />
               
                 <RefreshCw size={16} className={autoRefresh ? 'spinning' : ''} />
                 <span>Автообновление</span>

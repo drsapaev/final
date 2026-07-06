@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Printer, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { Printer, AlertCircle, Wifi, WifiOff, Printer as PrinterIcon } from 'lucide-react';
 import ModernDialog from './ModernDialog';
-import { useTheme } from '../../contexts/ThemeContext';
 import { printService } from '../../services/print';
 import { toast } from 'react-toastify';
+// UX Audit Registrar #5: все inline-стили перенесены в PrintDialog.css.
+// useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
+// Также: emoji 🖨️ в ticket-count заменён на lucide Printer icon.
+import './PrintDialog.css';
 
 import logger from '../../utils/logger';
 
@@ -50,12 +53,6 @@ const PrintDialog = ({
   documentData,
   onPrint,
 }) => {
-  const { theme } = useTheme();
-  const surfaceStyle = {
-    backgroundColor: 'var(--mac-bg-secondary)',
-    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
-    borderRadius: '14px',
-  };
   const [printers, setPrinters] = useState([]);
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -101,55 +98,52 @@ const PrintDialog = ({
 
       setPrinters(normalizedPrinters);
 
-      // Автовыбор принтера по умолчанию или первого доступного онлайн
-      const onlinePrinter =
-        normalizedPrinters.find((p) => p.isDefault && p.status === 'online') ||
-        normalizedPrinters.find((p) => p.status === 'online');
-      if (onlinePrinter) {
-        setSelectedPrinter(onlinePrinter.id);
-      } else {
-        setSelectedPrinter('');
-      }
-    } catch (error) {
-      logger.error('Error loading printers:', error);
-      setError(error.message || 'Не удалось загрузить список принтеров');
+      const defaultPrinter = normalizedPrinters.find((p) => p.isDefault);
+      const firstOnline = normalizedPrinters.find((p) => p.status === 'online');
+      setSelectedPrinter(
+        defaultPrinter?.id || firstOnline?.id || normalizedPrinters[0]?.id || '',
+      );
+    } catch (err) {
+      logger.error('Printers load error:', err);
+      setError(err.message || 'Не удалось загрузить принтеры');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handlePrint = async () => {
-    if (!usesBrowserPrint && !selectedPrinter) {
+    if (usesBrowserPrint) {
+      setIsPrinting(true);
+      try {
+        if (onPrint) {
+          await onPrint(documentData);
+        }
+        toast.success('Документ отправлен на печать');
+        onClose();
+      } catch (err) {
+        logger.error('Print error:', err);
+        toast.error(err?.message || 'Ошибка при печати документа');
+      } finally {
+        setIsPrinting(false);
+      }
+      return;
+    }
+
+    if (!selectedPrinter) {
       toast.error('Выберите принтер');
       return;
     }
 
-    const printer = printers.find((p) => p.id === selectedPrinter);
-    if (!usesBrowserPrint && printer?.status !== 'online') {
-      toast.error('Выбранный принтер недоступен');
-      return;
-    }
-
     setIsPrinting(true);
-
     try {
       if (onPrint) {
-        await onPrint(
-          usesBrowserPrint ? null : selectedPrinter,
-          documentType,
-          documentData,
-        );
+        await onPrint(documentData, selectedPrinter);
       }
-
-      toast.success(
-        usesBrowserPrint
-          ? 'Открыт диалог печати этого компьютера'
-          : 'Документ отправлен на печать',
-      );
+      toast.success(`Документ отправлен на принтер «${selectedPrinter}»`);
       onClose();
-    } catch (error) {
-      logger.error('Print error:', error);
-      toast.error('Ошибка при печати: ' + error.message);
+    } catch (err) {
+      logger.error('Print error:', err);
+      toast.error(err?.message || 'Ошибка при печати документа');
     } finally {
       setIsPrinting(false);
     }
@@ -160,24 +154,11 @@ const PrintDialog = ({
       case 'ticket':
         return 'Талон пациента';
       case 'receipt':
-        return 'Чек об оплате';
+        return 'Квитанция об оплате';
       case 'report':
-        return 'Отчет';
+        return 'Отчёт';
       default:
         return 'Документ';
-    }
-  };
-
-  const getDocumentIcon = () => {
-    switch (documentType) {
-      case 'ticket':
-        return '🎫';
-      case 'receipt':
-        return '🧾';
-      case 'report':
-        return '📄';
-      default:
-        return '📄';
     }
   };
 
@@ -189,12 +170,11 @@ const PrintDialog = ({
       disabled: isPrinting,
     },
     {
-      label: isPrinting ? 'Печатаем...' : 'Печать',
+      label: isPrinting ? 'Печать...' : 'Печать',
       variant: 'primary',
-      icon: isPrinting ? null : <Printer size={16} />,
+      icon: <Printer size={16} />,
       onClick: handlePrint,
-      disabled:
-        isPrinting || isLoading || (!usesBrowserPrint && !selectedPrinter),
+      disabled: isPrinting || (!usesBrowserPrint && !selectedPrinter),
     },
   ];
 
@@ -202,95 +182,51 @@ const PrintDialog = ({
     <ModernDialog
       isOpen={isOpen}
       onClose={onClose}
-      title={`${getDocumentIcon()} Печать документа`}
+      title="Печать документа"
       actions={actions}
-      dialogStyle={{
-        backgroundColor: 'var(--mac-bg-primary)',
-      }}
+      dialogClassName="print-dialog--styled"
       closeOnBackdrop={!isPrinting}
       closeOnEscape={!isPrinting}
     >
       <div>
         {/* Информация о документе */}
-        <div
-          style={{
-            marginBottom: '24px',
-            padding: '16px',
-            ...surfaceStyle,
-          }}
-        >
-          <h4
-            style={{
-              color: 'var(--color-text-primary)',
-              margin: '0 0 8px 0',
-              fontSize: '16px',
-              fontWeight: '600',
-            }}
-          >
+        <div className="print-doc-card">
+          <h4 className="print-doc-title">
             {getDocumentTitle()}
           </h4>
 
           {documentData && (
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
-            >
+            <div className="print-doc-fields">
               {documentData.patient_fio && (
-                <p
-                  style={{
-                    color: 'var(--color-text-secondary)',
-                    margin: 0,
-                    fontSize: '14px',
-                  }}
-                >
+                <p className="print-doc-field">
                   Пациент: <strong>{documentData.patient_fio}</strong>
                 </p>
               )}
 
               {documentData.services && (
-                <p
-                  style={{
-                    color: 'var(--color-text-secondary)',
-                    margin: 0,
-                    fontSize: '14px',
-                  }}
-                >
+                <p className="print-doc-field">
                   Услуги: {formatPrintServices(documentData.services)}
                 </p>
               )}
 
               {documentData.cost && (
-                <p
-                  style={{
-                    color: 'var(--color-text-secondary)',
-                    margin: 0,
-                    fontSize: '14px',
-                  }}
-                >
+                <p className="print-doc-field">
                   {/* UX Audit Registrar #1: toLocaleString() без локали + валюта ₽ (рубли)
                       вместо UZS (сумы). Исправлено на ru-RU + UZS. */}
                   Сумма: <strong>{new Intl.NumberFormat('ru-RU').format(documentData.cost)} сум</strong>
                 </p>
               )}
 
-              {/* UX Audit Registrar #1: показываем количество талонов для multi-service записи.
-                  print_tickets и queue_numbers формируются в buildPostWizardPaymentRow.
-                  printPanelTicketInBrowserAsync() уже печатает все талоны в одном окне
-                  с page-break-after, но пользователь не знал, что их будет несколько. */}
+              {/* UX Audit Registrar #1: показываем количество талонов для multi-service записи. */}
               {(() => {
                 const ticketCount =
                   (Array.isArray(documentData.print_tickets) ? documentData.print_tickets.length : 0) ||
                   (Array.isArray(documentData.queue_numbers) ? documentData.queue_numbers.length : 0);
                 if (ticketCount > 1) {
                   return (
-                    <p
-                      style={{
-                        color: 'var(--mac-accent-blue, #0ea5e9)',
-                        margin: 0,
-                        fontSize: '14px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      🖨️ Будет напечатано талонов: {ticketCount}
+                    <p className="print-doc-ticket-count">
+                      <PrinterIcon size={16} aria-hidden="true" />
+                      <span>Будет напечатано талонов: {ticketCount}</span>
                     </p>
                   );
                 }
@@ -301,43 +237,15 @@ const PrintDialog = ({
         </div>
 
         {usesBrowserPrint ? (
-          <div
-            style={{
-              padding: '16px',
-              borderRadius: '14px',
-              backgroundColor:
-                theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : '#eff6ff',
-              border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.24)' : '#bfdbfe'}`,
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '8px',
-              }}
-            >
+          <div className="print-browser-notice">
+            <div className="print-browser-notice-header">
               <Printer size={20} />
               <strong>Печать через браузер</strong>
             </div>
-            <p
-              style={{
-                margin: '0 0 8px 0',
-                fontSize: '14px',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
+            <p className="print-browser-notice-text">
               Будет открыт системный диалог печати на текущем компьютере.
             </p>
-            <p
-              style={{
-                margin: 0,
-                fontSize: '14px',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
+            <p className="print-browser-notice-hint">
               Список принтеров покажет устройства именно этого ПК, а не сервера.
             </p>
           </div>
@@ -345,79 +253,30 @@ const PrintDialog = ({
           <>
             {/* Выбор принтера */}
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  marginBottom: '12px',
-                  color: 'var(--color-text-primary)',
-                }}
-              >
+              <label className="print-field-label">
                 Выберите принтер
               </label>
 
               {isLoading ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '40px',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                >
-                  <div
-                    className="loading-spinner"
-                    style={{ marginRight: '12px' }}
-                  ></div>
+                <div className="print-loading">
+                  <div className="loading-spinner print-loading-spinner"></div>
                   Загрузка принтеров...
                 </div>
               ) : error ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '16px',
-                    backgroundColor:
-                      theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
-                    border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.24)' : '#fecaca'}`,
-                    borderRadius: '14px',
-                    color: theme === 'dark' ? '#fca5a5' : '#dc2626',
-                  }}
-                >
+                <div className="print-error-box">
                   <AlertCircle size={20} />
                   <div>
-                    <p style={{ margin: '0 0 8px 0', fontWeight: '500' }}>
+                    <p className="print-error-title">
                       Ошибка загрузки принтеров
                     </p>
-                    <p style={{ margin: 0, fontSize: '14px' }}>{error}</p>
-                    <button
-                      onClick={loadPrinters}
-                      style={{
-                        marginTop: '8px',
-                        padding: '4px 8px',
-                        fontSize: '12px',
-                        backgroundColor: 'transparent',
-                        border: '1px solid currentColor',
-                        borderRadius: '4px',
-                        color: 'inherit',
-                        cursor: 'pointer',
-                      }}
-                    >
+                    <p className="print-error-message">{error}</p>
+                    <button onClick={loadPrinters} className="print-retry-btn">
                       Повторить
                     </button>
                   </div>
                 </div>
               ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                  }}
-                >
+                <div className="print-printers-container">
                   {printers.map((printer) => (
                     <div
                       key={printer.id}
@@ -438,91 +297,22 @@ const PrintDialog = ({
                           setSelectedPrinter(printer.id);
                         }
                       }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px 14px',
-                        border: `1px solid ${
-                          selectedPrinter === printer.id
-                            ? '#3b82f6'
-                            : theme === 'dark'
-                              ? 'rgba(255,255,255,0.10)'
-                              : 'var(--mac-border)'
-                        }`,
-                        borderRadius: '12px',
-                        backgroundColor:
-                          selectedPrinter === printer.id
-                            ? theme === 'dark'
-                              ? 'rgba(59, 130, 246, 0.16)'
-                              : '#eff6ff'
-                            : theme === 'dark'
-                              ? 'rgba(255,255,255,0.04)'
-                              : 'white',
-                        cursor:
-                          printer.status === 'online'
-                            ? 'pointer'
-                            : 'not-allowed',
-                        opacity: printer.status === 'online' ? 1 : 0.6,
-                        transition: 'all 0.2s ease',
-                      }}
+                      className={`print-printer-item ${selectedPrinter === printer.id ? 'print-printer-item--selected' : ''} ${printer.status !== 'online' ? 'print-printer-item--disabled' : ''}`}
                     >
                       {/* Радио кнопка */}
-                      <div
-                        style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '50%',
-                          border: `2px solid ${selectedPrinter === printer.id ? '#3b82f6' : '#9ca3af'}`,
-                          backgroundColor:
-                            selectedPrinter === printer.id
-                              ? '#3b82f6'
-                              : 'transparent',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {selectedPrinter === printer.id && (
-                          <div
-                            style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              backgroundColor: 'white',
-                            }}
-                          />
-                        )}
+                      <div className={`print-radio ${selectedPrinter === printer.id ? 'print-radio--selected' : ''}`}>
+                        {selectedPrinter === printer.id && <div className="print-radio-dot" />}
                       </div>
 
                       {/* Иконка принтера */}
-                      <Printer
-                        size={20}
-                        style={{
-                          color: 'var(--color-text-secondary)',
-                          flexShrink: 0,
-                        }}
-                      />
+                      <Printer size={20} className="print-printer-icon" />
 
                       {/* Информация о принтере */}
-                      <div style={{ flex: 1 }}>
-                        <div
-                          style={{
-                            color: 'var(--color-text-primary)',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                          }}
-                        >
+                      <div className="print-printer-info">
+                        <div className="print-printer-name-text">
                           {printer.name}
                         </div>
-                        <div
-                          style={{
-                            color: 'var(--color-text-secondary)',
-                            fontSize: '12px',
-                            marginTop: '2px',
-                          }}
-                        >
+                        <div className="print-printer-type">
                           {printer.type === 'thermal' ||
                           printer.type === 'ESC/POS'
                             ? 'Термопринтер'
@@ -535,21 +325,7 @@ const PrintDialog = ({
                       </div>
 
                       {/* Статус */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          color:
-                            printer.status === 'online'
-                              ? '#10b981'
-                              : printer.status
-                                ? '#ef4444'
-                                : '#64748b',
-                        }}
-                      >
+                      <div className={`print-status-badge ${printer.status === 'online' ? 'print-status-badge--online' : printer.status ? 'print-status-badge--error' : ''}`}>
                         {printer.status === 'online' ? (
                           <>
                             <Wifi size={14} />
@@ -573,18 +349,9 @@ const PrintDialog = ({
               )}
 
               {printers.length === 0 && !isLoading && !error && (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '40px',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                >
-                  <Printer
-                    size={48}
-                    style={{ opacity: 0.3, marginBottom: '16px' }}
-                  />
-                  <p style={{ margin: 0 }}>Принтеры не найдены</p>
+                <div className="print-empty-state-full">
+                  <Printer size={48} className="print-empty-state-icon" />
+                  <p className="print-empty-state-text">Принтеры не найдены</p>
                 </div>
               )}
             </div>
@@ -608,6 +375,9 @@ PrintDialog.propTypes = {
       PropTypes.string,
     ]),
     cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    // UX Audit Registrar #5: добавлены пропсы для multi-service ticket count.
+    print_tickets: PropTypes.array,
+    queue_numbers: PropTypes.array,
   }),
   onPrint: PropTypes.func,
 };

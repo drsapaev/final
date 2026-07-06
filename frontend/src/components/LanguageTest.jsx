@@ -13,14 +13,14 @@ const LanguageTest = () => {
 
   return (
     <div style={{
-      padding: '20px',
+      padding: 'var(--mac-spacing-5)',
       background: 'var(--mac-bg-primary)',
       color: 'var(--mac-text-primary)',
       minHeight: '100vh'
     }}>
       <h1>🧪 Тест селектора языка</h1>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
         <h2>Информация о контексте:</h2>
         <p>Текущий язык: <strong>{language}</strong></p>
         <p>Функция t: <strong>{typeof t}</strong></p>
@@ -28,14 +28,14 @@ const LanguageTest = () => {
         <p>Тема: <strong>{isDark ? 'темная' : 'светлая'}</strong></p>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
         <h2>Тест переводов:</h2>
         <p>title: {t('title')}</p>
         <p>loginButton: {t('loginButton')}</p>
         <p>address: {t('address')}</p>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
         <h2>Селектор языка:</h2>
         <Select
           value={language}
@@ -54,7 +54,7 @@ const LanguageTest = () => {
         </Select>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
         <h2>Кнопка переключения темы:</h2>
         <Button onClick={toggleTheme}>
           Переключить на {isDark ? 'светлую' : 'темную'} тему

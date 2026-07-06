@@ -15,7 +15,7 @@ import {
   DialogContent,
   DialogTitle,
   Progress,
-} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   AlertTriangle,
   BrainCircuit,
@@ -37,6 +37,7 @@ import { api } from '../../api/client';
 // the source file.
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
+import { getErrorMessage } from '../../utils/errorHandler';
 import { parseECGFile, analyzeECGParameters } from './ECGParser';
 
 
@@ -45,24 +46,24 @@ const iconSize = 16;
 const styles = {
   root: {
     display: 'grid',
-    gap: '16px',
+    gap: 'var(--mac-spacing-4)',
   },
   sectionTitle: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     margin: '0 0 16px',
     color: 'var(--mac-text-primary)',
-    fontSize: '17px',
-    fontWeight: 600,
+    fontSize: 'var(--mac-font-size-xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   dropzone: (active) => ({
-    marginTop: '16px',
-    padding: '24px',
+    marginTop: 'var(--mac-spacing-4)',
+    padding: 'var(--mac-spacing-6)',
     border: '2px dashed',
     borderColor: active ? 'var(--mac-accent-blue)' : 'var(--mac-border)',
     borderRadius: 'var(--mac-radius-lg)',
-    background: active ? 'rgba(0, 122, 255, 0.08)' : 'var(--mac-card-bg)',
+    background: active ? 'var(--mac-accent-bg)' : 'var(--mac-card-bg)',
     cursor: 'pointer',
     transition: 'border-color 160ms ease, background 160ms ease',
     textAlign: 'center',
@@ -70,17 +71,17 @@ const styles = {
   mutedText: {
     margin: 0,
     color: 'var(--mac-text-secondary)',
-    fontSize: '13px',
+    fontSize: 'var(--mac-font-size-sm)',
   },
   caption: {
     margin: 0,
     color: 'var(--mac-text-secondary)',
-    fontSize: '12px',
+    fontSize: 'var(--mac-font-size-xs)',
   },
   uploadProgress: {
     display: 'grid',
-    gap: '8px',
-    marginTop: '16px',
+    gap: 'var(--mac-spacing-2)',
+    marginTop: 'var(--mac-spacing-4)',
   },
   fileList: {
     display: 'grid',
@@ -92,7 +93,7 @@ const styles = {
   fileItem: {
     display: 'grid',
     gridTemplateColumns: '32px minmax(0, 1fr) auto',
-    gap: '12px',
+    gap: 'var(--mac-spacing-3)',
     alignItems: 'start',
     padding: '14px 0',
     borderTop: '1px solid var(--mac-border)',
@@ -111,19 +112,19 @@ const styles = {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
   },
   fileName: {
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '14px',
-    fontWeight: 600,
+    fontSize: 'var(--mac-font-size-base)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   badgeRow: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '8px',
-    marginTop: '8px',
+    gap: 'var(--mac-spacing-2)',
+    marginTop: 'var(--mac-spacing-2)',
   },
   criticalAlert: {
     marginTop: '10px',
@@ -131,12 +132,12 @@ const styles = {
   criticalList: {
     display: 'grid',
     gap: '3px',
-    marginTop: '6px',
+    marginTop: 'var(--mac-spacing-2)',
   },
   actionRow: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '8px',
+    gap: 'var(--mac-spacing-2)',
     justifyContent: 'flex-end',
   },
   iconButton: {
@@ -158,12 +159,12 @@ const styles = {
   analysisStatus: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: 'var(--mac-spacing-3)',
   },
   analysisPanel: {
     display: 'grid',
-    gap: '16px',
-    padding: '16px',
+    gap: 'var(--mac-spacing-4)',
+    padding: 'var(--mac-spacing-4)',
     borderRadius: 'var(--mac-radius-lg)',
     border: '1px solid var(--mac-border)',
     background: 'var(--mac-bg-secondary)',
@@ -171,26 +172,26 @@ const styles = {
   subsectionTitle: {
     margin: '0 0 8px',
     color: 'var(--mac-text-primary)',
-    fontSize: '13px',
-    fontWeight: 600,
+    fontSize: 'var(--mac-font-size-sm)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   bodyText: {
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '13px',
+    fontSize: 'var(--mac-font-size-sm)',
     lineHeight: 1.5,
   },
   dialogHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px',
+    gap: 'var(--mac-spacing-3)',
   },
   dialogTitle: {
     margin: 0,
     color: 'var(--mac-text-primary)',
-    fontSize: '17px',
-    fontWeight: 600,
+    fontSize: 'var(--mac-font-size-xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
   dialogContent: {
     maxHeight: '78vh',
@@ -213,7 +214,7 @@ const styles = {
   metricGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: '12px',
+    gap: 'var(--mac-spacing-3)',
   },
   metricCard: {
     padding: '14px',
@@ -224,8 +225,8 @@ const styles = {
   metricValue: {
     margin: '4px 0 0',
     color: 'var(--mac-text-primary)',
-    fontSize: '17px',
-    fontWeight: 600,
+    fontSize: 'var(--mac-font-size-xl)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
   },
 };
 
@@ -305,6 +306,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         
       } catch (error) {
         logger.error('Ошибка загрузки ЭКГ:', error);
+        notify.error(getErrorMessage(error, 'Не удалось загрузить ЭКГ-файл. Проверьте соединение и формат файла.'));
         setUploadProgress(0);
       }
     }
@@ -374,6 +376,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       }
     } catch (error) {
       logger.error('Ошибка парсинга ЭКГ:', error);
+      notify.warning('Не удалось разобрать файл ЭКГ. Параметры не извлечены — показан только просмотр.');
     }
   };
 
@@ -401,6 +404,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       logger.error('Ошибка скачивания файла:', error);
+      notify.error('Не удалось скачать файл. Проверьте соединение и попробуйте позже.');
     }
   };
 
@@ -474,6 +478,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       onDataUpdate && onDataUpdate();
     } catch (error) {
       logger.error('Ошибка удаления файла:', error);
+      notify.error('Не удалось удалить файл. Проверьте соединение и попробуйте позже.');
     }
   };
 
@@ -514,14 +519,14 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
           </h3>
 
           <div {...getRootProps()} style={styles.dropzone(isDragActive)}>
-            <input {...getInputProps()} />
+            <Input {...getInputProps()} />
             <CloudUpload size={48} color="var(--mac-text-secondary)" aria-hidden="true" />
-            <p style={{ ...styles.mutedText, marginTop: '8px' }}>
+            <p style={{ ...styles.mutedText, marginTop: 'var(--mac-spacing-2)' }}>
               {isDragActive
                 ? 'Отпустите файлы здесь...'
                 : 'Перетащите ЭКГ файлы или нажмите для выбора'}
             </p>
-            <p style={{ ...styles.caption, marginTop: '6px' }}>
+            <p style={{ ...styles.caption, marginTop: 'var(--mac-spacing-2)' }}>
               Поддерживаются: PDF, SCP, XML, JPG, PNG
             </p>
           </div>
@@ -563,7 +568,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         )}
                       </div>
 
-                      <p style={{ ...styles.caption, marginTop: '4px' }}>
+                      <p style={{ ...styles.caption, marginTop: 'var(--mac-spacing-1)' }}>
                         {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleString()}
                       </p>
 
@@ -723,7 +728,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
             <Button
               variant="outline"
               onClick={closeViewer}
-              style={{ padding: '8px' }}
+              style={{ padding: 'var(--mac-spacing-2)' }}
               aria-label="Закрыть просмотр ЭКГ"
             >
               <X style={{ width: 16, height: 16 }} />
@@ -766,7 +771,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
               )}
 
               {ecgParameters && (
-                <section style={{ marginTop: '16px' }}>
+                <section style={{ marginTop: 'var(--mac-spacing-4)' }}>
                   <h3 style={styles.sectionTitle}>Параметры ЭКГ</h3>
 
                   <div style={styles.metricGrid}>

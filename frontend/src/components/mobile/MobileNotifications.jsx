@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellOff, Settings, Check } from 'lucide-react';
 import { Button, Card, Badge } from '../ui/macos';
@@ -16,7 +17,7 @@ const MobileNotifications = () => {
   const loadNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/mobile/notifications', {
+      const response = await fetch('/mobile/notifications', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -87,7 +88,7 @@ const MobileNotifications = () => {
       });
 
       // Отправляем подписку на сервер
-      await fetch('/api/v1/mobile/notifications/subscribe', {
+      await fetch('/mobile/notifications/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +105,7 @@ const MobileNotifications = () => {
 
   const markAsRead = async (notificationId) => {
     try {
-      await fetch(`/api/v1/mobile/notifications/${notificationId}/read`, {
+      await fetch(`/mobile/notifications/${notificationId}/read`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
@@ -125,7 +126,7 @@ const MobileNotifications = () => {
 
   const markAllAsRead = async () => {
     try {
-      await fetch('/api/v1/mobile/notifications/mark-all-read', {
+      await fetch('/mobile/notifications/mark-all-read', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`

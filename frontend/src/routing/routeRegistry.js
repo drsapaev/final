@@ -74,84 +74,74 @@ export const SIDEBAR_PRESETS = {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
+    // Phase 4+ fix: reduced from 8 tabs to 4 flat tabs.
+    // Goal: cardiologist workflow is "queue → visit" — everything else
+    // (ecg/blood/ai/services/history) was either a separate tab for a tool
+    // that belongs inside the visit (ecg, blood), or admin/lookup that
+    // doesn't belong in the clinical workflow (services, history).
+    //
+    // The 4 remaining tabs:
+    //   queue    — вход: вызвать следующего пациента из очереди
+    //   visit    — единый экран приёма: анамнез + ЭКГ + анализы + диагноз + AI inline
+    //   patients — поиск/история пациентов (включая бывший 'history' tab)
+    //   ai       — AI-помощник (draft support, не диагноз)
+    //
+    // Muscle memory: 4 flat items, well under Miller's 7±2.
     items: [
-      { id: 'queue', label: 'Очередь', icon: 'person.2' },
-      { id: 'appointments', label: 'Записи', icon: 'calendar' },
-      { id: 'visit', label: 'Приём', icon: 'heart' },
-      { id: 'ecg', label: 'ЭКГ', icon: 'waveform.path.ecg' },
-      { id: 'blood', label: 'Анализы крови', icon: 'testtube.2' },
-      { id: 'ai', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
-      { id: 'services', label: 'Услуги', icon: 'stethoscope' },
-      { id: 'history', label: 'История', icon: 'doc.text' },
+      { id: 'queue',    label: 'Очередь',   icon: 'person.2' },
+      { id: 'visit',    label: 'Приём',     icon: 'heart' },
+      { id: 'patients', label: 'Пациенты',  icon: 'person.2' },
+      { id: 'ai',       label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
   dermatology: {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
+    // Phase 4+ fix: reduced from 9 tabs to 4 flat tabs.
+    // Goal: dermatologist workflow is "queue → visit" — everything else
+    // (photos/skin/cosmetic/ai/services/history) was either a separate tab
+    // for a tool that belongs inside the visit (photos, skin, cosmetic),
+    // or admin/lookup that doesn't belong in the clinical workflow.
+    //
+    // The 4 remaining tabs:
+    //   queue    — вход: вызвать следующего пациента из очереди
+    //   visit    — единый экран приёма: анамнез + фото + осмотр кожи + диагноз + AI inline
+    //   patients — поиск/история пациентов (включая бывший 'history' tab)
+    //   ai       — AI-помощник (draft support, не диагноз)
     items: [
-      { id: 'queue', label: 'Очередь', icon: 'person.2' },
-      { id: 'appointments', label: 'Записи', icon: 'calendar' },
-      { id: 'visit', label: 'Приём', icon: 'stethoscope' },
-      // D-7 (UX audit): removed duplicate 'patients' tab — appointments already shows patients
-      { id: 'photos', label: 'Фото', icon: 'camera' },
-      { id: 'skin', label: 'Осмотр кожи', icon: 'eye' },
-      { id: 'cosmetic', label: 'Косметология', icon: 'sparkles' },
-      { id: 'ai', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
-      { id: 'services', label: 'Услуги', icon: 'scissors' },
-      { id: 'history', label: 'История', icon: 'doc.text' },
+      { id: 'queue',    label: 'Очередь',     icon: 'person.2' },
+      { id: 'visit',    label: 'Приём',       icon: 'stethoscope' },
+      { id: 'patients', label: 'Пациенты',    icon: 'person.2' },
+      { id: 'ai',       label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
   dentistry: {
     navigation: 'query',
     queryParam: 'tab',
-    defaultItem: 'dashboard',
-    // P-010 fix: replaced flat 13-item list with 4 grouped sections.
-    // Previously: 13 flat items exceeded Miller's 7±2 cognitive limit and
-    // made it hard for dentists to find tabs. Now grouped into:
-    //   - Обзор (1 item): dashboard
-    //   - Клиническая работа (6 items): patients, appointments, examinations, diagnoses, visits, photos
-    //   - Зубная карта и планы (3 items): dental-chart, treatment-plans, prosthetics
-    //   - Администрирование (3 items): templates, reports, ai-assistant
-    // Each section is well under the cognitive limit; muscle memory is now
-    // "go to section → pick tab" instead of "scan 13-item list".
-    // NOTE: `items` is intentionally removed — sections replace it.
-    // routeSelectors.js flattens sections into sidebarItems for any
-    // backward-compat consumer that still reads .sidebarItems.
-    sections: [
-      {
-        title: 'Обзор',
-        items: [
-          { id: 'dashboard', label: 'Обзор', icon: 'chart.bar' },
-        ],
-      },
-      {
-        title: 'Клиническая работа',
-        items: [
-          { id: 'patients', label: 'Пациенты', icon: 'person.2' },
-          { id: 'appointments', label: 'Записи', icon: 'calendar' },
-          // S-6: merged examinations + diagnoses into visits tab (EMR handles both)
-          { id: 'visits', label: 'Осмотр и диагноз', icon: 'eye' },
-          { id: 'visits', label: 'Протоколы визитов', icon: 'doc.text' },
-          { id: 'photos', label: 'Фотоархив', icon: 'camera' },
-        ],
-      },
-      {
-        title: 'Зубная карта и планы',
-        items: [
-          { id: 'dental-chart', label: 'Зубная карта', icon: 'smile' },
-          { id: 'treatment-plans', label: 'Планы лечения', icon: 'list' },
-          { id: 'prosthetics', label: 'Протезирование', icon: 'smile' },
-        ],
-      },
-      {
-        title: 'Администрирование',
-        items: [
-          { id: 'templates', label: 'Шаблоны', icon: 'doc' },
-          { id: 'reports', label: 'Отчёты', icon: 'chart.bar' },
-          { id: 'ai-assistant', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
-        ],
-      },
+    defaultItem: 'queue',
+    // Phase 4 fix: reduced from 13 tabs in 4 sections to 5 flat tabs.
+    // Goal: dentist workflow is "queue → visit → patient/photos" — everything
+    // else (examinations/diagnoses/dental-chart/treatment-plans/prosthetics/
+    // templates/reports) was either dead UI (treatment-plans/prosthetics had
+    // 501 backend stubs) or duplicated the visit screen (dental-chart
+    // duplicated the chart embedded in the visit; examinations/diagnoses
+    // were merged into EMR v2 visit screen).
+    //
+    // The 5 remaining tabs:
+    //   queue    — вход: вызвать следующего пациента из очереди
+    //   visit    — единый экран приёма: анамнез + схема зубов + Дополнительно
+    //   patients — поиск/история пациентов
+    //   photos   — фотоархив (рентген + intraoral)
+    //   ai-assistant — AI-помощник (draft support, не диагноз)
+    //
+    // Muscle memory: 5 flat items, well under Miller's 7±2.
+    items: [
+      { id: 'queue',         label: 'Очередь',      icon: 'list.number' },
+      { id: 'visit',         label: 'Приём',        icon: 'stethoscope' },
+      { id: 'patients',      label: 'Пациенты',     icon: 'person.2' },
+      { id: 'photos',        label: 'Фотоархив',    icon: 'camera' },
+      { id: 'ai-assistant',  label: 'AI-помощник',  icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
 };
@@ -322,23 +312,6 @@ export const ROUTE_REGISTRY = [
     layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Payment Cancelled' }),
   },
   {
-    id: 'queue-board',
-    path: '/queue-board',
-    group: 'public',
-    surface: 'screen',
-    lifecycle: stable,
-    shell: 'fullscreen',
-    auth: 'public',
-    roles: [],
-    entry: 'direct',
-    nav: false,
-    title: 'Queue Board',
-    owner: 'queue.display',
-    component: 'DisplayBoardUnified',
-    legacyRedirectFrom: [],
-    layout: layout({ hideHeader: true, hideSidebar: true, fullscreen: true, pageTitle: 'Queue Board' }),
-  },
-  {
     id: 'display-board',
     path: '/display-board',
     group: 'public',
@@ -352,7 +325,7 @@ export const ROUTE_REGISTRY = [
     title: 'Display Board',
     owner: 'queue.display',
     component: 'DisplayBoardUnified',
-    legacyRedirectFrom: [],
+    legacyRedirectFrom: ['/queue-board', '/display'],
     layout: layout({ hideHeader: true, hideSidebar: true, fullscreen: true, pageTitle: 'Display Board' }),
   },
   {
@@ -1146,44 +1119,6 @@ export const ROUTE_REGISTRY = [
     layout: layout({ hideSidebar: true, pageTitle: 'Patient Panel' }),
   },
   {
-    id: 'patient-payment-entry',
-    path: '/patient/payments',
-    group: 'clinical',
-    surface: 'screen',
-    lifecycle: stable,
-    shell: 'app-shell',
-    // P-002 fix: previously auth:'authenticated' + roles:[] allowed ANY logged-in
-    // staff member (lab tech, doctor, cashier) to open patient payment pages,
-    // exposing patient financial data without scope. Restricted to Patient role.
-    auth: 'role-scoped',
-    roles: ['Patient'],
-    entry: 'direct',
-    nav: false,
-    title: 'Patient Payments',
-    owner: 'clinical.patient',
-    component: 'PatientPanel',
-    legacyRedirectFrom: [],
-    layout: layout({ hideSidebar: true, activeSidebarItem: 'payments', pageTitle: 'Patient Payments' }),
-  },
-  {
-    id: 'patient-booking-entry',
-    path: '/patient/bookings',
-    group: 'clinical',
-    surface: 'screen',
-    lifecycle: stable,
-    shell: 'app-shell',
-    // P-002 fix: same as patient-payment-entry — restrict to Patient role only.
-    auth: 'role-scoped',
-    roles: ['Patient'],
-    entry: 'direct',
-    nav: false,
-    title: 'Patient Booking',
-    owner: 'clinical.patient',
-    component: 'PatientPanel',
-    legacyRedirectFrom: [],
-    layout: layout({ hideSidebar: true, activeSidebarItem: 'appointments', pageTitle: 'Patient Bookings' }),
-  },
-  {
     id: 'doctor-cardiology',
     path: '/doctor/cardiology',
     group: 'clinical',
@@ -1313,57 +1248,6 @@ export const ROUTE_REGISTRY = [
     component: 'UserProfile',
     legacyRedirectFrom: ['/profile'],
     layout: layout({ hideSidebar: true, pageTitle: 'User Profile' }),
-  },
-  {
-    id: 'clinical-security',
-    path: '/clinical/security',
-    group: 'clinical',
-    surface: 'screen',
-    lifecycle: stable,
-    shell: 'app-shell',
-    auth: 'authenticated',
-    roles: [],
-    entry: 'contextual',
-    nav: false,
-    title: 'Security Settings',
-    owner: 'iam.security',
-    component: 'SecurityPage',
-    legacyRedirectFrom: ['/security'],
-    layout: layout({ sidebarPreset: 'default', pageTitle: 'Security Settings' }),
-  },
-  {
-    id: 'clinical-two-factor',
-    path: '/clinical/security/two-factor',
-    group: 'clinical',
-    surface: 'screen',
-    lifecycle: stable,
-    shell: 'app-shell',
-    auth: 'role-scoped',
-    roles: ['Admin', 'Doctor'],
-    entry: 'direct',
-    nav: false,
-    title: 'Two-Factor Settings',
-    owner: 'iam.security',
-    component: 'TwoFactorManager',
-    legacyRedirectFrom: ['/security-settings'],
-    layout: layout({ sidebarPreset: 'default', pageTitle: 'Two-Factor Settings' }),
-  },
-  {
-    id: 'clinical-visit-details',
-    path: '/clinical/visits/:id',
-    group: 'clinical',
-    surface: 'screen',
-    lifecycle: stable,
-    shell: 'app-shell',
-    auth: 'role-scoped',
-    roles: ['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist'],
-    entry: 'contextual',
-    nav: false,
-    title: 'Visit Details',
-    owner: 'clinical.emr',
-    component: 'VisitDetails',
-    legacyRedirectFrom: ['/visits/:id'],
-    layout: layout({ sidebarPreset: 'default', pageTitle: 'Visit Details' }),
   },
   {
     id: 'clinical-pickup',

@@ -212,14 +212,14 @@ export const Notification = ({
   if (!shouldRender) return null;
 
   const typeConfig = {
-    [notificationTypes.SUCCESS]: { icon: '✅', color: '#10b981', bgColor: '#d1fae5' },
-    [notificationTypes.ERROR]: { icon: '❌', color: '#ef4444', bgColor: '#fee2e2' },
-    [notificationTypes.WARNING]: { icon: '⚠️', color: '#f59e0b', bgColor: '#fef3c7' },
-    [notificationTypes.INFO]: { icon: 'ℹ️', color: '#3b82f6', bgColor: '#dbeafe' },
-    [notificationTypes.MEDICAL]: { icon: '🏥', color: '#8b5cf6', bgColor: '#e9d5ff' },
+    [notificationTypes.SUCCESS]: { icon: '✅', color: 'var(--mac-success)', bgColor: 'var(--mac-success-bg)' },
+    [notificationTypes.ERROR]: { icon: '❌', color: 'var(--mac-error)', bgColor: 'var(--mac-error-bg)' },
+    [notificationTypes.WARNING]: { icon: '⚠️', color: 'var(--mac-warning)', bgColor: 'var(--mac-warning-bg)' },
+    [notificationTypes.INFO]: { icon: 'ℹ️', color: 'var(--mac-accent-blue)', bgColor: 'var(--mac-accent-bg)' },
+    [notificationTypes.MEDICAL]: { icon: '🏥', color: 'var(--mac-accent-purple)', bgColor: '#e9d5ff' },
     [notificationTypes.APPOINTMENT]: { icon: '📅', color: '#06b6d4', bgColor: '#cffafe' },
-    [notificationTypes.PAYMENT]: { icon: '💳', color: '#10b981', bgColor: '#d1fae5' },
-    [notificationTypes.EMERGENCY]: { icon: '🚨', color: '#ef4444', bgColor: '#fee2e2' }
+    [notificationTypes.PAYMENT]: { icon: '💳', color: 'var(--mac-success)', bgColor: 'var(--mac-success-bg)' },
+    [notificationTypes.EMERGENCY]: { icon: '🚨', color: 'var(--mac-error)', bgColor: 'var(--mac-error-bg)' }
   };
 
   const config = typeConfig[notification.type] || typeConfig[notificationTypes.INFO];
@@ -231,9 +231,9 @@ export const Notification = ({
         position: 'relative',
         backgroundColor: config.bgColor,
         border: `1px solid ${config.color}`,
-        borderRadius: '8px',
-        padding: '16px',
-        marginBottom: '12px',
+        borderRadius: 'var(--mac-radius-md)',
+        padding: 'var(--mac-spacing-4)',
+        marginBottom: 'var(--mac-spacing-3)',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
         minWidth: '300px',
         maxWidth: '400px',
@@ -251,11 +251,11 @@ export const Notification = ({
           right: '8px',
           background: 'none',
           border: 'none',
-          fontSize: '16px',
+          fontSize: 'var(--mac-font-size-lg)',
           cursor: 'pointer',
           color: config.color,
-          padding: '4px',
-          borderRadius: '4px',
+          padding: 'var(--mac-spacing-1)',
+          borderRadius: 'var(--mac-radius-sm)',
           transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
         }}
         onMouseEnter={(e) => {
@@ -274,10 +274,10 @@ export const Notification = ({
       </button>
 
       {/* Содержимое */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--mac-spacing-3)' }}>
         <div
           style={{
-            fontSize: '20px',
+            fontSize: 'var(--mac-font-size-2xl)',
             flexShrink: 0,
             marginTop: '2px'
           }}>
@@ -289,10 +289,10 @@ export const Notification = ({
           {notification.title &&
           <div
             style={{
-              fontSize: '14px',
-              fontWeight: '600',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: config.color,
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
             
               {notification.title}
@@ -301,8 +301,8 @@ export const Notification = ({
 
           <div
             style={{
-              fontSize: '14px',
-              color: '#374151',
+              fontSize: 'var(--mac-font-size-base)',
+              color: 'var(--mac-text-primary)',
               lineHeight: '1.4'
             }}>
             
@@ -314,8 +314,8 @@ export const Notification = ({
           <div
             style={{
               display: 'flex',
-              gap: '8px',
-              marginTop: '12px',
+              gap: 'var(--mac-spacing-2)',
+              marginTop: 'var(--mac-spacing-3)',
               flexWrap: 'wrap'
             }}>
             
@@ -324,13 +324,13 @@ export const Notification = ({
               key={index}
               onClick={() => handleAction(action)}
               style={{
-                padding: '6px 12px',
-                fontSize: '12px',
-                fontWeight: '500',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                fontSize: 'var(--mac-font-size-xs)',
+                fontWeight: 'var(--mac-font-weight-medium)',
                 border: `1px solid ${config.color}`,
-                borderRadius: '6px',
+                borderRadius: 'var(--mac-radius-sm)',
                 backgroundColor: config.color,
-                color: '#ffffff',
+                color: 'var(--mac-bg-primary)',
                 cursor: 'pointer',
                 transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
               }}

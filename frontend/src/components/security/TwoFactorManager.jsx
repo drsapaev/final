@@ -81,7 +81,7 @@ function MetricCard({ accent, icon: Icon, label, value }) {
         <Icon size={18} />
       </div>
       <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>{value}</div>
+      <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{value}</div>
     </div>
   );
 }
@@ -154,7 +154,7 @@ function EmptyState({ icon: Icon, title, description, action }) {
         <Icon size={22} />
       </div>
       <div>
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--mac-text-primary)' }}>{title}</div>
+        <div style={{ fontSize: 15, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{title}</div>
         <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>{description}</div>
       </div>
       {action}
@@ -194,7 +194,7 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
           }}
         >
           <div style={{ display: 'grid', gap: 4 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{name}</div>
+            <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)' }}>{name}</div>
             <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{details}</div>
             <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>Последний вход: {lastUsed}</div>
           </div>
@@ -203,7 +203,7 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
                 <span
                   style={{
                     fontSize: 12,
-                    fontWeight: 600,
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     borderRadius: 999,
                     padding: '6px 10px',
                     ...toneChipStyles.info,
@@ -785,14 +785,14 @@ export default function TwoFactorManager() {
                     {method.type === 'email' ? <Mail size={16} /> : <Smartphone size={16} />}
                   </div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{method.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)' }}>{method.label}</div>
                     <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{method.value}</div>
                   </div>
                 </div>
                 <span
                   style={{
                     fontSize: 12,
-                    fontWeight: 600,
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     borderRadius: 999,
                     padding: '6px 10px',
                     ...(method.verified ? toneChipStyles.success : toneChipStyles.warning),
@@ -959,7 +959,7 @@ export default function TwoFactorManager() {
                   {log.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{log.action}</div>
+                  <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)' }}>{log.action}</div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>{log.description}</div>
                   <div style={{ marginTop: 6, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
                     {formatDate(log.timestamp)} • {log.ip_address || 'unknown'} • {log.user_agent || 'unknown'}

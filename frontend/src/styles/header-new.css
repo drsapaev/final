@@ -62,10 +62,10 @@
 
 .hdr-btn--icon { width: 40px; justify-content: center; border: 1px solid rgba(148,163,184,.3); }
 .hdr-btn--ghost { border: 1px solid rgba(148,163,184,.3); }
-.hdr-btn--primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none; }
-.hdr-btn--danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border: none; }
+.hdr-btn--primary { background: linear-gradient(135deg, var(--mac-accent-blue), var(--mac-accent-blue-hover)); color: var(--mac-bg-primary); border: none; }
+.hdr-btn--danger { background: linear-gradient(135deg, var(--mac-error), var(--mac-error)); color: var(--mac-bg-primary); border: none; }
 .hdr-btn--nav { border: 1px solid rgba(148,163,184,.3); }
-.hdr-btn--nav.is-active { background: rgba(59,130,246,.15); border-color: rgba(59,130,246,.4); color: #93c5fd; }
+.hdr-btn--nav.is-active { background: rgba(59,130,246,.15); border-color: rgba(59,130,246,.4); color: var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 60%)); }
 .hdr-btn--brand { font-weight: 800; border: none; }
 
 .hdr-title { font-weight: 800; }

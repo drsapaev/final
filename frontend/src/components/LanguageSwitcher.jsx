@@ -42,11 +42,11 @@ const LanguageSwitcher = ({ compact = false }) => {
                 style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: 'var(--mac-spacing-2)',
                     padding: compact ? '4px 8px' : '6px 12px',
                 }}
             >
-                <span style={{ fontSize: '16px' }}>{currentLang.flag}</span>
+                <span style={{ fontSize: 'var(--mac-font-size-lg)' }}>{currentLang.flag}</span>
                 {!compact && <span>{currentLang.code.toUpperCase()}</span>}
                 <Icon name="chevron.down" size="small" />
             </Button>
@@ -57,7 +57,7 @@ const LanguageSwitcher = ({ compact = false }) => {
                         position: 'absolute',
                         top: '100%',
                         right: 0,
-                        marginTop: '4px',
+                        marginTop: 'var(--mac-spacing-1)',
                         backgroundColor: 'var(--mac-bg-secondary)',
                         borderRadius: 'var(--mac-radius-md)',
                         boxShadow: 'var(--mac-shadow-lg)',
@@ -86,7 +86,7 @@ const LanguageSwitcher = ({ compact = false }) => {
                                     : 'var(--mac-text-primary)',
                                 cursor: 'pointer',
                                 textAlign: 'left',
-                                fontSize: '14px',
+                                fontSize: 'var(--mac-font-size-base)',
                                 transition: 'background 0.15s',
                             }}
                             onMouseEnter={(e) => {
@@ -100,7 +100,7 @@ const LanguageSwitcher = ({ compact = false }) => {
                                 }
                             }}
                         >
-                            <span style={{ fontSize: '18px' }}>{lang.flag}</span>
+                            <span style={{ fontSize: 'var(--mac-font-size-xl)' }}>{lang.flag}</span>
                             <span>{lang.nativeName || lang.name}</span>
                         </button>
                     ))}

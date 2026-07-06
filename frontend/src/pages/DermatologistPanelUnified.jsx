@@ -209,9 +209,10 @@ const DermatologistPanelUnified = () => {
     selectedPatient,
     setSelectedPatient,
   } = useDoctorPanelState({
-    defaultTab: 'appointments',
+    // Phase 4+: sidebar reduced to 4 tabs — queue / visit / patients / ai.
+    defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
-    patientDeepLinkTab: 'appointments',
+    patientDeepLinkTab: 'patients',
   });
   const [selectedServices, setSelectedServices] = useState([]);
   const [visitData, setVisitData] = useState({
@@ -1015,7 +1016,7 @@ const DermatologistPanelUnified = () => {
           urlResolutionRef.current.notified = true;
           setSelectedPatient(null);
           setCurrentAppointment(null);
-          handleTabChange('appointments');
+          handleTabChange('patients');
           notify.info(
             visitIdFromUrl
               ? 'Не удалось найти визит в очереди дерматологии. Выберите запись вручную.'
@@ -1410,8 +1411,9 @@ const DermatologistPanelUnified = () => {
 
         {/* Контент вкладок */}
         <div>
-          {/* Записи дерматолога */}
-          {activeTab === 'appointments' &&
+          {/* Записи дерматолога.
+              Phase 4+: 'patients' tab combines appointments + history. */}
+          {(activeTab === 'appointments' || activeTab === 'patients') &&
           <div className="derma-flex-col-24 derma-w-full derma-max-w-none">
               <MacOSCard className="derma-card-w-full">
                 <div style={dermatologyAppointmentsHeaderStyle}>
@@ -1629,7 +1631,7 @@ const DermatologistPanelUnified = () => {
               title="Выберите визит"
               description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
               action={
-              <Button variant="outline" onClick={() => handleTabChange('appointments')} className="derma-p-4 derma-mt-16">
+              <Button variant="outline" onClick={() => handleTabChange('patients')} className="derma-p-4 derma-mt-16">
                     Перейти к записям
                   </Button>
               } />
@@ -1647,7 +1649,7 @@ const DermatologistPanelUnified = () => {
                 if (updatedPhotos) setPhotoData(updatedPhotos);
                 loadPatientData();
               }}
-              onGoToAppointments={() => handleTabChange('appointments')}
+              onGoToAppointments={() => handleTabChange('patients')}
             />
           }
           {(activeTab === 'skin' || activeTab === 'cosmetic') &&
@@ -1792,8 +1794,9 @@ const DermatologistPanelUnified = () => {
           }
 
           {/* История */}
-          {/* История — R-15: extracted to DermaHistoryTab */}
-          {activeTab === 'history' &&
+          {/* История — R-15: extracted to DermaHistoryTab.
+              Phase 4+: also renders under 'patients' tab. */}
+          {(activeTab === 'history' || activeTab === 'patients') &&
             <DermaHistoryTab
               skinExaminations={skinExaminations}
               cosmeticProcedures={cosmeticProcedures}

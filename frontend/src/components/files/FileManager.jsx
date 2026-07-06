@@ -1,3 +1,4 @@
+import { api } from '../../api/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Archive,
@@ -49,7 +50,7 @@ import {
 const pageStyles = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '16px',
+  gap: 'var(--mac-spacing-4)',
   width: '100%',
   minWidth: 0,
   padding: 'clamp(12px, 2vw, 20px)'
@@ -59,7 +60,7 @@ const headerStyles = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
   flexWrap: 'wrap'
 };
 
@@ -67,7 +68,7 @@ const toolbarStyles = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  gap: '12px',
+  gap: 'var(--mac-spacing-3)',
   flexWrap: 'wrap'
 };
 
@@ -81,7 +82,7 @@ const filterGridStyles = {
 const fileGridStyles = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: '12px'
+  gap: 'var(--mac-spacing-3)'
 };
 
 const iconButtonStyle = {
@@ -119,13 +120,13 @@ const fileTypeLabels = {
 };
 
 const fileTypeColors = {
-  image: '#34c759',
-  video: '#af52de',
-  audio: '#007aff',
-  document: '#ff9500',
-  archive: '#8e8e93',
-  xray: '#ff3b30',
-  other: '#8e8e93'
+  image: 'var(--mac-success)',
+  video: 'var(--mac-accent-purple)',
+  audio: 'var(--mac-accent-blue)',
+  document: 'var(--mac-warning)',
+  archive: 'var(--mac-text-tertiary)',
+  xray: 'var(--mac-error)',
+  other: 'var(--mac-text-tertiary)'
 };
 
 const FileManager = () => {
@@ -165,7 +166,7 @@ const FileManager = () => {
 
   const loadStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/files/statistics', {
+      const response = await fetch('/files/statistics', {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -189,7 +190,7 @@ const FileManager = () => {
       if (searchQuery) params.append('search', searchQuery);
 
       const query = params.toString();
-      const response = await fetch(`/api/v1/files/${query ? `?${query}` : ''}`, {
+      const response = await fetch(`/files/${query ? `?${query}` : ''}`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -287,7 +288,7 @@ const FileManager = () => {
       }
 
       try {
-        const response = await fetch('/api/v1/files/upload', {
+        const response = await fetch('/files/upload', {
           method: 'POST',
           headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
           body: formData
@@ -312,7 +313,7 @@ const FileManager = () => {
 
   const handleDownload = async (fileId, filename) => {
     try {
-      const response = await fetch(`/api/v1/files/${fileId}/download`, {
+      const response = await fetch(`/files/${fileId}/download`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
 
@@ -334,7 +335,7 @@ const FileManager = () => {
 
   const handlePreview = async (fileId) => {
     try {
-      const response = await fetch(`/api/v1/files/${fileId}/preview`, {
+      const response = await fetch(`/files/${fileId}/preview`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
 
@@ -361,7 +362,7 @@ const FileManager = () => {
     if (!ok) return;
 
     try {
-      const response = await fetch(`/api/v1/files/${fileId}`, {
+      const response = await fetch(`/files/${fileId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
@@ -408,7 +409,7 @@ const FileManager = () => {
   const selectedCount = selectedFiles.length;
 
   const renderFileActions = (file) => (
-    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
       <Button
         variant="ghost"
         size="small"
@@ -475,7 +476,7 @@ const FileManager = () => {
                 height: '100%',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                gap: '12px'
+                gap: 'var(--mac-spacing-3)'
               }}
             >
               <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
@@ -486,7 +487,7 @@ const FileManager = () => {
                     height: '38px',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: '8px',
+                    borderRadius: 'var(--mac-radius-md)',
                     background: 'var(--mac-bg-secondary)'
                   }}
                 >
@@ -496,7 +497,7 @@ const FileManager = () => {
                   <h3
                     style={{
                       margin: 0,
-                      fontSize: '14px',
+                      fontSize: 'var(--mac-font-size-base)',
                       color: 'var(--mac-text-primary)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -506,17 +507,17 @@ const FileManager = () => {
                   >
                     {getFileDisplayName(file)}
                   </h3>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
                     {formatFileSize(file.file_size)}
                   </p>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--mac-spacing-2)' }}>
                 <Badge size="small" variant="outline">
                   {fileTypeLabels[file.file_type] || file.file_type || 'Файл'}
                 </Badge>
-                <span style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)' }}>
+                <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                   {formatDate(file.created_at)}
                 </span>
               </div>
@@ -556,9 +557,9 @@ const FileManager = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '220px' }}>
           {getFileIcon(file, 22)}
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>{getFileDisplayName(file)}</div>
+            <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{getFileDisplayName(file)}</div>
             {file.original_filename && (
-              <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{file.original_filename}</div>
+              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>{file.original_filename}</div>
             )}
           </div>
         </div>
@@ -599,15 +600,15 @@ const FileManager = () => {
     <div style={pageStyles}>
       <div style={headerStyles}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '28px', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--mac-font-size-3xl)', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
             Файловый менеджер
           </h1>
-          <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
+          <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
             Управление файлами и документами
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
           <Button variant="secondary" onClick={() => setShowStatsModal(true)}>
             <BarChart3 size={16} />
             Статистика
@@ -668,14 +669,14 @@ const FileManager = () => {
             value={viewMode}
             onChange={setViewMode}
             options={[
-              { value: 'grid', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Grid size={14} />Плитка</span> },
-              { value: 'list', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><ListIcon size={14} />Список</span> }
+              { value: 'grid', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><Grid size={14} />Плитка</span> },
+              { value: 'list', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><ListIcon size={14} />Список</span> }
             ]}
           />
 
           {selectedCount > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--mac-text-secondary)' }}>
-              <span style={{ fontSize: '13px' }}>Выбрано: {selectedCount}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', color: 'var(--mac-text-secondary)' }}>
+              <span style={{ fontSize: 'var(--mac-font-size-sm)' }}>Выбрано: {selectedCount}</span>
               <Button size="small" variant="ghost" onClick={() => setSelectedFiles([])}>
                 Отменить
               </Button>
@@ -715,7 +716,7 @@ const FileManager = () => {
       )}
 
       <Dialog open={showUploadModal} onClose={() => setShowUploadModal(false)} maxWidth="sm">
-        <DialogTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+        <DialogTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
           <span>Загрузить файлы</span>
           <Button
             variant="ghost"
@@ -738,10 +739,10 @@ const FileManager = () => {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '8px',
+              gap: 'var(--mac-spacing-2)',
               padding: '28px 18px',
               border: '1px dashed var(--mac-border)',
-              borderRadius: '10px',
+              borderRadius: 'var(--mac-radius-lg)',
               background: 'var(--mac-bg-secondary)',
               textAlign: 'center',
               cursor: 'pointer'
@@ -749,7 +750,7 @@ const FileManager = () => {
           >
             <UploadIcon size={32} style={{ color: 'var(--mac-text-tertiary)' }} />
             <strong style={{ color: 'var(--mac-text-primary)' }}>Нажмите для выбора файлов</strong>
-            <span style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+            <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
               Поддерживаются все типы файлов
             </span>
           </div>
@@ -764,8 +765,8 @@ const FileManager = () => {
           />
 
           {uploading && (
-            <div style={{ marginTop: '16px', display: 'grid', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+            <div style={{ marginTop: 'var(--mac-spacing-4)', display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--mac-font-size-sm)' }}>
                 <span>Загрузка файлов...</span>
                 <span>{Math.round(uploadProgress)}%</span>
               </div>
@@ -781,7 +782,7 @@ const FileManager = () => {
       </Dialog>
 
       <Dialog open={showStatsModal} onClose={() => setShowStatsModal(false)} maxWidth="md">
-        <DialogTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+        <DialogTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
           <span>Статистика файлов</span>
           <Button
             variant="ghost"
@@ -797,7 +798,7 @@ const FileManager = () => {
           {!stats ? (
             <AppLoading title="Загрузка статистики..." />
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--mac-spacing-3)' }}>
               <Card padding="small" shadow="small">
                 <CardHeader>
                   <CardTitle>Всего файлов</CardTitle>
@@ -824,12 +825,12 @@ const FileManager = () => {
                 <CardHeader>
                   <CardTitle>По типам файлов</CardTitle>
                 </CardHeader>
-                <CardContent style={{ display: 'grid', gap: '8px' }}>
+                <CardContent style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   {Object.entries(stats.files_by_type || {}).length === 0 ? (
                     <span style={{ color: 'var(--mac-text-secondary)' }}>Нет данных</span>
                   ) : (
                     Object.entries(stats.files_by_type || {}).map(([type, count]) => (
-                      <div key={type} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                      <div key={type} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
                         <span style={{ color: 'var(--mac-text-secondary)' }}>{fileTypeLabels[type] || type}</span>
                         <strong>{count}</strong>
                       </div>
@@ -842,12 +843,12 @@ const FileManager = () => {
                 <CardHeader>
                   <CardTitle>Использование хранилища</CardTitle>
                 </CardHeader>
-                <CardContent style={{ display: 'grid', gap: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                <CardContent style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
                     <span style={{ color: 'var(--mac-text-secondary)' }}>Использовано</span>
                     <strong>{formatFileSize(stats.storage_usage?.used_bytes || 0)}</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
                     <span style={{ color: 'var(--mac-text-secondary)' }}>Максимум</span>
                     <strong>{formatFileSize(stats.storage_usage?.max_bytes || 0)}</strong>
                   </div>

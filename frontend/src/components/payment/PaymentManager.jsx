@@ -13,6 +13,7 @@ import {
 import logger from '../../utils/logger';
 import './PaymentManager.css';
 import PropTypes from 'prop-types';
+import { Input } from '../ui/macos';
 
 // UX Audit Stage 3 (Payment issue 8.1):
 // Удалён `const API_BASE = '/api/v1'` и `import { tokenManager }` —
@@ -237,7 +238,7 @@ const PaymentManager = ({
               <div className="payment-form">
                 <div className="form-row">
                   <label htmlFor="payment-manager-amount">Сумма оплаты (сум)</label>
-                  <input
+                  <Input
                     id="payment-manager-amount"
                     type="number"
                     aria-label="Сумма оплаты"

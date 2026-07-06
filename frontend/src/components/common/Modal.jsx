@@ -92,7 +92,7 @@ function ModalContainer({ modals, onClose, theme }) {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
     zIndex: 1000,
     display: 'flex',
     alignItems: 'center',
@@ -157,7 +157,7 @@ function ModalItem({ modal, onClose }) {
 
   const modalStyle = {
     backgroundColor: 'var(--color-background-primary)',
-    borderRadius: '12px',
+    borderRadius: 'var(--mac-radius-lg)',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
     maxWidth: getSize(modal.size),
     width: '100%',
@@ -182,7 +182,7 @@ function ModalItem({ modal, onClose }) {
 
   const titleStyle = {
     fontSize: getFontSize('xl'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--color-text-primary)',
     margin: 0
   };
@@ -194,7 +194,7 @@ function ModalItem({ modal, onClose }) {
     cursor: 'pointer',
     color: 'var(--color-text-secondary)',
     padding: '0.5rem',
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -296,7 +296,7 @@ export function Modal({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
     zIndex: 1000,
     display: 'flex',
     alignItems: 'center',
@@ -314,7 +314,7 @@ export function Modal({
 
   const modalStyle = {
     backgroundColor: 'var(--color-background-primary)',
-    borderRadius: '12px',
+    borderRadius: 'var(--mac-radius-lg)',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
     maxWidth: getSize(size),
     width: '100%',
@@ -337,7 +337,7 @@ export function Modal({
 
   const titleStyle = {
     fontSize: getFontSize('xl'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--color-text-primary)',
     margin: 0
   };
@@ -349,7 +349,7 @@ export function Modal({
     cursor: 'pointer',
     color: 'var(--color-text-secondary)',
     padding: '0.5rem',
-    borderRadius: '4px',
+    borderRadius: 'var(--mac-radius-sm)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -443,7 +443,7 @@ export const modal = {
       title: 'Подтверждение',
       content: <p>{message}</p>,
       footer:
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
           <button onClick={onCancel}>Отмена</button>
           <button onClick={onConfirm}>Подтвердить</button>
         </div>

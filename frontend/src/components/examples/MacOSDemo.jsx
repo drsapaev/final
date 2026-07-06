@@ -21,7 +21,7 @@ import {
   Textarea,
   Toast,
 } from '../ui/macos';
-import AccentPicker from '../ui/macos/AccentPicker.jsx';
+import { AccentPicker } from '../ui/macos';
 
 /**
  * macOS UI Demo Component
@@ -153,12 +153,12 @@ const MacOSDemo = () => {
               <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             flex: 1
           }}>
                 <h1 style={{
-              fontSize: '15px',
-              fontWeight: '600',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
               margin: 0
             }}>
@@ -170,14 +170,14 @@ const MacOSDemo = () => {
               {/* Center section - Actions */}
               <div style={{
             display: 'flex',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             alignItems: 'center'
           }}>
                 <Button
               variant="primary"
               size="small"
               onClick={() => showToast('success', 'Patient created!')}
-              style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              style={{ fontWeight: 'var(--mac-font-weight-semibold)', display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                   <Icon name="plus" size="small" style={{ color: 'white' }} />
                   New Patient
@@ -187,9 +187,9 @@ const MacOSDemo = () => {
               variant="outline"
               size="small"
               onClick={() => showToast('info', 'Search initiated')}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
-                  <Icon name="magnifyingglass" size="small" style={{ color: '#007aff' }} />
+                  <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-accent-blue)' }} />
                   Search
                 </Button>
                 
@@ -197,9 +197,9 @@ const MacOSDemo = () => {
               variant="secondary"
               size="small"
               onClick={() => showToast('warning', 'Settings opened')}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
-                  <Icon name="gear" size="small" style={{ color: '#8e8e93' }} />
+                  <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
                   Settings
                 </Button>
               </div>
@@ -207,9 +207,9 @@ const MacOSDemo = () => {
               {/* Right section - Accent & Theme */}
               <div style={{
             display: 'flex',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             alignItems: 'center',
-            marginLeft: '12px'
+            marginLeft: 'var(--mac-spacing-3)'
           }}>
                 <AccentPicker />
                 <Button
@@ -220,7 +220,7 @@ const MacOSDemo = () => {
                 width: '32px',
                 height: '32px',
                 padding: 0,
-                borderRadius: '6px',
+                borderRadius: 'var(--mac-radius-sm)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -228,7 +228,7 @@ const MacOSDemo = () => {
               aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
               title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
 
-                  <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? '#ff9500' : '#5ac8fa' }} />
+                  <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? 'var(--mac-warning)' : '#5ac8fa' }} />
                 </Button>
               </div>
             </header>
@@ -236,7 +236,7 @@ const MacOSDemo = () => {
 
       <div style={{
         display: 'flex',
-        gap: '20px',
+        gap: 'var(--mac-spacing-5)',
         marginTop: '0px', // Убираем marginTop, так как отступ уже есть в хедере
         flex: 1,
         minHeight: 0,
@@ -245,7 +245,7 @@ const MacOSDemo = () => {
       }}>
             {/* Sidebar с отступом */}
             <div style={{
-          marginTop: '20px', // Увеличиваем отступ сверху для сайдбара от хедера
+          marginTop: 'var(--mac-spacing-5)', // Увеличиваем отступ сверху для сайдбара от хедера
           flexShrink: 0
         }}>
               <Sidebar
@@ -268,7 +268,7 @@ const MacOSDemo = () => {
           flex: 1,
           overflow: 'auto',
           paddingRight: '10px',
-          marginTop: '20px', // Добавляем отступ сверху для контента, чтобы он был на том же уровне, что и сайдбар
+          marginTop: 'var(--mac-spacing-5)', // Добавляем отступ сверху для контента, чтобы он был на том же уровне, что и сайдбар
           minHeight: 0,
           scrollbarWidth: 'thin',
           scrollbarColor: 'var(--mac-border) transparent'
@@ -292,8 +292,8 @@ const MacOSDemo = () => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '20px',
-            marginBottom: '20px',
+            gap: 'var(--mac-spacing-5)',
+            marginBottom: 'var(--mac-spacing-5)',
             paddingBottom: '40px'
           }}>
             {/* Button Demo */}
@@ -303,36 +303,36 @@ const MacOSDemo = () => {
                 <CardDescription>Various button styles and states</CardDescription>
               </CardHeader>
               <CardContent>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <Button variant="primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
+                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
+                  <Button variant="primary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                     <Icon name="plus" size="small" style={{ color: 'white' }} />
                     Primary
                   </Button>
-                  <Button variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="gear" size="small" style={{ color: '#8e8e93' }} />
+                  <Button variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                    <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
                     Secondary
                   </Button>
-                  <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="square.and.arrow.up" size="small" style={{ color: '#007aff' }} />
+                  <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                    <Icon name="square.and.arrow.up" size="small" style={{ color: 'var(--mac-accent-blue)' }} />
                     Outline
                   </Button>
-                  <Button variant="ghost" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="eye" size="small" style={{ color: '#34c759' }} />
+                  <Button variant="ghost" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                    <Icon name="eye" size="small" style={{ color: 'var(--mac-success)' }} />
                     Ghost
                   </Button>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <Button variant="success" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="checkmark.circle" size="small" style={{ color: '#34c759' }} />
+                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
+                  <Button variant="success" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                    <Icon name="checkmark.circle" size="small" style={{ color: 'var(--mac-success)' }} />
                     Success
                   </Button>
-                  <Button variant="warning" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="exclamationmark.triangle" size="small" style={{ color: '#ff9500' }} />
+                  <Button variant="warning" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                    <Icon name="exclamationmark.triangle" size="small" style={{ color: 'var(--mac-warning)' }} />
                     Warning
                   </Button>
-                  <Button variant="danger" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="trash" size="small" style={{ color: '#ff3b30' }} />
+                  <Button variant="danger" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                    <Icon name="trash" size="small" style={{ color: 'var(--mac-error)' }} />
                     Danger
                   </Button>
                 </div>
@@ -347,7 +347,7 @@ const MacOSDemo = () => {
                 <CardDescription>Text inputs with validation</CardDescription>
               </CardHeader>
               <CardContent>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
                   <Input
                     label="Patient Name"
                     placeholder="Enter patient name"
@@ -376,22 +376,22 @@ const MacOSDemo = () => {
                 <CardDescription>Loading states and progress bars</CardDescription>
               </CardHeader>
               <CardContent>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
                   <div>
-                    <div style={{ marginBottom: '8px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                    <div style={{ marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                       Treatment Progress
                     </div>
                     <Progress value={75} max={100} showValue />
                   </div>
                   <div>
-                    <div style={{ marginBottom: '8px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                    <div style={{ marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                       Data Sync
                     </div>
                     <Progress value={45} max={100} variant="primary" />
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
                     <CircularProgress value={85} size="small" />
-                    <span style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>85%</span>
+                    <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>85%</span>
                   </div>
                 </div>
               </CardContent>
@@ -399,36 +399,36 @@ const MacOSDemo = () => {
           </div>
 
           {/* Form Controls Demo */}
-          <Card style={{ marginBottom: '24px' }}>
+          <Card style={{ marginBottom: 'var(--mac-spacing-6)' }}>
             <CardHeader>
               <CardTitle>Form Controls</CardTitle>
               <CardDescription>Complete set of macOS form components</CardDescription>
             </CardHeader>
             <CardContent>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-                <div style={{ display: 'grid', gap: '16px' }}>
-                  <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--mac-text-secondary)', fontWeight: '600' }}>Checkboxes</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--mac-spacing-6)' }}>
+                <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+                  <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Checkboxes</h4>
                   <Checkbox label="Receive notifications" description="Email and push" defaultChecked />
                   <Checkbox label="Enable auto-backup" />
                   <Checkbox label="Sync with cloud" disabled />
                 </div>
                 
-                <div style={{ display: 'grid', gap: '16px' }}>
-                  <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--mac-text-secondary)', fontWeight: '600' }}>Radio Buttons</h4>
+                <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+                  <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Radio Buttons</h4>
                   <Radio name="priority" value="normal" label="Normal Priority" defaultChecked />
                   <Radio name="priority" value="urgent" label="Urgent Priority" />
                   <Radio name="priority" value="low" label="Low Priority" />
                 </div>
                 
-                <div style={{ display: 'grid', gap: '16px' }}>
-                  <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--mac-text-secondary)', fontWeight: '600' }}>Switches</h4>
+                <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+                  <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Switches</h4>
                   <Switch label="Dark Mode" />
                   <Switch label="Push Notifications" defaultChecked />
                   <Switch label="Auto-save" />
                 </div>
                 
-                <div style={{ display: 'grid', gap: '16px' }}>
-                  <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--mac-text-secondary)', fontWeight: '600' }}>Select Dropdown</h4>
+                <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+                  <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Select Dropdown</h4>
                   <Select
                     label="Department"
                     options={[
@@ -442,9 +442,9 @@ const MacOSDemo = () => {
                 </div>
               </div>
               
-              <div style={{ marginTop: '32px', display: 'grid', gap: '20px' }}>
+              <div style={{ marginTop: '32px', display: 'grid', gap: 'var(--mac-spacing-5)' }}>
                 <div>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--mac-text-secondary)', fontWeight: '600' }}>Segmented Control</h4>
+                  <h4 style={{ margin: '0 0 16px 0', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Segmented Control</h4>
                   <SegmentedControl
                     options={[
                     { value: 'all', label: 'All Patients' },
@@ -458,7 +458,7 @@ const MacOSDemo = () => {
                 </div>
                 
                 <div>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--mac-text-secondary)', fontWeight: '600' }}>Textarea</h4>
+                  <h4 style={{ margin: '0 0 16px 0', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Textarea</h4>
                   <Textarea
                     label="Patient Notes"
                     placeholder="Enter detailed patient notes..."
@@ -488,15 +488,15 @@ const MacOSDemo = () => {
                 <div>
                   <h4 style={{
                     margin: '0 0 16px 0',
-                    fontSize: '13px',
+                    fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
-                    fontWeight: '600'
+                    fontWeight: 'var(--mac-font-weight-semibold)'
                   }}>
                     Variant 1: Underline Style (Safari-like)
                   </h4>
                   <div style={{
                     display: 'flex',
-                    marginBottom: '24px',
+                    marginBottom: 'var(--mac-spacing-6)',
                     borderBottom: '1px solid var(--mac-border)'
                   }}>
                     {[
@@ -512,13 +512,13 @@ const MacOSDemo = () => {
                           key={tab.id}
                           onClick={() => setActiveTab1(tab.id)}
                           style={{
-                            padding: '12px 20px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
                             border: 'none',
                             background: 'transparent',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
+                            gap: 'var(--mac-spacing-2)',
                             color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
                             fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                             fontSize: 'var(--mac-font-size-sm)',
@@ -549,10 +549,10 @@ const MacOSDemo = () => {
                   
                   {/* Active tab indicator */}
                   <div style={{
-                    padding: '12px',
+                    padding: 'var(--mac-spacing-3)',
                     backgroundColor: 'var(--mac-bg-tertiary)',
                     borderRadius: 'var(--mac-radius-sm)',
-                    fontSize: '12px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-text-secondary)',
                     fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
                   }}>
@@ -571,15 +571,15 @@ const MacOSDemo = () => {
                 <div>
                   <h4 style={{
                     margin: '0 0 16px 0',
-                    fontSize: '13px',
+                    fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
-                    fontWeight: '600'
+                    fontWeight: 'var(--mac-font-weight-semibold)'
                   }}>
                     Variant 2: Colored Bar Style (Finder-like)
                   </h4>
                   <div style={{
                     display: 'flex',
-                    marginBottom: '24px'
+                    marginBottom: 'var(--mac-spacing-6)'
                   }}>
                     {[
                     { id: 'tab2-1', label: 'Dashboard', icon: 'house' },
@@ -594,13 +594,13 @@ const MacOSDemo = () => {
                           key={tab.id}
                           onClick={() => setActiveTab2(tab.id)}
                           style={{
-                            padding: '12px 20px',
+                            padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
                             border: 'none',
                             background: 'transparent',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
+                            gap: 'var(--mac-spacing-2)',
                             color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
                             fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                             fontSize: 'var(--mac-font-size-sm)',
@@ -640,15 +640,15 @@ const MacOSDemo = () => {
                   </div>
                   <div style={{
                     borderBottom: '1px solid var(--mac-border)',
-                    marginBottom: '24px'
+                    marginBottom: 'var(--mac-spacing-6)'
                   }} />
                   
                   {/* Active tab indicator */}
                   <div style={{
-                    padding: '12px',
+                    padding: 'var(--mac-spacing-3)',
                     backgroundColor: 'var(--mac-bg-tertiary)',
                     borderRadius: 'var(--mac-radius-sm)',
-                    fontSize: '12px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-text-secondary)',
                     fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
                   }}>
@@ -667,19 +667,19 @@ const MacOSDemo = () => {
                 <div>
                   <h4 style={{
                     margin: '0 0 16px 0',
-                    fontSize: '13px',
+                    fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
-                    fontWeight: '600'
+                    fontWeight: 'var(--mac-font-weight-semibold)'
                   }}>
                     Variant 3: Rounded Style (Xcode-like)
                   </h4>
                   <div style={{
                     display: 'flex',
-                    gap: '8px',
-                    marginBottom: '24px',
+                    gap: 'var(--mac-spacing-2)',
+                    marginBottom: 'var(--mac-spacing-6)',
                     backgroundColor: 'var(--mac-bg-secondary)',
                     borderRadius: 'var(--mac-radius-md)',
-                    padding: '4px'
+                    padding: 'var(--mac-spacing-1)'
                   }}>
                     {[
                     { id: 'tab3-1', label: 'Files', icon: 'folder' },
@@ -694,14 +694,14 @@ const MacOSDemo = () => {
                           key={tab.id}
                           onClick={() => setActiveTab3(tab.id)}
                           style={{
-                            padding: '8px 16px',
+                            padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
                             border: 'none',
                             background: isActive ? 'var(--mac-accent-blue)' : 'transparent',
                             color: isActive ? 'white' : 'var(--mac-text-secondary)',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
+                            gap: 'var(--mac-spacing-2)',
                             fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                             fontSize: 'var(--mac-font-size-sm)',
                             borderRadius: 'var(--mac-radius-sm)',
@@ -732,10 +732,10 @@ const MacOSDemo = () => {
                   
                   {/* Active tab indicator */}
                   <div style={{
-                    padding: '12px',
+                    padding: 'var(--mac-spacing-3)',
                     backgroundColor: 'var(--mac-bg-tertiary)',
                     borderRadius: 'var(--mac-radius-sm)',
-                    fontSize: '12px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-text-secondary)',
                     fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
                   }}>
@@ -752,23 +752,23 @@ const MacOSDemo = () => {
 
                 {/* Usage Guidelines */}
                 <div style={{
-                  padding: '16px',
+                  padding: 'var(--mac-spacing-4)',
                   backgroundColor: 'var(--mac-bg-tertiary)',
                   borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border)'
                 }}>
                   <h5 style={{
                     margin: '0 0 12px 0',
-                    fontSize: '13px',
+                    fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-primary)',
-                    fontWeight: '600'
+                    fontWeight: 'var(--mac-font-weight-semibold)'
                   }}>
                     Usage Guidelines:
                   </h5>
                   <ul style={{
                     margin: 0,
                     paddingLeft: '20px',
-                    fontSize: '12px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-text-secondary)',
                     lineHeight: '1.5'
                   }}>
@@ -791,7 +791,7 @@ const MacOSDemo = () => {
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))',
-                gap: '20px'
+                gap: 'var(--mac-spacing-5)'
               }}>
                 {[
                 'house', 'person', 'heart', 'gear', 'bell', 'chart.bar',
@@ -802,17 +802,17 @@ const MacOSDemo = () => {
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '10px',
-                  padding: '16px',
-                  borderRadius: '10px',
+                  padding: 'var(--mac-spacing-4)',
+                  borderRadius: 'var(--mac-radius-lg)',
                   backgroundColor: 'var(--mac-bg-tertiary)',
                   transition: 'all 0.2s ease'
                 }}>
                     <Icon name={iconName} size="large" />
                     <span style={{
-                    fontSize: '11px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-text-secondary)',
                     textAlign: 'center',
-                    fontWeight: '500'
+                    fontWeight: 'var(--mac-font-weight-medium)'
                   }}>
                       {iconName}
                     </span>
@@ -834,15 +834,15 @@ const MacOSDemo = () => {
             <Button
             variant="outline"
             onClick={() => setIsModalOpen(false)}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
-              <Icon name="xmark" size="small" style={{ color: '#8e8e93' }} />
+              <Icon name="xmark" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
               Cancel
             </Button>
             <Button
             variant="primary"
             onClick={() => setIsModalOpen(false)}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
               <Icon name="checkmark" size="small" style={{ color: 'white' }} />
               Confirm
@@ -855,7 +855,7 @@ const MacOSDemo = () => {
           It features backdrop blur, smooth animations, and proper accessibility.
         </p>
 
-        <div style={{ marginTop: '16px' }}>
+        <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
           <Input
             label="Demo Input"
             placeholder="Type something..." />

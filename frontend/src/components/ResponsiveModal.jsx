@@ -81,7 +81,7 @@ const ResponsiveModal = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: isMobile ? 'flex-end' : 'center',
@@ -124,11 +124,11 @@ const ResponsiveModal = ({
         <div
           style={{
             padding: isMobile ? '16px' : '24px',
-            borderBottom: '1px solid #e5e7eb',
+            borderBottom: '1px solid var(--mac-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            background: 'linear-gradient(135deg, var(--mac-accent-blue) 0%, var(--mac-accent-blue-hover) 100%)',
             color: 'white'
           }}>
           
@@ -136,7 +136,7 @@ const ResponsiveModal = ({
             style={{
               margin: 0,
               fontSize: isMobile ? '18px' : '20px',
-              fontWeight: '600'
+              fontWeight: 'var(--mac-font-weight-semibold)'
             }}>
             
               {title}
@@ -150,7 +150,7 @@ const ResponsiveModal = ({
             aria-label={typeof title === 'string' ? `Закрыть: ${title}` : 'Закрыть модальное окно'}
             style={{
               minWidth: 'auto',
-              padding: '8px',
+              padding: 'var(--mac-spacing-2)',
               color: 'white',
               border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
@@ -175,9 +175,9 @@ const ResponsiveModal = ({
         {isMobile &&
         <div
           style={{
-            padding: '16px',
-            borderTop: '1px solid #e5e7eb',
-            background: '#f9fafb'
+            padding: 'var(--mac-spacing-4)',
+            borderTop: '1px solid var(--mac-border)',
+            background: 'var(--mac-bg-secondary)'
           }}>
           
             <Button
