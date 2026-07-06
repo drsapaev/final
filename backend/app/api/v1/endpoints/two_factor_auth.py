@@ -24,12 +24,14 @@ from app.schemas.two_factor_auth import (
     TwoFactorDisableRequest,
     TwoFactorRecoveryRequest,
     TwoFactorRecoveryResponse,
+    TwoFactorRecoveryVerifyRequest,
     TwoFactorSetupRequest,
     TwoFactorSetupResponse,
     TwoFactorStatusResponse,
     TwoFactorSuccessResponse,
     TwoFactorVerifyRequest,
     TwoFactorVerifyResponse,
+    TwoFactorVerifySetupRequest,
 )
 from app.services.authentication_service import get_authentication_service
 from app.services.two_factor_auth_api_service import TwoFactorAuthApiService
@@ -107,13 +109,17 @@ async def setup_two_factor_auth(
 
 @router.post("/verify-setup", response_model=TwoFactorVerifyResponse)
 async def verify_totp_setup(
-    totp_code: str,
+    request_data: TwoFactorVerifySetupRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Верифицировать настройку TOTP"""
+    """Верифицировать настройку TOTP.
+
+    SECURITY (AUTH-REAUDIT-28): totp_code перенесён из query-param в body.
+    """
     try:
         service = get_two_factor_service()
+        totp_code = request_data.totp_code
 
         if len(totp_code) != 6 or not totp_code.isdigit():
             raise HTTPException(
@@ -251,9 +257,19 @@ async def disable_two_factor_auth(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Отключить 2FA для текущего пользователя"""
+    """Отключить 2FA для текущего пользователя.
+
+    SECURITY (AUTH-REAUDIT-28): требуется ОБА фактора — пароль + 2FA-код.
+    """
     try:
         service = get_two_factor_service()
+
+        # SECURITY: 2FA-код обязателен.
+        if not request_data.totp_code and not request_data.backup_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Отключение 2FA требует подтверждения текущим TOTP-кодом или backup-кодом.",
+            )
 
         success = service.disable_two_factor_auth(
             db=db,
@@ -323,10 +339,16 @@ async def request_two_factor_recovery(
             },
         )
 
+        # SECURITY (AUTH-REAUDIT-28): НЕ возвращаем recovery_token в ответе.
+        # Раньше токен возвращался напрямую, что позволяло атакующему с
+        # украденным паролем (но заблокированным 2FA) получить recovery-токен
+        # и обойти канал восстановления (email/phone).
+        # Токен должен отправляться через recovery-канал; API возвращает только
+        # подтверждение и expiry.
         return TwoFactorRecoveryResponse(
-            recovery_token=recovery_token,
+            recovery_token=None,  # не возвращаем
             expires_at=expires_at,
-            message="Recovery token generated successfully",
+            message="Recovery token generated. It was sent to your configured recovery channel.",
         )
 
     except HTTPException:
@@ -337,12 +359,15 @@ async def request_two_factor_recovery(
 
 @router.post("/recovery/verify", response_model=TwoFactorVerifyResponse)
 async def verify_two_factor_recovery(
-    recovery_token: str,
+    request_data: TwoFactorRecoveryVerifyRequest,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Верифицировать восстановление 2FA"""
+    """Верифицировать восстановление 2FA.
+
+    SECURITY (AUTH-REAUDIT-28): recovery_token перенесён из query-param в body.
+    """
     try:
         service = get_two_factor_service()
         ip_address, user_agent = get_client_info(request)
@@ -351,7 +376,7 @@ async def verify_two_factor_recovery(
         success, message, session_token = service.verify_two_factor(
             db=db,
             user_id=current_user.id,
-            recovery_token=recovery_token,
+            recovery_token=request_data.recovery_token,
             device_fingerprint=None,  # Device fingerprint не требуется для recovery verify
             ip_address=ip_address,
             user_agent=user_agent,

@@ -445,20 +445,33 @@ class TwoFactorService:
         totp_code: str | None = None,
         backup_code: str | None = None,
     ) -> bool:
-        """Отключает 2FA для пользователя"""
+        """Отключает 2FA для пользователя.
+
+        SECURITY (AUTH-REAUDIT-28): требуется ОБА фактора — пароль И валидный
+        2FA-код (TOTP или backup). Раньше 2FA-код был опциональным, что
+        позволяло атакующему с украденным паролем (фишинг) отключить 2FA
+        без второго фактора.
+        """
         try:
-            # Получаем пользователя и проверяем пароль
+            # Получаем пользователя и проверяем пароль (1-й фактор)
             user = db.query(User).filter(User.id == user_id).first()
             if not user or not verify_password(password, user.hashed_password):
                 return False
 
-            # Проверяем 2FA код если нужно
-            if totp_code or backup_code:
-                success, _, _ = self.verify_two_factor(
-                    db, user_id, totp_code, backup_code
+            # SECURITY: 2FA-код (2-й фактор) теперь ОБЯЗАТЕЛЕН.
+            if not totp_code and not backup_code:
+                logger.warning(
+                    "2FA disable rejected: missing second factor (user_id=%s)",
+                    user_id,
                 )
-                if not success:
-                    return False
+                return False
+
+            # Проверяем 2FA код
+            success, _, _ = self.verify_two_factor(
+                db, user_id, totp_code, backup_code
+            )
+            if not success:
+                return False
 
             # Удаляем все данные 2FA
             two_factor_auth = (
