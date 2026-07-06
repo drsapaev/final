@@ -611,8 +611,8 @@ def migrate_sqlite_to_postgres(
 
                 if not dry_run and plan.primary_keys == ("id",):
                     target_connection.execute(
-                        text(  # nosec B608 — one-shot SQLite→PG migration script, hardcoded queries
-                            f"""
+                        text(
+                            f"""  # nosec B608 — one-shot SQLite→PG migration script, hardcoded queries
                             SELECT setval(
                                 pg_get_serial_sequence('{plan.table_name}', 'id'),
                                 COALESCE((SELECT MAX(id) FROM "{plan.table_name}"), 1),

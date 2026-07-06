@@ -273,8 +273,15 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
         # UX Audit Stage 3 (Queue WebSocket): broadcast to /ws/queue admin panel.
         try:
             from app.ws.queue_ws import broadcast_queue_update
+            # Resolve specialist_id from the daily_queue (or queue_entry fallback)
+            # to avoid F821 undefined name in this join_queue scope.
+            _specialist_id = (
+                daily_queue.specialist_id
+                if daily_queue
+                else getattr(getattr(queue_entry, "queue", None), "specialist_id", None)
+            )
             broadcast_queue_update(
-                department=f"specialist_{specialist_id}",
+                department=f"specialist_{_specialist_id}",
                 date=queue_day.strftime("%Y-%m-%d") if hasattr(queue_day, "strftime") else str(queue_day),
                 event_type="queue_update",
                 data={"action": "entry_added", "entry_id": queue_entry.id, "number": queue_entry.number},
