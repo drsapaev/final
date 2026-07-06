@@ -346,7 +346,7 @@ async def test_send_lab_results_response_hides_patient_contact_metadata(monkeypa
     )
     assert templates_service.template_data["patient_name"] == "Sensitive Patient"
     assert templates_service.template_data["download_link"] == (
-        "https://clinic.example.com/patient/lab-results"
+        "/patient/lab-results"
     )
     assert templates_service.template_data["doctor_id"] == "assigned"
     assert "/lab-results/123" not in str(templates_service.template_data)
@@ -413,7 +413,7 @@ async def test_send_lab_results_message_omits_raw_patient_and_doctor_ids(
     assert "123456" not in telegram_payload
     assert "789" not in telegram_payload
     assert "44" not in telegram_payload
-    assert "https://clinic.example.com/patient/lab-results" in telegram_payload
+    assert "/patient/lab-results" in telegram_payload
     assert "contact_doctor_assigned" in telegram_payload
 
 

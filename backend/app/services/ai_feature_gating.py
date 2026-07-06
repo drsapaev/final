@@ -44,7 +44,7 @@ def is_ai_feature_enabled(db: Session, flag_key: str) -> bool:
     Missing flag = feature is on by default.
     """
     service = get_feature_flag_service(db)
-    return service.is_enabled(flag_key)
+    return service.is_enabled(flag_key, default=True)
 
 
 def require_ai_feature(db: Session, flag_key: str) -> None:

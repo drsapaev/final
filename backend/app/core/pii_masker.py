@@ -52,7 +52,7 @@ PII_KEY_REGEX = re.compile(
 )
 
 # Phone: +998901234567 → +998901•••567
-PHONE_REGEX = re.compile(r"(\+\d{6})\d{4}(\d{3})")
+PHONE_REGEX = re.compile(r"(\+\d{6})\d{3}(\d{3})")
 
 # Email: john.doe@example.com → j•••@example.com
 EMAIL_REGEX = re.compile(r"([a-zA-Z0-9._%+-])[a-zA-Z0-9._%+-]*@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
@@ -198,10 +198,25 @@ class PIIMaskingFilter:
     """
 
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003 - logging API
-        # Mask the formatted message
+        # Mask PII embedded directly in the message string.
+        try:
+            if isinstance(record.msg, str):
+                record.msg = _mask_string_inplace(record.msg)
+        except Exception:
+            # Never let masking itself break logging
+            pass
+        # Mask PII in args. Note: logging.LogRecord unwraps a single-element
+        # tuple whose only item is a Mapping into the Mapping itself, so we
+        # must handle both shapes.
         if record.args:
             try:
-                record.args = tuple(mask_pii(a) if isinstance(a, (dict, list)) else a for a in record.args)
+                if isinstance(record.args, (dict, list)):
+                    record.args = (mask_pii(record.args),)
+                else:
+                    record.args = tuple(
+                        mask_pii(a) if isinstance(a, (dict, list, str)) else a
+                        for a in record.args
+                    )
             except Exception:
                 # Never let masking itself break logging
                 pass

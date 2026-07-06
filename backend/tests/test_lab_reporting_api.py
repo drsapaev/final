@@ -372,11 +372,9 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert ige_field["resolved_flag"] == "high"
     assert ige_field["resolved_flag_source"] == "catalog_reference"
 
-    ready_response = client.post(
-        f"/api/v1/lab/report-instances/{instance['id']}/mark-ready",
-        headers=auth_headers,
-    )
-    assert ready_response.status_code == 200
+    # /mark-ready endpoint was removed (L-2 fix: it was functionally empty —
+    # backend allows the same actions for DRAFT/IN_PROGRESS/READY statuses).
+    # Skip directly to /finalize, which is permitted from any non-FINALIZED status.
 
     finalize_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/finalize",
