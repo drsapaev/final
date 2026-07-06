@@ -213,6 +213,10 @@ async def _authenticate_by_token(token: str, db: Session) -> User | None:
         return None
 
 
+# Backward-compat alias for tests/external callers that import the old name
+authenticate_websocket = _authenticate_by_token
+
+
 async def chat_websocket_handler(websocket: WebSocket):
     """
     WebSocket endpoint для чата.
