@@ -19,9 +19,9 @@ import {
   Select,
   SegmentedControl,
   Textarea,
-  Toast,
 } from '../ui/macos';
 import { AccentPicker } from '../ui/macos';
+import { notify } from '../../services/notify.js';
 
 /**
  * macOS UI Demo Component
@@ -32,7 +32,6 @@ const MacOSDemo = () => {
   const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
   const [segmentedValue, setSegmentedValue] = useState('all');
   const [textareaValue, setTextareaValue] = useState('');
-  const [toasts, setToasts] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Tab states for demo
@@ -176,7 +175,7 @@ const MacOSDemo = () => {
                 <Button
               variant="primary"
               size="small"
-              onClick={() => showToast('success', 'Patient created!')}
+              onClick={() => notify.success('Patient created!')}
               style={{ fontWeight: 'var(--mac-font-weight-semibold)', display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                   <Icon name="plus" size="small" style={{ color: 'white' }} />
@@ -186,7 +185,7 @@ const MacOSDemo = () => {
                 <Button
               variant="outline"
               size="small"
-              onClick={() => showToast('info', 'Search initiated')}
+              onClick={() => notify.info('Search initiated')}
               style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                   <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-accent-blue)' }} />
@@ -196,7 +195,7 @@ const MacOSDemo = () => {
                 <Button
               variant="secondary"
               size="small"
-              onClick={() => showToast('warning', 'Settings opened')}
+              onClick={() => notify.warning('Settings opened')}
               style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                   <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
