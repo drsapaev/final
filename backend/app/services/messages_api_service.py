@@ -16,7 +16,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
-from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message, can_send_message_with_clinic
+from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message, can_send_message_with_branch
 from app.core.messaging_contract import MessageEventType
 from app.models.file_system import File as FileModel
 from app.models.file_system import FileType
@@ -128,7 +128,7 @@ class MessagesApiService:
         sender_role = current_user.role or "Patient"
         recipient_role = recipient.role or "Patient"
         # F-002: tenant-aware check
-        if not can_send_message_with_clinic(
+        if not can_send_message_with_branch(
             sender_role,
             recipient_role,
             sender_branch_id=getattr(current_user, "branch_id", None),
