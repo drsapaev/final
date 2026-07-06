@@ -8,7 +8,13 @@ const readProvider = (fileName) =>
   fs.readFileSync(path.join(ROOT, fileName), 'utf8').replace(/\r\n/g, '\n');
 
 describe('hosted payment provider ticket contract', () => {
-  for (const fileName of ['PaymentClick.jsx', 'PaymentPayMe.jsx']) {
+  // HIGH #5 fix: PaymentClick.jsx and PaymentPayMe.jsx were unified into
+  // PaymentProviderDialog.jsx. The wrappers preserve the public API and
+  // CSS classes; the source of truth (and the api-calls / ticket-parsing
+  // patterns the contract verifies) now lives in PaymentProviderDialog.jsx.
+  const PROVIDER_FILES = ['PaymentProviderDialog.jsx'];
+
+  for (const fileName of PROVIDER_FILES) {
     it(`${fileName} uses the authenticated api client for protected registrar invoice endpoints`, () => {
       const source = readProvider(fileName);
 
@@ -34,4 +40,14 @@ describe('hosted payment provider ticket contract', () => {
       expect(source).not.toContain('loadPrintTickets');
     });
   }
+
+  it('PaymentClick and PaymentPayMe are thin wrappers around PaymentProviderDialog', () => {
+    for (const fileName of ['PaymentClick.jsx', 'PaymentPayMe.jsx']) {
+      const source = readProvider(fileName);
+      expect(source).toContain("import PaymentProviderDialog from './PaymentProviderDialog'");
+      // Wrappers must NOT contain api calls directly — that logic lives in the dialog.
+      expect(source).not.toContain('api.post');
+      expect(source).not.toContain('api.get');
+    }
+  });
 });

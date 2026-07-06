@@ -614,8 +614,7 @@ async def get_pending_payments(
         }
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения ожидающих оплаты: {str(e)}"
@@ -728,8 +727,7 @@ async def get_cashier_stats(
         )
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения статистики: {str(e)}"
@@ -821,8 +819,7 @@ async def export_payments(
         )
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка экспорта: {str(e)}"
@@ -937,8 +934,7 @@ async def get_payments(
         )
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения истории платежей: {str(e)}"
@@ -1224,12 +1220,43 @@ async def create_payment(
                 paid_amount += p.amount
 
             # 3. Проверяем остаток
-            remaining_debt = total_cost - paid_amount  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
+            remaining_debt = total_cost - paid_amount
 
-            # ⚠️ RELAXED VALIDATION: Разрешаем оплату даже если долг 0 (депозит/аванс)
-            # или если total_cost посчитан неверно (0), но кассир хочет принять деньги.
-            # if payment_data.amount > remaining_debt:
-            #    raise HTTPException(...)
+            # === ВАЛИДАЦИЯ ПЕРЕПЛАТЫ С AUDIT-TRAIL ===
+            # Кассир может принять сумму, превышающую остаток (аванс/депозит),
+            # но это должно быть явно залогировано для финансового аудита.
+            try:
+                payment_amount_decimal = Decimal(str(payment_data.amount))
+            except (ArithmeticError, ValueError):
+                payment_amount_decimal = Decimal("0")
+
+            overpayment_amount = payment_amount_decimal - remaining_debt
+            if overpayment_amount > Decimal("0"):
+                # Авансовый платёж/переплата: разрешаем, но записываем в audit log.
+                logger.warning(
+                    "Cashier overpayment accepted: visit_id=%s patient_id=%s "
+                    "total_cost=%s paid_amount=%s remaining_debt=%s "
+                    "payment_amount=%s overpayment=%s cashier_id=%s",
+                    visit.id,
+                    patient_id,
+                    str(total_cost),
+                    str(paid_amount),
+                    str(remaining_debt),
+                    str(payment_amount_decimal),
+                    str(overpayment_amount),
+                    getattr(current_user, "id", None),
+                )
+
+            # Запрещаем приём платежа, когда услуги уже полностью оплачены
+            # и кассир пытается принять ещё один (без явного намерения аванса).
+            if remaining_debt <= Decimal("0") and payment_amount_decimal > Decimal("0"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Все услуги уже оплачены. "
+                        "Приём дополнительного платежа невозможен без авансового договора."
+                    ),
+                )
 
         else:
             raise HTTPException(
@@ -1293,8 +1320,7 @@ async def create_payment(
         raise
     except Exception as e:
         db.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка создания платежа: {str(e)}"
@@ -1396,8 +1422,7 @@ async def cancel_payment(
 
     except Exception as e:
         db.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка отмены платежа: {str(e)}"
@@ -1471,8 +1496,7 @@ async def mark_visit_as_paid(
 
     except Exception as e:
         db.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления статуса визита: {str(e)}"
@@ -1618,8 +1642,7 @@ async def refund_payment(
         raise
     except Exception as e:
         db.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка возврата средств: {str(e)}"
@@ -1648,8 +1671,7 @@ async def get_payment_receipt(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка генерации чека: {str(e)}"
@@ -1700,8 +1722,7 @@ async def get_hourly_stats(
         return [HourlyStatItem(**data) for data in hourly_data.values()]
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения почасовой статистики: {str(e)}"

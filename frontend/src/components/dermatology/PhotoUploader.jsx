@@ -37,6 +37,7 @@ import { useDropzone } from 'react-dropzone';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import PropTypes from 'prop-types';
 const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
@@ -85,6 +86,14 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
 
   // Обработка загрузки файлов
   const handleFileDrop = useCallback(async (acceptedFiles, fileType) => {
+    // D-001 fix: validate patientId/visitId BEFORE starting FileReader.
+    // Previously this check was inside reader.onload (async callback),
+    // causing an unhandled promise rejection that crashed silently.
+    if (!patientId && !visitId) {
+      notify.error('Для загрузки фото выберите пациента или визит');
+      return;
+    }
+
     for (const file of acceptedFiles) {
       setUploadProgress(0);
 
@@ -102,10 +111,6 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
 
           // Загружаем на сервер
           const formData = new FormData();
-          if (!patientId && !visitId) {
-            throw new Error('Photo upload requires patientId or visitId');
-          }
-
           formData.append('file', processedFile);
           formData.append('file_type', 'image');
           formData.append('title', processedFile.name);
@@ -117,33 +122,51 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
             formData.append('visit_id', visitId);
           }
 
-          const response = await api.post('/files/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round(
-                progressEvent.loaded * 100 / progressEvent.total
-              );
-              setUploadProgress(percentCompleted);
-            }
-          });
+          try {
+            const response = await api.post('/files/upload', formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+              onUploadProgress: (progressEvent) => {
+                const percentCompleted = Math.round(
+                  progressEvent.loaded * 100 / progressEvent.total
+                );
+                setUploadProgress(percentCompleted);
+              }
+            });
 
-          const newPhoto = {
-            id: response.data.id,
-            url: response.data.url || (response.data.id ? `/api/v1/files/${response.data.id}/download` : preview),
-            preview: preview,
-            name: processedFile.name,
-            size: processedFile.size,
-            uploadedAt: new Date().toISOString(),
-            metadata: metadata
-          };
+            const newPhoto = {
+              id: response.data.id,
+              url: response.data.url || (response.data.id ? `/api/v1/files/${response.data.id}/download` : preview),
+              preview: preview,
+              name: processedFile.name,
+              size: processedFile.size,
+              uploadedAt: new Date().toISOString(),
+              metadata: metadata
+            };
 
-          setPhotos((prev) => ({
-            ...prev,
-            [fileType]: [...prev[fileType], newPhoto]
-          }));
+            // D-001 fix: compute updatedPhotos BEFORE setPhotos, then pass
+            // the computed value to onDataUpdate. Previously `photos` was
+            // stale (setPhotos is async) so the parent received old data.
+            setPhotos((prev) => {
+              const updated = {
+                ...prev,
+                [fileType]: [...prev[fileType], newPhoto]
+              };
+              onDataUpdate && onDataUpdate(updated);
+              return updated;
+            });
 
+            setUploadProgress(0);
+          } catch (uploadError) {
+            logger.error('Photo upload failed:', uploadError);
+            notify.error('Не удалось загрузить фото. Проверьте соединение и попробуйте снова.');
+            setUploadProgress(0);
+          }
+        };
+
+        reader.onerror = () => {
+          logger.error('FileReader error');
+          notify.error('Не удалось прочитать файл.');
           setUploadProgress(0);
-          onDataUpdate && onDataUpdate(photos);
         };
 
         reader.readAsDataURL(processedFile);
@@ -196,13 +219,21 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   const deletePhoto = async (photoId, type) => {
     try {
       await api.delete(`/files/${photoId}`);
-      setPhotos((prev) => ({
-        ...prev,
-        [type]: prev[type].filter((p) => p.id !== photoId)
-      }));
-      onDataUpdate && onDataUpdate();
+      // D-001 fix: compute updated photos inside setPhotos callback
+      // and pass to onDataUpdate. Previously onDataUpdate() was called
+      // with no argument, so the parent received undefined.
+      setPhotos((prev) => {
+        const updated = {
+          ...prev,
+          [type]: prev[type].filter((p) => p.id !== photoId)
+        };
+        onDataUpdate && onDataUpdate(updated);
+        return updated;
+      });
+      notify.success('Фото удалено');
     } catch (error) {
       logger.error('Ошибка удаления фото:', error);
+      notify.error('Не удалось удалить фото. Проверьте соединение и попробуйте снова.');
     }
   };
 

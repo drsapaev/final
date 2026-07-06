@@ -19,6 +19,7 @@ import {
   Send } from
 'lucide-react';
 import PropTypes from 'prop-types';
+import notify from '../../services/notify';
 
 /**
  * Форма диагнозов и назначений для стоматологической ЭМК
@@ -131,6 +132,7 @@ const DiagnosisForm = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось сохранить диагноз. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }

@@ -550,6 +550,12 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
 
                 {/* Sections */}
                 <div className="emr-v2-sections">
+                    {/* Phase 4+ cognitive load reduction: sections are collapsible.
+                        Default-open: Complaints + Examination + Diagnosis (the 3
+                        sections a doctor fills on every visit).
+                        Default-closed: AnamnesisVitae, Treatment, Recommendations,
+                        Notes (filled only when clinically relevant — collapsing
+                        them removes visual noise from the default visit screen). */}
                     <ComplaintsSection
                         value={data.complaints}
                         onChange={handleFieldChange('complaints')}
@@ -572,6 +578,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                         doctorId={doctorId}
                         vitals={data.vitals || {}}
                         onVitalsChange={handleFieldChange('vitals')}
+                        defaultOpen={false}
                     />
 
                     <ExaminationSection
@@ -625,6 +632,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                         onRequestAI={debouncedRequestAI}
                         suggestions={aiSuggestions.treatment || []}
                         aiLoading={aiLoading.treatment || false}
+                        defaultOpen={false}
                     />
 
                     {/* Recommendations is reused in TreatmentSection above, or separate? 
@@ -650,12 +658,14 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                         onChange={handleFieldChange('recommendations')}
                         disabled={isSigned}
                         icd10Code={data.icd10_code || ''}
+                        defaultOpen={false}
                     />
 
                     <NotesSection
                         value={data.notes}
                         onChange={handleFieldChange('notes')}
                         disabled={isSigned}
+                        defaultOpen={false}
                     />
 
                     {/* Specialty-specific sections */}

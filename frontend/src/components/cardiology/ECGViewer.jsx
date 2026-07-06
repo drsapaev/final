@@ -37,6 +37,7 @@ import { api } from '../../api/client';
 // the source file.
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
+import { getErrorMessage } from '../../utils/errorHandler';
 import { parseECGFile, analyzeECGParameters } from './ECGParser';
 
 
@@ -305,6 +306,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         
       } catch (error) {
         logger.error('Ошибка загрузки ЭКГ:', error);
+        notify.error(getErrorMessage(error, 'Не удалось загрузить ЭКГ-файл. Проверьте соединение и формат файла.'));
         setUploadProgress(0);
       }
     }
@@ -374,6 +376,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       }
     } catch (error) {
       logger.error('Ошибка парсинга ЭКГ:', error);
+      notify.warning('Не удалось разобрать файл ЭКГ. Параметры не извлечены — показан только просмотр.');
     }
   };
 
@@ -401,6 +404,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       logger.error('Ошибка скачивания файла:', error);
+      notify.error('Не удалось скачать файл. Проверьте соединение и попробуйте позже.');
     }
   };
 
@@ -474,6 +478,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       onDataUpdate && onDataUpdate();
     } catch (error) {
       logger.error('Ошибка удаления файла:', error);
+      notify.error('Не удалось удалить файл. Проверьте соединение и попробуйте позже.');
     }
   };
 

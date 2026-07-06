@@ -637,17 +637,10 @@ def bulk_save_lab_report_values(
         _handle_domain_error(exc)
 
 
-@router.post("/report-instances/{instance_id}/mark-ready", response_model=LabReportInstanceOut)
-def mark_lab_report_ready(
-    instance_id: int,
-    db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab")),
-):
-    service = LabReportingService(db)
-    try:
-        return _instance_out(service, service.mark_ready(instance_id))
-    except LabReportingDomainError as exc:
-        _handle_domain_error(exc)
+# L-2 fix: /report-instances/{instance_id}/mark-ready endpoint removed.
+# WF-round5: Mark Ready was a functionally empty operation — backend allowed
+# the same actions for DRAFT/IN_PROGRESS/READY statuses, so the frontend
+# stopped calling this endpoint. The implementation was dead code.
 
 
 @router.post("/report-instances/{instance_id}/finalize", response_model=LabReportInstanceOut)

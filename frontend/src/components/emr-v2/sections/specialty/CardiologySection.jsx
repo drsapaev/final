@@ -20,8 +20,8 @@ import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
 import EMRSection from '../EMRSection';
 import EMRTextField from '../EMRTextField';
-import { useAppData } from '../../../../contexts/AppDataContext';
 import './CardiologySection.css';
+import { Heart, FileText } from 'lucide-react';
 
 /**
  * CardiologySection Component
@@ -32,8 +32,6 @@ import './CardiologySection.css';
  * @param {Object} props.labResults - Кардиологические анализы
  * @param {Function} props.onChange - Handler для изменения specialty_data
  * @param {boolean} props.disabled - Read-only mode
- * @param {number} props.visitId - Visit ID для ECGViewer
- * @param {number} props.patientId - Patient ID
  */
 export function CardiologySection({
   ecgData = {},
@@ -41,14 +39,7 @@ export function CardiologySection({
   labResults = {},
   onChange,
   disabled = false,
-  // R-13: visitId and patientId are no longer used inside this section
-  // (ECGViewer was removed). They are still accepted in propTypes for
-  // backwards compatibility with EMRContainerV2, which passes them
-  // unconditionally.
-  visitId: _visitId,
-  patientId: _patientId
-}) {void
-  useAppData();
+}) {
   const [activeTab, setActiveTab] = useState('ecg'); // 'ecg' | 'echo' | 'labs' | 'risk'
 
   // Handlers
@@ -62,7 +53,7 @@ export function CardiologySection({
   return (
     <EMRSection
       title="Кардиологические данные"
-      icon="🫀"
+      icon={<Heart size={16} aria-hidden="true" />}
       disabled={disabled}
       defaultOpen={true}>
       
@@ -102,7 +93,7 @@ export function CardiologySection({
             {activeTab === 'ecg' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-info-panel" role="status">
-                            <div className="cardiology-info-icon">📋</div>
+                            <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
                                 <h4>ЭКГ доступна на отдельной вкладке</h4>
                                 <p>
@@ -155,7 +146,7 @@ export function CardiologySection({
             {activeTab === 'echo' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-info-panel" role="status">
-                            <div className="cardiology-info-icon">📋</div>
+                            <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
                                 <h4>ЭхоКГ доступна на отдельной вкладке</h4>
                                 <p>
@@ -201,7 +192,7 @@ export function CardiologySection({
             {activeTab === 'labs' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-info-panel" role="status">
-                            <div className="cardiology-info-icon">📋</div>
+                            <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
                                 <h4>Полная форма анализов крови — на вкладке «Анализы крови»</h4>
                                 <p>
@@ -428,6 +419,4 @@ CardiologySection.propTypes = {
   labResults: PropTypes.object,
   onChange: PropTypes.func,
   disabled: PropTypes.bool,
-  visitId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };

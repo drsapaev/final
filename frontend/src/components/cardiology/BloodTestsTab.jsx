@@ -100,16 +100,39 @@ export function BloodTestsTab({
 
   return (
     <div className="cardio-flex-col-visible" style={{ gap: '24px' }}>
+      {/* Legacy notice — CardioBloodTest is deprecated in favor of LabResultsSection */}
+      <div style={{
+        padding: '12px 16px',
+        background: 'rgba(255, 149, 0, 0.08)',
+        border: '1px solid rgba(255, 149, 0, 0.3)',
+        borderRadius: '10px',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '10px',
+      }}>
+        <TestTube size={18} style={{ color: 'var(--mac-warning)', flexShrink: 0, marginTop: '2px' }} />
+        <div>
+          <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-warning)' }}>
+            Ручной ввод анализов — устаревший режим
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
+            Для новых анализов используйте раздел «Результаты анализов» в карте приёма (EMR) —
+            кнопка «Заказать анализы» отправляет заказ напрямую в лабораторию.
+            Исторические данные остаются доступны ниже.
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <MacOSCard className="cardio-card-padded">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('lg') }}>
           <h3 style={{ display: 'flex', alignItems: 'center', fontSize: getFontSize('lg'), fontWeight: '500', color: getColor('text') }}>
             <TestTube size={20} style={{ marginRight: getSpacing('sm'), color: getColor('secondary', 600) }} />
-            Анализы крови
+            Анализы крови (история)
           </h3>
-          <Button onClick={onNewTest}>
+          <Button onClick={onNewTest} title="Ручной ввод — используйте только если лаборатория недоступна">
             <Plus size={16} className="cardio-icon-mr" />
-            Новый анализ
+            Ручной ввод
           </Button>
         </div>
 
@@ -130,7 +153,7 @@ export function BloodTestsTab({
                 <div className="cardio-stat-value" style={{ color: it.critical ? 'var(--mac-danger)' : getColor('text') }}>
                   {it.value} {typeof it.value === 'number' ? it.unit : ''}
                   {it.critical && (
-                    <span className="cardio-critical-warn">⚠ {it.value} &gt; {settings?.ldlThreshold ?? 100}</span>
+                    <span className="cardio-critical-warn">{it.value} &gt; {settings?.ldlThreshold ?? 100}</span>
                   )}
                 </div>
               </div>
@@ -148,16 +171,16 @@ export function BloodTestsTab({
                   <Badge variant="info">{test.test_date}</Badge>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: getSpacing('lg'), fontSize: getFontSize('sm'), color: getColor('textSecondary'), marginBottom: getSpacing('sm') }}>
-                  <div>🩸 Холестерин: {test.cholesterol_total} мг/дл</div>
+                  <div>Холестерин: {test.cholesterol_total} мг/дл</div>
                   <div>HDL: {test.cholesterol_hdl}</div>
                   <div style={isLdlCritical(test.cholesterol_ldl) ? { color: '#dc2626', fontWeight: '600' } : undefined}>
                     LDL: {test.cholesterol_ldl}
-                    {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>⚠ критический</span>}
+                    {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>критический</span>}
                   </div>
                   <div>Триглицериды: {test.triglycerides}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: getSpacing('lg'), fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
-                  <div>🍬 Глюкоза: {test.glucose} мг/дл</div>
+                  <div>Глюкоза: {test.glucose} мг/дл</div>
                   <div>CRP: {test.crp} мг/л</div>
                   <div>Тропонин: {test.troponin} нг/мл</div>
                 </div>
@@ -200,8 +223,8 @@ export function BloodTestsTab({
                   style={{ border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), color: getColor('text') }}
                 />
               </div>
-              {renderField('cholesterol_total', 'Общий холестерин (мг/дл)', '<200', 'Total cholesterol')}
-              {renderField('cholesterol_hdl', 'HDL холестерин (мг/дл)', '>40', 'HDL cholesterol')}
+              {renderField('cholesterol_total', 'Общий холестерин (мг/дл)', '<200', 'Общий холестерин')}
+              {renderField('cholesterol_hdl', 'HDL холестерин (мг/дл)', '>40', 'Холестерин HDL')}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
@@ -226,13 +249,13 @@ export function BloodTestsTab({
                   </div>
                 )}
               </div>
-              {renderField('triglycerides', 'Триглицериды (мг/дл)', '<150', 'Triglycerides')}
-              {renderField('glucose', 'Глюкоза (мг/дл)', '70-100', 'Glucose')}
+              {renderField('triglycerides', 'Триглицериды (мг/дл)', '<150', 'Триглицериды')}
+              {renderField('glucose', 'Глюкоза (мг/дл)', '70-100', 'Глюкоза')}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: getSpacing('lg') }}>
               {renderField('crp', 'CRP (мг/л)', '<3.0', 'CRP')}
-              {renderField('troponin', 'Тропонин (нг/мл)', '<0.04', 'Troponin')}
+              {renderField('troponin', 'Тропонин (нг/мл)', '<0.04', 'Тропонин')}
             </div>
 
             <div>

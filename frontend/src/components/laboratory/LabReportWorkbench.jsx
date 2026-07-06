@@ -395,6 +395,20 @@ export default function LabReportWorkbench({
 
   async function handleRevise() {
     if (!activeInstance) return;
+    // M-1 fix: Revise creates a new instance (old one preserved as FINALIZED),
+    // but it changes which instance is "active" and creates audit-trail entries.
+    // The comment at L52-55 promised a guard — now delivered.
+    const ok = await confirm({
+      title: 'Создание исправленной версии',
+      message: 'Будет создана новая версия отчёта на основе утверждённой.',
+      description: 'Старая версия останется в истории как утверждённая. ' +
+        'Новая версия станет активной и доступной для редактирования. ' +
+        'Это действие создаёт запись в аудите.',
+      confirmLabel: 'Создать версию',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) return;
     setSaving(true);
     setBusyAction('revise');
     try {
@@ -415,13 +429,14 @@ export default function LabReportWorkbench({
     if (!activeInstance) return;
     setSaving(true);
     setBusyAction('print');
+    // L-5 fix: use setPrintFeedback (inline Alert) as the single feedback
+    // channel. Previously handlePrint called notify() up to 5 times per
+    // print attempt, producing stacked toasts alongside the inline Alert.
     setPrintFeedback({
       severity: 'info',
       text: 'Отправляю лабораторный отчёт на печать...'
     });
     try {
-      notify('info', 'Пытаюсь отправить отчёт на принтер...');
-
       const printResult = await printService.printLabResults(
         buildLabPrintPayload(activeInstance, selectedAppointment)
       );
@@ -436,10 +451,6 @@ export default function LabReportWorkbench({
           severity: 'success',
           text: `Лабораторный отчёт отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
         });
-        notify(
-          'success',
-          `Лабораторный отчёт отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
-        );
         return;
       }
 
@@ -447,17 +458,11 @@ export default function LabReportWorkbench({
         instanceId: activeInstance.id,
         error: printResult.error
       });
-      notify('warning', 'Прямая печать недоступна, использую PDF-файл как запасной вариант.');
 
       const blob = await labReportingApi.downloadPdf(activeInstance.id);
       const url = URL.createObjectURL(blob);
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
       // WF-05 fix: не помечаем как PRINTED при неудаче popup.
-      // Раньше markPrinted вызывался безусловно → false audit trail:
-      // статус PRINTED, но PDF не открыт. Теперь:
-      //   - popup OK → markPrinted + success feedback
-      //   - popup blocked → НЕ markPrinted, warning feedback,
-      //     лаборант может retry после разрешения pop-up
       if (popup) {
         const printed = await labReportingApi.markPrinted(activeInstance.id);
         onInstanceChange(printed);
@@ -468,16 +473,13 @@ export default function LabReportWorkbench({
           severity: 'success',
           text: 'PDF открыт в новой вкладке. Статус печати обновлён.'
         });
-        notify('success', 'PDF открыт в новой вкладке и статус печати обновлён.');
       } else {
-        // PDF сформирован, но не открыт. Статус НЕ меняем.
         setPrintFeedback({
           severity: 'warning',
           text: 'PDF сформирован, но новая вкладка заблокирована. ' +
             'Разрешите pop-up для этого сайта и нажмите «Печать» снова, ' +
             'чтобы обновить статус отчёта.'
         });
-        notify('warning', 'PDF сформирован, но вкладка заблокирована. Статус печати не обновлён.');
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
@@ -784,7 +786,7 @@ export default function LabReportWorkbench({
                             ) : field.value_type === 'multiline' ? (
                               <textarea
                                 className="macos-input"
-                                aria-label={`Lab result for ${field.label}`}
+                                aria-label={`Результат: ${field.label}`}
                                 rows={3}
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
@@ -793,7 +795,7 @@ export default function LabReportWorkbench({
                             ) : (
                               <input
                                 className="macos-input"
-                                aria-label={`Lab result for ${field.label}`}
+                                aria-label={`Результат: ${field.label}`}
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
                                 disabled={!canEditActiveInstance}

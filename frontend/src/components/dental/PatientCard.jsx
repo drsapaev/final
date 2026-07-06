@@ -20,6 +20,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
+import notify from '../../services/notify';
 
 /**
  * Расширенная карточка пациента для стоматологической ЭМК
@@ -163,6 +164,7 @@ const PatientCard = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
+      notify.error('Не удалось сохранить данные пациента. Проверьте соединение и попробуйте снова.');
     } finally {
       setLoading(false);
     }
