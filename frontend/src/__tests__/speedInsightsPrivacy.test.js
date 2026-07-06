@@ -33,11 +33,11 @@ describe('Speed Insights privacy sanitizer', () => {
     expect(
       sanitizeSpeedInsightsEvent(
         {
-          url: '/clinical/visits/98765',
+          url: '/clinical/pickup/98765',
         },
         ROUTE_REGISTRY
       ).url
-    ).toBe('/clinical/visits/:id');
+    ).toBe('/clinical/pickup/:patientId');
   });
 
   it('redacts unmatched numeric, uuid, and high-entropy path segments', () => {

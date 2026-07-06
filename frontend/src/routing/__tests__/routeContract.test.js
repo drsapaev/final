@@ -94,7 +94,6 @@ const ADMIN_CONTEXTUAL_ROUTE_CHROME_HEADING_CONTRACT = {
 
 const CLINICAL_CONTEXTUAL_ROUTE_IDS = [
   'clinical-profile',
-  'clinical-visit-details',
   'clinical-pickup',
 ];
 

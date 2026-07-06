@@ -490,12 +490,6 @@ export const FRONTEND_FILE_MAP = {
     status: 'correct'
   },
   
-  'src/pages/VisitDetails.jsx': {
-    purpose: 'Детали визита',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/',
-    status: 'correct'
-  },
   
   'src/pages/MobilePatientDashboard.jsx': {
     purpose: 'Мобильная панель пациента',
@@ -736,7 +730,6 @@ export function getRecommendedStructure() {
       'Search.jsx',
       'Appointments.jsx',
       'Scheduler.jsx',
-      'VisitDetails.jsx'
     ],
     'src/styles/': [
       'theme.css',
