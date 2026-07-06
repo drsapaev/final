@@ -16,6 +16,8 @@ import {
 } from '../ui/macos';
 import notify from '../../services/notify';
 import formatCurrency from '../../utils/formatCurrency';
+// UX Audit #4 regression fix: inline-стили → CSS-классы (после PR #1910 regression).
+import './CashPaymentModal.css';
 
 /**
  * Cash Payment Modal Component
@@ -101,7 +103,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                     display="flex"
                     alignItems="center"
                     justifyContent="space-between"
-                    style={{ width: '100%' }}>
+                    className="cpm-dialog-header">
                     <span>Обработка оплаты</span>
                     <Button
                         variant="ghost"
@@ -115,10 +117,10 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
 
             <DialogContent>
                 <Box mb={2}>
-                    <Typography variant="body2" color="textSecondary" style={{ marginBottom: 4 }}>
+                    <Typography variant="body2" color="textSecondary" className="cpm-patient-label-text">
                         Пациент:
                     </Typography>
-                    <Typography variant="body1" style={{ fontWeight: 500 }}>
+                    <Typography variant="body1" className="cpm-patient-name-text">
                         {appointment?.patient_name || `Пациент #${appointment?.patient_id}`}
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
@@ -132,12 +134,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             display="flex"
                             alignItems="center"
                             gap={1}
-                            style={{
-                                backgroundColor: 'rgba(0, 122, 255, 0.1)',
-                                borderRadius: 'var(--mac-radius-sm)',
-                                color: '#007AFF',
-                                fontSize: '13px',
-                            }}>
+                            className="cpm-amount-hint-box">
                             <Info size={14} aria-hidden="true" />
                             Сумма к оплате: {formatCurrency(defaultAmount)}
                         </Box>
@@ -146,7 +143,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
 
                 <form onSubmit={handleSubmit} id="cash-payment-form">
                     <Box mb={2}>
-                        <Label htmlFor="cash-payment-amount" style={{ display: 'block', marginBottom: 4 }}>
+                        <Label htmlFor="cash-payment-amount" className="cpm-field-label">
                             Сумма (сум)
                         </Label>
                         <Input
@@ -161,7 +158,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                     </Box>
 
                     <Box mb={2}>
-                        <Label htmlFor="cash-payment-method" style={{ display: 'block', marginBottom: 4 }}>
+                        <Label htmlFor="cash-payment-method" className="cpm-field-label">
                             Способ оплаты
                         </Label>
                         <Select
@@ -170,13 +167,13 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             value={paymentData.method}
                             onChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
                             options={PAYMENT_METHOD_OPTIONS}
-                            style={{ width: '100%' }}
+                            className="cpm-select-full"
                         />
                     </Box>
 
                     {paymentData.method === 'cash' && (
                         <Box mb={2}>
-                            <Label htmlFor="cash-payment-received" style={{ display: 'block', marginBottom: 4 }}>
+                            <Label htmlFor="cash-payment-received" className="cpm-field-label">
                                 Получено от пациента (сум)
                             </Label>
                             <Input
@@ -189,7 +186,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                 error={insufficientCash}
                             />
                             {insufficientCash && (
-                                <Typography variant="caption" style={{ color: 'var(--mac-error)', marginTop: 4, display: 'block' }}>
+                                <Typography variant="caption" className="cpm-insufficient-error">
                                     Недостаточно средств. Нужно ещё: {formatCurrency(numericAmount - numericReceived)}
                                 </Typography>
                             )}
@@ -198,12 +195,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                     mt={1}
                                     px={1.5}
                                     py={1}
-                                    style={{
-                                        backgroundColor: 'rgba(52, 199, 89, 0.12)',
-                                        borderRadius: 'var(--mac-radius-sm)',
-                                        color: 'var(--mac-success)',
-                                        fontWeight: 600,
-                                    }}>
+                                    className="cpm-change-due-box">
                                     Сдача: {formatCurrency(changeDue)}
                                 </Box>
                             )}
@@ -211,7 +203,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                     )}
 
                     <Box mb={1}>
-                        <Label htmlFor="cash-payment-note" style={{ display: 'block', marginBottom: 4 }}>
+                        <Label htmlFor="cash-payment-note" className="cpm-field-label">
                             Примечание (необязательно)
                         </Label>
                         <Textarea
@@ -231,7 +223,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                     Отмена
                 </Button>
                 <Button type="submit" variant="primary" form="cash-payment-form">
-                    <CheckCircle size={16} style={{ marginRight: 8 }} aria-hidden="true" />
+                    <CheckCircle size={16} className="cpm-submit-icon" aria-hidden="true" />
                     Обработать оплату
                 </Button>
             </DialogActions>

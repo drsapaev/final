@@ -1,105 +1,11 @@
 /**
  * PaymentWidget Styles
  *
- * UX Audit Registrar #4: все inline-стили из PaymentWidget.jsx перенесены сюда.
- * Provider brand colors (Click/Payme/Kaspi) вынесены в CSS variables,
- * чтобы легко переопределять под dark theme.
- *
- * Provider colors — это brand colors, не macos tokens. Они одинаковые
- * в light/dark темах, но вынесены сюда для согласованности.
+ * UX Audit #4 + regression fix:
+ * PR #1910 улучшил компонент (auto-polling, Click/PayMe/Kaspi),
+ * но вернул inline-стили. Этот CSS мигрирует их обратно на классы.
+ * Provider brand colors вынесены в CSS variables.
  */
-
-.pw-loading-box {
-    padding: var(--mac-spacing-6);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.pw-loading-text {
-    margin-left: var(--mac-spacing-4);
-}
-
-.pw-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: var(--mac-spacing-6);
-}
-
-.pw-header-icon {
-    margin-right: var(--mac-spacing-2);
-    color: var(--mac-accent-blue);
-}
-
-.pw-payment-info {
-    margin-bottom: var(--mac-spacing-6);
-}
-
-.pw-payment-info-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--mac-spacing-4);
-}
-
-.pw-payment-info-cell {
-    flex: 1 1 200px;
-}
-
-.pw-amount-text {
-    font-weight: var(--mac-font-weight-bold);
-}
-
-.pw-divider {
-    height: 1px;
-    margin-bottom: var(--mac-spacing-6);
-    background: var(--mac-border);
-}
-
-.pw-provider-select {
-    margin-bottom: var(--mac-spacing-6);
-}
-
-.pw-provider-option {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    gap: var(--mac-spacing-2);
-}
-
-.pw-provider-name {
-    text-transform: capitalize;
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.pw-provider-currency-badge {
-    margin-left: auto;
-}
-
-.pw-error-alert {
-    margin-bottom: var(--mac-spacing-6);
-}
-
-.pw-actions-row {
-    display: flex;
-    gap: var(--mac-spacing-4);
-    margin-top: var(--mac-spacing-6);
-}
-
-.pw-submit-icon {
-    margin-right: var(--mac-spacing-2);
-}
-
-.pw-status-check-button {
-    margin-left: var(--mac-spacing-4);
-}
-
-.pw-confirm-amount-box {
-    padding: var(--mac-spacing-4);
-    background-color: var(--mac-bg-secondary);
-    border-radius: var(--mac-radius-sm);
-    margin-bottom: var(--mac-spacing-4);
-}
 
 /* Provider brand colors (Click/Payme/Kaspi) */
 .pw-provider-icon--click {
@@ -114,18 +20,113 @@
     color: #FF6B35;
 }
 
-/* Currency badge — provider-colored background */
-.pw-currency-badge--click {
-    background-color: rgba(0, 170, 255, 0.125);
-    color: #00AAFF;
+/* Provider option layout */
+.pw-provider-option-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.pw-currency-badge--payme {
-    background-color: rgba(0, 200, 81, 0.125);
-    color: #00C851;
+.pw-provider-option-name {
+    font-size: var(--mac-font-size-base);
+    color: var(--mac-text-secondary);
 }
 
-.pw-currency-badge--kaspi {
-    background-color: rgba(255, 107, 53, 0.125);
-    color: #FF6B35;
+.pw-provider-option-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Loading box */
+.pw-loading-box {
+    padding: var(--mac-spacing-6);
+}
+
+.pw-loading-text {
+    margin-left: var(--mac-spacing-4);
+}
+
+/* Header */
+.pw-header-row {
+    margin-bottom: var(--mac-spacing-6);
+}
+
+.pw-header-icon {
+    margin-right: var(--mac-spacing-2);
+    color: var(--mac-accent-blue);
+}
+
+/* Payment info */
+.pw-payment-info-box {
+    margin-bottom: var(--mac-spacing-6);
+}
+
+.pw-payment-info-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mac-spacing-4);
+}
+
+.pw-payment-info-cell {
+    flex: 1 1 200px;
+}
+
+.pw-amount-bold {
+    font-weight: var(--mac-font-weight-bold);
+}
+
+/* Select margin */
+.pw-select-margin {
+    margin-bottom: var(--mac-spacing-6);
+}
+
+/* Provider badge styles */
+.pw-provider-badge {
+    margin-left: auto;
+    background-color: color-mix(in srgb, currentColor, transparent 88%);
+}
+
+/* Error alert */
+.pw-error-alert {
+    margin-bottom: var(--mac-spacing-6);
+}
+
+/* Actions row */
+.pw-actions-row {
+    gap: var(--mac-spacing-4);
+    margin-top: var(--mac-spacing-6);
+}
+
+.pw-submit-spinner {
+    margin-right: var(--mac-spacing-2);
+}
+
+/* Confirm dialog amount box */
+.pw-confirm-amount-box {
+    padding: var(--mac-spacing-4);
+    background-color: var(--mac-bg-secondary);
+    border-radius: var(--mac-radius-sm);
+    margin-bottom: var(--mac-spacing-4);
+}
+
+/* Divider */
+.pw-divider {
+    height: 1px;
+    margin-bottom: var(--mac-spacing-6);
+    background: var(--mac-border);
+}
+
+/* Provider option (span inside Select option) */
+.pw-provider-option {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: var(--mac-spacing-2);
+}
+
+.pw-provider-name {
+    text-transform: capitalize;
+    flex: 1 1 auto;
+    min-width: 0;
 }
