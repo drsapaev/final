@@ -186,7 +186,7 @@ const ICONS = {
   'bell.badge':
   <g>
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <circle cx="18" cy="8" r="2" fill="#ff3b30" />
+      <circle cx="18" cy="8" r="2" fill='var(--mac-error)' />
     </g>,
 
   'tv':
@@ -438,11 +438,11 @@ const Icon = React.forwardRef(({
   // Color mapping
   const colorMap = {
     default: 'var(--mac-text-secondary)',
-    primary: '#007aff',
+    primary: 'var(--mac-accent-blue)',
     secondary: 'var(--mac-text-secondary)',
-    success: '#34c759',
-    warning: '#ff9500',
-    danger: '#ff3b30',
+    success: 'var(--mac-success)',
+    warning: 'var(--mac-warning)',
+    danger: 'var(--mac-error)',
     white: 'white',
     black: 'black'
   };

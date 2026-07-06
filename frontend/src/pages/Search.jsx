@@ -582,7 +582,7 @@ const styles = {
     fontSize: 14,
     fontWeight: 'var(--mac-font-weight-medium)',
     color: 'var(--mac-text-secondary)',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'var(--mac-bg-tertiary)',
     padding: '4px 10px',
     borderRadius: 12,
     marginLeft: 8,

@@ -76,7 +76,7 @@ const ResponsiveTable = ({
               background: 'white',
               borderRadius: 'var(--mac-radius-lg)',
               padding: 'var(--mac-spacing-4)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              boxShadow: 'var(--mac-shadow-sm)',
               border: selectedRows.has(index) ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
               cursor: onRowClick ? 'pointer' : 'default'
             }}

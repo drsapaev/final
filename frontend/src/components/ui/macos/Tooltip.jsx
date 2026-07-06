@@ -126,7 +126,7 @@ const Tooltip = ({
     maxWidth: '200px',
     wordWrap: 'break-word',
     whiteSpace: 'normal',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    boxShadow: 'var(--mac-shadow-md)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)'

@@ -255,7 +255,7 @@ export function CardLoadingOld({ count = 3 }) {
     padding: getSpacing('lg'),
     backgroundColor: getColor('background', 'secondary'),
     borderRadius: 'var(--mac-radius-md)',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+    boxShadow: 'var(--mac-shadow-sm)'
   };
 
   const skeletonStyle = {

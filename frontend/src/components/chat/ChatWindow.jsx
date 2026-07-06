@@ -741,14 +741,14 @@ const ChatWindow = ({ isOpen, onClose }) => {
                     right: 0,
                     width: '10px',
                     height: '10px',
-                    backgroundColor: '#34C759',
+                    backgroundColor: 'var(--mac-success)',
                     borderRadius: '50%',
                     border: '2px solid var(--mac-bg-primary)'
                   }} />
                   }
                                                 </div>
                                                 <div className="conv-info">
-                                                    <div className="conv-name" style={{ color: u.is_online ? '#34C759' : 'inherit' }}>
+                                                    <div className="conv-name" style={{ color: u.is_online ? 'var(--mac-success)' : 'inherit' }}>
                                                         {u.name}
                                                     </div>
                                                     <div className="conv-role">{u.role}</div>
@@ -879,7 +879,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                     </div>
                                                 </div>
                                                 <div className="conv-action">
-                                                    <Plus size={16} color="#007AFF" />
+                                                    <Plus size={16} color='var(--mac-accent-blue)' />
                                                 </div>
                                             </div>
               )

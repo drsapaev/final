@@ -488,7 +488,7 @@ const ForceMajeureModal = ({
           padding: '12px 14px',
           borderRadius: 'var(--mac-radius-lg)',
           fontSize: 'var(--mac-font-size-base)',
-          border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#bbf7d0'}`
+          border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : 'var(--mac-success)'}`
         }}>
           ✅ {success}
         </div>

@@ -103,7 +103,7 @@ export function Table({
     backgroundColor: getColor('background', 'primary'),
     borderRadius: 'var(--mac-radius-md)',
     overflow: 'hidden',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+    boxShadow: 'var(--mac-shadow-sm)'
   };
 
   const headerStyle = {

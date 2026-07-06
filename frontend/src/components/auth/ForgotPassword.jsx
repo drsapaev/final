@@ -41,7 +41,7 @@ function getPasswordStrength(password) {
   score = Math.min(score, 4);
   const labels = [
     { label: 'Очень слабый', color: 'var(--mac-error)', percent: 25 },
-    { label: 'Слабый', color: '#ea580c', percent: 50 },
+    { label: 'Слабый', color: 'var(--mac-warning)', percent: 50 },
     { label: 'Средний', color: 'var(--mac-warning)', percent: 75 },
     { label: 'Хороший', color: 'var(--mac-success)', percent: 100 },
     { label: 'Сильный', color: 'var(--mac-success)', percent: 100 },

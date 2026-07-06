@@ -216,7 +216,7 @@ const ModernStatistics = ({
     title: t.completedToday,
     value: animatedValues.completedToday || 0,
     iconName: 'checkmark.circle',
-    color: '#5ac8fa',
+    color: 'var(--mac-accent-blue-light)',
     trend: statistics.trends.appointments,
     trendValue: statistics.trendValues.appointments,
     suffix: ''
@@ -247,7 +247,7 @@ const ModernStatistics = ({
     title: t.averageWaitTime,
     value: statistics.averageWaitTime,
     iconName: 'clock',
-    color: '#5ac8fa',
+    color: 'var(--mac-accent-blue-light)',
     trend: statistics.trends.waitTime,
     trendValue: statistics.trendValues.waitTime,
     suffix: ' ' + t.minutes

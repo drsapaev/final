@@ -206,7 +206,7 @@ export const Modal = ({
         style={{
           backgroundColor: 'var(--mac-bg-primary)',
           borderRadius: 'var(--mac-radius-lg)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: 'var(--mac-shadow-xl)',
           maxHeight: '90vh',
           overflow: 'hidden',
           display: 'flex',

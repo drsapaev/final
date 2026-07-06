@@ -235,7 +235,7 @@ const AppointmentContextMenu = ({
           backgroundColor: colors.bg,
           border: `1px solid ${colors.border}`,
           borderRadius: 'var(--mac-radius-md)',
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+          boxShadow: 'var(--mac-shadow-lg)',
           minWidth: '180px',
           maxWidth: '220px',
           padding: 'var(--mac-spacing-2) 0',

@@ -108,7 +108,7 @@ const ResponsiveModal = ({
         style={{
           backgroundColor: 'white',
           borderRadius: isMobile ? '16px 16px 0 0' : '20px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: 'var(--mac-shadow-xl)',
           maxHeight: isMobile ? '90vh' : '90vh',
           overflow: 'hidden',
           display: 'flex',

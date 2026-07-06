@@ -215,7 +215,7 @@ const FileUpload = ({
             position: 'relative',
             borderRadius: 'var(--mac-radius-md)',
             overflow: 'hidden',
-            backgroundColor: '#F5F5F7',
+            backgroundColor: 'var(--mac-bg-secondary)',
             border: '1px solid var(--mac-border, #E5E5E5)'
           }}>
                                 {preview.url ?
@@ -244,7 +244,7 @@ const FileUpload = ({
               justifyContent: 'center',
               padding: 'var(--mac-spacing-2)'
             }}>
-                                        <FileIcon size={24} color="#8E8E93" />
+                                        <FileIcon size={24} color='var(--mac-text-tertiary)' />
                                     </div>
             }
                             </div>
@@ -261,7 +261,7 @@ const FileUpload = ({
               width: '20px',
               height: '20px',
               borderRadius: '50%',
-              backgroundColor: '#8E8E93',
+              backgroundColor: 'var(--mac-text-tertiary)',
               color: 'white',
               border: 'none',
               display: 'flex',

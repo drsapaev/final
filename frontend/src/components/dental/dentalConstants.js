@@ -38,9 +38,9 @@ export const TOOTH_STATUS_COLORS = Object.freeze({
   [TOOTH_STATUS.FILLED]: '#2196f3',
   [TOOTH_STATUS.CROWN]: '#ff9800',
   [TOOTH_STATUS.IMPLANT]: '#9c27b0',
-  [TOOTH_STATUS.MISSING]: '#9e9e9e',
-  [TOOTH_STATUS.ROOT]: '#795548',
-  [TOOTH_STATUS.BRIDGE]: '#00bcd4',
+  [TOOTH_STATUS.MISSING]: 'var(--mac-text-tertiary)',
+  [TOOTH_STATUS.ROOT]: 'var(--mac-text-tertiary)',
+  [TOOTH_STATUS.BRIDGE]: 'var(--mac-accent-blue-light)',
 });
 
 export const TOOTH_STATUS_LABELS = Object.freeze({
