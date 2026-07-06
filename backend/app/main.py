@@ -17,6 +17,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
 from app.core.sentry import init_sentry as init_backend_sentry
+from app.core.prometheus import init_prometheus
 
 # -----------------------------------------------------------------------------
 # Логирование
@@ -144,6 +145,11 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+# Prometheus metrics — no-op if prometheus-client not installed.
+# Mounts /metrics endpoint + adds HTTP request tracking middleware.
+# Disable via ENABLE_PROMETHEUS=0 env var.
+init_prometheus(app)
 
 # -----------------------------------------------------------------------------
 # Регистрация обработчиков исключений
