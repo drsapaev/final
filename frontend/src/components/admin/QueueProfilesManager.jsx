@@ -45,6 +45,7 @@ import {
   Checkbox } from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { notify } from '../../services/notify.js';
 
 const STATUS_FILTER_OPTIONS = [
     { value: 'all', label: '\u0412\u0441\u0435' },
@@ -388,7 +389,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             await loadProfiles();
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
             setError(null);
-            alert(`Импорт завершён: ${imported} создано, ${updated} обновлено`);
+            notify.success(`Импорт завершён: ${imported} создано, ${updated} обновлено`);
 
         } catch (err) {
             logger.error('Error importing profiles:', err);

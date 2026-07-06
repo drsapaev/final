@@ -3,7 +3,7 @@ import {
   Card, CardContent, Typography, Alert, Badge, Button,
 } from '../ui/macos';
 import { Brain, Hospital, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
-import { useSnackbar } from 'notistack';
+import { notify } from '../../services/notify.js';
 import AIClinicalText from './AIClinicalText';
 import PropTypes from 'prop-types';
 
@@ -19,12 +19,11 @@ const AISuggestions = ({
 }) => {
   const [expanded, setExpanded] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
-  const { enqueueSnackbar } = useSnackbar();
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    enqueueSnackbar('Скопировано в буфер обмена', { variant: 'info' });
+    notify.info('Скопировано в буфер обмена');
     setTimeout(() => setCopiedId(null), 2000);
   };
   const handleActivationKeyDown = (event, onActivate) => {

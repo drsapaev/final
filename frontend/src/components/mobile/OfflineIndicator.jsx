@@ -3,6 +3,7 @@ import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react
 import { Card, Button } from '../ui/macos';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
+import { notify } from '../../services/notify.js';
 /**
  * Индикатор офлайн/онлайн статуса для мобильных устройств
  */
@@ -118,7 +119,7 @@ const OfflineIndicator = () => {
       syncData();
     } else {
       // Показываем инструкции для восстановления подключения
-      alert('Проверьте подключение к интернету и попробуйте снова');
+      notify.warning('Проверьте подключение к интернету и попробуйте снова');
     }
   };
 

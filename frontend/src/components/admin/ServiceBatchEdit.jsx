@@ -19,6 +19,7 @@ import {
   Checkbox,
   Select,
 } from '../ui/macos';
+import { notify } from '../../services/notify.js';
 
 const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }) => {
   const [updates, setUpdates] = useState({});
@@ -58,7 +59,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
 
   const handleSubmit = async () => {
     if (Object.keys(updates).length === 0) {
-      alert('Выберите хотя бы одно поле для изменения');
+      notify.warning('Выберите хотя бы одно поле для изменения');
       return;
     }
 
@@ -79,7 +80,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
       }
     } catch (error) {
       logger.error('Ошибка batch обновления:', error);
-      alert('Ошибка при массовом обновлении услуг');
+      notify.error('Ошибка при массовом обновлении услуг');
     } finally {
       setLoading(false);
     }

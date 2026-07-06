@@ -4,6 +4,7 @@ import { Bell, BellOff, Settings, Check } from 'lucide-react';
 import { Button, Card, Badge } from '../ui/macos';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
+import { notify } from '../../services/notify.js';
 
 /**
  * Компонент для управления мобильными уведомлениями
@@ -62,7 +63,7 @@ const MobileNotifications = () => {
 
   const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
-      alert('Уведомления не поддерживаются в этом браузере');
+      notify.warning('Уведомления не поддерживаются в этом браузере');
       return;
     }
 

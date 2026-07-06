@@ -39,11 +39,9 @@ import {
 } from '../ui/macos';
 import {
   normalizeServiceCode,
-
   formatServiceCodeInput,
-  isValidServiceCode } from
-
-'../../utils/serviceCodeUtils';
+  isValidServiceCode } from '../../utils/serviceCodeUtils';
+import { notify } from '../../services/notify.js';
 
 const SERVICE_GROUP_PREFIXES = {
   cardiology: ['K'],
@@ -833,7 +831,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert('Введите название услуги');
+      notify.warning('Введите название услуги');
       return;
     }
 

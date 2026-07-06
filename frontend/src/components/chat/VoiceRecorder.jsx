@@ -6,6 +6,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, Square, Send, Trash2 } from 'lucide-react';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { notify } from '../../services/notify.js';
 
 const VoiceRecorder = ({ onSend, onCancel }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -73,7 +74,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
 
         } catch (error) {
             logger.error('Microphone access denied:', error);
-            alert('Разрешите доступ к микрофону в настройках браузера');
+            notify.warning('Разрешите доступ к микрофону в настройках браузера');
         }
     };
 
