@@ -173,7 +173,7 @@ class AIChatService:
             error_message = AIChatMessage(
                 session_id=session_id,
                 role="assistant",
-                content=f"Произошла ошибка: {str(e)}",
+                content="Произошла ошибка. Попробуйте позже.",  # sanitized
                 is_error=True
             )
 
