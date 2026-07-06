@@ -12,6 +12,7 @@ import { api } from '../api/client';
 import { buildWsUrl } from '../api/runtime';
 import logger from '../utils/logger';
 import { tokenManager } from '../utils/tokenManager';
+import { detectPromptInjection } from '../utils/aiValidator';
 import {
     MESSAGING_CONTRACT_VERSION,
     isSupportedMessagingContractVersion,
@@ -148,6 +149,13 @@ export const useAIChat = (options = {}) => {
     const sendMessage = useCallback(async (content, includeHistory = true) => {
         if (!content?.trim()) {
             setError('Message cannot be empty');
+            return null;
+        }
+
+        // Prompt injection check
+        if (detectPromptInjection(content)) {
+            setError('Обнаружена попытка prompt injection. Сообщение отклонено.');
+            logger.warn('AI chat: prompt injection detected and blocked');
             return null;
         }
 
@@ -418,6 +426,13 @@ export const useAIChat = (options = {}) => {
     const sendMessageWS = useCallback((content) => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
             setError('WebSocket not connected');
+            return false;
+        }
+
+        // Prompt injection check
+        if (detectPromptInjection(content)) {
+            setError('Обнаружена попытка prompt injection.');
+            logger.warn('AI chat WS: prompt injection detected and blocked');
             return false;
         }
 
