@@ -330,6 +330,10 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str | None = None
     SMTP_USE_TLS: bool = True
 
+    # --- Telegram Settings ---
+    TELEGRAM_BOT_TOKEN: str | None = Field(default=None, description="Telegram Bot API token for notifications")
+    TELEGRAM_CHAT_ID: str | None = Field(default=None, description="Default Telegram chat ID for system alerts")
+
     # --- Cloud Printing Settings ---
     # Microsoft Universal Print
     MICROSOFT_PRINT_TENANT_ID: str | None = None

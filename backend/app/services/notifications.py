@@ -220,8 +220,8 @@ class NotificationSenderService:
         self.smtp_username = getattr(settings, "SMTP_USERNAME", None)
         self.smtp_password = getattr(settings, "SMTP_PASSWORD", None)
 
-        self.telegram_bot_token = getattr(settings, "TELEGRAM_BOT_TOKEN", None)
-        self.telegram_chat_id = getattr(settings, "TELEGRAM_CHAT_ID", None)
+        self.telegram_bot_token = settings.TELEGRAM_BOT_TOKEN
+        self.telegram_chat_id = settings.TELEGRAM_CHAT_ID
 
         self.sms_api_key = getattr(settings, "SMS_API_KEY", None)
         self.sms_api_url = getattr(settings, "SMS_API_URL", None)

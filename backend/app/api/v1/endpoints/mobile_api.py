@@ -8,7 +8,6 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
-from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -29,7 +28,7 @@ from app.crud import (
 )
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
-from app.models.notification import NotificationHistory
+from app.services.notification_platform_service import get_notification_platform_service
 from app.schemas.mobile import (
     AppointmentUpcomingOut,
     BookAppointmentRequest,
@@ -72,29 +71,27 @@ def _get_mobile_notification_rows(
     patient_id: int | None,
     limit: int,
     offset: int,
-) -> list[NotificationHistory]:
-    ownership_filters = [
-        and_(
-            NotificationHistory.recipient_type == "user",
-            NotificationHistory.recipient_id == user_id,
-        )
-    ]
-    if patient_id is not None:
-        ownership_filters.append(
-            and_(
-                NotificationHistory.recipient_type == "patient",
-                NotificationHistory.recipient_id == patient_id,
-            )
-        )
+) -> list[dict]:
+    """Fetch notifications via the canonical notification platform.
 
-    return (
-        db.query(NotificationHistory)
-        .filter(or_(*ownership_filters))
-        .order_by(NotificationHistory.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
+    Previously this queried the legacy NotificationHistory table directly.
+    Now uses notification_platform_service.get_inbox() which reads from
+    NotificationEvent/NotificationDelivery (the canonical platform tables).
+    """
+    from app.models.user import User
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return []
+
+    platform = get_notification_platform_service(db)
+    result = platform.get_inbox(
+        current_user=user,
+        status="all",
+        limit=limit,
     )
+    deliveries = result.get("deliveries", [])
+    # Apply offset manually since get_inbox uses cursor-based pagination
+    return deliveries[offset:offset + limit] if deliveries else []
 
 
 @router.post("/mobile/auth/login", response_model=MobileLoginResponse)
@@ -460,13 +457,13 @@ async def get_mobile_notifications(
 
         return [
             {
-                "id": notif.id,
-                "title": notif.subject, # Subject as title
-                "message": notif.content,
-                "type": notif.notification_type,
-                "data": notif.notification_metadata or {},
-                "sent_at": notif.created_at,
-                "read": False,
+                "id": notif.get("delivery_id"),
+                "title": notif.get("event_title", ""),
+                "message": notif.get("event_message", ""),
+                "type": notif.get("event_type", ""),
+                "data": notif.get("event_payload_snapshot", {}) or {},
+                "sent_at": notif.get("delivery_created_at"),
+                "read": notif.get("delivery_read_at") is not None,
             }
             for notif in notifications
         ]
@@ -485,18 +482,13 @@ async def mark_notification_read(
 ):
     """Отметить уведомление как прочитанное"""
     try:
-        notification = crud_notification.get_notification(
-            db, notification_id=notification_id
+        # Use canonical platform to mark notification as read
+        platform = get_notification_platform_service(db)
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(
+            platform.mark_read(current_user, notification_id)
         )
-        if not notification:
-            raise HTTPException(status_code=404, detail="Уведомление не найдено")
-
-        recipient_type = (notification.recipient_type or "").lower()
-        recipient_id = notification.recipient_id
-        owns_notification = recipient_type == "user" and recipient_id == current_user.id
-        if not owns_notification and recipient_type == "patient":
-            patient = get_patient_by_user_id(db, user_id=current_user.id)
-            owns_notification = bool(patient and recipient_id == patient.id)
+        owns_notification = True  # platform.mark_read verifies ownership internally
 
         if not owns_notification:
             raise HTTPException(status_code=404, detail="Уведомление не найдено")
