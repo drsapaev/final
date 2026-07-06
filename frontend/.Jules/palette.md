@@ -1,0 +1,3 @@
+## 2024-07-06 - Accessible Close Button in macOS Modal
+**Learning:** The `macOS/Modal.jsx` component had an icon-only `✕` button for the fullscreen variant that lacked an accessible name, making it hard for screen reader users to identify its purpose. The repository consistently uses "Закрыть" (or English equivalents where applicable) for close buttons (e.g., in `Alert.jsx`, `Dialog.jsx`, and the backdrop of `Modal.jsx`). Also, be careful with `pnpm lint` as it runs `eslint --fix` and might introduce unintended formatting changes across the codebase that should be reverted.
+**Action:** Always ensure icon-only buttons have descriptive `aria-label` and `title` attributes. Review `git status` after running `pnpm lint` and revert unrelated changes.
