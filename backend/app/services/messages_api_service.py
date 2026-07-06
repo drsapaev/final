@@ -685,7 +685,6 @@ router = APIRouter()
 @_chat_limiter.limit("10/minute") if _chat_limiter else (lambda f: f)
 async def send_message(
     request: Request,
-    request: Request,
     message_data: MessageCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
