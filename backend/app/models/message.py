@@ -31,6 +31,16 @@ class Message(Base):
         index=True
     )
 
+    # F-002: Tenant isolation — branch this message belongs to.
+    # NULL для backward compat (single-branch deployments / legacy rows).
+    branch_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("branches.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        comment="Tenant isolation: branch this message belongs to"
+    )
+
     # Тип сообщения: "text" или "voice"
     message_type: Mapped[str] = mapped_column(
         String(20),

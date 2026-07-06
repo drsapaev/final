@@ -160,6 +160,22 @@ register_exception_handlers(app)
 log.info("Exception handlers registered")
 
 # -----------------------------------------------------------------------------
+# F-005: SlowAPI rate limiter registration
+# -----------------------------------------------------------------------------
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.util import get_remote_address as _get_remote_address
+
+    _app_limiter = Limiter(key_func=_get_remote_address)
+    app.state.limiter = _app_limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    log.info("SlowAPI rate limiter registered")
+except ImportError:
+    log.warning("slowapi not installed, REST rate limiting disabled (install with: pip install slowapi)")
+
+
+# -----------------------------------------------------------------------------
 # WebSocket роутер (подключаем рано, чтобы точно были /ws/queue)
 # -----------------------------------------------------------------------------
 from app.ws.chat_ws import chat_websocket_handler  # noqa: E402
