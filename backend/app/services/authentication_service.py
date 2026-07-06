@@ -35,7 +35,7 @@ class AuthenticationService:
 
     def __init__(self):
         self.algorithm = "HS256"
-        self.access_token_expire_minutes = 30
+        self.access_token_expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
         self.refresh_token_expire_days = 30
         self.password_reset_expire_hours = 1
         self.email_verification_expire_hours = 24
@@ -55,7 +55,7 @@ class AuthenticationService:
                 minutes=self.access_token_expire_minutes
             )
 
-        to_encode.update({"exp": expire, "type": "access"})
+        to_encode.update({"exp": expire, "type": "access", "jti": str(uuid.uuid4())})
         encoded_jwt = jwt.encode(
             to_encode, settings.SECRET_KEY, algorithm=self.algorithm
         )

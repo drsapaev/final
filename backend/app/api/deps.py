@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
@@ -67,10 +68,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     to_encode = data.copy()
     if expires_delta is None:
         expires_delta = timedelta(
-            minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24)
+            minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30)
         )
     expire = datetime.utcnow() + expires_delta
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     encoded_jwt = jwt.encode(
         to_encode,
         settings.SECRET_KEY,
@@ -281,6 +282,35 @@ async def get_current_user(
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Check token blacklist (jti-based revocation)
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+        )
+        jti = payload.get("jti")
+        if jti:
+            from app.services.token_blacklist_service import TokenBlacklistService
+            if TokenBlacklistService.is_token_blacklisted(db, jti):
+                logger.warning(
+                    "[deps.get_current_user] token jti=%s is blacklisted (revoked)",
+                    jti,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+    except HTTPException:
+        raise
+    except Exception as blacklist_err:
+        logger.warning(
+            "[deps.get_current_user] blacklist check failed (non-blocking): %s",
+            blacklist_err,
+        )
+
     logger.debug(
         "[deps.get_current_user] authenticated user resolved role=%s active=%s",
         getattr(user, "role", None),
