@@ -1,4 +1,6 @@
 import logger from '../utils/logger';
+// UX Audit: миграция raw fetch() → api/client.js.
+import { api } from '../api/client';
 
 /**
  * Система проверки дизайна для панелей
@@ -239,8 +241,9 @@ export const generateDesignReport = (validationResults) => {
  */
 export const validateFile = async (filePath) => {
   try {
-    const response = await fetch(`/api/validate-design?file=${filePath}`);
-    return await response.json();
+    // UX Audit: api.get() с params вместо ручного URL-constructed query string.
+    const response = await api.get('/validate-design', { params: { file: filePath } });
+    return response.data;
   } catch (error) {
     logger.error('Ошибка при валидации файла:', error);
     return null;

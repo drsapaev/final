@@ -1,31 +1,17 @@
 import logger from './logger';
-import { buildApiUrl } from '../api/runtime';
-import tokenManager from './tokenManager';
+// UX Audit: миграция raw fetch() → api/client.js.
+import { api } from '../api/client';
 
 export async function resolveCanonicalVisitId(appointmentId) {
   if (!appointmentId) {
     return null;
   }
 
-  const token = tokenManager.getAccessToken();
-  if (!token) {
-    return null;
-  }
-
   try {
-    const response = await fetch(buildApiUrl(`/appointments/${appointmentId}/canonical-visit`), {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = await response.json();
-    return payload?.visit_id || null;
+    // UX Audit: api.get() автоматически добавляет Authorization header
+    // через axios-interceptor. 401/403 обрабатываются централизованно.
+    const response = await api.get(`/appointments/${appointmentId}/canonical-visit`);
+    return response.data?.visit_id || null;
   } catch (error) {
     logger.warn('[canonical-visit] failed to resolve visit_id', {
       appointmentId,
