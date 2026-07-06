@@ -812,9 +812,9 @@ const DentistPanelUnified = () => {
   const loadTreatmentPlans = useCallback(async () => {
     try {
       // TODO: Implement treatment plans endpoint
+      // Phase 4+ cleanup: treatmentPlans state removed (dead UI).
       // const res = await fetch(`${API_V1_BASE}/dental/treatments?limit=100`, { headers: authHeader() });
       // if (res.ok) setTreatmentPlans(await res.json());
-      setTreatmentPlans([]);
       logger.info('Treatment plans endpoint not implemented yet');
     } catch {
 
@@ -824,9 +824,9 @@ const DentistPanelUnified = () => {
     }}, []);const loadProsthetics = useCallback(async () => {
     try {
       // TODO: Implement prosthetics endpoint
+      // Phase 4+ cleanup: prosthetics state removed (dead UI).
       // const res = await fetch(`${API_V1_BASE}/dental/prosthetics?limit=100`, { headers: authHeader() });
       // if (res.ok) setProsthetics(await res.json());
-      setProsthetics([]);
       logger.info('Prosthetics endpoint not implemented yet');
     } catch {
 

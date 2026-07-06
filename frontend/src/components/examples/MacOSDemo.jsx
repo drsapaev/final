@@ -98,11 +98,11 @@ const MacOSDemo = () => {
   };
 
   const showToast = (type, message) => {
-    const id = Math.random().toString(36).slice(2);
-    setToasts((prev) => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    // UX Audit #1930: Toast component removed in PR #1928. Use notify service.
+    if (type === 'success') notify.success(message);
+    else if (type === 'error') notify.error(message);
+    else if (type === 'warning') notify.warning(message);
+    else notify.info(message);
   };
 
   const sidebarItems = [
@@ -862,15 +862,7 @@ const MacOSDemo = () => {
         </div>
       </Modal>
 
-      {/* Toast Notifications */}
-      {toasts.map((toast) =>
-      <Toast
-        key={toast.id}
-        type={toast.type}
-        message={toast.message}
-        position="top-right" />
-
-      )}
+      {/* Toast Notifications — removed in PR #1928. showToast() now uses notify service. */}
 
       {/* Demo Button */}
       <div style={{ position: 'fixed', bottom: '20px', right: '20px' }}>
