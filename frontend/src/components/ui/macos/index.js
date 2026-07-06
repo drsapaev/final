@@ -54,6 +54,5 @@ export { default as Progress, CircularProgress } from './Progress';
 export { default as SegmentedControl } from './SegmentedControl';
 export { default as Sidebar } from './Sidebar';
 export { default as Switch } from './Switch';
-export { default as Toast, ToastContainer } from './Toast';
 export { default as Tooltip } from './Tooltip';
 export { default as Typography } from './Typography';
