@@ -75,7 +75,6 @@ from app.api.v1.endpoints import (
     lab_reporting,
     medical_equipment,
     messages,
-    minimal_auth,
     mobile_api,
     mobile_api_extended,
     notification_websocket,
@@ -108,7 +107,6 @@ from app.api.v1.endpoints import (
     schedule,
     services,
     setup,
-    simple_auth,
     sms_providers,
     specialized_panels,
     system_management,
@@ -169,8 +167,6 @@ if settings.ENABLE_FALLBACK_AUTH:
     logger.warning(
         "ENABLE_FALLBACK_AUTH is enabled; legacy simple/minimal auth endpoints are mounted."
     )
-    api_router.include_router(simple_auth.router, prefix="/auth", tags=["simple-auth"])
-    api_router.include_router(minimal_auth.router, prefix="/auth", tags=["minimal-auth"])
 else:
     logger.info("Legacy simple/minimal auth endpoints are disabled by configuration.")
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
