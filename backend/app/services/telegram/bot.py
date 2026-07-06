@@ -22,7 +22,7 @@ class ClinicTelegramBot:
     """Telegram бот клиники"""
 
     def __init__(self):
-        self.token = os.getenv("TELEGRAM_BOT_TOKEN")
+        self.token = settings.TELEGRAM_BOT_TOKEN
         if not self.token:
             logger.warning("TELEGRAM_BOT_TOKEN not set. Telegram bot disabled.")
             self.bot = None
