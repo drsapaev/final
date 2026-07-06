@@ -24,15 +24,15 @@
   сразу отправляется auth-сообщение. При `e.code === 4001` (auth rejected)
   вызывается `tokenManager.invalidateAccessToken()` вместо слепого переподключения.
 
-### F-002: Tenant isolation via `clinic_id`
-- `models/message.py`: добавлено поле `clinic_id: Mapped[int | None]` с FK на
-  `clinics.id`. NULL для backward compat (single-clinic deployments / legacy rows).
-- `alembic/versions/0032_messages_clinic_id_tenant_isolation.py`: миграция
-  добавляет колонку, backfill из `users.clinic_id` (если существует), FK + индекс.
+### F-002: Tenant isolation via `branch_id`
+- `models/message.py`: добавлено поле `branch_id: Mapped[int | None]` с FK на
+  `branches.id`. NULL для backward compat (single-clinic deployments / legacy rows).
+- `alembic/versions/0032_messages_branch_id_tenant_isolation.py`: миграция
+  добавляет колонку, backfill из `users.branch_id` (если существует), FK + индекс.
 - `core/messaging_config.py`: добавлена `can_send_message_with_clinic()` —
   tenant-aware версия. Legacy `can_send_message()` сохранена для backward compat.
 - `services/messages_api_service.py`: `validate_recipient()` теперь использует
-  `can_send_message_with_clinic()` с проверкой `clinic_id` отправителя и получателя.
+  `can_send_message_with_clinic()` с проверкой `branch_id` отправителя и получателя.
 
 ### F-003: Audio magic bytes + attachment disposition
 - `utils/audio.py`: переписана `validate_audio_file()` — добавлена проверка
@@ -88,7 +88,7 @@
 - Legacy `can_send_message()` сохранена — существующие callers не сломаются.
 - Legacy `/download/{filename}` endpoint работает — старые сообщения продолжат
   скачиваться.
-- `clinic_id` nullable — существующие строки в БД не требуют немедленного backfill.
+- `branch_id` nullable — существующие строки в БД не требуют немедленного backfill.
 - SlowAPI — optional dependency (если не установлен, rate limiting disabled
   с warning в логах).
 - `python-magic` — optional (если не установлен, работает только magic bytes
@@ -103,9 +103,9 @@ cd backend
 alembic upgrade head
 ```
 
-Миграция `0032_messages_clinic_id_tenant_isolation`:
-1. Добавляет колонку `messages.clinic_id` (nullable).
-2. Backfill из `users.clinic_id` (если колонка существует в users).
+Миграция `0032_messages_branch_id_tenant_isolation`:
+1. Добавляет колонку `messages.branch_id` (nullable).
+2. Backfill из `users.branch_id` (если колонка существует в users).
 3. Добавляет FK + индекс.
 
 ## Не применено в этом PR

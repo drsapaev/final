@@ -131,8 +131,8 @@ class MessagesApiService:
         if not can_send_message_with_clinic(
             sender_role,
             recipient_role,
-            sender_clinic_id=getattr(current_user, "clinic_id", None),
-            recipient_clinic_id=getattr(recipient, "clinic_id", None),
+            sender_branch_id=getattr(current_user, "branch_id", None),
+            recipient_branch_id=getattr(recipient, "branch_id", None),
         ):
             raise HTTPException(
                 status_code=403,

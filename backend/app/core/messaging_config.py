@@ -45,24 +45,24 @@ def can_send_message(sender_role: str, recipient_role: str) -> bool:
     """
     Проверить, может ли отправитель писать получателю (legacy: только по ролям).
 
-    F-002: используйте can_send_message_with_clinic() для multi-tenant проверок.
+    F-002: используйте can_send_message_with_branch() для multi-tenant проверок.
     """
     allowed_recipients = MESSAGING_PERMISSIONS.get(sender_role, [])
     return recipient_role in allowed_recipients
 
 
-def can_send_message_with_clinic(
+def can_send_message_with_branch(
     sender_role: str,
     recipient_role: str,
-    sender_clinic_id: int | None = None,
-    recipient_clinic_id: int | None = None,
+    sender_branch_id: int | None = None,
+    recipient_branch_id: int | None = None,
 ) -> bool:
     """
     F-002: tenant-aware проверка прав отправки сообщения.
 
     Дополнительно к role-based проверке учитывает принадлежность
-    отправителя и получателя к одной клинике. Если clinic_id не задан
-    у одного из пользователей (single-clinic / legacy) — проверка
+    отправителя и получателя к одной клинике. Если branch_id не задан
+    у одного из пользователей (single-branch / legacy) — проверка
     пропускается (fallback к role-based).
     """
     allowed_recipients = MESSAGING_PERMISSIONS.get(sender_role, [])
@@ -70,8 +70,8 @@ def can_send_message_with_clinic(
         return False
 
     # Tenant isolation: оба пользователя должны быть в одной клинике
-    if sender_clinic_id is not None and recipient_clinic_id is not None:
-        if sender_clinic_id != recipient_clinic_id:
+    if sender_branch_id is not None and recipient_branch_id is not None:
+        if sender_branch_id != recipient_branch_id:
             return False
 
     return True
