@@ -126,3 +126,61 @@
   margin-left: 4px;
   color: var(--mac-text-tertiary);
 }
+
+/* ─── Session timeout warning dialog (migrated from inline styles) ─── */
+.lab-session-warning-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.lab-session-warning-dialog {
+  background: var(--mac-surface, white);
+  border: 1px solid var(--mac-border, #d8dde8);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+}
+
+.lab-session-warning-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: var(--mac-text-primary, #1a1d29);
+}
+
+.lab-session-warning-text {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--mac-text-secondary, #6b7280);
+  line-height: 1.5;
+}
+
+.lab-session-warning-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.lab-session-warning-btn-later {
+  padding: 8px 16px;
+  border: 1px solid var(--mac-border, #d8dde8);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.lab-session-warning-btn-extend {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--mac-accent, #dc2626);
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+}

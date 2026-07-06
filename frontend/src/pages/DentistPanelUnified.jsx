@@ -189,8 +189,7 @@ const DentistPanelUnified = () => {
     }
   }, []);
   const [patients, setPatients] = useState([]);
-  const [treatmentPlans, setTreatmentPlans] = useState([]);
-  const [prosthetics, setProsthetics] = useState([]);
+  // Phase 4+ cleanup: treatmentPlans/prosthetics state removed (dead UI).
   const [loading, setLoading] = useState(true);
   // P-009: selectedPatient / setSelectedPatient now come from useDoctorPanelState
   const [savedVisitProtocols, setSavedVisitProtocols] = useState(
@@ -216,8 +215,7 @@ const DentistPanelUnified = () => {
   const [showPhotoArchive, setShowPhotoArchive] = useState(false);
   const [showProtocolTemplates, setShowProtocolTemplates] = useState(false);
   const [showReports, setShowReports] = useState(false);
-  const [showTreatmentForm, setShowTreatmentForm] = useState(false);
-  const [showProstheticForm, setShowProstheticForm] = useState(false);
+  // Phase 4+ cleanup: showTreatmentForm/showProstheticForm removed (dead UI).
   const [dentalChartData, setDentalChartData] = useState(null);
 
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
@@ -404,31 +402,7 @@ const DentistPanelUnified = () => {
     recommendations: ''
   });
 
-  const [treatmentForm, setTreatmentForm] = useState({
-    patient_id: '',
-    treatment_date: '',
-    treatment_type: '',
-    teeth_involved: '',
-    procedure_description: '',
-    materials_used: '',
-    anesthesia: '',
-    complications: '',
-    follow_up_date: '',
-    cost: ''
-  });
 
-  const [prostheticForm, setProstheticForm] = useState({
-    patient_id: '',
-    prosthetic_date: '',
-    prosthetic_type: '',
-    teeth_replaced: '',
-    material: '',
-    shade: '',
-    fit_quality: '',
-    patient_satisfaction: '',
-    warranty_period: '',
-    cost: ''
-  });
 
   // Refs
 
@@ -864,15 +838,14 @@ const DentistPanelUnified = () => {
     try {
       await Promise.all([
       loadPatients(),
-      loadTreatmentPlans(),
-      loadProsthetics()]
+      loadPatients()]
       );
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
     }
-  }, [loadPatients, loadProsthetics, loadTreatmentPlans]);
+  }, [loadPatients]);
 
   useEffect(() => {
     loadData();
@@ -1257,29 +1230,7 @@ const DentistPanelUnified = () => {
     setShowExaminationForm(true);
   };
 
-  const handleTreatment = (patient) => {
-    const patientId = resolvePatientId(patient);
-    setSelectedPatient({
-      ...patient,
-      patient_id: patientId,
-      patient_name: resolvePatientName(patient),
-      patient_fio: resolvePatientName(patient)
-    });
-    setTreatmentForm({ ...treatmentForm, patient_id: patientId });
-    setShowTreatmentForm(true);
-  };
 
-  const handleProsthetic = (patient) => {
-    const patientId = resolvePatientId(patient);
-    setSelectedPatient({
-      ...patient,
-      patient_id: patientId,
-      patient_name: resolvePatientName(patient),
-      patient_fio: resolvePatientName(patient)
-    });
-    setProstheticForm({ ...prostheticForm, patient_id: patientId });
-    setShowProstheticForm(true);
-  };
 
   const handleDiagnosis = (patient) => {
     setSelectedPatient({
@@ -1525,49 +1476,7 @@ const DentistPanelUnified = () => {
     }
   };
 
-  const handleTreatmentSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_V1_BASE}/dental/treatments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
-        body: JSON.stringify(treatmentForm)
-      });
-      if (res.ok) {
-        setShowTreatmentForm(false);
-        setTreatmentForm({
-          patient_id: '', treatment_date: '', treatment_type: '', teeth_involved: '',
-          procedure_description: '', materials_used: '', anesthesia: '', complications: '',
-          follow_up_date: '', cost: ''
-        });
-        loadTreatmentPlans();
-      }
-    } catch (e) {
-      logger.error('Ошибка сохранения лечения:', e);
-    }
-  };
 
-  const handleProstheticSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_V1_BASE}/dental/prosthetics`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
-        body: JSON.stringify(prostheticForm)
-      });
-      if (res.ok) {
-        setShowProstheticForm(false);
-        setProstheticForm({
-          patient_id: '', prosthetic_date: '', prosthetic_type: '', teeth_replaced: '',
-          material: '', shade: '', fit_quality: '', patient_satisfaction: '',
-          warranty_period: '', cost: ''
-        });
-        loadProsthetics();
-      }
-    } catch (e) {
-      logger.error('Ошибка сохранения протеза:', e);
-    }
-  };
 
   // Фильтрация пациентов
   const filteredPatients = patients.filter((patient) => {
@@ -1590,13 +1499,8 @@ const DentistPanelUnified = () => {
       return new Date(apt.appointment_date).toDateString() === todayString;
     }).length;
 
-    const activePlansFromState = treatmentPlans.filter((plan) => plan.status === 'active').length;
-    const activePlansDerived = appointmentsTableData.filter((apt) => apt.status === 'in_progress' || apt.status === 'waiting').length;
-    const activeTreatmentPlansCount = activePlansFromState || activePlansDerived;
-
-    const completedProstheticsFromState = prosthetics.filter((prosthetic) => prosthetic.status === 'completed').length;
-    const completedProstheticsDerived = appointmentsTableData.filter((apt) => apt.status === 'completed').length;
-    const completedProstheticsCount = completedProstheticsFromState || completedProstheticsDerived;
+    const activeTreatmentPlansCount = appointmentsTableData.filter((apt) => apt.status === 'in_progress' || apt.status === 'waiting').length;
+    const completedProstheticsCount = appointmentsTableData.filter((apt) => apt.status === 'completed').length;
 
     return {
       totalPatients: patients.length,
@@ -1604,7 +1508,7 @@ const DentistPanelUnified = () => {
       activeTreatmentPlans: activeTreatmentPlansCount,
       completedProsthetics: completedProstheticsCount
     };
-  }, [appointmentsTableData, patients, prosthetics, treatmentPlans]);
+  }, [appointmentsTableData, patients]);
 
   const appointmentSummaryItems = useMemo(() => [
     {
@@ -1647,8 +1551,6 @@ const DentistPanelUnified = () => {
       patients={patients}
       onSelectPatient={handlePatientSelect}
       onDentalChart={handleDentalChart}
-      onTreatment={handleTreatment}
-      onProsthetic={handleProsthetic}
     />;
   const renderAppointments = () =>
   <div className="dental-appointments-root">
@@ -1893,7 +1795,6 @@ const DentistPanelUnified = () => {
       onReopenProtocol={reopenVisitProtocol}
       patients={patients}
       diagnoses={[]}
-      prosthetics={prosthetics}
     />;
   const renderDentalChart = () =>
   <div className="dental-flex-col dental-gap-24">
@@ -1939,80 +1840,8 @@ const DentistPanelUnified = () => {
 
 
   // Рендер планов лечения
-  const renderTreatmentPlans = () =>
-  <div className="dental-flex-col dental-gap-24">
-      <Card padding="lg">
-        <h3 className="dental-text-primary">Планы лечения</h3>
-        <p className="dental-text-desc dental-text-secondary">
-          Выберите пациента для создания или редактирования плана лечения
-        </p>
-
-        <div className="dental-grid-auto-fill-250">
-          {patients.map((patient) =>
-        <div
-          key={patient.id}
-          role="button"
-          tabIndex={0}
-          aria-label="Открыть план лечения пациента"
-          className="dental-card-btn"
-          onClick={() => handleTreatmentPlanner(patient)}
-          onKeyDown={(event) => handleCardKeyDown(event, () => handleTreatmentPlanner(patient))}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-          }}>
-
-              <div className="dental-flex dental-gap-12">
-                <div className="dental-icon-bg dental-icon-bg-success dental-icon-bg-full">
-                  <span className="dental-text-value dental-text-white">
-                    {patient.name?.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-secondary">Открыть план</p>
-                </div>
-              </div>
-            </div>
-        )}
-        </div>
-      </Card>
-    </div>;
 
 
-  // Рендер протезирования
-  const renderProsthetics = () =>
-  <div className="dental-flex-col dental-gap-24">
-      <Card padding="lg">
-        <h3 className="dental-text-primary">Протезирование</h3>
-        <div className="dental-flex-col dental-gap-12">
-          {prosthetics.map((prosthetic) =>
-        <div
-          key={prosthetic.id}
-          className="dental-prosthetic-row">
-
-              <div className="dental-flex dental-gap-16">
-                <div className="dental-icon-bg-40 dental-icon-bg-warning">
-                  <Smile className="dental-icon-20 dental-text-white" />
-                </div>
-                <div>
-                  <p className="dental-text-primary">{prosthetic.patientName}</p>
-                  <p className="dental-text-desc dental-text-secondary">{prosthetic.type}</p>
-                </div>
-              </div>
-              <Badge variant={prosthetic.status === 'completed' ? 'success' : 'warning'}>
-                {prosthetic.status}
-              </Badge>
-            </div>
-        )}
-        </div>
-      </Card>
-    </div>;
-
-
-  // Рендер AI помощника
   const renderAIAssistant = () =>
   <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
@@ -2033,8 +1862,6 @@ const DentistPanelUnified = () => {
   // Рендер контента
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return renderDashboard();
       case 'queue':
         return (
           <QueueIntegration
@@ -2049,12 +1876,6 @@ const DentistPanelUnified = () => {
 
       case 'patients':
         return renderPatients();
-      case 'appointments':
-        return renderAppointments();
-      case 'examinations':
-        return renderExaminations();
-      case 'diagnoses':
-        return renderDiagnoses();
       case 'visit':
       case 'visits':
         // Phase 4: 'visit' is the new sidebar tab; 'visits' kept as
@@ -2062,16 +1883,6 @@ const DentistPanelUnified = () => {
         return renderVisits();
       case 'photos':
         return renderPhotos();
-      case 'templates':
-        return renderTemplates();
-      case 'reports':
-        return renderReports();
-      case 'dental-chart':
-        return renderDentalChart();
-      case 'treatment-plans':
-        return renderTreatmentPlans();
-      case 'prosthetics':
-        return renderProsthetics();
       case 'ai-assistant':
         return renderAIAssistant();
       default:
@@ -2451,331 +2262,7 @@ const DentistPanelUnified = () => {
         </div>
       }
 
-      {/* Форма лечения */}
-      {showTreatmentForm && selectedPatient &&
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold">
-                Новый план лечения — {selectedPatientDisplayName}
-              </h2>
-            </div>
-            <div className="p-6">
-              <form onSubmit={handleTreatmentSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Дата лечения *</label>
-                    <Input
-                    type="date"
-                    aria-label="Дата лечения"
-                    value={treatmentForm.treatment_date}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, treatment_date: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Тип лечения *</label>
-                    <select
-                    value={treatmentForm.treatment_type}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, treatment_type: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-
-                      <option value="">Выберите тип</option>
-                      <option value="filling">Пломбирование</option>
-                      <option value="root_canal">Каналы</option>
-                      <option value="extraction">Удаление</option>
-                      <option value="cleaning">Чистка</option>
-                      <option value="whitening">Отбеливание</option>
-                      <option value="orthodontics">Ортодонтия</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Вовлеченные зубы</label>
-                    <Input
-                    type="text"
-                    aria-label="Зубы в лечении"
-                    value={treatmentForm.teeth_involved}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, teeth_involved: e.target.value })}
-                    placeholder="Номера зубов"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
-                    <Input
-                    type="number"
-                    aria-label="Стоимость лечения"
-                    value={treatmentForm.cost}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, cost: e.target.value })}
-                    placeholder="Сумма"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Описание процедуры</label>
-                  <textarea
-                  aria-label="Описание процедуры лечения"
-                  value={treatmentForm.procedure_description}
-                  onChange={(e) => setTreatmentForm({ ...treatmentForm, procedure_description: e.target.value })}
-                  placeholder="Подробное описание"
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Материалы</label>
-                    <Input
-                    type="text"
-                    aria-label="Использованные материалы"
-                    value={treatmentForm.materials_used}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, materials_used: e.target.value })}
-                    placeholder="Названия материалов"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Анестезия</label>
-                    <select
-                    value={treatmentForm.anesthesia}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, anesthesia: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-
-                      <option value="">Выберите</option>
-                      <option value="none">Не требуется</option>
-                      <option value="local">Местная</option>
-                      <option value="sedation">Седация</option>
-                      <option value="general">Общая</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Осложнения</label>
-                    <Input
-                    type="text"
-                    aria-label="Осложнения лечения"
-                    value={treatmentForm.complications}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, complications: e.target.value })}
-                    placeholder="Описание осложнений"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Дата контроля</label>
-                    <Input
-                    type="date"
-                    aria-label="Дата повторного приёма"
-                    value={treatmentForm.follow_up_date}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, follow_up_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex items-center gap-2">
-                    <Save className="h-4 w-4" />
-                    Сохранить лечение
-                  </Button>
-                  <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    // Открываем менеджер цен для указания итоговой стоимости
-                    setSelectedServiceForPrice({
-                      id: selectedServiceForPrice?.id || null, // S-19: use real service ID
-                      name: treatmentForm.procedure_type || 'Стоматологическое лечение',
-                      price: Number(treatmentForm.cost) || 50000
-                    });
-                    setShowPriceManager(true);
-                  }}
-                  className="flex items-center gap-2">
-
-                    <DollarSign className="h-4 w-4" />
-                    Указать цену
-                  </Button>
-                  <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowTreatmentForm(false)}>
-
-                    Отмена
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      }
-
-      {/* Форма протезирования */}
-      {showProstheticForm && selectedPatient &&
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold">
-                Новый протез — {selectedPatientDisplayName}
-              </h2>
-            </div>
-            <div className="p-6">
-              <form onSubmit={handleProstheticSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Дата протезирования *</label>
-                    <Input
-                    type="date"
-                    aria-label="Дата протезирования"
-                    value={prostheticForm.prosthetic_date}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, prosthetic_date: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Тип протеза *</label>
-                    <select
-                    value={prostheticForm.prosthetic_type}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, prosthetic_type: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-
-                      <option value="">Выберите тип</option>
-                      <option value="crown">Коронка</option>
-                      <option value="bridge">Мост</option>
-                      <option value="implant">Имплант</option>
-                      <option value="partial_denture">Частичный протез</option>
-                      <option value="full_denture">Полный протез</option>
-                      <option value="veneer">Винир</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Заменяемые зубы</label>
-                    <Input
-                    type="text"
-                    aria-label="Замещённые зубы"
-                    value={prostheticForm.teeth_replaced}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, teeth_replaced: e.target.value })}
-                    placeholder="Номера зубов"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Материал</label>
-                    <select
-                    value={prostheticForm.material}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, material: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-
-                      <option value="">Выберите материал</option>
-                      <option value="porcelain">Фарфор</option>
-                      <option value="metal">Металл</option>
-                      <option value="ceramic">Керамика</option>
-                      <option value="composite">Композит</option>
-                      <option value="zirconia">Диоксид циркония</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Оттенок</label>
-                    <Input
-                    type="text"
-                    aria-label="Оттенок протеза"
-                    value={prostheticForm.shade}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, shade: e.target.value })}
-                    placeholder="A1, B2, C3 и т.д."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
-                    <Input
-                    type="number"
-                    aria-label="Стоимость протеза"
-                    value={prostheticForm.cost}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, cost: e.target.value })}
-                    placeholder="Сумма"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Качество посадки</label>
-                    <select
-                    value={prostheticForm.fit_quality}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, fit_quality: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-
-                      <option value="">Выберите</option>
-                      <option value="excellent">Отличная</option>
-                      <option value="good">Хорошая</option>
-                      <option value="fair">Удовлетворительная</option>
-                      <option value="poor">Плохая</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Удовлетворенность пациента</label>
-                    <select
-                    value={prostheticForm.patient_satisfaction}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, patient_satisfaction: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-
-                      <option value="">Выберите</option>
-                      <option value="very_satisfied">Очень доволен</option>
-                      <option value="satisfied">Доволен</option>
-                      <option value="neutral">Нейтрально</option>
-                      <option value="dissatisfied">Не доволен</option>
-                      <option value="very_dissatisfied">Очень не доволен</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Гарантийный период</label>
-                  <Input
-                  type="text"
-                  aria-label="Гарантийный срок"
-                  value={prostheticForm.warranty_period}
-                  onChange={(e) => setProstheticForm({ ...prostheticForm, warranty_period: e.target.value })}
-                  placeholder="Например: 2 года"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex items-center gap-2">
-                    <Save className="h-4 w-4" />
-                    Сохранить протез
-                  </Button>
-                  <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowProstheticForm(false)}>
-
-                    Отмена
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      }
+      {/* Phase 4+ cleanup: treatment + prosthetic forms removed (dead UI) */}
 
       {/* Модальное окно для работы с зубом */}
       {toothModalOpen && selectedTooth &&

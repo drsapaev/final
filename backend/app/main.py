@@ -448,6 +448,32 @@ async def _startup_tasks() -> None:
         except Exception as e:
             log.error(f"Failed to start backup scheduler: {e}")
 
+    # #8 fix: Start lab notification scheduler as a safety net.
+    # The primary notification path is inline in lab_reporting_service.finalize(),
+    # but this scheduler catches any missed events (e.g. if the inline call
+    # failed due to a transient error). Runs every 5 minutes.
+    try:
+        import asyncio
+        from app.db.session import SessionLocal
+        from app.services.lab_notification_service import LabNotificationService
+
+        async def _run_lab_notifications_periodically():
+            while True:
+                try:
+                    lab_db = SessionLocal()
+                    LabNotificationService(lab_db).run_all_notifications()
+                    lab_db.close()
+                except Exception as exc:
+                    log.warning("Lab notification scheduler error: %s", exc)
+                await asyncio.sleep(300)  # 5 minutes
+
+        asyncio.create_task(_run_lab_notifications_periodically())
+        log.info("✅ Lab notification scheduler started (every 5 minutes)")
+    except ImportError:
+        log.debug("Lab notification service not available — scheduler skipped")
+    except Exception as e:
+        log.warning(f"Failed to start lab notification scheduler: {e}")
+
     # Print routes
     try:
         lines: list[str] = []
