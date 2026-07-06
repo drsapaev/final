@@ -73,6 +73,10 @@ class Settings(BaseSettings):
         default=False,
         description="Enable legacy/fallback auth login endpoints. Keep false outside explicit break-glass/dev use.",
     )
+    ENABLE_TEST_PAYMENT_INIT: bool = Field(
+        default=False,
+        description="Enable /payments/test-init endpoint (bypasses audit logging). Keep false in production.",
+    )
 
     # --- CORS (при необходимости) ---
     BACKEND_CORS_ORIGINS: list[str] = Field(
@@ -555,6 +559,13 @@ def get_settings() -> Settings:
             errors.append(
                 "DISABLE_2FA_REQUIREMENT must not be set in production. "
                 "This env var disables 2FA enforcement for Admin/Cashier roles."
+            )
+
+        # 8. ENABLE_TEST_PAYMENT_INIT must be False in production
+        if s.ENABLE_TEST_PAYMENT_INIT:
+            errors.append(
+                "ENABLE_TEST_PAYMENT_INIT must be False in production. "
+                "The /payments/test-init endpoint bypasses audit logging."
             )
 
         # === OUTPUT WARNINGS ===
