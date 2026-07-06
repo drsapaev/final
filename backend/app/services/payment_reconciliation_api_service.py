@@ -20,7 +20,14 @@ class PaymentReconciliationApiService:
     """Orchestrates payment reconciliation API flows."""
 
     def __init__(self, db):  # type: ignore[no-untyped-def]
-        self.reconciliation_service = PaymentReconciliationService(db)
+        # PAY-REAUDIT-28 P0-8: передаём реальный payment_manager. Раньше
+        # сервис создавал PaymentReconciliationService(db) без manager, что
+        # приводило к пустому PaymentProviderManager({}) и полной no-op
+        # сверке (всегда "0 расхождений", ложная уверенность у админа).
+        from app.services.payment_provider_manager_factory import get_payment_manager
+        self.reconciliation_service = PaymentReconciliationService(
+            db, payment_manager=get_payment_manager()
+        )
 
     def reconcile_provider(
         self, *, provider: str, start_date: date, end_date: date

@@ -804,7 +804,12 @@ class BillingService:
         Raises:
             ValueError: Если платеж не найден или переход статуса недопустим
         """
-        payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+        payment = (
+            self.db.query(Payment)
+            .filter(Payment.id == payment_id)
+            .with_for_update()  # PAY-REAUDIT-28 P0-7: SELECT FOR UPDATE — защита от race
+            .first()
+        )
         if not payment:
             raise ValueError(f"Платеж {payment_id} не найден")
 

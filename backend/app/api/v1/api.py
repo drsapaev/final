@@ -159,6 +159,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# AUTH-REAUDIT-28/PAY-REAUDIT-28: mount visit_payments router (was missing)
+from app.api.v1.endpoints import visit_payments as visit_payments_ep
+
 api_router = APIRouter()
 
 # Auth (/login, /me и т.д.)
@@ -180,6 +183,8 @@ api_router.include_router(payments.router, prefix="/payments", tags=["payments"]
 api_router.include_router(
     payment_webhooks_router, prefix="/payments/webhook", tags=["payment-webhooks"]
 )
+# PAY-REAUDIT-28 P0-2: mount visit_payments router (was unreachable)
+api_router.include_router(visit_payments_ep.router, tags=["visit-payments"])
 
 # Эндпоинты подтверждения визитов (публичные, без авторизации)
 api_router.include_router(visit_confirmation_router, tags=["visit-confirmation"])

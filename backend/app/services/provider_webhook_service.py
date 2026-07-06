@@ -550,108 +550,153 @@ class ProviderWebhookService:
         return payment_status
 
     def process_kaspi_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
-        """Webhook для Kaspi Pay платежной системы."""
-        try:
-            logger.info("Kaspi webhook received: %s", webhook_data)
+        """Webhook для Kaspi Pay платежной системы.
 
-            webhook_id = f"kaspi_{uuid.uuid4().hex[:8]}"
-            webhook = self.repository.create_webhook(
-                provider="kaspi",
-                webhook_id=webhook_id,
-                transaction_id=webhook_data.get("transaction_id", "unknown"),
-                amount=webhook_data.get("amount", 0),
-                currency=webhook_data.get("currency", "KZT"),
-                raw_data=webhook_data,
-                signature=webhook_data.get("signature"),
+        PAY-REAUDIT-28 P0-5: добавлена идемпотентность (проверка existing
+        transaction) и атомарность (transaction_ctx вместо нескольких
+        raw db.commit()). Раньше повторный webhook создавал дубликаты
+        транзакций и переобрабатывал платёж.
+        """
+        try:
+            # PII-safe logging: только идентификаторы, не весь payload.
+            logger.info(
+                "Kaspi webhook received",
+                extra={
+                    "transaction_id": webhook_data.get("transaction_id"),
+                    "merchant_id": webhook_data.get("merchant_id"),
+                },
             )
 
-            self.db.commit()
-
             manager = get_payment_manager()
-            result = manager.process_webhook("kaspi", webhook_data)
+            signature = webhook_data.get("signature")
 
-            if result.success:
-                webhook.status = "processed"
-                webhook.processed_at = datetime.utcnow()
+            if not signature:
+                logger.error("Kaspi webhook: Missing signature")
+                return {"status": "error", "message": "Missing signature"}
 
-                payment = None
-                mapped_status = None
-                if result.payment_id:
-                    payment = self.repository.get_payment_by_provider_payment_id(
-                        result.payment_id
-                    )
+            kaspi_provider = manager.get_provider("kaspi")
+            if not kaspi_provider:
+                logger.error("Kaspi webhook: Provider not configured")
+                return {"status": "error", "message": "Provider not configured"}
 
-                if payment:
-                    if not self._result_amount_matches_payment(payment, result):
-                        webhook.status = "failed"
-                        webhook.error_message = "provider_amount_mismatch"
-                        self.db.commit()
-                        return {
-                            "status": "error",
-                            "message": "Payment amount mismatch",
-                            "payment_id": payment.id,
-                            "payment_status": None,
-                            "payment_provider": "kaspi",
-                        }
-                    mapped_status = self._map_provider_status_to_payment_status(result.status)
-                    payment.status = mapped_status
-                    if payment.status == "paid":
-                        payment.paid_at = datetime.utcnow()
+            if not kaspi_provider.validate_webhook_signature(webhook_data, signature):
+                logger.error("Kaspi webhook: Invalid signature")
+                return {"status": "error", "message": "Invalid signature"}
 
-                    payment.provider_data = {
-                        **(payment.provider_data or {}),
-                        **result.provider_data,
-                    }
+            transaction_id = webhook_data.get("transaction_id", "unknown")
 
-                    webhook.payment_id = payment.id
-                    webhook.visit_id = payment.visit_id
-
-                    self.repository.create_transaction(
-                        transaction_id=webhook_data.get("transaction_id", webhook_id),
-                        provider="kaspi",
-                        amount=webhook_data.get("amount", 0),
-                        currency=webhook_data.get("currency", "KZT"),
-                        status=result.status,
-                        payment_id=payment.id,
-                        webhook_id=webhook.id,
-                        visit_id=payment.visit_id,
-                        provider_data=result.provider_data,
-                    )
-
-                self.db.commit()
+            # IDEMPOTENCY: проверяем, не был ли этот webhook уже обработан.
+            existing_transaction = self.repository.get_existing_transaction(
+                transaction_id=transaction_id,
+                provider="kaspi",
+            )
+            if existing_transaction:
+                logger.info(
+                    "Kaspi webhook: Transaction %s already processed (idempotent)",
+                    transaction_id,
+                )
                 return {
                     "status": "success",
-                    "message": "Webhook processed successfully",
-                    "payment_id": payment.id if payment else None,
-                    "payment_status": mapped_status,
+                    "message": "Already processed",
+                    "payment_id": getattr(existing_transaction, "payment_id", None),
+                    "payment_status": None,
                     "payment_provider": "kaspi",
                 }
 
-            webhook.status = "failed"
-            webhook.error_message = result.error_message
-            webhook.processed_at = datetime.utcnow()
+            # ATOMIC: всё в одной транзакции.
+            with transaction_ctx(self.db):
+                webhook_id = f"kaspi_{uuid.uuid4().hex[:8]}"
+                webhook = self.repository.create_webhook(
+                    provider="kaspi",
+                    webhook_id=webhook_id,
+                    transaction_id=transaction_id,
+                    amount=webhook_data.get("amount", 0),
+                    currency=webhook_data.get("currency", "KZT"),
+                    raw_data=webhook_data,
+                    signature=signature,
+                )
 
-            failed_payment = None
-            if result.payment_id:
-                failed_payment = self.repository.get_payment_by_provider_payment_id(result.payment_id)
-            if failed_payment:
-                failed_payment.status = "failed"
-                failed_payment.provider_data = {
-                    **(failed_payment.provider_data or {}),
-                    "webhook_error": result.error_message,
+                result = manager.process_webhook("kaspi", webhook_data)
+
+                if result.success:
+                    webhook.status = "processed"
+                    webhook.processed_at = datetime.utcnow()
+
+                    payment = None
+                    mapped_status = None
+                    if result.payment_id:
+                        payment = self.repository.get_payment_by_provider_payment_id(
+                            result.payment_id
+                        )
+
+                    if payment:
+                        if not self._result_amount_matches_payment(payment, result):
+                            webhook.status = "failed"
+                            webhook.error_message = "provider_amount_mismatch"
+                            return {
+                                "status": "error",
+                                "message": "Payment amount mismatch",
+                                "payment_id": payment.id,
+                                "payment_status": None,
+                                "payment_provider": "kaspi",
+                            }
+                        mapped_status = self._map_provider_status_to_payment_status(result.status)
+                        payment.status = mapped_status
+                        if payment.status == "paid":
+                            payment.paid_at = datetime.utcnow()
+
+                        payment.provider_data = {
+                            **(payment.provider_data or {}),
+                            **result.provider_data,
+                        }
+
+                        webhook.payment_id = payment.id
+                        webhook.visit_id = payment.visit_id
+
+                        self.repository.create_transaction(
+                            transaction_id=transaction_id,
+                            provider="kaspi",
+                            amount=webhook_data.get("amount", 0),
+                            currency=webhook_data.get("currency", "KZT"),
+                            status=result.status,
+                            payment_id=payment.id,
+                            webhook_id=webhook.id,
+                            visit_id=payment.visit_id,
+                            provider_data=result.provider_data,
+                        )
+
+                    return {
+                        "status": "success",
+                        "message": "Webhook processed successfully",
+                        "payment_id": payment.id if payment else None,
+                        "payment_status": mapped_status,
+                        "payment_provider": "kaspi",
+                    }
+
+                webhook.status = "failed"
+                webhook.error_message = result.error_message
+                webhook.processed_at = datetime.utcnow()
+
+                failed_payment = None
+                if result.payment_id:
+                    failed_payment = self.repository.get_payment_by_provider_payment_id(result.payment_id)
+                if failed_payment:
+                    failed_payment.status = "failed"
+                    failed_payment.provider_data = {
+                        **(failed_payment.provider_data or {}),
+                        "webhook_error": result.error_message,
+                    }
+
+                return {
+                    "status": "error",
+                    "message": result.error_message or "Processing error",
+                    "payment_id": failed_payment.id if failed_payment else None,
+                    "payment_status": "failed" if failed_payment else None,
+                    "payment_provider": "kaspi",
                 }
-            self.db.commit()
-
-            return {
-                "status": "error",
-                "message": result.error_message or "Processing error",
-                "payment_id": failed_payment.id if failed_payment else None,
-                "payment_status": "failed" if failed_payment else None,
-                "payment_provider": "kaspi",
-            }
         except Exception as exc:
-            logger.error("Kaspi webhook error: %s", exc)
-            return {"status": "error", "message": f"Internal server error: {exc}"}
+            logger.exception("Kaspi webhook error")
+            return {"status": "error", "message": "Internal server error"}
 
     @staticmethod
     def _extract_payment_id_from_order(order_id: str) -> int | None:

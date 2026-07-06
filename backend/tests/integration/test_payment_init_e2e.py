@@ -26,6 +26,10 @@ def configured_payment_providers(monkeypatch):
     monkeypatch.setattr(settings, "KASPI_ENABLED", True)
     monkeypatch.setattr(settings, "KASPI_MERCHANT_ID", "test_merchant")
     monkeypatch.setattr(settings, "KASPI_SECRET_KEY", "test_secret")
+    # PAY-REAUDIT-28 P0-1: env-gate должен быть явно открыт в тестах, чтобы
+    # /payments/test-init возвращал 200. Раньше gate был сломан (NameError),
+    # теперь работает корректно — поэтому тест должен явно включать флаг.
+    monkeypatch.setattr(settings, "ENABLE_TEST_PAYMENT_INIT", True)
     reset_payment_manager_for_tests()
     yield
     reset_payment_manager_for_tests()

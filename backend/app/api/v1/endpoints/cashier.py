@@ -1616,6 +1616,47 @@ async def refund_payment(
 
         new_refunded_amount = payment.refunded_amount or Decimal("0")
 
+        # PAY-REAUDIT-28 P0-4: вызываем API провайдера для фактического возврата
+        # средств. Раньше локальные проводки обновлялись, но деньги оставались
+        # у провайдера (Click/PayMe/Kaspi). Пациент не получал возврат.
+        if payment.provider and payment.provider_payment_id:
+            try:
+                from app.services.payment_provider_manager_factory import get_payment_manager
+                _manager = get_payment_manager()
+                _refund_result = _manager.refund_payment(
+                    payment.provider,
+                    payment.provider_payment_id,
+                    refund_amount_decimal,
+                )
+                if not _refund_result or not getattr(_refund_result, "success", False):
+                    # Откатываем локальный UPDATE — деньги у провайдера не вернулись.
+                    db.rollback()
+                    # Перезагружаем payment из БД (после rollback)
+                    db.refresh(payment)
+                    _err = getattr(_refund_result, "error_message", "Unknown provider error") if _refund_result else "Provider refund returned None"
+                    logger.error(
+                        "Provider refund failed for payment_id=%s provider=%s: %s",
+                        payment_id, payment.provider, _err,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail=f"Провайдер отклонил возврат: {_err}. Локальные проводки откачены, статус платежа не изменён.",
+                    )
+            except HTTPException:
+                raise
+            except Exception as prov_err:
+                # Если провайдер недоступен/не реализует refund — откатываем локал.
+                db.rollback()
+                db.refresh(payment)
+                logger.exception(
+                    "Provider refund call raised for payment_id=%s provider=%s",
+                    payment_id, payment.provider,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Не удалось выполнить возврат через провайдера: {type(prov_err).__name__}. Локальные проводки откачены.",
+                )
+
         # Если возвращена вся сумма — статус "refunded"
         if new_refunded_amount >= payment.amount:
             payment.status = "refunded"
