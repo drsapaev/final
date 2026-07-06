@@ -674,12 +674,31 @@ class LabReportingService:
         # (2) the ordering doctor if the instance was created from a lab order.
         # Previously lab_notification_service.py was fully implemented but
         # never called — patients had to manually poll for results.
+        # Now wired up: see check_critical_values() call below.
         try:
             self._emit_lab_results_ready_notification(instance)
         except Exception as notify_err:
             logger.warning(
                 "[LAB] results-ready notification failed (non-blocking): %s",
                 notify_err,
+            )
+
+        # Wire-up: check critical values on finalize. The
+        # LabNotificationService.check_critical_values() was implemented
+        # but never called. Now we invoke it inline after finalization
+        # so doctors get immediate alerts for glucose >20, potassium >6.5,
+        # hemoglobin <70, etc. (8 markers in CRITICAL_VALUES dict).
+        # Non-blocking — a failure here does not roll back the finalization.
+        try:
+            from app.services.lab_notification_service import LabNotificationService
+            lab_notif_svc = LabNotificationService(self.db)
+            asyncio.get_event_loop().create_task(
+                lab_notif_svc.check_critical_values()
+            )
+        except Exception as critical_err:
+            logger.warning(
+                "[LAB] critical values check failed (non-blocking): %s",
+                critical_err,
             )
 
         return self.get_instance(instance.id)
@@ -1486,8 +1505,10 @@ class LabReportingService:
           2. The patient via Telegram (if patient has a Telegram link and
              lab_notifications enabled) — so they can pick up results.
 
-        This replaces the never-called lab_notification_service.py cron
+        This replaces the old lab_notification_service.py cron
         approach with inline emission from finalize().
+        lab_notification_service.py is now wired up for critical values
+        checking (check_critical_values) — see the finalize() method.
         """
         patient_id = instance.patient_id
         visit_id = instance.visit_id
