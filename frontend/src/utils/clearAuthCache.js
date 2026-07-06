@@ -1,17 +1,23 @@
 import logger from '../utils/logger';
+import tokenManager from './tokenManager';
 
 /**
  * Утилита для очистки кэша аутентификации
  * Используется при проблемах с маршрутизацией из-за устаревших данных
+ *
+ * AUTH-REAUDIT-28 P0 fix: ранее очищались только `auth_token` и `auth_profile`,
+ * но `refresh_token` и `user` оставались. Теперь делегируем в tokenManager.clearAll()
+ * (он знает точный список ключей), и дополнительно чистим `auth_profile` —
+ * отдельный legacy-ключ, который не входит в зону ответственности tokenManager.
  */
 
 export function clearAuthCache() {
   try {
-    // Очищаем localStorage
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_profile');
+    // Полная очистка токенов + user через единый SSOT
+    tokenManager.clearAll();
 
-    // Очищаем sessionStorage (если используется)
+    // Legacy-ключи (auth_profile) — не входят в tokenManager.
+    localStorage.removeItem('auth_profile');
     sessionStorage.removeItem('auth_token');
     sessionStorage.removeItem('auth_profile');
 
