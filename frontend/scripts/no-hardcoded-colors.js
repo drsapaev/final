@@ -56,10 +56,16 @@ export default {
         if (typeof node.value !== 'string') return;
         const value = node.value;
 
+        // UX Audit: skip hex colors that are CSS fallbacks inside var(--mac-*, #hex).
+        // These are intentional — hex is fallback if token not defined.
+        const isCssFallback = value.includes('var(') && value.includes(',');
+
         let match;
         HEX_PATTERN.lastIndex = 0;
         while ((match = HEX_PATTERN.exec(value)) !== null) {
           if (value.startsWith('http') || value.startsWith('#/') || value.length > 100) continue;
+          // Skip if hex is inside var(--mac-*, #hex) fallback pattern.
+          if (isCssFallback) continue;
           context.report({
             node,
             messageId: 'hexColor',
