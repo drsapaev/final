@@ -531,7 +531,7 @@
 
 /* ─── Error border (for form validation) ─── */
 .admin-border-error { border-color: var(--mac-danger); }
-.admin-border-accent { border-color: var(--mac-accent); background-color: rgba(59, 130, 246, 0.1); }
+.admin-border-accent { border-color: var(--mac-accent); background-color: var(--mac-accent-bg); }
 
 /* ─── Table cell ─── */
 .admin-table-cell-padded { padding: 12px 16px; text-align: left; }
@@ -597,7 +597,7 @@
   width: 40px;
   height: 40px;
   border-radius: var(--mac-radius-md);
-  background: var(--admin-icon-bg, #0066cc);
+  background: var(--admin-icon-bg, var(--mac-accent-blue));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2537,7 +2537,7 @@
 
 /* Service catalog: filter button active */
 .admin-btn-filter-active {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: var(--mac-accent-bg);
   border-color: var(--mac-accent);
 }
 
@@ -2939,7 +2939,7 @@
 
 /* Service catalog: filter active button */
 .admin-btn-filter-active-catalog {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: var(--mac-accent-bg);
   border-color: var(--mac-accent);
 }
 
@@ -3030,7 +3030,7 @@
 /* Service catalog: info banner (p-12-16 + bg accent-100 + radius-8 + mb-8) */
 .admin-info-banner-catalog {
   padding: 12px 16px;
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: var(--mac-accent-bg);
   border-radius: 8px;
   margin-bottom: 8px;
 }
@@ -3038,7 +3038,7 @@
 /* Service catalog: success banner (p-12-16 + bg green-100 + radius-8) */
 .admin-success-banner-catalog {
   padding: 12px 16px;
-  background-color: rgba(16, 185, 129, 0.1);
+  background-color: var(--mac-success-bg);
   border-radius: 8px;
 }
 
@@ -4612,13 +4612,13 @@
 .admin-h-10-radius-999-background-022358 {
   height: 10px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.16);
+  background: color-mix(in srgb, white, transparent 84%);
 }
 
 .admin-h-10-radius-999-background-4443b0 {
   height: 10px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
+  background: color-mix(in srgb, white, transparent 92%);
 }
 
 .admin-h-128 {
@@ -4633,7 +4633,7 @@
 .admin-h-36-radius-12-background-4443b0 {
   height: 36px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.08);
+  background: color-mix(in srgb, white, transparent 92%);
 }
 
 .admin-h-384 {
@@ -4654,7 +4654,7 @@
   width: 38%;
   height: 36px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.08);
+  background: color-mix(in srgb, white, transparent 92%);
 }
 
 .admin-wrap-rgap-4 {
@@ -4844,7 +4844,7 @@
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.18);
+  background: color-mix(in srgb, white, transparent 82%);
 }
 
 .admin-fontsize-6b9c17-secondary-texttransform-5f7abe-ls-008em {
@@ -4858,7 +4858,7 @@
   font-size: 11px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.14);
+  background: color-mix(in srgb, white, transparent 86%);
 }
 
 .admin-fontsize-8b6852-secondary-texttransform-5f7abe-ls-008em {
@@ -4956,13 +4956,13 @@
 .admin-h-10-radius-999-background-022358 {
   height: 10px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.16);
+  background: color-mix(in srgb, white, transparent 84%);
 }
 
 .admin-h-10-radius-999-background-4443b0 {
   height: 10px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
+  background: color-mix(in srgb, white, transparent 92%);
 }
 
 .admin-h-10-w-48pct-radius-999-opacity-0p12 {
@@ -5011,7 +5011,7 @@
 .admin-h-36-radius-12-background-4443b0 {
   height: 36px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.08);
+  background: color-mix(in srgb, white, transparent 92%);
 }
 
 .admin-h-384 {
@@ -5202,7 +5202,7 @@
   width: 38%;
   height: 36px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.08);
+  background: color-mix(in srgb, white, transparent 92%);
 }
 
 .admin-wrap-rgap-4 {
@@ -8713,7 +8713,7 @@
 
 .admin-w-100pct-bg-linear-gradient-to-t-radius-4px-4px-0-0-minh-4-tr-height-0-3s-ease-h-dyn {
   width: 100%;
-  background: linear-gradient(to top, #2563eb, #60a5fa);
+  background: linear-gradient(to top, var(--mac-accent-blue-hover), #60a5fa);
   border-radius: 4px 4px 0 0;
   min-height: 4px;
   transition: height 0.3s ease;
@@ -8929,8 +8929,8 @@
   border-radius: 12px;
   font-size: 11px;
   font-weight: 500;
-  background-color: rgba(59, 130, 246, 0.1);
-  color: #3B82F6;
+  background-color: var(--mac-accent-bg);
+  color: var(--mac-accent-blue);
 }
 
 .admin-fs-28-fw-bold-primary-mb-4-var-mac-info-3B82F6 {
@@ -9009,7 +9009,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #EF4444;
+  color: var(--mac-error);
 }
 
 .admin-ta-left-p-12px-8px-bd-b-2px-solid-var-mac-bo-fs-12-fw-600-secondary-tt-uppercase-w-40 {
@@ -9942,7 +9942,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background-color: rgba(16, 185, 129, 0.1);
+  background-color: var(--mac-success-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11088,7 +11088,7 @@
 .admin-spinner-14-white {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid color-mix(in srgb, white, transparent 70%);
   border-top-color: white;
   border-radius: 50%;
   animation: admin-spin 0.8s linear infinite;
@@ -11713,7 +11713,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  background: #EF4444;
+  background: var(--mac-error);
   color: white;
   border: none;
   border-radius: 8px;
@@ -11727,7 +11727,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--mac-accent-bg);
   border-radius: 8px;
   margin-bottom: 16px;
 }
@@ -11768,8 +11768,8 @@
 
 .admin-qp-error {
   padding: 12px 16px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #EF4444;
+  background: var(--mac-error-bg);
+  color: var(--mac-error);
   border-radius: 8px;
   margin-bottom: 16px;
   display: flex;
@@ -11783,7 +11783,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, black, transparent 50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11798,7 +11798,7 @@
   max-width: 90vw;
   max-height: 90vh;
   overflow: auto;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 50px -12px color-mix(in srgb, black, transparent 75%);
 }
 
 .admin-qp-modal-header {
@@ -12510,4 +12510,57 @@
 
 .admin-table-wrapper tbody tr:last-child td {
   border-bottom: none;
+}
+
+
+/* ============================================
+   Sprint 9: Micro-interactions — macOS native
+   ============================================ */
+
+/* Card hover: subtle elevation (macOS style) */
+.admin-table-wrapper:hover,
+MacOSCard[class*="admin"]:hover {
+  box-shadow: var(--mac-shadow-md);
+  transition: box-shadow var(--mac-duration-normal, 0.2s) var(--mac-ease, ease);
+}
+
+/* Button press: scale down (macOS style) */
+.mac-button:active:not(:disabled),
+button[class*="admin-btn"]:active:not(:disabled) {
+  transform: scale(0.98);
+  transition: transform var(--mac-duration-fast, 0.1s) var(--mac-ease, ease);
+}
+
+/* Tab transition: smooth color change */
+.mac-tab-button {
+  transition: color var(--mac-duration-normal, 0.2s) var(--mac-ease, ease),
+              background-color var(--mac-duration-normal, 0.2s) var(--mac-ease, ease) !important;
+}
+
+/* Table row: subtle hover highlight (already in wrapper, reinforce) */
+.admin-table-wrapper tbody tr {
+  transition: background-color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease);
+}
+
+/* Section header in sidebar: fade in on scroll */
+.mac-sidebar-section-header {
+  transition: opacity var(--mac-duration-normal, 0.2s) var(--mac-ease, ease);
+}
+
+/* Focus visible: macOS ring (not box-shadow) */
+.mac-button:focus-visible,
+.mac-sidebar-item:focus-visible,
+.mac-tab-button:focus-visible {
+  outline: 2px solid var(--mac-accent-blue);
+  outline-offset: 2px;
+}
+
+/* Smooth sidebar collapse animation */
+.mac-sidebar {
+  transition: width var(--mac-duration-normal, 0.2s) var(--mac-ease, ease);
+}
+
+.mac-sidebar-item {
+  transition: background-color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease),
+              color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease) !important;
 }

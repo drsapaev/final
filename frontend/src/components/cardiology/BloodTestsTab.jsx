@@ -83,14 +83,14 @@ export function BloodTestsTab({
           onChange={(e) => setBloodTestForm({ ...bloodTestForm, [fieldName]: e.target.value })}
           className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
           style={{
-            border: `1px solid ${isError ? '#dc2626' : getColor('border')}`,
-            backgroundColor: isError ? '#fef2f2' : getColor('surface'),
-            color: isError ? '#dc2626' : getColor('text'),
+            border: `1px solid ${isError ? 'var(--mac-error)' : getColor('border')}`,
+            backgroundColor: isError ? 'var(--mac-error-bg)' : getColor('surface'),
+            color: isError ? 'var(--mac-error)' : getColor('text'),
           }}
           placeholder={placeholder}
         />
         {isError && (
-          <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
+          <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: '500' }}>
             {warning.message}
           </div>
         )}
@@ -173,7 +173,7 @@ export function BloodTestsTab({
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: getSpacing('lg'), fontSize: getFontSize('sm'), color: getColor('textSecondary'), marginBottom: getSpacing('sm') }}>
                   <div>Холестерин: {test.cholesterol_total} мг/дл</div>
                   <div>HDL: {test.cholesterol_hdl}</div>
-                  <div style={isLdlCritical(test.cholesterol_ldl) ? { color: '#dc2626', fontWeight: '600' } : undefined}>
+                  <div style={isLdlCritical(test.cholesterol_ldl) ? { color: 'var(--mac-error)', fontWeight: '600' } : undefined}>
                     LDL: {test.cholesterol_ldl}
                     {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>критический</span>}
                   </div>
@@ -237,14 +237,14 @@ export function BloodTestsTab({
                   onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
                   className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                   style={{
-                    border: `1px solid ${isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#dc2626' : getColor('border')}`,
-                    backgroundColor: isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#fef2f2' : getColor('surface'),
-                    color: isLdlCritical(bloodTestForm.cholesterol_ldl) ? '#dc2626' : getColor('text'),
+                    border: `1px solid ${isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error)' : getColor('border')}`,
+                    backgroundColor: isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error-bg)' : getColor('surface'),
+                    color: isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error)' : getColor('text'),
                   }}
                   placeholder="<100"
                 />
                 {isLdlCritical(bloodTestForm.cholesterol_ldl) && (
-                  <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: '#dc2626', fontWeight: '500' }}>
+                  <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: '500' }}>
                     LDL превышает порог {settings?.ldlThreshold ?? 100} мг/дл — рекомендуется интенсивная терапия статинами.
                   </div>
                 )}

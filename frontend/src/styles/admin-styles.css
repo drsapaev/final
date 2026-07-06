@@ -4,63 +4,63 @@
 /* Основные CSS переменные (устанавливаются через ThemeContext) */
 :root {
   /* Семантические цвета */
-  --color-background-primary: #ffffff;
-  --color-background-secondary: #f8fafc;
+  --color-background-primary: var(--mac-bg-primary);
+  --color-background-secondary: var(--mac-bg-secondary);
   --color-background-tertiary: #f1f5f9;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #374151;
-  --color-text-tertiary: #6b7280;
-  --color-border-light: #e5e7eb;
-  --color-border-medium: #d1d5db;
-  --color-border-dark: #9ca3af;
-  --color-surface-card: #ffffff;
-  --color-surface-hover: #f8fafc;
+  --color-text-primary: var(--mac-text-primary);
+  --color-text-secondary: var(--mac-text-primary);
+  --color-text-tertiary: var(--mac-text-secondary);
+  --color-border-light: var(--mac-border);
+  --color-border-medium: var(--mac-border);
+  --color-border-dark: var(--mac-text-tertiary);
+  --color-surface-card: var(--mac-bg-primary);
+  --color-surface-hover: var(--mac-bg-secondary);
   
   /* Акцентные цвета */
-  --color-primary-500: #0ea5e9;
+  --color-primary-500: var(--mac-accent-blue);
   --color-primary-400: #38bdf8;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
+  --color-success: var(--mac-success);
+  --color-warning: var(--mac-warning);
+  --color-danger: var(--mac-error);
   --color-info: #06b6d4;
   
   /* Медицинские цвета */
-  --color-medical-cardiology: #dc2626;
-  --color-medical-dermatology: #7c3aed;
-  --color-medical-dentistry: #059669;
+  --color-medical-cardiology: var(--mac-error);
+  --color-medical-dermatology: var(--mac-accent-purple);
+  --color-medical-dentistry: var(--mac-success);
   
   /* Тени */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px color-mix(in srgb, black, transparent 90%);
+  --shadow-lg: 0 10px 15px -3px color-mix(in srgb, black, transparent 90%);
+  --shadow-xl: 0 20px 25px -5px color-mix(in srgb, black, transparent 90%);
 }
 
 /* Темная тема - переменные устанавливаются через ThemeContext */
 :root[data-theme="dark"] {
   /* Семантические цвета для темной темы */
-  --color-background-primary: #0f172a;
-  --color-background-secondary: #1e293b;
-  --color-background-tertiary: #334155;
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #cbd5e1;
-  --color-text-tertiary: #94a3b8;
-  --color-border-light: #374151;
+  --color-background-primary: var(--mac-text-primary);
+  --color-background-secondary: var(--mac-text-primary);
+  --color-background-tertiary: var(--mac-text-primary);
+  --color-text-primary: var(--mac-bg-secondary);
+  --color-text-secondary: var(--mac-border);
+  --color-text-tertiary: var(--mac-text-tertiary);
+  --color-border-light: var(--mac-text-primary);
   --color-border-medium: #4b5563;
-  --color-border-dark: #6b7280;
-  --color-surface-card: #1e293b;
+  --color-border-dark: var(--mac-text-secondary);
+  --color-surface-card: var(--mac-text-primary);
   --color-surface-hover: #273746;
   
   /* Акцентные цвета для темной темы */
   --color-primary-500: #60a5fa;
-  --color-primary-400: #93c5fd;
+  --color-primary-400: var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 60%));
   --color-success: #34d399;
-  --color-warning: #fcd34d;
-  --color-danger: #f87171;
+  --color-warning: var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 60%));
+  --color-danger: var(--mac-error);
   --color-info: #67e8f9;
   
   /* Медицинские цвета для темной темы */
-  --color-medical-cardiology: #ef4444;
+  --color-medical-cardiology: var(--mac-error);
   --color-medical-dermatology: #a78bfa;
   --color-medical-dentistry: #34d399;
 }
@@ -284,7 +284,7 @@
 }
 
 .admin-status-error {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--mac-error-bg);
   color: var(--color-danger);
 }
 

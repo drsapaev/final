@@ -182,7 +182,7 @@ const TwoFactorSettings = () => {
           color: 'var(--text-primary)',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px'
+          gap: 'var(--mac-spacing-3)'
         }}>
           <Shield size={32} />
           Двухфакторная аутентификация
@@ -194,15 +194,15 @@ const TwoFactorSettings = () => {
 
       {error &&
       <div style={{
-        background: '#FEE2E2',
-        border: '1px solid #FCA5A5',
-        borderRadius: '8px',
-        padding: '16px',
-        marginBottom: '24px',
+        background: 'var(--mac-error-bg)',
+        border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
+        borderRadius: 'var(--mac-radius-md)',
+        padding: 'var(--mac-spacing-4)',
+        marginBottom: 'var(--mac-spacing-6)',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        color: '#DC2626'
+        gap: 'var(--mac-spacing-2)',
+        color: 'var(--mac-error)'
       }}>
           <AlertCircle size={20} />
           <span>{error}</span>
@@ -211,15 +211,15 @@ const TwoFactorSettings = () => {
 
       {success &&
       <div style={{
-        background: '#D1FAE5',
+        background: 'var(--mac-success-bg)',
         border: '1px solid #6EE7B7',
-        borderRadius: '8px',
-        padding: '16px',
-        marginBottom: '24px',
+        borderRadius: 'var(--mac-radius-md)',
+        padding: 'var(--mac-spacing-4)',
+        marginBottom: 'var(--mac-spacing-6)',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        color: '#059669'
+        gap: 'var(--mac-spacing-2)',
+        color: 'var(--mac-success)'
       }}>
           <CheckCircle size={20} />
           <span>{success}</span>
@@ -229,26 +229,26 @@ const TwoFactorSettings = () => {
       {/* Статус 2FA */}
       <div style={{
         background: 'var(--bg-secondary)',
-        padding: '24px',
-        borderRadius: '12px',
-        marginBottom: '24px'
+        padding: 'var(--mac-spacing-6)',
+        borderRadius: 'var(--mac-radius-lg)',
+        marginBottom: 'var(--mac-spacing-6)'
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '16px'
+          marginBottom: 'var(--mac-spacing-4)'
         }}>
           <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
             Статус 2FA
           </h3>
           <div style={{
             padding: '4px 12px',
-            background: status.enabled ? '#D1FAE5' : '#FEE2E2',
-            color: status.enabled ? '#059669' : '#DC2626',
-            borderRadius: '20px',
-            fontSize: '12px',
-            fontWeight: '500'
+            background: status.enabled ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
+            color: status.enabled ? 'var(--mac-success)' : 'var(--mac-error)',
+            borderRadius: 'var(--mac-radius-xl)',
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)'
           }}>
             {status.enabled ? 'Включена' : 'Отключена'}
           </div>
@@ -257,45 +257,45 @@ const TwoFactorSettings = () => {
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '16px'
+          gap: 'var(--mac-spacing-4)',
+          marginBottom: 'var(--mac-spacing-4)'
         }}>
           <div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '4px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)' }}>
               TOTP
             </div>
-            <div style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
               {status.totp_verified ? 'Настроен' : 'Не настроен'}
             </div>
           </div>
           <div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '4px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)' }}>
               Backup коды
             </div>
-            <div style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
               {status.backup_codes_count} осталось
             </div>
           </div>
           <div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '4px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)' }}>
               Восстановление
             </div>
-            <div style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
               {status.recovery_enabled ? 'Настроено' : 'Не настроено'}
             </div>
           </div>
           <div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '4px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)' }}>
               Доверенные устройства
             </div>
-            <div style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
               {status.trusted_devices_count}
             </div>
           </div>
         </div>
 
         {status.last_used &&
-        <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
             Последнее использование: {new Date(status.last_used).toLocaleString()}
           </div>
         }
@@ -305,33 +305,33 @@ const TwoFactorSettings = () => {
       {status.enabled &&
       <div style={{
         background: 'var(--bg-secondary)',
-        padding: '24px',
-        borderRadius: '12px',
-        marginBottom: '24px'
+        padding: 'var(--mac-spacing-6)',
+        borderRadius: 'var(--mac-radius-lg)',
+        marginBottom: 'var(--mac-spacing-6)'
       }}>
           <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '16px'
+          marginBottom: 'var(--mac-spacing-4)'
         }}>
             <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
               Backup коды
             </h3>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
               <button
               onClick={loadBackupCodes}
               style={{
-                padding: '8px 12px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                 background: 'var(--accent-color)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '6px',
+                borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: 'var(--mac-font-size-xs)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: 'var(--mac-spacing-1)'
               }}>
               
                 <Eye size={12} />
@@ -341,16 +341,16 @@ const TwoFactorSettings = () => {
               onClick={handleRegenerateBackupCodes}
               disabled={loading}
               style={{
-                padding: '8px 12px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                 background: 'var(--bg-primary)',
                 color: 'var(--text-primary)',
                 border: '1px solid var(--border-color)',
-                borderRadius: '6px',
+                borderRadius: 'var(--mac-radius-sm)',
                 cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '12px',
+                fontSize: 'var(--mac-font-size-xs)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: 'var(--mac-spacing-1)'
               }}>
               
                 <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
@@ -364,8 +364,8 @@ const TwoFactorSettings = () => {
               <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '8px',
-            marginBottom: '16px'
+            gap: 'var(--mac-spacing-2)',
+            marginBottom: 'var(--mac-spacing-4)'
           }}>
                 {backupCodes.map((code, index) =>
             <div
@@ -373,17 +373,17 @@ const TwoFactorSettings = () => {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
+                gap: 'var(--mac-spacing-2)',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                 background: 'var(--bg-primary)',
-                borderRadius: '6px',
+                borderRadius: 'var(--mac-radius-sm)',
                 border: '1px solid var(--border-color)'
               }}>
               
                     <code style={{
                 flex: 1,
                 fontFamily: 'monospace',
-                fontSize: '12px',
+                fontSize: 'var(--mac-font-size-xs)',
                 color: 'var(--text-primary)'
               }}>
                       {code}
@@ -392,7 +392,7 @@ const TwoFactorSettings = () => {
                 onClick={() => copyToClipboard(code, `code-${index}`)}
                 aria-label={`Скопировать резервный код ${index + 1}`}
                 style={{
-                  padding: '4px',
+                  padding: 'var(--mac-spacing-1)',
                   background: 'transparent',
                   color: 'var(--text-secondary)',
                   border: 'none',
@@ -411,35 +411,35 @@ const TwoFactorSettings = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px',
-            background: '#FEF3C7',
-            borderRadius: '6px',
+            padding: 'var(--mac-spacing-3)',
+            background: 'var(--mac-warning-bg)',
+            borderRadius: 'var(--mac-radius-sm)',
             border: '1px solid #F59E0B'
           }}>
                 <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              color: '#92400E',
-              fontSize: '12px'
+              gap: 'var(--mac-spacing-2)',
+              color: 'var(--mac-warning)',
+              fontSize: 'var(--mac-font-size-xs)'
             }}>
                   <AlertCircle size={16} />
-                  <span style={{ fontWeight: '500' }}>Важно:</span>
+                  <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Важно:</span>
                   <span>Сохраните эти коды в безопасном месте. Каждый код можно использовать только один раз.</span>
                 </div>
                 <button
               onClick={downloadBackupCodes}
               style={{
-                padding: '4px 8px',
-                background: '#F59E0B',
+                padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+                background: 'var(--mac-warning)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: 'var(--mac-font-size-xs)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: 'var(--mac-spacing-1)'
               }}>
               
                   <Download size={12} />
@@ -455,15 +455,15 @@ const TwoFactorSettings = () => {
       {devices.length > 0 &&
       <div style={{
         background: 'var(--bg-secondary)',
-        padding: '24px',
-        borderRadius: '12px',
-        marginBottom: '24px'
+        padding: 'var(--mac-spacing-6)',
+        borderRadius: 'var(--mac-radius-lg)',
+        marginBottom: 'var(--mac-spacing-6)'
       }}>
           <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
             Доверенные устройства
           </h3>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
             {devices.map((device) =>
           <div
             key={device.id}
@@ -471,29 +471,29 @@ const TwoFactorSettings = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '16px',
+              padding: 'var(--mac-spacing-4)',
               background: 'var(--bg-primary)',
-              borderRadius: '8px',
+              borderRadius: 'var(--mac-radius-md)',
               border: '1px solid var(--border-color)'
             }}>
             
                 <div style={{ flex: 1 }}>
                   <div style={{
-                fontWeight: '500',
+                fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--text-primary)',
-                marginBottom: '4px'
+                marginBottom: 'var(--mac-spacing-1)'
               }}>
                     {device.device_name}
                   </div>
                   <div style={{
-                fontSize: '12px',
+                fontSize: 'var(--mac-font-size-xs)',
                 color: 'var(--text-secondary)',
-                marginBottom: '4px'
+                marginBottom: 'var(--mac-spacing-1)'
               }}>
                     {device.device_type} • {device.ip_address}
                   </div>
                   <div style={{
-                fontSize: '12px',
+                fontSize: 'var(--mac-font-size-xs)',
                 color: 'var(--text-secondary)'
               }}>
                     {device.last_used ?
@@ -506,16 +506,16 @@ const TwoFactorSettings = () => {
                 <button
               onClick={() => handleUntrustDevice(device.id)}
               style={{
-                padding: '8px 12px',
-                background: '#FEE2E2',
-                color: '#DC2626',
-                border: '1px solid #FCA5A5',
-                borderRadius: '6px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                background: 'var(--mac-error-bg)',
+                color: 'var(--mac-error)',
+                border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
+                borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: 'var(--mac-font-size-xs)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: 'var(--mac-spacing-1)'
               }}>
               
                   <Trash2 size={12} />
@@ -530,29 +530,29 @@ const TwoFactorSettings = () => {
       {/* Действия */}
       <div style={{
         background: 'var(--bg-secondary)',
-        padding: '24px',
-        borderRadius: '12px'
+        padding: 'var(--mac-spacing-6)',
+        borderRadius: 'var(--mac-radius-lg)'
       }}>
         <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
           Действия
         </h3>
         
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', flexWrap: 'wrap' }}>
           {!status.enabled ?
           <button
             onClick={() => window.location.href = '/settings/2fa/setup'}
             style={{
-              padding: '12px 24px',
+              padding: 'var(--mac-spacing-3) var(--mac-spacing-6)',
               background: 'var(--accent-color)',
               color: 'white',
               border: 'none',
-              borderRadius: '8px',
+              borderRadius: 'var(--mac-radius-md)',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: 'var(--mac-spacing-2)'
             }}>
             
               <Shield size={16} />
@@ -563,17 +563,17 @@ const TwoFactorSettings = () => {
             onClick={handleDisable2FA}
             disabled={loading}
             style={{
-              padding: '12px 24px',
-              background: '#FEE2E2',
-              color: '#DC2626',
-              border: '1px solid #FCA5A5',
-              borderRadius: '8px',
+              padding: 'var(--mac-spacing-3) var(--mac-spacing-6)',
+              background: 'var(--mac-error-bg)',
+              color: 'var(--mac-error)',
+              border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
+              borderRadius: 'var(--mac-radius-md)',
               cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: 'var(--mac-spacing-2)'
             }}>
             
               <Trash2 size={16} />

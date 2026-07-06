@@ -92,7 +92,7 @@ a:not(.btn):not(.button) {
     /* WCAG AA contrast ratios - 4.5:1 for normal text, 3:1 for large text */
     --a11y-text-primary: #1a1a1a;
     --a11y-text-secondary: #4a4a4a;
-    --a11y-text-on-primary: #ffffff;
+    --a11y-text-on-primary: var(--mac-bg-primary);
     --a11y-error: #d32f2f;
     --a11y-success: #2e7d32;
     --a11y-warning: #ed6c02;
@@ -160,7 +160,7 @@ a:not(.btn):not(.button) {
 .status-indicator--success::before {
     background: var(--a11y-success);
     /* Add pattern for color blind users */
-    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, black, transparent 80%);
 }
 
 .status-indicator--error::before {
@@ -169,8 +169,8 @@ a:not(.btn):not(.button) {
     background-image: repeating-linear-gradient(45deg,
             transparent,
             transparent 2px,
-            rgba(255, 255, 255, 0.3) 2px,
-            rgba(255, 255, 255, 0.3) 4px);
+            color-mix(in srgb, white, transparent 70%) 2px,
+            color-mix(in srgb, white, transparent 70%) 4px);
 }
 
 .status-indicator--warning::before {
@@ -244,7 +244,7 @@ p {
    =========================== */
 @media (prefers-color-scheme: dark) {
     :root {
-        --a11y-text-primary: #f5f5f5;
+        --a11y-text-primary: var(--mac-bg-secondary);
         --a11y-text-secondary: #b0b0b0;
     }
 }
@@ -262,6 +262,6 @@ p {
     a[href]::after {
         content: " (" attr(href) ")";
         font-size: 0.8em;
-        color: #666;
+        color: var(--mac-text-secondary);
     }
 }

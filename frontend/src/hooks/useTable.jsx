@@ -7,6 +7,8 @@ import { useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 import { useReducedMotion } from './useEnhancedMediaQuery';
+import { Input,
+  Checkbox } from '../../ui/macos';
 
 // Хук для управления таблицей
 export const useTable = (data = [], options = {}) => {
@@ -210,13 +212,13 @@ export const TableHeader = ({
           key={column.key}
           className="table-header-cell"
           style={{
-            padding: '12px 16px',
+            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
             textAlign: column.align || 'left',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#374151',
-            backgroundColor: '#f9fafb',
-            borderBottom: '1px solid #e5e7eb',
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-text-primary)',
+            backgroundColor: 'var(--mac-bg-secondary)',
+            borderBottom: '1px solid var(--mac-border)',
             cursor: sortable && column.sortable !== false ? 'pointer' : 'default',
             userSelect: 'none',
             transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
@@ -224,19 +226,19 @@ export const TableHeader = ({
           onClick={() => sortable && column.sortable !== false && onSort(column.key)}
           onMouseEnter={(e) => {
             if (sortable && column.sortable !== false && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f3f4f6';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (!prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}>
           
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
               {column.title || column.key}
               {sortable && column.sortable !== false && sortConfig && sortConfig.key === column.key &&
-            <span style={{ fontSize: '12px' }}>
+            <span style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                   {sortConfig.direction === 'asc' ? '↑' : '↓'}
                 </span>
             }
@@ -288,60 +290,51 @@ export const TableRow = ({
     <tr
       className={`table-row ${selected ? 'selected' : ''} ${expanded ? 'expanded' : ''} ${className}`}
       style={{
-        backgroundColor: selected ? '#eff6ff' : '#ffffff',
-        borderBottom: '1px solid #e5e7eb',
+        backgroundColor: selected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)',
+        borderBottom: '1px solid var(--mac-border)',
         cursor: onClick ? 'pointer' : 'default',
         transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
       }}
       onClick={handleClick}
       onMouseEnter={(e) => {
         if (onClick && !prefersReducedMotion) {
-          e.target.style.backgroundColor = '#f9fafb';
+          e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
         }
       }}
       onMouseLeave={(e) => {
         if (onClick && !prefersReducedMotion) {
-          e.target.style.backgroundColor = selected ? '#eff6ff' : '#ffffff';
+          e.target.style.backgroundColor = selected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)';
         }
       }}
       {...props}>
       
       {/* Чекбокс для выбора */}
       {selectable &&
-      <td style={{ padding: '12px 16px', width: '40px' }}>
-          <input
-          type="checkbox"
-          aria-label={selected ? 'Deselect table row' : 'Select table row'}
-          checked={selected}
-          onChange={handleSelect}
-          style={{
-            width: '16px',
-            height: '16px',
-            cursor: 'pointer'
-          }} />
+      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', width: '40px' }}>
+          <Checkbox aria-label={selected ? 'Deselect table row' : 'Select table row'} checked={selected} onChange={handleSelect} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
         
         </td>
       }
 
       {/* Стрелка для разворачивания */}
       {expandable &&
-        <td style={{ padding: '12px 16px', width: '40px' }}>
+        <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', width: '40px' }}>
           <button
           aria-label={expanded ? 'Collapse table row' : 'Expand table row'}
           onClick={handleExpand}
           style={{
             background: 'none',
             border: 'none',
-            fontSize: '16px',
+            fontSize: 'var(--mac-font-size-lg)',
             cursor: 'pointer',
-            color: '#6b7280',
-            padding: '4px',
-            borderRadius: '4px',
+            color: 'var(--mac-text-secondary)',
+            padding: 'var(--mac-spacing-1)',
+            borderRadius: 'var(--mac-radius-sm)',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (!prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f3f4f6';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
@@ -361,11 +354,11 @@ export const TableRow = ({
         key={column.key}
         className="table-cell"
         style={{
-          padding: '12px 16px',
+          padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
           textAlign: column.align || 'left',
-          fontSize: '14px',
-          color: '#374151',
-          borderBottom: '1px solid #e5e7eb'
+          fontSize: 'var(--mac-font-size-base)',
+          color: 'var(--mac-text-primary)',
+          borderBottom: '1px solid var(--mac-border)'
         }}>
         
           {column.render ? column.render(row[column.key], row) : row[column.key]}
@@ -436,40 +429,40 @@ export const TablePagination = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '16px 20px',
-        backgroundColor: '#f9fafb',
-        borderTop: '1px solid #e5e7eb'
+        backgroundColor: 'var(--mac-bg-secondary)',
+        borderTop: '1px solid var(--mac-border)'
       }}
       {...props}>
       
       {/* Информация о странице */}
-      <div style={{ fontSize: '14px', color: '#6b7280' }}>
+      <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>
         Показано {startItem}-{endItem} из {totalItems} записей
       </div>
 
       {/* Контролы пагинации */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
         {/* Предыдущая страница */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
           style={{
-            padding: '8px 12px',
-            fontSize: '14px',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            backgroundColor: currentPage === 1 ? '#f3f4f6' : '#ffffff',
-            color: currentPage === 1 ? '#9ca3af' : '#374151',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-base)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-sm)',
+            backgroundColor: currentPage === 1 ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+            color: currentPage === 1 ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#ffffff';
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -477,7 +470,7 @@ export const TablePagination = ({
         </button>
 
         {/* Номера страниц */}
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
             const pageNumber = Math.max(1, Math.min(totalPages, currentPage - 2 + i));
             return (
@@ -485,25 +478,25 @@ export const TablePagination = ({
                 key={pageNumber}
                 onClick={() => onPageChange(pageNumber)}
                 style={{
-                  padding: '8px 12px',
-                  fontSize: '14px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                  fontSize: 'var(--mac-font-size-base)',
                   fontWeight: pageNumber === currentPage ? '600' : '400',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  backgroundColor: pageNumber === currentPage ? '#3b82f6' : '#ffffff',
-                  color: pageNumber === currentPage ? '#ffffff' : '#374151',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  backgroundColor: pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)',
+                  color: pageNumber === currentPage ? 'var(--mac-bg-primary)' : 'var(--mac-text-primary)',
                   cursor: 'pointer',
                   minWidth: '40px',
                   transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
                 }}
                 onMouseEnter={(e) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = pageNumber === currentPage ? '#2563eb' : '#f9fafb';
+                    e.target.style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = pageNumber === currentPage ? '#3b82f6' : '#ffffff';
+                    e.target.style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
                   }
                 }}>
                 
@@ -518,23 +511,23 @@ export const TablePagination = ({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           style={{
-            padding: '8px 12px',
-            fontSize: '14px',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            backgroundColor: currentPage === totalPages ? '#f3f4f6' : '#ffffff',
-            color: currentPage === totalPages ? '#9ca3af' : '#374151',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-base)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-sm)',
+            backgroundColor: currentPage === totalPages ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+            color: currentPage === totalPages ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
             cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#ffffff';
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -560,16 +553,16 @@ export const TableSearch = ({
       className={`table-search ${className}`}
       style={{
         padding: '16px 20px',
-        backgroundColor: '#f9fafb',
-        borderBottom: '1px solid #e5e7eb',
+        backgroundColor: 'var(--mac-bg-secondary)',
+        borderBottom: '1px solid var(--mac-border)',
         display: 'flex',
         alignItems: 'center',
-        gap: '12px'
+        gap: 'var(--mac-spacing-3)'
       }}
       {...props}>
       
-      <div style={{ fontSize: '16px', color: '#6b7280' }}>🔍</div>
-      <input
+      <div style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)' }}>🔍</div>
+      <Input
         type="text"
         aria-label={placeholder || 'Table search'}
         value={searchTerm}
@@ -577,23 +570,23 @@ export const TableSearch = ({
         placeholder={placeholder}
         style={{
           flex: 1,
-          padding: '8px 12px',
-          fontSize: '14px',
-          border: '1px solid #d1d5db',
-          borderRadius: '6px',
-          backgroundColor: '#ffffff',
-          color: '#374151',
+          padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+          fontSize: 'var(--mac-font-size-base)',
+          border: '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-sm)',
+          backgroundColor: 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-primary)',
           outline: 'none',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease'
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = '#3b82f6';
+            e.target.style.borderColor = 'var(--mac-accent-blue)';
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = '#d1d5db';
+            e.target.style.borderColor = 'var(--mac-border)';
           }
         }} />
       
@@ -650,9 +643,9 @@ export const Table = ({
     <div
       className={`table ${className}`}
       style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
+        backgroundColor: 'var(--mac-bg-primary)',
+        border: '1px solid var(--mac-border)',
+        borderRadius: 'var(--mac-radius-md)',
         overflow: 'hidden',
         ...style
       }}
@@ -669,7 +662,8 @@ export const Table = ({
 
       {/* Таблица */}
       <div style={{ overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="admin-table-wrapper">
+<table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <TableHeader
             columns={columns}
             sortConfig={sortConfig}
@@ -689,6 +683,7 @@ export const Table = ({
             onRowClick={onRowClick} />
           
         </table>
+</div>
       </div>
 
       {/* Пагинация */}
@@ -709,8 +704,8 @@ export const Table = ({
         style={{
           padding: '40px',
           textAlign: 'center',
-          color: '#6b7280',
-          fontSize: '14px'
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-base)'
         }}>
         
           Загрузка данных...
@@ -722,8 +717,8 @@ export const Table = ({
         style={{
           padding: '40px',
           textAlign: 'center',
-          color: '#ef4444',
-          fontSize: '14px'
+          color: 'var(--mac-error)',
+          fontSize: 'var(--mac-font-size-base)'
         }}>
         
           Ошибка загрузки данных: {error}
@@ -735,8 +730,8 @@ export const Table = ({
         style={{
           padding: '40px',
           textAlign: 'center',
-          color: '#6b7280',
-          fontSize: '14px'
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-base)'
         }}>
         
           {emptyMessage}

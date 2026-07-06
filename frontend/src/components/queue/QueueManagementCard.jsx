@@ -1,6 +1,10 @@
 /**
  * QueueManagementCard - Универсальный компонент управления очередью
  * Кнопки для управления статусами записей во всех специализированных панелях
+ *
+ * UX Audit Registrar #3: все inline-стили перенесены в QueueManagementCard.css.
+ * Backward compat: props.styles (actionButtonStyle, getColor) всё ещё поддерживается,
+ * но если не передан — используются CSS-классы с macos design tokens.
  */
 import { useState } from 'react';
 import PropTypes from 'prop-types';
@@ -16,6 +20,7 @@ import {
 'lucide-react';
 import api from '../../services/api';
 import logger from '../../utils/logger';
+import './QueueManagementCard.css';
 
 const normalizeQueueAction = (action) => String(action || '').trim().toLowerCase().replace(/-/g, '_');
 
@@ -47,10 +52,60 @@ const hasBackendQueueAction = (entry, action, flagName) => {
 };
 
 /**
+ * Renders a single action button.
+ * UX Audit Registrar #3: использует CSS-классы вместо inline-стилей.
+ * Если передан styles.actionButtonStyle — используется он (backward compat),
+ * иначе — CSS-класс .qm-action-btn.qm-action-btn--{color}.
+ */
+const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabel, title, actionButtonStyle, getColor }) => {
+  // Backward compat: если передан custom actionButtonStyle — используем inline-стиль.
+  if (actionButtonStyle) {
+    return (
+      <button
+        style={{
+          ...actionButtonStyle,
+          background: getColor ? getColor(color, 100) : undefined,
+          color: getColor ? getColor(color, 500) : undefined,
+        }}
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        title={title}>
+        <Icon size={iconSize} />
+      </button>
+    );
+  }
+
+  // Default: CSS-класс с macos tokens.
+  return (
+    <button
+      className={`qm-action-btn qm-action-btn--${color}`}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      title={title}>
+      <Icon size={iconSize} />
+    </button>
+  );
+};
+
+ActionButton.propTypes = {
+  color: PropTypes.oneOf(['danger', 'info', 'success', 'warning']).isRequired,
+  icon: PropTypes.elementType.isRequired,
+  iconSize: PropTypes.number.isRequired,
+  onClick: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+  ariaLabel: PropTypes.string,
+  title: PropTypes.string,
+  actionButtonStyle: PropTypes.object,
+  getColor: PropTypes.func,
+};
+
+/**
  * Кнопки действий для одной записи в очереди
  * @param {object} entry - Запись из очереди (appointment/queue entry)
  * @param {function} onStatusChange - Callback после изменения статуса
- * @param {object} styles - Объект со стилями кнопок (actionButtonStyle, colors)
+ * @param {object} styles - Объект со стилями кнопок (actionButtonStyle, colors) — optional, для backward compat
  */
 export const QueueActionButtons = ({
   entry,
@@ -61,30 +116,8 @@ export const QueueActionButtons = ({
   const [loading, setLoading] = useState(false);
 
   const {
-    actionButtonStyle = {
-      padding: '6px',
-      borderRadius: '6px',
-      border: 'none',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: '4px'
-    },
-    dangerColor = '#ef4444',
-    successColor = '#22c55e',
-    warningColor = '#f59e0b',
-    infoColor = '#3b82f6',
-    getColor = (color, shade) => {
-      const colors = {
-        danger: { 100: '#fee2e2', 500: '#ef4444' },
-        success: { 100: '#dcfce7', 500: '#22c55e' },
-        warning: { 100: '#fef3c7', 500: '#f59e0b' },
-        info: { 100: '#dbeafe', 500: '#3b82f6' }
-      };
-      return colors[color]?.[shade] || '#666';
-    }
+    actionButtonStyle = null, // UX Audit Registrar #3: по умолчанию null — используем CSS-классы
+    getColor = null,
   } = styles;
 
   const entryId = entry?.queue_entry_id ?? null;
@@ -143,92 +176,89 @@ export const QueueActionButtons = ({
 
   const iconSize = compact ? 14 : 16;
 
+  // Common props для всех кнопок
+  const btnProps = { iconSize, actionButtonStyle, getColor, disabled: loading };
+
   // Кнопки в зависимости от статуса
   const renderButtons = () => {
     const buttons = [];
 
     if (hasBackendQueueAction(entry, 'no_show', 'can_no_show')) {
       buttons.push(
-        <button
+        <ActionButton
           key="no-show"
-          style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+          color="danger"
+          icon={XCircle}
           onClick={() => handleAction('no-show')}
-          disabled={loading}
-          aria-label="Отметить неявку"
-          title="Отметить неявку">
-
-                    <XCircle size={iconSize} />
-                </button>);
+          ariaLabel="Отметить неявку"
+          title="Отметить неявку"
+          {...btnProps} />
+      );
     }
 
     if (hasBackendQueueAction(entry, 'send_to_diagnostics', 'can_send_to_diagnostics')) {
       buttons.push(
-        <button
+        <ActionButton
           key="diagnostics"
-          style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
+          color="info"
+          icon={Stethoscope}
           onClick={() => handleAction('diagnostics')}
-          disabled={loading}
-          aria-label="Направить на обследование"
-          title="На обследование">
-
-                    <Stethoscope size={iconSize} />
-                </button>);
+          ariaLabel="Направить на обследование"
+          title="На обследование"
+          {...btnProps} />
+      );
     }
 
     if (hasBackendQueueAction(entry, 'notify_diagnostics_return', 'can_notify_diagnostics_return')) {
       buttons.push(
-        <button
+        <ActionButton
           key="call-from-diagnostics"
-          style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
+          color="info"
+          icon={Bell}
           onClick={() => handleAction('call-from-diagnostics')}
-          disabled={loading}
-          aria-label="Вернуть с диагностики и вызвать повторно"
-          title="Вернуть с диагностики (Вызвать повторно)">
-
-                    <Bell size={iconSize} />
-                </button>);
+          ariaLabel="Вернуть с диагностики и вызвать повторно"
+          title="Вернуть с диагностики (Вызвать повторно)"
+          {...btnProps} />
+      );
     }
 
     if (hasBackendQueueAction(entry, 'complete', 'can_complete')) {
       buttons.push(
-        <button
+        <ActionButton
           key="complete"
-          style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+          color="success"
+          icon={CheckCircle}
           onClick={() => handleAction('complete')}
-          disabled={loading}
-          aria-label="Завершить приём"
-          title="Завершить приём">
-
-                    <CheckCircle size={iconSize} />
-                </button>);
+          ariaLabel="Завершить приём"
+          title="Завершить приём"
+          {...btnProps} />
+      );
     }
 
     if (hasBackendQueueAction(entry, 'incomplete', 'can_incomplete')) {
       buttons.push(
-        <button
+        <ActionButton
           key="incomplete"
-          style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+          color="warning"
+          icon={AlertCircle}
           onClick={() => handleAction('incomplete', { reason: 'Не вернулся с обследования' })}
-          disabled={loading}
-          aria-label="Отметить, что пациент не вернулся"
-          title="Не вернулся">
-
-                    <AlertCircle size={iconSize} />
-                </button>);
+          ariaLabel="Отметить, что пациент не вернулся"
+          title="Не вернулся"
+          {...btnProps} />
+      );
     }
 
     if (hasBackendQueueAction(entry, 'restore_next', 'can_restore_next')) {
       buttons.push(
-        <button
+        <ActionButton
           key="restore-next"
-          style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+          color="warning"
+          icon={RotateCcw}
           onClick={() => handleAction('restore-next')}
-          disabled={loading}
-          aria-label="Восстановить пациента следующим в очереди"
-          title="Восстановить следующим">
-
-                    <RotateCcw size={iconSize} />
-                </button>);
+          ariaLabel="Восстановить пациента следующим в очереди"
+          title="Восстановить следующим"
+          {...btnProps} />
+      );
     }
 
     if (buttons.length > 0) {
@@ -246,118 +276,102 @@ export const QueueActionButtons = ({
     switch (status) {
       case 'waiting':
         return (
-          <button
-            style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+          <ActionButton
+            color="danger"
+            icon={XCircle}
             onClick={() => handleAction('no-show')}
-            disabled={loading}
-            aria-label="Отметить неявку"
-            title="Отметить неявку">
-            
-                        <XCircle size={iconSize} />
-                    </button>);
-
+            ariaLabel="Отметить неявку"
+            title="Отметить неявку"
+            {...btnProps} />
+        );
 
       case 'called':
       case 'calling':
       case 'in_cabinet':
         return (
           <>
-                        <button
-              style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
+            <ActionButton
+              color="info"
+              icon={Stethoscope}
               onClick={() => handleAction('diagnostics')}
-              disabled={loading}
-              aria-label="Направить на обследование"
-              title="На обследование">
-              
-                            <Stethoscope size={iconSize} />
-                        </button>
-                        <button
-              style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+              ariaLabel="Направить на обследование"
+              title="На обследование"
+              {...btnProps} />
+            <ActionButton
+              color="success"
+              icon={CheckCircle}
               onClick={() => handleAction('complete')}
-              disabled={loading}
-              aria-label="Завершить приём"
-              title="Завершить приём">
-              
-                            <CheckCircle size={iconSize} />
-                        </button>
-                        <button
-              style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+              ariaLabel="Завершить приём"
+              title="Завершить приём"
+              {...btnProps} />
+            <ActionButton
+              color="danger"
+              icon={XCircle}
               onClick={() => handleAction('no-show')}
-              disabled={loading}
-              aria-label="Отметить, что пациент не явился"
-              title="Не явился">
-              
-                            <XCircle size={iconSize} />
-                        </button>
-                    </>);
-
+              ariaLabel="Отметить, что пациент не явился"
+              title="Не явился"
+              {...btnProps} />
+          </>
+        );
 
       case 'diagnostics':
         return (
           <>
-                        <button
-              style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
+            <ActionButton
+              color="info"
+              icon={Bell}
               onClick={() => handleAction('call-from-diagnostics')}
-              disabled={loading}
-              aria-label="Вернуть с диагностики и вызвать повторно"
-              title="Вернуть с диагностики (Вызвать повторно)">
-              
-                            <Bell size={iconSize} />
-                        </button>
-                        <button
-              style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+              ariaLabel="Вернуть с диагностики и вызвать повторно"
+              title="Вернуть с диагностики (Вызвать повторно)"
+              {...btnProps} />
+            <ActionButton
+              color="success"
+              icon={CheckCircle}
               onClick={() => handleAction('complete')}
-              disabled={loading}
-              aria-label="Завершить приём"
-              title="Завершить приём">
-              
-                            <CheckCircle size={iconSize} />
-                        </button>
-                        <button
-              style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+              ariaLabel="Завершить приём"
+              title="Завершить приём"
+              {...btnProps} />
+            <ActionButton
+              color="warning"
+              icon={AlertCircle}
               onClick={() => handleAction('incomplete', { reason: 'Не вернулся с обследования' })}
-              disabled={loading}
-              aria-label="Отметить, что пациент не вернулся"
-              title="Не вернулся">
-              
-                            <AlertCircle size={iconSize} />
-                        </button>
-                    </>);
-
+              ariaLabel="Отметить, что пациент не вернулся"
+              title="Не вернулся"
+              {...btnProps} />
+          </>
+        );
 
       case 'no_show':
         return (
-          <button
-            style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+          <ActionButton
+            color="warning"
+            icon={RotateCcw}
             onClick={() => handleAction('restore-next')}
-            disabled={loading}
-            aria-label="Восстановить пациента следующим в очереди"
-            title="Восстановить следующим">
-            
-                        <RotateCcw size={iconSize} />
-                    </button>);
-
+            ariaLabel="Восстановить пациента следующим в очереди"
+            title="Восстановить следующим"
+            {...btnProps} />
+        );
 
       case 'served':
       case 'completed':
       case 'done':
         return (
-          <span style={{ color: successColor, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle size={14} /> Завершён
-                    </span>);
-
+          <span className="qm-status-text qm-status-text--success">
+            <CheckCircle size={14} /> Завершён
+          </span>
+        );
 
       case 'incomplete':
         return (
-          <span style={{ color: dangerColor, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <AlertCircle size={14} /> Не завершён
-                    </span>);
-
+          <span className="qm-status-text qm-status-text--danger">
+            <AlertCircle size={14} /> Не завершён
+          </span>
+        );
 
       case 'cancelled':
         return (
-          <span style={{ color: '#6b7280', fontSize: '12px' }}>Отменён</span>);
-
+          <span className="qm-status-text qm-status-text--secondary">Отменён</span>
+        );
 
       default:
         return null;
@@ -365,59 +379,66 @@ export const QueueActionButtons = ({
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-            {loading ?
-      <Clock size={iconSize} style={{ animation: 'spin 1s linear infinite' }} /> :
-
-      renderButtons()
+    <div className="qm-actions-container">
+      {loading ?
+        <Clock size={iconSize} className="qm-loading-icon" /> :
+        renderButtons()
       }
-        </div>);
-
+    </div>
+  );
 };
 
 /**
  * Карточка статистики очереди (для хедера)
  */
 export const QueueStatsBar = ({ stats, getColor }) => {
-  const defaultGetColor = (color, shade) => {
-    const colors = {
-      warning: { 500: '#f59e0b' },
-      primary: { 500: '#3b82f6' },
-      success: { 500: '#22c55e' }
-    };
-    return colors[color]?.[shade] || '#666';
-  };
+  // UX Audit Registrar #3: если getColor не передан — используем CSS-классы.
+  // Backward compat: если getColor передан — используем inline-стили.
+  if (getColor) {
+    return (
+      <div className="qm-stats-bar">
+        <span style={{
+          background: `${getColor('warning', 500)}20`,
+          color: getColor('warning', 500),
+          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+          borderRadius: 'var(--mac-radius-sm)'
+        }}>
+          Ожидают: {stats?.waiting || 0}
+        </span>
+        <span style={{
+          background: `${getColor('primary', 500)}20`,
+          color: getColor('primary', 500),
+          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+          borderRadius: 'var(--mac-radius-sm)'
+        }}>
+          Вызваны: {stats?.called || 0}
+        </span>
+        <span style={{
+          background: `${getColor('success', 500)}20`,
+          color: getColor('success', 500),
+          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+          borderRadius: 'var(--mac-radius-sm)'
+        }}>
+          Обслужены: {stats?.served || 0}
+        </span>
+      </div>
+    );
+  }
 
-  const gc = getColor || defaultGetColor;
-
+  // Default: CSS-классы с macos tokens.
   return (
-    <div style={{ display: 'flex', gap: '12px', fontSize: '14px' }}>
-            <span style={{
-        background: `${gc('warning', 500)}20`,
-        color: gc('warning', 500),
-        padding: '4px 8px',
-        borderRadius: '6px'
-      }}>
-                Ожидают: {stats?.waiting || 0}
-            </span>
-            <span style={{
-        background: `${gc('primary', 500)}20`,
-        color: gc('primary', 500),
-        padding: '4px 8px',
-        borderRadius: '6px'
-      }}>
-                Вызваны: {stats?.called || 0}
-            </span>
-            <span style={{
-        background: `${gc('success', 500)}20`,
-        color: gc('success', 500),
-        padding: '4px 8px',
-        borderRadius: '6px'
-      }}>
-                Обслужены: {stats?.served || 0}
-            </span>
-        </div>);
-
+    <div className="qm-stats-bar">
+      <span className="qm-stats-pill qm-stats-pill--warning">
+        Ожидают: {stats?.waiting || 0}
+      </span>
+      <span className="qm-stats-pill qm-stats-pill--primary">
+        Вызваны: {stats?.called || 0}
+      </span>
+      <span className="qm-stats-pill qm-stats-pill--success">
+        Обслужены: {stats?.served || 0}
+      </span>
+    </div>
+  );
 };
 
 /**
@@ -425,21 +446,21 @@ export const QueueStatsBar = ({ stats, getColor }) => {
  */
 export const getQueueStatusInfo = (status) => {
   const statusMap = {
-    waiting: { label: 'Ожидает', variant: 'warning', color: '#f59e0b' },
-    called: { label: 'Вызван', variant: 'primary', color: '#3b82f6' },
-    calling: { label: 'Вызывается', variant: 'primary', color: '#3b82f6' },
-    in_cabinet: { label: 'В кабинете', variant: 'info', color: '#06b6d4' },
-    in_service: { label: 'На приёме', variant: 'info', color: '#06b6d4' },
-    diagnostics: { label: 'На обследовании', variant: 'info', color: '#8b5cf6' },
-    served: { label: 'Обслужен', variant: 'success', color: '#22c55e' },
-    completed: { label: 'Завершён', variant: 'success', color: '#22c55e' },
-    done: { label: 'Завершён', variant: 'success', color: '#22c55e' },
-    incomplete: { label: 'Не завершён', variant: 'danger', color: '#ef4444' },
-    no_show: { label: 'Не явился', variant: 'danger', color: '#ef4444' },
-    cancelled: { label: 'Отменён', variant: 'secondary', color: '#6b7280' }
+    waiting: { label: 'Ожидает', variant: 'warning', color: 'var(--mac-warning)' },
+    called: { label: 'Вызван', variant: 'primary', color: 'var(--mac-accent-blue)' },
+    calling: { label: 'Вызывается', variant: 'primary', color: 'var(--mac-accent-blue)' },
+    in_cabinet: { label: 'В кабинете', variant: 'info', color: 'var(--mac-accent-blue)' },
+    in_service: { label: 'На приёме', variant: 'info', color: 'var(--mac-accent-blue)' },
+    diagnostics: { label: 'На обследовании', variant: 'info', color: 'var(--mac-accent-purple)' },
+    served: { label: 'Обслужен', variant: 'success', color: 'var(--mac-success)' },
+    completed: { label: 'Завершён', variant: 'success', color: 'var(--mac-success)' },
+    done: { label: 'Завершён', variant: 'success', color: 'var(--mac-success)' },
+    incomplete: { label: 'Не завершён', variant: 'danger', color: 'var(--mac-error)' },
+    no_show: { label: 'Не явился', variant: 'danger', color: 'var(--mac-error)' },
+    cancelled: { label: 'Отменён', variant: 'secondary', color: 'var(--mac-text-secondary)' }
   };
 
-  return statusMap[status] || { label: status, variant: 'default', color: '#6b7280' };
+  return statusMap[status] || { label: status, variant: 'default', color: 'var(--mac-text-secondary)' };
 };
 
 const queueEntryShape = PropTypes.shape({

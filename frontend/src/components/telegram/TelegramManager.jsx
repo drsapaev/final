@@ -1,5 +1,7 @@
+import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
-import { Card, Button } from '../ui/macos';
+import { Card, Button,
+  Input } from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
 import {
   MessageSquare,
@@ -63,7 +65,7 @@ const TelegramManager = () => {
 
   const loadBotStatus = async () => {
     try {
-      const response = await fetch('/api/v1/telegram/bot-status', {
+      const response = await fetch('/telegram/bot-status', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -77,7 +79,7 @@ const TelegramManager = () => {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/v1/admin/telegram/settings', {
+      const response = await fetch('/admin/telegram/settings', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -91,7 +93,7 @@ const TelegramManager = () => {
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch('/api/v1/admin/telegram/templates?language=ru', {
+      const response = await fetch('/admin/telegram/templates?language=ru', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -105,7 +107,7 @@ const TelegramManager = () => {
 
   const loadUsers = async () => {
     try {
-      const response = await fetch('/api/v1/telegram/users?limit=50', {
+      const response = await fetch('/telegram/users?limit=50', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -119,7 +121,7 @@ const TelegramManager = () => {
 
   const loadStats = async () => {
     try {
-      const response = await fetch('/api/v1/admin/telegram/stats?days_back=30', {
+      const response = await fetch('/admin/telegram/stats?days_back=30', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -136,7 +138,7 @@ const TelegramManager = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/test-bot', {
+      const response = await fetch('/admin/telegram/test-bot', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
@@ -168,7 +170,7 @@ const TelegramManager = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/send-test-message', {
+      const response = await fetch('/admin/telegram/send-test-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -202,7 +204,7 @@ const TelegramManager = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/settings', {
+      const response = await fetch('/admin/telegram/settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -231,7 +233,7 @@ const TelegramManager = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/v1/admin/telegram/set-webhook', {
+      const response = await fetch('/admin/telegram/set-webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -388,7 +390,7 @@ const TelegramManager = () => {
               Токен бота
             </label>
             <div className="flex space-x-2">
-              <input
+              <Input
               type="password"
               aria-label="Telegram bot token"
               value={settings.bot_token || ''}
@@ -414,7 +416,7 @@ const TelegramManager = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Webhook URL
             </label>
-            <input
+            <Input
             type="url"
             aria-label="Telegram webhook URL"
             value={settings.webhook_url || ''}
@@ -676,7 +678,7 @@ const TelegramManager = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Chat ID
                 </label>
-                <input
+                <Input
                 type="number"
                 aria-label="Telegram test chat ID"
                 value={testChatId}

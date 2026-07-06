@@ -50,12 +50,17 @@ import {
     DentistrySection,
 } from './sections/specialty';
 
+// P0 fix: LabResultsSection — shows lab panel results to all doctors.
+// Previously doctors had no way to see LabReportInstance data; cardiologist
+// had a separate manual-entry CardioBloodTest table, derma/dental had nothing.
+import LabResultsSection from './sections/LabResultsSection';
+
 import './EMRContainerV2.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
 import notify from '../../services/notify';
-import Button from '../ui/macos/Button';
+import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
 // (consistent with the rest of the app + screen-reader friendly via aria-label).
@@ -714,6 +719,16 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             disabled={isSigned}
                         />
                     )}
+
+                    {/* P0 fix: Lab results section — visible to ALL specialties.
+                        Shows finalized LabReportInstance data from the lab panel.
+                        Collapsible (defaultOpen=false when no results, true when
+                        results exist). Read-only — doctors view, don't edit. */}
+                    <LabResultsSection
+                        patientId={patientId}
+                        visitId={visitId}
+                        disabled={isSigned}
+                    />
                 </div>
 
                 {/* Actions */}

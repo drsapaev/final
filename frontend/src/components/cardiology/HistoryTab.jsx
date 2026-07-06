@@ -49,7 +49,7 @@ export function HistoryTab({
     return (
       <MacOSCard style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
         <Calendar size={48} style={{ margin: '0 auto 16px', color: getColor('textSecondary') }} />
-        <h3 style={{ fontSize: getFontSize('lg'), fontWeight: '500', marginBottom: getSpacing('sm'), color: getColor('text') }}>
+        <h3 style={{ fontSize: getFontSize('lg'), fontWeight: 'var(--mac-font-weight-medium)', marginBottom: getSpacing('sm'), color: getColor('text') }}>
           История
         </h3>
         <p className="cardio-text-secondary">Выберите пациента в очереди или из записей</p>
@@ -79,7 +79,7 @@ export function HistoryTab({
           <div>
             <h3 style={{
               fontSize: getFontSize('lg'),
-              fontWeight: '500',
+              fontWeight: 'var(--mac-font-weight-medium)',
               marginBottom: getSpacing('xs'),
               color: getColor('text'),
             }}>
@@ -98,13 +98,13 @@ export function HistoryTab({
               className={`cardio-filter-btn ${historyFilter === opt.value ? 'cardio-filter-btn-active' : ''}`}
               style={{
                 padding: '6px 14px',
-                borderRadius: '6px',
+                borderRadius: 'var(--mac-radius-sm)',
                 border: `1px solid ${historyFilter === opt.value ? getColor('accent') : getColor('border')}`,
                 background: historyFilter === opt.value ? getColor('accent') : 'transparent',
-                color: historyFilter === opt.value ? '#fff' : getColor('text'),
+                color: historyFilter === opt.value ? 'var(--mac-bg-primary)' : getColor('text'),
                 cursor: 'pointer',
                 fontSize: getFontSize('sm'),
-                fontWeight: '500',
+                fontWeight: 'var(--mac-font-weight-medium)',
               }}
             >
               {opt.label} ({opt.count})
@@ -130,7 +130,7 @@ export function HistoryTab({
                   gap: getSpacing('md'),
                   padding: getSpacing('md'),
                   border: `1px solid ${getColor('border')}`,
-                  borderRadius: '8px',
+                  borderRadius: 'var(--mac-radius-md)',
                   background: getColor('surface'),
                 }}
               >
@@ -144,7 +144,7 @@ export function HistoryTab({
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: getSpacing('sm') }}>
-                    <div style={{ fontWeight: '500', fontSize: getFontSize('base'), color: getColor('text') }}>
+                    <div style={{ fontWeight: 'var(--mac-font-weight-medium)', fontSize: getFontSize('base'), color: getColor('text') }}>
                       {entry.title}
                     </div>
                     <Badge variant={entry.badgeVariant || 'info'}>
@@ -155,7 +155,7 @@ export function HistoryTab({
                     {entry.subtitle}
                   </div>
                   {entry.meta && (
-                    <div style={{ fontSize: getFontSize('xs'), color: getColor('textSecondary'), marginTop: '4px' }}>
+                    <div style={{ fontSize: getFontSize('xs'), color: getColor('textSecondary'), marginTop: 'var(--mac-spacing-1)' }}>
                       {entry.meta}
                     </div>
                   )}

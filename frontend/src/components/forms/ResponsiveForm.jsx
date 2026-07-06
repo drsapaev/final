@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { useBreakpoint } from '../../hooks/useEnhancedMediaQuery';
+import { Input } from '../ui/macos';
 
 
 const ResponsiveForm = ({
@@ -51,12 +52,12 @@ const FormGroup = ({
       <label
         style={{
           fontSize: isMobile ? '14px' : '16px',
-          fontWeight: '500',
-          color: '#374151'
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: '#ef4444', marginLeft: '4px' }}>*</span>}
+          {required && <span style={{ color: 'var(--mac-error)', marginLeft: 'var(--mac-spacing-1)' }}>*</span>}
         </label>
       }
       {children}
@@ -64,7 +65,7 @@ const FormGroup = ({
       <span
         style={{
           fontSize: isMobile ? '12px' : '14px',
-          color: '#ef4444'
+          color: 'var(--mac-error)'
         }}>
         
           {error}
@@ -88,7 +89,7 @@ const FormInput = ({
   const { isMobile } = useBreakpoint();
 
   return (
-    <input
+    <Input
       type={type}
       placeholder={placeholder}
       aria-label={placeholder || 'Form input'}
@@ -99,7 +100,7 @@ const FormInput = ({
       className={className}
       style={{
         padding: isMobile ? '12px' : '16px',
-        border: '1px solid #d1d5db',
+        border: '1px solid var(--mac-border)',
         borderRadius: isMobile ? '8px' : '12px',
         fontSize: isMobile ? '16px' : '16px', // Предотвращает zoom на iOS
         fontFamily: 'inherit',
@@ -108,11 +109,11 @@ const FormInput = ({
         ...style
       }}
       onFocus={(e) => {
-        e.target.style.borderColor = '#3b82f6';
+        e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
       onBlur={(e) => {
-        e.target.style.borderColor = '#d1d5db';
+        e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }} />);
 
@@ -140,7 +141,7 @@ const FormSelect = ({
       className={className}
       style={{
         padding: isMobile ? '12px' : '16px',
-        border: '1px solid #d1d5db',
+        border: '1px solid var(--mac-border)',
         borderRadius: isMobile ? '8px' : '12px',
         fontSize: isMobile ? '16px' : '16px',
         fontFamily: 'inherit',
@@ -150,11 +151,11 @@ const FormSelect = ({
         ...style
       }}
       onFocus={(e) => {
-        e.target.style.borderColor = '#3b82f6';
+        e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
       onBlur={(e) => {
-        e.target.style.borderColor = '#d1d5db';
+        e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }}>
       
@@ -188,7 +189,7 @@ const FormTextarea = ({
       className={className}
       style={{
         padding: isMobile ? '12px' : '16px',
-        border: '1px solid #d1d5db',
+        border: '1px solid var(--mac-border)',
         borderRadius: isMobile ? '8px' : '12px',
         fontSize: isMobile ? '16px' : '16px',
         fontFamily: 'inherit',
@@ -199,11 +200,11 @@ const FormTextarea = ({
         ...style
       }}
       onFocus={(e) => {
-        e.target.style.borderColor = '#3b82f6';
+        e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
       onBlur={(e) => {
-        e.target.style.borderColor = '#d1d5db';
+        e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }} />);
 

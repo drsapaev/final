@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Chart, registerables } from 'chart.js';
-import { Card, Button } from '../ui/macos';
+import { Card, Button,
+  Checkbox } from '../ui/macos';
 import {
   Download,
   RefreshCw,
@@ -84,7 +85,7 @@ const AdvancedCharts = ({
                 backgroundColor: 'rgba(0, 0, 0, 0.8)',
                 titleColor: 'white',
                 bodyColor: 'white',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderColor: 'color-mix(in srgb, white, transparent 90%)',
                 borderWidth: 1,
                 cornerRadius: 8,
                 displayColors: true,
@@ -215,11 +216,7 @@ const AdvancedCharts = ({
             <span className="text-sm">Метрики:</span>
             {['revenue', 'visits', 'patients', 'doctors'].map((metric) =>
             <label key={metric} className="flex items-center space-x-1">
-                <input
-                type="checkbox"
-                aria-label={`Toggle ${metric} metric`}
-                checked={selectedMetrics.includes(metric)}
-                onChange={(e) => {
+                <Checkbox aria-label={`Toggle ${metric} metric`} checked={selectedMetrics.includes(metric)} onChange={(e) => {
                   if (e.target.checked) {
                     setSelectedMetrics([...selectedMetrics, metric]);
                   } else {

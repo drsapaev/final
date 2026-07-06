@@ -221,10 +221,10 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 16px',
+        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-secondary)',
         border: '1px solid var(--mac-border)',
-        borderRadius: '8px',
+        borderRadius: 'var(--mac-radius-md)',
         cursor: 'pointer'
       }}
       onClick={() => toggleSection(section)}
@@ -235,7 +235,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
         }
       }}>
       
-        <Typography variant="subtitle1" style={{ fontWeight: 500 }}>
+        <Typography variant="subtitle1" style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>
           {title}
         </Typography>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

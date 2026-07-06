@@ -8,7 +8,7 @@ import {
   Skeleton,
   MacOSEmptyState,
   Select,
-} from '../ui/macos';
+  Checkbox } from '../ui/macos';
 import {
   Plus,
 
@@ -264,7 +264,7 @@ const BillingManager = () => {
   };
 
   const renderInvoicesTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Заголовок и кнопки */}
       <div className="admin-d-flex-jc-between-ai-center">
         <div>
@@ -277,7 +277,7 @@ const BillingManager = () => {
         </div>
         <Button
         onClick={() => setShowCreateInvoice(true)}
-        className="admin-flex-center-8">
+        className="flex items-center justify-center gap-2">
         
           <Plus size={16} />
           Создать счет
@@ -293,14 +293,14 @@ const BillingManager = () => {
         description="В системе пока нет созданных счетов"
         action={
         <Button onClick={() => setShowCreateInvoice(true)}>
-                <Plus size={16} className="admin-mr-8" />
+                <Plus size={16} className="mr-2" />
                 Создать первый счет
               </Button>
         } /> :
 
 
       invoices.map((invoice) =>
-      <MacOSCard key={invoice.id} className="admin-p-0">
+      <MacOSCard key={invoice.id} className="p-0">
               <div className="admin-d-flex-jc-between-ai-start">
                 <div className="admin-flex-1">
                   <div className="admin-d-flex-ai-center-gap-8-mb-12">
@@ -370,7 +370,7 @@ const BillingManager = () => {
 
       {/* Форма создания счета */}
       {showCreateInvoice &&
-    <MacOSCard className="admin-p-0">
+    <MacOSCard className="p-0">
           <div className="admin-d-flex-jc-between-ai-center-mb-16-3">
             <h4 className="admin-m-0-primary-fs-lg-fw-semi-1">
               Создать счет
@@ -426,21 +426,13 @@ const BillingManager = () => {
 
             <div className="admin-d-flex-ai-center-gap-16">
               <label className="admin-d-flex-ai-center-gap-8-fs-sm-primary-2">
-                <input
-              type="checkbox"
-              aria-label="Auto send invoice"
-              checked={invoiceForm.auto_send}
-              onChange={(e) => setInvoiceForm({ ...invoiceForm, auto_send: e.target.checked })}
+                <Checkbox aria-label="Auto send invoice" checked={invoiceForm.auto_send} onChange={(e) => setInvoiceForm({ ...invoiceForm, auto_send: e.target.checked })}
               className="admin-m-0" />
             
                 Автоотправка
               </label>
               <label className="admin-d-flex-ai-center-gap-8-fs-sm-primary-1">
-                <input
-              type="checkbox"
-              aria-label="Send payment reminders"
-              checked={invoiceForm.send_reminders}
-              onChange={(e) => setInvoiceForm({ ...invoiceForm, send_reminders: e.target.checked })}
+                <Checkbox aria-label="Send payment reminders" checked={invoiceForm.send_reminders} onChange={(e) => setInvoiceForm({ ...invoiceForm, send_reminders: e.target.checked })}
               className="admin-m-0" />
             
                 Напоминания
@@ -449,7 +441,7 @@ const BillingManager = () => {
           </div>
 
           {/* Позиции счета */}
-          <div className="admin-mb-16">
+          <div className="mb-4">
             <div className="admin-d-flex-jc-between-ai-center-mb-8">
               <label className="admin-fs-sm-fw-med-primary">
                 Позиции счета
@@ -520,7 +512,7 @@ const BillingManager = () => {
             </Button>
             <Button
           onClick={handleCreateInvoice}
-          className="admin-flex-center-8">
+          className="flex items-center justify-center gap-2">
           
               <Save size={16} />
               Создать
@@ -531,7 +523,7 @@ const BillingManager = () => {
 
       {/* Форма записи платежа */}
       {showRecordPayment &&
-    <MacOSCard className="admin-p-0">
+    <MacOSCard className="p-0">
           <div className="admin-d-flex-jc-between-ai-center-mb-16-2">
             <h4 className="admin-m-0-primary-fs-lg-fw-semi">
               Записать платеж
@@ -618,7 +610,7 @@ const BillingManager = () => {
             </Button>
             <Button
           onClick={handleRecordPayment}
-          className="admin-flex-center-8">
+          className="flex items-center justify-center gap-2">
           
               <Save size={16} />
               Записать

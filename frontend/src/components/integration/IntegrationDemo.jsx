@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, Badge } from '../ui/macos';
+import { Card, Button, Badge,
+  Input } from '../ui/macos';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { useAppData } from '../../contexts/AppDataContext';
@@ -107,7 +108,7 @@ const IntegrationDemo = () => {
           <div className="clinic-space-y-sm">
             <div>
               <label className="clinic-label">Симптомы:</label>
-              <input
+              <Input
                 type="text"
                 aria-label="Test symptoms"
                 value={testSymptoms}
@@ -119,7 +120,7 @@ const IntegrationDemo = () => {
             
             <div>
               <label className="clinic-label">Диагноз:</label>
-              <input
+              <Input
                 type="text"
                 aria-label="Test diagnosis"
                 value={testDiagnosis}

@@ -12,7 +12,8 @@
 import { useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AlertCircle, X } from 'lucide-react';
-import { Button, Tooltip } from '../ui/macos';
+import { Button, Tooltip,
+  Checkbox } from '../ui/macos';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
 
@@ -235,11 +236,7 @@ const CartStepV2 = ({
                 key={service.id}
                 className={`compact-service-card ${isInCart ? 'selected' : ''}`}>
 
-                <input
-                  type="checkbox"
-                  aria-label={`Select service ${service.name || service.service_code || service.id}`}
-                  checked={isInCart}
-                  onChange={() => handleServiceToggle(service)}
+                <Checkbox aria-label={`Select service ${service.name || service.service_code || service.id}`} checked={isInCart} onChange={() => handleServiceToggle(service)}
                   style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, margin: 0 }} />
 
                 <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '0px' }}>
@@ -284,7 +281,7 @@ const CartStepV2 = ({
           color: 'var(--mac-text-secondary)'
         }}>
           <span>Выбрано: {cart?.items?.length || 0} шт.</span>
-          <span style={{ color: 'var(--mac-success)', fontWeight: '600' }}>
+          <span style={{ color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
             Итого: {cartTotal.toLocaleString()} сум
           </span>
         </div>
@@ -308,7 +305,7 @@ const CartStepV2 = ({
           }}>
               <span style={{
               fontSize: 'var(--mac-font-size-xs)',
-              fontWeight: 600,
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)'
             }}>
                 Повторная скидка для консультаций
@@ -325,7 +322,7 @@ const CartStepV2 = ({
           <div style={{
             fontSize: 'var(--mac-font-size-xs)',
             color: 'var(--mac-warning)',
-            fontWeight: 600
+            fontWeight: 'var(--mac-font-weight-semibold)'
           }}>
                 {MIXED_REPEAT_WARNING}
               </div>
@@ -348,7 +345,7 @@ const CartStepV2 = ({
                     <div style={{
                     fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-text-primary)',
-                    fontWeight: 600,
+                    fontWeight: 'var(--mac-font-weight-semibold)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
@@ -356,7 +353,7 @@ const CartStepV2 = ({
                       {row.serviceName}
                     </div>
                     <div style={{
-                    fontSize: '11px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-text-secondary)'
                   }}>
                       {row.doctorName ? `Врач: ${row.doctorName}` : 'Врач не выбран'}
@@ -377,8 +374,8 @@ const CartStepV2 = ({
                   flexShrink: 0,
                   padding: '2px 8px',
                   borderRadius: '999px',
-                  fontSize: '11px',
-                  fontWeight: 600,
+                  fontSize: 'var(--mac-font-size-xs)',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
                   color: isEligible ? 'var(--mac-success)' : 'var(--mac-warning)',
                   background: isEligible ?
                   'color-mix(in srgb, var(--mac-success), transparent 90%)' :
@@ -398,6 +395,39 @@ const CartStepV2 = ({
           })}
           </div>
         }
+
+        {/* UX Audit Registrar #10: Группировка корзины по специалистам.
+            Показывает сколько визитов будет создано, когда услуги у разных врачей.
+            Раньше был плоский список без визуальной группировки. */}
+        {cart?.items?.length > 0 && (() => {
+          const doctorGroups = new Map();
+          cart.items.forEach((item) => {
+            const docId = item.doctor_id || 'no_doctor';
+            const docName = item.doctor_name || (item.doctor_id ? `Врач #${item.doctor_id}` : 'Без врача');
+            if (!doctorGroups.has(docId)) {
+              doctorGroups.set(docId, { id: docId, name: docName, items: [] });
+            }
+            doctorGroups.get(docId).items.push(item);
+          });
+          const groupCount = doctorGroups.size;
+          if (groupCount > 1) {
+            return (
+              <div style={{
+                marginBottom: 'var(--mac-spacing-2)',
+                padding: '6px 10px',
+                background: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 88%)',
+                border: '1px solid color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 75%)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: 'var(--mac-font-size-xs)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-accent-blue, #007aff)',
+              }}>
+                Будет создано визитов: {groupCount} · Услуг: {cart.items.length}
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* Горизонтальный скролл корзины */}
         {cart?.items?.length > 0 ?
@@ -419,7 +449,7 @@ const CartStepV2 = ({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'stretch',
-                gap: '4px',
+                gap: 'var(--mac-spacing-1)',
                 padding: '6px 8px',
                 background: 'var(--mac-bg-secondary)',
                 border: '1px solid var(--mac-border)',
@@ -430,7 +460,7 @@ const CartStepV2 = ({
                   <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: 'var(--mac-spacing-2)',
                   whiteSpace: 'nowrap'
                 }}>
                     <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
@@ -452,9 +482,9 @@ const CartStepV2 = ({
                     </button>
                   </div>
                   {requiresDoctor &&
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-1)' }}>
                       <label style={{
-                    fontSize: '10px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-text-secondary)'
                   }}>
                         Врач для консультации
@@ -464,9 +494,9 @@ const CartStepV2 = ({
                     onChange={(e) => onUpdateItem?.(item.id, 'doctor_id', e.target.value ? Number(e.target.value) : null)}
                     style={{
                       width: '100%',
-                      fontSize: '11px',
+                      fontSize: 'var(--mac-font-size-xs)',
                       padding: '4px 6px',
-                      borderRadius: '6px',
+                      borderRadius: 'var(--mac-radius-sm)',
                       border: '1px solid var(--mac-border)',
                       background: 'var(--mac-bg-primary)',
                       color: 'var(--mac-text-primary)'
@@ -493,7 +523,7 @@ const CartStepV2 = ({
         {/* Ошибки валидации */}
         {(errors.cart || errors.doctors || errors.repeat) &&
         <div style={{
-          padding: '8px',
+          padding: 'var(--mac-spacing-2)',
           background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
           border: '1px solid color-mix(in srgb, var(--mac-error), transparent 70%)',
           borderRadius: 'var(--mac-radius-sm)',

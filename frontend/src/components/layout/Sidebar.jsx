@@ -141,13 +141,13 @@ export default function Sidebar() {
             style={({ isActive }) => ({
               display: 'block',
               padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-              borderRadius: '8px',
+              borderRadius: 'var(--mac-radius-md)',
               color: isActive ? getColor('surface') : getColor('textSecondary'),
               background: isActive ? getColor('primary', 500) : 'transparent',
               textDecoration: 'none',
               transition: 'all 0.2s ease',
               fontSize: getSpacing('base'),
-              fontWeight: '500',
+              fontWeight: 'var(--mac-font-weight-medium)',
               border: isActive ? 'none' : `1px solid ${getColor('border')}`,
               ':hover': {
                 background: isActive ? getColor('primary', 600) : getColor('primary', 50),

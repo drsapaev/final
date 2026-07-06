@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowRight, AtSign, Eye, EyeOff, LogIn, CircleHelp, Phone, UserPlus, UserRound, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LogIn, CircleHelp, UserPlus, UserRound, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api, setToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
@@ -14,7 +14,7 @@ import TwoFactorVerify from '../TwoFactorVerify.jsx';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
 import {
-  Button, Card, CardHeader, CardTitle, CardContent, Input, Select, Checkbox, Alert,
+  Button, Card, CardHeader, CardTitle, CardContent, Input, Checkbox, Alert,
 } from '../ui/macos';
 import logger from '../../utils/logger';
 
@@ -32,59 +32,59 @@ const setupRoute = getCanonicalRouteById('setup')?.path || '/setup';
 // `void useTheme();` заменён на нормальный вызов — мы подписываемся
 // на смену темы, чтобы карточка логина перерисовывалась.
 const LoginFormStyled = () => {
-  useTheme();
+  // UX Audit: useTheme — используем isDark для conditional styles.
+  const { isDark } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const setupStatus = useSetupStatus();
-  // UX Audit Stage 2 (Login issue 3.5): передаём language в ForgotPassword.
-  // Раньше ForgotPassword всегда использовал 'RU' по умолчанию, даже если
-  // остальной UI на EN/UZ/KK. Теперь язык пробрасывается из useTranslation.
   const { language: rawLanguage } = useTranslation();
-  // ForgotPassword ожидает 'RU'/'UZ'/'EN' (upper-case), useTranslation даёт 'ru'/'uz'/'en'.
   const language = (rawLanguage || 'ru').toUpperCase();
   const from = location.state?.from?.pathname || landingRoute;
   const showSetupCta = setupStatus.initialized === false;
-  // UX Audit Stage 2 (Login issue 3.2): Caps Lock warning.
-  // Detect через keyboard event (getModifierState('CapsLock')).
   const [capsLockOn, setCapsLockOn] = useState(false);
+
+  // UX Audit: все стили используют --mac-* tokens, следуют за темой.
   const authControlStyles = {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    color: '#0f172a',
-    WebkitTextFillColor: '#0f172a',
-    caretColor: '#0f172a',
-    borderColor: 'rgba(148, 163, 184, 0.62)',
-    boxShadow: '0 8px 20px rgba(15, 23, 42, 0.05)',
+    backgroundColor: isDark
+      ? 'color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 2%)'
+      : 'color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 2%)',
+    color: 'var(--mac-text-primary, #0f172a)',
+    WebkitTextFillColor: 'var(--mac-text-primary, #0f172a)',
+    caretColor: 'var(--mac-text-primary, #0f172a)',
+    borderColor: 'color-mix(in srgb, var(--mac-card-border, #cbd5e1), transparent 38%)',
+    boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 92%)',
   };
   const authButtonBaseStyles = {
-    borderRadius: '10px',
-    fontWeight: '600',
+    borderRadius: 'var(--mac-radius-lg)',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     letterSpacing: '0.01em',
     boxShadow: 'none',
     WebkitBackdropFilter: 'none',
     backdropFilter: 'none',
   };
   const authSecondaryButtonStyles = {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    color: '#0f172a',
-    borderColor: 'rgba(148, 163, 184, 0.85)',
+    backgroundColor: isDark
+      ? 'color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 5%)'
+      : 'color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 5%)',
+    color: 'var(--mac-text-primary, #0f172a)',
+    borderColor: 'color-mix(in srgb, var(--mac-card-border, #cbd5e1), transparent 15%)',
   };
   const authGhostButtonStyles = {
-    backgroundColor: 'rgba(255, 255, 255, 0.88)',
-    color: '#0f172a',
-    borderColor: 'rgba(148, 163, 184, 0.58)',
-    boxShadow: '0 6px 14px rgba(15, 23, 42, 0.06)',
+    backgroundColor: 'transparent',
+    color: 'var(--mac-text-primary, #0f172a)',
+    borderColor: 'transparent',
+    boxShadow: 'none',
   };
   const authPrimaryButtonStyles = {
-    background: 'linear-gradient(135deg, #0a84ff 0%, #007aff 55%, #0060df 100%)',
-    borderColor: '#007aff',
-    color: 'white',
-    boxShadow: '0 12px 24px rgba(0, 122, 255, 0.28)',
+    background: 'linear-gradient(135deg, var(--mac-accent-blue, #0a84ff) 0%, var(--mac-accent-blue, #007aff) 55%, var(--mac-accent-blue, #0060df) 100%)',
+    borderColor: 'var(--mac-accent-blue, #007aff)',
+    color: 'var(--mac-text-on-accent, white)',
+    boxShadow: '0 8px 20px color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 72%)',
   };
 
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    loginType: 'username'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -123,7 +123,7 @@ const LoginFormStyled = () => {
       };
 
       logger.log('[AUTH] Login submit', {
-        loginType: formData.loginType,
+        
         rememberMe,
       });
 
@@ -226,7 +226,7 @@ const LoginFormStyled = () => {
 
       if (rawMessage && /failed to fetch/i.test(rawMessage)) {
         logger.warn('[FIX:LOGIN] Network login failure normalized', {
-          loginType: formData.loginType,
+          
           hasIdentifier: Boolean(formData.username),
           rawMessage,
           normalizedMessage: LOGIN_ERROR_MESSAGES.NETWORK,
@@ -239,7 +239,7 @@ const LoginFormStyled = () => {
         error: errorMessage,
         rawMessage,
         timestamp: new Date().toISOString(),
-        loginType: formData.loginType,
+        
         hasIdentifier: Boolean(formData.username)
       });
 
@@ -344,11 +344,11 @@ const LoginFormStyled = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px'
+        padding: 'var(--mac-spacing-5)'
       }}>
         <div style={{
           background: 'white',
-          borderRadius: '12px',
+          borderRadius: 'var(--mac-radius-lg)',
           boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
           padding: '40px',
           width: '100%',
@@ -368,21 +368,21 @@ const LoginFormStyled = () => {
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 20px',
-              fontSize: '24px',
+              fontSize: 'var(--mac-font-size-3xl)',
               color: 'white',
               position: 'relative'
             }}>
               <div style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'rgba(0, 0, 0, 0.2)',
+                background: 'color-mix(in srgb, black, transparent 80%)',
                 borderRadius: '50%'
               }} />
               <span style={{ position: 'relative', zIndex: 1 }}>🔐</span>
             </div>
             <h1 style={{
-              fontSize: '24px',
-              fontWeight: 'bold',
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               color: colors.semantic.text.primary,
               margin: '0 0 8px 0'
             }}>
@@ -391,7 +391,7 @@ const LoginFormStyled = () => {
             <p style={{
               color: colors.semantic.text.secondary,
               margin: '0',
-              fontSize: '14px'
+              fontSize: 'var(--mac-font-size-base)'
             }}>
               Подтвердите вход с помощью кода
             </p>
@@ -402,11 +402,11 @@ const LoginFormStyled = () => {
               Раньше это были 3 обычные <button> без role/aria-selected/aria-controls.
               Теперь screen reader правильно объявляет это как таб-лист с 3 табами.
               Keyboard navigation: ArrowLeft/Right, Home, End. */}
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
             <div
               role="tablist"
               aria-label="Методы двухфакторной аутентификации"
-              style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}
+              style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-4)' }}
             >
               {twoFactorTabs.map((tab, index) => {
                 const isActive = twoFactorMethod === tab.id;
@@ -423,12 +423,12 @@ const LoginFormStyled = () => {
                     onKeyDown={(e) => handle2FATabKeyDown(e, index)}
                     style={{
                       flex: 1,
-                      padding: '8px 12px',
+                      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                       background: isActive ? colors.primary[500] : 'transparent',
                       color: isActive ? 'white' : colors.semantic.text.secondary,
-                      border: '1px solid #e1e5e9',
-                      borderRadius: '6px',
-                      fontSize: '12px',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
+                      fontSize: 'var(--mac-font-size-xs)',
                       cursor: 'pointer',
                       font: 'inherit',
                       outline: isActive ? `2px solid ${colors.primary[500]}` : 'none',
@@ -475,7 +475,7 @@ const LoginFormStyled = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '20px',
+          padding: 'var(--mac-spacing-5)',
           position: 'relative'
         }}
       >
@@ -504,7 +504,7 @@ const LoginFormStyled = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: 'var(--mac-spacing-5)',
         position: 'relative'
       }}
     >
@@ -512,15 +512,17 @@ const LoginFormStyled = () => {
       <Card className="login-form-auth" style={{
         width: '100%',
       maxWidth: '400px',
-      // macOS-стиль карточки: полупрозрачная с размытием
-      background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.84) 0%, rgba(248, 250, 252, 0.74) 100%)',
+      // UX Audit: card background следует за темой через --mac-* tokens.
+      background: isDark
+        ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
+        : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
         backdropFilter: 'blur(26px) saturate(140%)',
         WebkitBackdropFilter: 'blur(26px) saturate(140%)',
-        border: '1px solid rgba(255, 255, 255, 0.42)',
+        border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
         boxShadow: `
-          0 18px 48px rgba(15, 23, 42, 0.18),
-          0 2px 8px rgba(15, 23, 42, 0.06),
-          inset 0 1px 0 rgba(255, 255, 255, 0.55)
+          0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
+          0 2px 8px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 94%),
+          inset 0 1px 0 color-mix(in srgb, var(--mac-card-bg, #fff), transparent 45%)
         `,
         borderRadius: '24px',
         overflow: 'hidden',
@@ -536,8 +538,8 @@ const LoginFormStyled = () => {
             textAlign: 'center'
           }}>
             <span style={{
-              fontSize: '24px',
-              fontWeight: '600',
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               // UX Audit Stage 2 (Login issue 3.3): --mac-text-primary вместо #1d1d1f
               color: 'var(--mac-text-primary, #1d1d1f)',
               letterSpacing: '-0.5px'
@@ -547,8 +549,8 @@ const LoginFormStyled = () => {
               <span aria-hidden="true">🔐</span>{' '}Вход в систему
             </span>
             <span style={{
-              fontSize: '14px',
-              fontWeight: '400',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-normal)',
               // UX Audit Stage 2 (Login issue 3.3): --mac-text-secondary вместо #86868b
               color: 'var(--mac-text-secondary, #86868b)',
               letterSpacing: '0.1px'
@@ -560,37 +562,27 @@ const LoginFormStyled = () => {
         </CardHeader>
         <CardContent style={{ paddingTop: 12, paddingBottom: 14 }}>
           <form onSubmit={handleSubmit}>
+            {/* UX Audit: селектор «Тип входа» удалён — был функционально мёртв.
+                loginType менял только label/placeholder, но API всегда получал
+                поле username. Backend сам определяет тип по формату ввода.
+                Теперь — единое поле «Логин» с подсказкой. */}
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 500 }}>Тип входа</label>
-              <Select
-                value={formData.loginType}
-                onChange={(val) => setFormData((prev) => ({ ...prev, loginType: val }))}
-                options={[
-                { value: 'username', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><UserRound size={14} />Имя пользователя</span> },
-                { value: 'email', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><AtSign size={14} />Email</span> },
-                { value: 'phone', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Phone size={14} />Телефон</span> }]
-                } />
-
-            </div>
-
-            <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 500 }}>
-                {formData.loginType === 'username' ? 'Имя пользователя' : formData.loginType === 'email' ? 'Email' : 'Телефон'} *
+              <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 'var(--mac-font-weight-medium)' }}>
+                Логин *
               </label>
               <Input
-                type={formData.loginType === 'email' ? 'email' : 'text'}
+                type="text"
                 name="username"
                 value={formData.username}
                 onChange={handleInputChange}
                 required
-                autoComplete={formData.loginType === 'email' ? 'email' : 'username'}
-                placeholder={`Введите ${formData.loginType === 'username' ? 'имя пользователя' : formData.loginType === 'email' ? 'email' : 'телефон'}`}
+                autoComplete="username"
+                placeholder="Имя пользователя, email или телефон"
                 style={authControlStyles} />
-
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 500 }}>Пароль *</label>
+              <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 'var(--mac-font-weight-medium)' }}>Пароль *</label>
               <div style={{ position: 'relative' }}>
                 <Input
                   type={showPassword ? 'text' : 'password'}
@@ -628,8 +620,8 @@ const LoginFormStyled = () => {
                     marginTop: 6,
                     padding: '6px 10px',
                     fontSize: 12,
-                    fontWeight: 600,
-                    color: '#b45309',
+                    fontWeight: 'var(--mac-font-weight-semibold)',
+                    color: 'var(--mac-warning-active, var(--mac-warning))',
                     background: 'rgba(245, 158, 11, 0.12)',
                     border: '1px solid rgba(245, 158, 11, 0.3)',
                     borderRadius: 8,
@@ -691,7 +683,7 @@ const LoginFormStyled = () => {
         </CardContent>
         {/*
           UX Audit Stage 2 (Login issue 3.3):
-          Стили перенесены с хардкодов (#0f172a, #64748b) на design tokens.
+          Стили перенесены с хардкодов (#0f172a, var(--mac-text-secondary)) на design tokens.
           Теперь поля ввода на login-экране корректно работают в light/dark теме.
           Раньше login был всегда тёмный, и эти стили форсировали тёмный текст —
           в light-теме приложения это выглядело инородно.

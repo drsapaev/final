@@ -161,7 +161,7 @@ export function DoctorTemplatesPanel({
                                     ? `для диагноза ${icd10Code}`
                                     : 'для этой секции'}
                             </small>
-                            <small style={{ marginTop: '8px', opacity: 0.7 }}>
+                            <small style={{ marginTop: 'var(--mac-spacing-2)', opacity: 0.7 }}>
                                 Шаблоны создаются автоматически при подписании EMR
                             </small>
                         </div>

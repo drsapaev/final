@@ -33,8 +33,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, AlertOctagon, CheckCircle2 } from 'lucide-react';
-import Modal from '../ui/macos/Modal.jsx';
-import Button from '../ui/macos/Button.jsx';
+import { Modal } from '../ui/macos';
+import { Button } from '../ui/macos';
+import { Input } from '../ui/macos';
 
 const INTENT_CONFIG = {
   danger: {
@@ -107,7 +108,7 @@ export function ConfirmDialog({
     >
       <div style={{
         display: 'flex',
-        gap: '16px',
+        gap: 'var(--mac-spacing-4)',
         alignItems: 'flex-start',
         padding: '8px 4px',
       }}>
@@ -126,8 +127,8 @@ export function ConfirmDialog({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             color: 'var(--mac-text-primary)',
-            fontSize: '15px',
-            fontWeight: 600,
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             marginBottom: description || message ? '8px' : 0,
             lineHeight: 1.3,
           }}>
@@ -136,7 +137,7 @@ export function ConfirmDialog({
           {message && (
             <div style={{
               color: 'var(--mac-text-primary)',
-              fontSize: '14px',
+              fontSize: 'var(--mac-font-size-base)',
               lineHeight: 1.5,
               marginBottom: description ? '8px' : 0,
             }}>
@@ -146,32 +147,32 @@ export function ConfirmDialog({
           {description && (
             <div style={{
               color: 'var(--mac-text-secondary)',
-              fontSize: '13px',
+              fontSize: 'var(--mac-font-size-sm)',
               lineHeight: 1.5,
             }}>
               {description}
             </div>
           )}
           {requireText !== null && (
-            <div style={{ marginTop: '12px' }}>
+            <div style={{ marginTop: 'var(--mac-spacing-3)' }}>
               <label
                 htmlFor="confirm-dialog-require-text"
                 style={{
                   display: 'block',
-                  fontSize: '12px',
+                  fontSize: 'var(--mac-font-size-xs)',
                   color: 'var(--mac-text-secondary)',
-                  marginBottom: '6px',
+                  marginBottom: 'var(--mac-spacing-2)',
                 }}
               >
                 Введите <code style={{
                   padding: '2px 6px',
                   backgroundColor: 'var(--mac-bg-secondary, rgba(0,0,0,0.05))',
-                  borderRadius: '4px',
+                  borderRadius: 'var(--mac-radius-sm)',
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                  fontSize: '12px',
+                  fontSize: 'var(--mac-font-size-xs)',
                 }}>{requireText}</code> для подтверждения:
               </label>
-              <input
+              <Input
                 id="confirm-dialog-require-text"
                 type="text"
                 value={typedText}
@@ -181,11 +182,11 @@ export function ConfirmDialog({
                 style={{
                   width: '100%',
                   padding: '8px 10px',
-                  borderRadius: '8px',
+                  borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border, rgba(0,0,0,0.12))',
                   backgroundColor: 'var(--mac-bg-primary, #fff)',
                   color: 'var(--mac-text-primary)',
-                  fontSize: '14px',
+                  fontSize: 'var(--mac-font-size-base)',
                   outline: 'none',
                   boxSizing: 'border-box',
                 }}
@@ -197,8 +198,8 @@ export function ConfirmDialog({
       <div style={{
         display: 'flex',
         justifyContent: 'flex-end',
-        gap: '8px',
-        marginTop: '20px',
+        gap: 'var(--mac-spacing-2)',
+        marginTop: 'var(--mac-spacing-5)',
       }}>
         <Button
           variant="outline"

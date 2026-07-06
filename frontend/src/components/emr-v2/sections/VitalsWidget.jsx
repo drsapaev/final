@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import './VitalsWidget.css';
+import { Input } from '../../ui/macos';
 
 /**
  * VitalsWidget (Кардиология)
@@ -30,7 +31,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
             <div className="emr-vitals__row">
                 <div className={`emr-vitals__field ${isBPCritical ? 'emr-vitals__field--critical' : isBPHigh ? 'emr-vitals__field--warning' : ''}`}>
                     <label>АД сист.</label>
-                    <input
+                    <Input
                         type="number"
                         aria-label="Systolic blood pressure"
                         value={vitals?.systolic || ''}
@@ -42,7 +43,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                 <span className="emr-vitals__separator">/</span>
                 <div className={`emr-vitals__field ${isBPCritical ? 'emr-vitals__field--critical' : isBPHigh ? 'emr-vitals__field--warning' : ''}`}>
                     <label>АД диаст.</label>
-                    <input
+                    <Input
                         type="number"
                         aria-label="Diastolic blood pressure"
                         value={vitals?.diastolic || ''}
@@ -53,7 +54,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                 </div>
                 <div className="emr-vitals__field">
                     <label>Пульс</label>
-                    <input
+                    <Input
                         type="number"
                         aria-label="Pulse"
                         value={vitals?.pulse || ''}
@@ -64,7 +65,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                 </div>
                 <div className="emr-vitals__field">
                     <label>SpO₂</label>
-                    <input
+                    <Input
                         type="number"
                         aria-label="Blood oxygen saturation"
                         value={vitals?.spo2 || ''}
@@ -85,7 +86,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
             <div className="emr-vitals__row">
                 <div className="emr-vitals__field">
                     <label>Рост {vitals?.heightSource && <small>({vitals.heightSource})</small>}</label>
-                    <input
+                    <Input
                         type="number"
                         aria-label="Height in centimeters"
                         value={vitals?.height || ''}
@@ -97,7 +98,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                 </div>
                 <div className="emr-vitals__field">
                     <label>Вес {vitals?.weightSource && <small>({vitals.weightSource})</small>}</label>
-                    <input
+                    <Input
                         type="number"
                         aria-label="Weight in kilograms"
                         value={vitals?.weight || ''}

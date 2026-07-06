@@ -9,7 +9,7 @@ import {
   CardContent,
   Typography,
   Badge,
-} from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   ArrowLeftRight,
 
@@ -117,7 +117,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             <div style={{ display: 'flex', border: '1px solid var(--mac-border)', borderRadius: 8, overflow: 'hidden' }}>
               <button
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: viewMode === 'slider' ? 'var(--mac-accent-blue)' : 'transparent',
                   color: viewMode === 'slider' ? 'white' : 'var(--mac-text-primary)',
@@ -134,7 +134,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               </button>
               <button
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: viewMode === 'side-by-side' ? 'var(--mac-accent-blue)' : 'transparent',
                   color: viewMode === 'side-by-side' ? 'white' : 'var(--mac-text-primary)',
@@ -151,7 +151,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               </button>
               <button
                 style={{
-                  padding: '8px 12px',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
                   border: 'none',
                   background: viewMode === 'overlay' ? 'var(--mac-accent-blue)' : 'transparent',
                   color: viewMode === 'overlay' ? 'white' : 'var(--mac-text-primary)',
@@ -173,7 +173,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               onClick={handleZoomOut}
               aria-label="Уменьшить масштаб фото"
               style={{
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 4,
                 background: 'transparent',
@@ -190,7 +190,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               onClick={handleZoomIn}
               aria-label="Увеличить масштаб фото"
               style={{
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 4,
                 background: 'transparent',
@@ -206,7 +206,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               onClick={handleResetZoom}
               aria-label="Сбросить масштаб фото"
               style={{
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 4,
                 background: 'transparent',
@@ -222,7 +222,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               onClick={handleFullscreen}
               aria-label="Открыть сравнение фото на весь экран"
               style={{
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 4,
                 background: 'transparent',
@@ -343,7 +343,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: 'white',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                boxShadow: 'var(--mac-shadow-md)'
               }}>
               
                 <ArrowLeftRight style={{ width: 20, height: 20 }} />
@@ -355,11 +355,11 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             position: 'absolute',
             top: 10,
             left: 10,
-            backgroundColor: 'rgba(0,0,0,0.7)',
+            backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
             color: 'white',
-            padding: '4px 8px',
+            padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
             borderRadius: 4,
-            fontSize: '14px'
+            fontSize: 'var(--mac-font-size-base)'
           }}>
               ДО
             </div>
@@ -367,11 +367,11 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             position: 'absolute',
             top: 10,
             right: 10,
-            backgroundColor: 'rgba(0,0,0,0.7)',
+            backgroundColor: 'color-mix(in srgb, black, transparent 30%)',
             color: 'white',
-            padding: '4px 8px',
+            padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
             borderRadius: 4,
-            fontSize: '14px'
+            fontSize: 'var(--mac-font-size-base)'
           }}>
               ПОСЛЕ
             </div>
@@ -455,7 +455,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               <Typography variant="caption" color="white" style={{ marginBottom: 8, display: 'block' }}>
                 Прозрачность
               </Typography>
-              <input
+              <Input
               type="range"
               aria-label="Настроить прозрачность наложения фото"
               min="0"
@@ -465,8 +465,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               style={{
                 width: '100%',
                 height: '4px',
-                borderRadius: '2px',
-                background: 'rgba(255,255,255,0.3)',
+                borderRadius: 'var(--mac-radius-sm)',
+                background: 'color-mix(in srgb, white, transparent 70%)',
                 outline: 'none',
                 appearance: 'none'
               }} />

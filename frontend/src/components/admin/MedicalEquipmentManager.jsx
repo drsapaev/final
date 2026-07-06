@@ -267,15 +267,15 @@ const MedicalEquipmentManager = () => {
   'Добавьте первое медицинское устройство, чтобы отслеживать его статус и измерения.';
 
   const renderOverviewTab = () =>
-  <div className="admin-flex-col-24">
-      <div className="admin-flex-between">
+  <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
         <h3 className="admin-section-h3-m0">
           Обзор оборудования
         </h3>
         <Button
         onClick={() => {loadDevices();loadOverview();}}
         disabled={loading}
-        className="admin-flex-center-8">
+        className="flex items-center justify-center gap-2">
         
           <RefreshCw size={16} />
           {loading ? 'Загрузка...' : 'Обновить'}
@@ -284,7 +284,7 @@ const MedicalEquipmentManager = () => {
 
       {overview ?
     <div className="admin-grid-auto-200-mb-24">
-          <MacOSCard className="admin-p-0">
+          <MacOSCard className="p-0">
             <div className="admin-stat-number-accent-mb-8">
               {overview.total_devices}
             </div>
@@ -292,7 +292,7 @@ const MedicalEquipmentManager = () => {
               Всего устройств
             </div>
           </MacOSCard>
-          <MacOSCard className="admin-p-0">
+          <MacOSCard className="p-0">
             <div className="admin-stat-number-success-mb-8">
               {overview.online_devices}
             </div>
@@ -300,7 +300,7 @@ const MedicalEquipmentManager = () => {
               В сети
             </div>
           </MacOSCard>
-          <MacOSCard className="admin-p-0">
+          <MacOSCard className="p-0">
             <div className="admin-stat-number-error-mb-8">
               {overview.offline_devices}
             </div>
@@ -308,7 +308,7 @@ const MedicalEquipmentManager = () => {
               Не в сети
             </div>
           </MacOSCard>
-          <MacOSCard className="admin-p-0">
+          <MacOSCard className="p-0">
             <div className="admin-stat-number-purple-mb-8">
               {overview.total_measurements}
             </div>
@@ -322,8 +322,8 @@ const MedicalEquipmentManager = () => {
     }
 
       <div className="admin-grid-auto-300-24">
-        <MacOSCard className="admin-p-0">
-          <h4 className="admin-rule-header admin-mb-16">
+        <MacOSCard className="p-0">
+          <h4 className="admin-rule-header mb-4">
             Статистика по типам устройств
           </h4>
           {overview?.device_types ?
@@ -332,7 +332,7 @@ const MedicalEquipmentManager = () => {
                 <span className="admin-text-sm-primary">
                   {getDeviceTypeName(type)}
                 </span>
-                <div className="admin-flex-center-8">
+                <div className="flex items-center justify-center gap-2">
                   <Badge variant="outline">{stats.total}</Badge>
                   <Badge variant="success">{stats.online}</Badge>
                 </div>
@@ -343,17 +343,17 @@ const MedicalEquipmentManager = () => {
         }
         </MacOSCard>
 
-        <MacOSCard className="admin-p-0">
-          <h4 className="admin-rule-header admin-mb-16">
+        <MacOSCard className="p-0">
+          <h4 className="admin-rule-header mb-4">
             Быстрые действия
           </h4>
-          <div className="admin-flex-col-12">
+          <div className="flex flex-col gap-3">
             <Button
             onClick={() => setActiveTab('devices')}
             variant="outline"
             className="admin-btn-justify-start">
             
-              <Settings size={16} className="admin-mr-8" />
+              <Settings size={16} className="mr-2" />
               Управление устройствами
             </Button>
             <Button
@@ -361,7 +361,7 @@ const MedicalEquipmentManager = () => {
             variant="outline"
             className="admin-btn-justify-start">
             
-              <BarChart3 size={16} className="admin-mr-8" />
+              <BarChart3 size={16} className="mr-2" />
               Просмотр измерений
             </Button>
             <Button
@@ -369,7 +369,7 @@ const MedicalEquipmentManager = () => {
             variant="outline"
             className="admin-btn-justify-start">
             
-              <Activity size={16} className="admin-mr-8" />
+              <Activity size={16} className="mr-2" />
               Выполнить измерение
             </Button>
           </div>
@@ -379,20 +379,20 @@ const MedicalEquipmentManager = () => {
 
 
   const renderDevicesTab = () =>
-  <div className="admin-flex-col-24">
-      <div className="admin-flex-between">
+  <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
         <h3 className="admin-section-h3-m0">Устройства</h3>
         <Button onClick={loadDevices} disabled={loading}>
-          <RefreshCw size={16} className="admin-mr-8" />
+          <RefreshCw size={16} className="mr-2" />
           {loading ? 'Загрузка...' : 'Обновить'}
         </Button>
       </div>
 
       {/* Фильтры */}
-      <MacOSCard className="admin-p-0">
+      <MacOSCard className="p-0">
         <div className="admin-grid-auto-200">
           <div>
-            <label htmlFor="device-type-filter" className="admin-form-label">Тип устройства</label>
+            <label htmlFor="device-type-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Тип устройства</label>
             <Select
             id="device-type-filter"
             value={filters.device_type}
@@ -410,7 +410,7 @@ const MedicalEquipmentManager = () => {
           
           </div>
           <div>
-            <label htmlFor="status-filter" className="admin-form-label">Статус</label>
+            <label htmlFor="status-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Статус</label>
             <Select
             id="status-filter"
             value={filters.status}
@@ -426,7 +426,7 @@ const MedicalEquipmentManager = () => {
           
           </div>
           <div>
-            <label htmlFor="location-filter" className="admin-form-label">Местоположение</label>
+            <label htmlFor="location-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Местоположение</label>
             <Input
             id="location-filter"
             value={filters.location}
@@ -442,9 +442,9 @@ const MedicalEquipmentManager = () => {
         {filteredDevices.map((device) => {
         const DeviceIcon = getDeviceIcon(device.device_type);
         return (
-          <MacOSCard key={device.id} className="admin-p-16">
+          <MacOSCard key={device.id} className="p-4">
               <div className="admin-flex-between-flex-start-mb-12">
-                <div className="admin-flex-center-8">
+                <div className="flex items-center justify-center gap-2">
                   <DeviceIcon size={20} className="admin-icon-blue" />
                   <div>
                     <h4 className="admin-device-h4">{device.name}</h4>
@@ -456,7 +456,7 @@ const MedicalEquipmentManager = () => {
                 </Badge>
               </div>
 
-              <div className="admin-flex-col-8-sm admin-mb-16">
+              <div className="admin-flex-col-8-sm mb-4">
                 <div><strong>Производитель:</strong> {device.manufacturer}</div>
                 <div><strong>Модель:</strong> {device.model}</div>
                 <div><strong>Местоположение:</strong> {device.location || 'Не указано'}</div>
@@ -468,9 +468,9 @@ const MedicalEquipmentManager = () => {
               <Button
                 size="sm"
                 onClick={() => connectDevice(device.id)}
-                className="admin-flex-center">
+                className="flex items-center justify-center">
                 
-                    <Wifi size={16} className="admin-mr-4" />
+                    <Wifi size={16} className="mr-1" />
                     Подключить
                   </Button> :
 
@@ -478,9 +478,9 @@ const MedicalEquipmentManager = () => {
                 size="sm"
                 variant="outline"
                 onClick={() => disconnectDevice(device.id)}
-                className="admin-flex-center">
+                className="flex items-center justify-center">
                 
-                    <WifiOff size={16} className="admin-mr-4" />
+                    <WifiOff size={16} className="mr-1" />
                     Отключить
                   </Button>
               }
@@ -491,7 +491,7 @@ const MedicalEquipmentManager = () => {
                 onClick={() => calibrateDevice(device.id)}
                 disabled={device.status !== 'online'}>
                 
-                  <Wrench size={16} className="admin-mr-4" />
+                  <Wrench size={16} className="mr-1" />
                   Калибровка
                 </Button>
 
@@ -500,7 +500,7 @@ const MedicalEquipmentManager = () => {
                 variant="outline"
                 onClick={() => setSelectedDevice(device)}>
                 
-                  <Settings size={16} className="admin-mr-4" />
+                  <Settings size={16} className="mr-1" />
                   Подробнее
                 </Button>
               </div>
@@ -520,14 +520,14 @@ const MedicalEquipmentManager = () => {
 
 
   const renderMeasurementTab = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       <h3 className="admin-section-h3-m0">Выполнить измерение</h3>
 
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <div className="admin-grid-auto-300-24">
-          <div className="admin-flex-col-16">
+          <div className="flex flex-col gap-4">
             <div>
-              <label htmlFor="measurement-device" className="admin-form-label">Устройство</label>
+              <label htmlFor="measurement-device" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Устройство</label>
               <Select
               id="measurement-device"
               value={measurementForm.device_id}
@@ -546,7 +546,7 @@ const MedicalEquipmentManager = () => {
             </div>
 
             <div>
-              <label htmlFor="measurement-patient" className="admin-form-label">ID пациента (опционально)</label>
+              <label htmlFor="measurement-patient" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">ID пациента (опционально)</label>
               <Input
               id="measurement-patient"
               value={measurementForm.patient_id}
@@ -558,23 +558,23 @@ const MedicalEquipmentManager = () => {
             <Button
             onClick={takeMeasurement}
             disabled={!measurementForm.device_id}
-            className="admin-w-full">
+            className="w-full">
             
-              <Activity size={16} className="admin-mr-8" />
+              <Activity size={16} className="mr-2" />
               Выполнить измерение
             </Button>
           </div>
 
-          <div className="admin-flex-col-16">
+          <div className="flex flex-col gap-4">
             <h4 className="admin-device-h4-base-med">Доступные устройства</h4>
-            <div className="admin-flex-col-8">
+            <div className="flex flex-col gap-2">
               {devices.
             filter((d) => d.status === 'online').
             map((device) => {
               const DeviceIcon = getDeviceIcon(device.device_type);
               return (
                 <div key={device.id} className="admin-measurement-device-row">
-                      <div className="admin-flex-center-8">
+                      <div className="flex items-center justify-center gap-2">
                         <DeviceIcon size={16} className="admin-icon-blue" />
                         <span className="admin-text-sm-primary">{device.name}</span>
                       </div>
@@ -599,26 +599,26 @@ const MedicalEquipmentManager = () => {
 
   const renderMeasurementsTab = () => {
     return (
-      <div className="admin-flex-col-24">
-        <div className="admin-flex-between">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
           <h3 className="admin-section-h3-m0">История измерений</h3>
           <div className="admin-flex-gap-8">
             <Button onClick={loadMeasurements} disabled={loading}>
-              <RefreshCw size={16} className="admin-mr-8" />
+              <RefreshCw size={16} className="mr-2" />
               Обновить
             </Button>
             <Button variant="outline">
-              <Download size={16} className="admin-mr-8" />
+              <Download size={16} className="mr-2" />
               Экспорт
             </Button>
           </div>
         </div>
 
         {/* Фильтры для измерений */}
-        <MacOSCard className="admin-p-0">
+        <MacOSCard className="p-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="measurements-device-type" className="admin-form-label">Тип устройства</label>
+              <label htmlFor="measurements-device-type" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Тип устройства</label>
               <Select
                 id="measurements-device-type"
                 value={filters.device_type}
@@ -643,9 +643,9 @@ const MedicalEquipmentManager = () => {
         </MacOSCard>
 
         {/* Список измерений */}
-        <div className="admin-flex-col-16">
+        <div className="flex flex-col gap-4">
           {measurements.map((measurement, index) =>
-          <MacOSCard key={index} className="admin-p-16">
+          <MacOSCard key={index} className="p-4">
               <div className="admin-flex-between-flex-start">
                 <div className="admin-flex-1">
                   <div className="admin-flex-center-8-mb-8">
@@ -671,7 +671,7 @@ const MedicalEquipmentManager = () => {
                   }
                     <div>
                       <strong>Данные:</strong>
-                      <div className="admin-text-sm admin-mt-4">
+                      <div className="text-sm admin-mt-4">
                         {measurement.measurements && Object.entries(measurement.measurements).map(([key, value]) =>
                       <div key={key}>
                             {key}: {typeof value === 'number' ? value.toFixed(1) : value}
@@ -782,8 +782,8 @@ const MedicalEquipmentManager = () => {
                 <div><strong>Версия ПО:</strong> {selectedDevice.firmware_version}</div>
               </div>
 
-              <div className="admin-flex-col-12">
-                <div className="admin-flex-center">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-center">
                   <strong>Статус:</strong>
                   <Badge variant={getStatusBadgeVariant(selectedDevice.status)} className="admin-ml-8">
                     {getStatusText(selectedDevice.status)}
@@ -821,7 +821,7 @@ const MedicalEquipmentManager = () => {
               onClick={() => runDiagnostics(selectedDevice.id)}
               disabled={selectedDevice.status !== 'online'}>
               
-                <AlertTriangle size={16} className="admin-mr-8" />
+                <AlertTriangle size={16} className="mr-2" />
                 Диагностика
               </Button>
               <Button
@@ -829,7 +829,7 @@ const MedicalEquipmentManager = () => {
               disabled={selectedDevice.status !== 'online'}
               variant="outline">
               
-                <Wrench size={16} className="admin-mr-8" />
+                <Wrench size={16} className="mr-2" />
                 Калибровка
               </Button>
               <Button

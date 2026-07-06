@@ -188,7 +188,11 @@ export function CardiologySection({
                 </div>
       }
 
-            {/* Lab Results Tab - R-12 / P-004 (UX audit): unified units to мг/дл */}
+            {/* Lab Results Tab - R-12 / P-004 (UX audit): unified units to мг/дл.
+                P2: legacy manual-entry CardioBloodTest. This will be deprecated
+                in favor of LabResultsSection (below specialty sections in
+                EMRContainerV2) which reads from the canonical LabReportInstance
+                model. Kept for back-compat until CardioBloodTest data is migrated. */}
             {activeTab === 'labs' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-info-panel" role="status">

@@ -9,6 +9,7 @@ import { useAnimation } from './useAnimation';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
 import logger from '../utils/logger';
+import { Input } from '../../ui/macos';
 // Валидаторы для медицинских форм
 export const validators = {
   required: (value) => {
@@ -297,24 +298,24 @@ export const FormField = ({
   };
 
   return (
-    <div className={`form-field ${className}`} style={{ marginBottom: '16px' }}>
+    <div className={`form-field ${className}`} style={{ marginBottom: 'var(--mac-spacing-4)' }}>
       {label &&
       <label
         htmlFor={name}
         style={{
           display: 'block',
-          marginBottom: '4px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: error ? '#ef4444' : '#374151'
+          marginBottom: 'var(--mac-spacing-1)',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: '#ef4444' }}> *</span>}
+          {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
       }
 
-      <input
+      <Input
         id={name}
         name={name}
         type={type}
@@ -325,24 +326,24 @@ export const FormField = ({
         required={required}
         style={{
           width: '100%',
-          padding: '8px 12px',
-          fontSize: '14px',
-          border: `1px solid ${error ? '#ef4444' : '#d1d5db'}`,
-          borderRadius: '6px',
-          backgroundColor: disabled ? '#f9fafb' : '#ffffff',
-          color: '#374151',
+          padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+          fontSize: 'var(--mac-font-size-base)',
+          border: `1px solid ${error ? 'var(--mac-error)' : 'var(--mac-border)'}`,
+          borderRadius: 'var(--mac-radius-sm)',
+          backgroundColor: disabled ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-primary)',
           outline: 'none',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#3b82f6';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? '#fef2f2' : '#dbeafe'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#d1d5db';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
             e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
@@ -354,9 +355,9 @@ export const FormField = ({
       <div
         className={`form-field-error ${animationClasses}`}
         style={{
-          marginTop: '4px',
-          fontSize: '12px',
-          color: '#ef4444'
+          marginTop: 'var(--mac-spacing-1)',
+          fontSize: 'var(--mac-font-size-xs)',
+          color: 'var(--mac-error)'
         }}>
         
           {error}
@@ -390,20 +391,20 @@ export const FormTextarea = ({
   };
 
   return (
-    <div className={`form-textarea ${className}`} style={{ marginBottom: '16px' }}>
+    <div className={`form-textarea ${className}`} style={{ marginBottom: 'var(--mac-spacing-4)' }}>
       {label &&
       <label
         htmlFor={name}
         style={{
           display: 'block',
-          marginBottom: '4px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: error ? '#ef4444' : '#374151'
+          marginBottom: 'var(--mac-spacing-1)',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: '#ef4444' }}> *</span>}
+          {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
       }
 
@@ -418,26 +419,26 @@ export const FormTextarea = ({
         rows={rows}
         style={{
           width: '100%',
-          padding: '8px 12px',
-          fontSize: '14px',
+          padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+          fontSize: 'var(--mac-font-size-base)',
           fontFamily: 'inherit',
-          border: `1px solid ${error ? '#ef4444' : '#d1d5db'}`,
-          borderRadius: '6px',
-          backgroundColor: disabled ? '#f9fafb' : '#ffffff',
-          color: '#374151',
+          border: `1px solid ${error ? 'var(--mac-error)' : 'var(--mac-border)'}`,
+          borderRadius: 'var(--mac-radius-sm)',
+          backgroundColor: disabled ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-primary)',
           outline: 'none',
           resize: 'vertical',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#3b82f6';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? '#fef2f2' : '#dbeafe'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#d1d5db';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
             e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
@@ -448,9 +449,9 @@ export const FormTextarea = ({
       {error &&
       <div
         style={{
-          marginTop: '4px',
-          fontSize: '12px',
-          color: '#ef4444'
+          marginTop: 'var(--mac-spacing-1)',
+          fontSize: 'var(--mac-font-size-xs)',
+          color: 'var(--mac-error)'
         }}>
         
           {error}
@@ -484,20 +485,20 @@ export const FormSelect = ({
   };
 
   return (
-    <div className={`form-select ${className}`} style={{ marginBottom: '16px' }}>
+    <div className={`form-select ${className}`} style={{ marginBottom: 'var(--mac-spacing-4)' }}>
       {label &&
       <label
         htmlFor={name}
         style={{
           display: 'block',
-          marginBottom: '4px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: error ? '#ef4444' : '#374151'
+          marginBottom: 'var(--mac-spacing-1)',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
         }}>
         
           {label}
-          {required && <span style={{ color: '#ef4444' }}> *</span>}
+          {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
       }
 
@@ -510,25 +511,25 @@ export const FormSelect = ({
         required={required}
         style={{
           width: '100%',
-          padding: '8px 12px',
-          fontSize: '14px',
-          border: `1px solid ${error ? '#ef4444' : '#d1d5db'}`,
-          borderRadius: '6px',
-          backgroundColor: disabled ? '#f9fafb' : '#ffffff',
-          color: '#374151',
+          padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+          fontSize: 'var(--mac-font-size-base)',
+          border: `1px solid ${error ? 'var(--mac-error)' : 'var(--mac-border)'}`,
+          borderRadius: 'var(--mac-radius-sm)',
+          backgroundColor: disabled ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-primary)',
           outline: 'none',
           cursor: disabled ? 'not-allowed' : 'pointer',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#3b82f6';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? '#fef2f2' : '#dbeafe'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? '#ef4444' : '#d1d5db';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
             e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
@@ -550,9 +551,9 @@ export const FormSelect = ({
       {error &&
       <div
         style={{
-          marginTop: '4px',
-          fontSize: '12px',
-          color: '#ef4444'
+          marginTop: 'var(--mac-spacing-1)',
+          fontSize: 'var(--mac-font-size-xs)',
+          color: 'var(--mac-error)'
         }}>
         
           {error}
@@ -584,7 +585,7 @@ export const Form = ({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
+        gap: 'var(--mac-spacing-4)',
         ...style
       }}
       {...props}>

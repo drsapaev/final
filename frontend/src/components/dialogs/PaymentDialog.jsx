@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { CreditCard, DollarSign, Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
-import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
+// UX Audit Registrar #5: все inline-стили перенесены в PaymentDialog.css.
+// useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
+// Также: emoji в заголовке (✅/💳) заменены на text-only (иконки и так есть в actions).
+import './PaymentDialog.css';
 
 import logger from '../../utils/logger';
+import { Input } from '../ui/macos';
 const PaymentDialog = ({
   isOpen,
   onClose,
@@ -13,12 +17,6 @@ const PaymentDialog = ({
   onPaymentSuccess,
   onPrintTicket,
 }) => {
-  const { theme, getColor } = useTheme();
-  const surfaceStyle = {
-    backgroundColor: 'var(--mac-bg-secondary)',
-    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
-    borderRadius: '14px',
-  };
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Карта');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -39,7 +37,7 @@ const PaymentDialog = ({
   const validateForm = () => {
     const newErrors = {};
 
-    if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+    if (!paymentAmount || !Number.isFinite(parseFloat(paymentAmount)) || parseFloat(paymentAmount) <= 0) {
       newErrors.amount = 'Укажите корректную сумму';
     }
 
@@ -57,24 +55,22 @@ const PaymentDialog = ({
     setIsProcessing(true);
 
     try {
-      // Имитация обработки платежа
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      setIsPaid(true);
-      toast.success('Оплата прошла успешно!');
-
-      // Вызываем callback с данными об оплате
+      // UX Audit Registrar: убрана 1.5-секундная «имитация» (setTimeout).
+      // Теперь: onPaymentSuccess callback делает РЕАЛЬНЫЙ API-запрос.
       if (onPaymentSuccess) {
-        onPaymentSuccess({
+        await onPaymentSuccess({
           appointmentId: appointment.id,
           amount: parseFloat(paymentAmount),
           method: paymentMethod,
           timestamp: new Date().toISOString(),
         });
       }
+
+      setIsPaid(true);
+      toast.success('Оплата отмечена как полученная');
     } catch (error) {
       logger.error('Payment error:', error);
-      toast.error('Ошибка при обработке платежа');
+      toast.error(error?.message || 'Ошибка при обработке платежа');
     } finally {
       setIsProcessing(false);
     }
@@ -134,76 +130,36 @@ const PaymentDialog = ({
         },
       ];
 
+  // UX Audit Registrar #5: emoji в заголовке (✅/💳) заменены на text-only.
+  // Иконки есть в actions (Printer/Check) и в success state (CheckCircle2).
+  const dialogTitle = isPaid ? 'Оплата завершена' : 'Оплата услуг';
+
   return (
     <ModernDialog
       isOpen={isOpen}
       onClose={onClose}
-      title={isPaid ? '✅ Оплата завершена' : '💳 Оплата услуг'}
+      title={dialogTitle}
       actions={actions}
-      dialogStyle={{
-        backgroundColor: 'var(--mac-bg-primary)',
-      }}
+      dialogClassName="payment-dialog--styled"
       closeOnBackdrop={!isProcessing}
       closeOnEscape={!isProcessing}
     >
       {isPaid ? (
-        <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              margin: '0 auto 16px',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background:
-                theme === 'dark' ? 'rgba(16, 185, 129, 0.14)' : '#ecfdf5',
-              color: '#10b981',
-              border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#a7f3d0'}`,
-            }}
-          >
+        <div className="payment-success">
+          <div className="payment-success-icon">
             <Check size={28} />
           </div>
-          <h4
-            style={{
-              color: getColor('textPrimary'),
-              marginBottom: '8px',
-              fontSize: '18px',
-              fontWeight: '600',
-            }}
-          >
+          <h4 className="payment-success-title">
             Оплата успешно завершена
           </h4>
-          <p
-            style={{
-              color: getColor('textSecondary'),
-              marginBottom: '16px',
-              lineHeight: 1.5,
-            }}
-          >
+          <p className="payment-success-details">
             Сумма:{' '}
-            <strong>{parseFloat(paymentAmount).toLocaleString()} ₽</strong>
+            <strong>{new Intl.NumberFormat('ru-RU').format(parseFloat(paymentAmount))} сум</strong>
             <br />
             Способ: <strong>{paymentMethod}</strong>
           </p>
-          <div
-            style={{
-              padding: '14px',
-              backgroundColor:
-                theme === 'dark' ? 'rgba(16, 185, 129, 0.08)' : '#f0fdf4',
-              borderRadius: '12px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#bbf7d0'}`,
-            }}
-          >
-            <p
-              style={{
-                color: theme === 'dark' ? '#6ee7b7' : '#065f46',
-                fontSize: '14px',
-                margin: 0,
-                lineHeight: 1.5,
-              }}
-            >
+          <div className="payment-success-cta">
+            <p className="payment-success-cta-text">
               Теперь вы можете распечатать талон для пациента
             </p>
           </div>
@@ -211,40 +167,15 @@ const PaymentDialog = ({
       ) : (
         <div>
           {/* Информация о пациенте */}
-          <div
-            style={{
-              marginBottom: '24px',
-              padding: '16px',
-              ...surfaceStyle,
-            }}
-          >
-            <h4
-              style={{
-                color: getColor('textPrimary'),
-                margin: '0 0 8px 0',
-                fontSize: '16px',
-                fontWeight: '600',
-              }}
-            >
+          <div className="payment-patient-card">
+            <h4 className="payment-patient-title">
               Пациент
             </h4>
-            <p
-              style={{
-                color: getColor('textSecondary'),
-                margin: 0,
-                fontSize: '14px',
-              }}
-            >
+            <p className="payment-patient-name">
               {appointment.patient_fio}
             </p>
             {appointment.services && (
-              <p
-                style={{
-                  color: getColor('textSecondary'),
-                  margin: '4px 0 0 0',
-                  fontSize: '12px',
-                }}
-              >
+              <p className="payment-patient-services">
                 Услуги:{' '}
                 {Array.isArray(appointment.services)
                   ? appointment.services.join(', ')
@@ -254,24 +185,13 @@ const PaymentDialog = ({
           </div>
 
           {/* Форма оплаты */}
-          <div
-            style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
-          >
+          <div className="payment-form">
             {/* Сумма */}
             <div>
-              <label
-                htmlFor="payment-amount"
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  marginBottom: '8px',
-                  color: getColor('textPrimary'),
-                }}
-              >
+              <label htmlFor="payment-amount" className="payment-field-label">
                 Сумма к оплате *
               </label>
-              <input
+              <Input
                 id="payment-amount"
                 type="number"
                 aria-label="Сумма к оплате"
@@ -285,47 +205,10 @@ const PaymentDialog = ({
                   }
                 }}
                 placeholder="Введите сумму"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: `1px solid ${
-                    errors.amount
-                      ? '#ef4444'
-                      : theme === 'dark'
-                        ? 'rgba(255,255,255,0.10)'
-                        : 'var(--mac-border)'
-                  }`,
-                  borderRadius: '12px',
-                  backgroundColor:
-                    theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
-                  color: getColor('textPrimary'),
-                  fontSize: '16px',
-                  transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                  outline: 'none',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#3b82f6';
-                  e.target.style.boxShadow =
-                    '0 0 0 3px rgba(59, 130, 246, 0.12)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = errors.amount
-                    ? '#ef4444'
-                    : theme === 'dark'
-                      ? 'rgba(255,255,255,0.10)'
-                      : 'var(--mac-border)';
-                  e.target.style.boxShadow = 'none';
-                }}
+                className={`payment-amount-input ${errors.amount ? 'payment-amount-input--error' : ''}`}
               />
               {errors.amount && (
-                <p
-                  id="payment-amount-error"
-                  style={{
-                    color: '#ef4444',
-                    fontSize: '12px',
-                    margin: '4px 0 0 0',
-                  }}
-                >
+                <p id="payment-amount-error" className="payment-field-error">
                   {errors.amount}
                 </p>
               )}
@@ -333,24 +216,10 @@ const PaymentDialog = ({
 
             {/* Способ оплаты */}
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  marginBottom: '8px',
-                  color: getColor('textPrimary'),
-                }}
-              >
+              <label className="payment-field-label">
                 Способ оплаты *
               </label>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '8px',
-                }}
-              >
+              <div className="payment-methods-grid">
                 {paymentMethods.map((method) => (
                   <button
                     key={method.value}
@@ -361,36 +230,7 @@ const PaymentDialog = ({
                         setErrors((prev) => ({ ...prev, method: null }));
                       }
                     }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '12px 14px',
-                      border: `1px solid ${
-                        paymentMethod === method.value
-                          ? '#3b82f6'
-                          : theme === 'dark'
-                            ? 'rgba(255,255,255,0.10)'
-                            : 'var(--mac-border)'
-                      }`,
-                      borderRadius: '12px',
-                      backgroundColor:
-                        paymentMethod === method.value
-                          ? theme === 'dark'
-                            ? 'rgba(59, 130, 246, 0.16)'
-                            : '#eff6ff'
-                          : theme === 'dark'
-                            ? 'rgba(255,255,255,0.04)'
-                            : 'white',
-                      color:
-                        paymentMethod === method.value
-                          ? '#1d4ed8'
-                          : getColor('textPrimary'),
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                    }}
+                    className={`payment-method-btn ${paymentMethod === method.value ? 'payment-method-btn--selected' : ''}`}
                   >
                     {method.icon}
                     {method.label}
@@ -398,13 +238,7 @@ const PaymentDialog = ({
                 ))}
               </div>
               {errors.method && (
-                <p
-                  style={{
-                    color: '#ef4444',
-                    fontSize: '12px',
-                    margin: '4px 0 0 0',
-                  }}
-                >
+                <p className="payment-field-error">
                   {errors.method}
                 </p>
               )}

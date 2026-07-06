@@ -82,7 +82,7 @@
 }
 
 .prescription-action-btn--delete:hover {
-    color: #ff3b30;
+    color: var(--mac-error);
     background: rgba(255, 59, 48, 0.1);
 }
 
@@ -135,7 +135,7 @@
 .prescription-input:focus {
     border-color: var(--mac-accent-blue, #007aff);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+    box-shadow: 0 0 0 2px var(--mac-accent-bg);
 }
 
 .prescription-add-btn {
@@ -173,7 +173,7 @@
     font-size: 13px;
     font-weight: 500;
     color: var(--mac-accent-blue, #007aff);
-    background: rgba(0, 122, 255, 0.1);
+    background: var(--mac-accent-bg);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -194,9 +194,9 @@
     max-height: 200px;
     overflow-y: auto;
     background: white;
-    border: 1px solid #e5e5e5;
+    border: 1px solid var(--mac-border);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px color-mix(in srgb, black, transparent 90%);
     z-index: 10;
 }
 

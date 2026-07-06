@@ -30,7 +30,7 @@ import {
   Checkbox,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 const VoiceToText = () => {
@@ -313,9 +313,9 @@ const VoiceToText = () => {
   };
 
   const renderRecordingControls = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--mac-spacing-4)' }}>
           {!isRecording ?
         <Button
           type="button"
@@ -391,14 +391,14 @@ const VoiceToText = () => {
             {formatTime(recordingTime)}
           </div>
           {isRecording &&
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'var(--mac-spacing-2)' }}>
               <div style={{
             width: '12px',
             height: '12px',
             backgroundColor: 'var(--mac-error)',
             borderRadius: '50%',
             animation: 'pulse 1s infinite',
-            marginRight: '8px'
+            marginRight: 'var(--mac-spacing-2)'
           }} />
               <span style={{
             fontSize: 'var(--mac-font-size-sm)',
@@ -410,7 +410,7 @@ const VoiceToText = () => {
         }
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--mac-spacing-4)' }}>
           <input
           type="file"
           aria-label="Upload audio file"
@@ -422,7 +422,7 @@ const VoiceToText = () => {
           <Button
           onClick={() => fileInputRef.current?.click()}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           
             <Upload style={{ width: '16px', height: '16px' }} />
             Загрузить файл
@@ -432,7 +432,7 @@ const VoiceToText = () => {
         <Button
           onClick={resetRecording}
           variant="outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           
               <RefreshCw style={{ width: '16px', height: '16px' }} />
               Сбросить
@@ -460,10 +460,10 @@ const VoiceToText = () => {
 
   const renderSettings = () =>
   <MacOSCard style={{
-    padding: '16px',
+    padding: 'var(--mac-spacing-4)',
     backgroundColor: 'var(--mac-bg-secondary)',
     border: '1px solid var(--mac-border)',
-    marginBottom: '24px'
+    marginBottom: 'var(--mac-spacing-6)'
   }}>
       <h4 style={{
       fontWeight: 'var(--mac-font-weight-medium)',
@@ -471,7 +471,7 @@ const VoiceToText = () => {
       margin: '0 0 16px 0',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: 'var(--mac-spacing-2)'
     }}>
         <Settings style={{ width: '16px', height: '16px' }} />
         Настройки
@@ -480,7 +480,7 @@ const VoiceToText = () => {
       <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '16px'
+      gap: 'var(--mac-spacing-4)'
     }}>
         <div>
           <label style={{
@@ -488,7 +488,7 @@ const VoiceToText = () => {
           fontSize: 'var(--mac-font-size-sm)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
-          marginBottom: '4px'
+          marginBottom: 'var(--mac-spacing-1)'
         }}>
             Язык
           </label>
@@ -510,7 +510,7 @@ const VoiceToText = () => {
           fontSize: 'var(--mac-font-size-sm)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
-          marginBottom: '4px'
+          marginBottom: 'var(--mac-spacing-1)'
         }}>
             Тип документа
           </label>
@@ -527,7 +527,7 @@ const VoiceToText = () => {
         
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           <Checkbox
           id="medical_context"
           checked={settings.medical_context}
@@ -546,10 +546,10 @@ const VoiceToText = () => {
 
 
   const renderStructuring = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -559,7 +559,7 @@ const VoiceToText = () => {
           margin: '0 0 8px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <FileText style={{ width: '16px', height: '16px' }} />
             Структурирование медицинского текста
@@ -579,7 +579,7 @@ const VoiceToText = () => {
           fontSize: 'var(--mac-font-size-sm)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
+          marginBottom: 'var(--mac-spacing-2)'
         }}>
             Введите медицинский текст
           </label>
@@ -602,7 +602,7 @@ const VoiceToText = () => {
           aria-label={loading ? 'Structuring medical text' : 'Structure medical text'}
           onClick={handleStructuring}
           disabled={loading || !textInput.trim()}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           
             {loading ?
           <>
@@ -626,10 +626,10 @@ const VoiceToText = () => {
 
 
   const renderEntities = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-accent-bg)',
         border: '1px solid var(--mac-accent-border)'
       }}>
@@ -639,7 +639,7 @@ const VoiceToText = () => {
           margin: '0 0 8px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Brain style={{ width: '16px', height: '16px' }} />
             Извлечение медицинских сущностей
@@ -659,7 +659,7 @@ const VoiceToText = () => {
           fontSize: 'var(--mac-font-size-sm)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
+          marginBottom: 'var(--mac-spacing-2)'
         }}>
             Введите текст для анализа
           </label>
@@ -682,7 +682,7 @@ const VoiceToText = () => {
           aria-label={loading ? 'Extracting medical entities' : 'Extract medical entities'}
           onClick={handleEntityExtraction}
           disabled={loading || !textInput.trim()}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           
             {loading ?
           <>
@@ -706,10 +706,10 @@ const VoiceToText = () => {
 
 
   const renderSummary = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-success-bg)',
         border: '1px solid var(--mac-success-border)'
       }}>
@@ -719,7 +719,7 @@ const VoiceToText = () => {
           margin: '0 0 8px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Edit3 style={{ width: '16px', height: '16px' }} />
             Генерация медицинского резюме
@@ -739,7 +739,7 @@ const VoiceToText = () => {
           fontSize: 'var(--mac-font-size-sm)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
+          marginBottom: 'var(--mac-spacing-2)'
         }}>
             Введите текст консультации
           </label>
@@ -762,7 +762,7 @@ const VoiceToText = () => {
           aria-label={loading ? 'Creating medical summary' : 'Create medical summary'}
           onClick={handleSummaryGeneration}
           disabled={loading || !textInput.trim()}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           
             {loading ?
           <>
@@ -786,10 +786,10 @@ const VoiceToText = () => {
 
 
   const renderValidation = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-warning-bg)',
         border: '1px solid var(--mac-warning-border)'
       }}>
@@ -799,7 +799,7 @@ const VoiceToText = () => {
           margin: '0 0 8px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <CheckCircle style={{ width: '16px', height: '16px' }} />
             Валидация медицинских записей
@@ -819,7 +819,7 @@ const VoiceToText = () => {
           fontSize: 'var(--mac-font-size-sm)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
-          marginBottom: '8px'
+          marginBottom: 'var(--mac-spacing-2)'
         }}>
             Введите JSON данные записи
           </label>
@@ -843,7 +843,7 @@ const VoiceToText = () => {
           aria-label={loading ? 'Validating medical record' : 'Validate medical record'}
           onClick={handleValidation}
           disabled={loading || !textInput.trim()}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           
             {loading ?
           <>
@@ -872,11 +872,11 @@ const VoiceToText = () => {
     if (result.error) {
       return (
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-error-bg)',
           border: '1px solid var(--mac-error-border)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <XCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
             <h3 style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -888,7 +888,7 @@ const VoiceToText = () => {
             </h3>
           </div>
           <p style={{
-            marginTop: '8px',
+            marginTop: 'var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-error)',
             margin: '8px 0 0 0'
@@ -900,8 +900,8 @@ const VoiceToText = () => {
     }
 
     return (
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
@@ -909,17 +909,17 @@ const VoiceToText = () => {
             margin: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат обработки
           </h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
             {result.text &&
             <Button
               onClick={() => copyToClipboard(result.text)}
               variant="outline"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
               
                 <Copy style={{ width: '16px', height: '16px' }} />
                 Копировать
@@ -928,7 +928,7 @@ const VoiceToText = () => {
             <Button
               onClick={exportResult}
               variant="outline"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
               
               <Download style={{ width: '16px', height: '16px' }} />
               Экспорт
@@ -938,13 +938,13 @@ const VoiceToText = () => {
 
         {/* Специальное отображение для транскрипции */}
         {activeTab === 'transcription' && result.text &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
             <MacOSCard style={{
-            padding: '16px',
+            padding: 'var(--mac-spacing-4)',
             backgroundColor: 'var(--mac-info-bg)',
             border: '1px solid var(--mac-info-border)'
           }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-2)' }}>
                 <h4 style={{
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)',
@@ -952,14 +952,14 @@ const VoiceToText = () => {
               }}>
                   Транскрибированный текст
                 </h4>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
                   <Button
                   type="button"
                   title={isEditing ? 'Close transcription editor' : 'Edit transcribed text'}
                   aria-label={isEditing ? 'Close transcription editor' : 'Edit transcribed text'}
                   onClick={() => setIsEditing(!isEditing)}
                   variant="outline"
-                  style={{ padding: '4px', minWidth: 'auto' }}>
+                  style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                     <Edit3 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   </Button>
@@ -970,7 +970,7 @@ const VoiceToText = () => {
                   aria-label="Save edited transcription"
                   onClick={saveEditedText}
                   variant="outline"
-                  style={{ padding: '4px', minWidth: 'auto' }}>
+                  style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}>
 
                       <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     </Button>
@@ -1002,7 +1002,7 @@ const VoiceToText = () => {
 
             {result.segments && result.segments.length > 0 &&
           <MacOSCard style={{
-            padding: '16px',
+            padding: 'var(--mac-spacing-4)',
             backgroundColor: 'var(--mac-bg-secondary)',
             border: '1px solid var(--mac-border)'
           }}>
@@ -1013,9 +1013,9 @@ const VoiceToText = () => {
             }}>
                   Сегменты
                 </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                   {result.segments.map((segment, index) =>
-              <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: 'var(--mac-font-size-sm)' }}>
+              <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--mac-spacing-3)', fontSize: 'var(--mac-font-size-sm)' }}>
                       <span style={{
                   color: 'var(--mac-accent)',
                   fontFamily: 'var(--mac-font-mono)',
@@ -1044,30 +1044,30 @@ const VoiceToText = () => {
             <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '16px',
+            gap: 'var(--mac-spacing-4)',
             fontSize: 'var(--mac-font-size-sm)'
           }}>
               <div>
                 <span style={{ color: 'var(--mac-text-secondary)' }}>Язык:</span>
-                <span style={{ marginLeft: '4px', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+                <span style={{ marginLeft: 'var(--mac-spacing-1)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
                   {result.language}
                 </span>
               </div>
               <div>
                 <span style={{ color: 'var(--mac-text-secondary)' }}>Длительность:</span>
-                <span style={{ marginLeft: '4px', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+                <span style={{ marginLeft: 'var(--mac-spacing-1)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
                   {result.duration?.toFixed(1)}s
                 </span>
               </div>
               <div>
                 <span style={{ color: 'var(--mac-text-secondary)' }}>Достоверность:</span>
-                <span style={{ marginLeft: '4px', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+                <span style={{ marginLeft: 'var(--mac-spacing-1)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
                   {(result.confidence * 100).toFixed(0)}%
                 </span>
               </div>
               <div>
                 <span style={{ color: 'var(--mac-text-secondary)' }}>Контекст:</span>
-                <span style={{ marginLeft: '4px', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+                <span style={{ marginLeft: 'var(--mac-spacing-1)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
                   {result.medical_context ? 'Медицинский' : 'Общий'}
                 </span>
               </div>
@@ -1077,7 +1077,7 @@ const VoiceToText = () => {
 
         {/* Общее отображение для других результатов */}
         {activeTab !== 'transcription' &&
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
             {Object.entries(result).map(([key, value]) =>
           <div key={key} style={{
             borderLeft: '4px solid var(--mac-accent)',
@@ -1097,7 +1097,7 @@ const VoiceToText = () => {
               <pre style={{
                 whiteSpace: 'pre-wrap',
                 backgroundColor: 'var(--mac-bg-secondary)',
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 overflowX: 'auto',
@@ -1121,16 +1121,16 @@ const VoiceToText = () => {
 
   return (
     <div style={{
-      padding: '24px',
+      padding: 'var(--mac-spacing-6)',
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         {/* Заголовок */}
         <div style={{
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           <h2 style={{
             fontSize: 'var(--mac-font-size-2xl)',
@@ -1139,7 +1139,7 @@ const VoiceToText = () => {
             margin: '0 0 8px 0',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: 'var(--mac-spacing-3)'
           }}>
             <Volume2 style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             AI Голосовой Ввод для Медицинских Карт
@@ -1156,7 +1156,7 @@ const VoiceToText = () => {
         {/* Вкладки */}
         <div style={{
           display: 'flex',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -1166,13 +1166,13 @@ const VoiceToText = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: '12px 20px',
+                  padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
                   fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                   fontSize: 'var(--mac-font-size-sm)',
@@ -1207,7 +1207,7 @@ const VoiceToText = () => {
                   right: '0',
                   height: '3px',
                   backgroundColor: 'var(--mac-accent)',
-                  borderRadius: '2px 2px 0 0'
+                  borderRadius: 'var(--mac-radius-sm) var(--mac-radius-sm) 0 0'
                 }} />
                 }
               </button>);
@@ -1218,13 +1218,13 @@ const VoiceToText = () => {
         {/* Разделительная линия */}
         <div style={{
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }} />
 
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px'
+          gap: 'var(--mac-spacing-6)'
         }}>
           <div>
             <h3 style={{
@@ -1249,14 +1249,14 @@ const VoiceToText = () => {
             {activeTab === 'validation' && renderValidation()}
             
             {activeTab === 'transcription' && audioBlob &&
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ marginTop: 'var(--mac-spacing-6)', display: 'flex', justifyContent: 'center' }}>
                 <Button
                 type="button"
                 title={loading ? 'Transcribing audio' : 'Transcribe audio'}
                 aria-label={loading ? 'Transcribing audio' : 'Transcribe audio'}
                 onClick={handleTranscription}
                 disabled={loading}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                 
                   {loading ?
                 <>

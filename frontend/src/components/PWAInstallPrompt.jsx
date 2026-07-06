@@ -85,7 +85,7 @@ const PWAInstallPrompt = () => {
       <CardContent>
         <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <Box style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Smartphone size={20} color="#007aff" />
+            <Smartphone size={20} color="var(--mac-accent-blue)" />
             <Typography variant="h6" component="h3">
               Установить приложение
             </Typography>
@@ -97,7 +97,7 @@ const PWAInstallPrompt = () => {
             type="button"
             title="Закрыть предложение установки приложения"
             aria-label="Закрыть предложение установки приложения"
-            style={{ padding: '4px', minWidth: 'auto' }}
+            style={{ padding: 'var(--mac-spacing-1)', minWidth: 'auto' }}
           >
             <X aria-hidden="true" size={16} />
           </Button>
@@ -127,7 +127,7 @@ const PWAInstallPrompt = () => {
         </Box>
         
         <Box style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Monitor size={14} color="#666" />
+          <Monitor size={14} color="var(--mac-text-secondary)" />
           <Typography variant="caption" color="secondary">
             Доступно для установки на мобильных устройствах
           </Typography>

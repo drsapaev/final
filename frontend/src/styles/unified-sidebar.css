@@ -37,14 +37,14 @@
 .sidebar-logo-text {
   font-size: 24px;
   font-weight: 700;
-  color: #3b82f6;
+  color: var(--mac-accent-blue);
   margin: 0;
 }
 
 .sidebar-logo-icon {
   width: 32px;
   height: 32px;
-  background-color: #3b82f6;
+  background-color: var(--mac-accent-blue);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -82,8 +82,8 @@
 }
 
 .sidebar-nav-item.active {
-  background-color: #3b82f6;
-  color: #ffffff;
+  background-color: var(--mac-accent-blue);
+  color: var(--mac-bg-primary);
   font-weight: 500;
 }
 
@@ -95,7 +95,7 @@
   transform: translateY(-50%);
   width: 4px;
   height: 20px;
-  background-color: #3b82f6;
+  background-color: var(--mac-accent-blue);
   border-radius: 0 2px 2px 0;
 }
 
@@ -140,7 +140,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: #3b82f6;
+  background-color: var(--mac-accent-blue);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -200,7 +200,7 @@
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 15px -3px color-mix(in srgb, black, transparent 90%), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   padding: 8px 0;
   margin-bottom: 8px;
   z-index: 1001;
@@ -272,15 +272,15 @@
 
 /* Темная тема */
 [data-theme="dark"] .sidebar-nav-item:hover {
-  background-color: #475569;
+  background-color: var(--mac-text-secondary);
 }
 
 [data-theme="dark"] .sidebar-user-profile:hover {
-  background-color: #475569;
+  background-color: var(--mac-text-secondary);
 }
 
 [data-theme="dark"] .sidebar-user-menu-item:hover {
-  background-color: #475569;
+  background-color: var(--mac-text-secondary);
 }
 
 /* Скрытие скроллбара */

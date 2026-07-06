@@ -324,7 +324,7 @@ body.landing-body {
   border-radius: 999px;
   background: rgba(34, 197, 94, 0.12);
   border: 1px solid rgba(34, 197, 94, 0.24);
-  color: #16a34a;
+  color: var(--mac-success);
   font-size: 13px;
   font-weight: 700;
 }
@@ -491,7 +491,7 @@ body.landing-body {
 .landing-support-list svg {
   flex: 0 0 auto;
   margin-top: 2px;
-  color: #22c55e;
+  color: var(--mac-success);
 }
 
 .landing-section,
@@ -670,7 +670,7 @@ body.landing-body {
   height: 18px;
   margin-top: 4px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #0ea5e9, #22c55e);
+  background: linear-gradient(180deg, var(--mac-accent-blue), var(--mac-success));
   box-shadow: 0 0 0 8px rgba(14, 165, 233, 0.08);
 }
 
@@ -730,7 +730,7 @@ body.landing-body {
   align-items: flex-start;
   padding: 16px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.5);
+  background: color-mix(in srgb, white, transparent 50%);
   border: 1px solid rgba(148, 163, 184, 0.14);
 }
 
@@ -768,7 +768,7 @@ body.landing-body {
   margin-top: 7px;
   border-radius: 999px;
   flex: 0 0 auto;
-  background: #22c55e;
+  background: var(--mac-success);
 }
 
 .landing-checklist-marker--negative {

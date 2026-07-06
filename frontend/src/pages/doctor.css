@@ -199,11 +199,11 @@
   transition: all 0.2s ease;
   margin-right: var(--mac-spacing-xs, 4px);
 }
-.doctor-action-btn-primary { background: rgba(0, 122, 255, 0.12); color: var(--mac-accent); }
-.doctor-action-btn-success { background: rgba(52, 199, 89, 0.12); color: var(--mac-success); }
+.doctor-action-btn-primary { background: var(--mac-accent-bg); color: var(--mac-accent); }
+.doctor-action-btn-success { background: var(--mac-success-bg); color: var(--mac-success); }
 .doctor-action-btn-danger { background: rgba(255, 59, 48, 0.12); color: var(--mac-danger); }
 .doctor-action-btn-info { background: rgba(88, 86, 214, 0.12); color: var(--mac-accent-purple); }
-.doctor-action-btn-warning { background: rgba(255, 149, 0, 0.12); color: var(--mac-accent-orange); }
+.doctor-action-btn-warning { background: var(--mac-warning-bg); color: var(--mac-accent-orange); }
 
 /* ─── Section header (batch 3) ─── */
 .doctor-section-head {

@@ -2,7 +2,7 @@
 .modern-filters {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid color-mix(in srgb, black, transparent 90%);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 20px;
@@ -11,7 +11,7 @@
 
 .dark .modern-filters {
   background: rgba(15, 23, 42, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: color-mix(in srgb, white, transparent 90%);
 }
 
 /* Основная панель */
@@ -35,7 +35,7 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   pointer-events: none;
   z-index: 1;
 }
@@ -43,7 +43,7 @@
 .search-input {
   width: 100%;
   padding: 12px 16px 12px 44px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--mac-border);
   border-radius: 12px;
   font-size: 14px;
   transition: all 0.2s ease;
@@ -52,12 +52,12 @@
 
 .search-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--mac-accent-blue);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 .search-input::placeholder {
-  color: #9ca3af;
+  color: var(--mac-text-tertiary);
 }
 
 .search-clear {
@@ -67,7 +67,7 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -75,8 +75,8 @@
 }
 
 .search-clear:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--mac-bg-secondary);
+  color: var(--mac-text-primary);
 }
 
 /* Действия фильтров */
@@ -94,17 +94,17 @@
   gap: 8px;
   padding: 8px 12px;
   background: white;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--mac-border);
   border-radius: 10px;
   transition: all 0.2s ease;
 }
 
 .date-filter:hover {
-  border-color: #d1d5db;
+  border-color: var(--mac-border);
 }
 
 .filter-icon {
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   flex-shrink: 0;
 }
 
@@ -124,7 +124,7 @@
   gap: 8px;
   padding: 10px 16px;
   background: white;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--mac-border);
   border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
@@ -134,15 +134,15 @@
 }
 
 .filters-toggle:hover {
-  border-color: #d1d5db;
+  border-color: var(--mac-border);
   transform: translateY(-1px);
 }
 
 .filters-toggle.has-filters {
-  background: #3b82f6 !important;
+  background: var(--mac-accent-blue) !important;
   color: white !important;
-  border-color: #3b82f6 !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  border-color: var(--mac-accent-blue) !important;
+  box-shadow: 0 4px 12px var(--mac-accent-border);
 }
 
 .filters-count {
@@ -151,7 +151,7 @@
   right: -4px;
   width: 12px;
   height: 12px;
-  background: #ef4444;
+  background: var(--mac-error);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -173,12 +173,12 @@
 .filters-expanded-panel {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid color-mix(in srgb, black, transparent 90%);
   animation: slideDown 0.3s ease-out;
 }
 
 .dark .filters-expanded-panel {
-  border-top-color: rgba(255, 255, 255, 0.1);
+  border-top-color: color-mix(in srgb, white, transparent 90%);
 }
 
 /* Сетка фильтров */
@@ -202,16 +202,16 @@
   gap: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--mac-text-primary);
 }
 
 .dark .filter-label {
-  color: #d1d5db;
+  color: var(--mac-border);
 }
 
 .filter-select {
   padding: 10px 12px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--mac-border);
   border-radius: 8px;
   font-size: 14px;
   background: white;
@@ -221,8 +221,8 @@
 
 .filter-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--mac-accent-blue);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 /* Быстрые кнопки даты */
@@ -234,7 +234,7 @@
 
 .quick-date-btn {
   padding: 8px 16px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--mac-border);
   border-radius: 8px;
   background: white;
   font-size: 13px;
@@ -244,7 +244,7 @@
 }
 
 .quick-date-btn:hover {
-  border-color: #d1d5db;
+  border-color: var(--mac-border);
   transform: translateY(-1px);
 }
 
@@ -271,11 +271,11 @@
 
 .results-count {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
 }
 
 .dark .results-count {
-  color: #9ca3af;
+  color: var(--mac-text-tertiary);
 }
 
 .filters-controls {
@@ -290,13 +290,13 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--mac-accent-bg);
   border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  color: #3b82f6;
+  color: var(--mac-accent-blue);
   transition: all 0.2s ease;
 }
 
@@ -318,7 +318,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: #ef4444;
+  background: var(--mac-error);
   color: white;
   border: none;
   border-radius: 8px;
@@ -329,7 +329,7 @@
 }
 
 .clear-filters-btn:hover {
-  background: #dc2626;
+  background: var(--mac-error);
   transform: translateY(-1px);
 }
 
@@ -365,9 +365,9 @@
 
 /* Темная тема */
 .dark .search-input {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--mac-bg-secondary);
 }
 
 .dark .search-input:focus {
@@ -377,38 +377,38 @@
 
 .dark .search-clear:hover {
   background: #4b5563;
-  color: #d1d5db;
+  color: var(--mac-border);
 }
 
 .dark .date-filter {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
 }
 
 .dark .filters-toggle {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--mac-bg-secondary);
 }
 
 .dark .filters-toggle:hover {
-  border-color: #6b7280;
+  border-color: var(--mac-text-secondary);
 }
 
 .dark .filter-select {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--mac-bg-secondary);
 }
 
 .dark .quick-date-btn {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--mac-bg-secondary);
 }
 
 .dark .quick-date-btn:hover {
-  border-color: #6b7280;
+  border-color: var(--mac-text-secondary);
 }
 
 /* Адаптивность */

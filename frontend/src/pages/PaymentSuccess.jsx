@@ -28,7 +28,7 @@ const pageStyle = {
 
 const centeredCardStyle = {
   textAlign: 'center',
-  marginBottom: '16px',
+  marginBottom: 'var(--mac-spacing-4)',
 };
 
 const statusIconWrapStyle = {
@@ -44,8 +44,8 @@ const statusIconWrapStyle = {
 const detailGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: '12px',
-  marginTop: '16px',
+  gap: 'var(--mac-spacing-3)',
+  marginTop: 'var(--mac-spacing-4)',
 };
 
 const detailItemStyle = {
@@ -59,14 +59,14 @@ const detailItemStyle = {
 const detailLabelStyle = {
   margin: '0 0 6px',
   color: 'var(--mac-text-secondary)',
-  fontSize: '13px',
+  fontSize: 'var(--mac-font-size-sm)',
 };
 
 const detailValueStyle = {
   margin: 0,
   color: 'var(--mac-text-primary)',
-  fontSize: '16px',
-  fontWeight: 600,
+  fontSize: 'var(--mac-font-size-lg)',
+  fontWeight: 'var(--mac-font-weight-semibold)',
   lineHeight: 1.35,
   overflowWrap: 'anywhere',
 };
@@ -74,14 +74,14 @@ const detailValueStyle = {
 const actionGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: '12px',
-  marginTop: '16px',
+  gap: 'var(--mac-spacing-3)',
+  marginTop: 'var(--mac-spacing-4)',
 };
 
 const buttonIconStyle = {
   width: '18px',
   height: '18px',
-  marginRight: '8px',
+  marginRight: 'var(--mac-spacing-2)',
   flexShrink: 0,
 };
 
@@ -97,7 +97,7 @@ const spinnerStyle = {
   width: '48px',
   height: '48px',
   borderRadius: '50%',
-  border: '4px solid rgba(52, 199, 89, 0.18)',
+  border: '4px solid var(--mac-success-bg)',
   borderTopColor: 'var(--mac-success)',
   animation: 'payment-success-spin 0.9s linear infinite',
   margin: '0 auto 16px',
@@ -294,7 +294,7 @@ const PaymentSuccess = () => {
       <main style={loadingWrapStyle} aria-busy="true" aria-live="polite">
         <Card padding="large" shadow="large" style={{ width: '100%', maxWidth: '420px', textAlign: 'center' }}>
           <div style={spinnerStyle} aria-hidden="true" />
-          <h1 style={{ margin: '0 0 8px', fontSize: '22px' }}>
+          <h1 style={{ margin: '0 0 8px', fontSize: 'var(--mac-font-size-2xl)' }}>
             Проверяем платеж
           </h1>
           <p style={{ margin: 0, color: 'var(--mac-text-secondary)', lineHeight: 1.5 }}>
@@ -319,11 +319,11 @@ const PaymentSuccess = () => {
     return (
       <main style={pageStyle}>
         <Card padding="large" shadow="large">
-          <Alert severity="error" role="alert" style={{ marginBottom: '16px' }}>
+          <Alert severity="error" role="alert" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
               <AlertCircle size={20} style={{ flexShrink: 0, color: 'var(--mac-danger)' }} />
               <div>
-                <strong style={{ display: 'block', marginBottom: '4px' }}>
+                <strong style={{ display: 'block', marginBottom: 'var(--mac-spacing-1)' }}>
                   Платеж не найден
                 </strong>
                 <span>{error}</span>
@@ -353,8 +353,8 @@ const PaymentSuccess = () => {
               style={{
                 ...statusIconWrapStyle,
                 color: 'var(--mac-success)',
-                background: 'rgba(52, 199, 89, 0.12)',
-                border: '1px solid rgba(52, 199, 89, 0.28)',
+                background: 'var(--mac-success-bg)',
+                border: '1px solid var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 72%))',
               }}
               aria-hidden="true"
             >
@@ -363,7 +363,7 @@ const PaymentSuccess = () => {
             <h1 style={{ margin: '0 0 8px', fontSize: '26px', color: 'var(--mac-success)' }}>
               Оплата успешно завершена
             </h1>
-            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: '16px', lineHeight: 1.5 }}>
+            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-lg)', lineHeight: 1.5 }}>
               Спасибо за использование наших услуг.
             </p>
           </>
@@ -373,8 +373,8 @@ const PaymentSuccess = () => {
               style={{
                 ...statusIconWrapStyle,
                 color: 'var(--mac-warning)',
-                background: 'rgba(255, 149, 0, 0.12)',
-                border: '1px solid rgba(255, 149, 0, 0.28)',
+                background: 'var(--mac-warning-bg)',
+                border: '1px solid var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 72%))',
               }}
               aria-hidden="true"
             >
@@ -383,7 +383,7 @@ const PaymentSuccess = () => {
             <h1 style={{ margin: '0 0 8px', fontSize: '26px', color: 'var(--mac-warning)' }}>
               Статус платежа: {getStatusText(paymentData?.status)}
             </h1>
-            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: '16px', lineHeight: 1.5 }}>
+            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-lg)', lineHeight: 1.5 }}>
               Информация о вашем платеже.
             </p>
           </>
@@ -391,9 +391,9 @@ const PaymentSuccess = () => {
       </Card>
 
       {paymentData && (
-        <Card padding="large" shadow="default" style={{ marginBottom: '16px' }}>
+        <Card padding="large" shadow="default" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
           <CardContent>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '18px' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', margin: 0, fontSize: 'var(--mac-font-size-xl)' }}>
               <Receipt size={20} aria-hidden="true" />
               Детали платежа
             </h2>
@@ -413,7 +413,7 @@ const PaymentSuccess = () => {
 
               <div style={detailItemStyle}>
                 <p style={detailLabelStyle}>Способ оплаты</p>
-                <p style={{ ...detailValueStyle, fontWeight: 500 }}>
+                <p style={{ ...detailValueStyle, fontWeight: 'var(--mac-font-weight-medium)' }}>
                   {getProviderName(paymentData.provider)}
                 </p>
               </div>
@@ -427,7 +427,7 @@ const PaymentSuccess = () => {
 
               <div style={{ ...detailItemStyle, gridColumn: '1 / -1' }}>
                 <p style={detailLabelStyle}>Дата и время</p>
-                <p style={{ ...detailValueStyle, fontWeight: 500 }}>
+                <p style={{ ...detailValueStyle, fontWeight: 'var(--mac-font-weight-medium)' }}>
                   {new Date(paymentData.created_at).toLocaleString('ru-RU')}
                 </p>
               </div>
@@ -435,7 +435,7 @@ const PaymentSuccess = () => {
               {paymentData.description && (
                 <div style={{ ...detailItemStyle, gridColumn: '1 / -1' }}>
                   <p style={detailLabelStyle}>Описание</p>
-                  <p style={{ ...detailValueStyle, fontWeight: 500 }}>
+                  <p style={{ ...detailValueStyle, fontWeight: 'var(--mac-font-weight-medium)' }}>
                     {paymentData.description}
                   </p>
                 </div>
@@ -447,7 +447,7 @@ const PaymentSuccess = () => {
 
       <Card padding="large" shadow="default">
         <CardContent>
-          <h2 style={{ margin: 0, fontSize: '18px' }}>
+          <h2 style={{ margin: 0, fontSize: 'var(--mac-font-size-xl)' }}>
             Действия
           </h2>
 
@@ -494,7 +494,7 @@ const PaymentSuccess = () => {
         </CardContent>
       </Card>
 
-      <p style={{ margin: '24px 0 0', textAlign: 'center', color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+      <p style={{ margin: '24px 0 0', textAlign: 'center', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
         При возникновении вопросов обратитесь в службу поддержки.
       </p>
     </main>

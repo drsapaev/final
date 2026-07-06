@@ -12,11 +12,11 @@ export const designRules = {
   colors: {
     // Запрещенные цвета (жестко заданные)
     forbiddenColors: [
-      '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8', // Синие
-      '#10b981', '#f59e0b', '#ef4444', '#06b6d4', // Зеленые, желтые, красные, голубые
-      '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', // Серые светлые
-      '#64748b', '#475569', '#334155', '#1e293b', '#0f172a', // Серые темные
-      '#ffffff', '#000000', '#gray', '#red', '#blue', '#green' // Базовые цвета
+      '#60a5fa', 'var(--mac-accent-blue)', 'var(--mac-accent-blue-hover)', 'var(--mac-accent-blue-hover)', // Синие
+      'var(--mac-success)', 'var(--mac-warning)', 'var(--mac-error)', '#06b6d4', // Зеленые, желтые, красные, голубые
+      'var(--mac-bg-secondary)', '#f1f5f9', 'var(--mac-border)', 'var(--mac-border)', // Серые светлые
+      'var(--mac-text-secondary)', 'var(--mac-text-secondary)', 'var(--mac-text-primary)', 'var(--mac-text-primary)', 'var(--mac-text-primary)', // Серые темные
+      'var(--mac-bg-primary)', 'var(--mac-text-primary)', '#gray', '#red', '#blue', '#green' // Базовые цвета
     ],
 
     // Разрешенные функции цветов

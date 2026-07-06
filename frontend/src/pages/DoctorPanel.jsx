@@ -9,9 +9,9 @@ import {
   CardContent,
   Badge,
   Skeleton,
-} from '../components/ui/macos';
+  Input } from '../components/ui/macos';
 // R-14: AnimatedTransition moved from native/ to macos/ kit.
-import AnimatedTransition from '../components/ui/macos/AnimatedTransition';
+import { AnimatedTransition } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import './doctor.css';
 import '../styles/animations.css';
@@ -374,7 +374,7 @@ const DoctorPanel = () => {
     gap: getSpacing('sm'),
     color: 'var(--mac-text-on-accent)',
     fontSize: isMobile ? getFontSize('lg') : getFontSize('xl'),
-    fontWeight: '700',
+    fontWeight: 'var(--mac-font-weight-bold)',
     textDecoration: 'none'
   };void
 
@@ -401,12 +401,12 @@ const DoctorPanel = () => {
 
   const tabStyle = {
     padding: isMobile ? `${getSpacing('sm')} ${getSpacing('md')}` : `${getSpacing('md')} ${getSpacing('lg')}`,
-    borderRadius: '12px',
+    borderRadius: 'var(--mac-radius-lg)',
     background: interactiveSurface,
     border: `1px solid ${panelBorder}`,
     color: 'var(--mac-text-secondary)',
     fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     cursor: 'pointer',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap',
@@ -434,7 +434,7 @@ const DoctorPanel = () => {
 
   const statCardStyle = {
     background: panelSurface,
-    borderRadius: '20px',
+    borderRadius: 'var(--mac-radius-xl)',
     padding: getSpacing('lg'),
     boxShadow: getShadow('lg'),
     backdropFilter: 'blur(20px)',
@@ -450,7 +450,7 @@ const DoctorPanel = () => {
 
   const patientsTableStyle = {
     background: panelSurface,
-    borderRadius: '20px',
+    borderRadius: 'var(--mac-radius-xl)',
     overflow: 'hidden',
     boxShadow: getShadow('lg'),
     backdropFilter: 'blur(20px)',
@@ -471,7 +471,7 @@ const DoctorPanel = () => {
   const thStyle = {
     padding: getSpacing('md'),
     textAlign: 'left',
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('secondary', 700),
     fontSize: getFontSize('sm'),
     borderBottom: `1px solid ${getColor('secondary', 200)}`
@@ -862,7 +862,7 @@ const DoctorPanel = () => {
                   <div className="doctor-section-actions">
                     <div className="doctor-search-wrap">
                       <Search size={20} className="doctor-search-icon" />
-                      <input
+                      <Input
                       aria-label="Search patients"
                       type="text"
                       placeholder="Поиск пациентов..."
@@ -912,7 +912,8 @@ const DoctorPanel = () => {
                   : 'Пациенты не подставляются тестовыми данными. Используйте очередь или регистрацию, чтобы открыть реальную карту пациента.'
               }) :
 
-              <table style={tableStyle}>
+              <div className="admin-table-wrapper">
+<table style={tableStyle}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Пациент</th>
@@ -990,6 +991,7 @@ const DoctorPanel = () => {
                   )}
                     </tbody>
                   </table>
+</div>
               }
               </CardContent>
             </Card>
@@ -1007,7 +1009,7 @@ const DoctorPanel = () => {
                   <div className="doctor-section-actions">
                     <div className="doctor-search-wrap">
                       <Search size={20} className="doctor-search-icon" />
-                      <input
+                      <Input
                       aria-label="Search appointments"
                       type="text"
                       placeholder="Поиск записей..."

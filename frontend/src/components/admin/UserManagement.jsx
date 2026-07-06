@@ -360,7 +360,7 @@ const UserManagement = () => {
     background: 'transparent',
     color: 'var(--mac-text-primary)',
     font: 'inherit',
-    fontSize: '13px',
+    fontSize: 'var(--mac-font-size-sm)',
     textAlign: 'left',
     cursor: 'pointer'
   };

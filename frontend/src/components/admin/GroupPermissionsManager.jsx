@@ -274,7 +274,7 @@ const GroupPermissionsManager = () => {
 
   // Стили
   const containerStyle = {
-    padding: '24px',
+    padding: 'var(--mac-spacing-6)',
     minHeight: '100vh',
     backgroundColor: 'var(--mac-bg-primary)'
   };
@@ -299,7 +299,7 @@ const GroupPermissionsManager = () => {
       {/* Левая панель - список пользователей */}
       <MacOSCard className="admin-card-sidebar-300">
         <h3 className="admin-list-h3">
-          <Users className="admin-icon-20" />
+          <Users className="w-5 h-5" />
           Пользователи
         </h3>
         
@@ -307,7 +307,7 @@ const GroupPermissionsManager = () => {
         placeholder="Поиск пользователей..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        className="admin-mb-16" />
+        className="mb-4" />
       
         
         <div className="admin-max-h-400-overflow">
@@ -356,27 +356,27 @@ const GroupPermissionsManager = () => {
       <>
             <div className="admin-flex-between-mb-16">
               <h3 className="admin-header-h3-m0">
-                <Shield className="admin-icon-20" />
+                <Shield className="w-5 h-5" />
                 Разрешения: {selectedUser.username}
               </h3>
               <Button
             onClick={() => loadUserPermissions(selectedUser.id)}
             disabled={loading}>
             
-                <RefreshCw className="admin-icon-16" />
+                <RefreshCw className="w-4 h-4" />
                 Обновить
               </Button>
             </div>
 
             {loading ?
         <div>
-                <Skeleton height="20px" className="admin-mb-8" />
-                <Skeleton height="20px" className="admin-mb-8" />
+                <Skeleton height="20px" className="mb-2" />
+                <Skeleton height="20px" className="mb-2" />
                 <Skeleton height="20px" />
               </div> :
         userPermissions ?
         <div>
-                <div className="admin-mb-16">
+                <div className="mb-4">
                   <Badge variant="primary">
                     Всего разрешений: {userPermissions.permissions_count}
                   </Badge>
@@ -388,7 +388,7 @@ const GroupPermissionsManager = () => {
                   </Badge>
                 </div>
 
-                <div className="admin-mb-24">
+                <div className="mb-6">
                   <h4 className="admin-form-h4">
                     Роли:
                   </h4>
@@ -399,7 +399,7 @@ const GroupPermissionsManager = () => {
                   </div>
                 </div>
 
-                <div className="admin-mb-24">
+                <div className="mb-6">
                   <h4 className="admin-form-h4">
                     Группы:
                   </h4>
@@ -448,7 +448,7 @@ const GroupPermissionsManager = () => {
                   }))]
                   }
                   size="large"
-                  className="admin-w-full" />
+                  className="w-full" />
                 
                     </div>
                   </div>
@@ -475,7 +475,7 @@ const GroupPermissionsManager = () => {
       {/* Левая панель - список групп */}
       <MacOSCard className="admin-card-sidebar-300">
         <h3 className="admin-list-h3">
-          <Users className="admin-icon-20" />
+          <Users className="w-5 h-5" />
           Группы
         </h3>
         
@@ -483,7 +483,7 @@ const GroupPermissionsManager = () => {
         placeholder="Поиск групп..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        className="admin-mb-16" />
+        className="mb-4" />
       
         
         <div className="admin-max-h-400-overflow">
@@ -529,27 +529,27 @@ const GroupPermissionsManager = () => {
       <>
             <div className="admin-flex-between-mb-16">
               <h3 className="admin-header-h3-m0">
-                <Shield className="admin-icon-20" />
+                <Shield className="w-5 h-5" />
                 Группа: {selectedGroup.display_name}
               </h3>
               <Button
             onClick={() => loadGroupSummary(selectedGroup.id)}
             disabled={loading}>
             
-                <RefreshCw className="admin-icon-16" />
+                <RefreshCw className="w-4 h-4" />
                 Обновить
               </Button>
             </div>
 
             {loading ?
         <div>
-                <Skeleton height="20px" className="admin-mb-8" />
-                <Skeleton height="20px" className="admin-mb-8" />
+                <Skeleton height="20px" className="mb-2" />
+                <Skeleton height="20px" className="mb-2" />
                 <Skeleton height="20px" />
               </div> :
         groupSummary ?
         <div>
-                <div className="admin-mb-16">
+                <div className="mb-4">
                   <Badge variant="primary">
                     Пользователей: {groupSummary.users_count}
                   </Badge>
@@ -561,13 +561,13 @@ const GroupPermissionsManager = () => {
                   </Badge>
                 </div>
 
-                <div className="admin-mb-24">
+                <div className="mb-6">
                   <h4 className="admin-form-h4">
                     Роли группы:
                   </h4>
                   <div className="admin-flex-wrap-8-mb-8">
                     {groupSummary.roles.map((role) =>
-              <div key={role.id} className="admin-flex-center-8">
+              <div key={role.id} className="flex items-center justify-center gap-2">
                         <Badge variant="success">{role.display_name}</Badge>
                         <Button
                   type="button"
@@ -603,7 +603,7 @@ const GroupPermissionsManager = () => {
                   }))]
                   }
                   size="large"
-                  className="admin-w-full" />
+                  className="w-full" />
                 
                     </div>
                   </div>
@@ -615,7 +615,7 @@ const GroupPermissionsManager = () => {
                   </h4>
                   <div className="admin-max-h-300-overflow">
                     {Object.entries(groupSummary.permissions_by_category).map(([category, perms]) =>
-              <div key={category} className="admin-mb-16">
+              <div key={category} className="mb-4">
                         <h5 className="admin-perm-category-h5">
                           {category} ({perms.length})
                         </h5>
@@ -654,14 +654,14 @@ const GroupPermissionsManager = () => {
 
 
   const renderCacheTab = () =>
-  <MacOSCard className="admin-p-24">
+  <MacOSCard className="p-6">
       <div className="admin-flex-between-mb-24">
         <h3 className="admin-header-h3-m0">
-          <Settings className="admin-icon-20" />
+          <Settings className="w-5 h-5" />
           Управление кэшем разрешений
         </h3>
         <Button onClick={clearCache} variant="danger">
-          <Trash2 className="admin-icon-16" />
+          <Trash2 className="w-4 h-4" />
           Очистить кэш
         </Button>
       </div>
@@ -712,7 +712,7 @@ const GroupPermissionsManager = () => {
         </div>
     }
 
-      <div className="admin-mt-24">
+      <div className="mt-6">
         <h4 className="admin-form-h4">
           Пользователи в кэше:
         </h4>
@@ -729,7 +729,7 @@ const GroupPermissionsManager = () => {
 
   return (
     <div style={containerStyle}>
-      <div className="admin-mb-24">
+      <div className="mb-6">
         <h1 className="admin-page-h1">
           <Shield className="admin-icon-32" />
           Управление разрешениями групп

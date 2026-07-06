@@ -177,22 +177,22 @@
 }
 
 .cardiology-risk-score.low {
-    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    background: linear-gradient(135deg, var(--mac-success-bg), var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 60%)));
     color: #065f46;
 }
 
 .cardiology-risk-score.moderate {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    background: linear-gradient(135deg, var(--mac-warning-bg), #fde68a);
     color: #92400e;
 }
 
 .cardiology-risk-score.high {
-    background: linear-gradient(135deg, #fed7aa, #fdba74);
+    background: linear-gradient(135deg, var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 50%)), #fdba74);
     color: #9a3412;
 }
 
 .cardiology-risk-score.very-high {
-    background: linear-gradient(135deg, #fecaca, #fca5a5);
+    background: linear-gradient(135deg, var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%)), var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%)));
     color: #991b1b;
 }
 
@@ -217,23 +217,23 @@
 }
 
 .cardiology-risk-category.low {
-    background: #ecfdf5;
+    background: var(--mac-success-bg);
     color: #047857;
 }
 
 .cardiology-risk-category.moderate {
     background: #fffbeb;
-    color: #b45309;
+    color: var(--mac-warning);
 }
 
 .cardiology-risk-category.high {
-    background: #fff7ed;
+    background: var(--mac-warning-bg);
     color: #c2410c;
 }
 
 .cardiology-risk-category.very-high {
-    background: #fef2f2;
-    color: #b91c1c;
+    background: var(--mac-error-bg);
+    color: var(--mac-error);
 }
 
 .cardiology-risk-legend {
@@ -252,22 +252,22 @@
 }
 
 .cardiology-risk-legend .legend-item.low {
-    background: #d1fae5;
+    background: var(--mac-success-bg);
     color: #065f46;
 }
 
 .cardiology-risk-legend .legend-item.moderate {
-    background: #fef3c7;
+    background: var(--mac-warning-bg);
     color: #92400e;
 }
 
 .cardiology-risk-legend .legend-item.high {
-    background: #fed7aa;
+    background: var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 50%));
     color: #9a3412;
 }
 
 .cardiology-risk-legend .legend-item.very-high {
-    background: #fecaca;
+    background: var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%));
     color: #991b1b;
 }
 /* R-13 / P-005 (UX audit): info panel replacing the duplicate ECGViewer / EchoForm */
@@ -307,18 +307,18 @@
     gap: 8px;
     margin: 8px 0;
     font-size: 13px;
-    color: #334155;
+    color: var(--mac-text-primary);
 }
 
 .cardiology-ecg-summary div {
     padding: 4px 8px;
-    background: #f8fafc;
+    background: var(--mac-bg-secondary);
     border-radius: 4px;
 }
 
 .cardiology-ecg-interpretation {
     margin: 8px 0 0 0;
     font-size: 13px;
-    color: #475569;
+    color: var(--mac-text-secondary);
     line-height: 1.5;
 }

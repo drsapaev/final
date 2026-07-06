@@ -24,8 +24,8 @@
 }
 
 .displayboard-root--contrast {
-  background: #000000;
-  color: #ffffff;
+  background: var(--mac-text-primary);
+  color: var(--mac-bg-primary);
   filter: contrast(150%);
 }
 
@@ -44,7 +44,7 @@
   border-radius: 12px;
   margin-bottom: 20px;
   border: 1px solid var(--board-border);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px color-mix(in srgb, black, transparent 90%);
 }
 
 /* ─── Flex utilities ─── */
@@ -100,17 +100,17 @@
 .displayboard-banner--info {
   background: rgba(59, 130, 246, 0.25);
   border: 1px solid rgba(59, 130, 246, 0.5);
-  color: #1e40af;
+  color: var(--mac-accent-blue-active);
 }
 .displayboard-banner--danger {
   background: rgba(239, 68, 68, 0.25);
   border: 1px solid rgba(239, 68, 68, 0.5);
-  color: #dc2626;
+  color: var(--mac-error);
 }
 .displayboard-banner--warning {
   background: rgba(245, 158, 11, 0.25);
   border: 1px solid rgba(245, 158, 11, 0.5);
-  color: #d97706;
+  color: var(--mac-warning);
 }
 
 /* ─── Current call card ─── */
@@ -122,14 +122,14 @@
   margin-bottom: 30px;
   text-align: center;
   border: 1px solid var(--board-border);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px color-mix(in srgb, black, transparent 90%);
   transform: scale(1);
   transition: all 0.3s ease;
   animation: none;
 }
 .displayboard-current-call--active {
   background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
-  color: #ffffff;
+  color: var(--mac-bg-primary);
   border: none;
   box-shadow: 0 8px 16px rgba(220, 53, 69, 0.3);
   transform: scale(1.02);
@@ -173,7 +173,7 @@
   margin-bottom: 30px;
 }
 .displayboard-announcement {
-  color: #ffffff;
+  color: var(--mac-bg-primary);
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 10px;
@@ -201,11 +201,11 @@
   padding: 20px;
   border-radius: 12px;
   text-align: center;
-  border: 2px solid #f59e0b; /* default = waiting */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--mac-warning); /* default = waiting */
+  box-shadow: 0 2px 4px color-mix(in srgb, black, transparent 90%);
   transition: all 0.3s ease;
 }
-.displayboard-queue-card[data-status="waiting"]   { border-color: #f59e0b; }
+.displayboard-queue-card[data-status="waiting"]   { border-color: var(--mac-warning); }
 .displayboard-queue-card[data-status="called"]    { border-color: #dc3545; background: rgba(220, 53, 69, 0.1); }
 .displayboard-queue-card[data-status="serving"]   { border-color: var(--mac-success, #10b981); }
 .displayboard-queue-card[data-status="completed"] { border-color: var(--mac-accent-blue, #3b82f6); }
@@ -215,9 +215,9 @@
   font-size: 2rem;
   font-weight: bold;
   margin-bottom: 10px;
-  color: #f59e0b;
+  color: var(--mac-warning);
 }
-.displayboard-queue-card[data-status="waiting"]   .displayboard-queue-number { color: #f59e0b; }
+.displayboard-queue-card[data-status="waiting"]   .displayboard-queue-number { color: var(--mac-warning); }
 .displayboard-queue-card[data-status="called"]    .displayboard-queue-number { color: #dc3545; }
 .displayboard-queue-card[data-status="serving"]   .displayboard-queue-number { color: var(--mac-success, #10b981); }
 .displayboard-queue-card[data-status="completed"] .displayboard-queue-number { color: var(--mac-accent-blue, #3b82f6); }
@@ -230,15 +230,15 @@
 }
 
 .displayboard-queue-badge {
-  color: #ffffff;
+  color: var(--mac-bg-primary);
   padding: 5px 10px;
   border-radius: 20px;
   font-size: 0.9rem;
   font-weight: bold;
   margin-bottom: 10px;
-  background: #f59e0b;
+  background: var(--mac-warning);
 }
-.displayboard-queue-card[data-status="waiting"]   .displayboard-queue-badge { background: #f59e0b; }
+.displayboard-queue-card[data-status="waiting"]   .displayboard-queue-badge { background: var(--mac-warning); }
 .displayboard-queue-card[data-status="called"]    .displayboard-queue-badge { background: #dc3545; }
 .displayboard-queue-card[data-status="serving"]   .displayboard-queue-badge { background: var(--mac-success, #10b981); }
 .displayboard-queue-card[data-status="completed"] .displayboard-queue-badge { background: var(--mac-accent-blue, #3b82f6); }
@@ -276,7 +276,7 @@
   border-radius: 12px;
   text-align: center;
   border: 1px solid var(--board-border);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px color-mix(in srgb, black, transparent 90%);
 }
 .displayboard-window-label {
   font-size: 1.2rem;
@@ -308,7 +308,7 @@
   border-radius: 12px;
   text-align: center;
   border: 1px solid var(--board-border);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px color-mix(in srgb, black, transparent 90%);
 }
 .displayboard-stat-value-lg {
   font-size: 2rem;
@@ -341,8 +341,8 @@
 
 /* ─── Error banner ─── */
 .displayboard-error {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: var(--mac-error-bg);
+  border: 1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%));
   color: var(--mac-danger, #dc2626);
   padding: 15px;
   border-radius: 8px;

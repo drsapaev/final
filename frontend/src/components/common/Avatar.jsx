@@ -2,7 +2,7 @@ import './Avatar.css';
 import PropTypes from 'prop-types';
 
 const roleGradients = {
-    admin: 'linear-gradient(135deg, #667eea, #764ba2)',
+    admin: 'linear-gradient(135deg, var(--mac-accent-purple), var(--mac-accent-purple))',
     doctor: 'linear-gradient(135deg, #11998e, #38ef7d)',
     registrar: 'linear-gradient(135deg, #fc4a1a, #f7b733)',
     patient: 'linear-gradient(135deg, #00c6ff, #0072ff)',

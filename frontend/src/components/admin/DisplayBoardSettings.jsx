@@ -25,7 +25,8 @@ import {
 'lucide-react';
 import {
   MacOSCard, Button, Select,
-} from '../ui/macos';
+  Input,
+  Checkbox } from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -272,7 +273,7 @@ const DisplayBoardSettings = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Расположение
               </label>
-              <input
+              <Input
                 type="text"
                 aria-label="Display board location"
                 value={selectedBoard.location || ''}
@@ -295,7 +296,7 @@ const DisplayBoardSettings = () => {
                   label: theme.display_name
                 }))}
                 size="large"
-                className="admin-w-full" />
+                className="w-full" />
             </div>
 
             <div>
@@ -311,7 +312,7 @@ const DisplayBoardSettings = () => {
                   label: `${option.label} - ${option.description}`
                 }))}
                 size="large"
-                className="admin-w-full" />
+                className="w-full" />
               <p className="text-sm text-gray-500 mt-1">
                 Уровень конфиденциальности для пациентов
               </p>
@@ -322,7 +323,7 @@ const DisplayBoardSettings = () => {
                 <Users size={16} className="inline mr-1" />
                 Количество номеров в очереди
               </label>
-              <input
+              <Input
                 type="number"
                 aria-label="Displayed queue number count"
                 min="1"
@@ -338,44 +339,28 @@ const DisplayBoardSettings = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Show doctor photos"
-                  checked={selectedBoard.show_doctor_photos}
-                  onChange={(e) => handleBoardSettingChange('show_doctor_photos', e.target.checked)}
+                <Checkbox aria-label="Show doctor photos" checked={selectedBoard.show_doctor_photos} onChange={(e) => handleBoardSettingChange('show_doctor_photos', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Фото врачей</span>
               </label>
 
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Show announcements"
-                  checked={selectedBoard.show_announcements}
-                  onChange={(e) => handleBoardSettingChange('show_announcements', e.target.checked)}
+                <Checkbox aria-label="Show announcements" checked={selectedBoard.show_announcements} onChange={(e) => handleBoardSettingChange('show_announcements', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Объявления</span>
               </label>
 
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Show banners"
-                  checked={selectedBoard.show_banners}
-                  onChange={(e) => handleBoardSettingChange('show_banners', e.target.checked)}
+                <Checkbox aria-label="Show banners" checked={selectedBoard.show_banners} onChange={(e) => handleBoardSettingChange('show_banners', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Баннеры</span>
               </label>
 
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Show videos"
-                  checked={selectedBoard.show_videos}
-                  onChange={(e) => handleBoardSettingChange('show_videos', e.target.checked)}
+                <Checkbox aria-label="Show videos" checked={selectedBoard.show_videos} onChange={(e) => handleBoardSettingChange('show_videos', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Видеоролики</span>
@@ -396,7 +381,7 @@ const DisplayBoardSettings = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Длительность показа вызова (сек)
               </label>
-              <input
+              <Input
                 type="number"
                 aria-label="Call display duration seconds"
                 min="5"
@@ -409,22 +394,14 @@ const DisplayBoardSettings = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Enable sound signals"
-                  checked={selectedBoard.sound_enabled}
-                  onChange={(e) => handleBoardSettingChange('sound_enabled', e.target.checked)}
+                <Checkbox aria-label="Enable sound signals" checked={selectedBoard.sound_enabled} onChange={(e) => handleBoardSettingChange('sound_enabled', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Звуковые сигналы</span>
               </label>
 
               <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Enable voice announcements"
-                  checked={selectedBoard.voice_announcements}
-                  onChange={(e) => handleBoardSettingChange('voice_announcements', e.target.checked)}
+                <Checkbox aria-label="Enable voice announcements" checked={selectedBoard.voice_announcements} onChange={(e) => handleBoardSettingChange('voice_announcements', e.target.checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">Голосовые объявления</span>
@@ -445,14 +422,14 @@ const DisplayBoardSettings = () => {
                     label: lang.label
                   }))}
                   size="large"
-                  className="admin-w-full" />
+                  className="w-full" />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Громкость: {selectedBoard.volume_level}%
                   </label>
-                  <input
+                  <Input
                   type="range"
                   aria-label="Volume level"
                   min="0"
@@ -519,7 +496,7 @@ const DisplayBoardSettings = () => {
 
           <div className="text-center">
             <Button
-              onClick={() => window.open('/display?board=main_board', '_blank')}
+              onClick={() => window.open('/display-board', '_blank')}
               className="w-full mb-2"
               variant="outline">
               

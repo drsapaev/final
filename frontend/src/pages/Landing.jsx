@@ -32,12 +32,12 @@ import './Landing.css';
 import PropTypes from 'prop-types';
 
 const FEATURE_VISUALS = [
-  { icon: FileText, accent: '#0ea5e9' },
-  { icon: Users, accent: '#22c55e' },
-  { icon: Activity, accent: '#f97316' },
-  { icon: CreditCard, accent: '#14b8a6' },
-  { icon: MessageSquare, accent: '#8b5cf6' },
-  { icon: BarChart3, accent: '#f59e0b' }
+  { icon: FileText, accent: 'var(--mac-accent-blue)' },
+  { icon: Users, accent: 'var(--mac-success)' },
+  { icon: Activity, accent: 'var(--mac-warning)' },
+  { icon: CreditCard, accent: 'var(--mac-accent-teal, #14b8a6)' },
+  { icon: MessageSquare, accent: 'var(--mac-accent-purple)' },
+  { icon: BarChart3, accent: 'var(--mac-warning)' }
 ];
 
 const MODULE_VISUALS = [FileText, Stethoscope, Activity, Users, MessageSquare, CreditCard, BarChart3, Shield];

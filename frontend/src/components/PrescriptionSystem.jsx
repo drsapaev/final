@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
-import { Card, Button, Badge } from './ui/macos';
+import { Card, Button, Badge,
+  Input } from './ui/macos';
 import logger from '../utils/logger';
 const createEmptyPrescription = () => ({
   medications: [], // Список препаратов
@@ -241,7 +242,7 @@ const PrescriptionSystem = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">Название препарата</label>
-                    <input
+                    <Input
                   type="text"
                   aria-label={`Medication ${index + 1} name`}
                   value={medication.name}
@@ -254,7 +255,7 @@ const PrescriptionSystem = ({
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Дозировка</label>
-                    <input
+                    <Input
                   type="text"
                   aria-label={`Medication ${index + 1} dosage`}
                   value={medication.dosage}
@@ -267,7 +268,7 @@ const PrescriptionSystem = ({
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Кратность</label>
-                    <input
+                    <Input
                   type="text"
                   aria-label={`Medication ${index + 1} frequency`}
                   value={medication.frequency}
@@ -280,7 +281,7 @@ const PrescriptionSystem = ({
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Продолжительность</label>
-                    <input
+                    <Input
                   type="text"
                   aria-label={`Medication ${index + 1} duration`}
                   value={medication.duration}
@@ -293,7 +294,7 @@ const PrescriptionSystem = ({
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Количество</label>
-                    <input
+                    <Input
                   type="number"
                   aria-label={`Medication ${index + 1} quantity`}
                   value={medication.quantity}
@@ -305,7 +306,7 @@ const PrescriptionSystem = ({
                   
                   <div className="md:col-span-2 lg:col-span-1">
                     <label className="block text-sm font-medium mb-1">Особые указания</label>
-                    <input
+                    <Input
                   type="text"
                   aria-label={`Medication ${index + 1} special instructions`}
                   value={medication.instructions}

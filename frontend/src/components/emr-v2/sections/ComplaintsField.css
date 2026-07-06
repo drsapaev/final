@@ -80,12 +80,12 @@
    TEXTAREA - Error
    ============================================ */
 .complaints-field--error {
-    border-color: #ff3b30;
+    border-color: var(--mac-error);
     background: rgba(255, 59, 48, 0.03);
 }
 
 .complaints-field--error:focus {
-    border-color: #ff3b30;
+    border-color: var(--mac-error);
     box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.15);
 }
 
@@ -108,7 +108,7 @@
     margin-top: 6px;
     padding: 8px 12px;
     font-size: 13px;
-    color: #ff3b30;
+    color: var(--mac-error);
     background: rgba(255, 59, 48, 0.08);
     border-radius: 6px;
 }
@@ -121,7 +121,7 @@
     background: var(--mac-background, #ffffff);
     border: 1px solid var(--mac-border, #e5e5e5);
     border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 20px color-mix(in srgb, black, transparent 90%);
     overflow: hidden;
     animation: fadeIn 0.2s ease;
 }
@@ -202,7 +202,7 @@
 }
 
 .complaints-ai-item--selected {
-    background: rgba(0, 122, 255, 0.1);
+    background: var(--mac-accent-bg);
 }
 
 .complaints-ai-item__number {
@@ -220,7 +220,7 @@
 }
 
 .complaints-ai-item--selected .complaints-ai-item__number {
-    background: #007aff;
+    background: var(--mac-accent-blue);
 }
 
 .complaints-ai-item__text {
@@ -328,7 +328,7 @@
     }
 
     .complaints-field {
-        border: 1px solid #000;
+        border: 1px solid var(--mac-text-primary);
         box-shadow: none;
         min-height: auto;
     }

@@ -21,29 +21,29 @@ const MetricCard = ({
 
   const colorClasses = {
     blue: {
-      bg: isDark ? '#1e3a8a' : '#dbeafe',
-      text: isDark ? '#93c5fd' : '#1d4ed8',
-      icon: isDark ? '#60a5fa' : '#3b82f6'
+      bg: isDark ? 'var(--mac-accent-blue-active)' : 'var(--mac-accent-bg)',
+      text: isDark ? 'var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 60%))' : 'var(--mac-accent-blue-hover)',
+      icon: isDark ? '#60a5fa' : 'var(--mac-accent-blue)'
     },
     green: {
-      bg: isDark ? '#14532d' : '#dcfce7',
-      text: isDark ? '#86efac' : '#16a34a',
-      icon: isDark ? '#4ade80' : '#22c55e'
+      bg: isDark ? '#14532d' : 'var(--mac-success-bg)',
+      text: isDark ? '#86efac' : 'var(--mac-success)',
+      icon: isDark ? '#4ade80' : 'var(--mac-success)'
     },
     purple: {
       bg: isDark ? '#581c87' : '#f3e8ff',
       text: isDark ? '#c084fc' : '#9333ea',
-      icon: isDark ? '#a855f7' : '#8b5cf6'
+      icon: isDark ? '#a855f7' : 'var(--mac-accent-purple)'
     },
     orange: {
-      bg: isDark ? '#9a3412' : '#fed7aa',
+      bg: isDark ? '#9a3412' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-warning), transparent 50%))',
       text: isDark ? '#fdba74' : '#ea580c',
       icon: isDark ? '#fb923c' : '#f97316'
     },
     red: {
-      bg: isDark ? '#7f1d1d' : '#fecaca',
-      text: isDark ? '#fca5a5' : '#dc2626',
-      icon: isDark ? '#f87171' : '#ef4444'
+      bg: isDark ? 'var(--mac-error)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
+      text: isDark ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-error)',
+      icon: isDark ? 'var(--mac-error)' : 'var(--mac-error)'
     }
   };
 
@@ -60,13 +60,13 @@ const MetricCard = ({
         <div className="flex-1">
           <p 
             className={`font-medium mb-1 ${compact ? 'text-xs' : 'text-sm'}`}
-            style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+            style={{ color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}
           >
             {title}
           </p>
           <p 
             className={`font-bold ${compact ? 'text-lg' : 'text-2xl'}`}
-            style={{ color: isDark ? '#f8fafc' : '#1e293b' }}
+            style={{ color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)' }}
           >
             {value}
           </p>

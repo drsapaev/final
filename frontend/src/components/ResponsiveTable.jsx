@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
 import PropTypes from 'prop-types';
+import { Checkbox } from './ui/macos';
 
 const ResponsiveTable = ({
   data = [],
@@ -64,7 +65,7 @@ const ResponsiveTable = ({
   if (isMobile) {
     return (
       <div className={`responsive-table-container ${className}`} style={style}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', padding: 'var(--mac-spacing-4)' }}>
           {sortedData.map((row, index) =>
           <div
             key={index}
@@ -73,10 +74,10 @@ const ResponsiveTable = ({
             tabIndex={onRowClick ? 0 : -1}
             style={{
               background: 'white',
-              borderRadius: '12px',
-              padding: '16px',
+              borderRadius: 'var(--mac-radius-lg)',
+              padding: 'var(--mac-spacing-4)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              border: selectedRows.has(index) ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+              border: selectedRows.has(index) ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
               cursor: onRowClick ? 'pointer' : 'default'
             }}
             onClick={() => onRowClick?.(row, index)}
@@ -87,24 +88,20 @@ const ResponsiveTable = ({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '12px'
+              marginBottom: 'var(--mac-spacing-3)'
             }}>
-                <div style={{ fontWeight: '600', fontSize: '16px' }}>
+                <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-lg)' }}>
                   {row.name || row.fio || `Запись ${index + 1}`}
                 </div>
                 {onRowSelect &&
-              <input
-                type="checkbox"
-                aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}
-                checked={selectedRows.has(index)}
-                onChange={(e) => onRowSelect(index, e.target.checked)}
+              <Checkbox aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`} checked={selectedRows.has(index)} onChange={(e) => onRowSelect(index, e.target.checked)}
                 style={{ transform: 'scale(1.2)' }} />
 
               }
               </div>
 
               {/* Основная информация */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                 {columns.
               filter((col) => !col.mobileHidden && !col.hidden).
               map((column, colIndex) => {
@@ -123,10 +120,10 @@ const ResponsiveTable = ({
 
                 return (
                   <div key={colIndex} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                        <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
                           {column.label}:
                         </span>
-                        <span style={{ fontWeight: '500', fontSize: '14px' }}>
+                        <span style={{ fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-base)' }}>
                           {displayValue}
                         </span>
                       </div>);
@@ -138,8 +135,8 @@ const ResponsiveTable = ({
               {actions.length > 0 &&
             <div style={{
               display: 'flex',
-              gap: '8px',
-              marginTop: '12px',
+              gap: 'var(--mac-spacing-2)',
+              marginTop: 'var(--mac-spacing-3)',
               justifyContent: 'flex-end'
             }}>
                   {actions.map((action, actionIndex) => {
@@ -200,12 +197,12 @@ const ResponsiveTable = ({
             display: table-cell !important;
             visibility: visible !important;
             opacity: 1 !important;
-            background: #f8fafc !important;
-            color: #374151 !important;
+            background: var(--mac-bg-secondary) !important;
+            color: var(--mac-text-primary) !important;
             font-weight: 600 !important;
             font-size: 14px !important;
             padding: 12px !important;
-            border-bottom: 2px solid #e5e7eb !important;
+            border-bottom: 2px solid var(--mac-border) !important;
             position: relative !important;
             z-index: 10 !important;
           }
@@ -214,7 +211,7 @@ const ResponsiveTable = ({
             display: table-row !important;
             visibility: visible !important;
             opacity: 1 !important;
-            background: #f8fafc !important;
+            background: var(--mac-bg-secondary) !important;
           }
           
           .responsive-table thead {
@@ -225,29 +222,26 @@ const ResponsiveTable = ({
         `}</style>
         <thead>
           <tr style={{
-            background: '#f8fafc',
-            borderBottom: '2px solid #e5e7eb',
+            background: 'var(--mac-bg-secondary)',
+            borderBottom: '2px solid var(--mac-border)',
             position: 'relative',
             zIndex: 10
           }}>
             {onRowSelect &&
             <th style={{
-              padding: '12px',
+              padding: 'var(--mac-spacing-3)',
               textAlign: 'center',
               width: '50px',
-              background: '#f8fafc !important',
+              background: 'var(--mac-bg-secondary) !important',
               position: 'sticky',
               top: 0,
               zIndex: 11,
               display: 'table-cell !important',
               visibility: 'visible !important',
               opacity: '1 !important',
-              color: '#374151 !important'
+              color: 'var(--mac-text-primary) !important'
             }} aria-label="Row selection">
-                <input
-                type="checkbox"
-                aria-label="Select all rows"
-                checked={selectedRows.size === data.length && data.length > 0}
+                <Checkbox aria-label="Select all rows" checked={selectedRows.size === data.length && data.length > 0}
                 onChange={(e) => {
                   data.forEach((_, index) => onRowSelect(index, e.target.checked));
                 }} />
@@ -259,30 +253,30 @@ const ResponsiveTable = ({
                 <th
                   key={index}
                   style={{
-                    padding: '12px',
+                    padding: 'var(--mac-spacing-3)',
                     textAlign: column.align || 'left',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    color: '#374151 !important',
+                    fontWeight: 'var(--mac-font-weight-semibold)',
+                    fontSize: 'var(--mac-font-size-base)',
+                    color: 'var(--mac-text-primary) !important',
                     cursor: column.sortable ? 'pointer' : 'default',
                     userSelect: 'none',
                     minWidth: column.minWidth || '120px',
-                    background: '#f8fafc !important',
+                    background: 'var(--mac-bg-secondary) !important',
                     position: column.fixed ? 'sticky' : 'relative',
                     left: column.fixed ? leftOffsets[index] : 'auto',
                     top: 0,
                     zIndex: column.fixed ? 12 : 11,
-                    borderBottom: '2px solid #e5e7eb',
+                    borderBottom: '2px solid var(--mac-border)',
                     display: 'table-cell !important',
                     visibility: 'visible !important',
                     opacity: '1 !important'
                   }}
                   onClick={() => column.sortable && handleSort(column.key)}>
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
                     {column.label}
                     {column.sortable &&
-                    <span style={{ fontSize: '12px', opacity: 0.6 }}>
+                    <span style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.6 }}>
                         {sortField === column.key ? sortDirection === 'asc' ? '↑' : '↓' : '↕'}
                       </span>
                     }
@@ -292,18 +286,18 @@ const ResponsiveTable = ({
             })}
             {actions.length > 0 &&
             <th style={{
-              padding: '12px',
+              padding: 'var(--mac-spacing-3)',
               textAlign: 'center',
               width: '200px',
-              background: '#f8fafc !important',
+              background: 'var(--mac-bg-secondary) !important',
               position: 'sticky',
               top: 0,
               zIndex: 11,
-              borderBottom: '2px solid #e5e7eb',
+              borderBottom: '2px solid var(--mac-border)',
               display: 'table-cell !important',
               visibility: 'visible !important',
               opacity: '1 !important',
-              color: '#374151 !important'
+              color: 'var(--mac-text-primary) !important'
             }}>
                 Действия
               </th>
@@ -315,15 +309,15 @@ const ResponsiveTable = ({
           <tr
             key={index}
             style={{
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid var(--mac-border)',
               cursor: onRowClick ? 'pointer' : 'default',
-              background: selectedRows.has(index) ? '#eff6ff' : 'white',
+              background: selectedRows.has(index) ? 'var(--mac-accent-bg)' : 'white',
               transition: 'background-color 0.2s ease'
             }}
             onClick={() => onRowClick?.(row, index)}
             onMouseEnter={(e) => {
               if (!selectedRows.has(index)) {
-                e.target.style.background = '#f9fafb';
+                e.target.style.background = 'var(--mac-bg-secondary)';
               }
             }}
             onMouseLeave={(e) => {
@@ -333,12 +327,8 @@ const ResponsiveTable = ({
             }}>
 
               {onRowSelect &&
-            <td style={{ padding: '12px', textAlign: 'center' }} aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}>
-                  <input
-                type="checkbox"
-                aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}
-                checked={selectedRows.has(index)}
-                onChange={(e) => {
+            <td style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center' }} aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}>
+                  <Checkbox aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`} checked={selectedRows.has(index)} onChange={(e) => {
                   e.stopPropagation();
                   onRowSelect(index, e.target.checked);
                 }} />
@@ -371,10 +361,10 @@ const ResponsiveTable = ({
                 <td
                   key={colIndex}
                   style={{
-                    padding: '12px',
+                    padding: 'var(--mac-spacing-3)',
                     textAlign: column.align || 'left',
-                    fontSize: '14px',
-                    color: '#374151',
+                    fontSize: 'var(--mac-font-size-base)',
+                    color: 'var(--mac-text-primary)',
                     cursor: column.clickable ? 'pointer' : 'inherit',
                     textDecoration: column.clickable ? 'underline' : 'none',
                     position: column.fixed ? 'sticky' : 'relative',
@@ -389,8 +379,8 @@ const ResponsiveTable = ({
 
             })}
               {actions.length > 0 &&
-            <td style={{ padding: '12px', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+            <td style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
                     {actions.map((action, actionIndex) => {
                   // Проверяем видимость действия
                   if (action.visible && !action.visible(row)) {

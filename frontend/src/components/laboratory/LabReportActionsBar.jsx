@@ -6,7 +6,10 @@ import { Button, Icon } from '../ui/macos';
  *
  * WF-round5: Mark Ready убран (был функционально пустой операцией —
  * backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
- * Теперь только: Save Draft → Finalize (primary), затем: Revise → Print (primary).
+ * Теперь только: Save Draft → Finalize (primary), затем: Revise → Print → Notify (primary).
+ *
+ * P1 fix: добавлена кнопка "Отправить пациенту" — вызывает POST /telegram/send-lab-results
+ * для push-уведомления результатов через Telegram бот.
  *
  * Терминология (Вариант B): «Финализировать» → «Утвердить»,
  * «Создать ревизию» → «Создать исправленную версию».
@@ -18,20 +21,22 @@ export default function LabReportActionsBar({
   canFinalize = false,
   canRevise = false,
   canPrint = false,
+  canNotify = false,
   onSaveDraft,
   onFinalize,
   onRevise,
   onPrint,
+  onNotify,
 }) {
   const showPrimaryGroup = canSaveDraft || canFinalize;
-  const showSecondaryGroup = canRevise || canPrint;
+  const showSecondaryGroup = canRevise || canPrint || canNotify;
 
   if (!showPrimaryGroup && !showSecondaryGroup) {
     return null;
   }
 
   return (
-    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
       {showPrimaryGroup && (
         <>
           <Button variant="outline" onClick={onSaveDraft} disabled={saving || !canSaveDraft}>
@@ -50,10 +55,17 @@ export default function LabReportActionsBar({
             <Icon name="arrow.triangle.branch" size={16} />
             {busyAction === 'revise' ? 'Создаю исправленную версию...' : 'Создать исправленную версию'}
           </Button>
-          <Button variant="primary" onClick={onPrint} disabled={saving || !canPrint}>
+          <Button variant="outline" onClick={onPrint} disabled={saving || !canPrint}>
             <Icon name="printer" size={16} />
             {busyAction === 'print' ? 'Отправляю...' : 'Печать результата'}
           </Button>
+          {/* P1 fix: Notify patient via Telegram — only for finalized/printed reports */}
+          {canNotify && (
+            <Button variant="success" onClick={onNotify} disabled={saving || busyAction === 'notify'}>
+              <Icon name="paperplane" size={16} />
+              {busyAction === 'notify' ? 'Отправляю...' : 'Отправить пациенту'}
+            </Button>
+          )}
         </>
       )}
     </div>
@@ -67,8 +79,10 @@ LabReportActionsBar.propTypes = {
   canFinalize: PropTypes.bool,
   canRevise: PropTypes.bool,
   canPrint: PropTypes.bool,
+  canNotify: PropTypes.bool,
   onSaveDraft: PropTypes.func.isRequired,
   onFinalize: PropTypes.func.isRequired,
   onRevise: PropTypes.func.isRequired,
   onPrint: PropTypes.func.isRequired,
+  onNotify: PropTypes.func,
 };

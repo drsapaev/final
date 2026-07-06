@@ -1,0 +1,106 @@
+/**
+ * QueueManagementCard Styles
+ *
+ * UX Audit Registrar #3: все inline-стили из QueueManagementCard.jsx перенесены сюда.
+ * Использует macos design tokens (--mac-*) для полной light/dark theme support.
+ *
+ * Backward compat: props.styles (actionButtonStyle, getColor) всё ещё поддерживается,
+ * но если не передан — используются эти CSS-классы.
+ */
+
+/* Action button base */
+.qm-action-btn {
+    padding: var(--mac-spacing-2);
+    border-radius: var(--mac-radius-sm);
+    border: none;
+    cursor: pointer;
+    transition: all var(--mac-duration-normal) var(--mac-ease);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: var(--mac-spacing-1);
+}
+
+/* Color modifiers — background = light variant, color = strong variant */
+.qm-action-btn--danger {
+    background: var(--mac-error-bg, color-mix(in srgb, var(--mac-error) 12%, transparent));
+    color: var(--mac-error);
+}
+
+.qm-action-btn--info {
+    background: var(--mac-accent-bg, color-mix(in srgb, var(--mac-accent-blue) 12%, transparent));
+    color: var(--mac-accent-blue);
+}
+
+.qm-action-btn--success {
+    background: var(--mac-success-bg, color-mix(in srgb, var(--mac-success) 12%, transparent));
+    color: var(--mac-success);
+}
+
+.qm-action-btn--warning {
+    background: var(--mac-warning-bg, color-mix(in srgb, var(--mac-warning) 12%, transparent));
+    color: var(--mac-warning);
+}
+
+/* Status text (when no actions, just a label) */
+.qm-status-text {
+    font-size: var(--mac-font-size-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-1);
+}
+
+.qm-status-text--success {
+    color: var(--mac-success);
+}
+
+.qm-status-text--danger {
+    color: var(--mac-error);
+}
+
+.qm-status-text--secondary {
+    color: var(--mac-text-secondary);
+}
+
+/* Container for action buttons row */
+.qm-actions-container {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-1);
+}
+
+.qm-loading-icon {
+    animation: spin 1s linear infinite;
+}
+
+/* Stats bar (QueueStatsBar) */
+.qm-stats-bar {
+    display: flex;
+    gap: var(--mac-spacing-3);
+    font-size: var(--mac-font-size-base);
+}
+
+.qm-stats-pill {
+    padding: var(--mac-spacing-1) var(--mac-spacing-2);
+    border-radius: var(--mac-radius-sm);
+}
+
+.qm-stats-pill--warning {
+    background: color-mix(in srgb, var(--mac-warning) 12%, transparent);
+    color: var(--mac-warning);
+}
+
+.qm-stats-pill--primary {
+    background: color-mix(in srgb, var(--mac-accent-blue) 12%, transparent);
+    color: var(--mac-accent-blue);
+}
+
+.qm-stats-pill--success {
+    background: color-mix(in srgb, var(--mac-success) 12%, transparent);
+    color: var(--mac-success);
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

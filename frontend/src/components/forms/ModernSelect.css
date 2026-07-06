@@ -28,7 +28,7 @@
 }
 
 .required-mark {
-  color: #ef4444;
+  color: var(--mac-error);
   margin-left: 2px;
 }
 
@@ -62,15 +62,15 @@
 
 .select-container:hover:not(.disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px color-mix(in srgb, black, transparent 90%);
 }
 
 .select-container.focused {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-accent-bg);
 }
 
 .select-container.error {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 0 3px var(--mac-error-bg);
 }
 
 .select-container.success {
@@ -93,7 +93,7 @@
 }
 
 .select-placeholder {
-  color: #9ca3af;
+  color: var(--mac-text-tertiary);
 }
 
 /* Теги для множественного выбора */
@@ -109,8 +109,8 @@
   align-items: center;
   gap: 4px;
   padding: 2px 6px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #1e40af;
+  background: var(--mac-accent-bg);
+  color: var(--mac-accent-blue-active);
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
@@ -135,7 +135,7 @@
 }
 
 .tag-remove:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: color-mix(in srgb, black, transparent 90%);
 }
 
 /* Действия */
@@ -154,7 +154,7 @@
   height: 20px;
   border: none;
   background: none;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   cursor: pointer;
   border-radius: 4px;
   transition: all 0.2s ease;
@@ -162,12 +162,12 @@
 
 .select-action-btn:hover {
   background: rgba(0, 0, 0, 0.05);
-  color: #374151;
+  color: var(--mac-text-primary);
 }
 
 .dark .select-action-btn:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: #d1d5db;
+  color: var(--mac-border);
 }
 
 /* Индикатор состояния */
@@ -178,11 +178,11 @@
 }
 
 .select-status.error {
-  color: #ef4444;
+  color: var(--mac-error);
 }
 
 .select-status.success {
-  color: #22c55e;
+  color: var(--mac-success);
 }
 
 /* Стрелка */
@@ -190,7 +190,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   transition: all 0.2s ease;
 }
 
@@ -199,7 +199,7 @@
 }
 
 .select-container.focused .select-arrow {
-  color: #3b82f6;
+  color: var(--mac-accent-blue);
 }
 
 /* Выпадающий список */
@@ -212,7 +212,7 @@
   border: 1px solid;
   border-radius: 8px;
   background: white;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px color-mix(in srgb, black, transparent 90%);
   max-height: 300px;
   overflow: hidden;
   animation: slideDown 0.2s ease-out;
@@ -232,7 +232,7 @@
 }
 
 .search-icon {
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   flex-shrink: 0;
 }
 
@@ -245,7 +245,7 @@
 }
 
 .search-input::placeholder {
-  color: #9ca3af;
+  color: var(--mac-text-tertiary);
 }
 
 /* Опции */
@@ -292,17 +292,17 @@
 }
 
 .select-option.highlighted {
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--mac-accent-bg);
 }
 
 .select-option.selected {
-  background: rgba(59, 130, 246, 0.1);
-  color: #1e40af;
+  background: var(--mac-accent-bg);
+  color: var(--mac-accent-blue-active);
   font-weight: 500;
 }
 
 .dark .select-option:hover {
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--mac-accent-bg);
 }
 
 .dark .select-option.highlighted {
@@ -319,7 +319,7 @@
 }
 
 .option-check {
-  color: #3b82f6;
+  color: var(--mac-accent-blue);
   flex-shrink: 0;
 }
 
@@ -331,15 +331,15 @@
   justify-content: center;
   gap: 8px;
   padding: 20px;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   font-size: 14px;
 }
 
 .loading-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid #e5e7eb;
-  border-top: 2px solid #3b82f6;
+  border: 2px solid var(--mac-border);
+  border-top: 2px solid var(--mac-accent-blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -356,11 +356,11 @@
 }
 
 .select-message.error {
-  color: #ef4444;
+  color: var(--mac-error);
 }
 
 .select-message.success {
-  color: #22c55e;
+  color: var(--mac-success);
 }
 
 /* Анимации */
@@ -386,26 +386,26 @@
 
 /* Темная тема */
 .dark .select-container {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
 }
 
 .dark .select-value {
-  color: #f9fafb;
+  color: var(--mac-bg-secondary);
 }
 
 .dark .select-placeholder {
-  color: #6b7280;
+  color: var(--mac-text-secondary);
 }
 
 .dark .select-dropdown {
-  background: #374151;
+  background: var(--mac-text-primary);
   border-color: #4b5563;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 25px color-mix(in srgb, black, transparent 70%);
 }
 
 .dark .select-option {
-  color: #f9fafb;
+  color: var(--mac-bg-secondary);
   border-bottom-color: rgba(255, 255, 255, 0.02);
 }
 

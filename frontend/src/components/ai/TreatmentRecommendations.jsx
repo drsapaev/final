@@ -25,7 +25,7 @@ import {
   Textarea,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 const TreatmentRecommendations = () => {
@@ -120,10 +120,10 @@ const TreatmentRecommendations = () => {
   };
 
   const renderTreatmentPlanForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -133,7 +133,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <User style={{ width: '16px', height: '16px' }} />
             Основные данные пациента
@@ -141,7 +141,7 @@ const TreatmentRecommendations = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -149,7 +149,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст пациента
               </label>
@@ -170,7 +170,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Пол
               </label>
@@ -194,7 +194,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Вес (кг)
               </label>
@@ -215,7 +215,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Диагноз
               </label>
@@ -234,7 +234,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-warning-bg)',
         border: '1px solid var(--mac-warning-border)'
       }}>
@@ -244,7 +244,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <AlertCircle style={{ width: '16px', height: '16px' }} />
             Аллергии
@@ -265,7 +265,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-error-bg)',
         border: '1px solid var(--mac-error-border)'
       }}>
@@ -275,7 +275,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <FileText style={{ width: '16px', height: '16px' }} />
             Сопутствующие заболевания
@@ -305,7 +305,7 @@ const TreatmentRecommendations = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-accent-blue)',
             border: 'none'
           }}>
@@ -332,10 +332,10 @@ const TreatmentRecommendations = () => {
 
 
   const renderMedicationForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-success-bg)',
         border: '1px solid var(--mac-success-border)'
       }}>
@@ -345,7 +345,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Pill style={{ width: '16px', height: '16px' }} />
             Информация о пациенте
@@ -353,7 +353,7 @@ const TreatmentRecommendations = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -361,7 +361,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -381,7 +381,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Состояние
               </label>
@@ -400,7 +400,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -410,7 +410,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <FileText style={{ width: '16px', height: '16px' }} />
             Текущие препараты
@@ -448,7 +448,7 @@ const TreatmentRecommendations = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-success)',
             border: 'none'
           }}>
@@ -475,10 +475,10 @@ const TreatmentRecommendations = () => {
 
 
   const renderEffectivenessForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-accent-bg)',
         border: '1px solid var(--mac-accent-border)'
       }}>
@@ -488,7 +488,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <TrendingUp style={{ width: '16px', height: '16px' }} />
             Текущие симптомы
@@ -509,7 +509,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-primary)',
         border: '1px solid var(--mac-border)'
       }}>
@@ -519,7 +519,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <User style={{ width: '16px', height: '16px' }} />
             Оценка состояния пациента
@@ -527,7 +527,7 @@ const TreatmentRecommendations = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -535,7 +535,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Качество жизни (1-10)
               </label>
@@ -557,7 +557,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Приверженность лечению (%)
               </label>
@@ -586,7 +586,7 @@ const TreatmentRecommendations = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-accent-blue)',
             border: 'none'
           }}>
@@ -613,10 +613,10 @@ const TreatmentRecommendations = () => {
 
 
   const renderLifestyleForm = () =>
-  <MacOSCard style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-warning-bg)',
         border: '1px solid var(--mac-warning-border)'
       }}>
@@ -626,7 +626,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <Activity style={{ width: '16px', height: '16px' }} />
             Основные параметры пациента
@@ -634,7 +634,7 @@ const TreatmentRecommendations = () => {
           <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
+          gap: 'var(--mac-spacing-4)'
         }}>
             <div>
               <label style={{
@@ -642,7 +642,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Возраст
               </label>
@@ -662,7 +662,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 ИМТ
               </label>
@@ -683,7 +683,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Уровень активности
               </label>
@@ -708,7 +708,7 @@ const TreatmentRecommendations = () => {
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
+              marginBottom: 'var(--mac-spacing-1)'
             }}>
                 Курение
               </label>
@@ -731,7 +731,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <MacOSCard style={{
-        padding: '16px',
+        padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-error-bg)',
         border: '1px solid var(--mac-error-border)'
       }}>
@@ -741,7 +741,7 @@ const TreatmentRecommendations = () => {
           margin: '0 0 12px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--mac-spacing-2)'
         }}>
             <AlertCircle style={{ width: '16px', height: '16px' }} />
             Заболевания
@@ -768,7 +768,7 @@ const TreatmentRecommendations = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--mac-spacing-2)',
             backgroundColor: 'var(--mac-warning)',
             border: 'none'
           }}>
@@ -800,11 +800,11 @@ const TreatmentRecommendations = () => {
     if (result.error) {
       return (
         <MacOSCard style={{
-          padding: '16px',
+          padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-error-bg)',
           border: '1px solid var(--mac-error-border)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
             <h3 style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -816,7 +816,7 @@ const TreatmentRecommendations = () => {
             </h3>
           </div>
           <p style={{
-            marginTop: '8px',
+            marginTop: 'var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-error)',
             margin: '8px 0 0 0'
@@ -828,8 +828,8 @@ const TreatmentRecommendations = () => {
     }
 
     return (
-      <MacOSCard style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--mac-spacing-4)' }}>
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
@@ -837,7 +837,7 @@ const TreatmentRecommendations = () => {
             margin: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: 'var(--mac-spacing-2)'
           }}>
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа
@@ -845,14 +845,14 @@ const TreatmentRecommendations = () => {
           <Button
             onClick={exportResult}
             variant="outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
 
             <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
           </Button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
           {Object.entries(result).map(([key, value]) =>
           <div key={key} style={{
             borderLeft: '4px solid var(--mac-accent-blue)',
@@ -872,7 +872,7 @@ const TreatmentRecommendations = () => {
               <pre style={{
                 whiteSpace: 'pre-wrap',
                 backgroundColor: 'var(--mac-bg-secondary)',
-                padding: '8px',
+                padding: 'var(--mac-spacing-2)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 overflowX: 'auto',
@@ -895,16 +895,16 @@ const TreatmentRecommendations = () => {
 
   return (
     <div style={{
-      padding: '24px',
+      padding: 'var(--mac-spacing-6)',
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         {/* Заголовок */}
         <div style={{
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           <h2 style={{
             fontSize: 'var(--mac-font-size-2xl)',
@@ -913,7 +913,7 @@ const TreatmentRecommendations = () => {
             margin: '0 0 8px 0',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: 'var(--mac-spacing-3)'
           }}>
             <Heart style={{ width: '32px', height: '32px', color: 'var(--mac-error)' }} />
             AI Рекомендации Лечения
@@ -930,7 +930,7 @@ const TreatmentRecommendations = () => {
         {/* Вкладки */}
         <div style={{
           display: 'flex',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -940,13 +940,13 @@ const TreatmentRecommendations = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: '12px 20px',
+                  padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--mac-spacing-2)',
                   color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
                   fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                   fontSize: 'var(--mac-font-size-sm)',
@@ -981,7 +981,7 @@ const TreatmentRecommendations = () => {
                   right: '0',
                   height: '3px',
                   backgroundColor: 'var(--mac-accent-blue)',
-                  borderRadius: '2px 2px 0 0'
+                  borderRadius: 'var(--mac-radius-sm) var(--mac-radius-sm) 0 0'
                 }} />
                 }
               </button>);
@@ -992,13 +992,13 @@ const TreatmentRecommendations = () => {
         {/* Разделительная линия */}
         <div style={{
           borderBottom: '1px solid var(--mac-border)',
-          marginBottom: '24px'
+          marginBottom: 'var(--mac-spacing-6)'
         }} />
 
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '24px'
+          gap: 'var(--mac-spacing-6)'
         }}>
           <div>
             <h3 style={{

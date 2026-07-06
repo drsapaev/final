@@ -170,7 +170,7 @@ export function UnauthorizedPage() {
 
   const titleStyle = {
     fontSize: getFontSize('xl'),
-    fontWeight: '600',
+    fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('md')
   };
@@ -188,9 +188,9 @@ export function UnauthorizedPage() {
     backgroundColor: getColor('primary', 'main'),
     color: getColor('primary', 'contrast'),
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-md)',
     fontSize: getFontSize('md'),
-    fontWeight: '500',
+    fontWeight: 'var(--mac-font-weight-medium)',
     cursor: 'pointer',
     textDecoration: 'none',
     display: 'inline-block'

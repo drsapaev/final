@@ -32,13 +32,13 @@ const PatientCard = ({
   } = patient;
 
   const getStatusColor = (status) => {
-    if (is_deleted) return '#9ca3af';  // Gray for archived
+    if (is_deleted) return 'var(--mac-text-tertiary)';  // Gray for archived
     switch (status) {
-      case 'active': return '#10b981';
-      case 'inactive': return '#6b7280';
-      case 'urgent': return '#ef4444';
-      case 'pending': return '#f59e0b';
-      default: return '#6b7280';
+      case 'active': return 'var(--mac-success)';
+      case 'inactive': return 'var(--mac-text-secondary)';
+      case 'urgent': return 'var(--mac-error)';
+      case 'pending': return 'var(--mac-warning)';
+      default: return 'var(--mac-text-secondary)';
     }
   };
 
@@ -58,16 +58,16 @@ const PatientCard = ({
         {/* Archived Badge */}
         {is_deleted && (
           <div style={{
-            background: '#fee2e2',
-            color: '#dc2626',
+            background: 'var(--mac-error-bg)',
+            color: 'var(--mac-error)',
             padding: '4px 12px',
-            borderRadius: '12px',
-            fontSize: '12px',
-            fontWeight: '500',
-            marginBottom: '12px',
+            borderRadius: 'var(--mac-radius-lg)',
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            marginBottom: 'var(--mac-spacing-3)',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: 'var(--mac-spacing-2)',
             alignSelf: 'flex-start'
           }}>
             📦 Архивирован
@@ -79,7 +79,7 @@ const PatientCard = ({
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold"
             style={{
-              backgroundColor: avatar ? 'transparent' : (is_deleted ? '#9ca3af' : '#3b82f6'),
+              backgroundColor: avatar ? 'transparent' : (is_deleted ? 'var(--mac-text-tertiary)' : 'var(--mac-accent-blue)'),
               backgroundImage: avatar ? `url(${avatar})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
@@ -91,13 +91,13 @@ const PatientCard = ({
           <div className="flex-1 min-w-0">
             <h3
               className="text-lg font-semibold truncate"
-              style={{ color: isDark ? '#f8fafc' : '#1e293b' }}
+              style={{ color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)' }}
             >
               {name}
             </h3>
             <p
               className="text-sm text-gray-500 truncate"
-              style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+              style={{ color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}
             >
               ID: {patientId || id}
             </p>
@@ -116,7 +116,7 @@ const PatientCard = ({
           {age && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Age:</span>
-              <span style={{ color: isDark ? '#cbd5e1' : '#374151' }}>
+              <span style={{ color: isDark ? 'var(--mac-border)' : 'var(--mac-text-primary)' }}>
                 {age} {getGenderIcon(gender)}
               </span>
             </div>
@@ -125,7 +125,7 @@ const PatientCard = ({
           {lastVisit && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Last visit:</span>
-              <span style={{ color: isDark ? '#cbd5e1' : '#374151' }}>
+              <span style={{ color: isDark ? 'var(--mac-border)' : 'var(--mac-text-primary)' }}>
                 {lastVisit}
               </span>
             </div>
@@ -134,7 +134,7 @@ const PatientCard = ({
           {department && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Dept:</span>
-              <span style={{ color: isDark ? '#cbd5e1' : '#374151' }}>
+              <span style={{ color: isDark ? 'var(--mac-border)' : 'var(--mac-text-primary)' }}>
                 {department}
               </span>
             </div>

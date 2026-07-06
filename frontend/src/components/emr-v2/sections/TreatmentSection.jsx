@@ -132,7 +132,7 @@ export function TreatmentSection({
       disabled={disabled}
       defaultOpen={defaultOpen}
       headerAction={
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
                     {/* My Experience button - always visible */}
                     <button
           type="button"
@@ -146,10 +146,10 @@ export function TreatmentSection({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: 'var(--mac-spacing-2)',
             padding: '6px 10px',
-            fontSize: '12px',
-            fontWeight: 500,
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
             background: hasMyExperience ?
             'var(--my-experience-bg, rgba(34, 197, 94, 0.15))' :
             'var(--surface-input, #252540)',
@@ -196,8 +196,8 @@ export function TreatmentSection({
       
 
             {/* Structured Prescriptions */}
-            <div style={{ marginTop: '16px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#666', marginBottom: '8px' }}>
+            <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
+                <h4 style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-2)' }}>
                     Лекарственные назначения
                 </h4>
                 <PrescriptionEditor
@@ -213,7 +213,7 @@ export function TreatmentSection({
         style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'color-mix(in srgb, black, transparent 50%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -232,8 +232,8 @@ export function TreatmentSection({
                     <div
           style={{
             background: 'white',
-            borderRadius: '8px',
-            padding: '20px',
+            borderRadius: 'var(--mac-radius-md)',
+            padding: 'var(--mac-spacing-5)',
             maxWidth: '500px',
             width: '90%',
             maxHeight: '60vh',
@@ -241,27 +241,27 @@ export function TreatmentSection({
           }}
           onClickCapture={(e) => e.stopPropagation()}>
           
-                        <h3 style={{ margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                             📜 Мой опыт по {icd10Code}
                         </h3>
                         {myExperienceTemplates.length === 0 ?
-          <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+          <p style={{ color: 'var(--mac-text-secondary)', textAlign: 'center', padding: 'var(--mac-spacing-5)' }}>
                                 Нет сохранённых шаблонов для этого диагноза.<br />
                                 <small>Они появятся после подписания EMR с этим кодом.</small>
                             </p> :
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                                 {myExperienceTemplates.map((t) =>
             <div
               key={t.id}
               style={{
                 display: 'flex',
                 alignItems: 'stretch',
-                gap: '8px',
-                padding: '8px',
-                background: t.is_pinned ? '#fff8e1' : '#f9f9f9',
+                gap: 'var(--mac-spacing-2)',
+                padding: 'var(--mac-spacing-2)',
+                background: t.is_pinned ? 'var(--mac-bg-primary)8e1' : '#f9f9f9',
                 border: t.is_pinned ? '2px solid #ffb300' : '1px solid #e0e0e0',
-                borderRadius: '6px'
+                borderRadius: 'var(--mac-radius-sm)'
               }}>
               
                                         {/* Pin button */}
@@ -276,7 +276,7 @@ export function TreatmentSection({
                 aria-label={`${t.is_pinned ? 'Открепить' : 'Закрепить'} шаблон лечения`}
                 title={t.is_pinned ? 'Открепить' : 'Закрепить (макс 3)'}
                 style={{
-                  padding: '4px 8px',
+                  padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
@@ -298,7 +298,7 @@ export function TreatmentSection({
                 aria-label="Редактировать шаблон лечения"
                 title="Редактировать"
                 style={{
-                  padding: '4px 8px',
+                  padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
@@ -316,23 +316,23 @@ export function TreatmentSection({
                 style={{
                   flex: 1,
                   textAlign: 'left',
-                  padding: '4px',
+                  padding: 'var(--mac-spacing-1)',
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer'
                 }}>
                 
-                                            <div style={{ fontSize: '14px', marginBottom: '4px', color: 'var(--text-primary, #f0f1f4)' }}>
+                                            <div style={{ fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)', color: 'var(--text-primary, #f0f1f4)' }}>
                                                 {t.treatment_text.substring(0, 150)}
                                                 {t.treatment_text.length > 150 && '...'}
                                             </div>
-                                            <div style={{ fontSize: '11px', color: 'var(--text-muted, #6b7280)', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--text-muted, #6b7280)', display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', flexWrap: 'wrap' }}>
                                                 {/* Stale warning - soft, not aggressive */}
                                                 {t.is_stale &&
                   <span className="badge badge--stale" style={{
                     padding: '2px 6px',
                     borderRadius: 'var(--radius-full, 9999px)',
-                    fontSize: '10px',
+                    fontSize: 'var(--mac-font-size-xs)',
                     background: 'var(--stale-bg, #252540)',
                     color: 'var(--stale-text, #6b7280)',
                     border: '1px solid var(--stale-border, rgba(255,255,255,0.1))'
@@ -347,7 +347,7 @@ export function TreatmentSection({
                     style={{
                       padding: '2px 6px',
                       borderRadius: 'var(--radius-full, 9999px)',
-                      fontSize: '10px',
+                      fontSize: 'var(--mac-font-size-xs)',
                       background: t.frequency_label === 'часто' ?
                       'var(--accent-success-muted, rgba(34, 197, 94, 0.15))' :
                       'var(--surface-input, #252540)',
@@ -372,12 +372,12 @@ export function TreatmentSection({
             type="button"
             onClick={() => setShowMyExperience(false)}
             style={{
-              marginTop: '16px',
-              padding: '8px 16px',
+              marginTop: 'var(--mac-spacing-4)',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
               width: '100%',
               background: '#f0f0f0',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: 'var(--mac-radius-sm)',
               cursor: 'pointer'
             }}>
             
@@ -402,7 +402,7 @@ export function TreatmentSection({
         style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'color-mix(in srgb, black, transparent 50%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -422,8 +422,8 @@ export function TreatmentSection({
                     <div
           style={{
             background: 'white',
-            borderRadius: '8px',
-            padding: '20px',
+            borderRadius: 'var(--mac-radius-md)',
+            padding: 'var(--mac-spacing-5)',
             maxWidth: '500px',
             width: '90%'
           }}
@@ -439,14 +439,14 @@ export function TreatmentSection({
             style={{
               width: '100%',
               minHeight: '150px',
-              padding: '12px',
+              padding: 'var(--mac-spacing-3)',
               border: '1px solid #ddd',
-              borderRadius: '6px',
-              fontSize: '14px',
+              borderRadius: 'var(--mac-radius-sm)',
+              fontSize: 'var(--mac-font-size-base)',
               resize: 'vertical'
             }} />
           
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginTop: 'var(--mac-spacing-4)' }}>
                             <button
               type="button"
               onClick={async () => {
@@ -455,12 +455,12 @@ export function TreatmentSection({
               }}
               style={{
                 flex: 1,
-                padding: '10px',
-                background: '#fff3e0',
+                padding: 'var(--mac-spacing-3)',
+                background: 'var(--mac-bg-primary)3e0',
                 border: '1px solid #ff9800',
-                borderRadius: '4px',
+                borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
-                fontSize: '13px'
+                fontSize: 'var(--mac-font-size-sm)'
               }}>
               
                                 ♻️ Заменить старый
@@ -473,12 +473,12 @@ export function TreatmentSection({
               }}
               style={{
                 flex: 1,
-                padding: '10px',
+                padding: 'var(--mac-spacing-3)',
                 background: '#e8f5e9',
                 border: '1px solid #4caf50',
-                borderRadius: '4px',
+                borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
-                fontSize: '13px'
+                fontSize: 'var(--mac-font-size-sm)'
               }}>
               
                                 💾 Сохранить как новый
@@ -488,12 +488,12 @@ export function TreatmentSection({
             type="button"
             onClick={() => setEditingTemplate(null)}
             style={{
-              marginTop: '12px',
-              padding: '8px 16px',
+              marginTop: 'var(--mac-spacing-3)',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
               width: '100%',
               background: '#f0f0f0',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: 'var(--mac-radius-sm)',
               cursor: 'pointer'
             }}>
             

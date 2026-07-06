@@ -23,6 +23,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { SmartAssistButton } from '../ai/SmartAssistButton';
 import { AISuggestionPopover } from '../ai/AISuggestionPopover';
 import './EMRSmartFieldV2.css';
+import { Input } from '../../ui/macos';
 
 /**
  * EMRSmartFieldV2 Component

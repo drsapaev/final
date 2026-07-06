@@ -720,3 +720,86 @@ def download_lab_report_pdf(
         )
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
+
+
+# =============================================================================
+# P1 fix: Doctor-initiated lab orders — allows doctors to order lab tests
+# directly from their panel during a patient visit.
+# =============================================================================
+
+from pydantic import BaseModel as PydBaseModel
+
+
+class LabOrderCreate(PydBaseModel):
+    """Doctor-initiated lab order request."""
+    template_id: int
+    patient_id: int
+    visit_id: int | None = None
+    notes: str | None = None
+
+
+class LabOrderResponse(PydBaseModel):
+    """Response after creating a lab order."""
+    instance_id: int
+    template_name: str
+    patient_id: int
+    visit_id: int | None
+    status: str
+    message: str
+
+
+@router.post("/orders", response_model=LabOrderResponse)
+def create_lab_order(
+    payload: LabOrderCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "Doctor", "Lab")),
+):
+    """
+    Create a lab order from a doctor panel.
+
+    P1 fix: previously doctors had no way to order lab tests during a visit.
+    This endpoint creates a LabReportInstance in DRAFT status linked to the
+    visit, so the lab technician sees it in their queue immediately.
+    """
+    service = LabReportingService(db)
+    try:
+        template = service.get_template(payload.template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="Шаблон не найден")
+
+        if user.role not in ("Admin", "Lab") and payload.visit_id:
+            visit = db.query(Visit).filter(Visit.id == payload.visit_id).first()
+            if not visit:
+                raise HTTPException(status_code=404, detail="Визит не найден")
+            doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+            if doctor and visit.doctor_id != doctor.id:
+                raise HTTPException(status_code=403, detail="Нет доступа к этому визиту")
+
+        version = None
+        if template.published_version_id:
+            version = service.get_template_version(template.published_version_id)
+        if not version and template.versions:
+            version = template.versions[-1]
+        if not version:
+            raise HTTPException(status_code=400, detail="У шаблона нет версий")
+
+        actor_name = getattr(user, "full_name", None) or getattr(user, "username", None)
+        create_data = {
+            "template_id": payload.template_id,
+            "patient_id": payload.patient_id,
+            "visit_id": payload.visit_id,
+            "notes": payload.notes or f"Заказан врачом: {actor_name}",
+        }
+        instance = service.create_instance(create_data, actor_name=actor_name)
+
+        template_name = template.name or template.code or "Лабораторный отчёт"
+        return LabOrderResponse(
+            instance_id=instance.id,
+            template_name=template_name,
+            patient_id=payload.patient_id,
+            visit_id=payload.visit_id,
+            status=instance.status,
+            message=f"Заказ «{template_name}» создан. Лаборатория увидит его в очереди.",
+        )
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)

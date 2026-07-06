@@ -13,7 +13,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    background: #f5f5f5;
+    background: var(--mac-bg-secondary);
     border: 1px solid #ddd;
     border-radius: 8px;
     font-size: 0.85rem;
@@ -43,10 +43,10 @@
     right: 0;
     margin-top: 8px;
     width: 320px;
-    background: #fff;
+    background: var(--mac-bg-primary);
     border: 1px solid #ddd;
     border-radius: 10px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 30px color-mix(in srgb, black, transparent 85%);
     z-index: 10000;
     /* High z-index to appear above all EMR sections */
     overflow: hidden;
@@ -58,7 +58,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px 14px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--mac-accent-purple) 0%, var(--mac-accent-purple) 100%);
     color: white;
     font-size: 0.9rem;
     font-weight: 600;
@@ -68,7 +68,7 @@
     width: 24px;
     height: 24px;
     border: none;
-    background: rgba(255, 255, 255, 0.2);
+    background: color-mix(in srgb, white, transparent 80%);
     color: white;
     border-radius: 4px;
     font-size: 1.1rem;
@@ -77,7 +77,7 @@
 }
 
 .completeness-checker__header button:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: color-mix(in srgb, white, transparent 70%);
 }
 
 /* Content */
@@ -90,7 +90,7 @@
 .completeness-checker__loading {
     text-align: center;
     padding: 20px;
-    color: #666;
+    color: var(--mac-text-secondary);
 }
 
 .completeness-checker__error {
@@ -118,7 +118,7 @@
 .completeness-checker__section-title {
     font-size: 0.75rem;
     font-weight: 600;
-    color: #666;
+    color: var(--mac-text-secondary);
     margin-bottom: 8px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -168,7 +168,7 @@
 
 .completeness-checker__item-reason {
     font-size: 0.8rem;
-    color: #666;
+    color: var(--mac-text-secondary);
     margin-top: 2px;
 }
 

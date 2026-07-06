@@ -2,17 +2,13 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { AlertTriangle, X } from 'lucide-react';
 import ModernDialog from './ModernDialog';
-import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
+// UX Audit Registrar #5: все inline-стили перенесены в CancelDialog.css.
+// useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
+import './CancelDialog.css';
 
 import logger from '../../utils/logger';
 const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
-  const { theme, getColor } = useTheme();
-  const surfaceStyle = {
-    backgroundColor: 'var(--mac-bg-secondary)',
-    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
-    borderRadius: '14px',
-  };
   const [reason, setReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
@@ -93,118 +89,46 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
       onClose={onClose}
       title="Отменить запись"
       actions={actions}
-      dialogStyle={{
-        backgroundColor: 'var(--mac-bg-primary)',
-      }}
+      dialogClassName="cancel-dialog--styled"
       closeOnBackdrop={!isProcessing}
       closeOnEscape={!isProcessing}
     >
       <div>
         {/* Предупреждение */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '12px',
-            padding: '16px',
-            backgroundColor:
-              theme === 'dark' ? 'rgba(245, 158, 11, 0.10)' : '#fff7ed',
-            border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.24)' : '#fed7aa'}`,
-            borderRadius: '14px',
-            marginBottom: '24px',
-          }}
-        >
-          <AlertTriangle
-            size={20}
-            style={{
-              color: theme === 'dark' ? '#fbbf24' : '#d97706',
-              flexShrink: 0,
-              marginTop: '2px',
-            }}
-          />
+        <div className="cancel-warning">
+          <AlertTriangle size={20} className="cancel-warning-icon" />
           <div>
-            <h4
-              style={{
-                color: theme === 'dark' ? '#fbbf24' : '#92400e',
-                fontSize: '14px',
-                fontWeight: '600',
-                margin: '0 0 4px 0',
-              }}
-            >
+            <h4 className="cancel-warning-title">
               Внимание!
             </h4>
-            <p
-              style={{
-                color: theme === 'dark' ? '#fcd34d' : '#a16207',
-                fontSize: '13px',
-                margin: 0,
-                lineHeight: '1.4',
-              }}
-            >
+            <p className="cancel-warning-text">
               Отмена записи необратима. Пациент получит уведомление об отмене.
             </p>
           </div>
         </div>
 
         {/* Информация о записи */}
-        <div
-          style={{
-            marginBottom: '24px',
-            padding: '16px',
-            ...surfaceStyle,
-          }}
-        >
-          <h4
-            style={{
-              color: getColor('textPrimary'),
-              margin: '0 0 12px 0',
-              fontSize: '16px',
-              fontWeight: '600',
-            }}
-          >
+        <div className="cancel-info-card">
+          <h4 className="cancel-info-title">
             Информация о записи
           </h4>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span
-                style={{
-                  color: getColor('textSecondary'),
-                  fontSize: '14px',
-                }}
-              >
+          <div className="cancel-info-rows">
+            <div className="cancel-info-row">
+              <span className="cancel-info-label">
                 Пациент:
               </span>
-              <span
-                style={{
-                  color: getColor('textPrimary'),
-                  fontSize: '14px',
-                  fontWeight: '500',
-                }}
-              >
+              <span className="cancel-info-value">
                 {appointment.patient_fio}
               </span>
             </div>
 
             {appointment.services && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span
-                  style={{
-                    color: getColor('textSecondary'),
-                    fontSize: '14px',
-                  }}
-                >
+              <div className="cancel-info-row">
+                <span className="cancel-info-label">
                   Услуги:
                 </span>
-                <span
-                  style={{
-                    color: getColor('textPrimary'),
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    textAlign: 'right',
-                    maxWidth: '60%',
-                  }}
-                >
+                <span className="cancel-info-value--right">
                   {Array.isArray(appointment.services)
                     ? appointment.services.join(', ')
                     : appointment.services}
@@ -213,23 +137,12 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             )}
 
             {appointment.cost && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span
-                  style={{
-                    color: getColor('textSecondary'),
-                    fontSize: '14px',
-                  }}
-                >
+              <div className="cancel-info-row">
+                <span className="cancel-info-label">
                   Стоимость:
                 </span>
-                <span
-                  style={{
-                    color: getColor('textPrimary'),
-                    fontSize: '14px',
-                    fontWeight: '500',
-                  }}
-                >
-                  {appointment.cost.toLocaleString()} ₽
+                <span className="cancel-info-value">
+                  {new Intl.NumberFormat('ru-RU').format(appointment.cost)} сум
                 </span>
               </div>
             )}
@@ -238,16 +151,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
 
         {/* Причина отмены */}
         <div>
-          <label
-            htmlFor="cancel-reason"
-            style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              marginBottom: '8px',
-              color: getColor('textPrimary'),
-            }}
-          >
+          <label htmlFor="cancel-reason" className="cancel-reason-label">
             Причина отмены *
           </label>
 
@@ -260,86 +164,26 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             rows={4}
             aria-invalid={!!error}
             aria-describedby={error ? 'cancel-reason-error' : undefined}
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              border: `1px solid ${
-                error
-                  ? '#ef4444'
-                  : theme === 'dark'
-                    ? 'rgba(255,255,255,0.10)'
-                    : 'var(--mac-border)'
-              }`,
-              borderRadius: '12px',
-              backgroundColor:
-                theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
-              color: getColor('textPrimary'),
-              fontSize: '14px',
-              resize: 'vertical',
-              minHeight: '100px',
-              transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-              fontFamily: 'inherit',
-              outline: 'none',
-            }}
-            onFocus={(e) => {
-              if (!error) {
-                e.target.style.borderColor = '#3b82f6';
-                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
-              }
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = error
-                ? '#ef4444'
-                : theme === 'dark'
-                  ? 'rgba(255,255,255,0.10)'
-                  : 'var(--mac-border)';
-              e.target.style.boxShadow = 'none';
-            }}
+            className={`cancel-reason-textarea ${error ? 'cancel-reason-textarea--error' : ''}`}
             autoFocus
           />
 
           {/* Счетчик символов и ошибка */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: '8px',
-            }}
-          >
+          <div className="cancel-reason-meta">
             <div>
               {error && (
-                <p
-                  id="cancel-reason-error"
-                  style={{
-                    color: '#ef4444',
-                    fontSize: '12px',
-                    margin: 0,
-                  }}
-                >
+                <p id="cancel-reason-error" className="cancel-reason-error">
                   {error}
                 </p>
               )}
             </div>
-            <span
-              style={{
-                color: getColor('textSecondary'),
-                fontSize: '12px',
-              }}
-            >
+            <span className="cancel-reason-counter">
               {reason.length}/500
             </span>
           </div>
 
           {/* Подсказка */}
-          <p
-            style={{
-              color: getColor('textSecondary'),
-              fontSize: '12px',
-              margin: '8px 0 0 0',
-              fontStyle: 'italic',
-            }}
-          >
+          <p className="cancel-reason-hint">
             Примеры: «Пациент заболел», «Изменились планы», «Врач недоступен»
           </p>
         </div>

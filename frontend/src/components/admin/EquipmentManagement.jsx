@@ -242,19 +242,19 @@ const EquipmentManagement = () => {
         </div>
         {stats &&
         <div className="admin-d-flex-gap-24-fw-wrap">
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-blue-mb-4">
                 {stats.total_equipment}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Всего единиц
               </div>
             </div>
-            <div className="admin-text-center">
+            <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-success-mb-4">
                 {stats.active_equipment}
               </div>
-              <div className="admin-text-sm admin-text-secondary">
+              <div className="text-sm text-[var(--mac-text-secondary)]">
                 Активных
               </div>
             </div>
@@ -272,7 +272,7 @@ const EquipmentManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <div className="admin-d-flex-fd-column-gap-16-fw-wrap">
           <div className="admin-flex-1-pos-relative">
             <Input
@@ -320,7 +320,7 @@ const EquipmentManagement = () => {
               onClick={() => setShowAddForm(true)}
               className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px">
               
-              <Plus aria-hidden="true" className="admin-icon-16" />
+              <Plus aria-hidden="true" className="w-4 h-4" />
               <span>Добавить оборудование</span>
             </Button>
           </div>
@@ -343,13 +343,13 @@ const EquipmentManagement = () => {
               setEditingEquipment(null);
               resetForm();
             }}
-            className="admin-p-8">
+            className="p-2">
             
-              <X aria-hidden="true" className="admin-icon-16" />
+              <X aria-hidden="true" className="w-4 h-4" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} className="admin-flex-col-16">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-10">
@@ -505,7 +505,7 @@ const EquipmentManagement = () => {
                   </> :
 
               <>
-                    <Save aria-hidden="true" className="admin-icon-16" />
+                    <Save aria-hidden="true" className="w-4 h-4" />
                     {editingEquipment ? 'Обновить' : 'Добавить'}
                   </>
               }
@@ -519,7 +519,7 @@ const EquipmentManagement = () => {
       {loading ?
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-1">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} className="admin-p-24">
+        <MacOSCard key={i} className="p-6">
               <Skeleton height="200px" />
             </MacOSCard>
         )}
@@ -531,7 +531,7 @@ const EquipmentManagement = () => {
         description={equipmentEmptyDescription}
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" focusable="false" className="admin-icon-16-mr-8" />
+              <Plus aria-hidden="true" focusable="false" className="w-4 h-4 mr-2" />
               Добавить оборудование
             </Button>
         } /> :
@@ -539,7 +539,7 @@ const EquipmentManagement = () => {
 
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden">
           {filteredEquipment.map((item) =>
-        <MacOSCard key={item.id} className="admin-p-24">
+        <MacOSCard key={item.id} className="p-6">
               <div className="admin-d-flex-jc-between-ai-start-mb-16">
                 <div>
                   <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0">
@@ -557,29 +557,29 @@ const EquipmentManagement = () => {
 
               <div className="admin-d-flex-fd-column-gap-8-mb-16">
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-3">
-                  <Building2 aria-hidden="true" className="admin-icon-16" />
+                  <Building2 aria-hidden="true" className="w-4 h-4" />
                   <span>{getBranchName(item.branch_id)}</span>
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-2">
-                  <Wrench aria-hidden="true" className="admin-icon-16" />
+                  <Wrench aria-hidden="true" className="w-4 h-4" />
                   <span>{getTypeLabel(item.type)}</span>
                 </div>
                 {item.cost > 0 &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-1">
-                    <DollarSign aria-hidden="true" className="admin-icon-16" />
+                    <DollarSign aria-hidden="true" className="w-4 h-4" />
                     <span>{item.cost.toLocaleString()} сум</span>
                   </div>
             }
                 {item.warranty_expiry &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary">
-                    <Calendar aria-hidden="true" className="admin-icon-16" />
+                    <Calendar aria-hidden="true" className="w-4 h-4" />
                     <span>Гарантия до: {new Date(item.warranty_expiry).toLocaleDateString()}</span>
                   </div>
             }
               </div>
 
               {item.description &&
-          <div className="admin-mb-16">
+          <div className="mb-4">
                   <p className="admin-fs-sm-secondary-m-0-lh-1p4">
                     {item.description}
                   </p>
@@ -594,7 +594,7 @@ const EquipmentManagement = () => {
               onClick={() => handleEdit(item)}
               className="admin-p-6px-12px">
               
-                  <Edit aria-hidden="true" className="admin-icon-16" />
+                  <Edit aria-hidden="true" className="w-4 h-4" />
                 </Button>
                 <Button
               type="button"
@@ -603,7 +603,7 @@ const EquipmentManagement = () => {
               onClick={() => handleDelete(item.id)}
               className="admin-p-6px-12px-error-bd-c-error">
               
-                  <Trash2 aria-hidden="true" className="admin-icon-16" />
+                  <Trash2 aria-hidden="true" className="w-4 h-4" />
                 </Button>
               </div>
             </MacOSCard>

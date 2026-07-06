@@ -106,11 +106,11 @@ const PhoneVerificationManager = () => {
   };
 
   const renderOverview = () =>
-  <div className="admin-flex-col-24">
+  <div className="flex flex-col gap-6">
       {/* Основная статистика */}
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-between">
+        <MacOSCard className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
                 Активные коды
@@ -123,8 +123,8 @@ const PhoneVerificationManager = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-between">
+        <MacOSCard className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
                 Подтверждено
@@ -137,8 +137,8 @@ const PhoneVerificationManager = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-between">
+        <MacOSCard className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
                 Ожидают
@@ -151,8 +151,8 @@ const PhoneVerificationManager = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard className="admin-p-24">
-          <div className="admin-flex-between">
+        <MacOSCard className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
                 Истекают скоро
@@ -167,9 +167,9 @@ const PhoneVerificationManager = () => {
       </div>
 
       {/* Статистика по целям */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
-          <BarChart3 className="admin-icon-20" />
+          <BarChart3 className="w-5 h-5" />
           Статистика по целям верификации
         </h3>
         <div className="admin-grid-gtc-rauto-fitcminmax250pxc1fr-gap-16">
@@ -193,9 +193,9 @@ const PhoneVerificationManager = () => {
       </MacOSCard>
 
       {/* Статистика по провайдерам */}
-      <MacOSCard className="admin-p-24">
+      <MacOSCard className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
-          <Send className="admin-icon-20" />
+          <Send className="w-5 h-5" />
           Статистика по SMS провайдерам
         </h3>
         <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
@@ -215,13 +215,13 @@ const PhoneVerificationManager = () => {
 
 
   const renderAdminTools = () =>
-  <div className="admin-flex-col-24">
-      <MacOSCard className="admin-p-24">
+  <div className="flex flex-col gap-6">
+      <MacOSCard className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
-          <Send className="admin-icon-20" />
+          <Send className="w-5 h-5" />
           Отправка кода администратором
         </h3>
-        <div className="admin-flex-col-16">
+        <div className="flex flex-col gap-4">
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
               Номер телефона
@@ -231,7 +231,7 @@ const PhoneVerificationManager = () => {
             value={adminForm.phone}
             onChange={(e) => setAdminForm((prev) => ({ ...prev, phone: formatPhone(e.target.value) }))}
             placeholder="+998XXXXXXXXX"
-            className="admin-w-full" />
+            className="w-full" />
           
           </div>
 
@@ -249,7 +249,7 @@ const PhoneVerificationManager = () => {
             { value: 'registration', label: 'Регистрация' }]
             }
             size="large"
-            className="admin-w-full" />
+            className="w-full" />
           
           </div>
 
@@ -267,7 +267,7 @@ const PhoneVerificationManager = () => {
             { value: 'mock', label: 'Mock (тест)' }]
             }
             size="large"
-            className="admin-w-full" />
+            className="w-full" />
           
           </div>
 
@@ -290,7 +290,7 @@ const PhoneVerificationManager = () => {
           onClick={sendAdminCode}
           disabled={loading || !adminForm.phone.trim()}
           aria-label="Send admin verification code"
-          className="admin-w-full">
+          className="w-full">
           
             {loading ?
           <>
@@ -299,7 +299,7 @@ const PhoneVerificationManager = () => {
               </> :
 
           <>
-                <Send className="admin-icon-16-mr-8" />
+                <Send className="w-4 h-4 mr-2" />
                 Отправить код
               </>
           }
@@ -310,13 +310,13 @@ const PhoneVerificationManager = () => {
 
 
   const renderSettings = () =>
-  <div className="admin-flex-col-24">
-      <MacOSCard className="admin-p-24">
+  <div className="flex flex-col gap-6">
+      <MacOSCard className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
-          <Settings className="admin-icon-20" />
+          <Settings className="w-5 h-5" />
           Настройки верификации
         </h3>
-        <div className="admin-flex-col-16">
+        <div className="flex flex-col gap-4">
           {statistics?.settings &&
         <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
@@ -450,9 +450,9 @@ const PhoneVerificationManager = () => {
 
       {/* Контент вкладок */}
       {loading && !statistics ?
-      <div className="admin-flex-col-16">
-          <Skeleton height="128px" className="admin-w-full" />
-          <Skeleton height="256px" className="admin-w-full" />
+      <div className="flex flex-col gap-4">
+          <Skeleton height="128px" className="w-full" />
+          <Skeleton height="256px" className="w-full" />
         </div> :
 
       <>

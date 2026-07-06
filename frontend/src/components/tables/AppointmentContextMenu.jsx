@@ -11,7 +11,8 @@ import {
 
   Phone,
   Edit,
-  Eye } from
+  Eye,
+  AlertTriangle } from
 'lucide-react';
 
 const ACTION_ALIASES = {
@@ -43,22 +44,23 @@ const AppointmentContextMenu = ({
   position,
   onClose,
   onAction,
-  theme = 'light'
+  theme = 'light',
+  isDoctorView = false
 }) => {
   const menuRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
 
   const isDark = theme === 'dark';
   const colors = {
-    bg: isDark ? '#1f2937' : '#ffffff',
-    border: isDark ? '#4b5563' : '#e5e7eb',
-    text: isDark ? '#f9fafb' : '#111827',
-    textSecondary: isDark ? '#d1d5db' : '#6b7280',
-    hover: isDark ? '#374151' : '#f3f4f6',
-    accent: '#3b82f6',
-    success: '#10b981',
-    warning: '#f59e0b',
-    error: '#ef4444'
+    bg: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
+    border: isDark ? '#4b5563' : 'var(--mac-border)',
+    text: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+    textSecondary: isDark ? 'var(--mac-border)' : 'var(--mac-text-secondary)',
+    hover: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)',
+    accent: 'var(--mac-accent-blue)',
+    success: 'var(--mac-success)',
+    warning: 'var(--mac-warning)',
+    error: 'var(--mac-error)'
   };
 
   useEffect(() => {
@@ -159,6 +161,21 @@ const AppointmentContextMenu = ({
     icon: Phone,
     color: colors.text,
     visible: !!row.patient_phone
+  },
+  { type: 'divider' },
+  {
+    id: 'force_majeure',
+    label: 'Форс-мажор',
+    icon: AlertTriangle,
+    color: colors.warning,
+    visible: !isDoctorView
+  },
+  {
+    id: 'schedule_next',
+    label: 'Назначить следующий визит',
+    icon: Calendar,
+    color: colors.accent,
+    visible: !isDoctorView
   }].
   filter((item) => item.type === 'divider' || item.visible);
 
@@ -217,11 +234,11 @@ const AppointmentContextMenu = ({
           left: adjustedPosition.x,
           backgroundColor: colors.bg,
           border: `1px solid ${colors.border}`,
-          borderRadius: '8px',
+          borderRadius: 'var(--mac-radius-md)',
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
           minWidth: '180px',
           maxWidth: '220px',
-          padding: '8px 0',
+          padding: 'var(--mac-spacing-2) 0',
           transform: isVisible ? 'scale(1)' : 'scale(0.95)',
           opacity: isVisible ? 1 : 0,
           transition: 'all 0.15s ease-out',
@@ -250,16 +267,16 @@ const AppointmentContextMenu = ({
               onClick={() => handleItemClick(item.id)}
               style={{
                 width: '100%',
-                padding: '8px 16px',
+                padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',
                 border: 'none',
                 backgroundColor: 'transparent',
                 color: item.color,
-                fontSize: '14px',
+                fontSize: 'var(--mac-font-size-base)',
                 textAlign: 'left',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
+                gap: 'var(--mac-spacing-3)',
                 transition: 'background-color 0.15s ease'
               }}
               onMouseEnter={(e) => {
