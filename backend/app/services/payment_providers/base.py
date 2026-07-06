@@ -139,7 +139,7 @@ class BasePaymentProvider(ABC):
         self, webhook_data: dict[str, Any], signature: str = None, auth_header: str = None
     ) -> bool:
         """
-        Валидация подписи webhook (опционально)
+        Валидация подписи webhook — MUST be overridden by each provider.
 
         Args:
             webhook_data: Данные webhook
@@ -148,9 +148,15 @@ class BasePaymentProvider(ABC):
 
         Returns:
             bool: True если подпись валидна
+
+        Raises:
+            NotImplementedError: If the provider subclass forgets to override.
         """
-        logger.warning(f"Валидация подписи не реализована для {self.provider_name}")
-        return True
+        raise NotImplementedError(
+            f"Provider {self.provider_name} must implement validate_webhook_signature. "
+            "Returning True by default is a security vulnerability — all webhooks "
+            "would be accepted without signature verification."
+        )
 
     def format_amount(self, amount: Decimal, currency: str) -> int:
         """

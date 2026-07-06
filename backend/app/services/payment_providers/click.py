@@ -2,6 +2,7 @@
 Интеграция с Click платежной системой (Узбекистан)
 """
 
+import hmac
 import hashlib
 from decimal import Decimal
 from typing import Any
@@ -254,7 +255,7 @@ class ClickProvider(BasePaymentProvider):
             return False
 
         expected_signature = self._generate_webhook_signature(webhook_data)
-        is_valid = signature == expected_signature
+        is_valid = hmac.compare_digest(signature, expected_signature)
 
         if not is_valid:
             self.log_error("validate_webhook_signature", "Signature mismatch", {

@@ -2,6 +2,7 @@
 Интеграция с PayMe платежной системой (Узбекистан)
 """
 
+import hmac
 import base64
 from datetime import datetime
 from decimal import Decimal
@@ -328,7 +329,7 @@ class PayMeProvider(BasePaymentProvider):
             received_secret = decoded[7:]  # Убираем "Paycom:"
 
             # Сравниваем с нашим secret_key
-            if received_secret != self.secret_key:
+            if not hmac.compare_digest(received_secret, self.secret_key or ""):
                 self.log_error("validate_webhook_signature", "Secret key mismatch", {})
                 return False
 
