@@ -11,6 +11,7 @@ from ...core.config import settings
 from .base_provider import AIRequest, AIResponse, BaseAIProvider
 from .deepseek_provider import DeepSeekProvider
 from .gemini_provider import GeminiProvider
+from .grok_provider import GrokProvider
 from .mock_provider import MockProvider
 from .openai_provider import OpenAIProvider
 
@@ -23,6 +24,7 @@ class AIProviderType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migrat
     OPENAI = "openai"
     GEMINI = "gemini"
     DEEPSEEK = "deepseek"
+    GROK = "grok"
     MOCK = "mock"
 
 
@@ -41,6 +43,7 @@ class AIManager:
             AIProviderType.OPENAI: OpenAIProvider,
             AIProviderType.GEMINI: GeminiProvider,
             AIProviderType.DEEPSEEK: DeepSeekProvider,
+            AIProviderType.GROK: GrokProvider,
             AIProviderType.MOCK: MockProvider,
         }
 
@@ -54,6 +57,9 @@ class AIManager:
             ),
             AIProviderType.DEEPSEEK: os.getenv(
                 "DEEPSEEK_API_KEY", getattr(settings, "DEEPSEEK_API_KEY", None)
+            ),
+            AIProviderType.GROK: os.getenv(
+                "XAI_API_KEY", getattr(settings, "XAI_API_KEY", None)
             ),
             AIProviderType.MOCK: "mock-api-key",  # Mock провайдер всегда доступен
         }

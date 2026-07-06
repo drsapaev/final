@@ -27,6 +27,7 @@ from app.api.v1.endpoints import (
     ai_cost_analytics,
     ai_gateway,
     ai_integration,
+    ai_tracking,
     analytics,
     analytics_export,
     analytics_kpi,
@@ -264,6 +265,7 @@ api_router.include_router(ai_gateway.router, prefix="/ai/v2", tags=["ai-gateway"
 api_router.include_router(ai_chat.router, prefix="/ai/chat", tags=["ai-chat"])
 
 api_router.include_router(ai_cost_analytics.router, prefix="/ai/analytics", tags=["ai-cost-analytics"])
+api_router.include_router(ai_tracking.router, prefix="/ai/tracking", tags=["ai-tracking"])
 
 api_router.include_router(admin_finance.router, tags=["admin-finance"])
 

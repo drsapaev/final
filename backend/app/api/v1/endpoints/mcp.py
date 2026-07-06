@@ -132,7 +132,7 @@ async def get_circuit_breaker_status(
 
 @router.post("/reset-metrics")
 async def reset_mcp_metrics(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician")),
 ) -> dict[str, Any]:
     """Сбросить метрики MCP (только для админов)"""
     try:
@@ -163,7 +163,7 @@ class MCPComplaintRequest(BaseModel):
 
 @router.post("/complaint/analyze")
 async def mcp_analyze_complaint(
-    request: MCPComplaintRequest, current_user: User = Depends(get_current_user)
+    request: MCPComplaintRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Анализ жалоб через MCP"""
     try:
@@ -220,7 +220,7 @@ async def mcp_analyze_complaint(
 
 @router.post("/complaint/validate")
 async def mcp_validate_complaint(
-    complaint: str, current_user: User = Depends(get_current_user)
+    complaint: str, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Валидация жалоб через MCP"""
     try:
@@ -240,7 +240,7 @@ async def mcp_validate_complaint(
 
 @router.get("/complaint/templates")
 async def mcp_get_complaint_templates(
-    specialty: str | None = None, current_user: User = Depends(get_current_user)
+    specialty: str | None = None, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Получить шаблоны жалоб через MCP"""
     try:
@@ -273,7 +273,7 @@ class MCPICD10Request(BaseModel):
 
 @router.post("/icd10/suggest")
 async def mcp_suggest_icd10(
-    request: MCPICD10Request, current_user: User = Depends(get_current_user)
+    request: MCPICD10Request, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Подсказки МКБ-10 через MCP"""
     try:
@@ -390,7 +390,7 @@ async def mcp_validate_icd10(
     code: str,
     symptoms: list[str] | None = None,
     diagnosis: str | None = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician")),
 ) -> dict[str, Any]:
     """Валидация кода МКБ-10 через MCP"""
     try:
@@ -413,7 +413,7 @@ async def mcp_search_icd10(
     query: str,
     category: str | None = None,
     limit: int = 10,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician")),
 ) -> dict[str, Any]:
     """Поиск кодов МКБ-10 через MCP"""
     try:
@@ -446,7 +446,7 @@ class MCPLabRequest(BaseModel):
 
 @router.post("/lab/interpret")
 async def mcp_interpret_lab_results(
-    request: MCPLabRequest, current_user: User = Depends(get_current_user)
+    request: MCPLabRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Интерпретация лабораторных результатов через MCP"""
     try:
@@ -482,7 +482,7 @@ async def mcp_interpret_lab_results(
 
 @router.post("/lab/check-critical")
 async def mcp_check_critical_values(
-    results: list[dict[str, Any]], current_user: User = Depends(get_current_user)
+    results: list[dict[str, Any]], current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Проверка критических значений через MCP"""
     try:
@@ -504,7 +504,7 @@ async def mcp_check_critical_values(
 async def mcp_get_normal_ranges(
     test_name: str | None = None,
     patient_gender: str | None = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician")),
 ) -> dict[str, Any]:
     """Получить нормальные диапазоны через MCP"""
     try:
@@ -532,7 +532,7 @@ async def mcp_analyze_image(
     modality: str | None = Form(None),
     clinical_context: str | None = Form(None),
     provider: str | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician")),
 ) -> dict[str, Any]:
     """Анализ медицинского изображения через MCP"""
     try:
@@ -576,7 +576,7 @@ async def mcp_analyze_skin_lesion(
     lesion_info: str | None = Form(None),
     patient_history: str | None = Form(None),
     provider: str | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician")),
 ) -> dict[str, Any]:
     """Анализ кожных образований через MCP"""
     try:
@@ -616,7 +616,7 @@ async def mcp_analyze_skin_lesion(
 
 @router.get("/imaging/types")
 async def mcp_get_imaging_types(
-    category: str | None = None, current_user: User = Depends(get_current_user)
+    category: str | None = None, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Получить типы медицинских изображений через MCP"""
     try:
@@ -646,7 +646,7 @@ class MCPBatchRequest(BaseModel):
 
 @router.post("/batch")
 async def mcp_batch_process(
-    request: MCPBatchRequest, current_user: User = Depends(get_current_user)
+    request: MCPBatchRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> list[dict[str, Any]]:
     """Пакетная обработка запросов через MCP"""
     try:

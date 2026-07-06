@@ -254,6 +254,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
     DEEPSEEK_API_KEY: str | None = None
+    XAI_API_KEY: str | None = Field(default=None, description="xAI (Grok) API key for AI features")
 
     # --- AI Security & Encryption ---
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
