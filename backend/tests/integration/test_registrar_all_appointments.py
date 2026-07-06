@@ -9,6 +9,7 @@ import pytest
 from app.api.v1.endpoints.registrar_integration import _registrar_available_actions
 from app.api.v1.endpoints.registrar_integration import _serialize_registrar_datetime
 from app.models.appointment import Appointment
+from app.models.lab import LabReportInstance
 from app.models.online_queue import DailyQueue
 from app.models.online_queue import OnlineQueueEntry
 from app.models.patient import Patient
@@ -673,11 +674,16 @@ class TestRegistrarAllAppointments:
         assert latest_response.status_code == 200, latest_response.text
         latest = latest_response.json()
 
-        ready_response = client.post(
-            f"/api/v1/lab/report-instances/{latest['id']}/mark-ready",
-            headers=auth_headers,
+        # /mark-ready HTTP endpoint was removed (L-2 fix: dead code).
+        # Transition the latest instance to READY directly so the registrar
+        # today-queues summary surfaces it as the latest lab report.
+        lab_instance = (
+            db_session.query(LabReportInstance)
+            .filter(LabReportInstance.id == latest["id"])
+            .first()
         )
-        assert ready_response.status_code == 200, ready_response.text
+        lab_instance.status = "READY"
+        db_session.commit()
 
         response = client.get(
             "/api/v1/registrar/queues/today?department=lab",

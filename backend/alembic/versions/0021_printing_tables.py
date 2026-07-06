@@ -331,7 +331,7 @@ def upgrade() -> None:
         for table_name in ("printer_configs", "print_templates", "print_jobs"):
             op.execute(
                 sa.text(
-                    f"""  # nosec B608 — Alembic migration DDL, table name hardcoded in migration script
+                    f"""
                     SELECT setval(
                         pg_get_serial_sequence('{table_name}', 'id'),
                         COALESCE((SELECT MAX(id) FROM {table_name}), 1),

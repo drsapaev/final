@@ -256,7 +256,7 @@ class TestCliEntryPoint:
 
     def test_cleanup_only_does_not_require_confirm_flag(self, monkeypatch):
         # --cleanup-only skips the confirm check
-        monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@h:5432/test_db")
+        monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@h:5432/test_db")
         monkeypatch.setattr("app.synthetic_seed.cleanup_synthetic", lambda db: {"patients": 0, "visits": 0})
         from app.synthetic_seed import main
         # Should NOT return 2 (no confirm flag needed)

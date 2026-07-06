@@ -119,6 +119,11 @@ def test_cashier_create_payment_creates_canonical_payment_notification(
     db_session.commit()
     db_session.refresh(visit)
 
+    # Add a billable service so remaining_debt > 0 — the cashier endpoint now
+    # rejects payments when all services are already paid (no overpayment
+    # without an explicit advance agreement).
+    _add_visit_service(db_session, visit, price="50000", service_id=301)
+
     response = client.post(
         "/api/v1/cashier/payments",
         json={

@@ -59,16 +59,15 @@ class SyntheticSeedSafetyError(RuntimeError):
 
 def _check_db_safety(database_url: str) -> None:
     """Refuse to seed production-looking databases."""
-    url_lower = database_url.lower()
+    db_name = database_url.rsplit("/", 1)[-1].split("?")[0].lower()
     for protected in PROTECTED_DB_NAMES:
-        if protected in url_lower:
+        if db_name == protected:
             raise SyntheticSeedSafetyError(
                 f"Refusing to seed database matching protected name '{protected}'. "
                 f"Synthetic seed is for staging/dev only. URL: {database_url[:80]}..."
             )
 
     # Require explicit dev/staging/test marker in DB name
-    db_name = database_url.rsplit("/", 1)[-1].split("?")[0].lower()
     if not any(marker in db_name for marker in ("staging", "dev", "test", "synthetic", "sandbox")):
         raise SyntheticSeedSafetyError(
             f"Database name '{db_name}' does not contain 'staging'/'dev'/'test'/'synthetic'/'sandbox'. "
@@ -114,7 +113,7 @@ COMPLAINTS_BY_SPECIALTY = {
         "Повышенное артериальное давление", "Отеки нижних конечностей",
     ],
     "dermatology": [
-        "Высыпания на коже", "Зуд", "Покраснение", "Шелушение кожи",
+        "Высыпания на коже", "Кожный зуд", "Покраснение", "Шелушение кожи",
         "Появление родинок",
     ],
     "dental": [

@@ -70,12 +70,12 @@ class IndexPhraseResponse(BaseModel):
 # ENDPOINTS
 # ============================================
 
-@router.post("/phrase-suggest", response_model=PhraseSuggestResponse,
-             dependencies=[Depends(RequireAiFeature("ai_phrase_suggest"))])
+@router.post("/phrase-suggest", response_model=PhraseSuggestResponse)
 async def suggest_phrases(
     request: PhraseSuggestRequest,
     db: Session = Depends(deps.get_db),
     _current_user=Depends(phrase_clinical_access),
+    _ai_feature=Depends(RequireAiFeature("ai_phrase_suggest")),
 ) -> PhraseSuggestResponse:
     """
     Получить подсказки фраз из истории врача.
