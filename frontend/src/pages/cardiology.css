@@ -549,3 +549,4 @@
   border-radius: var(--mac-radius-md);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
+.cardio-p-6 { padding: var(--mac-spacing-6); }

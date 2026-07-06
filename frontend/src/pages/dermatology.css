@@ -508,3 +508,55 @@
   color: var(--mac-text-primary);
   margin-bottom: var(--mac-spacing-2);
 }
+
+/* ─── Session warning modal (shared pattern: dentist + derma) ─── */
+.derma-session-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.derma-session-card {
+  background: var(--mac-card-bg, white);
+  border: 1px solid var(--mac-border, #d8dde8);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+}
+.derma-session-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: var(--mac-text-primary, #1a1d29);
+}
+.derma-session-desc {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--mac-text-secondary, #6b7280);
+  line-height: 1.5;
+}
+.derma-session-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.derma-session-btn-secondary {
+  padding: 8px 16px;
+  border: 1px solid var(--mac-border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+.derma-session-btn-primary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--mac-accent, #dc2626);
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+}

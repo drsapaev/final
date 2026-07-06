@@ -659,3 +659,66 @@
   box-shadow: var(--mac-shadow-xl);
   border: 1px solid var(--mac-border);
 }
+
+/* ─── Fix: missing class definitions (regression fix) ─── */
+.dental-font-medium  { font-weight: 500; }
+.dental-grid-3       { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--mac-spacing-3); }
+.dental-grid-4       { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--mac-spacing-3); }
+.dental-items-center { align-items: center; }
+.dental-mt-16        { margin-top: 16px; }
+.dental-mt-8         { margin-top: 8px; }
+.dental-p-48         { padding: 48px; }
+.dental-text-center  { text-align: center; }
+
+/* ─── Session warning modal (shared pattern: dentist + derma) ─── */
+.dental-session-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: color-mix(in srgb, var(--mac-bg-primary, #000) 50%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.dental-session-card {
+  background: var(--mac-card-bg, var(--mac-bg-primary));
+  border: 1px solid var(--mac-border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+}
+.dental-session-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: var(--mac-text-primary);
+}
+.dental-session-desc {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--mac-text-secondary);
+  line-height: 1.5;
+}
+.dental-session-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.dental-session-btn-secondary {
+  padding: 8px 16px;
+  border: 1px solid var(--mac-border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--mac-text-primary);
+}
+.dental-session-btn-primary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--mac-accent);
+  color: var(--mac-text-on-accent, white);
+  cursor: pointer;
+  font-size: 14px;
+}
