@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from jinja2 import Template
+from jinja2 import Environment, select_autoescape
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -1028,8 +1028,9 @@ class BillingService:
             'total_in_words': self._amount_to_words(invoice.total_amount),
         }
 
-        # Рендерим шаблон
-        jinja_template = Template(template_content)
+        # Рендерим шаблон (autoescape=True prevents SSTI/XSS from patient data)
+        env = Environment(autoescape=select_autoescape(["html", "xml"]))
+        jinja_template = env.from_string(template_content)
         html_content = jinja_template.render(**template_data)
 
         return html_content

@@ -1578,22 +1578,43 @@ async def refund_payment(
                 detail=f"Невозможно выполнить возврат для платежа со статусом '{payment.status}'"
             )
 
-        # Проверяем, что сумма возврата не превышает доступную
-        already_refunded = payment.refunded_amount or Decimal("0")
-        available_for_refund = payment.amount - already_refunded
+        # Atomic refund: use SQL UPDATE with WHERE guard to prevent race condition.
+        # Two concurrent requests could both read refunded_amount=0 and both pass
+        # the available_for_refund check. This atomic UPDATE ensures only one wins.
+        from sqlalchemy import text as sql_text
 
-        if refund_data.amount > available_for_refund:
+        refund_amount_decimal = Decimal(str(refund_data.amount))
+        atomic_update = sql_text("""
+            UPDATE payments
+            SET refunded_amount = COALESCE(refunded_amount, 0) + :refund_amount,
+                refund_reason = :reason,
+                refunded_at = :now,
+                refunded_by = :user_id
+            WHERE id = :payment_id
+              AND COALESCE(refunded_amount, 0) + :refund_amount <= amount
+        """)
+        result = db.execute(atomic_update, {
+            "refund_amount": refund_amount_decimal,
+            "reason": refund_data.reason,
+            "now": datetime.utcnow(),
+            "user_id": current_user.id if hasattr(current_user, 'id') else None,
+            "payment_id": payment_id,
+        })
+
+        if result.rowcount == 0:
+            # Either payment doesn't exist or refund would exceed amount (race lost)
+            db.rollback()
+            already_refunded = payment.refunded_amount or Decimal("0")
+            available = payment.amount - already_refunded
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Сумма возврата ({refund_data.amount}) превышает доступную ({available_for_refund})"
+                detail=f"Сумма возврата ({refund_data.amount}) превышает доступную ({available}). Возможно, возврат уже был выполнен."
             )
 
-        # Обновляем платеж
-        new_refunded_amount = already_refunded + refund_data.amount
-        payment.refunded_amount = new_refunded_amount
-        payment.refund_reason = refund_data.reason
-        payment.refunded_at = datetime.utcnow()
-        payment.refunded_by = current_user.id if hasattr(current_user, 'id') else None
+        db.commit()
+        db.refresh(payment)
+
+        new_refunded_amount = payment.refunded_amount or Decimal("0")
 
         # Если возвращена вся сумма — статус "refunded"
         if new_refunded_amount >= payment.amount:
@@ -1605,12 +1626,8 @@ async def refund_payment(
                 if visit and visit.status == 'paid':
                     visit.status = _preserve_cashier_visit_status(visit.status)
                     db.add(visit)
-        else:
-            # Частичный возврат — оставляем "paid" но с пометкой
-            pass
-
-        db.commit()
-        db.refresh(payment)
+            db.commit()
+            db.refresh(payment)
 
         refund_change_type = "full_refund" if payment.status == "refunded" else "partial_refund"
         refund_visit = db.query(Visit).filter(Visit.id == payment.visit_id).first() if payment.visit_id else None

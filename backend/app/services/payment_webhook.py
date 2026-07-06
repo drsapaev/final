@@ -147,7 +147,7 @@ class PaymentWebhookService:
                 secret_key.encode("utf-8"), sign_string.encode("utf-8"), hashlib.sha256
             ).hexdigest()
 
-            return signature.lower() == expected_signature.lower()
+            return hmac.compare_digest(signature.lower(), expected_signature.lower())
         except Exception:
             return False
 
@@ -172,7 +172,7 @@ class PaymentWebhookService:
             # Создаём подпись
             expected_signature = hashlib.md5(sign_string.encode("utf-8"), usedforsecurity=False).hexdigest()
 
-            return data["sign_string"] == expected_signature
+            return hmac.compare_digest(data["sign_string"], expected_signature)
         except Exception:
             return False
 

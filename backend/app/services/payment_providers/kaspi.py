@@ -322,4 +322,4 @@ class KaspiProvider(BasePaymentProvider):
         # Генерируем ожидаемую подпись
         expected_signature = self._generate_signature(data_copy)
 
-        return signature == expected_signature
+        return hmac.compare_digest(signature, expected_signature)
