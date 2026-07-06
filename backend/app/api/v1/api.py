@@ -85,7 +85,7 @@ from app.api.v1.endpoints import (
     patients,
     payment_reconciliation,
     payment_settings,
-    payment_webhook,
+    # payment_webhook,  # DEPRECATED — legacy webhook router
     payments,
     phone_verification,
     phrase_suggest,
@@ -241,7 +241,8 @@ api_router.include_router(
     system_management.router, prefix="/system", tags=["system-management"]
 )
 # Эндпоинты системы webhook'ов
-api_router.include_router(payment_webhook.router, tags=["webhooks"])
+# DEPRECATED: legacy webhook router — use /payments/webhook/* instead.
+# api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])

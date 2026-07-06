@@ -84,11 +84,19 @@ def update_visit_payment_status(
     _: dict = Depends(require_roles("Admin", "Registrar")),
 ):
     """Обновление статуса платежа для визита"""
+    # Validate payment_status against allowed values
+    allowed_statuses = {"unpaid", "pending", "paid", "partial", "refunded", "cancelled"}
+    normalized = payment_status.lower().strip()
+    if normalized not in allowed_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid payment_status '{payment_status}'. Allowed: {', '.join(sorted(allowed_statuses))}",
+        )
     service = VisitPaymentApiService(db)
     try:
         return service.update_visit_payment_status(
             visit_id=visit_id,
-            payment_status=payment_status,
+            payment_status=normalized,
         )
     except VisitPaymentApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)

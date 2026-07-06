@@ -351,8 +351,16 @@ def test_init_payment(
     db: Session = Depends(get_db),
     current_user=Depends(deps.require_roles("Admin", "Registrar", "Cashier")),
 ) -> PaymentInitResponse:
-    """Test payment initialization for authorized payment staff."""
-    # Runtime write path: keep this aligned with /payments/init RBAC.
+    """Test payment initialization — DISABLED unless ENABLE_TEST_PAYMENT_INIT=true.
+
+    This endpoint bypasses audit logging and failure notifications.
+    Enable only in dev/staging via ENABLE_TEST_PAYMENT_INIT env var.
+    """
+    if not getattr(settings, "ENABLE_TEST_PAYMENT_INIT", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Test payment init is disabled. Set ENABLE_TEST_PAYMENT_INIT=true to enable.",
+        )
     service = PaymentTestInitService(db, get_payment_manager())
     try:
         result = service.init_test_payment(
