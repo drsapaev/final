@@ -24,6 +24,8 @@ import {
 import {
   AppError, AppLoading, MacOSCard, Button, Badge, Input, Table, Checkbox, Select,
 } from '../ui/macos';
+// UX Audit: ModernDialog для extend-activation диалога (вместо window.prompt).
+import ModernDialog from '../dialogs/ModernDialog';
 
 import logger from '../../utils/logger';
 import api from '../../api/client';
@@ -146,23 +148,40 @@ const ActivationSystem = () => {
     }
   };
 
-  const extendActivation = async (activationKey) => {
-    const rawDays = window.prompt('На сколько дней продлить ключ?', '30');
-    if (!rawDays) return;
-    const days = Number.parseInt(rawDays, 10);
+  // UX Audit: window.prompt() → модальный диалог с input полем.
+  // state для extend dialog: { key, days } | null.
+  const [extendDialog, setExtendDialog] = useState(null);
+
+  const openExtendDialog = (activationKey) => {
+    setExtendDialog({ key: activationKey, days: '30', error: '' });
+  };
+
+  const handleExtendDaysChange = (e) => {
+    setExtendDialog((prev) => ({ ...prev, days: e.target.value, error: '' }));
+  };
+
+  const submitExtendActivation = async () => {
+    if (!extendDialog) return;
+    const days = Number.parseInt(extendDialog.days, 10);
     if (!Number.isFinite(days) || days <= 0) {
-      setMessage({ type: 'error', text: 'Введите корректное число дней' });
+      setExtendDialog((prev) => ({ ...prev, error: 'Введите корректное число дней' }));
       return;
     }
 
     try {
-      await api.post('/activation/extend', { key: activationKey, days });
+      await api.post('/activation/extend', { key: extendDialog.key, days });
       setMessage({ type: 'success', text: 'Активация продлена' });
+      setExtendDialog(null);
       await loadData();
     } catch (error) {
       logger.error('Ошибка продления:', error);
       setMessage({ type: 'error', text: 'Ошибка продления активации' });
+      setExtendDialog(null);
     }
+  };
+
+  const extendActivation = (activationKey) => {
+    openExtendDialog(activationKey);
   };
 
   const copyToClipboard = (text) => {
@@ -495,6 +514,36 @@ const ActivationSystem = () => {
       </MacOSCard>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
+
+      {/* UX Audit: Extend activation dialog (replaces window.prompt). */}
+      <ModernDialog
+        isOpen={!!extendDialog}
+        onClose={() => setExtendDialog(null)}
+        title="Продлить активацию"
+        actions={[
+          { label: 'Отмена', variant: 'secondary', onClick: () => setExtendDialog(null) },
+          { label: 'Продлить', variant: 'primary', onClick: submitExtendActivation },
+        ]}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
+          <label htmlFor="extend-days-input" style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-primary)' }}>
+            На сколько дней продлить ключ?
+          </label>
+          <Input
+            id="extend-days-input"
+            type="number"
+            min="1"
+            value={extendDialog?.days || ''}
+            onChange={handleExtendDaysChange}
+            aria-label="Количество дней для продления"
+            autoFocus
+          />
+          {extendDialog?.error && (
+            <p style={{ color: 'var(--mac-error)', fontSize: 'var(--mac-font-size-sm)', margin: 0 }}>
+              {extendDialog.error}
+            </p>
+          )}
+        </div>
+      </ModernDialog>
     </div>);
 
 };
