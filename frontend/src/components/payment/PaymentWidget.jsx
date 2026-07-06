@@ -31,29 +31,15 @@ import {
 
 // API клиент
 import { api as apiClient, getToken } from '../../api/client';
-import { useTheme } from '../../contexts/ThemeContext';
+// UX Audit #4 regression fix: useTheme удалён — theme?.palette?.primary?.main
+// заменён на var(--mac-accent-blue) через CSS-класс .pw-header-icon.
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import './PaymentWidget.css';
 
-const dividerStyle = {
-  height: 1,
-  marginBottom: 24,
-  background: 'var(--mac-border)'
-};
-
-const providerOptionStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  width: '100%',
-  gap: 8
-};
-
-const providerNameStyle = {
-  textTransform: 'capitalize',
-  flex: '1 1 auto',
-  minWidth: 0
-};
+// UX Audit #4 regression fix: dividerStyle, providerOptionStyle, providerNameStyle
+// вынесены в CSS-классы .pw-divider, .pw-provider-option, .pw-provider-name.
 
 const PaymentWidget = ({
   visitId,
@@ -64,7 +50,7 @@ const PaymentWidget = ({
   onError,
   onCancel
 }) => {
-  const theme = useTheme();
+  // UX Audit #4 regression fix: useTheme() удалён — больше не нужен.
 
   // Icon aliases
   const CreditCardIcon = CreditCard;
@@ -98,14 +84,14 @@ const PaymentWidget = ({
   const attemptsRef = useRef(0);
   const [pollingAttempts, setPollingAttempts] = useState(0);
 
-  // Иконки провайдеров
+  // Иконки провайдеров — UX Audit #4 regression fix: brand colors в CSS-классах.
   const providerIcons = {
-    click: <CreditCardIcon style={{ color: '#00AAFF' }} />,
-    payme: <PaymentIcon style={{ color: '#00C851' }} />,
-    kaspi: <BankIcon style={{ color: '#FF6B35' }} />
+    click: <CreditCardIcon className="pw-provider-icon--click" />,
+    payme: <PaymentIcon className="pw-provider-icon--payme" />,
+    kaspi: <BankIcon className="pw-provider-icon--kaspi" />
   };
 
-  // Цвета провайдеров
+  // Цвета провайдеров — оставлены для badge background computation.
   const providerColors = {
     click: '#00AAFF',
     payme: '#00C851',
@@ -391,14 +377,14 @@ const PaymentWidget = ({
       case 'processing':
         return (
           <Alert severity="info" icon={<InfoIcon />}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="pw-provider-option-row">
               <span>Перенаправление на страницу оплаты...</span>
               {pollingRef.current && (
-                <span style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
+                <span className="pw-provider-option-name">
                   Автоматическая проверка статуса: попытка {pollingAttempts} из {MAX_POLLING_ATTEMPTS}
                 </span>
               )}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="pw-provider-option-badges">
                 <Button
                   size="small"
                   onClick={checkPaymentStatus}>
@@ -456,9 +442,9 @@ const PaymentWidget = ({
     return (
       <Card>
         <CardContent>
-          <Box display="flex" justifyContent="center" alignItems="center" style={{ padding: 24 }}>
+          <Box display="flex" justifyContent="center" alignItems="center" className="pw-loading-box">
             <CircularProgress />
-            <Typography variant="body1" style={{ marginLeft: 16 }}>
+            <Typography variant="body1" className="pw-loading-text">
               Загрузка способов оплаты...
             </Typography>
           </Box>
@@ -483,25 +469,25 @@ const PaymentWidget = ({
     <Card elevation={3}>
       <CardContent>
         {/* Заголовок */}
-        <Box display="flex" alignItems="center" style={{ marginBottom: 24 }}>
-          <PaymentIcon style={{ marginRight: 8, color: theme?.palette?.primary?.main || '#007AFF' }} />
+        <Box display="flex" alignItems="center" className="pw-header-row">
+          <PaymentIcon className="pw-header-icon" />
           <Typography variant="h6" component="h2">
             Оплата услуг
           </Typography>
         </Box>
 
         {/* Информация о платеже */}
-        <Box style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-            <div style={{ flex: '1 1 200px' }}>
+        <Box className="pw-payment-info-box">
+          <div className="pw-payment-info-row">
+            <div className="pw-payment-info-cell">
               <Typography variant="body2" color="textSecondary">
                 Сумма к оплате:
               </Typography>
-              <Typography variant="h5" color="primary" style={{ fontWeight: 'bold' }}>
+              <Typography variant="h5" color="primary" className="pw-amount-bold">
                 {formatAmount(amount, currency)}
               </Typography>
             </div>
-            <div style={{ flex: '1 1 200px' }}>
+            <div className="pw-payment-info-cell">
               <Typography variant="body2" color="textSecondary">
                 Описание:
               </Typography>
@@ -512,7 +498,7 @@ const PaymentWidget = ({
           </div>
         </Box>
 
-        <div style={dividerStyle} />
+        <div className="pw-divider" />
 
         {/* Выбор провайдера */}
         <Select
@@ -521,13 +507,13 @@ const PaymentWidget = ({
           value={selectedProvider}
           onChange={(value) => setSelectedProvider(value)}
           disabled={loading}
-          style={{ marginBottom: 24 }}
+          className="pw-select-margin"
           options={providers.map((provider) => ({
             value: provider.code,
             label: (
-              <span style={providerOptionStyle}>
+              <span className="pw-provider-option">
                 {providerIcons[provider.code]}
-                <span style={providerNameStyle}>
+                <span className="pw-provider-name">
                   {provider.name}
                 </span>
                 <Badge
@@ -551,13 +537,13 @@ const PaymentWidget = ({
 
         {/* Ошибки */}
         {error &&
-        <Alert severity="error" style={{ marginBottom: 24 }}>
+        <Alert severity="error" className="pw-error-alert">
             {error}
           </Alert>
         }
 
         {/* Кнопки действий */}
-        <Box display="flex" style={{ gap: 16, marginTop: 24 }}>
+        <Box display="flex" className="pw-actions-row">
           <Button
             variant="contained"
             color="primary"
@@ -568,7 +554,7 @@ const PaymentWidget = ({
             
             {loading ?
             <>
-                <CircularProgress size={20} style={{ marginRight: 8 }} />
+                <CircularProgress size={20} className="pw-submit-spinner" />
                 Обработка...
               </> :
 
@@ -596,7 +582,7 @@ const PaymentWidget = ({
             <Typography variant="body1" gutterBottom>
               Вы собираетесь оплатить:
             </Typography>
-            <Box style={{ padding: 16, backgroundColor: '#f5f5f5', borderRadius: 4, marginBottom: 16 }}>
+            <Box className="pw-confirm-amount-box">
               <Typography variant="h6" color="primary">
                 {formatAmount(amount, currency)}
               </Typography>
