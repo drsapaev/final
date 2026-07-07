@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_current_user, get_db, require_roles
 from app.models.user import User
 from app.services.feature_flags import get_feature_flag_service
 from app.services.feature_flags_api_service import (
@@ -418,10 +418,15 @@ def get_feature_flag_history(
 @router.get(
     "/feature-flags/status/{flag_key}", response_model=FeatureFlagStatusResponse
 )
-def get_feature_flag_status(flag_key: str, db: Session = Depends(get_db)):
+# ADM-AUDIT-28 P0-3: was PUBLIC (no auth) — enumerated all flag keys.
+def get_feature_flag_status(
+    flag_key: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
-    Получает статус фича-флага (публичный эндпоинт)
-    Доступно всем авторизованным пользователям
+    Получает статус фича-флага.
+    Требует аутентификации (раньше был публичным).
     """
     service = get_feature_flag_service(db)
 
@@ -432,12 +437,15 @@ def get_feature_flag_status(flag_key: str, db: Session = Depends(get_db)):
 
 
 @router.get("/feature-flags/status")
+# ADM-AUDIT-28 P0-3: was PUBLIC (no auth)
 def get_multiple_feature_flags_status(
-    keys: str, db: Session = Depends(get_db)  # Comma-separated list of flag keys
+    keys: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Получает статус нескольких фича-флагов
-    Доступно всем авторизованным пользователям
+    Получает статус нескольких фича-флагов.
+    Требует аутентификации.
 
     Args:
         keys: Список ключей флагов через запятую (например: "flag1,flag2,flag3")

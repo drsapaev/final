@@ -393,7 +393,17 @@ async def get_user_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    """Получить профиль пользователя"""
+    """Получить профиль пользователя.
+
+    ADM-AUDIT-28 P0-1: ownership check — non-Admin staff can only see
+    their own profile. Раньше любой Nurse/Receptionist мог читать
+    salary, address, DOB любого пользователя.
+    """
+    if current_user.id != user_id and current_user.role != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к профилю другого пользователя",
+        )
     try:
         profile = user_profile.get_by_user_id(db, user_id)
         if not profile:
@@ -1059,7 +1069,16 @@ async def get_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    """Получить пользователя по ID"""
+    """Получить пользователя по ID.
+
+    ADM-AUDIT-28 P0-2: ownership check — non-Admin staff can only see
+    their own user record.
+    """
+    if current_user.id != user_id and current_user.role != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к данным другого пользователя",
+        )
     try:
         service = get_user_management_service()
         profile_data = service.get_user_profile(db, user_id)
