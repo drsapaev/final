@@ -270,6 +270,9 @@ class MorningAssignmentService:
         """Получает подтвержденные визиты на указанную дату без номеров в очередях"""
 
         # Находим визиты со статусом "confirmed" на указанную дату
+        # REG-AUDIT-28 P0-1: with_for_update() — защита от race condition.
+        # Раньше два Registrar'а могли одновременно запустить morning assignment
+        # и создать дубликаты OnlineQueueEntry для одних и тех же визитов.
         confirmed_visits = (
             self.db.query(Visit)
             .filter(
@@ -279,6 +282,7 @@ class MorningAssignmentService:
                     Visit.confirmed_at.isnot(None),
                 )
             )
+            .with_for_update()
             .all()
         )
 
