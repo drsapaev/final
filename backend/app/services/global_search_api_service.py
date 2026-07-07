@@ -136,7 +136,8 @@ class GlobalSearchApiService:
             return {"status": "ok"}
         except Exception as exc:
             self.repository.rollback()
-            return {"status": "error", "message": str(exc)}
+            # SEARCH-AUDIT-28 P1: don't leak exception to client
+            return {"status": "error", "message": "Internal error"}
 
     @staticmethod
     def _patient_payload(patient) -> dict:
