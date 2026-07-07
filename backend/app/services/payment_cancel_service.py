@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 from app.models.enums import PaymentStatus
 from app.repositories.payment_cancel_repository import PaymentCancelRepository
 from app.services.billing_service import BillingService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,13 +52,20 @@ class PaymentCancelService:
                     meta={**(payment.provider_data or {}), **result.provider_data},
                 )
             else:
-                self.billing_service.update_payment_status(
-                    payment_id=payment.id,
-                    new_status=PaymentStatus.CANCELLED.value,
-                    meta={
-                        **(payment.provider_data or {}),
-                        "cancel_error": result.error_message,
-                    },
+                # PAY-REAUDIT-28 P0-6: провайдер отклонил отмену — НЕ меняем
+                # локальный статус. Раньше код помечал платёж как CANCELLED
+                # даже при неудаче у провайдера, что приводило к рассинхрону:
+                # локально "отменён", у провайдера — активен (двойной расход).
+                logger.error(
+                    "Provider cancel failed for payment_id=%s provider=%s: %s",
+                    payment.id, payment.provider, result.error_message,
+                )
+                raise PaymentCancelDomainError(
+                    status_code=502,
+                    detail=(
+                        f"Провайдер отклонил отмену: {result.error_message}. "
+                        "Статус платежа не изменён. Повторите попытку или обратитесь к провайдеру."
+                    ),
                 )
         else:
             self.billing_service.update_payment_status(

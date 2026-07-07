@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.clinic import Doctor
 from app.models.payment import Payment

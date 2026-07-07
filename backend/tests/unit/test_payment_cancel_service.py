@@ -77,6 +77,11 @@ class TestPaymentCancelService:
     def test_cancel_online_payment_provider_failure_still_cancels(
         self, db_session, test_visit
     ):
+        # PAY-REAUDIT-28 P0-6: при неудаче отмены у провайдера локальный статус
+        # НЕ должен меняться на cancelled. Тест переименован семантически:
+        # прежнее поведение (помечать cancelled при ошибке провайдера) было
+        # багом — рассинхрон локальных проводок и реального состояния платежа
+        # у провайдера. Теперь сервис поднимает PaymentCancelDomainError(502).
         payment = Payment(
             visit_id=test_visit.id,
             amount=10_000.0,
@@ -97,8 +102,14 @@ class TestPaymentCancelService:
                 PaymentResult(success=False, error_message="provider unavailable")
             ),
         )
-        service.cancel_payment(payment_id=payment.id)
 
+        from app.services.payment_cancel_service import PaymentCancelDomainError
+        with pytest.raises(PaymentCancelDomainError) as exc_info:
+            service.cancel_payment(payment_id=payment.id)
+
+        # Статус НЕ изменился — платёж остался в processing.
         db_session.refresh(payment)
-        assert payment.status == "cancelled"
+        assert payment.status == "processing"
+        assert exc_info.value.status_code == 502
+        assert "provider unavailable" in exc_info.value.detail
         assert payment.provider_data["source"] == "unit"

@@ -74,7 +74,71 @@ async def cashier_websocket(
     - Новых визитах
     - Новых платежах
     - Изменениях статусов
+
+    PAY-REAUDIT-28 P0-3: JWT-токен обязателен. Извлекается из query-параметра
+    `token`. Без валидного токена и роли Admin/Cashier соединение закрывается
+    с кодом 4401. Раньше эндпоинт принимал любые соединения и транслировал
+    PHI (patient_id, visit_id, amount) всем подписчикам.
     """
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4401)
+        return
+
+    # Декодируем JWT и проверяем валидность + роль.
+    try:
+        from jose import jwt as _jwt
+        from app.core.config import settings as _settings
+        from app.db.session import SessionLocal as _SessionLocal
+        from app.models.user import User as _User
+
+        payload = _jwt.decode(
+            token,
+            _settings.SECRET_KEY,
+            algorithms=[_settings.ALGORITHM],
+        )
+        sub = payload.get("sub")
+        # sub может быть числовым user_id или username
+        user_id: int | None = None
+        if isinstance(sub, str) and sub.isdigit():
+            user_id = int(sub)
+        elif isinstance(sub, int):
+            user_id = sub
+
+        if user_id is None:
+            await websocket.close(code=4401)
+            return
+
+        # Проверяем blacklist (jti + sentinel all_user_tokens)
+        jti = payload.get("jti")
+        if jti:
+            from app.services.token_blacklist_service import TokenBlacklistService
+            db_check = _SessionLocal()
+            try:
+                if TokenBlacklistService.is_token_blacklisted(db_check, jti, user_id=user_id):
+                    await websocket.close(code=4401)
+                    return
+            finally:
+                db_check.close()
+
+        # Загружаем пользователя и проверяем роль
+        db_user = _SessionLocal()
+        try:
+            user = db_user.query(_User).filter(_User.id == user_id).first()
+            if not user or not user.is_active:
+                await websocket.close(code=4401)
+                return
+            if user.role not in ("Admin", "Cashier", "SuperAdmin"):
+                await websocket.close(code=4403)
+                return
+        finally:
+            db_user.close()
+
+    except Exception:
+        # Любая ошибка декодирования/валидации → отказ
+        await websocket.close(code=4401)
+        return
+
     await cashier_ws_manager.connect(websocket)
 
     try:
