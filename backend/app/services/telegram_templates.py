@@ -373,9 +373,24 @@ class TelegramTemplatesService:
             result = template.copy()
 
             if data:
+                # TG-AUDIT-28 P0-6: safe_substitute вместо str.format —
+                # защита от format string injection ({__class__} patterns).
+                # Также HTML-escape всех значений для предотвращения XSS в Telegram.
+                from string import Template
+                from html import escape as _html_escape
+
+                _safe_data = {
+                    k: _html_escape(str(v)) if v is not None else ""
+                    for k, v in data.items()
+                }
+
                 # Подставляем данные в текст
                 if "text" in result:
-                    result["text"] = result["text"].format(**data)
+                    # Convert {key} format to $key for Template
+                    _tmpl = result["text"]
+                    for k in _safe_data:
+                        _tmpl = _tmpl.replace("{" + k + "}", "$" + k)
+                    result["text"] = Template(_tmpl).safe_substitute(_safe_data)
 
                 # Подставляем данные в клавиатуру
                 if "keyboard" in result and result["keyboard"]:
@@ -392,7 +407,27 @@ class TelegramTemplatesService:
     def _format_keyboard(
         self, keyboard: dict[str, Any], data: dict[str, Any]
     ) -> dict[str, Any]:
-        """Форматирование клавиатуры с подстановкой данных"""
+        """Форматирование клавиатуры с подстановкой данных.
+
+        TG-AUDIT-28 P0-6: использует string.Template.safe_substitute
+        вместо str.format для защиты от format string injection.
+        """
+        from string import Template
+        from html import escape as _html_escape
+
+        _safe_data = {
+            k: _html_escape(str(v)) if v is not None else ""
+            for k, v in data.items()
+        }
+
+        def _safe_fmt(text: str) -> str:
+            if not text:
+                return text
+            _tmpl = text
+            for k in _safe_data:
+                _tmpl = _tmpl.replace("{" + k + "}", "$" + k)
+            return Template(_tmpl).safe_substitute(_safe_data)
+
         try:
             if "inline_keyboard" in keyboard:
                 formatted_buttons = []
@@ -401,17 +436,13 @@ class TelegramTemplatesService:
                     for button in row:
                         formatted_button = button.copy()
                         if "text" in formatted_button:
-                            formatted_button["text"] = formatted_button["text"].format(
-                                **data
-                            )
+                            formatted_button["text"] = _safe_fmt(formatted_button["text"])
                         if "callback_data" in formatted_button:
-                            formatted_button["callback_data"] = formatted_button[
-                                "callback_data"
-                            ].format(**data)
-                        if "url" in formatted_button:
-                            formatted_button["url"] = formatted_button["url"].format(
-                                **data
+                            formatted_button["callback_data"] = _safe_fmt(
+                                formatted_button["callback_data"]
                             )
+                        if "url" in formatted_button:
+                            formatted_button["url"] = _safe_fmt(formatted_button["url"])
                         formatted_row.append(formatted_button)
                     formatted_buttons.append(formatted_row)
 

@@ -507,6 +507,10 @@ async def send_payment_confirmation(
         )
 
 
+# TG-AUDIT-28 P0-7: cap recipients at 1000 to prevent broadcast abuse.
+BROADCAST_MAX_RECIPIENTS = 1000
+
+
 @router.post("/broadcast-message")
 async def send_broadcast_message(
     message: str,
