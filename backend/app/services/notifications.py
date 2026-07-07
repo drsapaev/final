@@ -723,7 +723,8 @@ class NotificationSenderService:
             server.send_message(msg)
             server.quit()
 
-            logger.info(f"Email отправлен на {to_email}: {subject}")
+            # NOTIF-REAUDIT-28 P1: PII-safe logging
+            logger.info("Email sent", extra={"has_recipient": bool(to_email)})
             return True
 
         except Exception as e:
@@ -749,7 +750,8 @@ class NotificationSenderService:
                 response = await client.post(url, data=data, timeout=10)
                 response.raise_for_status()
 
-            logger.info(f"Telegram уведомление отправлено в чат {chat_id}")
+            # NOTIF-REAUDIT-28 P1: PII-safe logging
+            logger.info("Telegram notification sent", extra={"has_chat_id": bool(chat_id)})
             return True
 
         except Exception as e:
@@ -765,7 +767,8 @@ class NotificationSenderService:
             response = await sms_manager.send_sms(phone, message)
 
             if response.success:
-                logger.info(f"SMS отправлено на {phone} через {response.provider}")
+                # NOTIF-REAUDIT-28 P1: PII-safe logging
+                logger.info("SMS sent", extra={"provider": getattr(response, "provider", "unknown")})
                 return True
             else:
                 logger.error(f"Ошибка отправки SMS ({response.provider}): {response.error}")

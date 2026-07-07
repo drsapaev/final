@@ -1587,11 +1587,7 @@ class LabReportingService:
         # push them. A full push integration requires calling the async
         # telegram bot API from this sync context, which is deferred to
         # a background task queue in a future iteration.
-        logger.info(
-            "[LAB] results finalized — patient_id=%s can pull results via Telegram bot. "
-            "Use POST /telegram/send-lab-results to push manually if needed.",
-            patient_id,
-        )
+        logger.info("Lab results finalized", extra={"has_patient": True})
 
     def _validate_template_selection_for_context(
         self,

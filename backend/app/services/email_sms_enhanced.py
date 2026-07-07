@@ -157,7 +157,8 @@ class EmailSMSEnhancedService:
                 server.send_message(msg)
 
             self.stats['emails_sent'] += 1
-            logger.info(f"Email отправлен на {to_email}: {subject}")
+            # NOTIF-REAUDIT-28 P1: PII-safe logging
+            logger.info("Email sent", extra={"has_recipient": bool(to_email)})
             return True, "Email отправлен успешно"
 
         except Exception as e:
@@ -207,7 +208,8 @@ class EmailSMSEnhancedService:
             result = response.json()
             if result.get('success', False):
                 self.stats['sms_sent'] += 1
-                logger.info(f"SMS отправлено на {phone}")
+                    # NOTIF-REAUDIT-28 P1: PII-safe logging
+                logger.info("SMS sent", extra={"has_recipient": bool(phone)})
                 return True, "SMS отправлено успешно"
             else:
                 self.stats['sms_failed'] += 1
