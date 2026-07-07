@@ -106,7 +106,9 @@ class AIProvider(Base):
         """
         Encrypt and store API key.
 
-        If ENCRYPTION_KEY not set, stores plaintext with warning.
+        AI-REAUDIT-28 P0-8: if ENCRYPTION_KEY not set, RAISES ValueError
+        instead of silently storing plaintext. In production, ENCRYPTION_KEY
+        must be set (validated in core/config.py).
         """
         if not value:
             self._api_key_encrypted = None
@@ -119,12 +121,13 @@ class AIProvider(Base):
         logger = logging.getLogger(__name__)
 
         if not settings.ENCRYPTION_KEY:
-            logger.warning(
-                f"ENCRYPTION_KEY not set. Storing API key for '{self.name}' in PLAINTEXT. "
-                "This is a security risk in production!"
+            # AI-REAUDIT-28 P0-8: отказ от plaintext-хранения. Раньше
+            # silently stored plaintext с warning-логом — в production это
+            # критическая уязвимость (backup leak = compromise всех API keys).
+            raise ValueError(
+                f"ENCRYPTION_KEY not set — refusing to store API key for "
+                f"'{self.name}' in plaintext. Set ENCRYPTION_KEY env var."
             )
-            self._api_key_encrypted = value
-            return
 
         try:
             from cryptography.fernet import Fernet

@@ -562,6 +562,14 @@ def get_settings() -> Settings:
                 "This env var disables 2FA enforcement for Admin/Cashier roles."
             )
 
+        # AI-REAUDIT-28 P0-8: ENCRYPTION_KEY обязателен в production.
+        # Без него AI provider API keys хранятся plaintext в ai_providers.api_key.
+        if not s.ENCRYPTION_KEY:
+            errors.append(
+                "ENCRYPTION_KEY must be set in production — "
+                "without it, AI provider API keys are stored in plaintext."
+            )
+
         # 8. ENABLE_TEST_PAYMENT_INIT must be False in production
         if s.ENABLE_TEST_PAYMENT_INIT:
             errors.append(
