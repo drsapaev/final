@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.core.audit_helper import log_action
 from app.api.deps import get_db, require_roles
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, ServiceCategory
