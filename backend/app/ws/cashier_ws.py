@@ -81,6 +81,13 @@ async def cashier_websocket(
     PHI (patient_id, visit_id, amount) всем подписчикам.
     """
     token = websocket.query_params.get("token")
+    # P1-6: also accept subprotocol
+    if not token and websocket.headers.get("sec-websocket-protocol"):
+        protocols = websocket.headers.get("sec-websocket-protocol", "").split(", ")
+        for proto in protocols:
+            if proto.startswith("bearer."):
+                token = proto[7:]
+                break
     if not token:
         await websocket.close(code=4401)
         return

@@ -18,7 +18,8 @@ router = APIRouter()
 @router.websocket("/ws/notifications/connect")
 async def websocket_notifications(
     websocket: WebSocket,
-    token: str = Query(..., description="JWT Token"),
+    # P1-6: accept token from query param OR Sec-WebSocket-Protocol subprotocol
+    token: str | None = Query(None, description="JWT token (legacy, use subprotocol)"),
 ):
     """Realtime notification channel with server-owned inbox sync."""
     db = SessionLocal()
