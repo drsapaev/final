@@ -14,7 +14,7 @@ Rules:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -108,7 +108,7 @@ class EMRRecord(Base):
 
     # ✅ Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     created_by: Mapped[int] = mapped_column(
         Integer, nullable=False, index=True, comment="User ID who created"
@@ -211,7 +211,7 @@ class EMRRevision(Base):
         comment="User ID, or SYSTEM_USER_ID=0 for migrations",
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     # Client session for tracking
@@ -278,7 +278,7 @@ class EMRAuditLog(Base):
 
     # ✅ Timestamp
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow, index=True
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True
     )
 
     # Indexes for audit queries

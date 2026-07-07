@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -56,10 +56,10 @@ class PaymentInvoice(Base):
 
     # Временные метки
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow, index=True
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True
     )
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, onupdate=datetime.utcnow
+        DateTime(timezone=True), nullable=True, onupdate=lambda: datetime.now(UTC)
     )
     paid_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -88,7 +88,7 @@ class PaymentInvoiceVisit(Base):
     visit_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     # Связи

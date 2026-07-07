@@ -128,7 +128,7 @@ class VisitService(Base):
     currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     visit: Mapped[Visit] = relationship(back_populates="services")
