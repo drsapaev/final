@@ -157,7 +157,8 @@ class EditDeltaResponse(BaseModel):
 
 
 class MarkPaidRequest(BaseModel):
-    amount: Decimal | None = None
+    # REG-AUDIT-28 P0-2: validate amount is positive and reasonable
+    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"))
     method: str | None = Field(default="cash")
 
 
@@ -172,7 +173,8 @@ class RegistrarRecordActionRequest(BaseModel):
     record_id: int | None = None
     records: list[RegistrarRecordRef] | None = None
     reason: str | None = None
-    amount: Decimal | None = None
+    # REG-AUDIT-28 P0-2: validate amount is positive and reasonable
+    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"))
     method: str | None = Field(default="cash")
 
 
