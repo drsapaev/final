@@ -14,30 +14,22 @@ def test_legacy_ai_image_upload_rejects_oversized_payload_before_provider_call(
     cardio_auth_headers: dict[str, str],
     monkeypatch,
 ) -> None:
-    provider_called = False
-
-    async def fake_analyze_xray_image(*args, **kwargs):
-        nonlocal provider_called
-        provider_called = True
-        return {"ok": True}
+    """AI-REAUDIT-28 P1: /ai/analyze-xray endpoint was deleted (called
+    non-existent AIManager method). Test now verifies _read_ai_upload_bounded
+    rejects oversized payloads directly.
+    """
+    import io
+    from fastapi import UploadFile
 
     monkeypatch.setattr(ai, "MAX_LEGACY_AI_UPLOAD_BYTES", 3)
     monkeypatch.setattr(ai, "AI_UPLOAD_READ_CHUNK_BYTES", 2)
-    monkeypatch.setattr(
-        ai.ai_manager,
-        "analyze_xray_image",
-        fake_analyze_xray_image,
-        raising=False,
-    )
+    upload = UploadFile(file=io.BytesIO(b"abcd"), filename="oversized.png")
 
-    response = client.post(
-        "/api/v1/ai/analyze-xray",
-        headers=cardio_auth_headers,
-        files={"image": ("oversized.png", b"abcd", "image/png")},
-    )
+    with pytest.raises(HTTPException) as exc_info:
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(ai._read_ai_upload_bounded(upload))
 
-    assert response.status_code == 413
-    assert provider_called is False
+    assert exc_info.value.status_code == 413
 
 
 @pytest.mark.asyncio
