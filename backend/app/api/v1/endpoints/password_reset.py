@@ -104,20 +104,21 @@ class PasswordResetConfirmRequest(BaseModel):
 
 
 @router.post("/initiate")  # P1-1: rate limit deferred (request param conflict)
-async def initiate_password_reset(
-    request: PasswordResetInitiateRequest, db: Session = Depends(get_db)
+@limiter.limit("3/minute")  # P1-1: rate limit
+async def initiate_password_reset(request: Request, 
+    request_data: PasswordResetInitiateRequest, db: Session = Depends(get_db)
 ):
     """Инициация сброса пароля"""
     try:
         password_reset_service = get_password_reset_service()
 
-        if request.phone:
+        if request_data.phone:
             result = await password_reset_service.initiate_phone_reset(
-                db=db, phone=request.phone
+                db=db, phone=request_data.phone
             )
         else:
             result = await password_reset_service.initiate_email_reset(
-                db=db, email=request.email
+                db=db, email=request_data.email
             )
 
         if result["success"]:
@@ -147,14 +148,14 @@ async def initiate_password_reset(
 
 @router.post("/verify-phone")
 async def verify_phone_for_reset(
-    request: PhoneVerificationRequest, db: Session = Depends(get_db)
+    request_data: PhoneVerificationRequest, db: Session = Depends(get_db)
 ):
     """Верификация телефона для сброса пароля"""
     try:
         password_reset_service = get_password_reset_service()
 
         result = await password_reset_service.verify_phone_and_get_token(
-            db=db, phone=request.phone, verification_code=request.verification_code
+            db=db, phone=request_data.phone, verification_code=request_data.verification_code
         )
 
         if result["success"]:
@@ -194,14 +195,14 @@ async def verify_phone_for_reset(
 
 @router.post("/confirm")
 async def confirm_password_reset(
-    request: PasswordResetConfirmRequest, db: Session = Depends(get_db)
+    request_data: PasswordResetConfirmRequest, db: Session = Depends(get_db)
 ):
     """Подтверждение сброса пароля"""
     try:
         password_reset_service = get_password_reset_service()
 
         result = password_reset_service.reset_password_with_token(
-            db=db, token=request.token, new_password=request.new_password
+            db=db, token=request_data.token, new_password=request_data.new_password
         )
 
         if result["success"]:
