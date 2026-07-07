@@ -577,6 +577,16 @@ def get_settings() -> Settings:
                 "The /payments/test-init endpoint bypasses audit logging."
             )
 
+        # NOTIF-REAUDIT-28 P0-4: в production должен быть настроен реальный
+        # SMS-провайдер (Eskiz или PlayMobile). MockSMSProvider молча
+        # "успешно" отправляет SMS без реальной доставки — password reset,
+        # 2FA, напоминания silently fail.
+        if not s.ESKIZ_EMAIL and not s.PLAYMOBILE_API_KEY:
+            errors.append(
+                "At least one real SMS provider must be configured in production "
+                "(ESKIZ_EMAIL or PLAYMOBILE_API_KEY). MockSMSProvider is not allowed."
+            )
+
         # === OUTPUT WARNINGS ===
         for warning in warnings_list:
             logger.warning(f"⚠️ PRODUCTION WARNING: {warning}")
