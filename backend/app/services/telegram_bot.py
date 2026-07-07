@@ -143,6 +143,10 @@ def telegram_text_corruption_reason(text: Any) -> str | None:
     return None
 
 
+"""P1-18: This is the STAFF bot (httpx-based, DB-stored token).
+Use services/telegram/bot.py:ClinicTelegramBot for the PATIENT bot
+(aiogram-based, env-var token). Do not confuse the two.
+"""
 class TelegramBotService:
     def __init__(self):
         self.bot_token = None

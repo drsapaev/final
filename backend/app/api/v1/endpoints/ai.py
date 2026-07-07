@@ -14,6 +14,7 @@ from ....core.rbac import AIPermission, require_any_ai_permission
 from ....models.user import User
 from ....services.ai import AIProviderType, ai_manager
 from ....services.mcp import get_mcp_manager
+from ....services.ai_feature_gating import RequireAiFeature
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ LEGACY_AI_ACCESS = require_any_ai_permission(
     AIPermission.SUGGEST_ICD10,
 )
 
-router = APIRouter(dependencies=[Depends(LEGACY_AI_ACCESS)])
+router = APIRouter(dependencies=[Depends(LEGACY_AI_ACCESS), Depends(RequireAiFeature("ai_legacy"))])  # P1-13
 
 
 async def _read_ai_upload_bounded(upload: UploadFile) -> bytes:
