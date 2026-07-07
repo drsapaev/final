@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -98,7 +98,7 @@ class QueuePositionNotificationService:
             "queue_number": str(entry.number),
             "cabinet": cabinet_number or "",
             "status": "called",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
         return await self._send_notification_to_patient(
@@ -154,7 +154,7 @@ class QueuePositionNotificationService:
             "queue_number": str(entry.number),
             "people_ahead": str(people_ahead),
             "status": entry.status or "waiting",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
         if estimated_wait_minutes:
@@ -269,7 +269,7 @@ class QueuePositionNotificationService:
             "entry_id": str(entry.id),
             "queue_number": str(entry.number),
             "people_ahead": str(people_ahead),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
         return await self._send_notification_to_patient(
@@ -301,7 +301,7 @@ class QueuePositionNotificationService:
             "type": "diagnostics_return",
             "entry_id": str(entry.id),
             "queue_number": str(entry.number),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
         return await self._send_notification_to_patient(

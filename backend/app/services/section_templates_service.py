@@ -16,7 +16,7 @@ Key features:
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -95,7 +95,7 @@ class DoctorSectionTemplatesService:
             if existing:
                 # Update usage count and last_used_at
                 existing.usage_count += 1
-                existing.last_used_at = datetime.utcnow()
+                existing.last_used_at = datetime.now(UTC)
                 # Update icd10_code if provided and different
                 if icd10_code and not existing.icd10_code:
                     existing.icd10_code = icd10_code.upper()
@@ -114,8 +114,8 @@ class DoctorSectionTemplatesService:
                     template_hash=template_hash,
                     usage_count=1,
                     is_pinned=False,
-                    last_used_at=datetime.utcnow(),
-                    created_at=datetime.utcnow(),
+                    last_used_at=datetime.now(UTC),
+                    created_at=datetime.now(UTC),
                 )
                 self.db.add(new_template)
                 await self.db.commit()
@@ -222,7 +222,7 @@ class DoctorSectionTemplatesService:
             def is_stale(last_used: datetime | None) -> bool:
                 if not last_used:
                     return False
-                return last_used < datetime.utcnow() - timedelta(days=STALE_MONTHS * 30)
+                return last_used < datetime.now(UTC) - timedelta(days=STALE_MONTHS * 30)
 
             # Build response
             response_templates = [
@@ -321,7 +321,7 @@ class DoctorSectionTemplatesService:
 
             # Pin the template
             template.is_pinned = True
-            template.pinned_at = datetime.utcnow()
+            template.pinned_at = datetime.now(UTC)
             await self.db.commit()
 
             return True, "Закреплён"
@@ -405,7 +405,7 @@ class DoctorSectionTemplatesService:
                 # Update existing template
                 original.template_text = new_text.strip()
                 original.template_hash = new_hash
-                original.last_used_at = datetime.utcnow()
+                original.last_used_at = datetime.now(UTC)
                 await self.db.commit()
                 await self.db.refresh(original)
                 return original, "Обновлён"
@@ -425,7 +425,7 @@ class DoctorSectionTemplatesService:
                 if existing:
                     # Just increment usage
                     existing.usage_count += 1
-                    existing.last_used_at = datetime.utcnow()
+                    existing.last_used_at = datetime.now(UTC)
                     await self.db.commit()
                     await self.db.refresh(existing)
                     return existing, "Такой шаблон уже есть, использование увеличено"
@@ -440,8 +440,8 @@ class DoctorSectionTemplatesService:
                     template_hash=new_hash,
                     usage_count=1,
                     is_pinned=False,
-                    last_used_at=datetime.utcnow(),
-                    created_at=datetime.utcnow(),
+                    last_used_at=datetime.now(UTC),
+                    created_at=datetime.now(UTC),
                 )
                 self.db.add(new_template)
                 await self.db.commit()

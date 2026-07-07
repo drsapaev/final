@@ -4,7 +4,7 @@ API endpoints для управления табло в админ панели
 
 import logging
 import shutil
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -347,7 +347,7 @@ def test_display_board(
                     "patient_name": "Тестовый П.",
                     "doctor_name": "Доктор Тест",
                     "cabinet": "101",
-                    "call_time": datetime.utcnow().isoformat(),
+                    "call_time": datetime.now(UTC).isoformat(),
                 },
             }
         elif test_type == "announcement":

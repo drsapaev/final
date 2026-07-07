@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from jinja2 import Environment, select_autoescape
@@ -1482,7 +1482,7 @@ def update_appointment_payment_status(db: Session, appointment) -> bool:
     is_paid = is_appointment_paid(db, appointment)
 
     if is_paid and not getattr(appointment, 'payment_processed_at', None):
-        appointment.payment_processed_at = datetime.utcnow()
+        appointment.payment_processed_at = datetime.now(UTC)
         logger.info(
             "[FIX:BILLING_PAYMENT_STATUS] Appointment payment marker updated without changing visit_type: appointment_id=%s",
             getattr(appointment, 'id', None),

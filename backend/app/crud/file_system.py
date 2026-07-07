@@ -4,7 +4,7 @@ CRUD операции для файловой системы
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy import desc, func, or_
@@ -273,7 +273,7 @@ class CRUDFile:
         return (
             db.query(File)
             .filter(
-                File.expires_at < datetime.utcnow(), File.status != FileStatus.DELETED
+                File.expires_at < datetime.now(UTC), File.status != FileStatus.DELETED
             )
             .all()
         )
@@ -408,7 +408,7 @@ class CRUDFileShare:
                 FileShare.is_active == True,
                 or_(
                     FileShare.expires_at.is_(None),
-                    FileShare.expires_at > datetime.utcnow(),
+                    FileShare.expires_at > datetime.now(UTC),
                 ),
             )
             .first()

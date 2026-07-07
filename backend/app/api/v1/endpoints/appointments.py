@@ -1,6 +1,6 @@
 # app/api/v1/endpoints/appointments.py
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -263,7 +263,7 @@ def _pick_date(date_str: str | None, date: str | None, d: str | None) -> str:
 
 def _upsert_queue_setting(db: Session, key: str, value: str) -> None:
     """Простой upsert в таблицу settings (category='queue'). Гарантируем created_at/updated_at."""
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     row = (
         db.query(Setting)
         .filter(Setting.category == "queue", Setting.key == key)

@@ -4,7 +4,7 @@ API endpoints для кассира
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from decimal import Decimal
 from typing import Any, Generic, TypeVar
 
@@ -1021,7 +1021,7 @@ async def create_grouped_payment(
         )
 
     remaining_to_allocate = payment_data.amount
-    created_at = datetime.utcnow()
+    created_at = datetime.now(UTC)
     created_payments: list[Payment] = []
     allocation_rows: list[tuple[Payment, Visit, Decimal, Decimal, Decimal]] = []
 
@@ -1271,8 +1271,8 @@ async def create_payment(
             method=payment_data.method,
             status="paid",
             note=payment_data.note,
-            created_at=datetime.utcnow(),
-            paid_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
+            paid_at=datetime.now(UTC),
         )
 
         db.add(new_payment)
@@ -1464,8 +1464,8 @@ async def mark_visit_as_paid(
                 method="cash",
                 status="paid",
                 note="Помечен как оплаченный",
-                created_at=datetime.utcnow(),
-                paid_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
+                paid_at=datetime.now(UTC),
             )
             db.add(new_payment)
 
@@ -1530,7 +1530,7 @@ async def confirm_payment(
     payment.status = 'paid'
     if not payment.provider_transaction_id:
         from datetime import datetime
-        payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.utcnow().timestamp())}"
+        payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.now(UTC).timestamp())}"
 
     # Обновляем только operational статус визита; registration type не меняем.
     visit = None
@@ -1596,7 +1596,7 @@ async def refund_payment(
         result = db.execute(atomic_update, {
             "refund_amount": refund_amount_decimal,
             "reason": refund_data.reason,
-            "now": datetime.utcnow(),
+            "now": datetime.now(UTC),
             "user_id": current_user.id if hasattr(current_user, 'id') else None,
             "payment_id": payment_id,
         })

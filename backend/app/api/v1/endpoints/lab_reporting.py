@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
@@ -715,7 +715,7 @@ def download_lab_report_pdf(
                 "critical_findings": critical_findings,
                 "footer_notes": instance.template_version.footer_notes,
                 "report_date": (
-                    instance.finalized_at or instance.created_at or datetime.utcnow()
+                    instance.finalized_at or instance.created_at or datetime.now(UTC)
                 ).strftime("%d.%m.%Y"),
             }
         )

@@ -3,7 +3,7 @@ API endpoints для трекинга AI моделей
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -119,7 +119,7 @@ async def get_current_ai_models(db: Session = Depends(get_db)):
         return {
             "models": models_info,
             "total_models": len(models_info),
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
         }
     except Exception as e:
         raise _ai_tracking_http_error(e, "get_current_ai_models") from e
@@ -239,7 +239,7 @@ async def get_ai_models_performance(
             },
             "models": model_stats,
             "period_days": days_back,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
         }
     except Exception as e:
         raise _ai_tracking_http_error(e, "get_ai_models_performance") from e

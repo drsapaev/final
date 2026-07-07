@@ -732,7 +732,7 @@ def check_invoice_status(
                     # Обновляем статус invoice
                     if result.status == "completed":
                         invoice.status = "paid"
-                        invoice.paid_at = datetime.utcnow()
+                        invoice.paid_at = datetime.now(UTC)
 
                         # [OK] ИСПРАВЛЕНО: Создаем платежи для всех визитов через SSOT
                         from app.services.billing_service import BillingService
@@ -907,7 +907,7 @@ def create_cart_appointments(
             # Фича-флаг "confirmation_before_queue" применяется только для онлайн-записей (телеграм/PWA)
             # Записи от регистратора сразу попадают в очередь
             visit_status = "confirmed"
-            confirmed_at = datetime.utcnow()
+            confirmed_at = datetime.now(UTC)
             confirmed_by = f"registrar_{current_user.id}"
 
             # [OK] ИСПРАВЛЕНО: Добавляем микрозадержку для разных created_at
@@ -1347,7 +1347,7 @@ def approve_price_override(
         if approval_data.action == "approve":
             override.status = "approved"
             override.approved_by = current_user.id
-            override.approved_at = datetime.utcnow()
+            override.approved_at = datetime.now(UTC)
 
             # Обновляем цену в визите
             visit = db.query(Visit).filter(Visit.id == override.visit_id).first()
@@ -1368,7 +1368,7 @@ def approve_price_override(
         elif approval_data.action == "reject":
             override.status = "rejected"
             override.approved_by = current_user.id
-            override.approved_at = datetime.utcnow()
+            override.approved_at = datetime.now(UTC)
             override.rejection_reason = approval_data.rejection_reason
 
             message = "Изменение цены отклонено"
@@ -1733,7 +1733,7 @@ def get_benefit_settings(
             .first()
         )
 
-        updated_at = latest_update.updated_at if latest_update else datetime.utcnow()
+        updated_at = latest_update.updated_at if latest_update else datetime.now(UTC)
 
         return BenefitSettingsResponse(
             repeat_visit_days=settings['repeat_visit_days'],
@@ -1796,7 +1796,7 @@ def update_benefit_settings(
                 # Обновляем существующую настройку
                 setting.value = setting_data["value"]
                 setting.updated_by = current_user.id
-                setting.updated_at = datetime.utcnow()
+                setting.updated_at = datetime.now(UTC)
             else:
                 # Создаём новую настройку
                 setting = ClinicSettings(
@@ -1858,7 +1858,7 @@ def get_wizard_settings(
         )
 
         use_new_wizard = False
-        updated_at = datetime.utcnow()
+        updated_at = datetime.now(UTC)
 
         if use_new_wizard_setting:
             use_new_wizard = (
@@ -1908,7 +1908,7 @@ def update_wizard_settings(
             "updated_by": current_user.id,
         }
         use_new_wizard_setting.updated_by = current_user.id
-        use_new_wizard_setting.updated_at = datetime.utcnow()
+        use_new_wizard_setting.updated_at = datetime.now(UTC)
 
         db.commit()
         db.refresh(use_new_wizard_setting)
@@ -2600,7 +2600,7 @@ def _sync_payment_invoices_for_paid_visit(
         if all(invoice_visit_id in paid_visit_ids for invoice_visit_id in visit_ids):
             invoice.status = "paid"
             invoice.payment_method = payment_method or invoice.payment_method
-            invoice.paid_at = datetime.utcnow()
+            invoice.paid_at = datetime.now(UTC)
 
 
 REGISTRAR_COMMAND_ROLE_BY_ACTION = {
@@ -3468,7 +3468,7 @@ def confirm_visit_by_registrar(
         # Проверяем что токен не истек
         if (
             visit.confirmation_expires_at
-            and visit.confirmation_expires_at < datetime.utcnow()
+            and visit.confirmation_expires_at < datetime.now(UTC)
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -3476,7 +3476,7 @@ def confirm_visit_by_registrar(
             )
 
         # Подтверждаем визит
-        visit.confirmed_at = datetime.utcnow()
+        visit.confirmed_at = datetime.now(UTC)
         visit.confirmed_by = request.confirmed_by or f"registrar_{current_user.id}"
         visit.status = "confirmed"
 

@@ -488,7 +488,7 @@ class RegistrarEditDeltaService:
             discount_mode=discount_mode or "none",
             status="open",
             approval_status="approved",
-            confirmed_at=datetime.utcnow(),
+            confirmed_at=datetime.now(UTC),
             confirmed_by=f"registrar_{current_user.id}" if current_user else None,
             source="desk",
         )

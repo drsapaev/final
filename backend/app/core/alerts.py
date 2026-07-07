@@ -19,7 +19,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from enum import Enum
 from typing import Any
 
@@ -115,7 +115,7 @@ class AlertManager:
             return True
 
         cooldown = timedelta(minutes=self._cooldown_minutes)
-        return datetime.utcnow() - last_time > cooldown
+        return datetime.now(UTC) - last_time > cooldown
 
     def _send_alert(self, alert: Alert) -> None:
         """Send alert through all registered handlers"""
@@ -159,7 +159,7 @@ class AlertManager:
 
         self._alerts.append(alert)
         self._alert_counts[alert_type] += 1
-        self._last_alert_time[alert_type] = datetime.utcnow()
+        self._last_alert_time[alert_type] = datetime.now(UTC)
 
         # Log the alert
         log_method = getattr(logger, severity.value, logger.error)
@@ -185,13 +185,13 @@ class AlertManager:
 
     def payment_failure(self, payment_id: str, error: str, amount: float = 0) -> None:
         """Alert for payment processing failure"""
-        self._payment_failure_timestamps.append(datetime.utcnow())
+        self._payment_failure_timestamps.append(datetime.now(UTC))
         self._cleanup_old_timestamps()
 
         # Check threshold
         recent_failures = len([
             t for t in self._payment_failure_timestamps
-            if datetime.utcnow() - t < timedelta(hours=1)
+            if datetime.now(UTC) - t < timedelta(hours=1)
         ])
 
         if recent_failures >= AlertThresholds.PAYMENT_FAILURE_CRITICAL:
@@ -224,12 +224,12 @@ class AlertManager:
 
     def auth_failure(self, username: str, ip: str, reason: str) -> None:
         """Alert for authentication failures (brute force detection)"""
-        self._auth_failure_timestamps.append(datetime.utcnow())
+        self._auth_failure_timestamps.append(datetime.now(UTC))
         self._cleanup_old_timestamps()
 
         recent_failures = len([
             t for t in self._auth_failure_timestamps
-            if datetime.utcnow() - t < timedelta(minutes=5)
+            if datetime.now(UTC) - t < timedelta(minutes=5)
         ])
 
         if recent_failures >= AlertThresholds.AUTH_FAILURE_CRITICAL:
@@ -277,12 +277,12 @@ class AlertManager:
 
     def track_error(self) -> None:
         """Track an error for error rate monitoring"""
-        self._error_timestamps.append(datetime.utcnow())
+        self._error_timestamps.append(datetime.now(UTC))
         self._cleanup_old_timestamps()
 
         errors_per_minute = len([
             t for t in self._error_timestamps
-            if datetime.utcnow() - t < timedelta(minutes=1)
+            if datetime.now(UTC) - t < timedelta(minutes=1)
         ])
 
         if errors_per_minute >= AlertThresholds.ERROR_RATE_CRITICAL:
@@ -302,14 +302,14 @@ class AlertManager:
 
     def _cleanup_old_timestamps(self) -> None:
         """Remove timestamps older than 1 hour"""
-        cutoff = datetime.utcnow() - timedelta(hours=1)
+        cutoff = datetime.now(UTC) - timedelta(hours=1)
         self._error_timestamps = [t for t in self._error_timestamps if t > cutoff]
         self._auth_failure_timestamps = [t for t in self._auth_failure_timestamps if t > cutoff]
         self._payment_failure_timestamps = [t for t in self._payment_failure_timestamps if t > cutoff]
 
     def get_recent_alerts(self, hours: int = 24) -> list[Alert]:
         """Get alerts from the last N hours"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
         return [a for a in self._alerts if a.timestamp > cutoff]
 
     def get_alert_stats(self) -> dict[str, Any]:

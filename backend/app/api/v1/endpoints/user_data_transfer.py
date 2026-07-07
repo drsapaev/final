@@ -3,7 +3,7 @@ API endpoints для передачи данных пользователей
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -226,7 +226,7 @@ def request_transfer_confirmation(
             "confirmation_token": token,
             "expires_in_hours": 24,
             "created_by": current_user.username,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
     except HTTPException:
@@ -297,7 +297,7 @@ def get_transfer_history(
             "total": len(history),
             "filtered_by_user": user_id,
             "requested_by": current_user.username,
-            "requested_at": datetime.utcnow().isoformat(),
+            "requested_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -327,7 +327,7 @@ def get_transfer_statistics(
             "failed_transfers": 0,
             "most_transferred_data_types": [],
             "top_initiators": [],
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "generated_by": current_user.username,
         }
 
@@ -365,7 +365,7 @@ def validate_transfer_request(
             "source_user_id": source_user_id,
             "target_user_id": target_user_id,
             "validated_by": current_user.username,
-            "validated_at": datetime.utcnow().isoformat(),
+            "validated_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:

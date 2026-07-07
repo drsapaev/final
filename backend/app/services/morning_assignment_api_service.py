@@ -103,7 +103,7 @@ class MorningAssignmentApiService:
                     {
                         "visit_id": visit_id,
                         "success": False,
-                        "message": f"Ошибка: {str(exc)}",
+                        "message": "Внутренняя ошибка",
                     }
                 )
 

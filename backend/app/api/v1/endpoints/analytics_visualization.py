@@ -2,7 +2,7 @@
 API endpoints для визуализации аналитических данных
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -79,7 +79,7 @@ async def get_dashboard_visualization(
             "chart_types": list(
                 {config["type"] for config in chart_configs.values()}
             ),
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
     }
 
@@ -129,7 +129,7 @@ async def get_kpi_visualization(
             "chart_types": list(
                 {config["type"] for config in chart_configs.values()}
             ),
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
     }
 
@@ -180,7 +180,7 @@ async def get_doctor_performance_visualization(
             "chart_types": list(
                 {config["type"] for config in chart_configs.values()}
             ),
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
     }
 
@@ -226,7 +226,7 @@ async def get_patient_analytics_visualization(
             "chart_types": list(
                 {config["type"] for config in chart_configs.values()}
             ),
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
     }
 
@@ -276,7 +276,7 @@ async def get_revenue_analytics_visualization(
             "chart_types": list(
                 {config["type"] for config in chart_configs.values()}
             ),
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
     }
 
@@ -312,7 +312,7 @@ async def get_comprehensive_visualization(
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
             "department": department or "all",
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
         "kpi_metrics": AnalyticsService.calculate_statistics(
             db, start, end, department
@@ -348,7 +348,7 @@ async def get_comprehensive_visualization(
         },
         "data": comprehensive_data,
         "visualization": visualization,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }
 
 

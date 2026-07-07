@@ -36,7 +36,7 @@ def get_admin_stats(
     """Агрегированная статистика для админ-панели."""
     try:
         # Даты/границы
-        today: date = datetime.utcnow().date()
+        today: date = datetime.now(UTC).date()
 
         # Пользователи
         total_users = db.query(User).count()
@@ -116,7 +116,7 @@ def get_admin_stats(
             "pendingApprovals": pending_approvals,
             "newPatientsToday": new_patients_today,
             "roleStats": role_stats,
-            "generatedAt": datetime.utcnow().isoformat(),
+            "generatedAt": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -133,7 +133,7 @@ def get_quick_stats(
     _: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:
     try:
-        today: date = datetime.utcnow().date()
+        today: date = datetime.now(UTC).date()
 
         # Используем сравнение datetime для SQLite совместимости
         today_start = datetime.combine(today, time.min)
@@ -175,7 +175,7 @@ def get_quick_stats(
                 "revenue": today_revenue,
                 "transactions": len(today_revenue_rows),
             },
-            "generatedAt": datetime.utcnow().isoformat(),
+            "generatedAt": datetime.now(UTC).isoformat(),
         }
     except Exception as e:
         raise_admin_stats_error(
@@ -373,7 +373,7 @@ def get_recent_activities(
         return {
             "activities": activities,
             "total": len(activities),
-            "generatedAt": datetime.utcnow().isoformat(),
+            "generatedAt": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -392,7 +392,7 @@ def get_activity_chart(
 ) -> dict[str, Any]:
     """Получение данных для графика активности за последние N дней."""
     try:
-        end_date = datetime.utcnow().date()
+        end_date = datetime.now(UTC).date()
         start_date = end_date - timedelta(days=days - 1)
 
         chart_data = []
@@ -466,7 +466,7 @@ def get_activity_chart(
                 "end": end_date.isoformat(),
                 "days": days,
             },
-            "generatedAt": datetime.utcnow().isoformat(),
+            "generatedAt": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -489,7 +489,7 @@ def get_analytics_overview(
 ) -> dict[str, Any]:
     """Получение обзора аналитики для админ-панели с фильтрами."""
     try:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         today = now.date()
 
         # Определяем период
@@ -628,7 +628,7 @@ def get_analytics_overview(
                 for status, count in status_counts.items()
             ],
             "topDoctors": top_doctors,
-            "generatedAt": datetime.utcnow().isoformat(),
+            "generatedAt": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -653,7 +653,7 @@ def get_analytics_charts(
 ) -> dict[str, Any]:
     """Получение данных для графиков аналитики."""
     try:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         today = now.date()
 
         # Определяем период
@@ -724,7 +724,7 @@ def get_analytics_charts(
             "period": period,
             "labels": labels,
             "data": chart_data,
-            "generatedAt": datetime.utcnow().isoformat(),
+            "generatedAt": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:

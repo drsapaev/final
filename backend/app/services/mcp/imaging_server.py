@@ -4,7 +4,7 @@ MCP сервер для анализа медицинских изображен
 
 import base64
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager
@@ -227,13 +227,13 @@ class MedicalImagingMCPServer(BaseMCPServer):
                     "image_type": image_type,
                     "modality": modality,
                     "provider_used": provider or "default",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "has_clinical_context": clinical_context is not None,
                 },
             }
 
         except Exception as e:
-            logger.error(f"Error analyzing medical image: {str(e)}")
+            logger.error("Internal error")
             return {"status": "error", "error": f"Analysis failed: {str(e)}"}
 
     @MCPTool(
@@ -293,12 +293,12 @@ class MedicalImagingMCPServer(BaseMCPServer):
                 "recommendations": recommendations,
                 "metadata": {
                     "provider_used": provider or "default",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 },
             }
 
         except Exception as e:
-            logger.error(f"Error analyzing skin lesion: {str(e)}")
+            logger.error("Internal error")
             return {"status": "error", "error": f"Skin analysis failed: {str(e)}"}
 
     @MCPTool(name="compare_images", description="Сравнение медицинских изображений")
@@ -363,12 +363,12 @@ class MedicalImagingMCPServer(BaseMCPServer):
                 "requires_expert_review": True,
                 "metadata": {
                     "comparison_type": comparison_type,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 },
             }
 
         except Exception as e:
-            logger.error(f"Error comparing images: {str(e)}")
+            logger.error("Internal error")
             return {"status": "error", "error": f"Comparison failed: {str(e)}"}
 
     @MCPResource(name="imaging_types", description="Типы медицинских изображений")

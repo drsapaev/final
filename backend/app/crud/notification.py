@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import and_, desc, func
@@ -81,7 +81,7 @@ class CRUDNotificationHistory(
     def get_recent(
         self, db: Session, *, hours: int = 24, limit: int = 100
     ) -> list[NotificationHistory]:
-        since = datetime.utcnow() - timedelta(hours=hours)
+        since = datetime.now(UTC) - timedelta(hours=hours)
         return (
             db.query(NotificationHistory)
             .filter(NotificationHistory.created_at >= since)
@@ -91,7 +91,7 @@ class CRUDNotificationHistory(
         )
 
     def get_stats(self, db: Session, *, days: int = 7) -> dict[str, Any]:
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         # Общая статистика
         total_query = db.query(NotificationHistory).filter(
@@ -164,11 +164,11 @@ class CRUDNotificationHistory(
                 notification.error_message = error_message
 
             if status == "sent":
-                notification.sent_at = datetime.utcnow()
+                notification.sent_at = datetime.now(UTC)
             elif status == "delivered":
-                notification.delivered_at = datetime.utcnow()
+                notification.delivered_at = datetime.now(UTC)
                 if not notification.sent_at:
-                    notification.sent_at = datetime.utcnow()
+                    notification.sent_at = datetime.now(UTC)
 
             db.commit()
             db.refresh(notification)

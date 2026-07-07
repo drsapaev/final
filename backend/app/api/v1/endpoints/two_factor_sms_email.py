@@ -5,7 +5,7 @@ API endpoints для SMS/Email двухфакторной аутентифика
 import logging
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -205,7 +205,7 @@ async def resend_verification_code(
             user_id=current_user.id,
             method=method,
             code=code,
-            expires_at=datetime.utcnow() + timedelta(minutes=5),
+            expires_at=datetime.now(UTC) + timedelta(minutes=5),
         )
 
         # Отправляем код

@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -212,7 +212,7 @@ class NotificationPlatformService:
 
     @staticmethod
     def _now() -> datetime:
-        return datetime.utcnow()
+        return datetime.now(UTC)
 
     @staticmethod
     def _parse_hhmm(value: str | None, fallback: tuple[int, int]) -> tuple[int, int]:

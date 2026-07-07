@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections import Counter
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
 
@@ -93,7 +93,7 @@ class EMRCutoverService:
             "rebound_prescriptions": rebound_prescriptions,
             "rebound_files": rebound_files,
             "errors": errors,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
         payload["contract_backfill"] = self._backfill_canonical_contracts(dry_run=dry_run)
         if not dry_run:
@@ -184,7 +184,7 @@ class EMRCutoverService:
         return {
             "passed": passed,
             "checks": checks,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
 
     def _migrate_single_legacy_emr(self, legacy_emr: EMR, *, dry_run: bool) -> dict:
@@ -392,7 +392,7 @@ class EMRCutoverService:
         if patient_id is None:
             raise ValueError("Resolved visit is missing patient_id")
 
-        created_at = legacy_emr.created_at or datetime.utcnow()
+        created_at = legacy_emr.created_at or datetime.now(UTC)
         updated_at = legacy_emr.updated_at or legacy_emr.saved_at or created_at
         status = "draft" if legacy_emr.is_draft else "in_progress"
 
@@ -508,7 +508,7 @@ class EMRCutoverService:
         ledger.status = status
         ledger.source_checksum = checksum
         ledger.attempt_count = (ledger.attempt_count or 0) + 1
-        ledger.migrated_at = datetime.utcnow() if status in {"migrated", "skipped"} else None
+        ledger.migrated_at = datetime.now(UTC) if status in {"migrated", "skipped"} else None
         ledger.error_payload = error_payload
         return self.repository.save_ledger(ledger)
 

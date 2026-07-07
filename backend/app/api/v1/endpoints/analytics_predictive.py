@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -418,7 +418,7 @@ async def get_predictive_analytics(
             "forecast_start": (end + timedelta(days=1)).isoformat(),
             "forecast_end": (end + timedelta(days=forecast_days)).isoformat(),
             "department": department or "all",
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
     }
 

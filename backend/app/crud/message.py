@@ -2,7 +2,7 @@
 CRUD операции для сообщений
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session
@@ -145,7 +145,7 @@ class CRUDMessage:
 
         if message and not message.is_read:
             message.is_read = True
-            message.read_at = datetime.utcnow()
+            message.read_at = datetime.now(UTC)
             db.commit()
             db.refresh(message)
 
@@ -159,7 +159,7 @@ class CRUDMessage:
         other_user_id: int
     ) -> int:
         """Пометить все сообщения в беседе как прочитанные"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         count = db.query(Message).filter(
             Message.sender_id == other_user_id,
             Message.recipient_id == user_id,

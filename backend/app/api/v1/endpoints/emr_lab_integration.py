@@ -2,7 +2,7 @@
 API endpoints для интеграции EMR с лабораторными данными
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -224,7 +224,7 @@ async def get_abnormal_lab_results(
     """Получить аномальные лабораторные результаты пациента"""
     _ensure_doctor_can_read_patient_lab_data(db, patient_id, current_user)
     try:
-        date_from = datetime.utcnow() - timedelta(days=days)
+        date_from = datetime.now(UTC) - timedelta(days=days)
 
         abnormal_results = await emr_lab_integration.get_abnormal_lab_results(
             db=db, patient_id=patient_id, date_from=date_from
@@ -335,7 +335,7 @@ async def get_lab_results_trends(
     """Получить тренды лабораторных результатов пациента"""
     _ensure_doctor_can_read_patient_lab_data(db, patient_id, current_user)
     try:
-        date_from = datetime.utcnow() - timedelta(days=period_days)
+        date_from = datetime.now(UTC) - timedelta(days=period_days)
 
         # Получаем результаты за период
         results = await emr_lab_integration.get_patient_lab_results(

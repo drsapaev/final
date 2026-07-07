@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 
 from sqlalchemy import MetaData, Table, and_, func, select
 from sqlalchemy.orm import Session
@@ -77,7 +77,7 @@ def next_ticket_and_insert_entry(
                 patient_id=patient_id,
                 ticket_number=new_no,
                 status="waiting",
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
             )
             .returning(qe_t)
         )
@@ -99,7 +99,7 @@ def set_entry_status(
     """Установить статус: waiting|serving|done|skipped."""
     qe_t = _qe(db)
     values: dict[str, object] = {"status": status}
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     if status == "serving":
         values["started_at"] = now
         if window_no is not None:

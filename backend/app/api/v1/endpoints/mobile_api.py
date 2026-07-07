@@ -4,7 +4,7 @@
 
 import gzip
 import json
-from datetime import datetime
+from datetime import datetime, UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
@@ -513,7 +513,7 @@ async def mobile_health_check():
     return {
         "status": "ok",
         "mobile_api": "active",
-        "timestamp": datetime.utcnow(),
+        "timestamp": datetime.now(UTC),
         "version": "1.0.0",
     }
 
@@ -529,7 +529,7 @@ async def test_push_notification(
             user_id=current_user.id,
             title="Тестовое уведомление",
             message="Это тестовое push-уведомление от мобильного API",
-            data={"test": "true", "timestamp": datetime.utcnow().isoformat()},
+            data={"test": "true", "timestamp": datetime.now(UTC).isoformat()},
             db=db
         )
 
@@ -537,13 +537,13 @@ async def test_push_notification(
             return {
                 "status": "success",
                 "message": "Тестовое уведомление отправлено",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         else:
             return {
                 "status": "error",
                 "message": "Не удалось отправить тестовое уведомление",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     except Exception as e:

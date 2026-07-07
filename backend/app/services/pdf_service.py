@@ -167,7 +167,7 @@ class PDFService:
             return pdf_bytes
 
         except Exception as e:
-            raise Exception(f"Ошибка генерации PDF: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     def generate_pdf_with_reportlab(
         self, document_type: str, data: dict[str, Any], paper_size: str = "A4"
@@ -215,7 +215,7 @@ class PDFService:
             return pdf_bytes
 
         except Exception as e:
-            raise Exception(f"Ошибка генерации PDF с ReportLab: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     def _get_page_css(self, paper_size: str) -> str:
         """Получить CSS для размера страницы"""
@@ -259,7 +259,7 @@ class PDFService:
             return f"data:image/png;base64,{img_str}"
 
         except Exception as e:
-            raise Exception(f"Ошибка генерации QR кода: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     def _build_prescription_reportlab(self, data: dict[str, Any]) -> list:
         """Построить рецепт с помощью ReportLab"""

@@ -3,7 +3,7 @@ AI Chat Service - Управление чат-сессиями и сообщен
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
 
@@ -125,7 +125,7 @@ class AIChatService:
         }
 
         # Получаем ответ от AI
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         try:
             response = await self._gateway.execute(
@@ -135,7 +135,7 @@ class AIChatService:
                 specialty=session.specialty
             )
 
-            latency_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            latency_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
             # Формируем контент ответа
             if response.status == "success":

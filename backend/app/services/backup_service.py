@@ -7,7 +7,7 @@ import logging
 import os
 import shutil
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -75,7 +75,7 @@ class BackupService:
             # Get database URL
             db_url = _get_database_url()
 
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             backup_filename = f"backup_{backup_type}_{timestamp}.db"
             backup_path = self.backup_dir / backup_filename
 
@@ -137,7 +137,7 @@ class BackupService:
                 "size": backup_size,
                 "size_mb": round(backup_size / (1024 * 1024), 2),
                 "type": backup_type,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "compressed": compressed_path is not None,
             }
 
@@ -178,7 +178,7 @@ class BackupService:
             )
 
             # Remove backups older than retention period
-            cutoff_date = datetime.utcnow() - timedelta(days=self.retention_days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=self.retention_days)
             removed_count = 0
 
             for backup in backups:
@@ -300,7 +300,7 @@ class BackupService:
                 "success": True,
                 "backup_used": backup_filename,
                 "safety_backup": safety_backup["filename"],
-                "restored_at": datetime.utcnow().isoformat(),
+                "restored_at": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:

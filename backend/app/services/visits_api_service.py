@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -149,7 +149,7 @@ class VisitsApiService:
             "doctor_id": payload.doctor_id,
             "status": "open",
             "notes": payload.notes,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
             "discount_mode": "none",
             "approval_status": "none",
         }
@@ -321,9 +321,9 @@ class VisitsApiService:
 
         visit.status = status_new
         if status_new == "in_progress":
-            visit.started_at = datetime.utcnow()
+            visit.started_at = datetime.now(UTC)
         if status_new in {"closed", "canceled"}:
-            visit.finished_at = datetime.utcnow()
+            visit.finished_at = datetime.now(UTC)
 
         if status_new == "canceled":
             try:

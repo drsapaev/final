@@ -5,7 +5,7 @@
 import hashlib
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import desc, func
@@ -92,7 +92,7 @@ class AITrackingService:
         """Завершить трекинг AI запроса"""
 
         # Обновляем время завершения
-        tracking.completed_at = datetime.utcnow()
+        tracking.completed_at = datetime.now(UTC)
 
         # Вычисляем время ответа
         if tracking.created_at:
@@ -171,7 +171,7 @@ class AITrackingService:
 
         # Фильтры
         if days_back:
-            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            cutoff_date = datetime.now(UTC) - timedelta(days=days_back)
             query = query.filter(AIUsageLog.created_at >= cutoff_date)
 
         if provider_id:

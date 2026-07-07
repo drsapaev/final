@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
 
@@ -19,8 +19,8 @@ class CRUDEMR(CRUDBase[EMR, EMRCreate, EMRUpdate]):
         emr = db.query(EMR).filter(EMR.id == emr_id).first()
         if emr and emr.is_draft:
             emr.is_draft = False
-            emr.saved_at = datetime.utcnow()
-            emr.updated_at = datetime.utcnow()
+            emr.saved_at = datetime.now(UTC)
+            emr.updated_at = datetime.now(UTC)
             db.commit()
             db.refresh(emr)
         return emr
@@ -73,8 +73,8 @@ class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUp
         )
         if prescription and prescription.is_draft:
             prescription.is_draft = False
-            prescription.saved_at = datetime.utcnow()
-            prescription.updated_at = datetime.utcnow()
+            prescription.saved_at = datetime.now(UTC)
+            prescription.updated_at = datetime.now(UTC)
             db.commit()
             db.refresh(prescription)
         return prescription
@@ -87,8 +87,8 @@ class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUp
             db.query(Prescription).filter(Prescription.id == prescription_id).first()
         )
         if prescription:
-            prescription.printed_at = datetime.utcnow()
-            prescription.updated_at = datetime.utcnow()
+            prescription.printed_at = datetime.now(UTC)
+            prescription.updated_at = datetime.now(UTC)
             db.commit()
             db.refresh(prescription)
         return prescription

@@ -41,7 +41,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-7s  %(message)s")
@@ -252,7 +252,7 @@ def cleanup_drill_db(user: str, password: str, host: str, port: int) -> None:
 
 def main() -> None:
     log.info("=" * 70)
-    log.info("Disaster Recovery Drill — %s", datetime.utcnow().isoformat())
+    log.info("Disaster Recovery Drill — %s", datetime.now(UTC).isoformat())
     log.info("=" * 70)
 
     ensure_pg_tools()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy import MetaData, Table, select, update
@@ -76,7 +76,7 @@ class VisitPaymentIntegrationRepository:
         update_webhook(
             self.db,
             webhook_id,
-            {"status": status, "processed_at": datetime.utcnow()},
+            {"status": status, "processed_at": datetime.now(UTC)},
         )
 
     def update_appointment_status(

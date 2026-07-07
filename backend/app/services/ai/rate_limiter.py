@@ -10,7 +10,7 @@ AI Rate Limiter - Контроль частоты AI запросов.
 import asyncio
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from fastapi import HTTPException, status
 
@@ -44,7 +44,7 @@ class AIRateLimiter:
         self._lock = asyncio.Lock()
 
         # Cleanup interval
-        self._last_cleanup = datetime.utcnow()
+        self._last_cleanup = datetime.now(UTC)
         self._cleanup_interval = timedelta(minutes=5)
 
     async def check_user_limit(self, user_id: int) -> tuple[bool, int | None]:
@@ -62,7 +62,7 @@ class AIRateLimiter:
         async with self._lock:
             await self._maybe_cleanup()
 
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             cutoff = now - timedelta(hours=1)
 
             # Очистка старых записей для этого пользователя
@@ -99,7 +99,7 @@ class AIRateLimiter:
             (allowed, retry_after_seconds)
         """
         async with self._lock:
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             cutoff = now - timedelta(minutes=1)
 
             # Очистка старых записей
@@ -125,7 +125,7 @@ class AIRateLimiter:
 
     async def _maybe_cleanup(self):
         """Периодическая очистка старых записей"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         if now - self._last_cleanup < self._cleanup_interval:
             return

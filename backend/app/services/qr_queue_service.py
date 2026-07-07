@@ -10,7 +10,7 @@ import logging
 import re
 import secrets
 import socket
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from typing import TYPE_CHECKING, Any
 
 import qrcode
@@ -260,7 +260,7 @@ class QRQueueService:
         return patient
 
     def _claim_pending_join_session(self, session_token: str) -> QueueJoinSession | None:
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(UTC)
         pending_filter = (
             QueueJoinSession.session_token == session_token,
             QueueJoinSession.status == "pending",
@@ -860,7 +860,7 @@ class QRQueueService:
                 phone="",  # Будет заполнено пользователем
                 ip_address=ip_address,
                 user_agent=user_agent,
-                expires_at=datetime.utcnow()
+                expires_at=datetime.now(UTC)
                 + timedelta(minutes=15),  # 15 минут на заполнение
             )
 
@@ -883,7 +883,7 @@ class QRQueueService:
             import traceback
 
             traceback.print_exc()
-            raise ValueError(f"Ошибка сервера при создании сессии: {str(e)}")
+            raise ValueError("Внутренняя ошибка")
 
     def complete_join_session(
         self,
@@ -905,7 +905,7 @@ class QRQueueService:
             Результат присоединения к очереди
         """
         # Находим сессию
-        # expires_at сохраняется в UTC (datetime.utcnow()), поэтому сравниваем с UTC
+        # expires_at сохраняется в UTC (datetime.now(UTC)), поэтому сравниваем с UTC
         session = self._claim_pending_join_session(session_token)
 
         if not session:
@@ -956,7 +956,7 @@ class QRQueueService:
         session.telegram_id = telegram_id
         session.queue_entry_id = queue_entry.id
         session.queue_number = queue_entry.number
-        session.joined_at = datetime.utcnow()
+        session.joined_at = datetime.now(UTC)
 
         self.db.commit()
 
@@ -1009,7 +1009,7 @@ class QRQueueService:
         if not specialist_ids:
             raise ValueError("Не выбраны специалисты для записи")
 
-        # expires_at сохраняется в UTC (datetime.utcnow()), поэтому сравниваем с UTC
+        # expires_at сохраняется в UTC (datetime.now(UTC)), поэтому сравниваем с UTC
         session = self._claim_pending_join_session(session_token)
 
         if not session:
@@ -1087,7 +1087,7 @@ class QRQueueService:
         session.telegram_id = telegram_id
         session.queue_entry_id = entries[0]["queue_entry_id"] if entries else None
         session.queue_number = entries[0]["queue_number"] if entries else None
-        session.joined_at = datetime.utcnow()
+        session.joined_at = datetime.now(UTC)
         self.db.commit()
 
         if created_entries:
@@ -1113,7 +1113,7 @@ class QRQueueService:
 
         return {
             "success": len(entries) > 0,
-            "queue_time": datetime.utcnow().isoformat(),
+            "queue_time": datetime.now(UTC).isoformat(),
             "entries": entries,
             "errors": errors or None,
             "message": f"Создано {len(entries)} записей, ошибок: {len(errors)}",
@@ -1244,7 +1244,7 @@ class QRQueueService:
 
         # Обновляем статус
         next_patient.status = "called"
-        next_patient.called_at = datetime.utcnow()
+        next_patient.called_at = datetime.now(UTC)
         next_patient.called_by_user_id = called_by_user_id
 
         self.db.commit()

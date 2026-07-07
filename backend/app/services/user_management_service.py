@@ -5,7 +5,7 @@
 import csv
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from typing import Any
 
@@ -272,7 +272,7 @@ class UserManagementService:
         except Exception as e:
             db.rollback()
             logger.error(f"Error creating user: {e}")
-            return False, f"Ошибка создания пользователя: {str(e)}", None
+            return False, "Внутренняя ошибка", None
 
     def update_user(
         self, db: Session, user_id: int, user_data: UserUpdateRequest, updated_by: int
@@ -365,7 +365,7 @@ class UserManagementService:
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating user: {e}")
-            return False, f"Ошибка обновления пользователя: {str(e)}"
+            return False, "Внутренняя ошибка"
 
     def delete_user(
         self,
@@ -429,7 +429,7 @@ class UserManagementService:
         except Exception as e:
             db.rollback()
             logger.error(f"Error deleting user: {e}")
-            return False, f"Ошибка удаления пользователя: {str(e)}"
+            return False, "Внутренняя ошибка"
 
     def get_user_profile(self, db: Session, user_id: int) -> dict[str, Any] | None:
         """Получает полный профиль пользователя"""
@@ -701,13 +701,13 @@ class UserManagementService:
             )
 
             # Недавние регистрации (30 дней)
-            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
             recent_registrations = (
                 db.query(User).filter(User.created_at >= thirty_days_ago).count()
             )
 
             # Недавние входы (24 часа)
-            twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
+            twenty_four_hours_ago = datetime.now(UTC) - timedelta(hours=24)
             recent_logins = (
                 db.query(User)
                 .join(UserProfile)
@@ -823,7 +823,7 @@ class UserManagementService:
         except Exception as e:
             db.rollback()
             logger.error(f"Error in bulk action: {e}")
-            return False, f"Ошибка массового действия: {str(e)}", {}
+            return False, "Внутренняя ошибка", {}
 
     def update_user_preferences(
         self, db: Session, user_id: int, preferences_data: UserPreferencesUpdate
@@ -853,7 +853,7 @@ class UserManagementService:
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating user preferences: {e}")
-            return False, f"Ошибка обновления настроек: {str(e)}"
+            return False, "Внутренняя ошибка"
 
     def update_notification_settings(
         self, db: Session, user_id: int, settings_data: UserNotificationSettingsUpdate
@@ -887,7 +887,7 @@ class UserManagementService:
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating notification settings: {e}")
-            return False, f"Ошибка обновления настроек уведомлений: {str(e)}"
+            return False, "Внутренняя ошибка"
 
     def _log_user_action(
         self,
@@ -1062,7 +1062,7 @@ class UserManagementService:
                 "export_users_error",
                 "user_export",
                 None,
-                f"Ошибка экспорта пользователей: {str(e)}",
+                "Внутренняя ошибка",
             )
 
     def _export_to_csv(self, data: list[dict], file_path: Path):

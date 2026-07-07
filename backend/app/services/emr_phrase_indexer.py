@@ -10,7 +10,7 @@ EMRPhraseIndexer - Batch-индексатор для миграции сущес
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -79,7 +79,7 @@ class EMRPhraseIndexer:
         Проиндексировать все EMR одного врача.
         """
         from app.models.appointment import Appointment
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         # Получаем все EMR, привязанные к записям этого врача
         emrs = self.db.query(EMR).join(
@@ -104,7 +104,7 @@ class EMRPhraseIndexer:
                 )
                 total_phrases += indexed
 
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
         return IndexResult(
             doctor_id=doctor_id,
@@ -139,7 +139,7 @@ class EMRPhraseIndexer:
         Проиндексировать EMR всех врачей.
         """
         from app.models.appointment import Appointment
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
         errors = []
 
         # Находим всех уникальных врачей, у которых есть сохранённые EMR
@@ -188,11 +188,11 @@ class EMRPhraseIndexer:
                     logger.info(f"Doctor {doctor_id} is now ready for autocomplete")
 
             except Exception as e:
-                error_msg = f"Error indexing doctor {doctor_id}: {str(e)}"
+                error_msg = "Internal error"
                 logger.error(error_msg)
                 errors.append(error_msg)
 
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
         return BatchResult(
             total_doctors=len(doctors),
@@ -267,7 +267,7 @@ class EMRPhraseIndexer:
 
         from app.models.doctor_phrase_history import DoctorPhraseHistory
 
-        cutoff_date = datetime.utcnow() - timedelta(days=max_age_days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=max_age_days)
 
         deleted = self.db.query(DoctorPhraseHistory).filter(
             DoctorPhraseHistory.doctor_id == doctor_id,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy.orm import Session
 
@@ -42,11 +42,11 @@ class AITrackingApiService:
         return {
             "requests": requests,
             "total": len(requests),
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
         }
 
     def get_usage_trends(self, *, days_back: int) -> dict:
-        cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days_back)
         daily_usage = self.repository.list_daily_usage(cutoff_date=cutoff_date)
 
         trends: dict[str, dict] = {}
@@ -76,6 +76,6 @@ class AITrackingApiService:
             "trends": sorted_trends,
             "period_days": days_back,
             "total_days": len(sorted_trends),
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
         }
 

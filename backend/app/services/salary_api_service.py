@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 from typing import Any
 
@@ -80,7 +80,7 @@ class SalaryApiService:
             reason=payload.get("reason"),
             effective_date=payload["effective_date"],
             changed_by_id=changed_by_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
 
         self.repository.add(record)
@@ -100,7 +100,7 @@ class SalaryApiService:
             raise SalaryApiDomainError(404, "Запись не найдена")
 
         record.is_confirmed = True
-        record.confirmed_at = datetime.utcnow()
+        record.confirmed_at = datetime.now(UTC)
         record.confirmed_by_id = confirmed_by_id
         self.repository.commit()
 
@@ -156,7 +156,7 @@ class SalaryApiService:
             currency=payload.get("currency", "UZS"),
             notes=payload.get("notes"),
             status="pending",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
 
         self.repository.add(payment)
@@ -187,7 +187,7 @@ class SalaryApiService:
 
         payment.status = new_status
         if new_status == "paid":
-            payment.payment_date = payment_date or datetime.utcnow()
+            payment.payment_date = payment_date or datetime.now(UTC)
             payment.payment_method = payment_method
 
         self.repository.commit()

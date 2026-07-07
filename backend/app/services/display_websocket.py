@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -117,7 +117,7 @@ class DisplayWebSocketManager:
         self.board_states[board_id] = {
             **self.board_states.get(board_id, {}),
             **message,
-            "last_update": datetime.utcnow().isoformat(),
+            "last_update": datetime.now(UTC).isoformat(),
         }
 
         # Отправляем всем подключенным
@@ -164,7 +164,7 @@ class DisplayWebSocketManager:
                     "called_at": (
                         queue_entry.called_at.isoformat()
                         if queue_entry.called_at
-                        else datetime.utcnow().isoformat()
+                        else datetime.now(UTC).isoformat()
                     ),
                     "urgency": "normal",  # normal, urgent, emergency
                 },
@@ -289,7 +289,7 @@ class DisplayWebSocketManager:
                 "data": {
                     "text": announcement_text,
                     "announcement_type": announcement_type,  # info, warning, emergency
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(UTC).isoformat(),
                 },
                 "display_duration": duration,
                 "sound_enabled": announcement_type in ["warning", "emergency"],
@@ -376,7 +376,7 @@ class DisplayWebSocketManager:
                         "announcements": self.board_states.get(board_id, {}).get(
                             "announcements", []
                         ),
-                        "last_update": datetime.utcnow().isoformat(),
+                        "last_update": datetime.now(UTC).isoformat(),
                         "board_id": board_id,
                         "total_entries": len(queue_entries),
                         "waiting_entries": len(
@@ -403,7 +403,7 @@ class DisplayWebSocketManager:
                         "queue_entries": [],
                         "current_call": None,
                         "announcements": [],
-                        "last_update": datetime.utcnow().isoformat(),
+                        "last_update": datetime.now(UTC).isoformat(),
                         "board_id": board_id,
                         "error": "Ошибка загрузки данных",
                     },
@@ -488,7 +488,7 @@ class DisplayWebSocketManager:
                     "department": f"specialist_{queue_entry.queue.specialist_id}",
                     "queue_id": queue_entry.queue.id,
                 },
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # Отправляем на все табло
@@ -519,7 +519,7 @@ class DisplayWebSocketManager:
             "type": "queue_event",
             "event": event_type,
             "department": department,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "data": data,
         }
 

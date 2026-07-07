@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from statistics import mean, median
 from typing import Any
 
@@ -45,7 +45,7 @@ _CACHE_TTL = timedelta(minutes=5)
 def _ensure_cache_fresh(db: Session) -> None:
     """Refresh cache if older than TTL."""
     global _CACHE, _CACHE_TS
-    if _CACHE_TS is not None and datetime.utcnow() - _CACHE_TS < _CACHE_TTL:
+    if _CACHE_TS is not None and datetime.now(UTC) - _CACHE_TS < _CACHE_TTL:
         return
 
     logger.info("wait_time_predictor: refreshing cache...")
@@ -93,7 +93,7 @@ def _ensure_cache_fresh(db: Session) -> None:
         }
 
     _CACHE = new_cache
-    _CACHE_TS = datetime.utcnow()
+    _CACHE_TS = datetime.now(UTC)
 
     # Store specialty + global aggregates in cache under special keys
     _CACHE[("__global__", -1, -1)] = {
@@ -157,7 +157,7 @@ def predict_wait_minutes(
     _ensure_cache_fresh(db)
 
     if target_dt is None:
-        target_dt = datetime.utcnow()
+        target_dt = datetime.now(UTC)
 
     dow = target_dt.isoweekday()  # Mon=1, Sun=7
     hour = target_dt.hour

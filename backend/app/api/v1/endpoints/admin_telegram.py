@@ -1661,7 +1661,7 @@ def _record_staff_action_execution_failure(
         ),
         "result": "failed",
         "reason": reason,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "confirmation_required": True,
         "telegram_execution_enabled": False,
         "domain_mutation": False,
@@ -1862,7 +1862,7 @@ async def send_telegram_ai_approval_alert(
             "domain_mutation": False,
             "requires_human_confirmation": True,
             "protected_route": workflow["protected_route"],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         },
     )
     db.commit()
@@ -1937,7 +1937,7 @@ def capture_telegram_ai_approval_outcome(
             "autonomous_mutation_allowed": False,
             "domain_mutation": False,
             "requires_human_confirmation": True,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         },
     )
     db.commit()
@@ -3269,8 +3269,8 @@ def get_telegram_stats(
             "messages_delivered": 0,
             "messages_failed": 0,
             "by_message_type": {},
-            "period_start": datetime.utcnow() - timedelta(days=days_back),
-            "period_end": datetime.utcnow(),
+            "period_start": datetime.now(UTC) - timedelta(days=days_back),
+            "period_end": datetime.now(UTC),
         }
     except Exception as e:
         raise_admin_telegram_error(

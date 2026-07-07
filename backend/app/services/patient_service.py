@@ -297,7 +297,7 @@ class PatientService:
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка удаления пациента: {str(exc)}",
+                detail="Внутренняя ошибка",
             )
 
         return {"message": "Пациент успешно удален"}

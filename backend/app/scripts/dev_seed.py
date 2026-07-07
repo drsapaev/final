@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, UTC
 from decimal import Decimal
 from typing import Any, Sequence
 
@@ -562,7 +562,7 @@ def _upsert_daily_queue(db: Session, *, doctor: Any, queue_tag: str, cabinet: st
         db.add(queue)
     queue.active = True
     queue.queue_tag = queue_tag
-    queue.opened_at = datetime.utcnow() - timedelta(hours=1)
+    queue.opened_at = datetime.now(UTC) - timedelta(hours=1)
     queue.cabinet_number = cabinet
     queue.cabinet_floor = 2
     queue.cabinet_building = "A"
@@ -609,10 +609,10 @@ def _upsert_queue_entry(
     entry.total_amount = int(service.price or 0)
     entry.source = "desk"
     entry.status = status
-    entry.queue_time = datetime.utcnow() - timedelta(minutes=35 - number)
+    entry.queue_time = datetime.now(UTC) - timedelta(minutes=35 - number)
     entry.priority = 0
     if status == "called":
-        entry.called_at = datetime.utcnow() - timedelta(minutes=5)
+        entry.called_at = datetime.now(UTC) - timedelta(minutes=5)
     return entry
 
 

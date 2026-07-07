@@ -28,7 +28,7 @@ See Also:
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -605,7 +605,7 @@ def open_daily_queue(
 
     # Отмечаем время открытия
     if not daily_queue.opened_at:
-        daily_queue.opened_at = datetime.utcnow()
+        daily_queue.opened_at = datetime.now(UTC)
 
     db.commit()
     db.refresh(daily_queue)

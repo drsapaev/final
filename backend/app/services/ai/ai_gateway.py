@@ -16,7 +16,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from .ai_interfaces import (
@@ -58,7 +58,7 @@ class CircuitBreaker:
         if state == "OPEN":
             # Проверяем таймаут
             last = self._last_failure.get(provider)
-            if last and datetime.utcnow() - last > timedelta(seconds=self.recovery_timeout):
+            if last and datetime.now(UTC) - last > timedelta(seconds=self.recovery_timeout):
                 self._state[provider] = "HALF_OPEN"
                 logger.info(f"Circuit breaker for {provider}: OPEN -> HALF_OPEN")
                 return True
@@ -77,7 +77,7 @@ class CircuitBreaker:
     def record_failure(self, provider: str):
         """Неудачный запрос"""
         self._failures[provider] = self._failures.get(provider, 0) + 1
-        self._last_failure[provider] = datetime.utcnow()
+        self._last_failure[provider] = datetime.now(UTC)
 
         if self._failures[provider] >= self.failure_threshold:
             self._state[provider] = "OPEN"
@@ -150,7 +150,7 @@ class AIGateway(IAIGateway):
         8. Return response
         """
         request_id = str(uuid.uuid4())[:8]
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         logger.info(
             f"[{request_id}] AI Gateway: {task_type.value} "
@@ -190,7 +190,7 @@ class AIGateway(IAIGateway):
             )
 
             # Calculate latency
-            latency_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            latency_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
             response.latency_ms = latency_ms
             response.request_id = request_id
 
@@ -220,7 +220,7 @@ class AIGateway(IAIGateway):
 
         except Exception as e:
             logger.exception(f"[{request_id}] AI Gateway error: {e}")
-            latency_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            latency_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
             return AIResponse(
                 status="error",
@@ -471,7 +471,7 @@ class AIGateway(IAIGateway):
 
         response, expires_at = self._cache[cache_key]
 
-        if datetime.utcnow() > expires_at:
+        if datetime.now(UTC) > expires_at:
             del self._cache[cache_key]
             return None
 
@@ -480,7 +480,7 @@ class AIGateway(IAIGateway):
 
     def _save_to_cache(self, cache_key: str, response: AIResponse):
         """Save response to cache"""
-        expires_at = datetime.utcnow() + self._cache_ttl
+        expires_at = datetime.now(UTC) + self._cache_ttl
         self._cache[cache_key] = (response.model_copy(), expires_at)
 
     def clear_cache(self):

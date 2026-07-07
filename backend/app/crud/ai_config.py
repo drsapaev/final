@@ -2,7 +2,7 @@
 CRUD операции для AI конфигурации
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import and_
@@ -238,7 +238,7 @@ def get_ai_usage_stats(
     specialty: str | None = None,
 ) -> dict[str, Any]:
     """Получить статистику использования AI"""
-    start_date = datetime.utcnow() - timedelta(days=days_back)
+    start_date = datetime.now(UTC) - timedelta(days=days_back)
 
     query = db.query(AIUsageLog).filter(AIUsageLog.created_at >= start_date)
 
@@ -309,7 +309,7 @@ def get_ai_usage_stats(
         "by_task_type": by_task_type,
         "by_specialty": by_specialty,
         "period_start": start_date,
-        "period_end": datetime.utcnow(),
+        "period_end": datetime.now(UTC),
     }
 
 

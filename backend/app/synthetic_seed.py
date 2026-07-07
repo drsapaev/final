@@ -35,7 +35,7 @@ import logging
 import os
 import random
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from pathlib import Path
 from typing import Any
 
@@ -171,14 +171,14 @@ def _generate_patient() -> dict[str, Any]:
         "doc_number": _random_passport(),
         "address": f"г. Ташкент, {random.choice(DISTRICTS)} район, ул. {random.choice(['Мирзо Улугбека', 'Амира Темура', 'Бабура', 'Шарафа Рашидова'])}, д. {random.randint(1, 200)}",
         "is_deleted": False,
-        "created_at": datetime.utcnow() - timedelta(days=random.randint(1, 365)),
+        "created_at": datetime.now(UTC) - timedelta(days=random.randint(1, 365)),
     }
 
 
 def _generate_visit(patient_id: int, specialty: str) -> dict[str, Any]:
     complaints = random.choice(COMPLAINTS_BY_SPECIALTY.get(specialty, ["Жалобы на общее самочувствие"]))
     icd10 = random.choice(ICD10_BY_SPECIALTY.get(specialty, ["R69"]))
-    visit_date = datetime.utcnow() - timedelta(days=random.randint(0, 90))
+    visit_date = datetime.now(UTC) - timedelta(days=random.randint(0, 90))
 
     return {
         "patient_id": patient_id,

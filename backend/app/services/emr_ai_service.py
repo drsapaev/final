@@ -190,7 +190,7 @@ class EMRService:
             logger.error(f"Ошибка валидации EMR: {e}")
             return {
                 "is_valid": False,
-                "errors": [f"Ошибка валидации: {str(e)}"],
+                "errors": ["Внутренняя ошибка"],
                 "warnings": [],
                 "suggestions": [],
             }

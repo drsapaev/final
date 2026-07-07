@@ -1118,7 +1118,7 @@ def _patient_mini_app_entry_token_signature(body: str) -> str:
 
 
 def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
-    expires_at = datetime.utcnow() + timedelta(
+    expires_at = datetime.now(UTC) + timedelta(
         seconds=PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS
     )
     body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(
@@ -1137,7 +1137,7 @@ def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
 
 
 def _build_patient_onboarding_entry_token(chat_id: int, section: str = "appointments") -> str:
-    expires_at = datetime.utcnow() + timedelta(
+    expires_at = datetime.now(UTC) + timedelta(
         seconds=PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS
     )
     body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(
@@ -1626,7 +1626,7 @@ async def _send_patient_bot_reply(
                 template_key=template_key,
                 message_text=str(text or ""),
                 status="sent" if sent else "failed",
-                sent_at=datetime.utcnow() if sent else None,
+                sent_at=datetime.now(UTC) if sent else None,
             )
         )
         db.commit()
@@ -1687,7 +1687,7 @@ def _upsert_ticket_qr_telegram_user(
         "last_name": from_user.get("last_name"),
         "active": True,
         "blocked": False,
-        "last_activity": datetime.utcnow(),
+        "last_activity": datetime.now(UTC),
     }
     if language_code is not None:
         payload["language_code"] = _normalize_patient_language(language_code)
@@ -1749,7 +1749,7 @@ def _upsert_staff_link_telegram_user(
         "last_name": from_user.get("last_name"),
         "active": True,
         "blocked": False,
-        "last_activity": datetime.utcnow(),
+        "last_activity": datetime.now(UTC),
     }
 
     if telegram_user:
@@ -1793,7 +1793,7 @@ def _record_staff_link_audit(
         "target_type": "telegram_user",
         "target_reference_hash": _staff_telegram_reference_hash(chat_id),
         "result": result,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "request_id": request_id,
     }
     if reason:
@@ -1829,7 +1829,7 @@ def _record_staff_command_audit(
         "target_type": "telegram_user",
         "target_reference_hash": _staff_telegram_reference_hash(chat_id),
         "result": result,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "request_id": request_id,
         "command_key": command_key,
         "read_only": True,
@@ -1908,7 +1908,7 @@ def _record_staff_action_denied_audit(
         "target_type": "telegram_staff_action",
         "target_reference_hash": _staff_action_reference_hash(operation_key),
         "result": "denied",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "request_id": request_id,
         "operation_key": operation_key,
         "command_key": command_key,
@@ -1950,7 +1950,7 @@ def _record_staff_action_confirmation_requested_audit(
         "target_type": "telegram_staff_action",
         "target_reference_hash": target_reference_hash,
         "result": "confirmation_requested",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "request_id": request_id,
         "operation_key": operation_key,
         "command_key": command_key,
@@ -3632,7 +3632,7 @@ def _build_lab_report_pdf(db: Session, instance: LabReportInstance) -> tuple[str
     service = LabReportingService(db)
     materialized_sections = service.materialize_instance(instance)
     critical_findings = service.summarize_critical_findings(materialized_sections)
-    report_date = instance.finalized_at or instance.created_at or datetime.utcnow()
+    report_date = instance.finalized_at or instance.created_at or datetime.now(UTC)
     pdf_bytes = lab_report_pdf_service.render_report(
         {
             "template_name": instance.template.name,
@@ -3675,7 +3675,7 @@ def _log_lab_report_document_send(
                 error_message=error_message,
                 related_entity_type="lab_report_instance",
                 related_entity_id=instance_id,
-                sent_at=datetime.utcnow() if status_value == "sent" else None,
+                sent_at=datetime.now(UTC) if status_value == "sent" else None,
             )
         )
         db.commit()
@@ -3727,7 +3727,7 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
             filename, pdf_bytes, caption = _build_lab_report_pdf(db, instance)
             if language == TELEGRAM_LANGUAGE_UZ:
                 report_date = (
-                    instance.finalized_at or instance.created_at or datetime.utcnow()
+                    instance.finalized_at or instance.created_at or datetime.now(UTC)
                 )
                 caption = _lab_report_document_caption(instance, report_date, language)
             send_document = getattr(bot_service, "_send_document", None)
@@ -3870,7 +3870,7 @@ async def _set_notification_consent(
         telegram_user.notifications_enabled = enabled
         telegram_user.appointment_reminders = enabled
         telegram_user.lab_notifications = enabled
-        telegram_user.last_activity = datetime.utcnow()
+        telegram_user.last_activity = datetime.now(UTC)
         db.commit()
 
     result_key = "notifications_enabled" if enabled else "notifications_disabled"

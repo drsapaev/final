@@ -17,7 +17,7 @@ import inspect
 import logging
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
@@ -70,7 +70,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expires_delta = timedelta(
             minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30)
         )
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(UTC) + expires_delta
     to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     encoded_jwt = jwt.encode(
         to_encode,

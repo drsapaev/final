@@ -3,7 +3,7 @@ MCP сервер для лабораторных анализов
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager
@@ -206,7 +206,7 @@ class MedicalLabMCPServer(BaseMCPServer):
                 "ai_interpretation": ai_interpretation,
                 "metadata": {
                     "provider_used": provider or "default",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "patient_age": patient_info.get("age") if patient_info else None,
                     "patient_gender": (
                         patient_info.get("gender") if patient_info else None
@@ -222,7 +222,7 @@ class MedicalLabMCPServer(BaseMCPServer):
             return response
 
         except Exception as e:
-            logger.error(f"Error interpreting lab results: {str(e)}")
+            logger.error("Internal error")
             return {
                 "status": "error",
                 "error": f"Failed to interpret results: {str(e)}",

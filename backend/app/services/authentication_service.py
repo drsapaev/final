@@ -5,7 +5,7 @@
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from jose import jwt
@@ -49,9 +49,9 @@ class AuthenticationService:
         """Создает JWT access токен"""
         to_encode = data.copy()
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(UTC) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now(UTC) + timedelta(
                 minutes=self.access_token_expire_minutes
             )
 
@@ -64,7 +64,7 @@ class AuthenticationService:
     def create_refresh_token(self, user_id: int, jti: str) -> str:
         """Создает JWT refresh токен"""
         data = {"user_id": user_id, "jti": jti, "type": "refresh"}
-        expire = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
+        expire = datetime.now(UTC) + timedelta(days=self.refresh_token_expire_days)
         data.update({"exp": expire})
 
         encoded_jwt = jwt.encode(data, settings.SECRET_KEY, algorithm=self.algorithm)
@@ -273,7 +273,7 @@ class AuthenticationService:
         if requires_2fa:
             pending_2fa_token = secrets.token_urlsafe(32)
             # Храним маркер в таблице сессий как незавершённую аутентификацию
-            session_expires = datetime.utcnow() + timedelta(
+            session_expires = datetime.now(UTC) + timedelta(
                 hours=self.session_expire_hours
             )
             user_session = UserSession(
@@ -319,7 +319,7 @@ class AuthenticationService:
             user_id=user.id,
             token=refresh_token,
             jti=jti,
-            expires_at=datetime.utcnow()
+            expires_at=datetime.now(UTC)
             + timedelta(days=self.refresh_token_expire_days),
             ip_address=ip_address,
             user_agent=user_agent,
@@ -370,7 +370,7 @@ class AuthenticationService:
                 .filter(
                     and_(
                         RefreshToken.token == refresh_token,
-                        RefreshToken.expires_at > datetime.utcnow(),
+                        RefreshToken.expires_at > datetime.now(UTC),
                     )
                 )
                 .first()
@@ -387,11 +387,11 @@ class AuthenticationService:
                 # Отзываем ВСЕ refresh-токены пользователя (session family).
                 db.query(RefreshToken).filter(
                     RefreshToken.user_id == token_obj.user_id
-                ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+                ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
                 db.query(UserSession).filter(
                     UserSession.user_id == token_obj.user_id,
                     UserSession.revoked == False,
-                ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+                ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
                 db.commit()
                 from app.services.token_blacklist_service import token_blacklist_service
                 token_blacklist_service.blacklist_all_user_tokens(
@@ -429,13 +429,13 @@ class AuthenticationService:
 
             # 6) Отзываем старый refresh-токен и записываем новый в БД.
             token_obj.revoked = True
-            token_obj.revoked_at = datetime.utcnow()
+            token_obj.revoked_at = datetime.now(UTC)
 
             new_token_obj = RefreshToken(
                 user_id=user.id,
                 token=new_refresh_token,
                 jti=new_jti,
-                expires_at=datetime.utcnow()
+                expires_at=datetime.now(UTC)
                 + timedelta(days=self.refresh_token_expire_days),
                 ip_address=token_obj.ip_address,
                 user_agent=token_obj.user_agent,
@@ -448,7 +448,7 @@ class AuthenticationService:
                 UserSession.user_id == user.id,
                 UserSession.refresh_token == refresh_token,
                 UserSession.revoked == False,
-            ).update({"refresh_token": new_refresh_token, "last_activity": datetime.utcnow()})
+            ).update({"refresh_token": new_refresh_token, "last_activity": datetime.now(UTC)})
 
             db.commit()
 
@@ -484,14 +484,14 @@ class AuthenticationService:
             if logout_all and user_id:
                 # Отзываем все refresh токены пользователя
                 db.query(RefreshToken).filter(RefreshToken.user_id == user_id).update(
-                    {"revoked": True, "revoked_at": datetime.utcnow()}
+                    {"revoked": True, "revoked_at": datetime.now(UTC)}
                 )
 
                 # Деактивируем все сессии (модель использует `revoked`, не `is_active`)
                 db.query(UserSession).filter(
                     UserSession.user_id == user_id,
                     UserSession.revoked == False,
-                ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+                ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
 
                 db.commit()
 
@@ -514,13 +514,13 @@ class AuthenticationService:
                 )
                 if token_obj:
                     token_obj.revoked = True
-                    token_obj.revoked_at = datetime.utcnow()
+                    token_obj.revoked_at = datetime.now(UTC)
 
                     # Деактивируем ТОЛЬКО связанную сессию (не все сессии пользователя).
                     db.query(UserSession).filter(
                         UserSession.user_id == token_obj.user_id,
                         UserSession.refresh_token == refresh_token,
-                    ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+                    ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
 
                     db.commit()
 
@@ -569,11 +569,11 @@ class AuthenticationService:
                     PasswordResetToken.user_id == user.id,
                     PasswordResetToken.used == False,
                 )
-            ).update({"used": True, "used_at": datetime.utcnow()})
+            ).update({"used": True, "used_at": datetime.now(UTC)})
 
             # Создаем новый токен
             token = secrets.token_urlsafe(32)
-            expires_at = datetime.utcnow() + timedelta(
+            expires_at = datetime.now(UTC) + timedelta(
                 hours=self.password_reset_expire_hours
             )
 
@@ -619,7 +619,7 @@ class AuthenticationService:
                     and_(
                         PasswordResetToken.token == token,
                         PasswordResetToken.used == False,
-                        PasswordResetToken.expires_at > datetime.utcnow(),
+                        PasswordResetToken.expires_at > datetime.now(UTC),
                     )
                 )
                 .first()
@@ -638,19 +638,19 @@ class AuthenticationService:
 
             user.hashed_password = get_password_hash(new_password)
             reset_token.used = True
-            reset_token.used_at = datetime.utcnow()
+            reset_token.used_at = datetime.now(UTC)
 
             # SECURITY: Отзываем все refresh токены пользователя ВНУТРИ транзакции
             # (раньше update шёл после commit и терялся).
             db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update(
-                {"revoked": True, "revoked_at": datetime.utcnow()}
+                {"revoked": True, "revoked_at": datetime.now(UTC)}
             )
 
             # SECURITY: Деактивируем все активные сессии пользователя
             db.query(UserSession).filter(
                 UserSession.user_id == user.id,
                 UserSession.revoked == False,
-            ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+            ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
 
             db.commit()
 
@@ -695,14 +695,14 @@ class AuthenticationService:
 
             # SECURITY: Отзываем все refresh токены ВНУТРИ транзакции.
             db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update(
-                {"revoked": True, "revoked_at": datetime.utcnow()}
+                {"revoked": True, "revoked_at": datetime.now(UTC)}
             )
 
             # SECURITY: Деактивируем все активные сессии
             db.query(UserSession).filter(
                 UserSession.user_id == user.id,
                 UserSession.revoked == False,
-            ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+            ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
 
             db.commit()
 
@@ -742,11 +742,11 @@ class AuthenticationService:
                     EmailVerificationToken.user_id == user.id,
                     EmailVerificationToken.verified == False,
                 )
-            ).update({"verified": True, "verified_at": datetime.utcnow()})
+            ).update({"verified": True, "verified_at": datetime.now(UTC)})
 
             # Создаем новый токен
             token = secrets.token_urlsafe(32)
-            expires_at = datetime.utcnow() + timedelta(
+            expires_at = datetime.now(UTC) + timedelta(
                 hours=self.email_verification_expire_hours
             )
 
@@ -784,7 +784,7 @@ class AuthenticationService:
                     and_(
                         EmailVerificationToken.token == token,
                         EmailVerificationToken.verified == False,
-                        EmailVerificationToken.expires_at > datetime.utcnow(),
+                        EmailVerificationToken.expires_at > datetime.now(UTC),
                     )
                 )
                 .first()
@@ -798,7 +798,7 @@ class AuthenticationService:
 
             # Отмечаем email как верифицированный
             verification_token.verified = True
-            verification_token.verified_at = datetime.utcnow()
+            verification_token.verified_at = datetime.now(UTC)
 
             db.commit()
 
@@ -973,7 +973,7 @@ class AuthenticationService:
         """Проверяет, заблокирован ли пользователь"""
         try:
             # Подсчитываем неудачные попытки за последние 15 минут
-            lockout_time = datetime.utcnow() - timedelta(
+            lockout_time = datetime.now(UTC) - timedelta(
                 minutes=self.lockout_duration_minutes
             )
             failed_attempts = (
@@ -1006,7 +1006,7 @@ class AuthenticationService:
                 and_(
                     UserSession.user_id == user_id,
                     UserSession.revoked == False,
-                    UserSession.expires_at > datetime.utcnow(),
+                    UserSession.expires_at > datetime.now(UTC),
                 )
             )
 
@@ -1045,7 +1045,7 @@ class AuthenticationService:
                 query = query.filter(
                     and_(
                         UserSession.revoked == False,
-                        UserSession.expires_at > datetime.utcnow(),
+                        UserSession.expires_at > datetime.now(UTC),
                     )
                 )
 
@@ -1080,7 +1080,7 @@ class AuthenticationService:
                             UserSession.ip == ip_address,
                             UserSession.user_agent == user_agent,
                             UserSession.revoked == False,
-                            UserSession.expires_at > datetime.utcnow(),
+                            UserSession.expires_at > datetime.now(UTC),
                         )
                     )
                     .first()
@@ -1089,10 +1089,10 @@ class AuthenticationService:
             if existing_session:
                 # Обновляем существующую сессию
                 existing_session.refresh_token = refresh_token
-                existing_session.expires_at = datetime.utcnow() + timedelta(
+                existing_session.expires_at = datetime.now(UTC) + timedelta(
                     hours=self.session_expire_hours
                 )
-                existing_session.last_activity = datetime.utcnow()
+                existing_session.last_activity = datetime.now(UTC)
                 if device_fingerprint:
                     existing_session.device_fingerprint = device_fingerprint
 
@@ -1106,12 +1106,12 @@ class AuthenticationService:
             session = UserSession(
                 user_id=user_id,
                 refresh_token=refresh_token,
-                expires_at=datetime.utcnow()
+                expires_at=datetime.now(UTC)
                 + timedelta(hours=self.session_expire_hours),
                 ip=ip_address,
                 user_agent=user_agent,
                 device_fingerprint=device_fingerprint,
-                last_activity=datetime.utcnow(),
+                last_activity=datetime.now(UTC),
             )
 
             db.add(session)
@@ -1133,7 +1133,7 @@ class AuthenticationService:
         try:
             session = db.query(UserSession).filter(UserSession.id == session_id).first()
             if session and not session.revoked:
-                session.last_activity = datetime.utcnow()
+                session.last_activity = datetime.now(UTC)
                 db.commit()
                 return True
             return False
@@ -1153,7 +1153,7 @@ class AuthenticationService:
             session = db.query(UserSession).filter(UserSession.id == session_id).first()
             if session and not session.revoked:
                 session.revoked = True
-                session.revoked_at = datetime.utcnow()
+                session.revoked_at = datetime.now(UTC)
                 # session.revoke_reason = reason  # Поле может не существовать в модели
 
                 db.commit()
@@ -1201,7 +1201,7 @@ class AuthenticationService:
 
             for session in sessions:
                 session.revoked = True
-                session.revoked_at = datetime.utcnow()
+                session.revoked_at = datetime.now(UTC)
                 # session.revoke_reason = reason  # Поле может не существовать в модели
                 revoked_count += 1
 
@@ -1235,7 +1235,7 @@ class AuthenticationService:
         try:
             expired_sessions = (
                 db.query(UserSession)
-                .filter(UserSession.expires_at <= datetime.utcnow())
+                .filter(UserSession.expires_at <= datetime.now(UTC))
                 .all()
             )
 
@@ -1244,7 +1244,7 @@ class AuthenticationService:
             for session in expired_sessions:
                 if not session.revoked:
                     session.revoked = True
-                    session.revoked_at = datetime.utcnow()
+                    session.revoked_at = datetime.now(UTC)
                     # session.revoke_reason = "expired"  # Поле может не существовать в модели
 
             db.commit()
@@ -1282,7 +1282,7 @@ class AuthenticationService:
                 "revoked": session.revoked,
                 "revoked_at": session.revoked_at,
                 "is_active": not session.revoked
-                and session.expires_at > datetime.utcnow(),
+                and session.expires_at > datetime.now(UTC),
             }
 
         except Exception as e:
@@ -1303,7 +1303,7 @@ class AuthenticationService:
                         UserSession.user_id == user_id,
                         UserSession.refresh_token == refresh_token,
                         UserSession.revoked == False,
-                        UserSession.expires_at > datetime.utcnow(),
+                        UserSession.expires_at > datetime.now(UTC),
                     )
                 )
                 .first()
@@ -1312,7 +1312,7 @@ class AuthenticationService:
             if session:
                 # Обновляем время последней активности если поле существует
                 if hasattr(session, 'last_activity'):
-                    session.last_activity = datetime.utcnow()
+                    session.last_activity = datetime.now(UTC)
                     db.commit()
 
             return session

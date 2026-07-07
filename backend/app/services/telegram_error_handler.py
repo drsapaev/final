@@ -6,7 +6,7 @@ Telegram Bot Error Handler
 import asyncio
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ class TelegramErrorHandler:
         return {
             "error_counts": self.error_counts.copy(),
             "total_errors": sum(self.error_counts.values()),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     def reset_stats(self):

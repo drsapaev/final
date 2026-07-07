@@ -9,7 +9,7 @@ Doctor Templates Service - персональная клиническая па�
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,7 +77,7 @@ class DoctorTemplatesService:
             if existing:
                 # Обновляем счетчик использования
                 existing.usage_count += 1
-                existing.last_used_at = datetime.utcnow()
+                existing.last_used_at = datetime.now(UTC)
                 # Восстанавливаем если был удалён
                 if existing.is_deleted:
                     existing.is_deleted = False
@@ -104,8 +104,8 @@ class DoctorTemplatesService:
                     treatment_text=normalized,
                     treatment_hash=treatment_hash,
                     usage_count=1,
-                    last_used_at=datetime.utcnow(),
-                    created_at=datetime.utcnow(),
+                    last_used_at=datetime.now(UTC),
+                    created_at=datetime.now(UTC),
                 )
                 self.db.add(template)
                 await self.db.commit()
@@ -172,7 +172,7 @@ class DoctorTemplatesService:
 
             # Calculate staleness: >12 months without use
             from datetime import timedelta
-            stale_threshold = datetime.utcnow() - timedelta(days=365)
+            stale_threshold = datetime.now(UTC) - timedelta(days=365)
 
             def is_stale(last_used: datetime) -> bool:
                 return last_used < stale_threshold
@@ -231,7 +231,7 @@ class DoctorTemplatesService:
             if template:
                 # Soft delete - врач может "передумать"
                 template.is_deleted = True
-                template.deleted_at = datetime.utcnow()
+                template.deleted_at = datetime.now(UTC)
                 await self.db.commit()
                 logger.info(f"Soft-deleted treatment template: {template_id}")
                 return True
@@ -330,7 +330,7 @@ class DoctorTemplatesService:
 
             # Pin this template
             template.is_pinned = True
-            template.pinned_at = datetime.utcnow()
+            template.pinned_at = datetime.now(UTC)
 
             await self.db.commit()
             logger.info(f"Pinned template: {template_id}")
@@ -423,7 +423,7 @@ class DoctorTemplatesService:
                 if existing:
                     # Already exists, just increment usage
                     existing.usage_count += 1
-                    existing.last_used_at = datetime.utcnow()
+                    existing.last_used_at = datetime.now(UTC)
                     if existing.is_deleted:
                         existing.is_deleted = False
                         existing.deleted_at = None
@@ -438,8 +438,8 @@ class DoctorTemplatesService:
                     treatment_text=normalized,
                     treatment_hash=new_hash,
                     usage_count=1,
-                    last_used_at=datetime.utcnow(),
-                    created_at=datetime.utcnow(),
+                    last_used_at=datetime.now(UTC),
+                    created_at=datetime.now(UTC),
                     is_pinned=False,  # New template not pinned by default
                 )
                 self.db.add(new_template)
@@ -452,7 +452,7 @@ class DoctorTemplatesService:
                 # Update existing template
                 original.treatment_text = normalized
                 original.treatment_hash = new_hash
-                original.last_used_at = datetime.utcnow()
+                original.last_used_at = datetime.now(UTC)
                 await self.db.commit()
                 await self.db.refresh(original)
                 logger.info(f"Updated template: {template_id}")

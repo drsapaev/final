@@ -8,7 +8,7 @@
 - Блокировке пользователя
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy.orm import Session
 
@@ -43,7 +43,7 @@ class TokenBlacklistService:
         """
         try:
             # Проверяем, не истёк ли уже токен
-            if expires_at < datetime.utcnow():
+            if expires_at < datetime.now(UTC):
                 logger.debug(f"Token {jti} already expired, skipping blacklist")
                 return True
 
@@ -152,7 +152,7 @@ class TokenBlacklistService:
             # expires_at > now). jti должен быть уникален (NOT NULL UNIQUE в модели),
             # поэтому вставляем с timestamp-суффиксом; истёкшие sentinel-записи
             # удаляются в cleanup_expired_tokens.
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             future_expiry = now + timedelta(days=30)  # Покрывает максимальный access-token TTL (30 min) с запасом
 
             # Удаляем предыдущие активные sentinel-записи этого пользователя
@@ -194,7 +194,7 @@ class TokenBlacklistService:
         """
         try:
             deleted = db.query(TokenBlacklist).filter(
-                TokenBlacklist.expires_at < datetime.utcnow()
+                TokenBlacklist.expires_at < datetime.now(UTC)
             ).delete()
             db.commit()
 

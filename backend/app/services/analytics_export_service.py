@@ -6,7 +6,7 @@ import csv
 import json
 import logging
 import zipfile
-from datetime import datetime
+from datetime import datetime, UTC
 from io import BytesIO, StringIO
 from typing import Any
 
@@ -32,7 +32,7 @@ class AnalyticsExportService:
             # Добавляем метаданные экспорта
             export_data = {
                 "export_metadata": {
-                    "exported_at": datetime.utcnow().isoformat(),
+                    "exported_at": datetime.now(UTC).isoformat(),
                     "export_format": "json",
                     "export_version": "1.0",
                     "filename": filename,
@@ -67,7 +67,7 @@ class AnalyticsExportService:
 
             # Записываем метаданные
             writer.writerow(["Analytics Report"])
-            writer.writerow(["Exported at", datetime.utcnow().isoformat()])
+            writer.writerow(["Exported at", datetime.now(UTC).isoformat()])
             writer.writerow(["Export format", "CSV"])
             writer.writerow([])
 

@@ -966,7 +966,7 @@ def complete_patient_visit(
                         and not visit.payment_processed_at
                     ):
                         visit.payment_processed_at = (
-                            payment.paid_at or datetime.utcnow()
+                            payment.paid_at or datetime.now(UTC)
                         )
                 # ✅ Также обновляем соответствующий Appointment, если он существует
                 from app.models.appointment import Appointment
@@ -995,7 +995,7 @@ def complete_patient_visit(
                         and not appointment.payment_processed_at
                     ):
                         appointment.payment_processed_at = (
-                            payment.paid_at or datetime.utcnow()
+                            payment.paid_at or datetime.now(UTC)
                         )
 
                 if visit_data:
@@ -1455,7 +1455,7 @@ async def schedule_next_visit(
 
         # Генерируем токен подтверждения
         confirmation_token = str(uuid.uuid4())
-        expires_at = datetime.utcnow() + timedelta(
+        expires_at = datetime.now(UTC) + timedelta(
             hours=48
         )  # 48 часов на подтверждение
 

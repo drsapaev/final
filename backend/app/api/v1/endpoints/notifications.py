@@ -44,7 +44,7 @@ _TIME_PATTERN = re.compile(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")
 
 def _combine_date_and_time(date_value, time_value: str | None) -> datetime:
     if date_value is None:
-        return datetime.utcnow()
+        return datetime.now(UTC)
 
     if not time_value:
         return datetime.combine(date_value, datetime.min.time())
@@ -293,7 +293,7 @@ async def send_appointment_reminder(
     return {
         "message": "Напоминание отправлено",
         "patient_id": patient_id,
-        "sent_at": datetime.utcnow().isoformat(),
+        "sent_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -332,7 +332,7 @@ async def send_visit_confirmation(
     return {
         "message": "Подтверждение визита отправлено",
         "visit_id": visit_id,
-        "sent_at": datetime.utcnow().isoformat(),
+        "sent_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -372,7 +372,7 @@ async def send_payment_notification(
     return {
         "message": "Уведомление об оплате отправлено",
         "visit_id": visit_id,
-        "sent_at": datetime.utcnow().isoformat(),
+        "sent_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -400,7 +400,7 @@ async def send_queue_update(
         "message": "Обновление очереди отправлено",
         "department": department,
         "current_number": current_number,
-        "sent_at": datetime.utcnow().isoformat(),
+        "sent_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -428,7 +428,7 @@ async def send_system_alert(
     return {
         "message": "Системное оповещение отправлено",
         "alert_type": alert_type,
-        "sent_at": datetime.utcnow().isoformat(),
+        "sent_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -440,7 +440,7 @@ async def test_notifications(
     """Тестирование всех типов уведомлений"""
     test_email = "test@example.com"
     test_phone = "+998901234567"
-    test_date = datetime.utcnow()
+    test_date = datetime.now(UTC)
 
     # Тестируем все типы уведомлений
     background_tasks.add_task(
@@ -485,7 +485,7 @@ async def test_notifications(
 
     return {
         "message": "Тестовые уведомления отправлены",
-        "sent_at": datetime.utcnow().isoformat(),
+        "sent_at": datetime.now(UTC).isoformat(),
     }
 
 

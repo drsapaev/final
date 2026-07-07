@@ -3,7 +3,7 @@ MCP сервер для анализа жалоб пациентов
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager
@@ -170,7 +170,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
                 "data": result,
                 "metadata": {
                     "provider_used": provider or "default",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "complaint_length": len(complaint),
                     "validation_score": validation_result.get("confidence", 0),
                 },
@@ -184,7 +184,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
             return enhanced_result
 
         except Exception as e:
-            logger.error(f"Error analyzing complaint: {str(e)}")
+            logger.error("Internal error")
             return {"status": "error", "error": f"Analysis failed: {str(e)}"}
 
     @MCPTool(

@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -152,7 +152,7 @@ class ForceMajeureService:
                     source="force_majeure_transfer",
                     status="waiting",
                     priority=self.TRANSFER_PRIORITY,  # Высокий приоритет
-                    queue_time=datetime.utcnow()  # Новое время в очереди
+                    queue_time=datetime.now(UTC)  # Новое время в очереди
                 )
 
                 self.db.add(new_entry)

@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -120,7 +120,7 @@ class EMRLabIntegrationService:
 
             # Обновляем EMR
             emr_record.lab_results = current_lab_results
-            emr_record.updated_at = datetime.utcnow()
+            emr_record.updated_at = datetime.now(UTC)
             db.commit()
 
             return {
@@ -181,7 +181,7 @@ class EMRLabIntegrationService:
         """Сгенерировать сводку лабораторных данных для EMR"""
         try:
             # Получаем последние результаты (за последние 30 дней)
-            date_from = datetime.utcnow() - timedelta(days=30)
+            date_from = datetime.now(UTC) - timedelta(days=30)
             results = await self.get_patient_lab_results(
                 db, patient_id, date_from=date_from
             )
@@ -241,7 +241,7 @@ class EMRLabIntegrationService:
                 "is_abnormal": is_abnormal,
                 "priority": "high" if is_abnormal else "normal",
                 "message": f"Готов результат анализа: {result.test_name}",
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.now(UTC),
             }
 
             # Здесь будет отправка уведомления (email, push, etc.)

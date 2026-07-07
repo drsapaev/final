@@ -932,7 +932,7 @@ class MedicalEquipmentService:
                 except Exception as e:
                     results["tests"]["measurement"] = {
                         "passed": False,
-                        "message": f"Ошибка измерения: {str(e)}",
+                        "message": "Внутренняя ошибка",
                     }
 
             results["success"] = all(

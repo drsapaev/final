@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -44,14 +44,14 @@ class ActivationAdminRepository:
 
     def revoke(self, row: Activation) -> Activation:
         row.status = ActivationStatus.REVOKED
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(UTC)
         self.db.flush()
         self.db.commit()
         self.db.refresh(row)
         return row
 
     def extend(self, row: Activation, *, days: int) -> Activation:
-        base = row.expiry_date or datetime.utcnow()
+        base = row.expiry_date or datetime.now(UTC)
         row.expiry_date = base + timedelta(days=days)
         if row.status in (
             ActivationStatus.EXPIRED,
@@ -59,7 +59,7 @@ class ActivationAdminRepository:
             ActivationStatus.TRIAL,
         ):
             row.status = ActivationStatus.ACTIVE
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(UTC)
         self.db.flush()
         self.db.commit()
         self.db.refresh(row)

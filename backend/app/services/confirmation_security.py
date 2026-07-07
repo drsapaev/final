@@ -7,7 +7,7 @@ import hashlib
 import logging
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import and_
@@ -107,7 +107,7 @@ class ConfirmationSecurityService:
             # 2. Проверяем срок действия токена
             if (
                 visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.utcnow()
+                and visit.confirmation_expires_at < datetime.now(UTC)
             ):
                 logger.debug("Confirmation token expired visit_id=%s", visit.id)
                 self._log_security_event(
@@ -255,7 +255,7 @@ class ConfirmationSecurityService:
         random_part = secrets.token_urlsafe(32)
 
         # Добавляем контекстную информацию для дополнительной безопасности
-        context = f"{visit_id}:{datetime.utcnow().timestamp()}"
+        context = f"{visit_id}:{datetime.now(UTC).timestamp()}"
         context_hash = hashlib.sha256(context.encode()).hexdigest()[:16]
 
         # Комбинируем части
@@ -332,7 +332,7 @@ class ConfirmationSecurityService:
                 .filter(
                     and_(
                         Visit.status == "pending_confirmation",
-                        Visit.confirmation_expires_at < datetime.utcnow(),
+                        Visit.confirmation_expires_at < datetime.now(UTC),
                     )
                 )
                 .all()
@@ -375,7 +375,7 @@ class ConfirmationSecurityService:
         Получает статистику безопасности за указанный период
         """
         try:
-            since = datetime.utcnow() - timedelta(hours=hours)
+            since = datetime.now(UTC) - timedelta(hours=hours)
 
             # Здесь должна быть логика получения статистики из таблицы аудита
             # Пока возвращаем заглушку
@@ -452,7 +452,7 @@ class ConfirmationSecurityService:
 
             # 3. Проверяем временные аномалии
             if visit.created_at:
-                time_since_creation = datetime.utcnow() - visit.created_at
+                time_since_creation = datetime.now(UTC) - visit.created_at
                 if (
                     time_since_creation.total_seconds() < 60
                 ):  # Слишком быстро после создания
@@ -488,7 +488,7 @@ class ConfirmationSecurityService:
     def _log_security_event(self, event_type: str, data: dict[str, Any]):
         """Логирует событие безопасности"""
         event = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "event_type": event_type,
             "data": data,
         }

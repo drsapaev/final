@@ -5,7 +5,7 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 import aiohttp
@@ -88,14 +88,14 @@ class AIService:
                 "success": True,
                 "analysis": result,
                 "provider": provider.name,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     async def suggest_icd10(
@@ -138,14 +138,14 @@ class AIService:
                 "success": True,
                 "suggestions": result,
                 "provider": provider.name,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     async def analyze_document(
@@ -191,14 +191,14 @@ class AIService:
                 "success": True,
                 "analysis": result,
                 "provider": provider.name,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     async def _call_ai_provider(self, provider: AIProvider, prompt: str) -> str:
@@ -214,7 +214,7 @@ class AIService:
                 raise Exception(f"Неподдерживаемый провайдер: {provider.name}")
 
         except Exception as e:
-            raise Exception(f"Ошибка вызова AI провайдера: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def _call_openai(self, provider: AIProvider, prompt: str) -> str:
         """Вызов OpenAI API"""
@@ -327,7 +327,7 @@ class AIService:
             return full_prompt
 
         except Exception as e:
-            raise Exception(f"Ошибка построения промпта: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     def _get_default_complaints_template(self) -> AIPromptTemplate:
         """Базовый шаблон для анализа жалоб"""

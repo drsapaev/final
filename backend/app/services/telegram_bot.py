@@ -6,7 +6,7 @@ Telegram Bot сервис для клиники
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 import requests
@@ -388,7 +388,7 @@ class TelegramBotService:
                         "last_name": last_name,
                         "language_code": language_code,
                         "chat_id": chat_id,
-                        "last_activity": datetime.utcnow(),
+                        "last_activity": datetime.now(UTC),
                     },
                 )
 

@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +63,7 @@ def _find_chat_upload_file(filename: str) -> Path:
 
 
 def _build_chat_storage_filename(*, user_id: int, original_filename: str) -> str:
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     return f"{timestamp}_{user_id}_{uuid.uuid4().hex}_{original_filename}"
 
 
@@ -499,7 +499,7 @@ class MessagesApiService:
         duration = await get_audio_duration(content, format_name)
 
         file_hash = hashlib.sha256(content).hexdigest()
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         safe_filename = f"voice_{current_user.id}_{timestamp}.{format_name}"
         upload_dir = "uploads/voice_messages"
         os.makedirs(upload_dir, exist_ok=True)

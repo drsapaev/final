@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from typing import Any
 
 from sqlalchemy import and_, or_
@@ -147,7 +147,7 @@ def soft_delete_patient(
         return None
 
     patient_obj.is_deleted = True
-    patient_obj.deleted_at = datetime.utcnow()
+    patient_obj.deleted_at = datetime.now(UTC)
     patient_obj.deleted_by = deleted_by
     db.add(patient_obj)
     db.commit()
@@ -223,7 +223,7 @@ def create_patient_from_user(db: Session, user: User) -> Patient:
         "middle_name": name_parts.get("middle_name"),
         "phone": user.phone,
         "email": user.email,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC),
     }
 
     patient = Patient(**patient_data)

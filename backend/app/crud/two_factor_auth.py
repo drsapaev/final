@@ -68,9 +68,9 @@ class CRUDTwoFactorAuth(
         """Обновить время последнего использования"""
         two_factor_auth = self.get_by_user_id(db, user_id)
         if two_factor_auth:
-            from datetime import datetime
+            from datetime import datetime, UTC
 
-            two_factor_auth.last_used = datetime.utcnow()
+            two_factor_auth.last_used = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -137,7 +137,7 @@ class CRUDTwoFactorBackupCode(
             from datetime import datetime
 
             backup_code.used = True
-            backup_code.used_at = datetime.utcnow()
+            backup_code.used_at = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -174,7 +174,7 @@ class CRUDTwoFactorRecovery(CRUDBase[TwoFactorRecovery, TwoFactorRecoveryCreate,
                 and_(
                     TwoFactorRecovery.recovery_token == token,
                     TwoFactorRecovery.verified == False,
-                    TwoFactorRecovery.expires_at > datetime.utcnow(),
+                    TwoFactorRecovery.expires_at > datetime.now(UTC),
                 )
             )
             .first()
@@ -187,7 +187,7 @@ class CRUDTwoFactorRecovery(CRUDBase[TwoFactorRecovery, TwoFactorRecoveryCreate,
             from datetime import datetime
 
             recovery.verified = True
-            recovery.verified_at = datetime.utcnow()
+            recovery.verified_at = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -209,7 +209,7 @@ class CRUDTwoFactorRecovery(CRUDBase[TwoFactorRecovery, TwoFactorRecoveryCreate,
 
         count = (
             db.query(TwoFactorRecovery)
-            .filter(TwoFactorRecovery.expires_at < datetime.utcnow())
+            .filter(TwoFactorRecovery.expires_at < datetime.now(UTC))
             .delete()
         )
         db.commit()
@@ -236,7 +236,7 @@ class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, No
             .filter(
                 and_(
                     TwoFactorSession.session_token == token,
-                    TwoFactorSession.expires_at > datetime.utcnow(),
+                    TwoFactorSession.expires_at > datetime.now(UTC),
                 )
             )
             .first()
@@ -262,7 +262,7 @@ class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, No
             .filter(
                 and_(
                     TwoFactorSession.device_fingerprint == device_fingerprint,
-                    TwoFactorSession.expires_at > datetime.utcnow(),
+                    TwoFactorSession.expires_at > datetime.now(UTC),
                 )
             )
             .first()
@@ -274,7 +274,7 @@ class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, No
         if session:
             from datetime import datetime
 
-            session.last_activity = datetime.utcnow()
+            session.last_activity = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -285,7 +285,7 @@ class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, No
 
         count = (
             db.query(TwoFactorSession)
-            .filter(TwoFactorSession.expires_at < datetime.utcnow())
+            .filter(TwoFactorSession.expires_at < datetime.now(UTC))
             .delete()
         )
         db.commit()
@@ -360,7 +360,7 @@ class CRUDTwoFactorDevice(CRUDBase[TwoFactorDevice, TwoFactorDeviceCreate, None]
         if device:
             from datetime import datetime
 
-            device.last_used = datetime.utcnow()
+            device.last_used = datetime.now(UTC)
             db.commit()
             return True
         return False

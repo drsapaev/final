@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 
 from sqlalchemy.orm import Session
 
@@ -88,7 +88,7 @@ class DisplayWebSocketApiService:
         )
 
         queue_entry.status = "called"
-        queue_entry.called_at = datetime.utcnow()
+        queue_entry.called_at = datetime.now(UTC)
         self.repository.save()
 
         doctor = queue_entry.queue.specialist
@@ -138,7 +138,7 @@ class DisplayWebSocketApiService:
         return {
             "type": "queue_state",
             "department": department,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "entries": filtered_entries,
             "total_waiting": len(
                 [entry for entry in filtered_entries if entry["status"] == "waiting"]

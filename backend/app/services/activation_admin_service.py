@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
 
@@ -27,8 +27,8 @@ class ActivationAdminService:
             machine_hash=row.machine_hash,
             expiry_date=row.expiry_date.strftime("%Y-%m-%d") if row.expiry_date else None,
             status=row.status,
-            created_at=(row.created_at or datetime.utcnow()).strftime("%Y-%m-%d %H:%M:%S"),
-            updated_at=(row.updated_at or row.created_at or datetime.utcnow()).strftime(
+            created_at=(row.created_at or datetime.now(UTC)).strftime("%Y-%m-%d %H:%M:%S"),
+            updated_at=(row.updated_at or row.created_at or datetime.now(UTC)).strftime(
                 "%Y-%m-%d %H:%M:%S"
             ),
             meta=row.meta,

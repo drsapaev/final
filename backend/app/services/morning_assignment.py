@@ -219,7 +219,7 @@ class MorningAssignmentService:
                         )
 
                 except Exception as e:
-                    error_msg = f"Ошибка обработки визита {visit.id}: {str(e)}"
+                    error_msg = "Внутренняя ошибка"
                     logger.error(error_msg)
                     errors.append(error_msg)
 

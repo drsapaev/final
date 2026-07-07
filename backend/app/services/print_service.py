@@ -11,7 +11,7 @@ import platform
 import re
 import socket
 import subprocess
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -193,7 +193,7 @@ class PrintService:
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"Ошибка печати: {str(e)}",
+                "message": "Внутренняя ошибка",
             }
 
     def _get_printer(
@@ -268,7 +268,7 @@ class PrintService:
             jinja_template = self.jinja_env.from_string(template_source)
             return jinja_template.render(**data)
         except Exception as e:
-            raise Exception(f"Ошибка рендеринга шаблона: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     def _normalize_lab_results_data(
         self, lab_data: dict[str, Any], user: User | None = None
@@ -353,7 +353,7 @@ class PrintService:
         update_data = {
             "status": status,
             "completed_at": (
-                datetime.utcnow() if status in ["completed", "failed"] else None
+                datetime.now(UTC) if status in ["completed", "failed"] else None
             ),
         }
 
@@ -397,7 +397,7 @@ class PrintService:
                 )
 
         except Exception as e:
-            raise Exception(f"Ошибка ESC/POS печати: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def _print_local_escpos(
         self, printer: PrinterConfig, content: str
@@ -446,7 +446,7 @@ class PrintService:
                     pass
 
         except Exception as e:
-            raise Exception(f"Ошибка локальной ESC/POS печати: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def _print_network_escpos(
         self, printer: PrinterConfig, content: str
@@ -478,7 +478,7 @@ class PrintService:
             }
 
         except Exception as e:
-            raise Exception(f"Ошибка сетевой печати: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def _print_usb_escpos(
         self, printer: PrinterConfig, content: str
@@ -503,7 +503,7 @@ class PrintService:
             }
 
         except Exception as e:
-            raise Exception(f"Ошибка USB печати: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     def _write_to_device(self, device_path: str, content: bytes):
         """Записать данные в устройство"""
@@ -534,7 +534,7 @@ class PrintService:
             }
 
         except Exception as e:
-            raise Exception(f"Ошибка печати через COM порт: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     def _write_to_serial(self, device_path: str, content: bytes):
         """Записать данные в последовательный порт"""
@@ -627,7 +627,7 @@ class PrintService:
                     pass
 
         except Exception as e:
-            raise Exception(f"Ошибка PDF печати: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def _print_pdf_network(
         self, printer: PrinterConfig, file_path: str
@@ -738,7 +738,7 @@ class PrintService:
                 raise Exception(f"Ошибка печати: {stderr.decode()}")
 
         except Exception as e:
-            raise Exception(f"Ошибка локальной PDF печати: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def _print_pdf_fallback(
         self, printer: PrinterConfig, file_path: str
@@ -790,7 +790,7 @@ class PrintService:
                     return {"status": "offline", "message": "Устройство не найдено"}
 
         except Exception as e:
-            return {"status": "error", "message": f"Ошибка проверки: {str(e)}"}
+            return {"status": "error", "message": "Внутренняя ошибка"}
 
     async def discover_system_printers(self) -> list[dict[str, Any]]:
         """Получить список локально установленных принтеров ОС."""

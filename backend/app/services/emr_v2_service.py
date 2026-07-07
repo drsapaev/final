@@ -10,7 +10,7 @@ Features:
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy import desc
@@ -205,7 +205,7 @@ class EMRV2Service:
             icd10_code=icd10_code,
             status="draft",
             created_by=user_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             row_version=1,
             last_client_session_id=client_session_id,
         )
@@ -232,7 +232,7 @@ class EMRV2Service:
             change_type="created",
             change_summary="Initial creation",
             created_by=user_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             client_session_id=client_session_id,
         )
         db.add(revision)
@@ -321,7 +321,7 @@ class EMRV2Service:
             change_type=change_type,
             change_summary=change_summary,
             created_by=user_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             client_session_id=client_session_id,
         )
         db.add(revision)
@@ -335,7 +335,7 @@ class EMRV2Service:
         emr.row_version = emr.row_version + 1
         emr.diagnosis_main = diagnosis_main
         emr.icd10_code = icd10_code
-        emr.updated_at = datetime.utcnow()
+        emr.updated_at = datetime.now(UTC)
         emr.updated_by = user_id
         emr.last_client_session_id = client_session_id
 
@@ -385,7 +385,7 @@ class EMRV2Service:
         if emr.status == "signed":
             raise EMRSignedError("EMR is already signed")
 
-        signed_at = datetime.utcnow()
+        signed_at = datetime.now(UTC)
 
         emr = self._update_emr(
             db,
@@ -451,7 +451,7 @@ class EMRV2Service:
 
             if existing:
                 existing.usage_count += 1
-                existing.last_used_at = datetime.utcnow()
+                existing.last_used_at = datetime.now(UTC)
                 logger.info(
                     f"[DoctorTemplates] Updated: doctor={doctor_id}, "
                     f"icd10={icd10_code}, usage={existing.usage_count}"
@@ -465,8 +465,8 @@ class EMRV2Service:
                     treatment_text=normalized,
                     treatment_hash=treatment_hash,
                     usage_count=1,
-                    last_used_at=datetime.utcnow(),
-                    created_at=datetime.utcnow(),
+                    last_used_at=datetime.now(UTC),
+                    created_at=datetime.now(UTC),
                 )
                 db.add(template)
                 logger.info(
@@ -527,7 +527,7 @@ class EMRV2Service:
             change_type="amended",
             change_summary=f"{change_summary} | Reason: {reason}",
             created_by=user_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
         db.add(revision)
 
@@ -540,7 +540,7 @@ class EMRV2Service:
         emr.row_version = emr.row_version + 1
         emr.diagnosis_main = diagnosis_main
         emr.icd10_code = icd10_code
-        emr.updated_at = datetime.utcnow()
+        emr.updated_at = datetime.now(UTC)
         emr.updated_by = user_id
         emr.status = "amended"
 
@@ -598,7 +598,7 @@ class EMRV2Service:
             change_type="restored",
             change_summary=f"Restored from version {target_version} | Reason: {restore_reason}",
             created_by=user_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
         db.add(revision)
 
@@ -613,7 +613,7 @@ class EMRV2Service:
         emr.row_version = emr.row_version + 1
         emr.diagnosis_main = diagnosis_main
         emr.icd10_code = icd10_code
-        emr.updated_at = datetime.utcnow()
+        emr.updated_at = datetime.now(UTC)
         emr.updated_by = user_id
 
         # Audit log
@@ -767,7 +767,7 @@ class EMRV2Service:
             ip_address=ip_address,
             user_agent=user_agent,
             extra_data=extra_data,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
         )
         db.add(log)
         return log
@@ -792,7 +792,7 @@ class EMRV2Service:
 
         # Check if we already logged a view for this user/emr in the last 5 minutes
         rate_limit_minutes = 5
-        cutoff_time = datetime.utcnow() - timedelta(minutes=rate_limit_minutes)
+        cutoff_time = datetime.now(UTC) - timedelta(minutes=rate_limit_minutes)
 
         recent_view = db.query(EMRAuditLog).filter(
             EMRAuditLog.emr_id == emr.id,

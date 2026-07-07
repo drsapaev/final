@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from decimal import Decimal
 from typing import Any
 
@@ -115,7 +115,7 @@ class PaymentReconciliationApiService:
                 "high_severity_count": len(
                     [a for a in alerts if a.get("severity") == "high"]
                 ),
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(UTC).isoformat(),
             }
         except Exception as exc:
             raise PaymentReconciliationApiDomainError(

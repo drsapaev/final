@@ -1,5 +1,5 @@
 # app/crud/payment_webhook.py
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import MetaData, Table, and_, select
 from sqlalchemy.orm import Session
@@ -41,7 +41,7 @@ def create_webhook(db: Session, webhook_in: PaymentWebhookCreate) -> PaymentWebh
 
     # Подготавливаем данные с автоматическим временем
     data = webhook_in.model_dump()
-    data["created_at"] = datetime.utcnow()
+    data["created_at"] = datetime.now(UTC)
 
     row = db.execute(t.insert().values(**data).returning(t)).mappings().first()
     db.commit()
@@ -123,7 +123,7 @@ def update_webhook(
 
     # Подготавливаем данные с автоматическим временем
     data = webhook_in.copy()
-    data["processed_at"] = datetime.utcnow()
+    data["processed_at"] = datetime.now(UTC)
 
     row = (
         db.execute(t.update().where(t.c.id == webhook_id).values(**data).returning(t))
@@ -163,7 +163,7 @@ def create_transaction(
 
     # Подготавливаем данные с автоматическим временем
     data = transaction_in.model_dump()
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     data["created_at"] = now
     data["updated_at"] = now
 
@@ -251,7 +251,7 @@ def update_transaction(
 
     # Подготавливаем данные с автоматическим временем
     data = transaction_in.copy()
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = datetime.now(UTC)
 
     row = (
         db.execute(
@@ -291,7 +291,7 @@ def create_provider(db: Session, provider_in: PaymentProviderCreate) -> PaymentP
 
     # Подготавливаем данные с автоматическим временем
     data = provider_in.model_dump()
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     data["created_at"] = now
     data["updated_at"] = now
 
@@ -337,7 +337,7 @@ def update_provider(
 
     # Подготавливаем данные с автоматическим временем
     data = provider_in.model_dump(exclude_unset=True)
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = datetime.now(UTC)
 
     row = (
         db.execute(t.update().where(t.c.id == provider_id).values(**data).returning(t))

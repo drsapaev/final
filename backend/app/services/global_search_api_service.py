@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 
 from sqlalchemy.orm import Session
 
@@ -108,7 +108,7 @@ class GlobalSearchApiService:
                 result_count=total,
                 opened_type=None,
                 opened_id=None,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
             )
         except Exception:
             self.repository.rollback()
@@ -131,7 +131,7 @@ class GlobalSearchApiService:
                 result_count=None,
                 opened_type=opened_type,
                 opened_id=opened_id,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
             )
             return {"status": "ok"}
         except Exception as exc:

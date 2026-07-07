@@ -4,7 +4,7 @@ MCP клиент для медицинских сервисов
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from .base_server import MCPRequest
@@ -69,12 +69,12 @@ class MedicalMCPClient:
             self.initialized = False
             logger.info("All MCP servers shut down successfully")
         except Exception as e:
-            logger.error(f"Error shutting down MCP servers: {str(e)}")
+            logger.error("Internal error")
 
     def _generate_request_id(self) -> str:
         """Генерация уникального ID запроса"""
         self._request_counter += 1
-        return f"req_{self._request_counter}_{datetime.utcnow().timestamp()}"
+        return f"req_{self._request_counter}_{datetime.now(UTC).timestamp()}"
 
     async def _call_server(
         self, server_name: str, method: str, params: dict[str, Any]
@@ -105,7 +105,7 @@ class MedicalMCPClient:
                 "request_id": request.id,
             }
         except Exception as e:
-            logger.error(f"Error calling {server_name}.{method}: {str(e)}")
+            logger.error("Internal error")
             return {"status": "error", "error": str(e), "request_id": request.id}
 
     # === COMPLAINT ANALYSIS ===
@@ -370,7 +370,7 @@ class MedicalMCPClient:
         health_status = {
             "overall": "healthy",
             "servers": {},
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         for name, server in self.servers.items():
