@@ -5,7 +5,8 @@ API endpoints для управления SMS провайдерами
 import logging
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.rate_limiter import limiter
+from fastapi import APIRouter, Request, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.api.deps import require_roles
@@ -148,8 +149,9 @@ async def get_provider_balance(
 
 
 @router.post("/test")
-async def test_sms_sending(
-    request: SMSTestRequest, current_user: User = Depends(require_roles(["Admin"]))
+@limiter.limit("10/minute")
+async def test_sms_sending(request: Request,
+    request_data: SMSTestRequest, current_user: User = Depends(require_roles(["Admin"]))
 ):
     """Тестовая отправка SMS"""
     try:

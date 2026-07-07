@@ -6,6 +6,7 @@ import json
 import logging
 from typing import NoReturn
 
+from app.core.rate_limiter import limiter
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
@@ -69,8 +70,9 @@ def raise_authentication_internal_error(action: str, exc: Exception) -> NoReturn
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(
-    request_data: LoginRequest, request: Request, db: Session = Depends(get_db)
+@limiter.limit("5/minute")
+async def login(request: Request,
+    request_data: LoginRequest, db: Session = Depends(get_db)
 ):
     """Вход в систему"""
     try:

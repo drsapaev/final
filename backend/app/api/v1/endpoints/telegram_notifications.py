@@ -6,7 +6,8 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from app.core.rate_limiter import limiter
+from fastapi import APIRouter, Request, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -512,7 +513,8 @@ BROADCAST_MAX_RECIPIENTS = 1000
 
 
 @router.post("/broadcast-message")
-async def send_broadcast_message(
+@limiter.limit("1/5minute")
+async def send_broadcast_message(request: Request, 
     message: str,
     target_groups: list[str] = Query(
         ..., description="Группы получателей: patients, doctors, admins"

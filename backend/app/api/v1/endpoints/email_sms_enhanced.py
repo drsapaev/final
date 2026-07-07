@@ -6,7 +6,8 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from app.core.rate_limiter import limiter
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -296,7 +297,8 @@ async def send_payment_confirmation_enhanced(
 
 
 @router.post("/send-bulk-email")
-async def send_bulk_email(
+@limiter.limit("1/5minute")
+async def send_bulk_email(request: Request, 
     recipients: list[dict[str, Any]],
     subject: str,
     template_name: str | None = None,
@@ -350,7 +352,8 @@ async def send_bulk_email(
 
 
 @router.post("/send-bulk-sms")
-async def send_bulk_sms(
+@limiter.limit("1/5minute")
+async def send_bulk_sms(request: Request, 
     recipients: list[dict[str, Any]],
     message: str | None = None,
     template_name: str | None = None,

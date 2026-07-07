@@ -20,6 +20,9 @@ from app.services.ai_tracking_service import get_ai_tracking_service
 # AI-REAUDIT-28 P0-1: весь роутер требует RBAC VIEW_STATS. Раньше 6 эндпоинтов
 # были без аутентификации — утечка моделей/провайдеров/истории запросов.
 router = APIRouter(dependencies=[Depends(require_ai_permission(AIPermission.VIEW_STATS))])
+
+# Rate limiting on all tracking endpoints
+from app.core.rate_limiter import limiter
 logger = logging.getLogger(__name__)
 
 AI_TRACKING_PUBLIC_ERROR = "Internal server error"

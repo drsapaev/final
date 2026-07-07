@@ -189,10 +189,15 @@ app.add_api_websocket_route("/ws/chat", chat_websocket_handler)  # User-to-user 
 # -----------------------------------------------------------------------------
 # Audit Middleware (должен быть ДО CORS для установки request_id)
 # -----------------------------------------------------------------------------
+from app.core.rate_limiter import setup_rate_limiting
 from app.middleware.audit_middleware import AuditMiddleware  # noqa: E402
 
 app.add_middleware(AuditMiddleware)
 log.info("Audit middleware registered")
+
+# Rate limiting
+setup_rate_limiting(app)
+log.info("Rate limiting middleware registered")
 
 # -----------------------------------------------------------------------------
 # Security Middleware (rate limiting, brute force protection, IP logging)
