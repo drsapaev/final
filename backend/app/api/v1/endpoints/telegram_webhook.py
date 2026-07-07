@@ -15,6 +15,7 @@ from typing import Any, NoReturn
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -4404,6 +4405,16 @@ def _validate_webhook_secret(request: Request, db: Session) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid Telegram webhook secret",
         )
+
+
+# TG-AUDIT-28 P0-8: webhook должен возвращать 200 даже при ошибке,
+# чтобы Telegram не retry'ил (дублирующая обработка). Ошибка логируется.
+def _acknowledge_webhook_error(operation: str, exc: Exception) -> JSONResponse:
+    logger.error(
+        "Telegram webhook error operation=%s error_type=%s: %s",
+        operation, type(exc).__name__, exc,
+    )
+    return JSONResponse(status_code=200, content={"status": "error", "message": "Internal error logged"})
 
 
 def _raise_telegram_webhook_internal_error(
