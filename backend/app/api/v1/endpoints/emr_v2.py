@@ -52,6 +52,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/emr", tags=["EMR v2"])
 
+# EMR-AUDIT-28 P0-1: "Lab"/"Laboratory" removed from ALLOWED_ROLES.
+# Lab role could read ANY patient's EMR by sequential visit_id enumeration
+# (ensure_emr_visit_access returned early without ownership check for
+# non-doctor roles). Lab should use a dedicated /lab/emr-summary endpoint
+# that returns only lab-relevant fields, not full clinical narrative.
 EMR_V2_ALLOWED_ROLES = (
     "Doctor",
     "Admin",
@@ -63,8 +68,6 @@ EMR_V2_ALLOWED_ROLES = (
     "Dermatologist",
     "dentist",
     "Dentist",
-    "Lab",
-    "Laboratory",
 )
 
 EMR_V2_DOCTOR_ROLES = {
@@ -102,15 +105,18 @@ def get_current_active_doctor(db: Session, current_user: User) -> Doctor | None:
 
 
 def ensure_emr_visit_access(db: Session, visit_id: int, current_user: User) -> None:
-    """Prevent doctor-profile users from opening another doctor's visit EMR."""
+    """Prevent doctor-profile users from opening another doctor's visit EMR.
+
+    EMR-AUDIT-28 P0-1: ранее non-doctor roles (Lab) bypassed ownership check
+    (early return без проверки). Теперь все non-Admin роли без Doctor profile
+    получают 403.
+    """
     if current_user.role == "Admin" or current_user.is_superuser:
         return
 
     doctor = get_current_active_doctor(db, current_user)
     if not doctor:
-        if current_user.role in EMR_V2_DOCTOR_ROLES:
-            raise HTTPException(status_code=403, detail="Access denied")
-        return
+        raise HTTPException(status_code=403, detail="Access denied")
 
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
@@ -129,9 +135,8 @@ def filter_patient_emrs_for_access(
 
     doctor = get_current_active_doctor(db, current_user)
     if not doctor:
-        if current_user.role in EMR_V2_DOCTOR_ROLES:
-            raise HTTPException(status_code=403, detail="Access denied")
-        return emrs
+        # EMR-AUDIT-28 P0-1: deny all non-Admin roles without Doctor profile
+        raise HTTPException(status_code=403, detail="Access denied")
 
     visit_ids = [emr.visit_id for emr in emrs]
     if not visit_ids:

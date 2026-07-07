@@ -96,9 +96,13 @@ def list_results(db: Session, order_id: int) -> list[dict]:
 
 
 def get_patient_lab_results(
-    db: Session, patient_id: int, limit: int = 50
+    db: Session, patient_id: int, limit: int = 50, offset: int = 0
 ) -> list[dict]:
-    """Получить результаты анализов пациента"""
+    """Получить результаты анализов пациента.
+
+    LAB-AUDIT-28 P0-3: added offset parameter (mobile_api was passing it
+    but function didn't accept it → TypeError → 500).
+    """
     r = _results(db)
     o = _orders(db)
 
@@ -109,6 +113,7 @@ def get_patient_lab_results(
             .join(o, r.c.order_id == o.c.id)
             .where(o.c.patient_id == patient_id)
             .order_by(r.c.id.desc())
+            .offset(offset)
             .limit(limit)
         )
         .mappings()

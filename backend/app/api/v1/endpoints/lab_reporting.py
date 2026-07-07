@@ -77,10 +77,17 @@ def _doctor_allowed_visit_ids(
 
 
 def _ensure_doctor_can_read_lab_instance(db: Session, instance, current_user) -> None:
-    if getattr(current_user, "role", None) != "Doctor":
-        return
+    """LAB-AUDIT-28 P0-1: ранее non-Doctor roles (Lab) bypassed ownership check
+    (early return). Теперь все non-Admin роли без Doctor profile получают 403.
+    Lab role could read ANY patient's lab results by sequential instance_id
+    enumeration — patient_snapshot (full_name, phone, address, DOB, sex),
+    all lab values, critical findings.
+    """
     if getattr(current_user, "is_superuser", False):
         return
+    if getattr(current_user, "role", None) == "Admin":
+        return
+    # All other roles (including Lab) must go through Doctor ownership check
     if not instance.visit_id:
         raise HTTPException(status_code=403, detail="Access denied")
     _doctor_allowed_visit_ids(db, current_user, requested_visit_ids=[instance.visit_id])
