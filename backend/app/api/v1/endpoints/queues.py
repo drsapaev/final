@@ -16,6 +16,8 @@ def stats(
     d: str | None = Query(None),
     date: str | None = Query(None),
     db: Session = Depends(get_db),
+    # QUEUE-AUDIT-28 P0-3: was public — leaked queue stats to anonymous
+    _current_user=Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
     date_str = d or date
     if not date_str:

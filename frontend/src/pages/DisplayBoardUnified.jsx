@@ -310,7 +310,9 @@ export default function DisplayBoardUnified({
 
       // Голосовое объявление
       if (boardSettings.voiceEnabled) {
-        const text = `Пациент номер ${message.data.number}, ${message.data.patient_name}, пройдите к врачу ${message.data.doctor_name}`;
+        // QUEUE-AUDIT-28 P0-9: PHI removed — patient name no longer spoken aloud.
+        // Раньше speechSynthesis произносил "Lastname F." в публичном зале ожидания.
+        const text = `Пациент номер ${message.data.number}, пройдите в кабинет ${message.data.cabinet || 'врача'}`;
         playVoiceAnnouncement(text);
       }
     } catch (error) {
