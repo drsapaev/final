@@ -60,14 +60,14 @@ def _validate_derma_context(
 ) -> Visit | None:
     patient = db.get(Patient, patient_id)
     if patient is None:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     if visit_id is None:
         return None
 
     visit = db.get(Visit, visit_id)
     if visit is None:
-        raise HTTPException(status_code=404, detail="Визит не найден")
+        raise HTTPException(status_code=404, detail=t("visit.not_found"))
     if visit.patient_id != patient_id:
         raise HTTPException(
             status_code=400,

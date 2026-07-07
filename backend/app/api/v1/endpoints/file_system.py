@@ -131,7 +131,7 @@ async def upload_file(
             from app.models.patient import Patient
             patient = db.query(Patient).filter(Patient.id == patient_id).first()
             if not patient:
-                raise HTTPException(status_code=404, detail="Пациент не найден")
+                raise HTTPException(status_code=404, detail=t("patient.not_found"))
             if current_user.role in ("Doctor", "cardio", "derma", "dentist"):
                 from app.models.clinic import Doctor
                 from app.models.visit import Visit

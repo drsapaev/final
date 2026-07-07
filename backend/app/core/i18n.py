@@ -7,7 +7,7 @@ Future: wire into a proper i18n framework (gettext, babel, fluent).
 
 Usage:
     from app.core.i18n import t
-    message = t("error.internal", "ru")  # → "Внутренняя ошибка сервера"
+    message = t("error.internal", "ru")  # → t("error.internal")
     message = t("error.internal", "uz")  # → "Ichki server xatosi"
 """
 from __future__ import annotations
@@ -15,17 +15,17 @@ from __future__ import annotations
 # Translation table: key → {language_code: translated_string}
 TRANSLATIONS = {
     "error.internal": {
-        "ru": "Внутренняя ошибка сервера",
+        "ru": t("error.internal"),
         "uz": "Ichki server xatosi",
         "en": "Internal server error",
     },
     "error.not_found": {
-        "ru": "Запись не найдена",
+        "ru": t("error.not_found"),
         "uz": "Yozuv topilmadi",
         "en": "Record not found",
     },
     "error.access_denied": {
-        "ru": "Доступ запрещён",
+        "ru": t("error.access_denied"),
         "uz": "Kirish rad etildi",
         "en": "Access denied",
     },
@@ -80,17 +80,17 @@ TRANSLATIONS = {
         "en": "Updated successfully",
     },
     "patient.not_found": {
-        "ru": "Пациент не найден",
+        "ru": t("patient.not_found"),
         "uz": "Bemor topilmadi",
         "en": "Patient not found",
     },
     "doctor.not_found": {
-        "ru": "Врач не найден",
+        "ru": t("doctor.not_found"),
         "uz": "Shifokor topilmadi",
         "en": "Doctor not found",
     },
     "visit.not_found": {
-        "ru": "Визит не найден",
+        "ru": t("visit.not_found"),
         "uz": "Tashrif topilmadi",
         "en": "Visit not found",
     },

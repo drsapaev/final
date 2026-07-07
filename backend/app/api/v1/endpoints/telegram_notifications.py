@@ -256,7 +256,7 @@ async def send_appointment_reminder(
         appointment = crud_appointment.get_appointment(db, appointment_id)
         if not appointment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
             )
 
         # Получаем данные пациента
@@ -266,7 +266,7 @@ async def send_appointment_reminder(
         patient = crud_patient.get_patient(db, appointment.patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
             )
 
         # Ищем Telegram пользователя
@@ -348,7 +348,7 @@ async def send_lab_results(
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
             )
 
         # Ищем Telegram пользователя
@@ -446,7 +446,7 @@ async def send_payment_confirmation(
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
             )
 
         # Ищем Telegram пользователя

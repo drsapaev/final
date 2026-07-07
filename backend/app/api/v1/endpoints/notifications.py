@@ -276,7 +276,7 @@ async def send_appointment_reminder(
     # Получаем данные пациента
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
@@ -309,12 +309,12 @@ async def send_visit_confirmation(
     # Получаем данные визита
     visit = visit_crud.get(db, id=visit_id)
     if not visit:
-        raise HTTPException(status_code=404, detail="Визит не найден")
+        raise HTTPException(status_code=404, detail=t("visit.not_found"))
 
     # Получаем данные пациента
     patient = patient_crud.get(db, id=visit.patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
@@ -349,12 +349,12 @@ async def send_payment_notification(
     # Получаем данные визита
     visit = visit_crud.get(db, id=visit_id)
     if not visit:
-        raise HTTPException(status_code=404, detail="Визит не найден")
+        raise HTTPException(status_code=404, detail=t("visit.not_found"))
 
     # Получаем данные пациента
     patient = patient_crud.get(db, id=visit.patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(

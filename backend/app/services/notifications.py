@@ -2127,11 +2127,11 @@ class NotificationSenderService:
         try:
             visit = db.query(Visit).filter(Visit.id == visit_id).first()
             if not visit:
-                return {"success": False, "error": "Визит не найден"}
+                return {"success": False, "error": t("visit.not_found")}
 
             patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
             if not patient:
-                return {"success": False, "error": "Пациент не найден"}
+                return {"success": False, "error": t("patient.not_found")}
 
             # Определяем канал автоматически если нужно
             if channel == "auto":
@@ -2340,11 +2340,11 @@ class NotificationSenderService:
         try:
             visit = db.query(Visit).filter(Visit.id == visit_id).first()
             if not visit:
-                return {"success": False, "error": "Визит не найден"}
+                return {"success": False, "error": t("visit.not_found")}
 
             patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
             if not patient:
-                return {"success": False, "error": "Пациент не найден"}
+                return {"success": False, "error": t("patient.not_found")}
 
             channel = self._determine_best_channel(patient)
             notification_data = self._prepare_notification_data(db, visit, patient)

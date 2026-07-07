@@ -167,12 +167,12 @@ async def create_ecg(
     try:
         patient = db.get(Patient, ecg_data.patient_id)
         if patient is None:
-            raise HTTPException(status_code=404, detail="Пациент не найден")
+            raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
         if ecg_data.visit_id is not None:
             visit = db.get(Visit, ecg_data.visit_id)
             if visit is None:
-                raise HTTPException(status_code=404, detail="Визит не найден")
+                raise HTTPException(status_code=404, detail=t("visit.not_found"))
             if visit.patient_id != ecg_data.patient_id:
                 raise HTTPException(
                     status_code=400,
@@ -298,12 +298,12 @@ async def create_blood_test(
     try:
         patient = db.get(Patient, blood_test_data.patient_id)
         if patient is None:
-            raise HTTPException(status_code=404, detail="Пациент не найден")
+            raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
         if blood_test_data.visit_id is not None:
             visit = db.get(Visit, blood_test_data.visit_id)
             if visit is None:
-                raise HTTPException(status_code=404, detail="Визит не найден")
+                raise HTTPException(status_code=404, detail=t("visit.not_found"))
             if visit.patient_id != blood_test_data.patient_id:
                 raise HTTPException(
                     status_code=400,

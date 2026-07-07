@@ -142,7 +142,7 @@ class SpecializedPanelsApiService:
     ) -> dict:
         patient = self.repository.get_patient(patient_id)
         if not patient:
-            raise SpecializedPanelsApiDomainError(404, "Пациент не найден")
+            raise SpecializedPanelsApiDomainError(404, t("patient.not_found"))
 
         visits = self.repository.list_specialized_patient_visits(
             patient_id=patient_id,
