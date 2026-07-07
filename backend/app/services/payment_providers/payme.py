@@ -8,7 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-import requests
+import httpx
 
 from .base import BasePaymentProvider, PaymentResult, PaymentStatus
 
@@ -119,7 +119,7 @@ class PayMeProvider(BasePaymentProvider):
                 "Content-Type": "application/json",
             }
 
-            response = requests.post(
+            response = httpx.post(
                 url, json=request_data, headers=headers, timeout=30
             )
             response.raise_for_status()
@@ -392,7 +392,7 @@ class PayMeProvider(BasePaymentProvider):
                 "Content-Type": "application/json",
             }
 
-            response = requests.post(
+            response = httpx.post(
                 url, json=request_data, headers=headers, timeout=30
             )
             response.raise_for_status()

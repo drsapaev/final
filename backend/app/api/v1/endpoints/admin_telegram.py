@@ -1755,6 +1755,10 @@ def _validate_staff_action_target_binding(
     return None
 
 
+# ============================================================
+# === AI APPROVAL ENDPOINTS ===
+# ============================================================
+
 @router.post("/telegram/ai-approval-alerts")
 async def send_telegram_ai_approval_alert(
     request: TelegramAiApprovalAlertRequest,
@@ -1953,6 +1957,10 @@ def capture_telegram_ai_approval_outcome(
         "domain_mutation": False,
     }
 
+
+# ============================================================
+# === STAFF ACTION ENDPOINTS ===
+# ============================================================
 
 @router.post("/telegram/staff-actions/{confirmation_id}/confirm")
 def confirm_staff_action(
@@ -2490,6 +2498,10 @@ def _fetch_telegram_webhook_info(bot_token: str) -> dict[str, Any]:
 
 # ===================== НАСТРОЙКИ TELEGRAM =====================
 
+
+# ============================================================
+# === SETTINGS & BOT MANAGEMENT ENDPOINTS ===
+# ============================================================
 
 @router.get("/telegram/settings")
 def get_telegram_settings(
@@ -3094,6 +3106,10 @@ def get_telegram_integration_status(
             e,
         )
 
+
+# ============================================================
+# === TEMPLATES & MESSAGING ENDPOINTS ===
+# ============================================================
 
 @router.get("/telegram/templates")
 def get_telegram_templates(

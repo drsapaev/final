@@ -2896,6 +2896,10 @@ def _run_single_registrar_record_action(
     )
 
 
+# ============================================================
+# === MARK-PAID ENDPOINTS ===
+# ============================================================
+
 @router.post("/registrar/visits/{visit_id}/mark-paid")
 def mark_visit_as_paid(
     visit_id: int,

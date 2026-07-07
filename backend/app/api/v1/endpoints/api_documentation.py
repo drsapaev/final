@@ -570,9 +570,9 @@ async def get_api_examples(
             "login": {
                 "curl": "curl -X POST 'http://localhost:18000/api/v1/auth/login' -H 'Content-Type: application/x-www-form-urlencoded' -d 'username=YOUR_ADMIN_USERNAME&password=REPLACE_WITH_ADMIN_PASSWORD'",
                 "python": """
-import requests
+import httpx
 
-response = requests.post(
+response = httpx.post(
     'http://localhost:18000/api/v1/auth/login',
     data={'username': 'YOUR_ADMIN_USERNAME', 'password': 'REPLACE_WITH_ADMIN_PASSWORD'}
 )
@@ -595,7 +595,7 @@ const token = data.access_token;
             "create_patient": {
                 "curl": "curl -X POST 'http://localhost:18000/api/v1/patients/' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"full_name\": \"Иван Иванов\", \"phone\": \"+998901234567\", \"birth_date\": \"1990-01-01\", \"gender\": \"male\"}'",
                 "python": """
-import requests
+import httpx
 
 headers = {'Authorization': f'Bearer {token}'}
 data = {
@@ -604,7 +604,7 @@ data = {
     'birth_date': '1990-01-01',
     'gender': 'male'
 }
-response = requests.post(
+response = httpx.post(
     'http://localhost:18000/api/v1/patients/',
     headers=headers,
     json=data
@@ -631,7 +631,7 @@ const response = await fetch('http://localhost:18000/api/v1/patients/', {
             "create_visit": {
                 "curl": "curl -X POST 'http://localhost:18000/api/v1/visits/' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"patient_id\": 1, \"service_id\": 1, \"payment_amount\": 100000, \"notes\": \"Консультация\"}'",
                 "python": """
-import requests
+import httpx
 
 headers = {'Authorization': f'Bearer {token}'}
 data = {
@@ -640,7 +640,7 @@ data = {
     'payment_amount': 100000,
     'notes': 'Консультация'
 }
-response = requests.post(
+response = httpx.post(
     'http://localhost:18000/api/v1/visits/',
     headers=headers,
     json=data
