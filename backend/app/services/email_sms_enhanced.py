@@ -21,6 +21,56 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _escape_html(text: str | None) -> str:
+    """NOTIF-REAUDIT-28 P1-4: escape user-supplied text before interpolating
+    into HTML email body (was raw f-string → XSS via <script>, <img onerror>,
+    phishing <a> tags)."""
+    from html import escape
+    return escape(str(text or ""))
+
+
+def _protected_frontend_url(path: str) -> str:
+    """NOTIF-REAUDIT-28 P1-2: build a real frontend URL (was clinic.example.com).
+
+    PR #1932 fixed this in telegram_notifications.py but NOT here — patients
+    receiving email lab results got a broken link to clinic.example.com.
+    """
+    from app.core.config import settings as _settings
+    base_url = str(getattr(_settings, "FRONTEND_URL", None) or "http://localhost:5173").strip()
+    normalized_base = base_url.rstrip("/") or "http://localhost:5173"
+    normalized_path = f"/{str(path or '').strip().lstrip('/')}"
+    return f"{normalized_base}{normalized_path}"
+
+
+def _escape_html(text: str | None) -> str:
+    """NOTIF-REAUDIT-28 P1-4: escape user-supplied text before interpolating
+    into HTML email body (was raw f-string → XSS via <script>, <img onerror>,
+    phishing <a> tags)."""
+    from html import escape
+    return escape(str(text or ""))
+
+
+def _escape_html(text: str | None) -> str:
+    """NOTIF-REAUDIT-28 P1-4: escape user-supplied text before interpolating
+    into HTML email body (was raw f-string → XSS via <script>, <img onerror>,
+    phishing <a> tags)."""
+    from html import escape
+    return escape(str(text or ""))
+
+
+def _protected_frontend_url(path: str) -> str:
+    """NOTIF-REAUDIT-28 P1-2: build a real frontend URL (was clinic.example.com).
+
+    PR #1932 fixed this in telegram_notifications.py but NOT here — patients
+    receiving email lab results got a broken link to clinic.example.com.
+    """
+    from app.core.config import settings as _settings
+    base_url = str(getattr(_settings, "FRONTEND_URL", None) or "http://localhost:5173").strip()
+    normalized_base = base_url.rstrip("/") or "http://localhost:5173"
+    normalized_path = f"/{str(path or '').strip().lstrip('/')}"
+    return f"{normalized_base}{normalized_path}"
+
+
 class EmailSMSEnhancedService:
     """Расширенный сервис для Email и SMS уведомлений"""
 
@@ -371,7 +421,8 @@ class EmailSMSEnhancedService:
                 'collection_date': lab_data.get('collection_date', ''),
                 'ready_date': datetime.now().strftime('%d.%m.%Y'),
                 'has_abnormalities': lab_data.get('has_abnormalities', False),
-                'download_link': f"https://clinic.example.com/lab-results/{patient_data.get('id')}",
+                # NOTIF-REAUDIT-28 P1-2: real URL (was clinic.example.com)
+                'download_link': _protected_frontend_url('/patient/lab-results'),
                 'clinic_name': 'Programma Clinic',
                 'clinic_phone': '+998 71 123-45-67',
             }
@@ -434,7 +485,7 @@ class EmailSMSEnhancedService:
                 'payment_method': payment_data.get('payment_method', 'Карта'),
                 'payment_date': datetime.now().strftime('%d.%m.%Y %H:%M'),
                 'transaction_id': payment_data.get('transaction_id', ''),
-                'receipt_link': f"https://clinic.example.com/receipt/{payment_data.get('transaction_id')}",
+                'receipt_link': _protected_frontend_url('/patient/payments'),
                 'clinic_name': 'Programma Clinic',
                 'clinic_phone': '+998 71 123-45-67',
             }
