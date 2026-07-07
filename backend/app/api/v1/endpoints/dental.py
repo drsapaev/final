@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -26,7 +26,8 @@ DENTAL_PERSISTENCE_NOT_IMPLEMENTED_DETAIL = (
 class DentalPriceOverrideRequest(BaseModel):
     visit_id: int
     service_id: int
-    new_price: Decimal
+    # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
+    new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
     reason: str
     details: str | None = None
     treatment_completed: bool = True
@@ -37,7 +38,8 @@ class DentalPriceOverrideResponse(BaseModel):
     visit_id: int
     service_id: int
     original_price: Decimal
-    new_price: Decimal
+    # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
+    new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
     reason: str
     details: str | None
     status: str

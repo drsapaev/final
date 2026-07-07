@@ -144,7 +144,25 @@ async def get_specialized_patient_history(
     current_user: User = Depends(require_roles("Admin", "Doctor")),
     db: Session = Depends(get_db),
 ):
-    """Получить историю пациента в специализированном отделении"""
+    """Получить историю пациента в специализированном отделении.
+
+    SPEC-AUDIT-28 P0-1: Doctor может видеть только пациентов, с которыми
+    есть визит, привязанный к этому врачу. Раньше любой Doctor мог
+    читать историю любого пациента.
+    """
+    # Ownership check for non-Admin
+    if current_user.role != "Admin" and not current_user.is_superuser:
+        from app.models.visit import Visit
+        from app.models.clinic import Doctor
+        doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+        if not doctor:
+            raise HTTPException(status_code=403, detail="Doctor profile not found")
+        has_visit = db.query(Visit).filter(
+            Visit.patient_id == patient_id,
+            Visit.doctor_id == doctor.id,
+        ).first()
+        if not has_visit:
+            raise HTTPException(status_code=403, detail="Access denied to this patient")
     try:
         return SpecializedPanelsApiService(db).get_specialized_patient_history(
             patient_id=patient_id,
