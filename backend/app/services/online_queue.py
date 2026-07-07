@@ -180,7 +180,11 @@ def load_stats(db: Session, *, department: str, date_str: str) -> DayStats:
 
 
 def _broadcast(dep: str, d: str, stats: DayStats) -> None:
-    """Отправляем обновление в WebSocket комнату"""
+    """P2-28: DEPRECATED. Use services/queue_service.py (QueueBusinessService)
+and crud/online_queue.py instead. This service uses Setting table
+as counter (non-atomic) and will be removed in a future release.
+
+Original docstring:Отправляем обновление в WebSocket комнату"""
     payload = {
         "type": "queue.update",
         "room": f"{dep}::{d}",
