@@ -10,7 +10,7 @@ SSOT Rules:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import JSON, Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -58,10 +58,10 @@ class QueueProfile(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=lambda: datetime.now(UTC), nullable=False
     )
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime, onupdate=datetime.utcnow, nullable=True
+        DateTime, onupdate=lambda: datetime.now(UTC), nullable=True
     )
 
 

@@ -2,7 +2,7 @@
 GlobalSearchAudit model for logging search queries and result access.
 Required for compliance: any patient data access must be auditable.
 """
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -51,6 +51,6 @@ class GlobalSearchAudit(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(UTC),
         index=True
     )

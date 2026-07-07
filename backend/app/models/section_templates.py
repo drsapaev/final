@@ -19,7 +19,7 @@ DoctorSectionTemplate Model - Universal section templates
 import hashlib
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 from typing import Literal
 
@@ -67,8 +67,8 @@ class DoctorSectionTemplate(Base):
     usage_count = Column(Integer, default=1, nullable=False)
     is_pinned = Column(Boolean, default=False, nullable=False)
     pinned_at = Column(DateTime, nullable=True)
-    last_used_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_used_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     # Relationship
     doctor = relationship("User", backref="section_templates")

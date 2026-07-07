@@ -2,7 +2,7 @@
 Salary History Model
 Модель для хранения истории изменений зарплат сотрудников
 """
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -70,7 +70,7 @@ class SalaryHistory(Base):
 
     # Временные метки
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     # Relationships
@@ -135,7 +135,7 @@ class SalaryPayment(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     # Relationships

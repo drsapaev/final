@@ -298,6 +298,7 @@ class ClinicTelegramBot:
     async def _handle_queue_callback(self, callback: types.CallbackQuery, data: str):
         """Обработка выбора специалиста для очереди"""
         specialist_map = {
+            # P3: hardcoded specialist IDs — should query DB (Specialty table)
             "queue_therapist": {"name": "Терапевт", "id": 1},
             "queue_cardiologist": {"name": "Кардиолог", "id": 2},
             "queue_dermatologist": {"name": "Дерматолог", "id": 3},
