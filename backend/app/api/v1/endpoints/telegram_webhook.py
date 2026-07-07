@@ -101,6 +101,58 @@ from app.utils.validators import normalize_phone_uz
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# TG-AUDIT-28 P1-4: body size limit for webhook (was unbounded — DoS risk).
+# Telegram webhook payloads are typically <10KB; 256KB is generous.
+MAX_TELEGRAM_WEBHOOK_BODY_BYTES = 256 * 1024
+
+
+async def _read_telegram_webhook_json(request: Request) -> dict[str, Any]:
+    """Read webhook body with size limit. Raises HTTPException(413) if too large."""
+    body = await request.body()
+    if len(body) > MAX_TELEGRAM_WEBHOOK_BODY_BYTES:
+        logger.warning(
+            "Telegram webhook body too large: %d bytes (max %d)",
+            len(body), MAX_TELEGRAM_WEBHOOK_BODY_BYTES,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Webhook body too large",
+        )
+    try:
+        return json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        logger.warning("Telegram webhook body parse error: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON body",
+        ) from exc
+
+# TG-AUDIT-28 P1-4: body size limit for webhook (was unbounded — DoS risk).
+# Telegram webhook payloads are typically <10KB; 256KB is generous.
+MAX_TELEGRAM_WEBHOOK_BODY_BYTES = 256 * 1024
+
+
+async def _read_telegram_webhook_json(request: Request) -> dict[str, Any]:
+    """Read webhook body with size limit. Raises HTTPException(413) if too large."""
+    body = await request.body()
+    if len(body) > MAX_TELEGRAM_WEBHOOK_BODY_BYTES:
+        logger.warning(
+            "Telegram webhook body too large: %d bytes (max %d)",
+            len(body), MAX_TELEGRAM_WEBHOOK_BODY_BYTES,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Webhook body too large",
+        )
+    try:
+        return json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        logger.warning("Telegram webhook body parse error: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON body",
+        ) from exc
 WEBHOOK_SECRET_HEADER = "x-telegram-bot-api-secret-token"
 TELEGRAM_TICKET_QR_LINKED_MESSAGE = (
     "Ваш Telegram привязан к чеку клиники. "
