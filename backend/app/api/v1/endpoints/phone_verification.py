@@ -9,6 +9,7 @@ from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
+from app.core.rate_limiter import limiter
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.user import User
@@ -100,8 +101,9 @@ class UpdatePhoneRequest(BaseModel):
 
 
 @router.post("/send-code")
-async def send_verification_code(
-    request: SendVerificationCodeRequest, current_user: User = Depends(get_current_user)
+@limiter.limit("5/minute")  # P1-1: rate limit
+async def send_verification_code(request: Request, 
+    request_data: SendVerificationCodeRequest, current_user: User = Depends(get_current_user)
 ):
     """Отправка кода верификации"""
     try:
@@ -109,21 +111,21 @@ async def send_verification_code(
 
         # Определяем провайдера SMS
         provider_type = None
-        if request.provider:
+        if request_data.provider:
             try:
-                provider_type = SMSProviderType(request.provider)
+                provider_type = SMSProviderType(request_data.provider)
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Неподдерживаемый SMS провайдер: {request.provider}",
+                    detail=f"Неподдерживаемый SMS провайдер: {request_data.provider}",
                 )
 
         # Отправляем код
         result = await verification_service.send_verification_code(
-            phone=request.phone,
-            purpose=request.purpose,
+            phone=request_data.phone,
+            purpose=request_data.purpose,
             provider_type=provider_type,
-            custom_message=request.custom_message,
+            custom_message=request_data.custom_message,
         )
 
         if result["success"]:
@@ -154,14 +156,14 @@ async def send_verification_code(
 
 @router.post("/verify-code")
 async def verify_code(
-    request: VerifyCodeRequest, current_user: User = Depends(get_current_user)
+    request_data: VerifyCodeRequest, current_user: User = Depends(get_current_user)
 ):
     """Проверка кода верификации"""
     try:
         verification_service = get_phone_verification_service()
 
         result = verification_service.verify_code(
-            phone=request.phone, code=request.code, purpose=request.purpose
+            phone=request_data.phone, code=request_data.code, purpose=request_data.purpose
         )
 
         if result["success"]:
@@ -272,7 +274,7 @@ async def cancel_verification(
 
 @router.put("/update-phone")
 async def update_user_phone(
-    request: UpdatePhoneRequest,
+    request_data: UpdatePhoneRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -283,8 +285,8 @@ async def update_user_phone(
         result = await verification_service.verify_and_update_user_phone(
             db=db,
             user_id=current_user.id,
-            phone=request.new_phone,
-            code=request.verification_code,
+            phone=request_data.new_phone,
+            code=request_data.verification_code,
             purpose="phone_change",
         )
 

@@ -11,6 +11,7 @@ from typing import NoReturn
 from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.rate_limiter import limiter
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
@@ -41,6 +42,7 @@ def raise_two_factor_sms_internal_error(
 
 
 @router.post("/send-code")
+@limiter.limit("5/minute")  # P1-1: rate limit
 async def send_verification_code(request: Request, 
     method: str = Query(..., description="Метод отправки: sms или email"),
     phone_number: str | None = Query(None, description="Номер телефона для SMS"),
@@ -171,6 +173,7 @@ async def get_verification_status(
 
 
 @router.post("/resend-code")
+@limiter.limit("3/minute")  # P1-1: rate limit
 async def resend_verification_code(request: Request, 
     method: str = Query(..., description="Метод отправки: sms или email"),
     phone_number: str | None = Query(None, description="Номер телефона для SMS"),
