@@ -916,11 +916,13 @@ class AIAnalyticsService:
     def _save_training_dataset(
         self, dataset: list[dict[str, Any]], info: dict[str, Any]
     ) -> str:
-        """Сохраняет обучающий датасет"""
-        # В реальной реализации здесь будет сохранение в зашифрованном файле
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        filename = f"training_dataset_{info['data_type']}_{timestamp}.json"
-        return f"/secure/datasets/{filename}"
+        """Сохраняет обучающий датасет.
+
+        AI-REAUDIT-28 P1: был stub — возвращал fake path /secure/datasets/...
+        Файл никогда не создавался, админ думал что датасет сгенерирован.
+        """
+        logger.warning("Training dataset generation not implemented — returning stub")
+        return "NOT_IMPLEMENTED"
 
     def _get_empty_usage_analytics(self) -> dict[str, Any]:
         """Возвращает пустую структуру аналитики"""
