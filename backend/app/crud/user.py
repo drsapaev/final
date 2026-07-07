@@ -191,7 +191,7 @@ def get_user_permissions(user: User) -> list[str]:
 
 def create_access_token(data: dict) -> str:
     """Создать токен доступа"""
-    from jose import jwt
+    import jwt
 
     to_encode = data.copy()
     expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

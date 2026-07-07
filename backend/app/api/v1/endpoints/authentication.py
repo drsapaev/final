@@ -174,7 +174,7 @@ async def logout(
         auth_header = request.headers.get("authorization") or ""
         if auth_header.lower().startswith("bearer "):
             try:
-                from jose import jwt as _jwt
+                import jwt as _jwt
                 from app.core.config import settings as _settings
                 _payload = _jwt.decode(
                     auth_header.split(" ", 1)[1],

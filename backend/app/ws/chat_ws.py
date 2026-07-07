@@ -15,7 +15,8 @@ from collections import defaultdict
 
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError as JWTError
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 

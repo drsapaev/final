@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Any
 
 import argon2 as _argon2
-from jose import jwt
+import jwt
 from passlib.context import CryptContext
 
 logger = logging.getLogger(__name__)

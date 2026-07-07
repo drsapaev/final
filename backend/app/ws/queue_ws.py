@@ -232,7 +232,7 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
         return False
     # Validate JWT
     try:
-        from jose import jwt as _jwt
+        import jwt as _jwt
         from app.core.config import settings as _settings
         payload = _jwt.decode(token, _settings.SECRET_KEY, algorithms=[_settings.ALGORITHM])
         # Check blacklist

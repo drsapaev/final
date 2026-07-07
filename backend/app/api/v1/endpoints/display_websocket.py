@@ -16,7 +16,8 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
