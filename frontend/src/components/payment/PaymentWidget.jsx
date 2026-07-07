@@ -222,14 +222,15 @@ const PaymentWidget = ({
         cancel_url: `${window.location.origin}/payment/cancel`
       };
 
-      // Используем тестовый endpoint если токен демо
-      const currentToken = getToken();
-      const isTestToken = currentToken === 'demo_token_for_ui_testing';
-      const endpoint = isTestToken ? '/payments/test-init' : '/payments/init';
+      // PAY-REAUDIT-28 P1-4: удалён hardcoded test-token bypass — строка
+      // `demo_token_for_ui_testing` была в JS-бандле, и любой пользователь
+      // мог поставить такой токен через devtools, чтобы перенаправить
+      // платежи на /payments/test-init. Test-init должен вызываться только
+      // через прямой API-вызов в dev/staging.
+      const endpoint = '/payments/init';
 
       logger.log('Sending payment request', {
         endpoint,
-        isTestToken,
         hasAuthHeader: !!apiClient.defaults.headers.common['Authorization'],
         authHeaderLength: apiClient.defaults.headers.common['Authorization']?.length || 0,
       });

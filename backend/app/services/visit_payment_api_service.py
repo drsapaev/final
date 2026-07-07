@@ -17,7 +17,10 @@ class VisitPaymentApiDomainError(Exception):
 class VisitPaymentApiService:
     """Orchestrates visit-payment API responses and validation."""
 
-    VALID_PAYMENT_STATUSES = ("unpaid", "pending", "paid", "failed", "refunded")
+    # PAY-REAUDIT-28 P1-11: унифицированный набор статусов (совпадает с endpoint).
+    VALID_PAYMENT_STATUSES = (
+        "unpaid", "pending", "paid", "partial", "failed", "refunded", "cancelled",
+    )
 
     def __init__(self, db):  # type: ignore[no-untyped-def]
         self.db = db
