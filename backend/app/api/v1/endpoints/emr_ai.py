@@ -10,10 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.core.rbac import AIPermission, require_any_ai_permission
 from app.db.session import get_db
+from app.services.ai_feature_gating import RequireAiFeature
 from app.models.user import User
 from app.services.emr_ai_service import get_emr_ai_service
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(RequireAiFeature("ai_emr_legacy"))])  # P1-13: feature flag
 logger = logging.getLogger(__name__)
 
 EMR_AI_ACCESS = require_any_ai_permission(

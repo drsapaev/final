@@ -18,6 +18,10 @@ from ..queue_service import QueueBusinessService
 logger = logging.getLogger(__name__)
 
 
+"""P1-18: This is the PATIENT bot (aiogram-based, env-var token).
+Use services/telegram_bot.py:TelegramBotService for the STAFF bot
+(httpx-based, DB-stored token). Do not confuse the two.
+"""
 class ClinicTelegramBot:
     """Telegram бот клиники"""
 

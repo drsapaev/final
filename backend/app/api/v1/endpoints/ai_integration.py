@@ -10,12 +10,13 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.services.ai_feature_gating import RequireAiFeature
 from app.api.deps import get_db, require_roles
 from app.crud import ai_config as crud_ai
 from app.models.user import User
 from app.services.ai_service import get_ai_service
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(RequireAiFeature("ai_integration"))])  # P1-13: feature flag
 logger = logging.getLogger(__name__)
 
 AI_INTEGRATION_PUBLIC_ERROR = "Internal server error"

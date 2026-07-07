@@ -13,10 +13,11 @@ from pydantic import BaseModel
 from ....api.deps import get_current_user, require_roles
 from ....models.user import User
 from ....services.mcp import get_mcp_manager
+from ....services.ai_feature_gating import RequireAiFeature
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(RequireAiFeature("mcp_tools"))])  # P1-13: feature flag
 # AI-REAUDIT-28 P1-13: удалены redundant inline role checks —
 # require_roles dependency уже enforcing RBAC.
 
