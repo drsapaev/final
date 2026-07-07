@@ -843,6 +843,15 @@ class BillingService:
             PaymentStatus.VOID.value: [],
         }
 
+        # PAY-REAUDIT-28 P1-1: неизвестный current_status отклоняется явно.
+        # Раньше если current_status не входил в allowed_transitions (None,
+        # "", "voided", опечатка), валидация молча пропускалась и принимала
+        # любой new_status (включая "" → "refunded").
+        if current_status and current_status not in allowed_transitions:
+            raise ValueError(
+                f"Неизвестный текущий статус '{current_status}' у платежа {payment_id}"
+            )
+
         if current_status in allowed_transitions:
             # Allow same-status transitions (idempotent updates)
             if new_status_lower == current_status:
