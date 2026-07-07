@@ -2,7 +2,7 @@
 Odontogram Model
 Модель для хранения данных одонтограммы (стоматологической карты зубов)
 """
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import (
     JSON,
@@ -93,7 +93,7 @@ class Odontogram(Base):
             'status': status,
             'notes': notes,
             'surfaces': surfaces or {},
-            'updated_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.now(UTC).isoformat(),
         }
 
         # Записываем в историю
@@ -104,10 +104,10 @@ class Odontogram(Base):
             'tooth_id': tooth_id,
             'old_status': old_status,
             'new_status': status,
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(UTC).isoformat(),
         })
 
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def get_tooth(self, tooth_id: str) -> dict:
         """Получает данные по зубу"""

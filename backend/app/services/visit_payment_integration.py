@@ -1,7 +1,7 @@
 # app/services/visit_payment_integration.py
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -235,8 +235,8 @@ class VisitPaymentIntegrationService:
                 "payment_provider": webhook.provider,
                 "payment_transaction_id": webhook.transaction_id,
                 "payment_webhook_id": webhook.id,
-                "payment_processed_at": datetime.utcnow(),
-                "created_at": datetime.utcnow(),
+                "payment_processed_at": datetime.now(UTC),
+                "created_at": datetime.now(UTC),
             }
 
             visit_id = repo.insert_visit(visit_data)
@@ -292,7 +292,7 @@ class VisitPaymentIntegrationService:
             # Подготавливаем данные для обновления
             update_data = {
                 "payment_status": payment_status,
-                "payment_processed_at": datetime.utcnow(),
+                "payment_processed_at": datetime.now(UTC),
             }
 
             # Добавляем данные из вебхука, если есть
@@ -634,7 +634,7 @@ class VisitPaymentIntegrationService:
                 "payment_provider": webhook.provider,
                 "payment_transaction_id": webhook.transaction_id,
                 "payment_webhook_id": webhook.id,
-                "payment_processed_at": datetime.utcnow(),
+                "payment_processed_at": datetime.now(UTC),
             }
 
             repo.update_appointment_fields(

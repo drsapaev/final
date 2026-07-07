@@ -3,7 +3,7 @@ MCP сервер для работы с МКБ-10
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager
@@ -252,14 +252,14 @@ class MedicalICD10MCPServer(BaseMCPServer):
                     "has_diagnosis": diagnosis is not None,
                     "specialty": specialty,
                     "provider_used": provider or "default",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "ai_count": len(suggestions) if suggestions else 0,
                     "cache_count": len(relevant_codes),
                 },
             }
 
         except Exception as e:
-            logger.error(f"Error suggesting ICD-10 codes: {str(e)}")
+            logger.error("Internal error")
             return {
                 "status": "error",
                 "error": f"Failed to suggest ICD-10 codes: {str(e)}",

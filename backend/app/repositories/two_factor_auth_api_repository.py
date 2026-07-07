@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,7 @@ class TwoFactorAuthApiRepository:
             .filter(
                 UserSession.refresh_token == pending_token,
                 UserSession.revoked.is_(False),
-                UserSession.expires_at > datetime.utcnow(),
+                UserSession.expires_at > datetime.now(UTC),
             )
             .first()
         )
@@ -39,7 +39,7 @@ class TwoFactorAuthApiRepository:
                 UserSession.user_id == user_id,
                 UserSession.refresh_token == pending_token,
                 UserSession.revoked.is_(False),
-                UserSession.expires_at > datetime.utcnow(),
+                UserSession.expires_at > datetime.now(UTC),
             )
             .first()
         )

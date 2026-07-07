@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import and_, text
@@ -45,7 +45,7 @@ class MigrationService:
                         "Старая таблица queue_tickets не найдена, миграция не требуется"
                     )
             except Exception as e:
-                errors.append(f"Ошибка проверки старой таблицы: {str(e)}")
+                errors.append("Внутренняя ошибка")
 
             # Проверяем целостность данных в новых таблицах
             integrity_result = self._check_data_integrity()
@@ -305,7 +305,7 @@ class MigrationService:
             return {
                 "passed": all_passed,
                 "checks": checks,
-                "checked_at": datetime.utcnow().isoformat(),
+                "checked_at": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
@@ -313,7 +313,7 @@ class MigrationService:
             return {
                 "passed": False,
                 "error": str(e),
-                "checked_at": datetime.utcnow().isoformat(),
+                "checked_at": datetime.now(UTC).isoformat(),
             }
 
     def backup_queue_data(self, target_date: date | None = None) -> dict[str, Any]:
@@ -336,7 +336,7 @@ class MigrationService:
 
             backup_data = {
                 "backup_date": target_date.isoformat(),
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "queues": [],
             }
 

@@ -129,7 +129,7 @@ def consume_telegram_ticket_start_token(db, token: str) -> Visit | None:
     if not parsed:
         return None
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     token_hash = parsed["token_hash"]
     visit = db.query(Visit).filter(Visit.confirmation_token == token_hash).first()
     if not visit:
@@ -336,7 +336,7 @@ class VisitConfirmationService:
 
             if (
                 visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.utcnow()
+                and visit.confirmation_expires_at < datetime.now(UTC)
             ):
                 raise VisitConfirmationDomainError(
                     status_code=400,
@@ -388,7 +388,7 @@ class VisitConfirmationService:
 
             if (
                 visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.utcnow()
+                and visit.confirmation_expires_at < datetime.now(UTC)
             ):
                 raise VisitConfirmationDomainError(
                     status_code=400,
@@ -459,7 +459,7 @@ class VisitConfirmationService:
         confirmation_phone: str | None = None,
         confirmation_telegram_id: str | None = None,
     ) -> dict[str, Any]:
-        visit.confirmed_at = datetime.utcnow()
+        visit.confirmed_at = datetime.now(UTC)
         visit.confirmed_by = confirmed_by
         visit.status = "confirmed"
 
@@ -791,7 +791,7 @@ class VisitConfirmationService:
         if not bot_username:
             return None
 
-        expires_at = datetime.utcnow() + timedelta(
+        expires_at = datetime.now(UTC) + timedelta(
             minutes=TELEGRAM_TICKET_QR_TTL_MINUTES
         )
         token = build_telegram_ticket_start_token(expires_at=expires_at)

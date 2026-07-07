@@ -11,7 +11,7 @@ import os
 import shutil
 import tempfile
 import zipfile
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -150,7 +150,7 @@ class FileSystemService:
         if expires_at is None:
             return True
         now = (
-            datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.utcnow()
+            datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.now(UTC)
         )
         return expires_at > now
 
@@ -463,7 +463,7 @@ class FileSystemService:
             logger.error(f"Ошибка загрузки файла: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка загрузки файла: {str(e)}",
+                detail="Внутренняя ошибка",
             )
 
     def get_file(
@@ -764,7 +764,7 @@ class FileSystemService:
             logger.error(f"Ошибка создания архива: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка создания архива: {str(e)}",
+                detail="Внутренняя ошибка",
             )
 
     async def import_files(
@@ -832,7 +832,7 @@ class FileSystemService:
                         processed_files += 1
 
                     except Exception as e:
-                        errors.append(f"Ошибка обработки файла {filename}: {str(e)}")
+                        errors.append("Внутренняя ошибка")
 
             return {
                 "processed_files": processed_files,
@@ -851,7 +851,7 @@ class FileSystemService:
             logger.error(f"Ошибка импорта файлов: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка импорта файлов: {str(e)}",
+                detail="Внутренняя ошибка",
             )
         finally:
             # Очищаем временные файлы

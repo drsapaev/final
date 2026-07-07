@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy import and_, desc, func, or_
@@ -307,7 +307,7 @@ class NotificationPlatformRepository:
     def mark_delivery_seen(
         self, *, delivery: NotificationDelivery, seen_at: datetime | None = None
     ) -> NotificationDelivery:
-        delivery.seen_at = seen_at or datetime.utcnow()
+        delivery.seen_at = seen_at or datetime.now(UTC)
         if delivery.delivery_status not in {"seen", "read", "archived"}:
             delivery.delivery_status = "seen"
         self.db.flush()
@@ -317,7 +317,7 @@ class NotificationPlatformRepository:
     def mark_delivery_read(
         self, *, delivery: NotificationDelivery, read_at: datetime | None = None
     ) -> NotificationDelivery:
-        now = read_at or datetime.utcnow()
+        now = read_at or datetime.now(UTC)
         if delivery.seen_at is None:
             delivery.seen_at = now
         delivery.read_at = now
@@ -330,7 +330,7 @@ class NotificationPlatformRepository:
     def archive_delivery(
         self, *, delivery: NotificationDelivery, archived_at: datetime | None = None
     ) -> NotificationDelivery:
-        now = archived_at or datetime.utcnow()
+        now = archived_at or datetime.now(UTC)
         if delivery.seen_at is None:
             delivery.seen_at = now
         if delivery.read_at is None:
@@ -363,7 +363,7 @@ class NotificationPlatformRepository:
             )
 
         deliveries = query.all()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         for delivery in deliveries:
             delivery.seen_at = delivery.seen_at or now
             delivery.read_at = now

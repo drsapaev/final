@@ -2,7 +2,7 @@
 CRUD операции для webhook'ов
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import and_, desc
@@ -138,7 +138,7 @@ class CRUDWebhook:
             return {}
 
         # Статистика за последние 24 часа
-        last_24h = datetime.utcnow() - timedelta(hours=24)
+        last_24h = datetime.now(UTC) - timedelta(hours=24)
         recent_calls = (
             db.query(WebhookCall)
             .filter(
@@ -240,7 +240,7 @@ class CRUDWebhookCall:
             .filter(
                 and_(
                     WebhookCall.status == WebhookCallStatus.RETRYING,
-                    WebhookCall.next_retry_at <= datetime.utcnow(),
+                    WebhookCall.next_retry_at <= datetime.now(UTC),
                 )
             )
             .limit(limit)
@@ -274,7 +274,7 @@ class CRUDWebhookCall:
             db_obj.duration_ms = duration_ms
 
         if status in [WebhookCallStatus.SUCCESS, WebhookCallStatus.FAILED]:
-            db_obj.completed_at = datetime.utcnow()
+            db_obj.completed_at = datetime.now(UTC)
 
         db.add(db_obj)
         db.commit()
@@ -283,7 +283,7 @@ class CRUDWebhookCall:
 
     def cleanup_old(self, db: Session, days: int = 30) -> int:
         """Удаляет старые вызовы webhook'ов"""
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
         deleted_count = (
             db.query(WebhookCall).filter(WebhookCall.created_at < cutoff_date).delete()
@@ -336,7 +336,7 @@ class CRUDWebhookEvent:
     def mark_processed(self, db: Session, *, db_obj: WebhookEvent) -> WebhookEvent:
         """Отмечает событие как обработанное"""
         db_obj.processed = True
-        db_obj.processed_at = datetime.utcnow()
+        db_obj.processed_at = datetime.now(UTC)
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
@@ -344,7 +344,7 @@ class CRUDWebhookEvent:
 
     def cleanup_old(self, db: Session, days: int = 7) -> int:
         """Удаляет старые обработанные события"""
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
         deleted_count = (
             db.query(WebhookEvent)

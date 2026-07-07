@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
 
@@ -104,7 +104,7 @@ class MigrationManagementApiService:
                 }
                 for row in tag_stats
             ],
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
 
     def check_migration_health(self) -> dict:
@@ -160,5 +160,5 @@ class MigrationManagementApiService:
         return {
             "healthy": all_healthy,
             "checks": health_checks,
-            "checked_at": datetime.utcnow().isoformat(),
+            "checked_at": datetime.now(UTC).isoformat(),
         }

@@ -20,7 +20,7 @@ import time
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import event, text
@@ -46,7 +46,7 @@ class QueryStats:
         self.min_time_ms = min(self.min_time_ms, time_ms)
         self.max_time_ms = max(self.max_time_ms, time_ms)
         self.avg_time_ms = self.total_time_ms / self.count
-        self.last_executed = datetime.utcnow()
+        self.last_executed = datetime.now(UTC)
 
 
 class QueryOptimizer:
@@ -104,7 +104,7 @@ class QueryOptimizer:
         cls._recent_queries.append({
             "query": query[:500],
             "duration_ms": duration_ms,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(UTC)
         })
         if len(cls._recent_queries) > 1000:
             cls._recent_queries = cls._recent_queries[-500:]
@@ -135,7 +135,7 @@ class QueryOptimizer:
     @classmethod
     def _check_n_plus_one(cls, pattern: str) -> None:
         """Detect potential N+1 query patterns"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         window = timedelta(seconds=1)
 
         # Add current execution

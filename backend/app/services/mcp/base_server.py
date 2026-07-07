@@ -101,7 +101,7 @@ class BaseMCPServer(ABC):
                     id=request.id,
                 )
         except Exception as e:
-            logger.error(f"Error handling MCP request: {str(e)}")
+            logger.error("Internal error")
             return MCPResponse(error={"code": -32603, "message": str(e)}, id=request.id)
 
     async def _handle_tool(self, tool_name: str, request: MCPRequest) -> MCPResponse:
@@ -126,7 +126,7 @@ class BaseMCPServer(ABC):
                 },
             )
         except Exception as e:
-            logger.error(f"Error executing tool {tool_name}: {str(e)}")
+            logger.error("Internal error")
             return MCPResponse(
                 error={"code": -32603, "message": f"Tool execution failed: {str(e)}"},
                 id=request.id,
@@ -159,7 +159,7 @@ class BaseMCPServer(ABC):
                 },
             )
         except Exception as e:
-            logger.error(f"Error accessing resource {resource_name}: {str(e)}")
+            logger.error("Internal error")
             return MCPResponse(
                 error={"code": -32603, "message": f"Resource access failed: {str(e)}"},
                 id=request.id,

@@ -9,7 +9,7 @@ import io
 import logging
 import secrets
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 import qrcode
@@ -221,7 +221,7 @@ class TwoFactorService:
             recovery_expires = None
             if recovery_email or recovery_phone:
                 recovery_token = self.generate_recovery_token()
-                recovery_expires = datetime.utcnow() + timedelta(
+                recovery_expires = datetime.now(UTC) + timedelta(
                     hours=self.recovery_expiry_hours
                 )
 
@@ -272,7 +272,7 @@ class TwoFactorService:
                 two_factor_auth.totp_enabled = True
                 two_factor_auth.backup_codes_generated = True
                 two_factor_auth.backup_codes_count = self.backup_codes_count
-                two_factor_auth.last_used = datetime.utcnow()
+                two_factor_auth.last_used = datetime.now(UTC)
 
                 db.commit()
                 return True
@@ -330,7 +330,7 @@ class TwoFactorService:
 
                 if backup_code_obj:
                     backup_code_obj.used = True
-                    backup_code_obj.used_at = datetime.utcnow()
+                    backup_code_obj.used_at = datetime.now(UTC)
                     success = True
                     _method_used = "backup_code"
 
@@ -343,7 +343,7 @@ class TwoFactorService:
                             TwoFactorRecovery.two_factor_auth_id == two_factor_auth.id,
                             TwoFactorRecovery.recovery_token == recovery_token,
                             TwoFactorRecovery.verified == False,
-                            TwoFactorRecovery.expires_at > datetime.utcnow(),
+                            TwoFactorRecovery.expires_at > datetime.now(UTC),
                         )
                     )
                     .first()
@@ -351,13 +351,13 @@ class TwoFactorService:
 
                 if recovery:
                     recovery.verified = True
-                    recovery.verified_at = datetime.utcnow()
+                    recovery.verified_at = datetime.now(UTC)
                     success = True
                     _method_used = "recovery"
 
             if success:
                 # Обновляем время последнего использования
-                two_factor_auth.last_used = datetime.utcnow()
+                two_factor_auth.last_used = datetime.now(UTC)
 
                 # Создаем сессию если нужно
                 session_token = None
@@ -389,7 +389,7 @@ class TwoFactorService:
         try:
             # Генерируем токен сессии
             session_token = secrets.token_urlsafe(32)
-            expires_at = datetime.utcnow() + timedelta(hours=self.session_expiry_hours)
+            expires_at = datetime.now(UTC) + timedelta(hours=self.session_expiry_hours)
 
             # Создаем сессию
             session = TwoFactorSession(
@@ -413,7 +413,7 @@ class TwoFactorService:
             )
 
             if device:
-                device.last_used = datetime.utcnow()
+                device.last_used = datetime.now(UTC)
                 device.trusted = True
                 device.active = True
             else:

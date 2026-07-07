@@ -104,7 +104,7 @@ class KaspiProvider(BasePaymentProvider):
         except Exception as e:
             self.log_error("create_payment", str(e), {"order_id": order_id})
             return PaymentResult(
-                success=False, error_message=f"Ошибка создания платежа Kaspi: {str(e)}"
+                success=False, error_message="Внутренняя ошибка"
             )
 
     def check_payment_status(self, payment_id: str) -> PaymentResult:
@@ -162,7 +162,7 @@ class KaspiProvider(BasePaymentProvider):
         except Exception as e:
             self.log_error("check_payment_status", str(e), {"payment_id": payment_id})
             return PaymentResult(
-                success=False, error_message=f"Ошибка проверки статуса Kaspi: {str(e)}"
+                success=False, error_message="Внутренняя ошибка"
             )
 
     def process_webhook(self, webhook_data: dict[str, Any]) -> PaymentResult:
@@ -226,7 +226,7 @@ class KaspiProvider(BasePaymentProvider):
         except Exception as e:
             self.log_error("process_webhook", str(e), webhook_data)
             return PaymentResult(
-                success=False, error_message=f"Ошибка обработки webhook Kaspi: {str(e)}"
+                success=False, error_message="Внутренняя ошибка"
             )
 
     def refund_payment(self, payment_id: str, amount: Decimal = None) -> PaymentResult:
@@ -282,7 +282,7 @@ class KaspiProvider(BasePaymentProvider):
         except Exception as e:
             self.log_error("refund_payment", str(e), {"payment_id": payment_id})
             return PaymentResult(
-                success=False, error_message=f"Ошибка возврата платежа Kaspi: {str(e)}"
+                success=False, error_message="Внутренняя ошибка"
             )
 
     def _generate_signature(self, params: dict[str, Any]) -> str:

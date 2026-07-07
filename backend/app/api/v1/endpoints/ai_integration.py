@@ -4,7 +4,7 @@ API endpoints для AI интеграции в панелях врачей
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -371,7 +371,7 @@ async def quick_diagnosis_help(
                     "name": current_user.full_name,
                     "specialty": current_user.role,
                 },
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     except Exception as e:

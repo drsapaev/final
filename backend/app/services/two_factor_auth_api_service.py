@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from app.models.authentication import RefreshToken
 from app.repositories.two_factor_auth_api_repository import TwoFactorAuthApiRepository
@@ -51,7 +51,7 @@ class TwoFactorAuthApiService:
                 user_id=user.id,
                 token=refresh_token,
                 jti=jti,
-                expires_at=datetime.utcnow()
+                expires_at=datetime.now(UTC)
                 + timedelta(days=auth_service.refresh_token_expire_days),
             )
         )

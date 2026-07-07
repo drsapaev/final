@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -289,9 +289,9 @@ def set_status(
 
     visit.status = status_new
     if status_new == "in_progress" and hasattr(visit, "started_at"):
-        visit.started_at = datetime.utcnow()
+        visit.started_at = datetime.now(UTC)
     if status_new in {"closed", "canceled"} and hasattr(visit, "finished_at"):
-        visit.finished_at = datetime.utcnow()
+        visit.finished_at = datetime.now(UTC)
 
     # [FIX] Также обновляем статус в очереди, если есть связанная запись
     if status_new == "canceled":

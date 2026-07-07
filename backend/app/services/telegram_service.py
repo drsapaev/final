@@ -4,7 +4,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -349,7 +349,7 @@ class TelegramService:
                     "last_name": user.last_name,
                     "language_code": user.language_code or "ru",
                     "active": True,
-                    "last_activity": datetime.utcnow(),
+                    "last_activity": datetime.now(UTC),
                 }
 
                 crud_telegram.create_telegram_user(self.db, user_data)
@@ -359,7 +359,7 @@ class TelegramService:
                 crud_telegram.update_telegram_user(
                     self.db,
                     existing.id,
-                    {"last_activity": datetime.utcnow(), "active": True},
+                    {"last_activity": datetime.now(UTC), "active": True},
                 )
 
         except Exception as e:

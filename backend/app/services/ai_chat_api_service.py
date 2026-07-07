@@ -120,7 +120,7 @@ class AIChatApiService:
                 correction=correction,
             )
         except ValueError as exc:
-            raise AIChatApiDomainError(status_code=400, detail=str(exc)) from exc
+            raise AIChatApiDomainError(status_code=400, detail="Internal server error") from exc
 
         return {
             "message": "Feedback recorded",

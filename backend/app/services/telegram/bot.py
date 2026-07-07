@@ -336,7 +336,7 @@ class ClinicTelegramBot:
                 )
 
         except Exception as e:
-            logger.error(f"Error joining queue: {str(e)}")
+            logger.error("Internal error")
             await callback.message.answer("❌ Произошла ошибка. Попробуйте позже.")
 
     async def _handle_my_appointments(self, callback: types.CallbackQuery):

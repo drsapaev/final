@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -142,7 +142,7 @@ class ProviderWebhookService:
 
                 if result.success:
                     webhook.status = "processed"
-                    webhook.processed_at = datetime.utcnow()
+                    webhook.processed_at = datetime.now(UTC)
 
                     payment = None
                     mapped_status = None
@@ -174,7 +174,7 @@ class ProviderWebhookService:
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
                         payment.status = mapped_status
                         if payment.status == "paid":
-                            payment.paid_at = datetime.utcnow()
+                            payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
                             **(payment.provider_data or {}),
@@ -210,7 +210,7 @@ class ProviderWebhookService:
 
                 webhook.status = "failed"
                 webhook.error_message = result.error_message
-                webhook.processed_at = datetime.utcnow()
+                webhook.processed_at = datetime.now(UTC)
 
                 failed_payment = None
                 if result.payment_id:
@@ -325,7 +325,7 @@ class ProviderWebhookService:
                 if method == "CreateTransaction":
                     return {
                         "result": {
-                            "create_time": int(datetime.utcnow().timestamp() * 1000),
+                            "create_time": int(datetime.now(UTC).timestamp() * 1000),
                             "transaction": existing_transaction.id,
                             "state": 1,
                         },
@@ -337,7 +337,7 @@ class ProviderWebhookService:
                 if method == "PerformTransaction":
                     return {
                         "result": {
-                            "perform_time": int(datetime.utcnow().timestamp() * 1000),
+                            "perform_time": int(datetime.now(UTC).timestamp() * 1000),
                             "transaction": existing_transaction.id,
                             "state": 2,
                         },
@@ -349,7 +349,7 @@ class ProviderWebhookService:
                 if method == "CancelTransaction":
                     return {
                         "result": {
-                            "cancel_time": int(datetime.utcnow().timestamp() * 1000),
+                            "cancel_time": int(datetime.now(UTC).timestamp() * 1000),
                             "transaction": existing_transaction.id,
                             "state": -1,
                         },
@@ -381,7 +381,7 @@ class ProviderWebhookService:
 
                 if result.success:
                     webhook.status = "processed"
-                    webhook.processed_at = datetime.utcnow()
+                    webhook.processed_at = datetime.now(UTC)
 
                     payment = None
                     mapped_status = None
@@ -411,7 +411,7 @@ class ProviderWebhookService:
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
                         payment.status = mapped_status
                         if payment.status == "paid":
-                            payment.paid_at = datetime.utcnow()
+                            payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
                             **(payment.provider_data or {}),
@@ -444,7 +444,7 @@ class ProviderWebhookService:
                     if method == "CreateTransaction":
                         return {
                             "result": {
-                                "create_time": int(datetime.utcnow().timestamp() * 1000),
+                                "create_time": int(datetime.now(UTC).timestamp() * 1000),
                                 "transaction": webhook.id,
                                 "state": 1,
                             },
@@ -456,7 +456,7 @@ class ProviderWebhookService:
                     if method == "PerformTransaction":
                         return {
                             "result": {
-                                "perform_time": int(datetime.utcnow().timestamp() * 1000),
+                                "perform_time": int(datetime.now(UTC).timestamp() * 1000),
                                 "transaction": webhook.id,
                                 "state": 2,
                             },
@@ -468,7 +468,7 @@ class ProviderWebhookService:
                     if method == "CancelTransaction":
                         return {
                             "result": {
-                                "cancel_time": int(datetime.utcnow().timestamp() * 1000),
+                                "cancel_time": int(datetime.now(UTC).timestamp() * 1000),
                                 "transaction": webhook.id,
                                 "state": -1,
                             },
@@ -487,7 +487,7 @@ class ProviderWebhookService:
 
                 webhook.status = "failed"
                 webhook.error_message = result.error_message
-                webhook.processed_at = datetime.utcnow()
+                webhook.processed_at = datetime.now(UTC)
 
                 failed_payment = None
                 if result.payment_id:
@@ -558,7 +558,7 @@ class ProviderWebhookService:
             if payment:
                 payment.status = payment_status
                 if payment_status == "paid" and not payment.paid_at:
-                    payment.paid_at = datetime.utcnow()
+                    payment.paid_at = datetime.now(UTC)
                 payment.provider_data = {
                     **(payment.provider_data or {}),
                     **(transaction.provider_data or {}),
@@ -636,7 +636,7 @@ class ProviderWebhookService:
 
                 if result.success:
                     webhook.status = "processed"
-                    webhook.processed_at = datetime.utcnow()
+                    webhook.processed_at = datetime.now(UTC)
 
                     payment = None
                     mapped_status = None
@@ -659,7 +659,7 @@ class ProviderWebhookService:
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
                         payment.status = mapped_status
                         if payment.status == "paid":
-                            payment.paid_at = datetime.utcnow()
+                            payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
                             **(payment.provider_data or {}),
@@ -691,7 +691,7 @@ class ProviderWebhookService:
 
                 webhook.status = "failed"
                 webhook.error_message = result.error_message
-                webhook.processed_at = datetime.utcnow()
+                webhook.processed_at = datetime.now(UTC)
 
                 failed_payment = None
                 if result.payment_id:

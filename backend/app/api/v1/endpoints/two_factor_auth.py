@@ -3,7 +3,7 @@ API endpoints для двухфакторной аутентификации (2F
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -317,7 +317,7 @@ async def request_two_factor_recovery(
 
         # Создаем токен восстановления
         recovery_token = service.generate_recovery_token()
-        expires_at = datetime.utcnow() + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         # Сохраняем попытку восстановления
         two_factor_auth_obj = two_factor_auth.get_by_user_id(db, current_user.id)
@@ -447,7 +447,7 @@ async def regenerate_backup_codes(
         return TwoFactorBackupCodesResponse(
             backup_codes=backup_codes,
             total=len(backup_codes),
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(UTC),
         )
 
     except HTTPException:

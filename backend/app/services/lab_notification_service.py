@@ -3,7 +3,7 @@ Lab Results Auto-Notification Service
 Сервис автоматических уведомлений о готовности анализов
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import or_
@@ -171,7 +171,7 @@ class LabNotificationService:
         """
         try:
             # Находим результаты за последние 24 часа
-            yesterday = datetime.utcnow() - timedelta(hours=24)
+            yesterday = datetime.now(UTC) - timedelta(hours=24)
 
             recent_results = self.db.query(LabResult).filter(LabResult.created_at >= yesterday).all()
 
@@ -332,14 +332,14 @@ class LabNotificationService:
             Статистика отправленных напоминаний
         """
         try:
-            target_date = datetime.utcnow() + timedelta(days=days_before)
+            target_date = datetime.now(UTC) + timedelta(days=days_before)
 
             # Находим заказы с датой повторного анализа
             upcoming_followups = (
                 self.db.query(LabOrder)
                 .filter(
                     LabOrder.follow_up_date.isnot(None),
-                    LabOrder.follow_up_date >= datetime.utcnow(),
+                    LabOrder.follow_up_date >= datetime.now(UTC),
                     LabOrder.follow_up_date <= target_date,
                     or_(
                         LabOrder.follow_up_reminded == False,
@@ -355,7 +355,7 @@ class LabNotificationService:
                 patient = self.db.query(Patient).filter(Patient.id == order.patient_id).first()
 
                 if patient:
-                    days_until = (order.follow_up_date - datetime.utcnow()).days
+                    days_until = (order.follow_up_date - datetime.now(UTC)).days
 
                     message = f"""
 📅 Напоминание о повторном анализе
@@ -400,7 +400,7 @@ class LabNotificationService:
                                 reminders_sent += 1
 
                     order.follow_up_reminded = True
-                    order.follow_up_reminded_at = datetime.utcnow()
+                    order.follow_up_reminded_at = datetime.now(UTC)
 
             self.db.commit()
 
@@ -425,7 +425,7 @@ async def run_lab_notifications(db: Session) -> dict[str, Any]:
         "ready_results": await service.check_and_notify_ready_results(),
         "critical_values": await service.check_critical_values(),
         "follow_up_reminders": await service.send_follow_up_reminders(),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     logger.info(f"Lab notifications run completed: {results}")

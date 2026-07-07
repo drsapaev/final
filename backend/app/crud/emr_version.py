@@ -2,7 +2,7 @@
 CRUD операции для версий EMR
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
@@ -56,7 +56,7 @@ def update_version(
     for field, value in version_data.dict(exclude_unset=True).items():
         setattr(db_version, field, value)
 
-    db_version.updated_at = datetime.utcnow()
+    db_version.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(db_version)
     return db_version

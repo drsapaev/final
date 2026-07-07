@@ -1,6 +1,6 @@
 import logging
 import smtplib
-from datetime import datetime
+from datetime import datetime, UTC
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
@@ -797,7 +797,7 @@ class NotificationSenderService:
                 "title": title,
                 "message": message,
                 "data": data or {},
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             if db:

@@ -2,7 +2,7 @@
 CRUD операции для управления пользователями
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session
@@ -61,7 +61,7 @@ class CRUDUserProfile(CRUDBase[UserProfile, UserProfileCreate, UserProfileUpdate
 
     def get_recent_activity(self, db: Session, hours: int = 24) -> list[UserProfile]:
         """Получить профили с недавней активностью"""
-        since = datetime.utcnow() - timedelta(hours=hours)
+        since = datetime.now(UTC) - timedelta(hours=hours)
         return db.query(UserProfile).filter(UserProfile.last_activity >= since).all()
 
     def update_status(self, db: Session, user_id: int, status: UserStatus) -> bool:
@@ -77,7 +77,7 @@ class CRUDUserProfile(CRUDBase[UserProfile, UserProfileCreate, UserProfileUpdate
         """Обновить время последнего входа"""
         profile = self.get_by_user_id(db, user_id)
         if profile:
-            profile.last_login = datetime.utcnow()
+            profile.last_login = datetime.now(UTC)
             profile.login_count += 1
             db.commit()
             return True
@@ -87,7 +87,7 @@ class CRUDUserProfile(CRUDBase[UserProfile, UserProfileCreate, UserProfileUpdate
         """Обновить время последней активности"""
         profile = self.get_by_user_id(db, user_id)
         if profile:
-            profile.last_activity = datetime.utcnow()
+            profile.last_activity = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -135,7 +135,7 @@ class CRUDUserProfile(CRUDBase[UserProfile, UserProfileCreate, UserProfileUpdate
         """Проверить, заблокирован ли пользователь"""
         profile = self.get_by_user_id(db, user_id)
         if profile and profile.locked_until:
-            return profile.locked_until > datetime.utcnow()
+            return profile.locked_until > datetime.now(UTC)
         return False
 
 
@@ -410,7 +410,7 @@ class CRUDUserAuditLog(CRUDBase[UserAuditLog, None, None]):
         self, db: Session, hours: int = 24, limit: int = 100
     ) -> list[UserAuditLog]:
         """Получить недавнюю активность"""
-        since = datetime.utcnow() - timedelta(hours=hours)
+        since = datetime.now(UTC) - timedelta(hours=hours)
         return (
             db.query(UserAuditLog)
             .filter(UserAuditLog.created_at >= since)
@@ -423,7 +423,7 @@ class CRUDUserAuditLog(CRUDBase[UserAuditLog, None, None]):
         self, db: Session, user_id: int, days: int = 30
     ) -> dict[str, int]:
         """Получить сводку активности пользователя"""
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         # Подсчитываем действия по типам
         actions = (
@@ -439,7 +439,7 @@ class CRUDUserAuditLog(CRUDBase[UserAuditLog, None, None]):
 
     def cleanup_old_logs(self, db: Session, days: int = 365) -> int:
         """Очистить старые записи аудита"""
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         count = db.query(UserAuditLog).filter(UserAuditLog.created_at < since).delete()
         db.commit()
         return count

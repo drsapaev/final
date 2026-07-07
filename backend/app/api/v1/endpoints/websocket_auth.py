@@ -5,7 +5,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from jose import JWTError, jwt
@@ -338,7 +338,7 @@ async def _handle_authenticated_message(
             json.dumps(
                 {
                     "type": "pong",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "authenticated": True,
                     "user": user.username,
                 }
@@ -396,7 +396,7 @@ async def _handle_message_with_auth_level(
     if message_type == "ping":
         response = {
             "type": "pong",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "authenticated": user is not None,
         }
         if user:
@@ -436,7 +436,7 @@ async def _broadcast_patient_call(
         "patient_id": patient_id,
         "department": department,
         "caller": caller,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     # Используем существующий ws_manager для рассылки
@@ -463,7 +463,7 @@ async def _send_queue_status(
         "type": "queue_status",
         "department": department,
         "date": date,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "queue_length": 0,  # Заглушка
         "current_number": 1,  # Заглушка
     }

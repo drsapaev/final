@@ -3,7 +3,7 @@ Rate limiting middleware for WebSocket connections
 """
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +22,12 @@ class WebSocketRateLimiter:
         self.connection_timeout_seconds = 300  # 5 minutes
 
         # Cleanup interval
-        self.last_cleanup = datetime.utcnow()
+        self.last_cleanup = datetime.now(UTC)
         self.cleanup_interval = timedelta(minutes=5)
 
     def _cleanup_old_connections(self):
         """Remove old connection records"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         if now - self.last_cleanup < self.cleanup_interval:
             return
 
@@ -65,7 +65,7 @@ class WebSocketRateLimiter:
             return False, f"Too many connections from this IP (max {self.max_connections_per_ip})"
 
         # Check connections per minute
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         minute_ago = now - timedelta(minutes=1)
 
         recent_connections = [
@@ -81,7 +81,7 @@ class WebSocketRateLimiter:
 
     def record_connection(self, ip_address: str):
         """Record a new connection"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         self.connection_timestamps[ip_address].append(now)
         self.connections_per_ip[ip_address] = len(self.connection_timestamps[ip_address])
 

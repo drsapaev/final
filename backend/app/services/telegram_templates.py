@@ -401,7 +401,7 @@ class TelegramTemplatesService:
 
         except Exception as e:
             return {
-                "text": f"Ошибка форматирования шаблона: {str(e)}",
+                "text": "Внутренняя ошибка",
                 "keyboard": None,
             }
 

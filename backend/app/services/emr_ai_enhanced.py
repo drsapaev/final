@@ -148,7 +148,7 @@ class EMREnhancedAIService:
 
         except Exception as e:
             logger.error(f"Ошибка валидации EMR: {e}")
-            return {"is_valid": False, "errors": [f"Ошибка валидации: {str(e)}"]}
+            return {"is_valid": False, "errors": ["Внутренняя ошибка"]}
 
     async def generate_icd10_suggestions(
         self, diagnosis_text: str, specialty: str = "general"

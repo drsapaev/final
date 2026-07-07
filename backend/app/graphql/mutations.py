@@ -2,7 +2,7 @@
 GraphQL мутации для API клиники
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 
 import strawberry
 from sqlalchemy import func
@@ -699,7 +699,7 @@ class Mutation:
 
             # Обновляем статус и время вызова
             next_entry.status = "called"
-            next_entry.called_at = datetime.utcnow()
+            next_entry.called_at = datetime.now(UTC)
 
             # Обновляем последний вызванный номер в дневной очереди
             daily_queue = (

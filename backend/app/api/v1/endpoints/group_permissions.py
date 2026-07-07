@@ -3,7 +3,7 @@ API endpoints для управления разрешениями групп п
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -143,7 +143,7 @@ def check_user_permission(
             "user_id": user_id,
             "permission": permission,
             "has_permission": has_permission,
-            "checked_at": datetime.utcnow().isoformat(),
+            "checked_at": datetime.now(UTC).isoformat(),
             "checked_by": current_user.username,
         }
 
@@ -459,7 +459,7 @@ def clear_permissions_cache(
             "success": True,
             "message": "Кэш разрешений очищен",
             "cleared_by": current_user.username,
-            "cleared_at": datetime.utcnow().isoformat(),
+            "cleared_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -483,7 +483,7 @@ def get_cache_stats(current_user: User = Depends(require_roles("Admin", "SuperAd
             "success": True,
             "cache_stats": stats,
             "requested_by": current_user.username,
-            "requested_at": datetime.utcnow().isoformat(),
+            "requested_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:

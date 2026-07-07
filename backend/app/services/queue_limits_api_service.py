@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 
 from sqlalchemy.orm import Session
 
@@ -61,7 +61,7 @@ class QueueLimitsApiService:
                     "enabled": True,
                     "current_usage": spec_data["current_usage"],
                     "doctors_count": len(spec_data["doctors"]),
-                    "last_updated": datetime.utcnow(),
+                    "last_updated": datetime.now(UTC),
                 }
             )
         return result
@@ -90,7 +90,7 @@ class QueueLimitsApiService:
             "success": True,
             "message": f"Лимиты обновлены для специальностей: {', '.join(updated_specialties)}",
             "updated_specialties": updated_specialties,
-            "updated_at": datetime.utcnow(),
+            "updated_at": datetime.now(UTC),
         }
 
     def get_queue_status_with_limits(self, *, day: date, specialty: str | None) -> list[dict]:
@@ -157,7 +157,7 @@ class QueueLimitsApiService:
             "doctor_id": limit_data.doctor_id,
             "day": limit_data.day,
             "max_online_entries": limit_data.max_online_entries,
-            "updated_at": datetime.utcnow(),
+            "updated_at": datetime.now(UTC),
         }
 
     def reset_queue_limits(self, *, specialty: str | None, current_user_id: int) -> dict:
@@ -178,7 +178,7 @@ class QueueLimitsApiService:
             message = "Все лимиты сброшены к значениям по умолчанию"
 
         self._update_settings(self.db, new_settings, current_user_id)
-        return {"success": True, "message": message, "reset_at": datetime.utcnow()}
+        return {"success": True, "message": message, "reset_at": datetime.now(UTC)}
 
     def rollback(self) -> None:
         self.repository.rollback()

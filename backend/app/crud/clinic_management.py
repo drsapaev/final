@@ -2,7 +2,7 @@
 CRUD операции для расширенного управления клиникой
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 
 from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session
@@ -158,7 +158,7 @@ class CRUDBranch:
             .filter(
                 and_(
                     Branch.id == branch_id,
-                    Equipment.next_maintenance <= datetime.utcnow(),
+                    Equipment.next_maintenance <= datetime.now(UTC),
                 )
             )
             .scalar()
@@ -367,7 +367,7 @@ class CRUDEquipment:
         self, db: Session, *, days_ahead: int = 30
     ) -> list[Equipment]:
         """Получить оборудование, требующее обслуживания"""
-        due_date = datetime.utcnow() + timedelta(days=days_ahead)
+        due_date = datetime.now(UTC) + timedelta(days=days_ahead)
         return (
             db.query(Equipment)
             .filter(
@@ -653,7 +653,7 @@ class CRUDBackup:
 
     def get_expired(self, db: Session) -> list[Backup]:
         """Получить истекшие резервные копии"""
-        return db.query(Backup).filter(Backup.expires_at <= datetime.utcnow()).all()
+        return db.query(Backup).filter(Backup.expires_at <= datetime.now(UTC)).all()
 
 
 # ===================== СИСТЕМНАЯ ИНФОРМАЦИЯ =====================
@@ -771,7 +771,7 @@ class CRUDClinicStats:
         total_backups = db.query(func.count(Backup.id)).scalar() or 0
         recent_backups = (
             db.query(func.count(Backup.id))
-            .filter(Backup.created_at >= datetime.utcnow() - timedelta(days=7))
+            .filter(Backup.created_at >= datetime.now(UTC) - timedelta(days=7))
             .scalar()
             or 0
         )

@@ -4,7 +4,7 @@ MCP Manager - централизованное управление MCP серв
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from ...core.config import settings
@@ -54,7 +54,7 @@ class MCPManager:
     def _is_server_available(self, server: str) -> bool:
         """Check if server is available (not circuit-broken)"""
         if server in self._server_disabled_until:
-            if datetime.utcnow() < self._server_disabled_until[server]:
+            if datetime.now(UTC) < self._server_disabled_until[server]:
                 return False
             # Cooldown passed, reset
             del self._server_disabled_until[server]
@@ -66,7 +66,7 @@ class MCPManager:
         """Record a failure and potentially trip the circuit breaker"""
         self._server_failures[server] = self._server_failures.get(server, 0) + 1
         if self._server_failures[server] >= self.CIRCUIT_BREAKER_THRESHOLD:
-            self._server_disabled_until[server] = datetime.utcnow() + timedelta(
+            self._server_disabled_until[server] = datetime.now(UTC) + timedelta(
                 seconds=self.CIRCUIT_BREAKER_COOLDOWN
             )
             logger.warning(
@@ -82,7 +82,7 @@ class MCPManager:
 
     def get_circuit_breaker_status(self) -> dict[str, Any]:
         """Get current circuit breaker status for monitoring"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         status = {}
         for server, disabled_until in self._server_disabled_until.items():
             remaining = (disabled_until - now).total_seconds()
@@ -133,7 +133,7 @@ class MCPManager:
             logger.info("MCP Manager shut down successfully")
 
         except Exception as e:
-            logger.error(f"Error shutting down MCP Manager: {str(e)}")
+            logger.error("Internal error")
 
     async def _periodic_health_check(self):
         """Периодическая проверка состояния серверов"""
@@ -166,7 +166,7 @@ class MCPManager:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in health check: {str(e)}")
+                logger.error("Internal error")
 
     async def execute_request(
         self,
@@ -196,7 +196,7 @@ class MCPManager:
 
         # Circuit breaker check
         if not self._is_server_available(server):
-            remaining = (self._server_disabled_until[server] - datetime.utcnow()).total_seconds()
+            remaining = (self._server_disabled_until[server] - datetime.now(UTC)).total_seconds()
             logger.warning(
                 f"CIRCUIT_BREAKER_BLOCKED: server={server}, remaining={remaining:.0f}s"
             )
@@ -208,7 +208,7 @@ class MCPManager:
                 "retry_after": int(remaining),
             }
 
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
         timeout = timeout or self.config["request_timeout"]
 
         try:
@@ -252,7 +252,7 @@ class MCPManager:
                 server_stats["errors"] += 1
 
             # Обновляем среднее время ответа
-            response_time = (datetime.utcnow() - start_time).total_seconds()
+            response_time = (datetime.now(UTC) - start_time).total_seconds()
             current_avg = server_stats["avg_response_time"]
             total_requests = server_stats["requests"]
             server_stats["avg_response_time"] = (
@@ -272,7 +272,7 @@ class MCPManager:
             return result
 
         except TimeoutError:
-            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            elapsed = (datetime.now(UTC) - start_time).total_seconds()
             # ⚠️ КРИТИЧНО: Явный лог с указанием слоя и параметров
             logger.warning(
                 f"MCP_TIMEOUT: server={server}, method={method}, "
@@ -354,7 +354,7 @@ class MCPManager:
         return {
             **self.metrics,
             "config": self.config,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     def get_server_metrics(self, server_name: str | None = None) -> dict[str, Any]:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -79,7 +79,7 @@ class AppointmentsApiService:
         return result
 
     def upsert_queue_setting(self, *, key: str, value: str) -> None:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         row = self.repository.get_queue_setting(key=key)
         if row:
             row.value = value

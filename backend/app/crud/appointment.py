@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from typing import Any
 
 from fastapi import HTTPException
@@ -220,7 +220,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             )
 
         appointment.status = new_status_normalized
-        appointment.updated_at = datetime.utcnow()
+        appointment.updated_at = datetime.now(UTC)
         db.commit()
         db.refresh(appointment)
         return appointment

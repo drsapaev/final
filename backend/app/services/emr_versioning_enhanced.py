@@ -4,7 +4,7 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -393,7 +393,7 @@ class EMRVersioningEnhancedService:
             "id": emr_id,
             "complaints": "",
             "diagnosis": "",
-            "updated_at": datetime.utcnow(),
+            "updated_at": datetime.now(UTC),
         }
 
 

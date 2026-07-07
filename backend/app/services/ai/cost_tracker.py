@@ -8,7 +8,7 @@ AI Cost Tracking Service - Мониторинг расходов на AI API.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import func
@@ -124,7 +124,7 @@ class AICostTracker:
                 "cached_savings_usd": 15.0
             }
         """
-        cutoff = datetime.utcnow() - timedelta(days=days_back)
+        cutoff = datetime.now(UTC) - timedelta(days=days_back)
 
         query = self.db.query(AIUsageLog).filter(
             AIUsageLog.created_at >= cutoff,
@@ -238,7 +238,7 @@ class AICostTracker:
         from app.core.config import settings
 
         # Получаем текущий месяц
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         days_in_month = 30  # Упрощение
         days_elapsed = (now - month_start).days + 1

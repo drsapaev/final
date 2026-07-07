@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -57,7 +57,7 @@ class ServiceAuditService:
             comment=comment,
             ip_address=ip_address,
             user_agent=user_agent,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
 
         self.db.add(audit_log)

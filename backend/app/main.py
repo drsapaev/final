@@ -340,7 +340,7 @@ def detailed_health():
     Public endpoint (no auth) — safe to expose to uptime monitors.
     """
     import time
-    from datetime import datetime
+    from datetime import datetime, UTC
 
     checks = {}
     overall_ok = True
@@ -391,7 +391,7 @@ def detailed_health():
 
     response = {
         "status": "ok" if overall_ok else "degraded",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(UTC).isoformat() + "Z",
         "checks": checks,
     }
 

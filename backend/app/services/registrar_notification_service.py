@@ -4,7 +4,7 @@
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from typing import Any
 
 from sqlalchemy import and_, func
@@ -290,7 +290,7 @@ class RegistrarNotificationService:
             )
             # Обновляем статус уведомления
             price_override.notification_sent = True
-            price_override.notification_sent_at = datetime.utcnow()
+            price_override.notification_sent_at = datetime.now(UTC)
             self.db.commit()
 
             return {

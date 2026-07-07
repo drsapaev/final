@@ -5,7 +5,7 @@ Payment Reconciliation Service
 Detects discrepancies, missing payments, and financial inconsistencies.
 """
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from decimal import Decimal
 from typing import Any
 
@@ -149,7 +149,7 @@ class PaymentReconciliationService:
                 "discrepancies": discrepancies,
                 "missing_in_provider": missing_in_provider,
                 "missing_internal": missing_internal,
-                "reconciled_at": datetime.utcnow().isoformat(),
+                "reconciled_at": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
@@ -157,7 +157,7 @@ class PaymentReconciliationService:
             return {
                 "provider": provider_name,
                 "error": str(e),
-                "reconciled_at": datetime.utcnow().isoformat(),
+                "reconciled_at": datetime.now(UTC).isoformat(),
             }
 
     def reconcile_all_providers(
@@ -193,7 +193,7 @@ class PaymentReconciliationService:
                 "total_difference": total_difference,
                 "has_discrepancies": total_discrepancies > 0 or total_difference != 0,
             },
-            "reconciled_at": datetime.utcnow().isoformat(),
+            "reconciled_at": datetime.now(UTC).isoformat(),
         }
 
     def detect_missing_payments(
@@ -210,7 +210,7 @@ class PaymentReconciliationService:
             List of potentially missing payments
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
             # Find payments that were initiated but never completed
             pending_payments = self.repository.list_pending_payments_for_provider(
@@ -234,7 +234,7 @@ class PaymentReconciliationService:
                         "currency": payment.currency,
                         "created_at": payment.created_at.isoformat(),
                         "status": payment.status,
-                        "days_pending": (datetime.utcnow() - payment.created_at).days,
+                        "days_pending": (datetime.now(UTC) - payment.created_at).days,
                     })
 
             return missing

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from passlib.context import CryptContext
 from sqlalchemy import or_, select
@@ -74,7 +74,7 @@ def create_user(db: Session, user_data: dict) -> User:
     # Устанавливаем значения по умолчанию
     user_data.setdefault("is_active", True)
     user_data.setdefault("is_superuser", False)
-    user_data.setdefault("created_at", datetime.utcnow())
+    user_data.setdefault("created_at", datetime.now(UTC))
 
     user = User(**user_data)
     db.add(user)
@@ -194,7 +194,7 @@ def create_access_token(data: dict) -> str:
     from jose import jwt
 
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
         to_encode, settings.AUTH_SECRET, algorithm=settings.AUTH_ALGORITHM

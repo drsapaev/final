@@ -3,7 +3,7 @@ API endpoints для управления webhook'ами
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -354,7 +354,7 @@ async def test_webhook(
         test_data = test_request.test_data or {
             "test": True,
             "message": "Это тестовое событие",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "user": current_user.username,
         }
 
@@ -365,7 +365,7 @@ async def test_webhook(
             test_data,
             source="test",
             source_id=str(current_user.id),
-            correlation_id=f"test-{webhook_id}-{int(datetime.utcnow().timestamp())}",
+            correlation_id=f"test-{webhook_id}-{int(datetime.now(UTC).timestamp())}",
         )
 
         logger.info(

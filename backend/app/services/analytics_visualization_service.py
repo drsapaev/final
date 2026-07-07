@@ -4,7 +4,7 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -357,7 +357,7 @@ class AnalyticsVisualizationService:
             "summary": {
                 "total_charts": 0,
                 "chart_types": [],
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(UTC).isoformat(),
             },
         }
 

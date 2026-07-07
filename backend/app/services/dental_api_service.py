@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 from typing import Any
 
@@ -157,7 +157,7 @@ class DentalApiService:
                 )
 
         price_override.notification_sent = True
-        price_override.notification_sent_at = datetime.utcnow()
+        price_override.notification_sent_at = datetime.now(UTC)
         self.repository.commit()
 
     def get_dental_price_overrides(
@@ -209,7 +209,7 @@ class DentalApiService:
 
         price_override.status = "approved" if action == "approve" else "rejected"
         price_override.approved_by = user.id
-        price_override.approved_at = datetime.utcnow()
+        price_override.approved_at = datetime.now(UTC)
         if action == "reject":
             price_override.rejection_reason = approval_data.rejection_reason
 

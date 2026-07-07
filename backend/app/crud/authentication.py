@@ -2,7 +2,7 @@
 CRUD операции для системы аутентификации
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session
@@ -43,7 +43,7 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
                 and_(
                     RefreshToken.token == token,
                     RefreshToken.revoked == False,
-                    RefreshToken.expires_at > datetime.utcnow(),
+                    RefreshToken.expires_at > datetime.now(UTC),
                 )
             )
             .first()
@@ -61,7 +61,7 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
                 and_(
                     RefreshToken.user_id == user_id,
                     RefreshToken.revoked == False,
-                    RefreshToken.expires_at > datetime.utcnow(),
+                    RefreshToken.expires_at > datetime.now(UTC),
                 )
             )
             .all()
@@ -72,7 +72,7 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
         token_obj = self.get_by_token(db, token)
         if token_obj:
             token_obj.revoked = True
-            token_obj.revoked_at = datetime.utcnow()
+            token_obj.revoked_at = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -84,7 +84,7 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
             .filter(
                 and_(RefreshToken.user_id == user_id, RefreshToken.revoked == False)
             )
-            .update({"revoked": True, "revoked_at": datetime.utcnow()})
+            .update({"revoked": True, "revoked_at": datetime.now(UTC)})
         )
         db.commit()
         return count
@@ -93,7 +93,7 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
         """Очистить истекшие токены"""
         count = (
             db.query(RefreshToken)
-            .filter(RefreshToken.expires_at < datetime.utcnow())
+            .filter(RefreshToken.expires_at < datetime.now(UTC))
             .delete()
         )
         db.commit()
@@ -139,7 +139,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
                 and_(
                     UserSession.refresh_token == refresh_token,
                     UserSession.revoked == False,
-                    UserSession.expires_at > datetime.utcnow(),
+                    UserSession.expires_at > datetime.now(UTC),
                 )
             )
             .first()
@@ -157,7 +157,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
                 and_(
                     UserSession.user_id == user_id,
                     UserSession.revoked == False,
-                    UserSession.expires_at > datetime.utcnow(),
+                    UserSession.expires_at > datetime.now(UTC),
                 )
             )
             .all()
@@ -174,7 +174,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
         session = self.get_by_session_id(db, session_id)
         if session and not session.revoked:
             session.revoked = True
-            session.revoked_at = datetime.utcnow()
+            session.revoked_at = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -189,7 +189,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
                     UserSession.revoked == False,
                 )
             )
-            .update({"revoked": True, "revoked_at": datetime.utcnow()})
+            .update({"revoked": True, "revoked_at": datetime.now(UTC)})
         )
         db.commit()
         return count
@@ -200,11 +200,11 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
             db.query(UserSession)
             .filter(
                 and_(
-                    UserSession.expires_at < datetime.utcnow(),
+                    UserSession.expires_at < datetime.now(UTC),
                     UserSession.revoked == False,
                 )
             )
-            .update({"revoked": True, "revoked_at": datetime.utcnow()})
+            .update({"revoked": True, "revoked_at": datetime.now(UTC)})
         )
         db.commit()
         return count
@@ -229,7 +229,7 @@ class CRUDPasswordResetToken(CRUDBase[PasswordResetToken, None, None]):
                 and_(
                     PasswordResetToken.token == token,
                     PasswordResetToken.used == False,
-                    PasswordResetToken.expires_at > datetime.utcnow(),
+                    PasswordResetToken.expires_at > datetime.now(UTC),
                 )
             )
             .first()
@@ -248,7 +248,7 @@ class CRUDPasswordResetToken(CRUDBase[PasswordResetToken, None, None]):
         token_obj = self.get_by_token(db, token)
         if token_obj:
             token_obj.used = True
-            token_obj.used_at = datetime.utcnow()
+            token_obj.used_at = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -257,7 +257,7 @@ class CRUDPasswordResetToken(CRUDBase[PasswordResetToken, None, None]):
         """Очистить истекшие токены"""
         count = (
             db.query(PasswordResetToken)
-            .filter(PasswordResetToken.expires_at < datetime.utcnow())
+            .filter(PasswordResetToken.expires_at < datetime.now(UTC))
             .delete()
         )
         db.commit()
@@ -285,7 +285,7 @@ class CRUDEmailVerificationToken(CRUDBase[EmailVerificationToken, None, None]):
                 and_(
                     EmailVerificationToken.token == token,
                     EmailVerificationToken.verified == False,
-                    EmailVerificationToken.expires_at > datetime.utcnow(),
+                    EmailVerificationToken.expires_at > datetime.now(UTC),
                 )
             )
             .first()
@@ -304,7 +304,7 @@ class CRUDEmailVerificationToken(CRUDBase[EmailVerificationToken, None, None]):
         token_obj = self.get_by_token(db, token)
         if token_obj:
             token_obj.verified = True
-            token_obj.verified_at = datetime.utcnow()
+            token_obj.verified_at = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -313,7 +313,7 @@ class CRUDEmailVerificationToken(CRUDBase[EmailVerificationToken, None, None]):
         """Очистить истекшие токены"""
         count = (
             db.query(EmailVerificationToken)
-            .filter(EmailVerificationToken.expires_at < datetime.utcnow())
+            .filter(EmailVerificationToken.expires_at < datetime.now(UTC))
             .delete()
         )
         db.commit()
@@ -364,7 +364,7 @@ class CRUDLoginAttempt(CRUDBase[LoginAttempt, None, None]):
         self, db: Session, ip_address: str, minutes: int = 15
     ) -> int:
         """Получить недавние неудачные попытки по IP"""
-        since = datetime.utcnow() - timedelta(minutes=minutes)
+        since = datetime.now(UTC) - timedelta(minutes=minutes)
         return (
             db.query(LoginAttempt)
             .filter(
@@ -379,7 +379,7 @@ class CRUDLoginAttempt(CRUDBase[LoginAttempt, None, None]):
 
     def cleanup_old_attempts(self, db: Session, days: int = 30) -> int:
         """Очистить старые попытки входа"""
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         count = (
             db.query(LoginAttempt).filter(LoginAttempt.attempted_at < since).delete()
         )
@@ -418,7 +418,7 @@ class CRUDUserActivity(CRUDBase[UserActivity, None, None]):
         self, db: Session, user_id: int, hours: int = 24
     ) -> list[UserActivity]:
         """Получить недавнюю активность"""
-        since = datetime.utcnow() - timedelta(hours=hours)
+        since = datetime.now(UTC) - timedelta(hours=hours)
         return (
             db.query(UserActivity)
             .filter(
@@ -430,7 +430,7 @@ class CRUDUserActivity(CRUDBase[UserActivity, None, None]):
 
     def cleanup_old_activities(self, db: Session, days: int = 90) -> int:
         """Очистить старую активность"""
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         count = db.query(UserActivity).filter(UserActivity.created_at < since).delete()
         db.commit()
         return count
@@ -494,7 +494,7 @@ class CRUDSecurityEvent(CRUDBase[SecurityEvent, None, None]):
         event = db.query(SecurityEvent).filter(SecurityEvent.id == event_id).first()
         if event:
             event.resolved = True
-            event.resolved_at = datetime.utcnow()
+            event.resolved_at = datetime.now(UTC)
             event.resolved_by = resolved_by
             if notes:
                 # Модель использует extra_data, не metadata.
@@ -505,7 +505,7 @@ class CRUDSecurityEvent(CRUDBase[SecurityEvent, None, None]):
 
     def cleanup_old_events(self, db: Session, days: int = 365) -> int:
         """Очистить старые события"""
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         count = (
             db.query(SecurityEvent)
             .filter(

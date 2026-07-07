@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,7 +46,7 @@ def validate_license(db: Session) -> LicenseStatus:
     if vu:
         try:
             dt = datetime.strptime(vu, "%Y-%m-%d").date()
-            if datetime.utcnow().date() > dt:
+            if datetime.now(UTC).date() > dt:
                 return LicenseStatus(
                     ok=False, reason="EXPIRED", key=key, valid_until=vu
                 )

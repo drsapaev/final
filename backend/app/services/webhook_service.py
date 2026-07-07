@@ -8,7 +8,7 @@ import hmac
 import json
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 import httpx
@@ -194,7 +194,7 @@ class WebhookService:
 
             # Отмечаем событие как обработанное
             event.processed = True
-            event.processed_at = datetime.utcnow()
+            event.processed_at = datetime.now(UTC)
             self.db.commit()
 
             logger.info(
@@ -262,7 +262,7 @@ class WebhookService:
                 "event_type": call.event_type.value,
                 "event_data": call.event_data,
                 "webhook_id": webhook.uuid,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "attempt": call.attempt_number,
             }
 
@@ -304,13 +304,13 @@ class WebhookService:
             call.response_headers = dict(response.headers)
             call.response_body = response.text[:10000]  # Ограничиваем размер
             call.duration_ms = duration_ms
-            call.completed_at = datetime.utcnow()
+            call.completed_at = datetime.now(UTC)
 
             # Определяем статус
             if 200 <= response.status_code < 300:
                 call.status = WebhookCallStatus.SUCCESS
                 webhook.successful_calls += 1
-                webhook.last_success_at = datetime.utcnow()
+                webhook.last_success_at = datetime.now(UTC)
                 logger.info(
                     f"Webhook {webhook.id} успешно отправлен (статус: {response.status_code})"
                 )
@@ -320,7 +320,7 @@ class WebhookService:
                     f"HTTP {response.status_code}: {response.text[:500]}"
                 )
                 webhook.failed_calls += 1
-                webhook.last_failure_at = datetime.utcnow()
+                webhook.last_failure_at = datetime.now(UTC)
                 logger.warning(
                     f"Webhook {webhook.id} завершился с ошибкой: {response.status_code}"
                 )
@@ -336,10 +336,10 @@ class WebhookService:
             call.status = WebhookCallStatus.FAILED
             call.error_message = str(e)[:1000]
             call.duration_ms = duration_ms
-            call.completed_at = datetime.utcnow()
+            call.completed_at = datetime.now(UTC)
 
             webhook.failed_calls += 1
-            webhook.last_failure_at = datetime.utcnow()
+            webhook.last_failure_at = datetime.now(UTC)
 
             logger.error(f"Ошибка выполнения webhook {webhook.id}: {e}")
 
@@ -350,7 +350,7 @@ class WebhookService:
         finally:
             # Обновляем статистику webhook'а
             webhook.total_calls += 1
-            webhook.last_call_at = datetime.utcnow()
+            webhook.last_call_at = datetime.now(UTC)
 
             self.db.commit()
 
@@ -370,7 +370,7 @@ class WebhookService:
                 payload=call.payload,
                 attempt_number=call.attempt_number + 1,
                 max_attempts=call.max_attempts,
-                next_retry_at=datetime.utcnow()
+                next_retry_at=datetime.now(UTC)
                 + timedelta(seconds=webhook.retry_delay),
             )
 
@@ -402,7 +402,7 @@ class WebhookService:
                 .filter(
                     and_(
                         WebhookCall.status == WebhookCallStatus.RETRYING,
-                        WebhookCall.next_retry_at <= datetime.utcnow(),
+                        WebhookCall.next_retry_at <= datetime.now(UTC),
                     )
                 )
                 .limit(50)
@@ -425,7 +425,7 @@ class WebhookService:
     def cleanup_old_calls(self, days: int = 30):
         """Очищает старые вызовы webhook'ов"""
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
             deleted_count = (
                 self.db.query(WebhookCall)
@@ -446,7 +446,7 @@ class WebhookService:
     def cleanup_old_events(self, days: int = 7):
         """Очищает старые события"""
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
             deleted_count = (
                 self.db.query(WebhookEvent)
@@ -478,7 +478,7 @@ class WebhookService:
             return {}
 
         # Статистика за последние 24 часа
-        last_24h = datetime.utcnow() - timedelta(hours=24)
+        last_24h = datetime.now(UTC) - timedelta(hours=24)
         recent_calls = (
             self.db.query(WebhookCall)
             .filter(
@@ -553,7 +553,7 @@ class WebhookService:
         )
 
         # Статистика за последние 24 часа
-        last_24h = datetime.utcnow() - timedelta(hours=24)
+        last_24h = datetime.now(UTC) - timedelta(hours=24)
         recent_calls = (
             self.db.query(WebhookCall)
             .filter(WebhookCall.created_at >= last_24h)

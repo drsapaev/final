@@ -1063,7 +1063,7 @@ def send_entry_to_diagnostics(
         )
 
     entry.status = "diagnostics"
-    entry.diagnostics_started_at = datetime.utcnow()
+    entry.diagnostics_started_at = datetime.now(UTC)
     db.commit()
 
     logger.info(

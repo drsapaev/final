@@ -1,6 +1,6 @@
 import calendar
 import statistics
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import and_, func
@@ -46,7 +46,7 @@ class AnalyticsService:
             return visit.visit_date
         if getattr(visit, "created_at", None):
             return visit.created_at.date()
-        return datetime.utcnow().date()
+        return datetime.now(UTC).date()
 
     @staticmethod
     def _visit_activity_hour(visit: Visit) -> int:

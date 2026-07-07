@@ -5,7 +5,7 @@ WebSocket endpoints для табло очереди
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from fastapi import (
@@ -98,7 +98,7 @@ async def websocket_display_board(
                 if message.get("type") == "ping":
                     await websocket.send_text(
                         json.dumps(
-                            {"type": "pong", "timestamp": datetime.utcnow().isoformat()}
+                            {"type": "pong", "timestamp": datetime.now(UTC).isoformat()}
                         )
                     )
                 elif message.get("type") == "request_update":
@@ -192,7 +192,7 @@ async def websocket_queue_department(
                         json.dumps(
                             {
                                 "type": "pong",
-                                "timestamp": datetime.utcnow().isoformat(),
+                                "timestamp": datetime.now(UTC).isoformat(),
                                 "department": department,
                             }
                         )

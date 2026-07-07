@@ -6,7 +6,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -33,7 +33,7 @@ class DataRetentionService:
         retention_days: int = DEFAULT_RETENTION_DAYS
     ) -> datetime:
         """Получить дату, старше которой данные подлежат удалению"""
-        return datetime.utcnow() - timedelta(days=retention_days)
+        return datetime.now(UTC) - timedelta(days=retention_days)
 
     def cleanup_old_messages(
         self,
@@ -194,7 +194,7 @@ class DataRetentionService:
         total_messages = self.db.query(Message).count()
 
         # Сообщения по возрасту
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         year_ago = now - timedelta(days=365)
         three_years_ago = now - timedelta(days=365 * 3)
         seven_years_ago = now - timedelta(days=365 * 7)
@@ -244,7 +244,7 @@ def run_scheduled_cleanup(db: Session) -> dict:
     service = DataRetentionService(db)
 
     results = {
-        "run_at": datetime.utcnow().isoformat(),
+        "run_at": datetime.now(UTC).isoformat(),
         "old_messages": service.cleanup_old_messages(dry_run=False),
         "deleted_messages": service.cleanup_deleted_messages(dry_run=False),
         "voice_messages": service.cleanup_voice_messages(dry_run=False)

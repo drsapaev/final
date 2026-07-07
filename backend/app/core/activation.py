@@ -9,7 +9,7 @@ import re
 import socket
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from jose import jwt
 from sqlalchemy import and_, select
@@ -71,7 +71,7 @@ def generate_key(prefix: str = "CQ") -> str:
     """
     rnd = base64.b32encode(os.urandom(10)).decode().rstrip("=")  # ~16 симв.
     rnd = re.sub(r"[^A-Z0-9]", "", rnd)
-    today = datetime.utcnow().strftime("%Y%m%d")
+    today = datetime.now(UTC).strftime("%Y%m%d")
     chunks = [rnd[i : i + 5] for i in range(0, min(len(rnd), 15), 5)]
     while len(chunks) < 3:
         chunks.append("X" * 5)
@@ -96,7 +96,7 @@ def issue_key(
     meta: str | None = None,
 ) -> IssueResult:
     key = generate_key()
-    exp = datetime.utcnow() + timedelta(days=int(days))
+    exp = datetime.now(UTC) + timedelta(days=int(days))
     logger.info(
         "[FIX:ACTIVATION] Issuing activation key %s status=%s days=%s",
         key,
@@ -158,7 +158,7 @@ def _activate_key(db: Session, *, key: str, commit: bool) -> ActivateResult:
         )
 
     # Проверим срок
-    if row.expiry_date and datetime.utcnow() > row.expiry_date:
+    if row.expiry_date and datetime.now(UTC) > row.expiry_date:
         row.status = ActivationStatus.EXPIRED
         db.flush()
         if commit:
@@ -185,7 +185,7 @@ def _activate_key(db: Session, *, key: str, commit: bool) -> ActivateResult:
         "st": row.status,
     }
     # exp в JWT — в секундах; берём min(срок лицензии, +400 дней)
-    exp_dt = row.expiry_date or (datetime.utcnow() + timedelta(days=400))
+    exp_dt = row.expiry_date or (datetime.now(UTC) + timedelta(days=400))
     claims["exp"] = int(exp_dt.timestamp())
 
     token = jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -236,7 +236,7 @@ def validate_server_activation(db: Session) -> Status:
     if row.status == ActivationStatus.REVOKED:
         return Status(ok=False, reason="REVOKED", key=row.key, machine_hash=mh)
 
-    if row.expiry_date and datetime.utcnow() > row.expiry_date:
+    if row.expiry_date and datetime.now(UTC) > row.expiry_date:
         row.status = ActivationStatus.EXPIRED
         db.flush()
         db.commit()

@@ -6,7 +6,7 @@ import io
 import json
 import logging
 import zipfile
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class EMRExportService:
         try:
             export_data = {
                 "metadata": {
-                    "export_date": datetime.utcnow().isoformat(),
+                    "export_date": datetime.now(UTC).isoformat(),
                     "format_version": "1.0",
                     "export_type": "emr",
                     "includes": {
@@ -53,7 +53,7 @@ class EMRExportService:
             return export_data
 
         except Exception as e:
-            raise Exception(f"Ошибка экспорта в JSON: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def export_emr_to_xml(
         self, emr_data: dict[str, Any], include_versions: bool = False
@@ -74,7 +74,7 @@ class EMRExportService:
             xml_content += '<emr_export>\n'
             xml_content += '  <metadata>\n'
             xml_content += (
-                f'    <export_date>{datetime.utcnow().isoformat()}</export_date>\n'
+                f'    <export_date>{datetime.now(UTC).isoformat()}</export_date>\n'
             )
             xml_content += '    <format_version>1.0</format_version>\n'
             xml_content += '    <export_type>emr</export_type>\n'
@@ -129,7 +129,7 @@ class EMRExportService:
             return csv_content
 
         except Exception as e:
-            raise Exception(f"Ошибка экспорта в CSV: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def export_emr_to_zip(
         self, emr_data: dict[str, Any], include_attachments: bool = True
@@ -168,7 +168,7 @@ class EMRExportService:
             return zip_buffer.getvalue()
 
         except Exception as e:
-            raise Exception(f"Ошибка экспорта в ZIP: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def import_emr_from_json(
         self, json_data: str | dict[str, Any]
@@ -199,7 +199,7 @@ class EMRExportService:
             return emr_data
 
         except Exception as e:
-            raise Exception(f"Ошибка импорта из JSON: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def import_emr_from_xml(self, xml_data: str) -> dict[str, Any]:
         """Импорт EMR из XML формата"""
@@ -224,7 +224,7 @@ class EMRExportService:
             return emr_data
 
         except Exception as e:
-            raise Exception(f"Ошибка импорта из XML: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def import_emr_from_zip(self, zip_data: bytes) -> dict[str, Any]:
         """Импорт EMR из ZIP архива"""
@@ -243,7 +243,7 @@ class EMRExportService:
                 return await self.import_emr_from_json(json_content)
 
         except Exception as e:
-            raise Exception(f"Ошибка импорта из ZIP: {str(e)}")
+            raise Exception("Внутренняя ошибка")
 
     async def validate_import_data(
         self, data: str | dict[str, Any] | bytes, format_type: str = 'json'
@@ -307,7 +307,7 @@ class EMRExportService:
                         validation_result["is_valid"] = False
 
                 except ET.ParseError as e:
-                    validation_result["errors"].append(f"Ошибка парсинга XML: {str(e)}")
+                    validation_result["errors"].append("Внутренняя ошибка")
                     validation_result["is_valid"] = False
 
             elif format_type == 'zip':
@@ -334,7 +334,7 @@ class EMRExportService:
         except Exception as e:
             return {
                 "is_valid": False,
-                "errors": [f"Ошибка валидации: {str(e)}"],
+                "errors": ["Внутренняя ошибка"],
                 "warnings": [],
                 "data_type": None,
                 "format_version": None,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -173,7 +173,7 @@ class QueueCabinetManagementApiService:
             "queue_id": queue_id,
             "cabinet_info": self._build_queue_payload(queue),
             "updated_by": updated_by,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
 
     def bulk_update_cabinet_info(
@@ -225,7 +225,7 @@ class QueueCabinetManagementApiService:
             "updated_queues": updated_queues,
             "errors": errors,
             "updated_by": updated_by,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
 
     def sync_cabinet_info_from_doctors(
@@ -277,7 +277,7 @@ class QueueCabinetManagementApiService:
             "errors": errors,
             "sync_date": day_obj.isoformat(),
             "synced_by": synced_by,
-            "synced_at": datetime.utcnow().isoformat(),
+            "synced_at": datetime.now(UTC).isoformat(),
         }
 
     def get_cabinet_statistics(

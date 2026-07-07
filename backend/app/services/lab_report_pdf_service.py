@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -34,7 +34,7 @@ class LabReportPDFService:
         layout_preset = context.get("layout_preset") or "lab_table_classic_v1"
         page_settings = context.get("page_settings") or {}
         context = dict(context)
-        context["generated_at"] = datetime.utcnow()
+        context["generated_at"] = datetime.now(UTC)
         context["oam_docx_mode"] = self._is_oam_docx_template(context)
         context["smear_matrix_mode"] = self._is_smear_matrix_template(context)
         context["docx_three_column_mode"] = self._is_docx_three_column_template(context)

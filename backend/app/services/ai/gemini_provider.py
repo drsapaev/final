@@ -296,7 +296,7 @@ class GeminiProvider(BaseAIProvider):
                 }
 
         except Exception as e:
-            return {"error": f"Ошибка анализа изображения: {str(e)}"}
+            return {"error": "Внутренняя ошибка"}
 
     # Реализация недостающих абстрактных методов
     async def analyze_medical_image_generic(

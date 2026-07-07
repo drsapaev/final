@@ -2,7 +2,7 @@
 Сервис для управления фича-флагами
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -92,7 +92,7 @@ class FeatureFlagService:
         old_enabled = flag.enabled
         flag.enabled = enabled
         flag.updated_by = user_id
-        flag.updated_at = datetime.utcnow()
+        flag.updated_at = datetime.now(UTC)
 
         # Записываем в историю
         self._record_history(
@@ -197,7 +197,7 @@ class FeatureFlagService:
         old_config = flag.config
         flag.config = config
         flag.updated_by = user_id
-        flag.updated_at = datetime.utcnow()
+        flag.updated_at = datetime.now(UTC)
 
         # Записываем в историю
         self._record_history(
@@ -294,7 +294,7 @@ class FeatureFlagService:
 
     def _get_flag_from_cache_or_db(self, flag_key: str) -> FeatureFlag | None:
         """Получает флаг из кэша или базы данных"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Проверяем кэш
         if (
@@ -322,7 +322,7 @@ class FeatureFlagService:
         """Обновляет весь кэш флагов"""
         flags = self.db.query(FeatureFlag).all()
         self._cache = {flag.key: flag for flag in flags}
-        self._cache_timestamp = datetime.utcnow()
+        self._cache_timestamp = datetime.now(UTC)
 
     def _invalidate_cache(self):
         """Сбрасывает кэш"""

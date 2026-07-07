@@ -374,7 +374,7 @@ class LabReportingService:
         if published and published.id != version.id:
             published.status = "ARCHIVED"
         version.status = "PUBLISHED"
-        version.published_at = datetime.utcnow()
+        version.published_at = datetime.now(UTC)
         self.repository.commit()
         return self.repository.get_template_version(version.id)
 
@@ -662,7 +662,7 @@ class LabReportingService:
         # The database trigger only allows the immutable transition after this point.
         self.repository.flush()
         instance.status = "FINALIZED"
-        instance.finalized_at = datetime.utcnow()
+        instance.finalized_at = datetime.now(UTC)
         # P-01 bridge: sync в legacy lab_results таблицу для read-only
         # потребителей (mobile app, EMR, statistics, notifications).
         # Создаёт LabResult записи как projection из LabReportValue.
@@ -864,7 +864,7 @@ class LabReportingService:
         if instance.status not in {"FINALIZED", "PRINTED"}:
             raise LabReportingDomainError(409, "Only finalized reports can be printed")
         instance.status = "PRINTED"
-        instance.printed_at = datetime.utcnow()
+        instance.printed_at = datetime.now(UTC)
         self.repository.commit()
         return self.get_instance(instance.id)
 
@@ -1108,7 +1108,7 @@ class LabReportingService:
                 self.repository.add_template_version(version)
                 self._replace_version_sections(version, initial_version.get("sections") or [])
                 version.status = "PUBLISHED"
-                version.published_at = datetime.utcnow()
+                version.published_at = datetime.now(UTC)
                 version.seed_signature = template_signature
                 seeded_count += 1
                 continue
@@ -1130,7 +1130,7 @@ class LabReportingService:
                 self.repository.add_template_version(version)
                 self._replace_version_sections(version, initial_version.get("sections") or [])
                 version.status = "PUBLISHED"
-                version.published_at = datetime.utcnow()
+                version.published_at = datetime.now(UTC)
                 version.seed_signature = template_signature
                 seeded_count += 1
                 continue
@@ -1171,7 +1171,7 @@ class LabReportingService:
             self.repository.add_template_version(version)
             self._replace_version_sections(version, initial_version.get("sections") or [])
             version.status = "PUBLISHED"
-            version.published_at = datetime.utcnow()
+            version.published_at = datetime.now(UTC)
             version.seed_signature = template_signature
             seeded_count += 1
         if seeded_count:

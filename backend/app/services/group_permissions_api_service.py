@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy.orm import Session
 
@@ -157,7 +157,7 @@ class GroupPermissionsApiService:
 
         expires_at = None
         if expires_hours:
-            expires_at = datetime.utcnow() + timedelta(hours=expires_hours)
+            expires_at = datetime.now(UTC) + timedelta(hours=expires_hours)
 
         override = self.repository.create_override(
             user_id=user_id,

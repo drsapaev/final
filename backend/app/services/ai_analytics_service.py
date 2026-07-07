@@ -6,7 +6,7 @@
 import hashlib
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from statistics import mean, median
 from typing import Any
 
@@ -44,7 +44,7 @@ class AIAnalyticsService:
             input_hash = self._hash_sensitive_data(input_data)
 
             usage_record = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "user_id": user_id,
                 "ai_function": ai_function,
                 "input_hash": input_hash,
@@ -149,7 +149,7 @@ class AIAnalyticsService:
         """Оптимизирует AI модели на основе накопленных данных"""
         try:
             optimization_results = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "models_analyzed": [],
                 "optimizations_applied": [],
                 "performance_improvements": {},
@@ -191,7 +191,7 @@ class AIAnalyticsService:
 
         except Exception as e:
             logger.error(f"Ошибка оптимизации AI моделей: {e}")
-            return {"error": str(e), "timestamp": datetime.utcnow().isoformat()}
+            return {"error": str(e), "timestamp": datetime.now(UTC).isoformat()}
 
     def generate_ai_training_dataset(
         self, data_type: str, start_date: date, end_date: date, anonymize: bool = True
@@ -205,7 +205,7 @@ class AIAnalyticsService:
                     "end_date": end_date.isoformat(),
                 },
                 "anonymized": anonymize,
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(UTC).isoformat(),
             }
 
             if data_type == "diagnostic_patterns":
@@ -816,7 +816,7 @@ class AIAnalyticsService:
             "function": function,
             "optimization_type": "prompt_tuning",
             "expected_improvement": "15% faster response time",
-            "applied_at": datetime.utcnow().isoformat(),
+            "applied_at": datetime.now(UTC).isoformat(),
         }
 
     def _generate_optimization_recommendations(

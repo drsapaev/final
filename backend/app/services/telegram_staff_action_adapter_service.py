@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import date, datetime, time
+from datetime import date, datetime, time, UTC
 from decimal import Decimal
 from typing import Any
 
@@ -74,7 +74,7 @@ class TelegramStaffActionAdapterService:
                 else _reference_hash(target_type, operation_key)
             ),
             "result": result,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "confirmation_required": True,
             "telegram_execution_enabled": False,
             "domain_mutation": result == "completed",
@@ -517,7 +517,7 @@ class TelegramStaffActionAdapterService:
 
             payment.refunded_amount = already_refunded + refund_amount
             payment.refund_reason = (reason or "Protected staff Telegram action")[:512]
-            payment.refunded_at = datetime.utcnow()
+            payment.refunded_at = datetime.now(UTC)
             payment.refunded_by = actor_user_id
             if payment.refunded_amount >= payment.amount:
                 payment.status = "refunded"

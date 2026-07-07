@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -164,7 +164,7 @@ class UserDataTransferService:
             self.logger.error(
                 f"Ошибка получения сводки данных пользователя {user_id}: {e}"
             )
-            return {"error": f"Ошибка получения данных: {str(e)}"}
+            return {"error": "Внутренняя ошибка"}
 
     def transfer_user_data(
         self,
@@ -226,7 +226,7 @@ class UserDataTransferService:
                     "source_user": source_user.username,
                     "target_user": target_user.username,
                     "initiated_by": initiated_by_user_id,
-                    "transfer_date": datetime.utcnow().isoformat(),
+                    "transfer_date": datetime.now(UTC).isoformat(),
                 },
             }
 
@@ -261,7 +261,7 @@ class UserDataTransferService:
             self.logger.error(
                 f"Ошибка передачи данных {source_user_id} -> {target_user_id}: {e}"
             )
-            return {"success": False, "error": f"Ошибка передачи данных: {str(e)}"}
+            return {"success": False, "error": "Внутренняя ошибка"}
 
     def _transfer_appointments(
         self, db: Session, source_patient_id: int, target_patient_id: int
@@ -392,7 +392,7 @@ class UserDataTransferService:
             return True, "Валидация прошла успешно"
 
         except Exception as e:
-            return False, f"Ошибка валидации: {str(e)}"
+            return False, "Внутренняя ошибка"
 
     def create_transfer_confirmation_token(
         self,

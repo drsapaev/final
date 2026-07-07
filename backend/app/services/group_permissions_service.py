@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import and_, delete, insert, or_
@@ -45,7 +45,7 @@ class GroupPermissionsService:
             cache_key = f"user_permissions_{user_id}"
             if use_cache and cache_key in self._permissions_cache:
                 cached_data = self._permissions_cache[cache_key]
-                if datetime.utcnow() - cached_data['timestamp'] < timedelta(
+                if datetime.now(UTC) - cached_data['timestamp'] < timedelta(
                     seconds=self._cache_ttl
                 ):
                     return cached_data['permissions']
@@ -91,7 +91,7 @@ class GroupPermissionsService:
                         UserPermissionOverride.is_active == True,
                         or_(
                             UserPermissionOverride.expires_at.is_(None),
-                            UserPermissionOverride.expires_at > datetime.utcnow(),
+                            UserPermissionOverride.expires_at > datetime.now(UTC),
                         ),
                     )
                 )
@@ -109,7 +109,7 @@ class GroupPermissionsService:
             if use_cache:
                 self._permissions_cache[cache_key] = {
                     'permissions': permissions,
-                    'timestamp': datetime.utcnow(),
+                    'timestamp': datetime.now(UTC),
                 }
 
             return permissions
@@ -285,7 +285,7 @@ class GroupPermissionsService:
             self.logger.error(
                 f"Ошибка получения сводки разрешений группы {group_id}: {e}"
             )
-            return {"error": f"Ошибка получения данных: {str(e)}"}
+            return {"error": "Внутренняя ошибка"}
 
     def assign_role_to_group(
         self, db: Session, group_id: int, role_id: int, assigned_by_user_id: int
@@ -349,7 +349,7 @@ class GroupPermissionsService:
             self.logger.error(
                 f"Ошибка назначения роли {role_id} группе {group_id}: {e}"
             )
-            return {"success": False, "error": f"Ошибка назначения роли: {str(e)}"}
+            return {"success": False, "error": "Внутренняя ошибка"}
 
     def revoke_role_from_group(
         self, db: Session, group_id: int, role_id: int, revoked_by_user_id: int
@@ -410,7 +410,7 @@ class GroupPermissionsService:
         except Exception as e:
             db.rollback()
             self.logger.error(f"Ошибка отзыва роли {role_id} у группы {group_id}: {e}")
-            return {"success": False, "error": f"Ошибка отзыва роли: {str(e)}"}
+            return {"success": False, "error": "Внутренняя ошибка"}
 
     def add_user_to_group(
         self, db: Session, user_id: int, group_id: int, added_by_user_id: int
@@ -473,7 +473,7 @@ class GroupPermissionsService:
             self.logger.error(
                 f"Ошибка добавления пользователя {user_id} в группу {group_id}: {e}"
             )
-            return {"success": False, "error": f"Ошибка добавления в группу: {str(e)}"}
+            return {"success": False, "error": "Внутренняя ошибка"}
 
     def remove_user_from_group(
         self, db: Session, user_id: int, group_id: int, removed_by_user_id: int
@@ -535,7 +535,7 @@ class GroupPermissionsService:
             self.logger.error(
                 f"Ошибка удаления пользователя {user_id} из группы {group_id}: {e}"
             )
-            return {"success": False, "error": f"Ошибка удаления из группы: {str(e)}"}
+            return {"success": False, "error": "Внутренняя ошибка"}
 
     def _clear_user_cache(self, user_id: int):
         """Очистить кэш разрешений пользователя"""

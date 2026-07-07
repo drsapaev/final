@@ -7,7 +7,7 @@ import os
 import time
 from collections import defaultdict
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from fastapi import Request, status
@@ -64,7 +64,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         self.locked_ips: dict[str, datetime] = {}  # IP -> lock_until
 
         # Очистка старых записей каждые 5 минут
-        self.last_cleanup = datetime.utcnow()
+        self.last_cleanup = datetime.now(UTC)
         self.cleanup_interval = timedelta(minutes=5)
 
     def _get_client_ip(self, request: Request) -> str:
@@ -116,7 +116,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
     def _cleanup_old_records(self):
         """Очистить старые записи из памяти"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         # Use epoch seconds from the system clock to avoid naive datetime timezone shifts.
         current_timestamp = time.time()
         default_window = min(cfg["window"] for cfg in self.rate_limits.values())
@@ -219,8 +219,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         # Проверяем, не заблокирован ли IP
         if ip_address in self.locked_ips:
             lock_until = self.locked_ips[ip_address]
-            if datetime.utcnow() < lock_until:
-                remaining = (lock_until - datetime.utcnow()).total_seconds()
+            if datetime.now(UTC) < lock_until:
+                remaining = (lock_until - datetime.now(UTC)).total_seconds()
                 return True, f"IP заблокирован из-за множественных неудачных попыток. Разблокировка через {int(remaining)} секунд"
             else:
                 # Блокировка истекла
@@ -240,7 +240,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         if len(failed) >= max_attempts:
             # Блокируем IP
             lock_duration = self.brute_force_config["lockout_duration"]
-            self.locked_ips[ip_address] = datetime.utcnow() + timedelta(
+            self.locked_ips[ip_address] = datetime.now(UTC) + timedelta(
                 seconds=lock_duration
             )
             logger.warning(

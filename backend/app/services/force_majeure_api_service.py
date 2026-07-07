@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 from typing import Any
 
@@ -190,7 +190,7 @@ class ForceMajeureApiService:
             raise ForceMajeureApiDomainError(400, f"Неизвестное действие: {action}")
 
         req.processed_by = current_user.id
-        req.processed_at = datetime.utcnow()
+        req.processed_at = datetime.now(UTC)
         if process_request.bank_card_number:
             req.bank_card_number = process_request.bank_card_number
         if process_request.manager_notes:
