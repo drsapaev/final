@@ -126,6 +126,23 @@ async def upload_file(
         if tags:
             tags_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
 
+        # FILES-AUDIT-28 P1: validate patient_id ownership
+        if patient_id is not None and current_user.role not in ("Admin", "Registrar"):
+            from app.models.patient import Patient
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if not patient:
+                raise HTTPException(status_code=404, detail="Пациент не найден")
+            if current_user.role in ("Doctor", "cardio", "derma", "dentist"):
+                from app.models.clinic import Doctor
+                from app.models.visit import Visit
+                doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+                if doctor:
+                    has_visit = db.query(Visit).filter(
+                        Visit.patient_id == patient_id, Visit.doctor_id == doctor.id
+                    ).first()
+                    if not has_visit:
+                        raise HTTPException(status_code=403, detail="Нет доступа к данному пациенту")
+
         # Создаем данные для загрузки
         file_data = FileUploadRequest(
             filename=file.filename or "unknown",
@@ -133,6 +150,7 @@ async def upload_file(
             title=title,
             description=description,
             permission=permission,
+
             patient_id=patient_id,
             appointment_id=appointment_id,
             visit_id=visit_id,

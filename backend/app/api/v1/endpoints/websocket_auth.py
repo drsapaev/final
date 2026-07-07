@@ -63,6 +63,19 @@ async def authenticate_websocket_token(
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
+        # AUTH-REAUDIT-28 P1: check token blacklist (jti + sentinel)
+        jti = payload.get("jti")
+        sub = payload.get("sub")
+        token_user_id = None
+        if isinstance(sub, str) and sub.isdigit():
+            token_user_id = int(sub)
+        elif isinstance(sub, int):
+            token_user_id = sub
+        if jti:
+            from app.services.token_blacklist_service import TokenBlacklistService
+            if TokenBlacklistService.is_token_blacklisted(db, jti, user_id=token_user_id):
+                logger.warning("WebSocket auth rejected: token blacklisted jti=%s", jti)
+                return None
     except JWTError:
         return None
 

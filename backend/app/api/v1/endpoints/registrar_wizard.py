@@ -689,7 +689,7 @@ def init_invoice_payment(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка инициации платежа: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -800,7 +800,7 @@ def check_invoice_status(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка проверки статуса: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -1308,7 +1308,7 @@ def get_pending_price_overrides(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения изменений цен: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1389,7 +1389,7 @@ def approve_price_override(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обработки изменения цены: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1551,7 +1551,7 @@ def get_all_free_requests(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения заявок All Free: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1637,7 +1637,7 @@ def approve_all_free_request(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обработки заявки All Free: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1746,7 +1746,7 @@ def get_benefit_settings(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек льгот: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1825,7 +1825,7 @@ def update_benefit_settings(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек льгот: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -2152,7 +2152,7 @@ def get_visits(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения записей: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -2548,7 +2548,7 @@ def get_all_appointments(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения записей: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -3045,7 +3045,7 @@ def mark_visit_as_paid(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления записи: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -3254,7 +3254,7 @@ def mark_queue_entry_as_paid(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления записи: {str(e)}",
+            detail="Internal server error",
         )
 
 @router.post("/registrar/visits/{visit_id}/complete")
@@ -3289,7 +3289,7 @@ def complete_visit(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления записи: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -3321,7 +3321,7 @@ def start_visit(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления записи: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -3515,7 +3515,7 @@ def confirm_visit_by_registrar(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка подтверждения визита: {str(e)}",
+            detail="Internal server error",
         )
 
 
