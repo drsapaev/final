@@ -266,7 +266,11 @@ async def preview_file(
         return StreamingResponse(
             io.BytesIO(file_content),
             media_type=mime_type,
-            headers={"Content-Disposition": f"inline; filename={filename}"},
+            headers={
+                "Content-Disposition": f"inline; filename={filename}",
+                # FILES-AUDIT-28 P0-3: prevent content-type sniffing (SVG XSS)
+                "X-Content-Type-Options": "nosniff",
+            },
         )
 
     except HTTPException:
