@@ -8,7 +8,7 @@ import string
 from datetime import datetime, timedelta, UTC
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -41,7 +41,7 @@ def raise_two_factor_sms_internal_error(
 
 
 @router.post("/send-code")
-async def send_verification_code(
+async def send_verification_code(request: Request, 
     method: str = Query(..., description="Метод отправки: sms или email"),
     phone_number: str | None = Query(None, description="Номер телефона для SMS"),
     email_address: str | None = Query(None, description="Email адрес"),
@@ -171,7 +171,7 @@ async def get_verification_status(
 
 
 @router.post("/resend-code")
-async def resend_verification_code(
+async def resend_verification_code(request: Request, 
     method: str = Query(..., description="Метод отправки: sms или email"),
     phone_number: str | None = Query(None, description="Номер телефона для SMS"),
     email_address: str | None = Query(None, description="Email адрес"),

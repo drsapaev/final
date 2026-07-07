@@ -5,7 +5,7 @@ API endpoints для верификации телефонных номеров
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 

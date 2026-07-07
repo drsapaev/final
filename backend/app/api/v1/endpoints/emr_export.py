@@ -5,7 +5,8 @@ API endpoints для экспорта и импорта EMR данных
 import logging
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from app.core.rate_limiter import limiter
+from fastapi import Request, APIRouter, Depends, HTTPException, Query, Response
 
 from app.api.deps import get_current_user, require_roles
 from app.models.user import User
@@ -63,7 +64,8 @@ async def get_import_formats(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/export/json")
-async def export_emr_to_json(
+@limiter.limit("5/minute")  # P1-1: rate limit (export)
+async def export_emr_to_json(request: Request, 
     emr_data: dict,
     include_versions: bool = Query(False, description="Включить версии EMR"),
     include_templates: bool = Query(False, description="Включить шаблоны"),

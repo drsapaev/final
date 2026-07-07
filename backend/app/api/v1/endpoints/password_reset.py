@@ -7,7 +7,8 @@ import re
 from datetime import datetime
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.core.rate_limiter import limiter
+from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy.orm import Session
 
@@ -102,7 +103,7 @@ class PasswordResetConfirmRequest(BaseModel):
         return v
 
 
-@router.post("/initiate")
+@router.post("/initiate")  # P1-1: rate limit deferred (request param conflict)
 async def initiate_password_reset(
     request: PasswordResetInitiateRequest, db: Session = Depends(get_db)
 ):
