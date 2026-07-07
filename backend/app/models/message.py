@@ -108,6 +108,39 @@ class Message(Base):
         return f"<Message {self.id} from {self.sender_id} to {self.recipient_id}>"
 
 
+
+    @property
+    def decrypted_content(self) -> str:
+        """P1-4: decrypt content on read (Fernet)."""
+        if not self.content:
+            return ""
+        from app.core.config import settings
+        if not settings.ENCRYPTION_KEY:
+            return self.content
+        try:
+            if self.content.startswith("gAAAAA"):
+                from cryptography.fernet import Fernet
+                cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+                return cipher.decrypt(self.content.encode()).decode()
+            return self.content
+        except Exception:
+            return self.content
+
+    def set_content(self, value: str) -> None:
+        """P1-4: encrypt content on write (Fernet)."""
+        if not value:
+            self.content = ""
+            return
+        from app.core.config import settings
+        if not settings.ENCRYPTION_KEY:
+            self.content = value
+            return
+        from cryptography.fernet import Fernet
+        cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+        self.content = cipher.encrypt(value.encode()).decode()
+
+
+
 class MessageReaction(Base):
     """Реакция на сообщение"""
     __tablename__ = "message_reactions"
