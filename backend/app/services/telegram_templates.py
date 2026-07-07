@@ -79,7 +79,8 @@ class TelegramTemplatesService:
             },
             "appointment_reminder": {
                 "ru": {
-                    "text": "🔔 <b>Напоминание о приеме</b>\n\nЗдравствуйте, {patient_name}!\n\nНапоминаем о приеме:\n📅 <b>Дата:</b> {appointment_date}\n🕐 <b>Время:</b> {appointment_time}\n👨‍⚕️ <b>Врач:</b> {doctor_name}\n🏥 <b>Специализация:</b> {specialty}\n🏢 <b>Кабинет:</b> {cabinet}\n\n📍 <b>Адрес:</b> {clinic_address}\n📞 <b>Телефон:</b> {clinic_phone}\n\nПодтвердите или выберите действие:",
+                    # TG-AUDIT-28 P1-1: PHI removed — patient name no longer in Telegram chat
+                    "text": "🔔 <b>Напоминание о приеме</b>\n\nЗдравствуйте!\n\nНапоминаем о приеме:\n📅 <b>Дата:</b> {appointment_date}\n🕐 <b>Время:</b> {appointment_time}\n👨‍⚕️ <b>Врач:</b> {doctor_name}\n🏥 <b>Специализация:</b> {specialty}\n🏢 <b>Кабинет:</b> {cabinet}\n\n📍 <b>Адрес:</b> {clinic_address}\n📞 <b>Телефон:</b> {clinic_phone}\n\nПодтвердите или выберите действие:",
                     "keyboard": {
                         "inline_keyboard": [
                             [
@@ -106,7 +107,7 @@ class TelegramTemplatesService:
                     },
                 },
                 "uz": {
-                    "text": "🔔 <b>Qabul haqida eslatma</b>\n\nAssalomu alaykum, {patient_name}!\n\nQabul haqida eslatma:\n📅 <b>Sana:</b> {appointment_date}\n🕐 <b>Vaqt:</b> {appointment_time}\n👨‍⚕️ <b>Shifokor:</b> {doctor_name}\n🏥 <b>Mutaxassislik:</b> {specialty}\n🏢 <b>Xona:</b> {cabinet}\n\n📍 <b>Manzil:</b> {clinic_address}\n📞 <b>Telefon:</b> {clinic_phone}\n\nTasdiqlang yoki amalni tanlang:",
+                    "text": "🔔 <b>Qabul haqida eslatma</b>\n\nAssalomu alaykum!\n\nQabul haqida eslatma:\n📅 <b>Sana:</b> {appointment_date}\n🕐 <b>Vaqt:</b> {appointment_time}\n👨‍⚕️ <b>Shifokor:</b> {doctor_name}\n🏥 <b>Mutaxassislik:</b> {specialty}\n🏢 <b>Xona:</b> {cabinet}\n\n📍 <b>Manzil:</b> {clinic_address}\n📞 <b>Telefon:</b> {clinic_phone}\n\nTasdiqlang yoki amalni tanlang:",
                     "keyboard": {
                         "inline_keyboard": [
                             [
@@ -135,7 +136,7 @@ class TelegramTemplatesService:
             },
             "lab_results_ready": {
                 "ru": {
-                    "text": "🧪 <b>Результаты анализов готовы</b>\n\nЗдравствуйте, {patient_name}!\n\nГотовы результаты анализов:\n📋 <b>Тип исследования:</b> {test_type}\n📅 <b>Дата забора:</b> {collection_date}\n✅ <b>Готовность:</b> {ready_date}\n\n{abnormalities_text}\n\nВы можете получить их в клинике или скачать по ссылке ниже.",
+                    "text": "🧪 <b>Результаты анализов готовы</b>\n\nЗдравствуйте!\n\nГотовы результаты анализов:\n📋 <b>Тип исследования:</b> {test_type}\n📅 <b>Дата забора:</b> {collection_date}\n✅ <b>Готовность:</b> {ready_date}\n\n{abnormalities_text}\n\nВы можете получить их в клинике или скачать по ссылке ниже.",
                     "keyboard": {
                         "inline_keyboard": [
                             [
@@ -162,7 +163,7 @@ class TelegramTemplatesService:
                     },
                 },
                 "uz": {
-                    "text": "🧪 <b>Tahlil natijalari tayyor</b>\n\nAssalomu alaykum, {patient_name}!\n\nTahlil natijalari tayyor:\n📋 <b>Tadqiqot turi:</b> {test_type}\n📅 <b>Olish sanasi:</b> {collection_date}\n✅ <b>Tayyorlik:</b> {ready_date}\n\n{abnormalities_text}\n\nUlarni klinikadan olishingiz yoki quyidagi havoladan yuklab olishingiz mumkin.",
+                    "text": "🧪 <b>Tahlil natijalari tayyor</b>\n\nAssalomu alaykum!\n\nTahlil natijalari tayyor:\n📋 <b>Tadqiqot turi:</b> {test_type}\n📅 <b>Olish sanasi:</b> {collection_date}\n✅ <b>Tayyorlik:</b> {ready_date}\n\n{abnormalities_text}\n\nUlarni klinikadan olishingiz yoki quyidagi havoladan yuklab olishingiz mumkin.",
                     "keyboard": {
                         "inline_keyboard": [
                             [

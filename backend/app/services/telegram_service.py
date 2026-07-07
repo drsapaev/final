@@ -33,10 +33,8 @@ from app.models.telegram_config import (
     TelegramConfig,
 )
 
-# Настройка логирования для Telegram
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
-)
+# TG-AUDIT-28 P1-2: удалён logging.basicConfig — он переопределял
+# root logger для всего приложения. Используем module-level logger.
 logger = logging.getLogger(__name__)
 
 
@@ -56,10 +54,14 @@ class TelegramService:
             return False
 
         try:
-            self.db = SessionLocal()
-
-            # Получаем конфигурацию бота
-            self.config = crud_telegram.get_telegram_config(self.db)
+            # TG-AUDIT-28 P1-3: не храним DB session на singleton —
+            # не thread-safe, вызывает DetachedInstanceError.
+            # Используем локальную сессию для инициализации.
+            _init_db = SessionLocal()
+            try:
+                self.config = crud_telegram.get_telegram_config(_init_db)
+            finally:
+                _init_db.close()
 
             if not self.config or not self.config.bot_token:
                 logger.error("Токен Telegram бота не настроен")
