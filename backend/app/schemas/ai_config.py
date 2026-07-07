@@ -5,12 +5,27 @@ Pydantic схемы для AI конфигурации
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from urllib.parse import urlparse
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ===================== AI ПРОВАЙДЕРЫ =====================
 
 
 class AIProviderBase(BaseModel):
+    """P1-14: api_url SSRF validation."""
+
+    @field_validator("api_url")
+    @classmethod
+    def _validate_api_url_ssrf(cls, v):
+        if v is None:
+            return v
+        parsed = urlparse(v)
+        if parsed.scheme not in ("https",):
+            raise ValueError("api_url must use https://")
+        hostname = parsed.hostname or ""
+        if hostname in ("169.254.169.254", "localhost", "127.0.0.1", "0.0.0.0", "::1"):
+            raise ValueError("api_url cannot point to internal/loopback addresses")
+        return v
     name: str = Field(..., max_length=50, description="Уникальное имя провайдера")
     display_name: str = Field(..., max_length=100, description="Отображаемое имя")
     api_key: str | None = Field(None, max_length=200, description="API ключ")

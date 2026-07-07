@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from ....api.deps import get_current_user, require_roles
@@ -222,7 +222,7 @@ async def mcp_analyze_complaint(
 
 @router.post("/complaint/validate")
 async def mcp_validate_complaint(
-    complaint: str, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
+    complaint: str = Body(..., description="Patient complaint text"),  # P1-16: moved from query to body current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Валидация жалоб через MCP"""
     try:
