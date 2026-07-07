@@ -187,6 +187,37 @@ app.add_api_websocket_route("/ws/dev-queue", ws_queue)
 app.add_api_websocket_route("/ws/chat", chat_websocket_handler)  # User-to-user chat
 
 # -----------------------------------------------------------------------------
+
+# Security headers middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """FRONTEND-SECURITY: Add security headers to all responses."""
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        # CSP: allow inline styles (Tailwind), scripts from self, images from data: and https:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com data:; "
+            "img-src 'self' data: https: blob:; "
+            "connect-src 'self' wss: ws:; "
+            "frame-ancestors 'none';"
+        )
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+log.info("Security headers middleware registered")
+
 # Audit Middleware (должен быть ДО CORS для установки request_id)
 # -----------------------------------------------------------------------------
 from app.core.rate_limiter import setup_rate_limiting

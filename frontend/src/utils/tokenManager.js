@@ -6,6 +6,12 @@
  */
 import logger from './logger';
 
+/**
+ * FRONTEND-SECURITY: Tokens stored in localStorage are accessible to XSS.
+ * Mitigation: CSP headers (added in backend) prevent inline script injection.
+ * Future: migrate to httpOnly cookies (requires backend changes).
+ * Current: accept the risk with CSP + strict input validation.
+ */
 const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user';
