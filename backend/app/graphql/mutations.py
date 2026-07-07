@@ -95,7 +95,7 @@ class Mutation:
         except Exception as e:
             return PatientMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -111,7 +111,7 @@ class Mutation:
             if not patient:
                 return PatientMutationResponse(
                     success=False,
-                    message="Пациент не найден",
+                    message=t("patient.not_found"),
                     errors=["PATIENT_NOT_FOUND"],
                 )
 
@@ -145,7 +145,7 @@ class Mutation:
         except Exception as e:
             return PatientMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -159,7 +159,7 @@ class Mutation:
             if not patient:
                 return MutationResponse(
                     success=False,
-                    message="Пациент не найден",
+                    message=t("patient.not_found"),
                     errors=["PATIENT_NOT_FOUND"],
                 )
 
@@ -183,7 +183,7 @@ class Mutation:
         except Exception as e:
             return MutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -202,14 +202,14 @@ class Mutation:
             if not patient:
                 return AppointmentMutationResponse(
                     success=False,
-                    message="Пациент не найден",
+                    message=t("patient.not_found"),
                     errors=["PATIENT_NOT_FOUND"],
                 )
 
             doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
             if not doctor:
                 return AppointmentMutationResponse(
-                    success=False, message="Врач не найден", errors=["DOCTOR_NOT_FOUND"]
+                    success=False, message=t("doctor.not_found"), errors=["DOCTOR_NOT_FOUND"]
                 )
 
             service = db.query(Service).filter(Service.id == input.service_id).first()
@@ -243,7 +243,7 @@ class Mutation:
         except Exception as e:
             return AppointmentMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -259,7 +259,7 @@ class Mutation:
             if not appointment:
                 return AppointmentMutationResponse(
                     success=False,
-                    message="Запись не найдена",
+                    message=t("error.not_found"),
                     errors=["APPOINTMENT_NOT_FOUND"],
                 )
 
@@ -291,7 +291,7 @@ class Mutation:
         except Exception as e:
             return AppointmentMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -307,7 +307,7 @@ class Mutation:
             if not appointment:
                 return AppointmentMutationResponse(
                     success=False,
-                    message="Запись не найдена",
+                    message=t("error.not_found"),
                     errors=["APPOINTMENT_NOT_FOUND"],
                 )
 
@@ -336,7 +336,7 @@ class Mutation:
         except Exception as e:
             return AppointmentMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -353,14 +353,14 @@ class Mutation:
             if not patient:
                 return VisitMutationResponse(
                     success=False,
-                    message="Пациент не найден",
+                    message=t("patient.not_found"),
                     errors=["PATIENT_NOT_FOUND"],
                 )
 
             doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
             if not doctor:
                 return VisitMutationResponse(
-                    success=False, message="Врач не найден", errors=["DOCTOR_NOT_FOUND"]
+                    success=False, message=t("doctor.not_found"), errors=["DOCTOR_NOT_FOUND"]
                 )
 
             # Проверяем услуги
@@ -417,7 +417,7 @@ class Mutation:
             db.rollback()
             return VisitMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -430,7 +430,7 @@ class Mutation:
             visit = db.query(Visit).filter(Visit.id == id).first()
             if not visit:
                 return VisitMutationResponse(
-                    success=False, message="Визит не найден", errors=["VISIT_NOT_FOUND"]
+                    success=False, message=t("visit.not_found"), errors=["VISIT_NOT_FOUND"]
                 )
 
             valid_statuses = [
@@ -460,7 +460,7 @@ class Mutation:
         except Exception as e:
             return VisitMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -487,7 +487,7 @@ class Mutation:
                 if not doctor:
                     return ServiceMutationResponse(
                         success=False,
-                        message="Врач не найден",
+                        message=t("doctor.not_found"),
                         errors=["DOCTOR_NOT_FOUND"],
                     )
 
@@ -514,7 +514,7 @@ class Mutation:
         except Exception as e:
             return ServiceMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -552,7 +552,7 @@ class Mutation:
         except Exception as e:
             return ServiceMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -569,14 +569,14 @@ class Mutation:
             if not patient:
                 return QueueMutationResponse(
                     success=False,
-                    message="Пациент не найден",
+                    message=t("patient.not_found"),
                     errors=["PATIENT_NOT_FOUND"],
                 )
 
             doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
             if not doctor:
                 return QueueMutationResponse(
-                    success=False, message="Врач не найден", errors=["DOCTOR_NOT_FOUND"]
+                    success=False, message=t("doctor.not_found"), errors=["DOCTOR_NOT_FOUND"]
                 )
 
             # Проверяем, не стоит ли пациент уже в очереди к этому врачу сегодня
@@ -652,7 +652,7 @@ class Mutation:
             db.rollback()
             return QueueMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
 
@@ -726,6 +726,6 @@ class Mutation:
             db.rollback()
             return QueueMutationResponse(
                 success=False,
-                message="Внутренняя ошибка сервера",
+                message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )

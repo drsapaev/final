@@ -50,7 +50,7 @@ def get_my_appointment_details(
     Получить детали записи текущего пациента
     """
     if not current_user.patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     service = PatientPortalService(db)
     try:
@@ -137,7 +137,7 @@ def get_patient(
     _ensure_patient_self_access(current_user, patient_id)
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
     return patient
 
 
@@ -186,7 +186,7 @@ def get_patient_appointments(
     _ensure_patient_self_access(current_user, patient_id)
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     appointments = patient_crud.get_patient_appointments(db, patient_id=patient_id)
     return appointments
@@ -213,7 +213,7 @@ def soft_delete_patient(
 
     patient = do_soft_delete(db, patient_id=patient_id, deleted_by=current_user.id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     # Audit log
     log_critical_change(
@@ -248,7 +248,7 @@ def restore_patient(
 
     patient = do_restore(db, patient_id=patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     # Audit log
     log_critical_change(
@@ -286,7 +286,7 @@ def get_patient_family(
 
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     # Получаем родственников пациента
     family = do_get_family(db, patient_id=patient_id)
@@ -386,7 +386,7 @@ def get_primary_contact(
 
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     primary = do_get_primary(db, patient_id=patient_id)
 

@@ -214,7 +214,7 @@ class MessagesApiService:
             if not patient:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Пациент не найден",
+                    detail=t("patient.not_found"),
                 )
             # Admin can tag any patient; Doctor must be assigned;
             # other roles cannot tag patients.

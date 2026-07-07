@@ -39,11 +39,11 @@ class RegistrarNotificationsApiService:
             appointment = self.repository.get_appointment(appointment_id)
 
         if not appointment:
-            raise RegistrarNotificationsApiDomainError(404, "Запись не найдена")
+            raise RegistrarNotificationsApiDomainError(404, t("error.not_found"))
 
         patient = self.repository.get_patient(appointment.patient_id)
         if not patient:
-            raise RegistrarNotificationsApiDomainError(404, "Пациент не найден")
+            raise RegistrarNotificationsApiDomainError(404, t("patient.not_found"))
 
         services = []
         if appointment_type == "visit":
@@ -62,7 +62,7 @@ class RegistrarNotificationsApiService:
 
         doctor = self.repository.get_doctor(price_override.doctor_id)
         if not doctor:
-            raise RegistrarNotificationsApiDomainError(404, "Врач не найден")
+            raise RegistrarNotificationsApiDomainError(404, t("doctor.not_found"))
 
         service_obj = self.repository.get_service(price_override.service_id)
         if not service_obj:

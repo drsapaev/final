@@ -116,7 +116,7 @@ async def send_appointment_reminder_enhanced(
         appointment = crud_appointment.get_appointment(db, appointment_id)
         if not appointment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
             )
 
         # Получаем данные пациента
@@ -126,7 +126,7 @@ async def send_appointment_reminder_enhanced(
         patient = crud_patient.get_patient(db, appointment.patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
             )
 
         # Подготавливаем данные
@@ -189,7 +189,7 @@ async def send_lab_results_enhanced(
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
             )
 
         # Здесь должна быть логика получения данных анализов
@@ -252,7 +252,7 @@ async def send_payment_confirmation_enhanced(
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
             )
 
         # Подготавливаем данные

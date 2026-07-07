@@ -820,7 +820,7 @@ def preview_repeat_eligibility(
         db.query(Patient.id).filter(Patient.id == payload.patient_id).first() is not None
     )
     if not patient_exists:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     settings = _load_registration_discount_settings(db)
     repeat_visit_days = int(settings.get("repeat_visit_days", 21) or 21)
@@ -1572,7 +1572,7 @@ def approve_all_free_request(
 
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("visit.not_found")
             )
 
         if visit.discount_mode != "all_free":
@@ -2924,7 +2924,7 @@ def mark_visit_as_paid(
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
             )
 
         # [OK] ИСПРАВЛЕНО: Проверяем, не создан ли уже платеж для этого визита
@@ -3276,7 +3276,7 @@ def complete_visit(
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
             )
 
         _ensure_visit_doctor_access(db, visit, current_user)
@@ -3310,7 +3310,7 @@ def start_visit(
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
             )
 
         visit.status = "in_progress"
@@ -3459,7 +3459,7 @@ def confirm_visit_by_registrar(
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("visit.not_found")
             )
 
         # Проверяем что визит ожидает подтверждения

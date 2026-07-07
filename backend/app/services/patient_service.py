@@ -228,7 +228,7 @@ class PatientService:
     ) -> Patient:
         patient = patient_crud.get(self.db, id=patient_id)
         if not patient:
-            raise HTTPException(status_code=404, detail="Пациент не найден")
+            raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
         if patient_in.phone and patient_in.phone != patient.phone:
             existing_patient = patient_crud.get_patient_by_phone(
@@ -269,7 +269,7 @@ class PatientService:
     ) -> dict[str, str]:
         patient = patient_crud.get(self.db, id=patient_id)
         if not patient:
-            raise HTTPException(status_code=404, detail="Пациент не найден")
+            raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
         if patient_crud.has_active_appointments(self.db, patient_id=patient_id):
             raise HTTPException(

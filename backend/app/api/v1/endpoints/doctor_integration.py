@@ -1025,7 +1025,7 @@ def complete_patient_visit(
 
         # Иначе действительно не найдено
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
+            status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
         )
 
     except HTTPException:
@@ -1433,7 +1433,7 @@ async def schedule_next_visit(
         patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
             )
 
         # Проверяем существование услуг
@@ -1723,7 +1723,7 @@ def get_visit_details(
 
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("visit.not_found")
             )
 
         # Проверяем права доступа
@@ -1802,7 +1802,7 @@ def add_service_to_visit(
 
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("visit.not_found")
             )
 
         # Проверяем права доступа
@@ -1862,7 +1862,7 @@ def remove_service_from_visit(
 
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("visit.not_found")
             )
 
         # Проверяем права доступа

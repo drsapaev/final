@@ -191,7 +191,7 @@ async def get_my_appointment(
     patient = service.get_patient_for_user(current_user)
 
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     appointment = service.get_appointment_for_patient(
         appointment_id=appointment_id,
@@ -199,7 +199,7 @@ async def get_my_appointment(
     )
 
     if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
+        raise HTTPException(status_code=404, detail=t("error.not_found"))
 
     can_mod, hours_until = can_modify_appointment(appointment)
 
@@ -238,7 +238,7 @@ async def cancel_my_appointment(
     patient = service.get_patient_for_user(current_user)
 
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     appointment = service.get_appointment_for_patient(
         appointment_id=appointment_id,
@@ -246,7 +246,7 @@ async def cancel_my_appointment(
     )
 
     if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
+        raise HTTPException(status_code=404, detail=t("error.not_found"))
 
     if appointment.status == 'cancelled':
         raise HTTPException(status_code=400, detail="Запись уже отменена")
@@ -291,7 +291,7 @@ async def reschedule_my_appointment(
     patient = service.get_patient_for_user(current_user)
 
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     appointment = service.get_appointment_for_patient(
         appointment_id=appointment_id,
@@ -299,7 +299,7 @@ async def reschedule_my_appointment(
     )
 
     if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
+        raise HTTPException(status_code=404, detail=t("error.not_found"))
 
     if appointment.status in ['cancelled', 'completed']:
         raise HTTPException(status_code=400, detail=f"Нельзя перенести запись со статусом '{appointment.status}'")
@@ -371,7 +371,7 @@ async def get_available_slots(
     patient = service.get_patient_for_user(current_user)
 
     if not patient:
-        raise HTTPException(status_code=404, detail="Пациент не найден")
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     appointment = service.get_appointment_for_patient(
         appointment_id=appointment_id,
@@ -379,7 +379,7 @@ async def get_available_slots(
     )
 
     if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
+        raise HTTPException(status_code=404, detail=t("error.not_found"))
 
     # Парсим даты
     try:

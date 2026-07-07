@@ -6,7 +6,7 @@ Usage:
 
     # Raise not found error
     if not patient:
-        not_found("Пациент не найден")
+        not_found(t("patient.not_found"))
 
     # Return success response
     return success_response(data={"id": 1}, message="Created successfully")
@@ -34,7 +34,7 @@ def not_found(message: str = "Ресурс не найден") -> None:
     )
 
 
-def forbidden(message: str = "Доступ запрещён") -> None:
+def forbidden(message: str = t("error.access_denied")) -> None:
     """
     Raise HTTP 403 Forbidden error.
 
@@ -121,7 +121,7 @@ def rate_limited(
     )
 
 
-def server_error(message: str = "Внутренняя ошибка сервера") -> None:
+def server_error(message: str = t("error.internal")) -> None:
     """
     Raise HTTP 500 Internal Server Error.
 
