@@ -157,7 +157,7 @@ export function sanitizeAIContent(aiContent) {
  * @returns {string} Экранированная строка
  *
  * @example
- * const safe = escapeHTML('<img src=x onerror="alert(1)">');
+ * const safe = escapeHTML('<img alt="" src=x onerror="alert(1)">');
  * // Результат: '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;'
  */
 export function escapeHTML(str) {
