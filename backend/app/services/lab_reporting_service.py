@@ -31,6 +31,7 @@ from app.models.lab import (
     LabResult,
     LabTemplateServiceBinding,
 )
+from app.models.visit import Visit
 from app.models.user import User
 from app.models.clinic import Doctor
 from app.repositories.lab_reporting_api_repository import LabReportingApiRepository
@@ -1523,13 +1524,22 @@ class LabReportingService:
         )
 
         # 1. Notify the ordering doctor via in-app notification.
+        # LAB-AUDIT-28 P0-2: field name was wrong (lab_order_id → order_id),
+        # and LabOrder has no requested_by_doctor_id column — doctor is found
+        # via visit.doctor_id. Ordering doctor was NEVER notified on finalize.
         order = None
-        if instance.lab_order_id:
-            order = self.db.query(LabOrder).filter(LabOrder.id == instance.lab_order_id).first()
+        if instance.order_id:
+            order = self.db.query(LabOrder).filter(LabOrder.id == instance.order_id).first()
 
         doctor_id = None
-        if order and hasattr(order, "requested_by_doctor_id"):
-            doctor_id = order.requested_by_doctor_id
+        if order and order.visit_id:
+            visit = self.db.query(Visit).filter(Visit.id == order.visit_id).first()
+            if visit:
+                doctor_id = visit.doctor_id
+        elif instance.visit_id:
+            visit = self.db.query(Visit).filter(Visit.id == instance.visit_id).first()
+            if visit:
+                doctor_id = visit.doctor_id
 
         if doctor_id:
             doctor_user = (
