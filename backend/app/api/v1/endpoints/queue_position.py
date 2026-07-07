@@ -111,18 +111,30 @@ class SendCallNotificationRequest(BaseModel):
 @router.get("/{entry_id}", response_model=QueuePositionResponse)
 async def get_queue_position(
     entry_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    # QUEUE-AUDIT-28 P0-4: was public — sequential ID enumeration leaked all
+    # positions + specialist names + cabinets to anonymous users.
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Получить информацию о позиции в очереди
+    Получить информацию о позиции в очереди.
 
-    Публичный эндпоинт для отображения позиции на дисплее
-    или в мобильном приложении.
+    Требует аутентификации. Patient может видеть только свои записи;
+    Admin/Registrar/Doctor — любые.
     """
     try:
         entry = QueuePositionApiService(db).get_position_entry(entry_id=entry_id)
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    # Ownership check: non-staff users can only see their own entries
+    if current_user.role not in ("Admin", "Registrar", "Doctor", "SuperAdmin"):
+        # Verify the entry belongs to the current user via patient linkage
+        if hasattr(entry, "patient_id") and entry.patient_id:
+            from app.models.patient import Patient
+            patient = db.query(Patient).filter(Patient.id == entry.patient_id).first()
+            if not patient or patient.user_id != current_user.id:
+                raise HTTPException(status_code=403, detail="Нет доступа к этой записи очереди")
 
     service = get_queue_position_service(db)
     position_info = service.get_queue_position_info(entry)
@@ -134,12 +146,15 @@ async def get_queue_position(
 async def get_queue_position_by_number(
     queue_number: int,
     specialist_id: int = Query(..., description="ID специалиста"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    # QUEUE-AUDIT-28 P0-5: was public — scanning queue_number 1-1000 leaked
+    # all positions for any specialist.
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Получить информацию о позиции по номеру в очереди
+    Получить информацию о позиции по номеру в очереди.
 
-    Используется для поиска позиции по талону.
+    Требует аутентификации.
     """
     try:
         entry = QueuePositionApiService(db).get_position_entry_by_number(
@@ -148,6 +163,14 @@ async def get_queue_position_by_number(
         )
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    # Ownership check for non-staff
+    if current_user.role not in ("Admin", "Registrar", "Doctor", "SuperAdmin"):
+        if hasattr(entry, "patient_id") and entry.patient_id:
+            from app.models.patient import Patient
+            patient = db.query(Patient).filter(Patient.id == entry.patient_id).first()
+            if not patient or patient.user_id != current_user.id:
+                raise HTTPException(status_code=403, detail="Нет доступа к этой записи очереди")
 
     service = get_queue_position_service(db)
     position_info = service.get_queue_position_info(entry)

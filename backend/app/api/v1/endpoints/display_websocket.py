@@ -71,15 +71,20 @@ async def websocket_display_board(
     db = SessionLocal()
 
     try:
-        # Аутентификация по токену (опциональная для публичных табло)
-        authenticated_user = None
-        if token:
-            authenticated_user = await authenticate_websocket_token(token, db)
-            if not authenticated_user:
-                await websocket.close(
-                    code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
-                )
-                return
+        # QUEUE-AUDIT-28 P0-2: token REQUIRED (was optional).
+        # Раньше anonymous пользователи получали все patient names + positions
+        # + doctors + cabinets через /ws/board/{board_id}.
+        if not token:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION, reason="Token required"
+            )
+            return
+        authenticated_user = await authenticate_websocket_token(token, db)
+        if not authenticated_user:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
+            )
+            return
 
         await manager.connect(websocket, board_id, authenticated_user)
 

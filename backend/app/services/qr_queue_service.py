@@ -1226,6 +1226,8 @@ class QRQueueService:
             raise ValueError(f"Очередь не активна на дату {queue_date}")
 
         # Находим следующего пациента в статусе "waiting"
+        # QUEUE-AUDIT-28 P0-7: with_for_update() — защита от race condition.
+        # Раньше два врача могли одновременно вызвать одного пациента.
         next_patient = (
             self.db.query(OnlineQueueEntry)
             .filter(
@@ -1233,6 +1235,7 @@ class QRQueueService:
                 OnlineQueueEntry.status == "waiting",
             )
             .order_by(OnlineQueueEntry.number)
+            .with_for_update()
             .first()
         )
 
@@ -1316,7 +1319,8 @@ class QRQueueService:
                     "expires_at": token.expires_at.isoformat(),
                     "sessions_count": sessions_count,
                     "successful_joins": successful_joins,
-                    "qr_url": f"https://clinic.example.com/queue/join/{token.token}",
+                    # QUEUE-AUDIT-28 P0-10: real URL (was clinic.example.com — regression)
+                    "qr_url": f"{self._get_frontend_url()}/queue/join/{token.token}",
                 }
             )
 

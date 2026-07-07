@@ -563,7 +563,7 @@ class QueueBusinessService:
         if daily_queue is None:
             if queue_id is None:
                 raise QueueValidationError("daily_queue or queue_id must be provided")
-            daily_queue = db.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+            daily_queue = db.query(DailyQueue).filter(DailyQueue.id == queue_id).with_for_update().first()
             if not daily_queue:
                 raise QueueNotFoundError(f"DailyQueue {queue_id} not found")
 
