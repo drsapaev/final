@@ -181,6 +181,40 @@ class CRUDMessage:
         """Мягкое удаление сообщения для пользователя"""
         message = db.query(Message).filter(Message.id == message_id).first()
 
+    def toggle_reaction(
+        self, db: Session, *, user_id: int, message_id: int, reaction: str
+    ) -> bool:
+        """CHAT-AUDIT-28 P0-1: implement toggle_reaction (was missing → 500).
+
+        Toggles a reaction: if the same user+message+reaction exists, removes it;
+        otherwise creates it.
+        """
+        from app.models.message import MessageReaction
+
+        existing = (
+            db.query(MessageReaction)
+            .filter(
+                MessageReaction.message_id == message_id,
+                MessageReaction.user_id == user_id,
+                MessageReaction.reaction == reaction,
+            )
+            .first()
+        )
+        if existing:
+            db.delete(existing)
+            db.commit()
+            return False  # removed
+        else:
+            new_reaction = MessageReaction(
+                message_id=message_id,
+                user_id=user_id,
+                reaction=reaction,
+            )
+            db.add(new_reaction)
+            db.commit()
+            return True  # added
+
+
         if not message:
             return False
 

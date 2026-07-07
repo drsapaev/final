@@ -205,6 +205,41 @@ class MessagesApiService:
             obj_in=prepared_message_data,
         )
         if message_data.patient_id is not None:
+            # CHAT-AUDIT-28 P0-2: validate sender has access to this patient.
+            # Раньше любой пользователь мог тегнуть любого пациента в сообщении.
+            from app.models.patient import Patient
+            patient = self.repository.db.query(Patient).filter(
+                Patient.id == message_data.patient_id
+            ).first()
+            if not patient:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Пациент не найден",
+                )
+            # Admin can tag any patient; Doctor must be assigned;
+            # other roles cannot tag patients.
+            if current_user.role != "Admin":
+                if current_user.role in ("Doctor", "cardio", "derma", "dentist"):
+                    from app.models.clinic import Doctor
+                    from app.models.visit import Visit
+                    doctor = self.repository.db.query(Doctor).filter(
+                        Doctor.user_id == current_user.id
+                    ).first()
+                    if doctor:
+                        has_visit = self.repository.db.query(Visit).filter(
+                            Visit.patient_id == message_data.patient_id,
+                            Visit.doctor_id == doctor.id,
+                        ).first()
+                        if not has_visit:
+                            raise HTTPException(
+                                status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Нет доступа к данному пациенту",
+                            )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Только Admin или лечащий врач могут тегать пациентов",
+                    )
             new_message.patient_id = message_data.patient_id
             self.repository.commit()
             self.repository.refresh(new_message)
