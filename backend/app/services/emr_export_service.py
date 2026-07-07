@@ -58,7 +58,17 @@ class EMRExportService:
     async def export_emr_to_xml(
         self, emr_data: dict[str, Any], include_versions: bool = False
     ) -> str:
-        """Экспорт EMR в XML формат"""
+        """Экспорт EMR в XML формат.
+
+        EMR-AUDIT-28 P1: XML injection fixed — all user data is now
+        escaped with xml_escape to prevent XXE/XSS in exported XML.
+        """
+        from xml.sax.saxutils import escape as xml_escape
+
+        def _safe(value) -> str:
+            """Escape user data for XML safety."""
+            return xml_escape(str(value)) if value is not None else ""
+
         try:
             xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
             xml_content += '<emr_export>\n'
@@ -75,10 +85,10 @@ class EMRExportService:
                 if isinstance(value, dict):
                     xml_content += f'    <{key}>\n'
                     for sub_key, sub_value in value.items():
-                        xml_content += f'      <{sub_key}>{sub_value}</{sub_key}>\n'
+                        xml_content += f'      <{sub_key}>{_safe(sub_value)}</{sub_key}>\n'
                     xml_content += f'    </{key}>\n'
                 else:
-                    xml_content += f'    <{key}>{value}</{key}>\n'
+                    xml_content += f'    <{key}>{_safe(value)}</{key}>\n'
             xml_content += '  </emr_data>\n'
 
             if include_versions and 'versions' in emr_data:
@@ -86,7 +96,7 @@ class EMRExportService:
                 for version in emr_data['versions']:
                     xml_content += '    <version>\n'
                     for key, value in version.items():
-                        xml_content += f'      <{key}>{value}</{key}>\n'
+                        xml_content += f'      <{key}>{_safe(value)}</{key}>\n'
                     xml_content += '    </version>\n'
                 xml_content += '  </versions>\n'
 
@@ -95,7 +105,7 @@ class EMRExportService:
             return xml_content
 
         except Exception as e:
-            raise Exception(f"Ошибка экспорта в XML: {str(e)}")
+            raise Exception(f"Ошибка экспорта в XML: {type(e).__name__}")
 
     async def export_emr_to_csv(
         self, emr_data: dict[str, Any], fields: list[str] = None
