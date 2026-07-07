@@ -9,7 +9,8 @@ from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime, UTC
 from typing import Any
 
-import requests
+import httpx
+import asyncio
 from sqlalchemy.orm import Session
 
 from app.crud import (
@@ -535,6 +536,18 @@ class TelegramBotService:
             logger.error(f"Ошибка получения врачей: {e}")
             await self._send_message(chat_id, "❌ Ошибка получения списка врачей.")
 
+    async def _httpx_post(self, url: str, **kwargs) -> dict:
+        """HTTPX-AUDIT: async POST replacing sync requests.post."""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, **kwargs)
+            return response
+
+    async def _httpx_get(self, url: str, **kwargs) -> dict:
+        """HTTPX-AUDIT: async GET replacing sync requests.get."""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, **kwargs)
+            return response
+
     async def _send_message(
         self, chat_id: int, text: str, reply_markup: dict | None = None
     ):
@@ -560,7 +573,7 @@ class TelegramBotService:
             if reply_markup:
                 data["reply_markup"] = json.dumps(reply_markup)
 
-            response = requests.post(url, json=data, timeout=10)
+            response = await self._httpx_post(url, json=data, timeout=10)
 
             if response.status_code == 200:
                 result = response.json()
@@ -592,7 +605,7 @@ class TelegramBotService:
         data = {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"}
         files = {"document": (filename, document_bytes, "application/pdf")}
         try:
-            response = requests.post(url, data=data, files=files, timeout=20)
+            response = await self._httpx_post(url, data=data, files=files, timeout=20)
         except requests.RequestException as exc:
             logger.warning(
                 "Telegram document send request failed error_type=%s",
@@ -630,7 +643,7 @@ class TelegramBotService:
         url = f"https://api.telegram.org/bot{bot_token}/setMyCommands"
         for payload in payloads:
             try:
-                response = requests.post(url, json=payload, timeout=10)
+                response = await self._httpx_post(url, json=payload, timeout=10)
             except requests.RequestException as exc:
                 logger.warning(
                     "Telegram command registration request failed error_type=%s",
@@ -666,7 +679,7 @@ class TelegramBotService:
 
         url = f"https://api.telegram.org/bot{bot_token}/setChatMenuButton"
         try:
-            response = requests.post(url, json={"menu_button": menu_button}, timeout=10)
+            response = await self._httpx_post(url, json={"menu_button": menu_button}, timeout=10)
         except requests.RequestException as exc:
             logger.warning(
                 "Telegram menu button setup request failed error_type=%s",
@@ -708,7 +721,7 @@ class TelegramBotService:
 
             url = f"https://api.telegram.org/bot{bot_token}/{method}"
             try:
-                response = requests.post(url, json=payload, timeout=10)
+                response = await self._httpx_post(url, json=payload, timeout=10)
             except requests.RequestException as exc:
                 logger.warning(
                     "Telegram profile setup request failed method=%s error_type=%s",
@@ -784,7 +797,7 @@ class TelegramBotService:
 
             data = {"callback_query_id": callback_query_id, "text": text}
 
-            response = requests.post(url, json=data, timeout=10)
+            response = await self._httpx_post(url, json=data, timeout=10)
             return response.status_code == 200
 
         except Exception as e:
@@ -801,7 +814,7 @@ class TelegramBotService:
 
             data = {"inline_query_id": query_id, "results": json.dumps(results)}
 
-            response = requests.post(url, json=data, timeout=10)
+            response = await self._httpx_post(url, json=data, timeout=10)
             return response.status_code == 200
 
         except Exception as e:
