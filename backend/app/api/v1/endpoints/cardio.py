@@ -183,6 +183,12 @@ async def create_ecg(
             file_record = db.get(FileModel, ecg_data.file_id)
             if file_record is None:
                 raise HTTPException(status_code=404, detail="Файл не найден")
+            # SPEC-AUDIT-28 P0-2: validate file belongs to the same patient
+            if hasattr(file_record, "patient_id") and file_record.patient_id and file_record.patient_id != ecg_data.patient_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Файл не принадлежит выбранному пациенту",
+                )
 
         if ecg_data.visit_id is None:
             _ensure_doctor_can_access_patient(db, ecg_data.patient_id, user)
