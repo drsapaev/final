@@ -281,8 +281,11 @@ class EMRV2Service:
                 "Cannot edit signed EMR. Use amend endpoint instead."
             )
 
-        # Optimistic locking check
-        if row_version > 0 and emr.row_version != row_version:
+        # EMR-AUDIT-28 P0-3: row_version=0 больше не обходить optimistic
+        # locking. Раньше frontend отправлял row_version=0 при force=true,
+        # что позволяло перезаписать чужие изменения без конфликт-чек.
+        # Теперь row_version обязателен и всегда проверяется.
+        if row_version is not None and emr.row_version != row_version:
             # Smart conflict resolution: same user with same session = OK
             if (
                 client_session_id
