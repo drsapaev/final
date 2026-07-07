@@ -138,12 +138,42 @@ async def lifespan(app: FastAPI):
 # Приложение
 # -----------------------------------------------------------------------------
 app = FastAPI(
-    title="Clinic Manager API",
+    title="MediClinic Pro API",
+    description="""
+    Medical clinic management system API.
+
+    ## Authentication
+    All endpoints (except /auth/login, /auth/csrf-token, /health) require
+    a Bearer JWT token in the Authorization header.
+
+    ## Rate Limiting
+    Sensitive endpoints (login, SMS, broadcast) are rate-limited via slowapi.
+    Rate limit headers are included in responses.
+
+    ## Audit Logging
+    Admin actions are logged to the AuditLog table for HIPAA compliance.
+
+    ## WebSocket
+    Real-time endpoints available at /ws/notifications, /ws/queue, /ws/cashier.
+    Authentication via ?token= query parameter (JWT).
+    """,
     version=settings.APP_VERSION,
     openapi_url="/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+    openapi_tags=[
+        {"name": "auth", "description": "Authentication and authorization"},
+        {"name": "payments", "description": "Payment processing (Click, PayMe, Kaspi)"},
+        {"name": "payment-webhooks", "description": "Payment provider webhooks"},
+        {"name": "EMR v2", "description": "Electronic medical records (v2)"},
+        {"name": "ai", "description": "AI-powered medical assistance"},
+        {"name": "two-factor-auth", "description": "Two-factor authentication"},
+        {"name": "telegram", "description": "Telegram bot integration"},
+        {"name": "qr-queue", "description": "Queue management with QR codes"},
+        {"name": "lab", "description": "Laboratory results and reporting"},
+        {"name": "mcp", "description": "Model Context Protocol tools"},
+    ],
 )
 
 # Prometheus metrics — no-op if prometheus-client not installed.
