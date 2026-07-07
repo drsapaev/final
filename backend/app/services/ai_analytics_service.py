@@ -2,6 +2,14 @@
 Сервис для расширенной аналитики AI использования и обучения на данных клиники
 Отслеживает использование AI функций, анализирует эффективность и обучается на данных
 """
+"""
+⚠️ AI-REAUDIT-28 P1: This service returns ~90% mock/hardcoded data.
+Methods like _extract_symptom_patterns, _analyze_diagnosis_frequency,
+_analyze_treatment_patterns return hardcoded values, not real analytics.
+Admin dashboard shows fake data. Do not rely on these metrics for
+clinical or business decisions.
+"""
+
 
 import hashlib
 import json
