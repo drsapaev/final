@@ -413,14 +413,21 @@ async def cancel_job(
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
 
 
+# PRINT-AUDIT-28 P0-1: PHI moved from query params to request body.
+# Раньше patient_name, diagnosis, prescription_text были в URL → логировались
+# в nginx access logs, browser history, referer headers.
+class QuickPrintPrescriptionRequest(BaseModel):
+    provider_name: str
+    printer_id: str
+    patient_name: str
+    diagnosis: str
+    prescription_text: str
+    doctor_name: str
+
+
 @router.post("/quick-print/prescription")
 async def quick_print_prescription(
-    provider_name: str,
-    printer_id: str,
-    patient_name: str,
-    diagnosis: str,
-    prescription_text: str,
-    doctor_name: str,
+    request: QuickPrintPrescriptionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.DOCTOR])),
@@ -429,11 +436,11 @@ async def quick_print_prescription(
     try:
         printing_service = get_cloud_printing_service(db)
 
-        patient_data = {"patient_name": patient_name}
+        patient_data = {"patient_name": request.patient_name}
         template_data = {
-            "diagnosis": diagnosis,
-            "prescription_text": prescription_text,
-            "doctor_name": doctor_name,
+            "diagnosis": request.diagnosis,
+            "prescription_text": request.prescription_text,
+            "doctor_name": request.doctor_name,
         }
 
         job_id = await printing_service.print_medical_document(
@@ -460,14 +467,18 @@ async def quick_print_prescription(
         )
 
 
+class QuickPrintTicketRequest(BaseModel):
+    provider_name: str
+    printer_id: str
+    patient_name: str
+    queue_number: str
+    doctor_name: str
+    cabinet: str
+
+
 @router.post("/quick-print/ticket")
 async def quick_print_ticket(
-    provider_name: str,
-    printer_id: str,
-    patient_name: str,
-    queue_number: str,
-    doctor_name: str,
-    cabinet: str,
+    request: QuickPrintTicketRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
@@ -476,11 +487,11 @@ async def quick_print_ticket(
     try:
         printing_service = get_cloud_printing_service(db)
 
-        patient_data = {"patient_name": patient_name}
+        patient_data = {"patient_name": request.patient_name}
         template_data = {
-            "queue_number": queue_number,
-            "doctor_name": doctor_name,
-            "cabinet": cabinet,
+            "queue_number": request.queue_number,
+            "doctor_name": request.doctor_name,
+            "cabinet": request.cabinet,
         }
 
         job_id = await printing_service.print_medical_document(
