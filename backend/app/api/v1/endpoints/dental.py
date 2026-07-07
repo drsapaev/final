@@ -61,7 +61,7 @@ async def get_dental_examinations(
         return []
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения осмотров: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -94,7 +94,7 @@ async def get_treatment_plans(
         return []
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения планов лечения: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -127,7 +127,7 @@ async def get_prosthetics(
         return []
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения протезов: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -161,7 +161,7 @@ async def get_xray_images(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения снимков: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -201,7 +201,7 @@ async def create_dental_price_override(
     except Exception as e:
         service.rollback()
         raise HTTPException(
-            status_code=500, detail=f"Ошибка создания изменения цены: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -244,7 +244,7 @@ async def get_dental_price_overrides(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения изменений цен: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -278,7 +278,7 @@ async def approve_price_override(
     except Exception as e:
         service.rollback()
         raise HTTPException(
-            status_code=500, detail=f"Ошибка обработки изменения цены: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -299,5 +299,5 @@ async def get_pending_price_overrides(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка получения ожидающих изменений цен: {str(e)}",
+            detail="Internal server error",
         )

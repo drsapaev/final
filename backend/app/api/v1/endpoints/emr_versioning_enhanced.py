@@ -31,7 +31,7 @@ async def get_version_timeline(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения временной линии: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -52,10 +52,10 @@ async def compare_versions(
         return comparison
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Internal server error")
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка сравнения версий: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -80,10 +80,10 @@ async def restore_version_with_backup(
         return {"message": "Версия успешно восстановлена", "result": result}
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Internal server error")
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка восстановления версии: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -103,7 +103,7 @@ async def get_version_statistics(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -144,7 +144,7 @@ async def create_version_with_analysis(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания версии: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{emr_id}/versions/{version_id}/details")
@@ -188,7 +188,7 @@ async def get_version_details(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения деталей версии: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -219,7 +219,7 @@ async def delete_version(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка удаления версии: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{emr_id}/versions/export")
@@ -276,4 +276,4 @@ async def export_versions(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка экспорта версий: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -356,7 +356,7 @@ def generate_qr_token(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации QR токена: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -415,7 +415,7 @@ def generate_clinic_qr_token(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации общего QR токена: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -528,7 +528,7 @@ def get_available_specialists(db: Session = Depends(get_db)):
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка специалистов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -561,7 +561,7 @@ def get_qr_token_info(token: str, db: Session = Depends(get_db)):
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации о токене: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -676,7 +676,7 @@ def complete_join_session(
             "[complete_join_session] ValueError: %s",
             str(e),
         )
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")
     # Остальные исключения обрабатываются централизованными обработчиками
     # (exception_handlers.py)
 
@@ -819,7 +819,7 @@ async def call_next_patient(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")
     except Exception as e:
         logger.error(
             "Error calling next patient",
@@ -1349,7 +1349,7 @@ def update_online_entry(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления данных: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -3178,7 +3178,7 @@ def full_update_online_entry(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при обновлении записи: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -3391,5 +3391,5 @@ def cancel_service_in_entry(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при отмене услуги: {str(e)}",
+            detail="Internal server error",
         )

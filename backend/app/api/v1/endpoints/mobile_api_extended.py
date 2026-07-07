@@ -173,7 +173,7 @@ async def search_doctors(
         return {"doctors": result, "total_found": len(result)}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка поиска врачей: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/doctors/{doctor_id}/schedule")
@@ -197,7 +197,7 @@ async def get_doctor_schedule(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения расписания: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -239,7 +239,7 @@ async def search_services(
         return {"services": result, "total_found": len(result)}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка поиска услуг: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/services/categories")
@@ -271,7 +271,7 @@ async def get_service_categories(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения категорий: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -311,7 +311,7 @@ async def get_queues_status(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статуса очередей: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -354,7 +354,7 @@ async def get_my_queue_position(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения позиции в очереди: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -411,7 +411,7 @@ async def cancel_appointment(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка отмены записи: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/appointments/reschedule")
@@ -478,7 +478,7 @@ async def reschedule_appointment(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка переноса записи: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== ОБРАТНАЯ СВЯЗЬ ====================
@@ -531,7 +531,7 @@ ID: #{feedback.id}"""
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка отправки обратной связи: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -600,7 +600,7 @@ ID: #{emergency.id}"""
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка экстренного обращения: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -662,7 +662,7 @@ async def update_profile(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка обновления профиля: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -709,7 +709,7 @@ async def upload_avatar(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка загрузки аватара: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -743,7 +743,7 @@ async def update_notification_settings(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка обновления настроек: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -766,7 +766,7 @@ async def get_notification_settings(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения настроек: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -810,7 +810,7 @@ async def get_clinic_info(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения информации о клинике: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 

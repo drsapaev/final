@@ -178,7 +178,7 @@ async def get_skin_examinations(
             patient_id,
         )
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения осмотров: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -243,7 +243,7 @@ async def create_skin_examination(
             examination_data.visit_id,
         )
         raise HTTPException(
-            status_code=500, detail=f"Ошибка создания осмотра: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -298,7 +298,7 @@ async def get_cosmetic_procedures(
             patient_id,
         )
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения процедур: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -362,7 +362,7 @@ async def create_cosmetic_procedure(
             procedure_data.visit_id,
         )
         raise HTTPException(
-            status_code=500, detail=f"Ошибка создания процедуры: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -404,7 +404,7 @@ async def create_price_override(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка создания изменения цены: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -450,7 +450,7 @@ async def get_price_overrides(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения изменений цен: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -467,5 +467,5 @@ async def get_photo_gallery(
         return {"message": "Фотогалерея будет доступна в следующей версии"}
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения фотогалереи: {str(e)}"
+            status_code=500, detail="Internal server error"
         )

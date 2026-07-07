@@ -231,7 +231,7 @@ def create_invoice(
 
         return invoice
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
 
 
 @router.get("/invoices", response_model=list[InvoiceResponse])
@@ -316,7 +316,7 @@ def get_invoice_html(
         html_content = service.generate_invoice_html(invoice_id, template_id)
         return {"html": html_content}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Internal server error")
     except Exception as e:
         raise _billing_http_error(e, "get_invoice_html") from e
 
@@ -357,9 +357,9 @@ def record_payment(
         )
         return payment
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Internal server error")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
 
 
 @router.get("/payments")

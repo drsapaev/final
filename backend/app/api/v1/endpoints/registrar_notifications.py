@@ -141,7 +141,7 @@ async def get_active_registrars(
         logger.error(f"Ошибка получения списка регистраторов: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка регистраторов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -184,7 +184,7 @@ async def notify_new_appointment(
         logger.error(f"Ошибка отправки уведомления о записи: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки уведомления: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -231,7 +231,7 @@ async def notify_price_change(
         logger.error(f"Ошибка отправки уведомления об изменении цены: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки уведомления: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -270,7 +270,7 @@ async def notify_queue_status(
         logger.error(f"Ошибка отправки уведомления о статусе очереди: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки уведомления: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -305,7 +305,7 @@ async def send_system_alert(
         logger.error(f"Ошибка отправки системного уведомления: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки уведомления: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -346,7 +346,7 @@ async def send_daily_summary(
         logger.error(f"Ошибка отправки ежедневной сводки: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки сводки: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -376,7 +376,7 @@ async def get_notification_stats(
         logger.error(f"Ошибка получения статистики уведомлений: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -406,5 +406,5 @@ async def test_notifications(
         logger.error(f"Ошибка отправки тестового уведомления: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки тестового уведомления: {str(e)}",
+            detail="Internal server error",
         )

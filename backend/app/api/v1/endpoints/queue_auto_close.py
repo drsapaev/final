@@ -35,7 +35,7 @@ async def check_and_close_expired_queues(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка при проверке очередей: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -55,7 +55,7 @@ async def get_queues_pending_close(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка при получении очередей: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -75,10 +75,10 @@ async def force_close_queue(
         return {"success": True, "message": "Очередь успешно закрыта", "data": result}
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка при закрытии очереди: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -103,5 +103,5 @@ async def get_auto_close_status(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка при получении статуса: {str(e)}"
+            status_code=500, detail="Internal server error"
         )

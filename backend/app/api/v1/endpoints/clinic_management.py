@@ -65,7 +65,7 @@ def create_branch(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка создания филиала: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -173,7 +173,7 @@ def create_equipment(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка создания оборудования: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -287,7 +287,7 @@ def schedule_maintenance(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка планирования обслуживания: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -327,7 +327,7 @@ def create_license(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка создания лицензии: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -447,7 +447,7 @@ def activate_license(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка активации лицензии: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -484,7 +484,7 @@ def create_backup(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка создания резервной копии: {str(e)}",
+            detail="Internal server error",
         )
 
 

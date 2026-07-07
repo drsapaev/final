@@ -40,7 +40,7 @@ async def get_emr_templates(
         return templates
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения шаблонов: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -59,7 +59,7 @@ async def get_user_templates(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка получения пользовательских шаблонов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -76,7 +76,7 @@ async def create_emr_template(
         return template
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка создания шаблона: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -94,7 +94,7 @@ async def create_template_from_structure(
         return template
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка создания шаблона из структуры: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -114,7 +114,7 @@ async def get_emr_template(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения шаблона: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -143,7 +143,7 @@ async def update_emr_template(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка обновления шаблона: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -161,10 +161,10 @@ async def clone_emr_template(
         )
         return cloned_template
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Internal server error")
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка клонирования шаблона: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -190,7 +190,7 @@ async def delete_emr_template(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка удаления шаблона: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -226,7 +226,7 @@ async def load_default_templates(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка загрузки шаблонов: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -243,7 +243,7 @@ async def get_emr_versions(
         return versions
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения версий: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -267,5 +267,5 @@ async def restore_emr_version(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка восстановления версии: {str(e)}"
+            status_code=500, detail="Internal server error"
         )

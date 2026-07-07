@@ -347,7 +347,7 @@ def add_family_relation(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
 
 
 @router.delete("/{patient_id}/family/{relation_id}", status_code=status.HTTP_200_OK)

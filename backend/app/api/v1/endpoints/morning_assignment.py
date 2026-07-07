@@ -74,7 +74,7 @@ def run_morning_assignment_manual(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка запуска утренней сборки: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -107,7 +107,7 @@ def get_morning_assignment_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -133,7 +133,7 @@ def manual_assignment_for_visits(
         api_service.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка ручного присвоения: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -165,7 +165,7 @@ def get_pending_visits(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения ожидающих визитов: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -194,5 +194,5 @@ def get_queue_summary(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сводки очередей: {str(e)}",
+            detail="Internal server error",
         ) from e

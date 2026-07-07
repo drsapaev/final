@@ -531,7 +531,7 @@ def get_doctor_queue_today(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения очереди врача: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -656,7 +656,7 @@ def call_patient(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка вызова пациента: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -754,7 +754,7 @@ def start_patient_visit(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка начала приема: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1033,7 +1033,7 @@ def complete_patient_visit(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка завершения приема: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1120,7 +1120,7 @@ def get_doctor_services(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения услуг врача: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1204,7 +1204,7 @@ def get_doctor_info(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации врача: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1264,7 +1264,7 @@ def get_doctor_calendar(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения календаря: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1378,7 +1378,7 @@ def get_doctor_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики врача: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1561,7 +1561,7 @@ async def schedule_next_visit(
         logger.error(f"Ошибка назначения следующего визита: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка назначения визита: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1641,7 +1641,7 @@ def get_today_visits(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения визитов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1687,7 +1687,7 @@ def get_visit_statistics(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )
 
     except HTTPException:
@@ -1696,7 +1696,7 @@ def get_visit_statistics(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка назначения визита: {str(e)}",
+            detail="Internal server error",
         )
 
 @router.get("/doctor/visits/{visit_id}")
@@ -1781,7 +1781,7 @@ def get_visit_details(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения визита: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1843,7 +1843,7 @@ def add_service_to_visit(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка добавления услуги: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1894,5 +1894,5 @@ def remove_service_from_visit(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления услуги: {str(e)}",
+            detail="Internal server error",
         )

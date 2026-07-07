@@ -168,7 +168,7 @@ async def send_appointment_reminder_enhanced(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки напоминания: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -231,7 +231,7 @@ async def send_lab_results_enhanced(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки результатов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -291,7 +291,7 @@ async def send_payment_confirmation_enhanced(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки подтверждения: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -345,7 +345,7 @@ async def send_bulk_email(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка массовой рассылки: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -395,7 +395,7 @@ async def send_bulk_sms(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка массовой рассылки: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -440,7 +440,7 @@ async def send_custom_email(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки email: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -476,7 +476,7 @@ async def send_custom_sms(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки SMS: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -501,7 +501,7 @@ async def get_email_sms_statistics(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -526,7 +526,7 @@ async def reset_email_sms_statistics(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка сброса статистики: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -615,7 +615,7 @@ async def get_available_templates(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения шаблонов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -671,7 +671,7 @@ async def test_email_sending(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования email: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -703,5 +703,5 @@ async def test_sms_sending(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования SMS: {str(e)}",
+            detail="Internal server error",
         )

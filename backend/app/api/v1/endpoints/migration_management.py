@@ -126,7 +126,7 @@ def migrate_legacy_queue_data(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка миграции данных: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -155,7 +155,7 @@ def migrate_legacy_emr_cutover(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка EMR cutover backfill: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -174,7 +174,7 @@ def verify_emr_cutover(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки EMR cutover: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -202,7 +202,7 @@ def check_data_integrity(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки целостности: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -240,7 +240,7 @@ def backup_queue_data(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания резервной копии: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -280,7 +280,7 @@ def restore_queue_data(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка восстановления данных: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -313,7 +313,7 @@ def cleanup_old_queue_data(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка очистки данных: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -334,7 +334,7 @@ def get_migration_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -355,5 +355,5 @@ def check_migration_health(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки состояния миграций: {str(e)}",
+            detail="Internal server error",
         ) from e

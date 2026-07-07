@@ -234,7 +234,7 @@ async def update_current_user_preferences(
         logging.error(f"Failed to update preferences for user {current_user.id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -268,7 +268,7 @@ async def create_user(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания пользователя: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -319,7 +319,7 @@ async def get_users(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка пользователей: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -353,7 +353,7 @@ async def update_user(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления пользователя: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -383,7 +383,7 @@ async def delete_user(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления пользователя: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -458,7 +458,7 @@ async def get_user_profile(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения профиля: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -539,7 +539,7 @@ async def update_user_profile(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления профиля: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -598,7 +598,7 @@ async def get_user_preferences(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -668,7 +668,7 @@ async def update_user_preferences(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -732,7 +732,7 @@ async def get_user_notification_settings(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек уведомлений: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -807,7 +807,7 @@ async def update_user_notification_settings(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек уведомлений: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -855,7 +855,7 @@ async def get_user_activity(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения активности: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -873,7 +873,7 @@ async def get_user_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -907,7 +907,7 @@ async def bulk_action_users(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка массового действия: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -944,7 +944,7 @@ async def export_users(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка экспорта: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -988,7 +988,7 @@ async def list_export_files(current_user: User = Depends(require_roles("Admin"))
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения файлов экспорта: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1012,7 +1012,7 @@ async def download_export_file(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка скачивания файла: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1036,7 +1036,7 @@ async def delete_export_file(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления файла: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -1095,5 +1095,5 @@ async def get_user(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения пользователя: {str(e)}",
+            detail="Internal server error",
         )

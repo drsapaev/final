@@ -148,7 +148,7 @@ async def send_verification_code(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки кода верификации: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -198,7 +198,7 @@ async def verify_code(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки кода: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -229,7 +229,7 @@ async def get_verification_status(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статуса верификации: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -266,7 +266,7 @@ async def cancel_verification(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отмены верификации: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -309,7 +309,7 @@ async def update_user_phone(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления номера телефона: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -328,7 +328,7 @@ async def get_verification_statistics(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -392,5 +392,5 @@ async def admin_send_verification_code(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки кода администратором: {str(e)}",
+            detail="Internal server error",
         )

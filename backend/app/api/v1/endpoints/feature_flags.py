@@ -202,7 +202,7 @@ def create_feature_flag(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания фича-флага: {str(e)}",
+            detail="Internal server error",
         ) from e
 
     return FeatureFlagResponse(
@@ -255,7 +255,7 @@ def update_feature_flag(
         service.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления фича-флага: {str(e)}",
+            detail="Internal server error",
         ) from e
 
     return FeatureFlagResponse(

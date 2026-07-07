@@ -268,7 +268,7 @@ async def send_message(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Internal server error")
 
 
 @router.post("/messages/{message_id}/feedback")

@@ -121,7 +121,7 @@ def get_user_permissions(
         logger.error(f"Ошибка получения разрешений пользователя {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения разрешений: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -153,7 +153,7 @@ def check_user_permission(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки разрешения: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -182,7 +182,7 @@ def get_groups(
         logger.error(f"Ошибка получения списка групп: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения групп: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -214,7 +214,7 @@ def get_group_permissions_summary(
         logger.error(f"Ошибка получения сводки разрешений группы {group_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сводки: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -247,7 +247,7 @@ def assign_role_to_group(
         logger.error(f"Ошибка назначения роли {request.role_id} группе {group_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка назначения роли: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -278,7 +278,7 @@ def revoke_role_from_group(
         logger.error(f"Ошибка отзыва роли {role_id} у группы {group_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отзыва роли: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -313,7 +313,7 @@ def add_user_to_group(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка добавления в группу: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -346,7 +346,7 @@ def remove_user_from_group(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления из группы: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -375,7 +375,7 @@ def get_roles(
         logger.error(f"Ошибка получения списка ролей: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения ролей: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -401,7 +401,7 @@ def get_permissions(
         logger.error(f"Ошибка получения списка разрешений: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения разрешений: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -437,7 +437,7 @@ def create_permission_override(
         logger.error(f"Ошибка создания переопределения разрешения: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания переопределения: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -466,7 +466,7 @@ def clear_permissions_cache(
         logger.error(f"Ошибка очистки кэша разрешений: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка очистки кэша: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -490,5 +490,5 @@ def get_cache_stats(current_user: User = Depends(require_roles("Admin", "SuperAd
         logger.error(f"Ошибка получения статистики кэша: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )

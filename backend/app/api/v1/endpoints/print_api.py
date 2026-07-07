@@ -58,7 +58,7 @@ async def print_queue_ticket(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка печати талона: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -104,7 +104,7 @@ async def print_prescription(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка печати рецепта: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -149,7 +149,7 @@ async def print_medical_certificate(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка печати справки: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -178,7 +178,7 @@ async def print_payment_receipt(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка печати чека: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -206,7 +206,7 @@ async def print_lab_results(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка печати результатов анализов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -265,7 +265,7 @@ def get_printers(
     except Exception as e:
         logger.error("[FIX] Failed to load printers from database: %s", e)
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения списка принтеров: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -291,7 +291,7 @@ def get_printer_status(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки статуса принтера: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -317,7 +317,7 @@ def test_printer(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестовой печати: {str(e)}",
+            detail="Internal server error",
         )
 
 

@@ -326,7 +326,7 @@ async def compare_versions(
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
 
 
 @router.get("/patient/{patient_id}", response_model=list[EMRRecordSummary])
@@ -412,7 +412,7 @@ async def save_emr(
             },
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
 
 
 @router.post("/{visit_id}/sign", response_model=EMRRecordOut)
@@ -472,7 +472,7 @@ async def sign_emr(
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
     except EMRSignedError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
     except ConcurrencyError as e:
         raise HTTPException(
             status_code=409,
@@ -514,7 +514,7 @@ async def amend_emr(
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
     except ConcurrencyError as e:
         raise HTTPException(
             status_code=409,
@@ -555,6 +555,6 @@ async def restore_emr(
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
 
 

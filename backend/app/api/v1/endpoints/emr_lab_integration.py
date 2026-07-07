@@ -177,11 +177,11 @@ async def get_patient_lab_results(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Internal server error")
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка получения лабораторных результатов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -207,10 +207,10 @@ async def integrate_lab_results_with_emr(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Internal server error")
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка интеграции лабораторных данных: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -248,7 +248,7 @@ async def get_abnormal_lab_results(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения аномальных результатов: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -271,7 +271,7 @@ async def get_lab_summary_for_emr(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка генерации сводки лабораторных данных: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -299,10 +299,10 @@ async def notify_doctor_about_lab_result(
         return {"message": "Уведомление врача отправлено", "notification": notification}
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Internal server error")
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка уведомления врача: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -389,5 +389,5 @@ async def get_lab_results_trends(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения трендов: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
