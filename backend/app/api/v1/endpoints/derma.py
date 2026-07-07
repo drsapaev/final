@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import desc
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -33,7 +33,8 @@ DERMA_ADMIN_ROLES = {"Admin"}
 class PriceOverrideRequest(BaseModel):
     visit_id: int
     service_id: int
-    new_price: Decimal
+    # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
+    new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
     reason: str
     details: str | None = None
 
@@ -43,7 +44,8 @@ class PriceOverrideResponse(BaseModel):
     visit_id: int
     service_id: int
     original_price: Decimal
-    new_price: Decimal
+    # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
+    new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
     reason: str
     details: str | None
     status: str
