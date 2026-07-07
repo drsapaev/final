@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.api.deps import get_db, require_roles
 from app.crud import patient as crud_patient
 from app.crud import telegram_config as crud_telegram
@@ -332,7 +333,8 @@ async def send_qr_code(
             "date": qr_data.get("date", "Не указано"),
             "time_window": qr_data.get("time_window", "07:00-09:00"),
             "qr_token": qr_data.get("token", ""),
-            "queue_url": "https://clinic.example.com/queue",  # Из настроек
+            # TG-AUDIT-28 P0-4: real URL (was clinic.example.com — regression)
+            "queue_url": f"{str(getattr(settings, 'FRONTEND_URL', '') or 'http://localhost:5173').rstrip('/')}/queue",
         }
 
         # Отправляем QR код

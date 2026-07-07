@@ -2538,6 +2538,15 @@ def update_telegram_settings(
 ):
     """Обновить настройки Telegram"""
     try:
+        # TG-AUDIT-28 P0-5: фильтруем masked bot_token placeholder.
+        # GET /telegram/settings возвращает bot_token как "***скрыт***";
+        # фронтенд отправляет его обратно при Save; без фильтра backend
+        # записал бы masked значение в DB → бот ломается.
+        if settings and isinstance(settings, dict):
+            bt = settings.get("bot_token")
+            if bt and isinstance(bt, str) and "***" in bt:
+                settings = {k: v for k, v in settings.items() if k != "bot_token"}
+
         # Обновляем настройки в категории "telegram"
         updated_settings = crud_clinic.update_settings_batch(
             db, "telegram", settings, current_user.id

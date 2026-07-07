@@ -26,6 +26,7 @@ except ImportError:
     Application = None
     Update = None
 
+from app.core.config import settings
 from app.crud import telegram_config as crud_telegram
 from app.db.session import SessionLocal
 from app.models.telegram_config import (
@@ -419,7 +420,8 @@ class TelegramService:
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            "🔗 Открыть сайт", url="https://clinic.example.com/queue"
+                            # TG-AUDIT-28 P0-4: real URL (was clinic.example.com — regression)
+                            "🔗 Открыть сайт", url=f"{str(getattr(settings, 'FRONTEND_URL', '') or 'http://localhost:5173').rstrip('/')}/queue"
                         )
                     ],
                     [InlineKeyboardButton("⬅️ Назад", callback_data="back_to_main")],
