@@ -89,9 +89,12 @@ def _get_mobile_notification_rows(
         status="all",
         limit=limit,
     )
-    deliveries = result.get("deliveries", [])
+    # NOTIF-REAUDIT-28 P0-1: get_inbox returns "items" key, not "deliveries".
+    # Раньше всегда возвращался пустой список — мобильное приложение не
+    # показывало уведомления.
+    items = result.get("items", [])
     # Apply offset manually since get_inbox uses cursor-based pagination
-    return deliveries[offset:offset + limit] if deliveries else []
+    return items[offset:offset + limit] if items else []
 
 
 @router.post("/mobile/auth/login", response_model=MobileLoginResponse)
@@ -482,25 +485,16 @@ async def mark_notification_read(
 ):
     """Отметить уведомление как прочитанное"""
     try:
-        # Use canonical platform to mark notification as read
+        # NOTIF-REAUDIT-28 P0-2: используем await (раньше run_until_complete
+        # внутри async-эндпоинта падал с RuntimeError). mark_read ожидает
+        # delivery_id: str, а не int.
         platform = get_notification_platform_service(db)
-        import asyncio
-        asyncio.get_event_loop().run_until_complete(
-            platform.mark_read(current_user, notification_id)
-        )
-        owns_notification = True  # platform.mark_read verifies ownership internally
-
-        if not owns_notification:
-            raise HTTPException(status_code=404, detail="Уведомление не найдено")
-
-        if hasattr(notification, 'read'):
-            success = MobileApiService(db).mark_notification_as_read(
-                notification=notification
+        try:
+            await platform.mark_read(
+                current_user=current_user,
+                delivery_id=str(notification_id),
             )
-        else:
-            success = True
-
-        if not success:
+        except PermissionError:
             raise HTTPException(status_code=404, detail="Уведомление не найдено")
 
         return {"message": "Уведомление отмечено как прочитанное"}

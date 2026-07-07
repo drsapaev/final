@@ -194,7 +194,10 @@ async def resend_verification_code(
             )
 
         # Генерируем новый код
-        code = ''.join(random.choices(string.digits, k=6))
+        # NOTIF-REAUDIT-28 P0-3: secrets.randbelow — криптографически стойкий
+        # генератор. random.choices НЕ криптостойкий — предсказуемые 2FA-коды.
+        import secrets as _secrets
+        code = ''.join([str(_secrets.randbelow(10)) for _ in range(6)])
 
         # Сохраняем код
         service.save_verification_code(

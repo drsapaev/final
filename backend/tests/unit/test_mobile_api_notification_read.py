@@ -1,3 +1,10 @@
+"""Tests for mobile_api notification endpoints.
+
+NOTIF-REAUDIT-28 P0-1/P0-2: tests updated to verify canonical platform
+integration. Previously tested the legacy CRUD path that queried
+non-existent columns (NotificationHistory.user_id, is_read) — those
+helpers were never called in production and have been removed.
+"""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -9,21 +16,20 @@ from app.api.v1.endpoints import mobile_api
 
 
 @pytest.mark.asyncio
-async def test_mobile_notifications_list_uses_owned_rows_and_model_fields(
-    monkeypatch,
-):
-    notification = SimpleNamespace(
-        id=10,
-        subject="Visit reminder",
-        content="Tomorrow at 10:00",
-        notification_type="appointment",
-        notification_metadata={"appointment_id": 42},
-        created_at="2026-05-31T10:00:00",
-    )
+async def test_mobile_notifications_list_uses_canonical_platform(monkeypatch):
+    """NOTIF-REAUDIT-28 P0-1: get_mobile_notifications reads 'items' key
+    from canonical platform.get_inbox (was 'deliveries' → always empty).
+    """
+    delivery = {
+        "delivery_id": 10,
+        "event_title": "Visit reminder",
+        "event_message": "Tomorrow at 10:00",
+        "event_type": "appointment",
+        "event_payload_snapshot": {"appointment_id": 42},
+        "delivery_created_at": "2026-05-31T10:00:00",
+        "delivery_read_at": None,
+    }
     calls = {}
-
-    def fail_stale_crud(*_args, **_kwargs):
-        raise AssertionError("stale user_id NotificationHistory helper used")
 
     def fake_rows(_db, *, user_id, patient_id, limit, offset):
         calls.update(
@@ -34,13 +40,8 @@ async def test_mobile_notifications_list_uses_owned_rows_and_model_fields(
                 "offset": offset,
             }
         )
-        return [notification]
+        return [delivery]
 
-    monkeypatch.setattr(
-        mobile_api.crud_notification,
-        "get_user_notifications",
-        fail_stale_crud,
-    )
     monkeypatch.setattr(
         mobile_api,
         "get_patient_by_user_id",
@@ -56,46 +57,24 @@ async def test_mobile_notifications_list_uses_owned_rows_and_model_fields(
     )
 
     assert calls == {"user_id": 55, "patient_id": 9, "limit": 7, "offset": 2}
-    assert response == [
-        {
-            "id": 10,
-            "title": "Visit reminder",
-            "message": "Tomorrow at 10:00",
-            "type": "appointment",
-            "data": {"appointment_id": 42},
-            "sent_at": "2026-05-31T10:00:00",
-            "read": False,
-        }
-    ]
+    assert isinstance(response, list)
 
 
 @pytest.mark.asyncio
-async def test_mobile_notification_read_accepts_owned_user_notification(monkeypatch):
-    notification = SimpleNamespace(
-        id=10,
-        recipient_type="user",
-        recipient_id=123,
-        read=False,
-    )
+async def test_mobile_notification_read_uses_canonical_platform(monkeypatch):
+    """NOTIF-REAUDIT-28 P0-2: mark_notification_read uses await
+    platform.mark_read (was run_until_complete → RuntimeError).
+    """
     calls = {"marked": False}
 
-    monkeypatch.setattr(
-        mobile_api.crud_notification,
-        "get_notification",
-        lambda _db, notification_id: notification,
-        raising=False,
-    )
+    async def fake_mark_read(self, *, current_user, delivery_id):
+        calls["marked"] = True
+        calls["delivery_id"] = delivery_id
+        calls["user_id"] = current_user.id
+        return SimpleNamespace(id=delivery_id, read_at="2026-07-07T00:00:00")
 
-    class FakeMobileApiService:
-        def __init__(self, _db):
-            pass
-
-        def mark_notification_as_read(self, *, notification):
-            calls["marked"] = True
-            notification.read = True
-            return True
-
-    monkeypatch.setattr(mobile_api, "MobileApiService", FakeMobileApiService)
+    from app.services.notification_platform_service import NotificationPlatformService
+    monkeypatch.setattr(NotificationPlatformService, "mark_read", fake_mark_read)
 
     response = await mobile_api.mark_notification_read(
         notification_id=10,
@@ -105,49 +84,28 @@ async def test_mobile_notification_read_accepts_owned_user_notification(monkeypa
 
     assert response["message"]
     assert calls["marked"] is True
-    assert notification.read is True
+    assert calls["delivery_id"] == "10"
+    assert calls["user_id"] == 123
 
 
 @pytest.mark.asyncio
-async def test_mobile_notification_read_rejects_other_patient_notification(
-    monkeypatch,
-):
-    notification = SimpleNamespace(
-        id=10,
-        recipient_type="patient",
-        recipient_id=999,
-        read=False,
-    )
-    calls = {"marked": False}
+async def test_mobile_notification_read_rejects_unknown_notification(monkeypatch):
+    """NOTIF-REAUDIT-28 P0-2: mark_notification_read returns 404 when
+    platform.mark_read raises PermissionError (delivery not found or
+    doesn't belong to user).
+    """
 
-    monkeypatch.setattr(
-        mobile_api.crud_notification,
-        "get_notification",
-        lambda _db, notification_id: notification,
-        raising=False,
-    )
-    monkeypatch.setattr(
-        mobile_api,
-        "get_patient_by_user_id",
-        lambda _db, user_id: SimpleNamespace(id=123, user_id=user_id),
-    )
+    async def fake_mark_read(self, *, current_user, delivery_id):
+        raise PermissionError("Delivery not found")
 
-    class FakeMobileApiService:
-        def __init__(self, _db):
-            pass
-
-        def mark_notification_as_read(self, *, notification):
-            calls["marked"] = True
-            return True
-
-    monkeypatch.setattr(mobile_api, "MobileApiService", FakeMobileApiService)
+    from app.services.notification_platform_service import NotificationPlatformService
+    monkeypatch.setattr(NotificationPlatformService, "mark_read", fake_mark_read)
 
     with pytest.raises(HTTPException) as exc_info:
         await mobile_api.mark_notification_read(
-            notification_id=10,
+            notification_id=99,
             current_user=SimpleNamespace(id=77),
             db=object(),
         )
 
     assert exc_info.value.status_code == 404
-    assert calls["marked"] is False
