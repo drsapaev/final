@@ -361,6 +361,10 @@ class QRQueueService:
 
         return visit
 
+    # ============================================================
+    # === QR TOKEN MANAGEMENT ===
+    # ============================================================
+
     def generate_qr_token(
         self,
         specialist_id: int,
@@ -1194,6 +1198,10 @@ class QRQueueService:
             ],
         }
 
+    # ============================================================
+    # === QUEUE OPERATIONS ===
+    # ============================================================
+
     def call_next_patient(
         self,
         specialist_id: int,
@@ -1260,6 +1268,10 @@ class QRQueueService:
             },
             "queue_length": self._get_queue_length(daily_queue.id),
         }
+
+    # ============================================================
+    # === TOKEN QUERIES ===
+    # ============================================================
 
     def get_active_qr_tokens(self, user_id: int) -> list[dict[str, Any]]:
         """
@@ -1457,6 +1469,10 @@ class QRQueueService:
             import traceback
             traceback.print_exc()
             return 0
+
+    # ============================================================
+    # === WAIT TIME ESTIMATION ===
+    # ============================================================
 
     def _estimate_wait_time(self, queue_id: int, queue_number: int) -> int:
         """Оценивает время ожидания в минутах"""
