@@ -225,6 +225,29 @@ class TwoFactorDisableRequest(BaseModel):
     backup_code: str | None = Field(None, min_length=8, max_length=10)
 
 
+class TwoFactorVerifySetupRequest(BaseModel):
+    """Тело запроса верификации TOTP-настройки.
+
+    SECURITY (AUTH-REAUDIT-28): totp_code перенесён из query-param в body —
+    query-параметры логируются в access-логах nginx/браузере и реферере.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    totp_code: str = Field(..., min_length=6, max_length=6)
+
+
+class TwoFactorRecoveryVerifyRequest(BaseModel):
+    """Тело запроса верификации recovery-токена.
+
+    SECURITY (AUTH-REAUDIT-28): recovery_token перенесён из query-param в body.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    recovery_token: str = Field(..., min_length=8, max_length=255)
+
+
 class TwoFactorRecoveryRequest(BaseModel):
     """Запрос на восстановление 2FA"""
 
