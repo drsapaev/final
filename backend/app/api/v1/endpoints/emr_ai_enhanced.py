@@ -55,7 +55,7 @@ async def generate_smart_template(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка генерации шаблона: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -85,7 +85,7 @@ async def get_smart_suggestions(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения подсказок: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -113,7 +113,7 @@ async def auto_fill_emr_fields(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка автозаполнения: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/validate", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
@@ -134,7 +134,7 @@ async def validate_emr_data(
         return {"result": validation_result, **ai_safety_meta()}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка валидации: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/icd10-suggestions", dependencies=[Depends(RequireAiFeature("ai_icd10_suggestion"))])
@@ -159,7 +159,7 @@ async def get_icd10_suggestions(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка генерации ICD-10 предложений: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -185,7 +185,7 @@ async def analyze_patient_data(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка анализа пациента: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -210,7 +210,7 @@ async def get_specialty_templates(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения шаблонов: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -280,7 +280,7 @@ async def enhance_emr_with_ai(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка улучшения EMR: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/analytics/quality")
@@ -316,5 +316,5 @@ async def get_emr_quality_analytics(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения аналитики: {str(e)}"
+            status_code=500, detail="Internal server error"
         )

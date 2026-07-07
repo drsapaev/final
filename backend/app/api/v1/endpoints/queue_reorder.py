@@ -117,7 +117,7 @@ async def reorder_queue(
         logger.error(f"Error reordering queue: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка изменения порядка очереди: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -154,7 +154,7 @@ async def move_queue_entry(
         logger.error(f"Error moving queue entry: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка перемещения записи в очереди: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -182,7 +182,7 @@ async def get_queue_status_by_specialist(
         logger.error(f"Error getting queue status by specialist: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения состояния очереди: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -206,5 +206,5 @@ async def get_queue_status(
         logger.error(f"Error getting queue status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения состояния очереди: {str(e)}",
+            detail="Internal server error",
         )

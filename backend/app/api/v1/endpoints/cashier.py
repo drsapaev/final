@@ -617,7 +617,7 @@ async def get_pending_payments(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения ожидающих оплаты: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -730,7 +730,7 @@ async def get_cashier_stats(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -822,7 +822,7 @@ async def export_payments(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка экспорта: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -937,7 +937,7 @@ async def get_payments(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения истории платежей: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -1323,7 +1323,7 @@ async def create_payment(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания платежа: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -1425,7 +1425,7 @@ async def cancel_payment(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отмены платежа: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -1499,7 +1499,7 @@ async def mark_visit_as_paid(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления статуса визита: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -1703,7 +1703,7 @@ async def refund_payment(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка возврата средств: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -1732,7 +1732,7 @@ async def get_payment_receipt(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации чека: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -1783,5 +1783,5 @@ async def get_hourly_stats(
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения почасовой статистики: {str(e)}"
+            detail="Internal server error"
         )

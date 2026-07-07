@@ -34,7 +34,7 @@ async def create_backup(
         logger.error(f"Error creating backup: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Backup creation failed: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -59,7 +59,7 @@ async def list_backups(
         logger.error(f"Error listing backups: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -84,7 +84,7 @@ async def restore_backup(
         logger.error(f"Error restoring backup: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Restore failed: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -107,7 +107,7 @@ async def verify_backup(
         logger.error(f"Error verifying backup: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Verification failed: {str(e)}",
+            detail="Internal server error",
         )
 
 

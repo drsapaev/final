@@ -76,11 +76,11 @@ def generate_qr_token(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации QR токена: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -177,7 +177,7 @@ def open_queue(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка открытия приема: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -220,7 +220,7 @@ def check_queue_status(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки статуса: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -249,7 +249,7 @@ def get_today_queue(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения очереди: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -283,7 +283,7 @@ def get_queue_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )
 
 

@@ -25,7 +25,7 @@ def get_visit_payments_summary(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сводки: {str(e)}",
+            detail="Internal server error",
         )
 
 @router.get("/visit-payments/{visit_id}", summary="Информация о платеже для визита")
@@ -43,7 +43,7 @@ def get_visit_payment_info(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации о платеже: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -70,7 +70,7 @@ def get_visits_by_payment_status(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения визитов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -103,7 +103,7 @@ def update_visit_payment_status(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления статуса платежа: {str(e)}",
+            detail="Internal server error",
         )
 
 @router.post(
@@ -132,5 +132,5 @@ def create_visit_from_payment(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания визита: {str(e)}",
+            detail="Internal server error",
         )

@@ -136,7 +136,7 @@ def get_print_templates(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения шаблонов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -164,7 +164,7 @@ def create_print_template(
         except TemplateError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ошибка в шаблоне Jinja2: {str(e)}",
+                detail="Internal server error",
             )
 
         template = crud_print.create_print_template(db, template_data)
@@ -176,7 +176,7 @@ def create_print_template(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания шаблона: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -232,7 +232,7 @@ def update_print_template(
             except TemplateError as e:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Ошибка в шаблоне Jinja2: {str(e)}",
+                    detail="Internal server error",
                 )
 
         updated_template = crud_print.update_print_template(
@@ -246,7 +246,7 @@ def update_print_template(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления шаблона: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -310,7 +310,7 @@ def upload_template_file(
         except TemplateError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ошибка в шаблоне Jinja2: {str(e)}",
+                detail="Internal server error",
             )
 
         with open(file_path, 'wb') as f:
@@ -327,7 +327,7 @@ def upload_template_file(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка загрузки шаблона: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -368,12 +368,12 @@ def preview_template(
     except TemplateError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка рендеринга шаблона: {str(e)}",
+            detail="Internal server error",
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка предварительного просмотра: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -419,7 +419,7 @@ def get_default_template(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения стандартного шаблона: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -515,5 +515,5 @@ def get_print_jobs(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения заданий печати: {str(e)}",
+            detail="Internal server error",
         )

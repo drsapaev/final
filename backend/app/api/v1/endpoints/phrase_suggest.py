@@ -158,7 +158,7 @@ async def index_phrases(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to index phrases: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -418,7 +418,7 @@ async def batch_index_emrs(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Batch indexing failed: {str(e)}"
+            detail="Internal server error"
         )
 
 
@@ -466,5 +466,5 @@ async def index_doctor_emrs(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Doctor indexing failed: {str(e)}"
+            detail="Internal server error"
         )

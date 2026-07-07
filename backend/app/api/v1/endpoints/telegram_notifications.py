@@ -329,7 +329,7 @@ async def send_appointment_reminder(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки напоминания: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -427,7 +427,7 @@ async def send_lab_results(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки результатов: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -503,7 +503,7 @@ async def send_payment_confirmation(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки подтверждения: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -586,7 +586,7 @@ async def send_broadcast_message(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки широковещательного сообщения: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -622,7 +622,7 @@ async def get_notification_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -649,5 +649,5 @@ async def schedule_reminder(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка планирования напоминания: {str(e)}",
+            detail="Internal server error",
         )

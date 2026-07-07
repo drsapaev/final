@@ -89,7 +89,7 @@ async def get_doctor_info(
         logger.error(f"Ошибка получения информации о враче {doctor_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации о враче: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -127,7 +127,7 @@ async def get_doctors_list(
         logger.error(f"Ошибка получения списка врачей: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка врачей: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -155,7 +155,7 @@ async def get_doctor_by_user_id(
         logger.error(f"Ошибка получения врача по user_id {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации о враче: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -183,7 +183,7 @@ async def get_department_info(
         logger.error(f"Ошибка получения информации об отделении {department_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации об отделении: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -212,7 +212,7 @@ async def get_departments_list(
         logger.error(f"Ошибка получения списка отделений: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка отделений: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -246,7 +246,7 @@ async def get_appointment_doctor_info(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -272,7 +272,7 @@ async def get_formatted_doctor_info(
         logger.error(f"Ошибка форматирования информации о враче {doctor_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка форматирования информации: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -310,5 +310,5 @@ async def get_formatted_department_info(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка форматирования информации: {str(e)}",
+            detail="Internal server error",
         )

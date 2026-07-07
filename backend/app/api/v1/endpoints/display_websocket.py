@@ -148,7 +148,7 @@ async def call_patient_to_board(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка вызова пациента на табло: {str(e)}",
+            detail="Internal server error",
         ) from e
 
 
@@ -283,7 +283,7 @@ async def send_announcement_to_board(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки объявления: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -339,7 +339,7 @@ def get_boards_status(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статуса табло: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -369,5 +369,5 @@ async def quick_call_next_patient(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка быстрого вызова: {str(e)}",
+            detail="Internal server error",
         ) from e

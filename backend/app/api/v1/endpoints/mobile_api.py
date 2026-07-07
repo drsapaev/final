@@ -155,7 +155,7 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка аутентификации: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/patients/me", response_model=PatientProfileOut)
@@ -196,7 +196,7 @@ async def get_mobile_patient_profile(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения профиля: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -239,7 +239,7 @@ async def get_upcoming_appointments(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения записей: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -293,7 +293,7 @@ async def get_appointment_detail(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения записи: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -349,7 +349,7 @@ async def book_mobile_appointment(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка записи к врачу: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/lab/results", response_model=list[LabResultOut])
@@ -388,7 +388,7 @@ async def get_lab_results(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения результатов: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -436,7 +436,7 @@ async def get_mobile_quick_stats(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -473,7 +473,7 @@ async def get_mobile_notifications(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения уведомлений: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -503,7 +503,7 @@ async def mark_notification_read(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка отметки уведомления: {str(e)}"
+            status_code=500, detail="Internal server error"
         )
 
 
@@ -548,5 +548,5 @@ async def test_push_notification(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Ошибка тестирования push-уведомления: {str(e)}"
+            status_code=500, detail="Internal server error"
         )

@@ -65,7 +65,7 @@ async def create_webhook(
         logger.error(f"Ошибка создания webhook: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка создания webhook: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -206,7 +206,7 @@ async def update_webhook(
         logger.error(f"Ошибка обновления webhook {webhook_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка обновления webhook: {str(e)}",
+            detail="Internal server error",
         )
 
 
