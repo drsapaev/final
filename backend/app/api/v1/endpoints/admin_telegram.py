@@ -12,7 +12,7 @@ from decimal import Decimal
 from html import escape
 from typing import Any, NoReturn
 
-import requests
+import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -2479,7 +2479,7 @@ def _get_configured_bot_username(db: Session) -> str | None:
 
 
 def _fetch_telegram_webhook_info(bot_token: str) -> dict[str, Any]:
-    response = requests.get(
+    response = httpx.get(
         f"https://api.telegram.org/bot{bot_token}/getWebhookInfo", timeout=10
     )
     response.raise_for_status()
@@ -2579,7 +2579,7 @@ def test_telegram_bot(
             )
 
         # Тестируем подключение к API Telegram
-        response = requests.get(
+        response = httpx.get(
             f"https://api.telegram.org/bot{bot_token}/getMe", timeout=10
         )
 
@@ -2778,7 +2778,7 @@ def set_telegram_webhook(
         secret_token = secrets.token_urlsafe(32)
 
         # Устанавливаем webhook
-        response = requests.post(
+        response = httpx.post(
             f"https://api.telegram.org/bot{bot_token}/setWebhook",
             json={"url": selected_webhook_url, "secret_token": secret_token},
             timeout=10,
@@ -2845,7 +2845,7 @@ def get_telegram_webhook_info(
             return {"webhook_set": False, "message": "Токен бота не настроен"}
 
         # Получаем информацию о webhook
-        response = requests.get(
+        response = httpx.get(
             f"https://api.telegram.org/bot{bot_token}/getWebhookInfo", timeout=10
         )
 
@@ -3210,7 +3210,7 @@ def send_test_message(
             )
 
         # Отправляем сообщение
-        response = requests.post(
+        response = httpx.post(
             f"https://api.telegram.org/bot{bot_token}/sendMessage",
             json={
                 "chat_id": chat_id,
