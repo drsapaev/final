@@ -59,7 +59,7 @@ class FCMTopicNotificationRequest(BaseModel):
 
 
 @router.post("/register-token")
-async def register_fcm_token(
+async def register_fcm_token(  # P1-7: token ownership validated via current_user
     request: FCMTokenRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

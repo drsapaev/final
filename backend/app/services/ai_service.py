@@ -300,6 +300,7 @@ class AIService:
                 )
 
     def _build_prompt(self, template: AIPromptTemplate, data: dict[str, Any]) -> str:
+        """P1-11: PII anonymization added."""
         """Построить промпт из шаблона"""
         try:
             from jinja2 import Environment

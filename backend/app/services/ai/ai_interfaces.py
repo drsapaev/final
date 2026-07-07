@@ -32,7 +32,8 @@ class AIProviderType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migrat
     OPENAI = "openai"
     GEMINI = "gemini"
     DEEPSEEK = "deepseek"
-    MOCK = "mock"
+    GROK = "grok"
+    MOCK = "mock"  # P1-12: added GROK to unified enum
 
 
 class AIResponse(BaseModel):
