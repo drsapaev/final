@@ -13,7 +13,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
 
-import requests
+import httpx
 from jinja2 import Environment, FileSystemLoader
 
 from app.core.config import settings
@@ -197,7 +197,7 @@ class EmailSMSEnhancedService:
             }
 
             # Отправляем SMS
-            response = requests.post(
+            response = await httpx.AsyncClient().post(
                 self.sms_api_url,
                 json=data,
                 timeout=30,
