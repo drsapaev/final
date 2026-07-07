@@ -7,11 +7,15 @@ from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_roles
 from app.models.user import User
 from app.services.emr_export_service import EMRExportService
 
-router = APIRouter()
+# EMR-AUDIT-28 P0-4: весь роутер требует Admin/Doctor role.
+# Раньше использовал get_current_user без role check — Patient мог
+# вызывать export и получать произвольный EMR data как downloadable file.
+from app.api.deps import require_roles as _require_emr_export_roles
+router = APIRouter(dependencies=[Depends(_require_emr_export_roles("Admin", "Doctor"))])
 logger = logging.getLogger(__name__)
 
 EMR_EXPORT_PUBLIC_ERROR = "Internal server error"
