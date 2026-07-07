@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import get_db, require_roles
 from app.models.clinic import Doctor
