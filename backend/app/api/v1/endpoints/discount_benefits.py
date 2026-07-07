@@ -170,7 +170,7 @@ async def create_discount(
             "discount_id": discount.id,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 @router.get("/discounts")
@@ -274,7 +274,7 @@ async def apply_discount(
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 # === ЛЬГОТЫ ===
@@ -298,7 +298,7 @@ async def create_benefit(
             "benefit_id": benefit.id,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 @router.get("/benefits")
@@ -356,7 +356,7 @@ async def assign_benefit_to_patient(
             "patient_benefit_id": patient_benefit.id,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 @router.post("/benefits/verify/{patient_benefit_id}")
@@ -377,7 +377,7 @@ async def verify_patient_benefit(
 
         return {"success": True, "message": "Льгота верифицирована успешно"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 @router.get("/benefits/patient/{patient_id}")
@@ -444,7 +444,7 @@ async def apply_benefit(
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 # === ПРОГРАММЫ ЛОЯЛЬНОСТИ ===
@@ -468,7 +468,7 @@ async def create_loyalty_program(
             "program_id": program.id,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 @router.get("/loyalty-programs")
@@ -516,7 +516,7 @@ async def enroll_patient_in_loyalty(
             "patient_loyalty_id": patient_loyalty.id,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 @router.post("/loyalty-programs/earn-points")
@@ -544,7 +544,7 @@ async def earn_loyalty_points(
             "points_earned": points,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 @router.post("/loyalty-programs/redeem-points")
@@ -572,7 +572,7 @@ async def redeem_loyalty_points(
             "discount_amount": discount_amount,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 @router.get("/loyalty-programs/balance/{patient_id}/{program_id}")
@@ -609,7 +609,7 @@ async def calculate_total_discount(
 
         return {"success": True, "calculation": result}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
 # === АНАЛИТИКА ===
