@@ -214,14 +214,47 @@ def _origin_allowed(origin: str | None) -> bool:
 
 
 def _auth_ok(headers, token_qs: str | None) -> bool:
+    """QUEUE-AUDIT-28 P0-1: validate JWT, not just check token exists.
+
+    Раньше принимал любой `Bearer foo` или `?token=anything` — anonymous
+    пользователи получали доступ ко всем обновлениям очереди (PHI leak).
+    """
     if os.getenv("WS_DEV_ALLOW", "0") == "1":
         return True
+    # Extract token from header or query param
     auth = headers.get("authorization") or headers.get("Authorization")
+    token = None
     if auth and auth.lower().startswith("bearer "):
+        token = auth.split(" ", 1)[1].strip()
+    elif token_qs:
+        token = token_qs.strip()
+    if not token:
+        return False
+    # Validate JWT
+    try:
+        from jose import jwt as _jwt
+        from app.core.config import settings as _settings
+        payload = _jwt.decode(token, _settings.SECRET_KEY, algorithms=[_settings.ALGORITHM])
+        # Check blacklist
+        jti = payload.get("jti")
+        sub = payload.get("sub")
+        user_id = None
+        if isinstance(sub, str) and sub.isdigit():
+            user_id = int(sub)
+        elif isinstance(sub, int):
+            user_id = sub
+        if jti and user_id:
+            from app.db.session import SessionLocal as _SessionLocal
+            from app.services.token_blacklist_service import TokenBlacklistService
+            _db = _SessionLocal()
+            try:
+                if TokenBlacklistService.is_token_blacklisted(_db, jti, user_id=user_id):
+                    return False
+            finally:
+                _db.close()
         return True
-    if token_qs:
-        return True
-    return False
+    except Exception:
+        return False
 
 
 # -----------------------------------------------------------------------------
