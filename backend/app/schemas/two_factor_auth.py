@@ -54,7 +54,8 @@ class TwoFactorBackupCodeBase(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    code: str = Field(..., min_length=8, max_length=10)
+    # SECURITY: хранится как SHA-256 hex hash (64 chars). См. two_factor_service._hash_backup_code.
+    code: str = Field(..., min_length=64, max_length=64)
     used: bool = False
 
 

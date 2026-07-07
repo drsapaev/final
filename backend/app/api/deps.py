@@ -291,9 +291,18 @@ async def get_current_user(
             algorithms=[getattr(settings, "ALGORITHM", "HS256")],
         )
         jti = payload.get("jti")
+        # sub может быть числовым user_id или username; извлекаем user_id если возможно
+        sub = payload.get("sub")
+        token_user_id: int | None = None
+        if isinstance(sub, str) and sub.isdigit():
+            token_user_id = int(sub)
+        elif isinstance(sub, int):
+            token_user_id = sub
+        elif user is not None:
+            token_user_id = getattr(user, "id", None)
         if jti:
             from app.services.token_blacklist_service import TokenBlacklistService
-            if TokenBlacklistService.is_token_blacklisted(db, jti):
+            if TokenBlacklistService.is_token_blacklisted(db, jti, user_id=token_user_id):
                 logger.warning(
                     "[deps.get_current_user] token jti=%s is blacklisted (revoked)",
                     jti,

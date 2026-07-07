@@ -352,20 +352,24 @@ class AuthenticationService:
         }
 
     def refresh_access_token(self, db: Session, refresh_token: str) -> dict[str, Any]:
-        """Обновляет access токен"""
+        """Обновляет access токен.
+
+        SECURITY (RFC 6749 §10.4): refresh-token rotation — при каждом успешном
+        обмене выдаём НОВЫЙ refresh-токен и отзываем старый. Повторное использование
+        отозванного refresh-токена трактуется как кража — отзываем всю сессию-семью.
+        """
         try:
-            # Проверяем refresh токен
-            payload = self.verify_token(refresh_token, "refresh")
+            # 1) Проверяем подпись + type=refresh + blacklist.
+            payload = self.verify_token_with_blacklist(refresh_token, "refresh")
             if not payload:
                 return {"success": False, "message": "Недействительный refresh токен"}
 
-            # Проверяем токен в БД
+            # 2) Проверяем токен в БД.
             token_obj = (
                 db.query(RefreshToken)
                 .filter(
                     and_(
                         RefreshToken.token == refresh_token,
-                        RefreshToken.revoked == False,
                         RefreshToken.expires_at > datetime.utcnow(),
                     )
                 )
@@ -378,7 +382,31 @@ class AuthenticationService:
                     "message": "Refresh токен не найден или истек",
                 }
 
-            # Получаем пользователя
+            # 3) Reuse detection: токен уже был отозван — возможная кража.
+            if token_obj.revoked:
+                # Отзываем ВСЕ refresh-токены пользователя (session family).
+                db.query(RefreshToken).filter(
+                    RefreshToken.user_id == token_obj.user_id
+                ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+                db.query(UserSession).filter(
+                    UserSession.user_id == token_obj.user_id,
+                    UserSession.revoked == False,
+                ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+                db.commit()
+                from app.services.token_blacklist_service import token_blacklist_service
+                token_blacklist_service.blacklist_all_user_tokens(
+                    db, token_obj.user_id, reason="refresh_token_reuse"
+                )
+                logger.warning(
+                    "Refresh-token reuse detected for user_id=%s — all tokens revoked",
+                    token_obj.user_id,
+                )
+                return {
+                    "success": False,
+                    "message": "Refresh токен недействителен",
+                }
+
+            # 4) Получаем пользователя
             user = db.query(User).filter(User.id == token_obj.user_id).first()
             if not user or not user.is_active:
                 return {
@@ -386,7 +414,8 @@ class AuthenticationService:
                     "message": "Пользователь не найден или неактивен",
                 }
 
-            # Создаем новый access токен
+            # 5) Создаём НОВЫЕ access + refresh токены (rotation).
+            new_jti = str(uuid.uuid4())
             access_token = self.create_access_token(
                 {
                     "sub": str(user.id),
@@ -396,16 +425,44 @@ class AuthenticationService:
                     "is_superuser": user.is_superuser,
                 }
             )
+            new_refresh_token = self.create_refresh_token(user.id, new_jti)
+
+            # 6) Отзываем старый refresh-токен и записываем новый в БД.
+            token_obj.revoked = True
+            token_obj.revoked_at = datetime.utcnow()
+
+            new_token_obj = RefreshToken(
+                user_id=user.id,
+                token=new_refresh_token,
+                jti=new_jti,
+                expires_at=datetime.utcnow()
+                + timedelta(days=self.refresh_token_expire_days),
+                ip_address=token_obj.ip_address,
+                user_agent=token_obj.user_agent,
+                device_fingerprint=token_obj.device_fingerprint,
+            )
+            db.add(new_token_obj)
+
+            # Обновляем linked UserSession.refresh_token, чтобы сессия оставалась активной.
+            db.query(UserSession).filter(
+                UserSession.user_id == user.id,
+                UserSession.refresh_token == refresh_token,
+                UserSession.revoked == False,
+            ).update({"refresh_token": new_refresh_token, "last_activity": datetime.utcnow()})
+
+            db.commit()
 
             return {
                 "success": True,
                 "access_token": access_token,
+                "refresh_token": new_refresh_token,  # NEW: rotated token
                 "token_type": "bearer",
                 "expires_in": self.access_token_expire_minutes * 60,
             }
 
         except Exception as e:
             logger.error(f"Error refreshing token: {e}")
+            db.rollback()
             return {"success": False, "message": "Ошибка обновления токена"}
 
     def logout_user(
@@ -414,8 +471,15 @@ class AuthenticationService:
         refresh_token: str = None,
         user_id: int = None,
         logout_all: bool = False,
+        access_token_jti: str | None = None,
+        access_token_exp: datetime | None = None,
     ) -> dict[str, Any]:
-        """Выполняет выход пользователя"""
+        """Выполняет выход пользователя.
+
+        Args:
+            access_token_jti: JTI текущего access-токена (для индивидуального отзыва).
+            access_token_exp: expiry access-токена (нужен для blacklist_token).
+        """
         try:
             if logout_all and user_id:
                 # Отзываем все refresh токены пользователя
@@ -423,14 +487,19 @@ class AuthenticationService:
                     {"revoked": True, "revoked_at": datetime.utcnow()}
                 )
 
-                # Деактивируем все сессии
-                db.query(UserSession).filter(UserSession.user_id == user_id).update(
-                    {"is_active": False}
-                )
+                # Деактивируем все сессии (модель использует `revoked`, не `is_active`)
+                db.query(UserSession).filter(
+                    UserSession.user_id == user_id,
+                    UserSession.revoked == False,
+                ).update({"revoked": True, "revoked_at": datetime.utcnow()})
 
-                # ✅ NEW: Блокируем все access токены пользователя
+                db.commit()
+
+                # SECURITY: Sentinel-запись — отзывает ВСЕ access-токены пользователя.
                 from app.services.token_blacklist_service import token_blacklist_service
-                token_blacklist_service.blacklist_all_user_tokens(db, user_id, reason="logout_all")
+                token_blacklist_service.blacklist_all_user_tokens(
+                    db, user_id, reason="logout_all"
+                )
 
                 self._log_user_activity(
                     db, user_id, "logout_all", "Выход со всех устройств"
@@ -447,20 +516,39 @@ class AuthenticationService:
                     token_obj.revoked = True
                     token_obj.revoked_at = datetime.utcnow()
 
-                    # Деактивируем связанную сессию
+                    # Деактивируем ТОЛЬКО связанную сессию (не все сессии пользователя).
                     db.query(UserSession).filter(
-                        UserSession.user_id == token_obj.user_id
-                    ).update({"revoked": True})
+                        UserSession.user_id == token_obj.user_id,
+                        UserSession.refresh_token == refresh_token,
+                    ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+
+                    db.commit()
+
+                    # SECURITY: Отзываем текущий access-токен по jti (если передан).
+                    if access_token_jti and access_token_exp:
+                        from app.services.token_blacklist_service import token_blacklist_service
+                        token_blacklist_service.blacklist_token(
+                            db,
+                            jti=access_token_jti,
+                            expires_at=access_token_exp,
+                            user_id=token_obj.user_id,
+                            reason="logout",
+                        )
 
                     self._log_user_activity(
                         db, token_obj.user_id, "logout", "Выход из системы"
                     )
+                else:
+                    db.commit()
 
-            db.commit()
+            else:
+                db.commit()
+
             return {"success": True, "message": "Успешный выход"}
 
         except Exception as e:
             logger.error(f"Error logging out user: {e}")
+            db.rollback()
             return {"success": False, "message": "Ошибка выхода"}
 
     def create_password_reset_token(
@@ -552,11 +640,25 @@ class AuthenticationService:
             reset_token.used = True
             reset_token.used_at = datetime.utcnow()
 
-            db.commit()
-
-            # Отзываем все refresh токены пользователя
+            # SECURITY: Отзываем все refresh токены пользователя ВНУТРИ транзакции
+            # (раньше update шёл после commit и терялся).
             db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update(
                 {"revoked": True, "revoked_at": datetime.utcnow()}
+            )
+
+            # SECURITY: Деактивируем все активные сессии пользователя
+            db.query(UserSession).filter(
+                UserSession.user_id == user.id,
+                UserSession.revoked == False,
+            ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+
+            db.commit()
+
+            # SECURITY: Отзываем все access-токены пользователя (sentinel-запись).
+            # Должно быть ПОСЛЕ commit() — blacklist-сервис сам делает commit.
+            from app.services.token_blacklist_service import token_blacklist_service
+            token_blacklist_service.blacklist_all_user_tokens(
+                db, user.id, reason="password_reset"
             )
 
             self._log_user_activity(db, user.id, "password_reset", "Пароль сброшен")
@@ -590,11 +692,24 @@ class AuthenticationService:
             # Обновляем пароль и сбрасываем флаг must_change_password
             user.hashed_password = get_password_hash(new_password)
             user.must_change_password = False
-            db.commit()
 
-            # Отзываем все refresh токены пользователя
+            # SECURITY: Отзываем все refresh токены ВНУТРИ транзакции.
             db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update(
                 {"revoked": True, "revoked_at": datetime.utcnow()}
+            )
+
+            # SECURITY: Деактивируем все активные сессии
+            db.query(UserSession).filter(
+                UserSession.user_id == user.id,
+                UserSession.revoked == False,
+            ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+
+            db.commit()
+
+            # SECURITY: Отзываем все access-токены (sentinel-запись, после commit).
+            from app.services.token_blacklist_service import token_blacklist_service
+            token_blacklist_service.blacklist_all_user_tokens(
+                db, user.id, reason="password_change"
             )
 
             self._log_user_activity(db, user.id, "password_changed", "Пароль изменен")
@@ -1047,11 +1162,11 @@ class AuthenticationService:
                 self._log_security_event(
                     db,
                     session.user_id,
-                    "session_revoked",
-                    f"Сессия отозвана: {reason}",
-                    session.ip,
-                    session.user_agent,
-                    "low",
+                    event_type="session_revoked",
+                    severity="low",
+                    description=f"Сессия отозвана: {reason}",
+                    ip_address=session.ip,
+                    user_agent=session.user_agent,
                 )
 
                 logger.info(f"Сессия {session_id} отозвана: {reason}")
@@ -1097,9 +1212,9 @@ class AuthenticationService:
                 self._log_security_event(
                     db,
                     user_id,
-                    "sessions_revoked",
-                    f"Отозвано {revoked_count} сессий: {reason}",
+                    event_type="sessions_revoked",
                     severity="medium",
+                    description=f"Отозвано {revoked_count} сессий: {reason}",
                 )
 
                 logger.info(

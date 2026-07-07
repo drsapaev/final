@@ -146,7 +146,7 @@ async def refresh_access_token(
 
         return RefreshTokenResponse(
             access_token=result["access_token"],
-            refresh_token=request_data.refresh_token,  # Возвращаем тот же refresh токен
+            refresh_token=result.get("refresh_token") or request_data.refresh_token,
             token_type=result["token_type"],
             expires_in=result["expires_in"],
         )
@@ -167,11 +167,36 @@ async def logout(
     """Выход из системы"""
     try:
         service = get_authentication_service()
+
+        # Извлекаем jti + expiry из access-токена, чтобы отозвать его индивидуально.
+        access_jti: str | None = None
+        access_exp = None
+        auth_header = request.headers.get("authorization") or ""
+        if auth_header.lower().startswith("bearer "):
+            try:
+                from jose import jwt as _jwt
+                from app.core.config import settings as _settings
+                _payload = _jwt.decode(
+                    auth_header.split(" ", 1)[1],
+                    _settings.SECRET_KEY,
+                    algorithms=[_settings.ALGORITHM],
+                )
+                access_jti = _payload.get("jti")
+                _exp = _payload.get("exp")
+                if _exp:
+                    from datetime import datetime as _dt
+                    access_exp = _dt.utcfromtimestamp(_exp)
+            except Exception:
+                # Non-blocking: если не удалось декодировать — просто не отзываем jti.
+                pass
+
         result = service.logout_user(
             db=db,
             refresh_token=request_data.refresh_token,
             user_id=current_user.id,
             logout_all=request_data.logout_all_devices,
+            access_token_jti=access_jti,
+            access_token_exp=access_exp,
         )
 
         if not result["success"]:
@@ -394,21 +419,24 @@ async def get_paginated_user_sessions(
         total = len(sessions)
         sessions = sessions[skip : skip + per_page]
 
-        # Конвертируем в ответы
+        # Конвертируем в ответы (поля соответствуют модели UserSession).
+        from datetime import datetime as _dt
+        now = _dt.utcnow()
         session_responses = []
         for session in sessions:
             session_responses.append(
                 UserSessionResponse(
                     id=session.id,
-                    session_id=session.session_id,
+                    user_id=session.user_id,
                     created_at=session.created_at,
-                    last_activity=session.last_activity,
                     expires_at=session.expires_at,
-                    is_active=session.is_active,
-                    ip_address=session.ip_address,
+                    is_active=(not session.revoked and session.expires_at > now),
+                    revoked=session.revoked,
+                    revoked_at=getattr(session, "revoked_at", None),
+                    ip_address=session.ip,  # alias
                     user_agent=session.user_agent,
-                    device_name=session.device_name,
-                    current_session=False,  # TODO: определить текущую сессию
+                    refresh_token=None,  # не возвращаем токен в API-ответе
+                    current_session=False,
                 )
             )
 
@@ -474,7 +502,7 @@ async def get_user_activity(
                     created_at=activity.created_at,
                     ip_address=activity.ip_address,
                     metadata=(
-                        json.loads(activity.metadata) if activity.metadata else None
+                        json.loads(activity.extra_data) if activity.extra_data else None
                     ),
                 )
             )
@@ -507,26 +535,30 @@ async def get_auth_status(
         sessions = user_session.get_active_sessions(db, current_user.id)
         current_session = sessions[0] if sessions else None
 
+        from datetime import datetime as _dt
+        now = _dt.utcnow()
         return AuthStatusResponse(
             authenticated=True,
             user=UserProfileResponse(**profile),
             session=(
                 UserSessionResponse(
                     id=current_session.id,
-                    session_id=current_session.session_id,
+                    user_id=current_session.user_id,
                     created_at=current_session.created_at,
-                    last_activity=current_session.last_activity,
                     expires_at=current_session.expires_at,
-                    is_active=current_session.is_active,
-                    ip_address=current_session.ip_address,
+                    is_active=(not current_session.revoked and current_session.expires_at > now),
+                    revoked=current_session.revoked,
+                    revoked_at=getattr(current_session, "revoked_at", None),
+                    ip_address=current_session.ip,
                     user_agent=current_session.user_agent,
-                    device_name=current_session.device_name,
+                    refresh_token=None,
                     current_session=True,
                 )
                 if current_session
                 else None
             ),
             two_factor_required=profile.get("two_factor_enabled", False),
+            # 2FA-статус сессии не сохраняется отдельно; используем флаг профиля.
             two_factor_verified=profile.get("two_factor_enabled", False),
         )
 
