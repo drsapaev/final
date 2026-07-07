@@ -19,6 +19,26 @@ from app.services.telegram_bot import TelegramBotService, telegram_bot_service
 
 router = APIRouter()
 
+
+def _is_duplicate_update(db, update_id: int | None) -> bool:
+    """P1-9: check if this Telegram update was already processed."""
+    if update_id is None:
+        return False
+    try:
+        from app.models.telegram_webhook_dedup import TelegramWebhookDedup
+        existing = db.query(TelegramWebhookDedup).filter(
+            TelegramWebhookDedup.update_id == update_id
+        ).first()
+        if existing:
+            return True
+        # Record this update_id
+        dedup = TelegramWebhookDedup(update_id=update_id)
+        db.add(dedup)
+        db.commit()
+        return False
+    except Exception:
+        return False  # Non-blocking: if dedup fails, process anyway
+
 @router.post(
     "/mini-app/onboarding/requests",
     response_model=PatientOnboardingSubmitResponse,
