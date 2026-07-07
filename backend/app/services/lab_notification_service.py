@@ -153,7 +153,12 @@ class LabNotificationService:
         # SMS если есть телефон
         if patient.phone:
             _short_message = f"Ваши анализы готовы! Заказ #{order.id}. Просмотр в личном кабинете."
-            # await notification_sender_service.send_sms(patient.phone, short_message)
+            # NOTIF-REAUDIT-28 P1-5: uncommented — patients without app/Telegram
+            # must receive lab result alerts via SMS. PR #1932 left this commented out.
+            try:
+                await notification_sender_service.send_sms(patient.phone, _short_message)
+            except Exception as sms_err:
+                logger.warning('Lab result SMS send failed for patient %s: %s', patient.id, sms_err)
 
         logger.info(f"Notification sent for order {order.id} to patient {patient.id}")
 

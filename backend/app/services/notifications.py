@@ -7,7 +7,13 @@ from html import escape
 from typing import Any
 
 import httpx
-from jinja2 import Template
+from jinja2 import Environment, select_autoescape
+
+# NOTIF-REAUDIT-28 P1-1: autoescape для защиты от SSTI/XSS.
+# Раньше Template(template_text) использовался без autoescape —
+# admin-controlled templates могли выполнять произвольный Python (SSTI),
+# а user data с HTML попадала в email body unescaped.
+_jinja_env = Environment(autoescape=True)
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -1589,9 +1595,13 @@ class NotificationSenderService:
             return False
 
     def render_template(self, template_text: str, data: dict[str, Any]) -> str:
-        """Рендеринг шаблона с данными"""
+        """Рендеринг шаблона с данными.
+
+        NOTIF-REAUDIT-28 P1-1: использует Environment с autoescape=True
+        для защиты от SSTI/XSS.
+        """
         try:
-            template = Template(template_text)
+            template = _jinja_env.from_string(template_text)
             return template.render(**data)
         except Exception as e:
             logger.error(f"Ошибка рендеринга шаблона: {e}")

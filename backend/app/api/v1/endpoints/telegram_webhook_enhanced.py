@@ -2,6 +2,7 @@
 Расширенный webhook endpoint для Telegram бота
 """
 
+import hmac
 import json
 import logging
 from json import JSONDecodeError
@@ -64,7 +65,7 @@ def _validate_webhook_secret(request: Request, db: Session) -> None:
         )
 
     received_secret = request.headers.get(WEBHOOK_SECRET_HEADER)
-    if received_secret != expected_secret:
+    if not hmac.compare_digest(received_secret or "", expected_secret or ""):
         logger.warning("Enhanced Telegram webhook rejected due to invalid secret token")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
