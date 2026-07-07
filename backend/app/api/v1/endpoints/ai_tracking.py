@@ -8,6 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.rbac import AIPermission, require_ai_permission
 from app.db.session import get_db
 from app.schemas.ai_tracking import (
     AIModelStats,
@@ -16,7 +17,9 @@ from app.schemas.ai_tracking import (
 from app.services.ai_tracking_api_service import AITrackingApiService
 from app.services.ai_tracking_service import get_ai_tracking_service
 
-router = APIRouter()
+# AI-REAUDIT-28 P0-1: весь роутер требует RBAC VIEW_STATS. Раньше 6 эндпоинтов
+# были без аутентификации — утечка моделей/провайдеров/истории запросов.
+router = APIRouter(dependencies=[Depends(require_ai_permission(AIPermission.VIEW_STATS))])
 logger = logging.getLogger(__name__)
 
 AI_TRACKING_PUBLIC_ERROR = "Internal server error"

@@ -403,15 +403,17 @@ class MedicalMCPClient:
             params = req.get("params", {})
 
             if not server_name or not method:
+                # AI-REAUDIT-28 P0-7: asyncio.coroutine удалён в Python 3.11+.
+                # Раньше malformed batch request падал с AttributeError,
+                # маскируемым gather(return_exceptions=True). Заменяем на async-хелпер.
+                async def _missing_server_method_error():
+                    return {
+                        "status": "error",
+                        "error": "Missing server or method",
+                    }
+
                 tasks.append(
-                    asyncio.create_task(
-                        asyncio.coroutine(
-                            lambda: {
-                                "status": "error",
-                                "error": "Missing server or method",
-                            }
-                        )()
-                    )
+                    asyncio.create_task(_missing_server_method_error())
                 )
             else:
                 tasks.append(self._call_server(server_name, method, params))
