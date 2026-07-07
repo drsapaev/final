@@ -758,10 +758,21 @@ class NotificationSenderService:
             logger.error(f"Ошибка отправки Telegram: {e}")
             return False
 
-    async def send_sms(self, phone: str, message: str) -> bool:
-        """Отправка SMS уведомления"""
+    async def send_sms(self, phone: str, message: str, *, user_id: int | None = None) -> bool:
+        """P1-5: check user notification preferences before sending."""
         try:
             from app.services.sms_providers import get_sms_manager
+
+            # P1-5: check SMS notification preference
+            if user_id:
+                try:
+                    from app.crud.user_management import user_notification_settings
+                    settings = user_notification_settings.get_by_user_id(self.db, user_id) if hasattr(self, 'db') and self.db else None
+                    if settings and not getattr(settings, 'sms_enabled', True):
+                        logger.info("SMS skipped: user %s has SMS disabled", user_id)
+                        return True
+                except Exception:
+                    pass
 
             sms_manager = get_sms_manager()
             response = await sms_manager.send_sms(phone, message)
