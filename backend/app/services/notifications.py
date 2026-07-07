@@ -29,6 +29,27 @@ from app.services.telegram.bot import telegram_bot
 logger = logging.getLogger(__name__)
 
 
+def _fresh_db():
+    """NOTIF-REAUDIT-28 P0-5: create a fresh DB session for background tasks.
+
+    FastAPI закрывает request-scoped сессию после ответа. Background tasks,
+    которым передали `db=db`, работают с закрытой сессией → DetachedInstanceError.
+    Использование: `with _fresh_db() as db: sender.send(db, ...)`
+    """
+    from contextlib import contextmanager
+    from app.db.session import SessionLocal
+
+    @contextmanager
+    def _session():
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    return _session()
+
+
 NOTIFICATION_EVENT_TYPE_ALIASES = {
     "queue_changed": "queue_update",
     "diagnostics_return": "diagnostics_return_needed",
