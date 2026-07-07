@@ -195,19 +195,26 @@ class UserProfileResponse(BaseModel):
 
 
 class UserSessionResponse(BaseModel):
-    """Схема для ответа сессии пользователя"""
+    """Схема для ответа сессии пользователя.
+
+    Поля соответствуют реальной модели UserSession:
+    - id, user_id, refresh_token, user_agent, ip, created_at, expires_at, revoked
+    - is_active вычисляется как `not revoked and expires_at > now` (в endpoint)
+    - current_session помечается на стороне endpoint по совпадению session_id
+    """
 
     model_config = ConfigDict(protected_namespaces=())
 
     id: int
-    session_id: str
+    user_id: int | None = None
     created_at: datetime
-    last_activity: datetime
     expires_at: datetime
     is_active: bool
-    ip_address: str | None = None
+    revoked: bool = False
+    revoked_at: datetime | None = None
+    ip_address: str | None = None  # alias для model.ip
     user_agent: str | None = None
-    device_name: str | None = None
+    refresh_token: str | None = None  # НЕ возвращаем в API-ответе (см. endpoint, который зануляет)
     current_session: bool = False
 
 

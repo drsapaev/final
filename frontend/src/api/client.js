@@ -98,6 +98,11 @@ async function refreshTokenIfNeeded() {
         const newToken = response.data.access_token;
         tokenManager.setAccessToken(newToken);
         api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        // AUTH-REAUDIT-28: backend rotates refresh tokens on each /refresh —
+        // persist the new one so future refreshes work.
+        if (response.data.refresh_token) {
+          tokenManager.setRefreshToken(response.data.refresh_token);
+        }
         logger.log('✅ Token refreshed successfully');
 
         // Notify all pending requests
@@ -272,6 +277,25 @@ function clearToken() {
   setToken(null);
 }
 
+/**
+ * Persist refresh token after login or after successful /authentication/refresh.
+ * Uses tokenManager so the storage key stays consistent.
+ */
+function setRefreshToken(token) {
+  if (token) {
+    const t = typeof token === 'string' ? token.trim() : token;
+    if (t) {
+      tokenManager.setRefreshToken(t);
+      return;
+    }
+  }
+  tokenManager.setRefreshToken(null);
+}
+
+function getRefreshToken() {
+  return tokenManager.getRefreshToken();
+}
+
 function createLocalRateLimitError(config) {
   const error = new Error('Client-side cooldown active after HTTP 429');
   error.name = 'AxiosError';
@@ -367,6 +391,8 @@ export {
   setAxiosAuthToken,
   setBearerToken,
   getToken,
+  setRefreshToken,
+  getRefreshToken,
   clearToken,
   me,
   getProfile,

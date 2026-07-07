@@ -80,7 +80,8 @@ class TwoFactorBackupCode(Base):
     )  # ✅ SECURITY: CASCADE (backup codes die with 2FA)
 
     # Код и его статус
-    code: Mapped[str] = mapped_column(String(10), nullable=False)  # 8-символьный код
+    # SECURITY: хранится как SHA-256 hex hash (64 chars), см. two_factor_service._hash_backup_code.
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

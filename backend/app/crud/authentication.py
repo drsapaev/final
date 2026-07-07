@@ -101,34 +101,44 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
 
 
 class CRUDUserSession(CRUDBase[UserSession, None, None]):
-    """CRUD операции для пользовательских сессий"""
+    """CRUD операции для пользовательских сессий.
+
+    Модель UserSession имеет поля: id, user_id, refresh_token, user_agent, ip,
+    created_at, expires_at, revoked, revoked_at. Поля `session_id`, `session_token`,
+    `is_active`, `last_activity`, `device_name` НЕ существуют в модели — ранее
+    обращения к ним падали с AttributeError, маскируемым broad-except.
+    """
 
     def get_by_session_id(self, db: Session, session_id: str) -> UserSession | None:
-        """Получить сессию по ID"""
+        """Получить сессию по id (session_id приводится к int)."""
+        try:
+            sid = int(session_id)
+        except (TypeError, ValueError):
+            return None
         return (
-            db.query(UserSession).filter(UserSession.session_id == session_id).first()
+            db.query(UserSession).filter(UserSession.id == sid).first()
         )
 
-    def get_by_session_token(
-        self, db: Session, session_token: str
+    def get_by_refresh_token(
+        self, db: Session, refresh_token: str
     ) -> UserSession | None:
-        """Получить сессию по токену"""
+        """Получить сессию по refresh-токену."""
         return (
             db.query(UserSession)
-            .filter(UserSession.session_token == session_token)
+            .filter(UserSession.refresh_token == refresh_token)
             .first()
         )
 
     def get_valid_session(
-        self, db: Session, session_token: str
+        self, db: Session, refresh_token: str
     ) -> UserSession | None:
-        """Получить действительную сессию"""
+        """Получить действительную сессию (revoked=False, expires_at > now)."""
         return (
             db.query(UserSession)
             .filter(
                 and_(
-                    UserSession.session_token == session_token,
-                    UserSession.is_active == True,
+                    UserSession.refresh_token == refresh_token,
+                    UserSession.revoked == False,
                     UserSession.expires_at > datetime.utcnow(),
                 )
             )
@@ -146,7 +156,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
             .filter(
                 and_(
                     UserSession.user_id == user_id,
-                    UserSession.is_active == True,
+                    UserSession.revoked == False,
                     UserSession.expires_at > datetime.utcnow(),
                 )
             )
@@ -154,19 +164,17 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
         )
 
     def update_activity(self, db: Session, session_id: str) -> bool:
-        """Обновить активность сессии"""
+        """Обновить активность сессии (no-op — поле last_activity убрано из модели)."""
+        # Модель UserSession не имеет last_activity; возвращаем True если сессия валидна.
         session = self.get_by_session_id(db, session_id)
-        if session:
-            session.last_activity = datetime.utcnow()
-            db.commit()
-            return True
-        return False
+        return session is not None and not session.revoked
 
     def deactivate_session(self, db: Session, session_id: str) -> bool:
-        """Деактивировать сессию"""
+        """Деактивировать сессию (помечать revoked=True)."""
         session = self.get_by_session_id(db, session_id)
-        if session:
-            session.is_active = False
+        if session and not session.revoked:
+            session.revoked = True
+            session.revoked_at = datetime.utcnow()
             db.commit()
             return True
         return False
@@ -175,18 +183,28 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
         """Деактивировать все сессии пользователя"""
         count = (
             db.query(UserSession)
-            .filter(and_(UserSession.user_id == user_id, UserSession.is_active == True))
-            .update({"is_active": False})
+            .filter(
+                and_(
+                    UserSession.user_id == user_id,
+                    UserSession.revoked == False,
+                )
+            )
+            .update({"revoked": True, "revoked_at": datetime.utcnow()})
         )
         db.commit()
         return count
 
     def cleanup_expired_sessions(self, db: Session) -> int:
-        """Очистить истекшие сессии"""
+        """Помечать истекшие сессии как отозванные."""
         count = (
             db.query(UserSession)
-            .filter(UserSession.expires_at < datetime.utcnow())
-            .delete()
+            .filter(
+                and_(
+                    UserSession.expires_at < datetime.utcnow(),
+                    UserSession.revoked == False,
+                )
+            )
+            .update({"revoked": True, "revoked_at": datetime.utcnow()})
         )
         db.commit()
         return count
@@ -479,7 +497,8 @@ class CRUDSecurityEvent(CRUDBase[SecurityEvent, None, None]):
             event.resolved_at = datetime.utcnow()
             event.resolved_by = resolved_by
             if notes:
-                event.metadata = notes
+                # Модель использует extra_data, не metadata.
+                event.extra_data = notes
             db.commit()
             return True
         return False

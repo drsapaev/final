@@ -74,22 +74,48 @@ class TokenBlacklistService:
             return False
 
     @staticmethod
-    def is_token_blacklisted(db: Session, jti: str) -> bool:
+    def is_token_blacklisted(db: Session, jti: str, user_id: int | None = None) -> bool:
         """
-        Проверить, находится ли токен в черном списке
+        Проверить, находится ли токен в черном списке.
+
+        Проверка двух типов записей:
+        1. Точный jti — для индивидуально отозванных токенов (logout).
+        2. "all_user_tokens" sentinel — когда был вызван
+           ``blacklist_all_user_tokens(user_id)``. Все access-токены
+           пользователя считаются отозванными до истечения sentinel-записи.
 
         Args:
             db: Сессия базы данных
             jti: JWT ID токена
+            user_id: ID пользователя (опционально; передаётся deps.get_current_user)
 
         Returns:
             True если токен в черном списке
         """
         try:
+            # 1) Точный jti
             entry = db.query(TokenBlacklist).filter(
                 TokenBlacklist.jti == jti
             ).first()
-            return entry is not None
+            if entry is not None:
+                return True
+
+            # 2) Sentinel "отозвать все токены пользователя"
+            if user_id is not None:
+                from datetime import datetime as _dt
+                sentinel = (
+                    db.query(TokenBlacklist)
+                    .filter(
+                        TokenBlacklist.user_id == user_id,
+                        TokenBlacklist.reason.like("all_user_tokens:%"),
+                        TokenBlacklist.expires_at > _dt.utcnow(),
+                    )
+                    .first()
+                )
+                if sentinel is not None:
+                    return True
+
+            return False
         except Exception as e:
             logger.error(f"Error checking blacklist for {jti}: {e}")
             return False
@@ -121,20 +147,34 @@ class TokenBlacklistService:
         # Это более эффективно чем искать все существующие токены
 
         try:
-            # Добавляем запись с user_id и expires_at в будущем
-            # При проверке токена будем искать по user_id
-            future_expiry = datetime.utcnow() + timedelta(days=30)  # На 30 дней вперёд
+            # Sentinel-запись: одна на пользователя с уникальным стабильным jti.
+            # is_token_blacklisted ищет по (user_id, reason LIKE 'all_user_tokens:%',
+            # expires_at > now). jti должен быть уникален (NOT NULL UNIQUE в модели),
+            # поэтому вставляем с timestamp-суффиксом; истёкшие sentinel-записи
+            # удаляются в cleanup_expired_tokens.
+            now = datetime.utcnow()
+            future_expiry = now + timedelta(days=30)  # Покрывает максимальный access-token TTL (30 min) с запасом
+
+            # Удаляем предыдущие активные sentinel-записи этого пользователя
+            # (idempotent — повторный вызов не накапливает дубликаты)
+            db.query(TokenBlacklist).filter(
+                TokenBlacklist.user_id == user_id,
+                TokenBlacklist.reason.like("all_user_tokens:%"),
+            ).delete(synchronize_session=False)
 
             blacklist_entry = TokenBlacklist(
-                jti=f"all_user_{user_id}_{datetime.utcnow().timestamp()}",
+                jti=f"all_user_{user_id}_{int(now.timestamp())}",
                 user_id=user_id,
                 expires_at=future_expiry,
-                reason=f"all_user_tokens:{reason}"
+                reason=f"all_user_tokens:{reason}",
             )
             db.add(blacklist_entry)
             db.commit()
 
-            logger.warning(f"All tokens for user {user_id} blacklisted (reason: {reason})")
+            logger.warning(
+                "All tokens for user %s blacklisted until %s (reason: %s)",
+                user_id, future_expiry.isoformat(), reason,
+            )
             return 1
 
         except Exception as e:

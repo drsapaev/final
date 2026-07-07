@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight, Eye, EyeOff, LogIn, CircleHelp, UserPlus, UserRound, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { api, setToken } from '../../api/client';
+import { api, setToken, setRefreshToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
@@ -165,6 +165,9 @@ const LoginFormStyled = () => {
         if (data.must_change_password) {
           // UX Audit Stage 1: setToken() уже пишет в localStorage через tokenManager
           setToken(accessToken);
+          if (data.refresh_token) {
+            setRefreshToken(data.refresh_token);
+          }
           navigate(changePasswordRequiredRoute, {
             state: { currentPassword: formData.password },
             replace: true
@@ -175,6 +178,12 @@ const LoginFormStyled = () => {
         // Сохраняем токен единообразно для всех клиентов
         // UX Audit Stage 1 (issue 3.1.3): удалён дублирующий localStorage.setItem
         setToken(accessToken);
+        // SECURITY/AUTH-REAUDIT-28: persist refresh_token — раньше не сохранялся,
+        // из-за чего proactive-refresh в api/client.js был мёртвым кодом, и пользователь
+        // молча разлогинивался каждые 30 минут.
+        if (data.refresh_token) {
+          setRefreshToken(data.refresh_token);
+        }
 
         try {
           // UX Audit Stage 1 (Login issue 3.7):
@@ -254,6 +263,10 @@ const LoginFormStyled = () => {
       if (response.data?.access_token) {
         const accessToken = typeof response.data.access_token === 'string' ? response.data.access_token.trim() : response.data.access_token;
         setToken(accessToken);
+        // AUTH-REAUDIT-28: persist rotated refresh token after 2FA completion.
+        if (response.data?.refresh_token) {
+          setRefreshToken(response.data.refresh_token);
+        }
 
         const profileResponse = await api.get('/auth/me');
         setProfile(profileResponse.data);
