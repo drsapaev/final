@@ -13,7 +13,20 @@ from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.migration_management_api_service import MigrationManagementApiService
 
+# ADM-AUDIT-28 P0-4: production env guard for destructive migrations.
 router = APIRouter()
+
+
+def _ensure_not_production(operation: str):
+    """Block destructive migration operations in production."""
+    from app.core.config import settings
+    env = str(getattr(settings, "ENV", "") or "").lower()
+    if env in ("prod", "production"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Destructive migration operation '{operation}' is blocked in production. "
+            "Use a staging environment or manual DBA procedure.",
+        )
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
