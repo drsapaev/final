@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx
 import asyncio
+
+from app.models.telegram_config import TelegramUser
 from sqlalchemy.orm import Session
 
 from app.crud import (
@@ -580,6 +582,20 @@ class TelegramBotService:
                 return result.get("ok", False)
             else:
                 logger.error(f"Ошибка отправки сообщения: {response.status_code}")
+            # P1-8: detect bot blocked by user (HTTP 403)
+            if response.status_code == 403 and hasattr(self, 'db') and self.db:
+                try:
+                    chat_id = data.get("chat_id") if isinstance(data, dict) else None
+                    if chat_id:
+                        user = self.db.query(TelegramUser).filter(
+                            TelegramUser.chat_id == str(chat_id)
+                        ).first()
+                        if user:
+                            user.notifications_enabled = False
+                            self.db.commit()
+                            logger.info("Telegram user blocked bot: chat_id=%s", chat_id)
+                except Exception:
+                    pass
                 return False
 
         except Exception as e:

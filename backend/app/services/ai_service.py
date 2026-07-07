@@ -442,7 +442,20 @@ class AIService:
                 "response_time_ms": 1000,
             }
 
-            crud_ai.create_usage_log(self.db, log_data)
+            # P1-15: fix signature mismatch — was crud_ai.create_usage_log(self.db, log_data)
+            # Correct function is create_ai_usage_log with kwargs
+            try:
+                crud_ai.create_ai_usage_log(
+                    self.db,
+                    user_id=None,
+                    provider_id=log_data.get("provider_id"),
+                    task_type=log_data.get("task_type", "unknown"),
+                    tokens_used=log_data.get("input_tokens", 0),
+                    response_time_ms=int(log_data.get("response_time", 0) * 1000),
+                    status=log_data.get("status", "completed"),
+                )
+            except Exception as e:
+                logger.warning("Failed to log AI usage: %s", type(e).__name__)
 
         except Exception as e:
             logger.warning(
