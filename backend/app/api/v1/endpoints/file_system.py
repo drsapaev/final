@@ -126,7 +126,7 @@ async def upload_file(
         if tags:
             tags_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
 
-        # FILES-AUDIT-28 P1: validate patient_id ownership
+        # #43: Scan for malware before saving\n        is_clean, threat = scan_for_malware(file_content)\n        if not is_clean:\n            raise HTTPException(status_code=400, detail=f"File rejected: malware detected ({threat})")\n\n        # FILES-AUDIT-28 P1: validate patient_id ownership
         if patient_id is not None and current_user.role not in ("Admin", "Registrar"):
             from app.models.patient import Patient
             patient = db.query(Patient).filter(Patient.id == patient_id).first()
