@@ -18,6 +18,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from app.core.audit_helper import log_action
 from app.api.deps import get_current_user, require_roles, require_staff
 from app.crud.user_management import (
     user_audit_log,

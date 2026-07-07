@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.audit_helper import log_action
 from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.confirmation_security import ConfirmationSecurityService

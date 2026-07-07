@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from app.core.audit_helper import log_action
 from app.api.deps import get_current_user, get_db, require_roles
 from app.models.user import User
 from app.services.feature_flags import get_feature_flag_service
