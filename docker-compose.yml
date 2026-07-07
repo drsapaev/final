@@ -1,0 +1,62 @@
+# Production docker-compose
+# DOCKER-DEPLOY-AUDIT: secrets via env_file, not hardcoded
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - clinic-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: /api/v1
+        VITE_API_URL: ""
+        VITE_API_BASE_URL: ""
+        VITE_WS_URL: ""
+        VITE_WS_HOST: ""
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - clinic-net
+
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    env_file:
+      - ./backend/.env.production
+    environment:
+      POSTGRES_DB: clinic
+      POSTGRES_USER: clinic
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - clinic-net
+
+volumes:
+  pgdata:
+
+networks:
+  clinic-net:
+    driver: bridge
