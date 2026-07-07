@@ -79,6 +79,38 @@ class AIChatSession(Base):
         return f"<AIChatSession {self.id}: {self.title or 'Untitled'}>"
 
 
+
+    @property
+    def decrypted_title(self) -> str:
+        """P1-4: decrypt title on read."""
+        if not self.title:
+            return ""
+        from app.core.config import settings
+        if not settings.ENCRYPTION_KEY:
+            return self.title
+        try:
+            if self.title.startswith("gAAAAA"):
+                from cryptography.fernet import Fernet
+                cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+                return cipher.decrypt(self.title.encode()).decode()
+            return self.title
+        except Exception:
+            return self.title
+
+    def set_title(self, value: str) -> None:
+        """P1-4: encrypt title on write."""
+        if not value:
+            self.title = None
+            return
+        from app.core.config import settings
+        if not settings.ENCRYPTION_KEY:
+            self.title = value
+            return
+        from cryptography.fernet import Fernet
+        cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+        self.title = cipher.encrypt(value.encode()).decode()
+
+
 class AIChatMessage(Base):
     """
     Сообщение в AI чате.
@@ -136,6 +168,39 @@ class AIChatMessage(Base):
     def __repr__(self) -> str:
         preview = self.content[:50] + "..." if len(self.content) > 50 else self.content
         return f"<AIChatMessage {self.id} ({self.role}): {preview}>"
+
+
+
+    @property
+    def decrypted_content(self) -> str:
+        """P1-4: decrypt content on read (Fernet)."""
+        if not self.content:
+            return ""
+        from app.core.config import settings
+        if not settings.ENCRYPTION_KEY:
+            return self.content  # plaintext fallback (dev/test)
+        try:
+            if self.content.startswith("gAAAAA"):
+                from cryptography.fernet import Fernet
+                cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+                return cipher.decrypt(self.content.encode()).decode()
+            return self.content  # not encrypted yet (migration period)
+        except Exception:
+            return self.content
+
+    def set_content(self, value: str) -> None:
+        """P1-4: encrypt content on write (Fernet)."""
+        if not value:
+            self.content = ""
+            return
+        from app.core.config import settings
+        if not settings.ENCRYPTION_KEY:
+            self.content = value  # plaintext fallback (dev/test)
+            return
+        from cryptography.fernet import Fernet
+        cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+        self.content = cipher.encrypt(value.encode()).decode()
+
 
 
 class AIChatFeedback(Base):
