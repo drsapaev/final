@@ -276,54 +276,14 @@ class DeepSeekProvider(BaseAIProvider):
                 "raw_response": response.content,
             }
 
-    async def analyze_skin(
-        self, image_data: bytes, metadata: dict | None = None
-    ) -> dict[str, Any]:
-        """Анализ кожи по фото через Gemini Vision"""
-        try:
-            # Преобразуем bytes в PIL Image
-            image = Image.open(io.BytesIO(image_data))
-
-            prompt = """Проанализируйте состояние кожи на фото.
-
-Определите:
-1. Тип кожи (сухая/жирная/комбинированная/нормальная)
-2. Возможные проблемы (акне, пигментация, морщины, покраснения и т.д.)
-3. Общее состояние кожи
-4. Рекомендации по уходу
-
-Ответьте СТРОГО в формате JSON:
-{
-    "skin_type": "тип кожи",
-    "problems": ["список проблем"],
-    "skin_condition": "общее состояние (отличное/хорошее/удовлетворительное/требует лечения)",
-    "recommendations": ["список рекомендаций"],
-    "procedures": ["рекомендуемые процедуры"],
-    "ai_confidence": "high/medium/low"
-}"""
-
-            if metadata:
-                prompt += f"\n\nДополнительная информация о пациенте: {json.dumps(metadata, ensure_ascii=False)}"
-
-            response = await self.vision_model.generate_content_async([prompt, image])
-
-            try:
-                content = response.text.strip()
-                if content.startswith("```json"):
-                    content = content[7:]
-                if content.endswith("```"):
-                    content = content[:-3]
-                return json.loads(content.strip())
-            except Exception:
-                return {
-                    "error": "Не удалось разобрать ответ AI",
-                    "raw_response": response.text,
-                }
-
-        except Exception as e:
-            return {"error": "Ошибка анализа изображения"}  # sanitized
-
-    # Реализация недостающих абстрактных методов
+    async def analyze_skin(self, image_data: bytes, metadata: dict | None = None) -> dict[str, Any]:
+        """AI-REAUDIT-28 P0-4: DeepSeek не поддерживает vision API.
+        Раньше метод был copy-pasted из GeminiProvider и ссылался на
+        несуществующий self.vision_model — AttributeError в рантайме.
+        Теперь поднимает NotImplementedError, чтобы AIGateway circuit-breaker
+        переключился на следующий провайдер.
+        """
+        raise NotImplementedError("DeepSeek does not support image analysis")
     async def analyze_medical_image_generic(
         self, image_data: bytes, image_type: str, metadata: dict | None = None
     ) -> dict[str, Any]:
@@ -356,13 +316,13 @@ class DeepSeekProvider(BaseAIProvider):
         self, ecg_data: str, metadata: dict | None = None
     ) -> dict[str, Any]:
         """Интерпретация ЭКГ"""
-        return {"error": "ECG interpretation not implemented in Gemini provider"}
+        return {"error": "ECG interpretation not implemented in DeepSeek provider"}
 
     async def generate_treatment_plan(
         self, diagnosis: str, patient_info: dict | None = None
     ) -> dict[str, Any]:
         """Генерация плана лечения"""
-        return {"error": "Treatment plan generation not implemented in Gemini provider"}
+        return {"error": "Treatment plan generation not implemented in DeepSeek provider"}
 
     async def clinical_decision_support(
         self, symptoms: list[str], patient_info: dict | None = None

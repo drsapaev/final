@@ -18,6 +18,21 @@ from app.services.ai_feature_gating import RequireAiFeature
 
 router = APIRouter()
 
+
+def _ensure_phrase_ownership(current_user, doctor_id: int) -> None:
+    """AI-REAUDIT-28 P0-9: проверка, что текущий пользователь — владелец
+    phrase-данных (или Admin). Раньше любой клинический пользователь мог
+    читать/портить phrase-index другого врача (IDOR + PII leak через
+    telemetry-stats).
+    """
+    if current_user.role == "Admin":
+        return
+    if getattr(current_user, "id", None) != doctor_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нельзя обращаться к phrase-данным другого врача.",
+        )
+
 PHRASE_CLINICAL_ROLES = ("Admin", "Doctor", "cardio", "derma", "dentist")
 phrase_clinical_access = deps.require_roles(*PHRASE_CLINICAL_ROLES)
 phrase_admin_access = deps.require_roles("Admin")
@@ -85,6 +100,9 @@ async def suggest_phrases(
 
     Возвращает только "хвост" (continuation), не полный текст.
     """
+    # AI-REAUDIT-28 P0-9: ownership check
+    _ensure_phrase_ownership(_current_user, request.doctorId)
+
     service = get_doctor_phrase_service(db)
 
     suggestions = service.suggest_phrases(
@@ -153,6 +171,8 @@ async def get_phrase_stats(
     """
     Получить статистику фраз врача.
     """
+    # AI-REAUDIT-28 P0-9: ownership check
+    _ensure_phrase_ownership(_current_user, doctor_id)
     return PhraseSuggestApiService(db).get_phrase_stats(doctor_id=doctor_id)
 
 
@@ -187,6 +207,8 @@ async def check_readiness(
     from app.services.doctor_autocomplete_readiness import get_doctor_readiness_service
 
     service = get_doctor_readiness_service(db)
+    # AI-REAUDIT-28 P0-9: ownership check
+    _ensure_phrase_ownership(_current_user, doctor_id)
     result = service.check_readiness(doctor_id)
 
     return ReadinessResponse(**result.to_dict())
@@ -261,7 +283,9 @@ async def get_telemetry_stats(
     Показывает acceptance rate и топ принятых фраз.
     """
     return TelemetryStatsResponse(
-        **PhraseSuggestApiService(db).get_telemetry_stats(doctor_id=doctor_id)
+        # AI-REAUDIT-28 P0-9: ownership check
+    _ensure_phrase_ownership(_current_user, doctor_id)
+    **PhraseSuggestApiService(db).get_telemetry_stats(doctor_id=doctor_id)
     )
 
 
@@ -325,6 +349,9 @@ async def update_field_preferences(
     Позволяет врачу приостановить подсказки для конкретных полей.
     Доступно ТОЛЬКО после readiness=true.
     """
+    # AI-REAUDIT-28 P0-9: ownership check
+    _ensure_phrase_ownership(_current_user, request.doctorId)
+
     # TODO: Store in UserPreferences table
     # For now, just echo back
     return FieldPreferencesResponse(
