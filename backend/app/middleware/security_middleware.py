@@ -154,6 +154,22 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             if now > self.locked_ips[ip]:
                 del self.locked_ips[ip]
 
+        # MW-AUDIT-28 P0-3: prevent unbounded dict growth.
+        # In multi-worker deployment without Redis, in-memory dicts can
+        # grow to millions of entries. Cap at 10000 unique IPs.
+        MAX_TRACKED_IPS = 10000
+        if len(self.request_counts) > MAX_TRACKED_IPS:
+            # Evict oldest 20% of entries
+            sorted_keys = sorted(self.request_counts.keys(),
+                                 key=lambda k: max(self.request_counts[k]) if self.request_counts[k] else 0)
+            for k in sorted_keys[:MAX_TRACKED_IPS // 5]:
+                del self.request_counts[k]
+        if len(self.failed_attempts) > MAX_TRACKED_IPS:
+            sorted_ips = sorted(self.failed_attempts.keys(),
+                               key=lambda ip: max(ts for ep in self.failed_attempts[ip].values() for ts in ep) if self.failed_attempts[ip] else 0)
+            for ip in sorted_ips[:MAX_TRACKED_IPS // 5]:
+                del self.failed_attempts[ip]
+
         self.last_cleanup = now
 
     def _check_rate_limit(
@@ -342,7 +358,11 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             return response
 
         except Exception as e:
+            # MW-AUDIT-28 P0-1: fail-closed on middleware error.
+            # Раньше вызывал call_next повторно → fail-open.
             logger.error(f"Security middleware error: {e}", exc_info=True)
-            # В случае ошибки пропускаем проверку
-            return await call_next(request)
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": "Internal server error"},
+            )
 
