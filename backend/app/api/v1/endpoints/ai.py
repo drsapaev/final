@@ -18,6 +18,14 @@ from ....services.ai_feature_gating import RequireAiFeature
 
 logger = logging.getLogger(__name__)
 
+
+class AIResultResponse(BaseModel):
+    """Generic AI response model for OpenAPI documentation."""
+    success: bool = True
+    data: dict | None = None
+    error: str | None = None
+    provider: str | None = None
+
 MAX_LEGACY_AI_UPLOAD_BYTES = 25 * 1024 * 1024
 AI_UPLOAD_READ_CHUNK_BYTES = 1024 * 1024
 
