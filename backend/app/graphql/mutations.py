@@ -95,8 +95,8 @@ class Mutation:
         except Exception as e:
             return PatientMutationResponse(
                 success=False,
-                message=f"Ошибка создания пациента: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     @strawberry.mutation
@@ -145,8 +145,8 @@ class Mutation:
         except Exception as e:
             return PatientMutationResponse(
                 success=False,
-                message=f"Ошибка обновления пациента: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     @strawberry.mutation
@@ -183,8 +183,8 @@ class Mutation:
         except Exception as e:
             return MutationResponse(
                 success=False,
-                message=f"Ошибка удаления пациента: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     # ===================== APPOINTMENT MUTATIONS =====================
@@ -243,8 +243,8 @@ class Mutation:
         except Exception as e:
             return AppointmentMutationResponse(
                 success=False,
-                message=f"Ошибка создания записи: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     @strawberry.mutation
@@ -291,8 +291,8 @@ class Mutation:
         except Exception as e:
             return AppointmentMutationResponse(
                 success=False,
-                message=f"Ошибка обновления статуса записи: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     @strawberry.mutation
@@ -336,8 +336,8 @@ class Mutation:
         except Exception as e:
             return AppointmentMutationResponse(
                 success=False,
-                message=f"Ошибка отмены записи: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     # ===================== VISIT MUTATIONS =====================
@@ -417,8 +417,8 @@ class Mutation:
             db.rollback()
             return VisitMutationResponse(
                 success=False,
-                message=f"Ошибка создания визита: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     @strawberry.mutation
@@ -460,8 +460,8 @@ class Mutation:
         except Exception as e:
             return VisitMutationResponse(
                 success=False,
-                message=f"Ошибка обновления статуса визита: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     # ===================== SERVICE MUTATIONS =====================
@@ -514,8 +514,8 @@ class Mutation:
         except Exception as e:
             return ServiceMutationResponse(
                 success=False,
-                message=f"Ошибка создания услуги: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     @strawberry.mutation
@@ -552,8 +552,8 @@ class Mutation:
         except Exception as e:
             return ServiceMutationResponse(
                 success=False,
-                message=f"Ошибка обновления цены услуги: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     # ===================== QUEUE MUTATIONS =====================
@@ -625,7 +625,11 @@ class Mutation:
                 )
 
             # Создаем запись в очереди
-            queue_number = daily_queue.current_number + 1
+            # GQL-AUDIT-28 P0-3: lock daily_queue to prevent race on current_number
+            daily_queue = db.query(DailyQueue).filter(
+                DailyQueue.id == daily_queue.id
+            ).with_for_update().first()
+            queue_number = (daily_queue.current_number or 0) + 1
             daily_queue.current_number = queue_number
 
             queue_entry = OnlineQueueEntry(
@@ -648,8 +652,8 @@ class Mutation:
             db.rollback()
             return QueueMutationResponse(
                 success=False,
-                message=f"Ошибка постановки в очередь: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )
 
     @strawberry.mutation
@@ -683,7 +687,8 @@ class Mutation:
                         OnlineQueueEntry.created_at >= daily_queue.created_at
                     )
 
-            next_entry = query.order_by(OnlineQueueEntry.queue_number).first()
+            # GQL-AUDIT-28 P0-2: with_for_update — защита от race condition
+            next_entry = query.order_by(OnlineQueueEntry.queue_number).with_for_update().first()
 
             if not next_entry:
                 return QueueMutationResponse(
@@ -721,6 +726,6 @@ class Mutation:
             db.rollback()
             return QueueMutationResponse(
                 success=False,
-                message=f"Ошибка вызова пациента: {str(e)}",
-                errors=[str(e)],
+                message="Внутренняя ошибка сервера",
+                errors=["INTERNAL_ERROR"],
             )

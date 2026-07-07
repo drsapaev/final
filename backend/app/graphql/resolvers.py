@@ -46,9 +46,25 @@ from app.models.user import User
 from app.models.visit import Visit
 
 
-def get_db_session() -> Session:
-    """Получить сессию базы данных"""
-    return next(get_db())
+def get_db_session():
+    """Получить сессию базы данных.
+
+    GQL-AUDIT-28 P0-1: ранее next(get_db()) потреблял генератор, но
+    finally: db.close() никогда не выполнялся → утечка сессий БД.
+    Возвращает context manager для использования как 'with get_db_session() as db:'.
+    """
+    from contextlib import contextmanager
+    from app.db.session import SessionLocal
+
+    @contextmanager
+    def _session():
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    return _session()
 
 
 # ===================== UTILITY FUNCTIONS =====================
