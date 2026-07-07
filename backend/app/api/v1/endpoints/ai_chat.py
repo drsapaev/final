@@ -454,6 +454,7 @@ async def chat_websocket(
     except Exception as e:
         logger.exception(f"WebSocket error: {e}")
         try:
-            await websocket.close(code=1011, reason=str(e))
+            # AI-REAUDIT-28 P1-11: не泄露 exception в close reason.
+            await websocket.close(code=1011, reason="Internal server error")
         except Exception:
             pass
