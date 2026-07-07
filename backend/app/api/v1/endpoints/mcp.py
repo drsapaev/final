@@ -17,6 +17,8 @@ from ....services.mcp import get_mcp_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+# AI-REAUDIT-28 P1-13: удалены redundant inline role checks —
+# require_roles dependency уже enforcing RBAC.
 
 MAX_MCP_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024
 MCP_IMAGE_READ_CHUNK_BYTES = 1024 * 1024
@@ -450,9 +452,6 @@ async def mcp_interpret_lab_results(
 ) -> dict[str, Any]:
     """Интерпретация лабораторных результатов через MCP"""
     try:
-        if current_user.role not in ["doctor", "lab", "admin", "Admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-
         mcp_manager = await get_mcp_manager()
 
         patient_info = {}
@@ -536,9 +535,6 @@ async def mcp_analyze_image(
 ) -> dict[str, Any]:
     """Анализ медицинского изображения через MCP"""
     try:
-        if current_user.role not in ["doctor", "admin", "Admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-
         # Проверяем тип файла
         if not image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Файл должен быть изображением")
@@ -580,9 +576,6 @@ async def mcp_analyze_skin_lesion(
 ) -> dict[str, Any]:
     """Анализ кожных образований через MCP"""
     try:
-        if current_user.role not in ["doctor", "admin", "Admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-
         # Читаем и кодируем изображение
         image_data = await _read_mcp_image_bounded(image)
         image_base64 = base64.b64encode(image_data).decode('utf-8')
@@ -650,9 +643,6 @@ async def mcp_batch_process(
 ) -> list[dict[str, Any]]:
     """Пакетная обработка запросов через MCP"""
     try:
-        if current_user.role not in ["doctor", "admin", "Admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-
         mcp_manager = await get_mcp_manager()
 
         results = await mcp_manager.batch_execute(
