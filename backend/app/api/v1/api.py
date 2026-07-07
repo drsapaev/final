@@ -19,7 +19,6 @@ from app.api.v1.endpoints import (
     admin_providers,
     admin_stats,
     admin_telegram,
-    admin_users,
     advanced_analytics,
     ai,
     ai_analytics,
@@ -303,7 +302,6 @@ api_router.include_router(admin_doctors.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_providers.router, tags=["admin"])
 api_router.include_router(admin_telegram.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_stats.router, prefix="/admin", tags=["admin"])
-api_router.include_router(admin_users.router)
 api_router.include_router(mobile_api.router, prefix="/mobile", tags=["mobile"])
 api_router.include_router(
     mobile_api_extended.router, prefix="/mobile", tags=["mobile-extended"]

@@ -544,8 +544,9 @@ class TestDoctorSecurity:
         self, client: TestClient, doctor_auth_headers
     ):
         """Врач не может получить доступ к админским маршрутам"""
+        # ADM-AUDIT-28 P0-6: admin_users.py was deleted; use /admin/departments
         response = client.get(
-            "/api/v1/admin/users",
+            "/api/v1/admin/departments",
             headers=doctor_auth_headers,
         )
 
