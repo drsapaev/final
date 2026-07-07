@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta, UTC
 from typing import Any
 
-from jose import jwt
+import jwt
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session
 

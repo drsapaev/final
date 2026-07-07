@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, UTC
 
-from jose import jwt
+import jwt
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
