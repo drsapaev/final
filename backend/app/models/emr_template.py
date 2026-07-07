@@ -71,3 +71,12 @@ class EMRVersion(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
+
+
+# EMR-AUDIT-28 P1: EMRVersion consolidation.
+# Two EMRVersion models existed writing to different tables:
+# - emr_template.py:EMRVersion → table "emr_versions", column "version_data"
+# - emr_version.py:EMRVersion → table "emr_version_history", column "data"
+# The canonical model is emr_version.py:EMRVersion (has FK + is_current).
+# This alias ensures backward compatibility for code importing from emr_template.
+from app.models.emr_version import EMRVersion as EMRVersionCanonical

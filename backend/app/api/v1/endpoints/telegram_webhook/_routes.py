@@ -487,9 +487,9 @@ async def get_bot_info(
             return {"active": False, "message": "Бот не настроен"}
 
         # Получаем информацию о боте через API
-        import requests
+        import httpx
 
-        response = requests.get(
+        response = httpx.get(
             f"https://api.telegram.org/bot{bot_service.bot_token}/getMe", timeout=10
         )
 

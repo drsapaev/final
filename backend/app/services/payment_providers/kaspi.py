@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-import requests
+import httpx
 
 from .base import BasePaymentProvider, PaymentResult, PaymentStatus
 
@@ -125,7 +125,7 @@ class KaspiProvider(BasePaymentProvider):
                 "X-Signature": signature,
             }
 
-            response = requests.get(url, headers=headers, timeout=30)
+            response = httpx.get(url, headers=headers, timeout=30)
             response.raise_for_status()
 
             data = response.json()
@@ -258,7 +258,7 @@ class KaspiProvider(BasePaymentProvider):
                 "X-Signature": signature,
             }
 
-            response = requests.post(url, json=refund_data, headers=headers, timeout=30)
+            response = httpx.post(url, json=refund_data, headers=headers, timeout=30)
             response.raise_for_status()
 
             data = response.json()

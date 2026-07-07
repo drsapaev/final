@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
-import requests
+import httpx
 import serial
 from sqlalchemy.orm import Session
 
@@ -454,7 +454,7 @@ class HTTPDeviceDriver(BaseDeviceDriver):
             auth = params.get('auth', {})
 
             # Тестовый запрос для проверки подключения
-            response = requests.get(  # nosec B113 — timeout on next line via params.get
+            response = httpx.get(  # nosec B113 — timeout on next line via params.get
                 f"{base_url}/status",
                 auth=(auth.get('username'), auth.get('password')) if auth else None,
                 timeout=params.get('timeout', 5),
@@ -487,7 +487,7 @@ class HTTPDeviceDriver(BaseDeviceDriver):
             base_url = params.get('base_url')
             auth = params.get('auth', {})
 
-            response = requests.get(  # nosec B113 — timeout on next line via params.get
+            response = httpx.get(  # nosec B113 — timeout on next line via params.get
                 f"{base_url}/status",
                 auth=(auth.get('username'), auth.get('password')) if auth else None,
                 timeout=params.get('timeout', 5),
@@ -514,7 +514,7 @@ class HTTPDeviceDriver(BaseDeviceDriver):
 
             data = {'patient_id': patient_id} if patient_id else {}
 
-            response = requests.post(  # nosec B113 — timeout on next line via params.get
+            response = httpx.post(  # nosec B113 — timeout on next line via params.get
                 f"{base_url}/measure",
                 json=data,
                 auth=(auth.get('username'), auth.get('password')) if auth else None,
@@ -551,7 +551,7 @@ class HTTPDeviceDriver(BaseDeviceDriver):
 
             self.device_info.status = DeviceStatus.CALIBRATING
 
-            response = requests.post(  # nosec B113 — timeout on next line via params.get
+            response = httpx.post(  # nosec B113 — timeout on next line via params.get
                 f"{base_url}/calibrate",
                 auth=(auth.get('username'), auth.get('password')) if auth else None,
                 timeout=params.get('timeout', 60),

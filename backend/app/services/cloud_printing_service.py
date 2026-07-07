@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
-import requests
+import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -154,7 +154,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
         }
 
         try:
-            response = requests.post(url, data=data,
+            response = httpx.post(url, data=data,
                 timeout=30,)
             response.raise_for_status()
             token_data = response.json()
@@ -175,7 +175,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             headers = {"Authorization": f"Bearer {token}"}
 
             url = "https://graph.microsoft.com/v1.0/print/printers"
-            response = requests.get(url, headers=headers,
+            response = httpx.get(url, headers=headers,
                 timeout=30,)
             response.raise_for_status()
 
@@ -207,7 +207,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             headers = {"Authorization": f"Bearer {token}"}
 
             url = f"https://graph.microsoft.com/v1.0/print/printers/{printer_id}"
-            response = requests.get(url, headers=headers,
+            response = httpx.get(url, headers=headers,
                 timeout=30,)
             response.raise_for_status()
 
@@ -266,7 +266,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             url = (
                 f"https://graph.microsoft.com/v1.0/print/printers/{job.printer_id}/jobs"
             )
-            response = requests.post(url, headers=headers, json=job_data,
+            response = httpx.post(url, headers=headers, json=job_data,
                 timeout=30,)
             response.raise_for_status()
 
@@ -283,7 +283,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             headers = {"Authorization": f"Bearer {token}"}
 
             url = f"https://graph.microsoft.com/v1.0/print/jobs/{job_id}"
-            response = requests.get(url, headers=headers,
+            response = httpx.get(url, headers=headers,
                 timeout=30,)
             response.raise_for_status()
 
@@ -301,7 +301,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             headers = {"Authorization": f"Bearer {token}"}
 
             url = f"https://graph.microsoft.com/v1.0/print/jobs/{job_id}/cancel"
-            response = requests.post(url, headers=headers,
+            response = httpx.post(url, headers=headers,
                 timeout=30,)
             response.raise_for_status()
 

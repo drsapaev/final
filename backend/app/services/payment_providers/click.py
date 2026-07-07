@@ -7,7 +7,7 @@ import hashlib
 from decimal import Decimal
 from typing import Any
 
-import requests
+import httpx
 
 from .base import BasePaymentProvider, PaymentResult, PaymentStatus
 
@@ -110,7 +110,7 @@ class ClickProvider(BasePaymentProvider):
             sign_string = f"{params['service_id']}{params['merchant_id']}{params['transaction_param']}{self.secret_key}"
             params["sign"] = hashlib.md5(sign_string.encode(), usedforsecurity=False).hexdigest()
 
-            response = requests.post(url, json=params, timeout=30)
+            response = httpx.post(url, json=params, timeout=30)
             response.raise_for_status()
 
             data = response.json()
