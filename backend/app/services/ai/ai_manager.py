@@ -49,6 +49,36 @@ class AIManager:
             return patient_info
         return _pii_anonymizer.anonymize(patient_info or {})
 
+    # AI-REAUDIT-28 P1-14: server-side prompt injection detection.
+    # Frontend-only defense (PR #1951) is bypassable — user can call API
+    # directly. Ported key patterns from frontend/src/utils/aiValidator.js.
+    _PROMPT_INJECTION_PATTERNS = [
+        r"ignore\s+(all\s+)?previous\s+instructions",
+        r"forget\s+(everything|all|previous)",
+        r"you\s+are\s+(now|no\s+longer)\s+(a|an)?\s*(doctor|admin|system)",
+        r"system\s*:\s*",
+        r"<\|im_start\|>",
+        r"<\|system\|>",
+        r"\[system\]",
+        r"reveal\s+(your|the)\s+(system\s+)?prompt",
+        r"покажи\s+свой\s+(системный\s+)?промпт",
+        r"игнорируй\s+(все\s+)?предыдущие\s+инструкции",
+        r"забудь\s+(вс[её]|предыдущие)",
+        r"ты\s+теперь\s+(не\s+)?врач",
+    ]
+
+    @staticmethod
+    def _detect_prompt_injection(text: str) -> bool:
+        """Возвращает True если текст похож на prompt injection."""
+        if not text:
+            return False
+        import re as _re
+        lowered = text.lower()
+        for pattern in AIManager._PROMPT_INJECTION_PATTERNS:
+            if _re.search(pattern, lowered, _re.IGNORECASE):
+                return True
+        return False
+
     @staticmethod
     def _anonymize_text(text: str) -> str:
         """Strip PII patterns (phones, emails, IINs) from free text."""
@@ -150,13 +180,26 @@ class AIManager:
     async def generate(
         self, prompt: str, provider_type: AIProviderType | None = None, **kwargs
     ) -> AIResponse:
-        """Универсальная генерация текста"""
+        """Универсальная генерация текста.
+
+        AI-REAUDIT-28 P1-2: PII anonymization применена ко всем методам
+        (раньше только analyze_complaint и interpret_lab_results).
+        """
         provider = self.get_provider(provider_type)
         if not provider:
             return AIResponse(
                 content="", provider="none", error="No AI provider available"
             )
 
+        # AI-REAUDIT-28 P1-14: server-side prompt injection detection
+        if self._detect_prompt_injection(prompt):
+            logger.warning("Prompt injection detected in generate() — blocked")
+            return AIResponse(
+                content="", provider="none",
+                error="Potential prompt injection detected",
+            )
+        # PII anonymization
+        prompt = self._anonymize_text(prompt)
         request = AIRequest(prompt=prompt, **kwargs)
         return await provider.generate(request)
 
@@ -171,6 +214,10 @@ class AIManager:
         if not provider:
             return {"error": "No AI provider available"}
 
+        # AI-REAUDIT-28 P1-14: server-side prompt injection detection
+        if self._detect_prompt_injection(complaint):
+            logger.warning("Prompt injection detected in analyze_complaint() — blocked")
+            return {"error": "Potential prompt injection detected"}
         # Anonymize PII before sending to external AI provider
         complaint = self._anonymize_text(complaint)
         patient_info = self._anonymize_patient_info(patient_info)
@@ -182,11 +229,18 @@ class AIManager:
         diagnosis: str | None = None,
         provider_type: AIProviderType | None = None,
     ) -> list[dict[str, str]]:
-        """Подсказки кодов МКБ-10"""
+        """Подсказки кодов МКБ-10.
+
+        AI-REAUDIT-28 P1-2: PII anonymization для symptoms и diagnosis.
+        """
         provider = self.get_provider(provider_type)
         if not provider:
             return []
 
+        # PII anonymization
+        symptoms = [self._anonymize_text(s) for s in symptoms]
+        if diagnosis:
+            diagnosis = self._anonymize_text(diagnosis)
         return await provider.suggest_icd10(symptoms, diagnosis)
 
     async def interpret_lab_results(
@@ -222,6 +276,8 @@ class AIManager:
         if not provider:
             return {"error": "No AI provider available for image analysis"}
 
+        # AI-REAUDIT-28 P1-2: PII anonymization for metadata
+        metadata = self._anonymize_patient_info(metadata)
         return await provider.analyze_skin(image_data, metadata)
 
     async def interpret_ecg(
@@ -230,11 +286,16 @@ class AIManager:
         patient_info: dict | None = None,
         provider_type: AIProviderType | None = None,
     ) -> dict[str, Any]:
-        """Интерпретация ЭКГ"""
+        """Интерпретация ЭКГ.
+
+        AI-REAUDIT-28 P1-2: PII anonymization for patient_info.
+        """
         provider = self.get_provider(provider_type)
         if not provider:
             return {"error": "No AI provider available"}
 
+        # PII anonymization
+        patient_info = self._anonymize_patient_info(patient_info)
         return await provider.interpret_ecg(ecg_data, patient_info)
 
     async def analyze_medical_trends(
@@ -244,13 +305,18 @@ class AIManager:
         analysis_type: str,
         provider: AIProviderType | None = None,
     ) -> dict[str, Any]:
-        """Анализ медицинских трендов и паттернов в данных"""
+        """Анализ медицинских трендов и паттернов в данных.
+
+        AI-REAUDIT-28 P1-2: PII anonymization for medical_data dicts.
+        """
         provider_instance = self.get_provider(provider)
         if not provider_instance:
             raise ValueError("Нет доступного AI провайдера")
 
+        # PII anonymization for each record in medical_data
+        anonymized_data = [self._anonymize_patient_info(d) for d in medical_data]
         return await provider_instance.analyze_medical_trends(
-            medical_data=medical_data,
+            medical_data=anonymized_data,
             time_period=time_period,
             analysis_type=analysis_type,
         )
