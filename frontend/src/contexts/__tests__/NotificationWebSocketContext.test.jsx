@@ -149,8 +149,9 @@ describe('NotificationWebSocketContext', () => {
     });
 
     expect(MockWebSocket.instances).toHaveLength(1);
+    // P1-6: token now sent via subprotocol, not URL query param
     expect(MockWebSocket.instances[0].url).toBe(
-      'ws://localhost:18000/api/v1/ws/notifications/connect?token=token-1',
+      'ws://localhost:18000/api/v1/ws/notifications/connect',
     );
   });
 
