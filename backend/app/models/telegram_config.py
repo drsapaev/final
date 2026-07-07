@@ -38,7 +38,7 @@ class TelegramConfig(Base):
     __tablename__ = "telegram_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    bot_token: Mapped[str | None] = mapped_column(String(200), nullable=True)  # Токен бота
+    bot_token: Mapped[str | None] = mapped_column(String(500), nullable=True)  # TG-AUDIT-28 P1: encrypted (Fernet)
     webhook_url: Mapped[str | None] = mapped_column(String(300), nullable=True)  # URL вебхука
     webhook_secret: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Секрет для верификации
 
@@ -68,6 +68,39 @@ class TelegramConfig(Base):
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+
+
+    @property
+    def decrypted_bot_token(self) -> str | None:
+        """TG-AUDIT-28 P1: decrypt bot_token on read."""
+        if not self.bot_token:
+            return None
+        from app.core.config import settings
+        if not settings.ENCRYPTION_KEY:
+            return self.bot_token  # plaintext fallback (dev/test)
+        try:
+            if self.bot_token.startswith("gAAAAA"):
+                from cryptography.fernet import Fernet
+                cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+                return cipher.decrypt(self.bot_token.encode()).decode()
+            return self.bot_token  # not encrypted yet (migration period)
+        except Exception:
+            return self.bot_token
+
+    def set_bot_token(self, value: str | None) -> None:
+        """TG-AUDIT-28 P1: encrypt bot_token on write."""
+        if not value:
+            self.bot_token = None
+            return
+        from app.core.config import settings
+        if not settings.ENCRYPTION_KEY:
+            self.bot_token = value  # plaintext fallback (dev/test)
+            return
+        from cryptography.fernet import Fernet
+        cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+        self.bot_token = cipher.encrypt(value.encode()).decode()
 
 
 class TelegramTemplate(Base):
