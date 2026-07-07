@@ -164,12 +164,9 @@ api_router = APIRouter()
 # Auth (/login, /me и т.д.)
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
-if settings.ENABLE_FALLBACK_AUTH:
-    logger.warning(
-        "ENABLE_FALLBACK_AUTH is enabled; legacy simple/minimal auth endpoints are mounted."
-    )
-else:
-    logger.info("Legacy simple/minimal auth endpoints are disabled by configuration.")
+# Legacy simple/minimal auth routers were deleted in PR #1942; the
+# ENABLE_FALLBACK_AUTH flag now only gates the legacy /auth/login and
+# /auth/json-login endpoints inside auth.py itself.
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")

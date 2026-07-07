@@ -636,40 +636,9 @@ async def get_current_session(
         )
 
 
-@router.get("/sessions", include_in_schema=False)
-async def get_active_user_sessions(
-    active_only: bool = Query(True, description="Только активные сессии"),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Получить все сессии пользователя"""
-    try:
-        auth_service = get_authentication_service()
-        sessions = auth_service.get_user_sessions(db, current_user.id, active_only)
-
-        sessions_info = []
-        for session in sessions:
-            session_info = auth_service.get_session_info(db, session.id)
-            if session_info:
-                sessions_info.append(session_info)
-
-        return {
-            "success": True,
-            "message": f"Найдено {len(sessions_info)} сессий",
-            "sessions": sessions_info,
-            "total": len(sessions_info),
-        }
-
-    except Exception as e:
-        logger.error(
-            "Authentication endpoint failed action=%s error_type=%s",
-            "get active user sessions",
-            type(e).__name__,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка получения сессий пользователя",
-        )
+# AUTH-REAUDIT-28: удалён дублирующий GET /sessions (include_in_schema=False),
+# который shadowed канонический GET /sessions выше (paginated). FastAPI
+# регистрирует маршруты в порядке объявления, и второй shadowed первый.
 
 
 @router.post("/sessions/{session_id}/revoke")
