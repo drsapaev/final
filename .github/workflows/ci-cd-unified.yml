@@ -1,3 +1,11 @@
+# CI-CD-AUDIT: Pipeline is well-configured.
+# Recommendations for future improvement:
+# 1. Add pip dependency caching (actions/setup-python cache: 'pip') for faster CI
+# 2. Add test coverage reporting (codecov/codecov-action)
+# 3. Add npm dependency caching (actions/setup-node cache: 'npm')
+# 4. WS_DEV_ALLOW=1 and CORS_DISABLE=1 are acceptable for CI environment
+# 5. Consider adding Trivy container security scanning for Docker images
+
 name: 🏥 CI/CD Pipeline - Клиника (Unified)
 
 on:
