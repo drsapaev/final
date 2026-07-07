@@ -224,7 +224,11 @@ class FileSystemService:
                 shutil.copyfileobj(source, target, length=1024 * 1024)
 
     def _generate_file_path(self, filename: str, file_hash: str) -> str:
-        """Генерировать путь для сохранения файла"""
+        """Генерировать путь для сохранения файла.
+
+        FILES-AUDIT-28 P0-1: sanitize filename to prevent path traversal.
+        Раньше `../../etc/passwd` в filename мог выйти за пределы storage dir.
+        """
         # Используем первые 2 символа хеша для создания поддиректории
         hash_prefix = file_hash[:2]
         current_date = datetime.now()
@@ -232,7 +236,13 @@ class FileSystemService:
 
         # Создаем уникальное имя файла
         name, ext = os.path.splitext(filename)
-        unique_filename = f"{file_hash[:8]}_{name}{ext}"
+        # Sanitize: remove path separators, dots-only names, null bytes
+        safe_name = os.path.basename(name)  # strips directory components
+        safe_name = safe_name.replace("..", "").replace("/", "").replace("\\", "").replace("\x00", "")
+        if not safe_name or safe_name.startswith("."):
+            safe_name = "file"
+        safe_ext = os.path.splitext(ext)[1]  # just the extension
+        unique_filename = f"{file_hash[:8]}_{safe_name}{safe_ext}"
 
         return os.path.join(
             self.base_storage_path, year_month, hash_prefix, unique_filename
