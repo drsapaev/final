@@ -82,6 +82,10 @@ class LabReportingService:
         self._catalog_analyte_cache: dict[str, LabCatalogAnalyte | None] = {}
         self._catalog_reference_cache: dict[str, list[LabCatalogReferenceRange]] = {}
 
+    # ============================================================
+    # === ORDER LISTING ===
+    # ============================================================
+
     def list_orders(
         self,
         *,
@@ -103,6 +107,10 @@ class LabReportingService:
             limit=limit,
             offset=offset,
         )
+
+    # ============================================================
+    # === TEMPLATE MANAGEMENT ===
+    # ============================================================
 
     def list_templates(self) -> list[LabReportTemplate]:
         logger.info("[LAB] list_templates")
@@ -230,6 +238,10 @@ class LabReportingService:
             "default_template": default_template,
             "allowed_templates": allowed_templates,
         }
+
+    # ============================================================
+    # === CATALOG MANAGEMENT ===
+    # ============================================================
 
     def list_catalog_units(self) -> list[LabCatalogUnit]:
         logger.info("[LAB] list_catalog_units")
@@ -452,6 +464,10 @@ class LabReportingService:
             raise LabReportingDomainError(404, "Lab report instance not found")
         return instance
 
+    # ============================================================
+    # === INSTANCE MANAGEMENT ===
+    # ============================================================
+
     def create_instance(
         self,
         payload: dict[str, Any],
@@ -614,6 +630,10 @@ class LabReportingService:
         self.repository.commit()
         return self.get_instance(instance.id)
 
+    # ============================================================
+    # === FINALIZE & NOTIFY ===
+    # ============================================================
+
     def finalize(self, instance_id: int) -> LabReportInstance:
         logger.info("[LAB] finalize instance_id=%s", instance_id)
         instance = self.get_instance(instance_id)
@@ -703,6 +723,10 @@ class LabReportingService:
             )
 
         return self.get_instance(instance.id)
+
+    # ============================================================
+    # === LEGACY SYNC ===
+    # ============================================================
 
     def _sync_legacy_lab_results(
         self,
@@ -819,6 +843,10 @@ class LabReportingService:
             instance.id,
             instance.order_id,
         )
+
+    # ============================================================
+    # === REVISION & ANALYTICS ===
+    # ============================================================
 
     def revise(self, instance_id: int) -> LabReportInstance:
         logger.info("[LAB] revise instance_id=%s", instance_id)
