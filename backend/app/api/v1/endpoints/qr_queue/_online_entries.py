@@ -929,23 +929,53 @@ def _full_update_handle_all_free_visit(
 
 
 
-def _full_update_collect_existing_services(
-    db: Session,
-    entry,
-    request,
-):
-    """Section 4.1+4.2: Compute aggregated_ids and collect existing service_ids + queue_times.
+def _full_update_parse_entry_services(services_json):
+    """Parse services JSON from an OnlineQueueEntry, handling double-encoding.
 
-    Returns (existing_service_ids, existing_service_queue_times, final_aggregated_ids).
+    Returns a list of service dicts, or empty list on error.
     """
     import json
+
+    if not services_json:
+        return []
+    try:
+        parsed = json.loads(services_json) if isinstance(services_json, str) else services_json
+        # Handle double-encoding
+        if isinstance(parsed, str):
+            parsed = json.loads(parsed)
+            logger.warning(
+                "[full_update_online_entry] ⚠️ Обнаружено двойное кодирование JSON в entry.services"
+            )
+        if isinstance(parsed, list):
+            return parsed
+        else:
+            logger.warning(
+                "[full_update_online_entry] ⚠️ entry.services не является списком: %s",
+                type(parsed).__name__,
+            )
+            return []
+    except Exception as parse_err:
+        logger.warning(
+            "[full_update_online_entry] Ошибка парсинга services: %s",
+            parse_err,
+        )
+        return []
+
+
+
+def _full_update_compute_aggregated_ids(
+    db: Session,
+    entry,
+):
+    """Section 4.1: Compute aggregated_ids by visit_id or session boundary.
+
+    - If entry.visit_id: aggregate all entries in the same visit (same-patient guard).
+    - Else: aggregate by patient_id or phone, bounded by session_id or queue_id.
+    Returns computed_aggregated_ids list.
+    """
     from datetime import date
 
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
-
-    existing_service_ids = set()
-    # ⭐ FIX PHASE 2: Сохраняем оригинальные queue_times для существующих услуг
-    existing_service_queue_times = {}
 
     # ⭐ FIX 3: Backend САМ вычисляет aggregated_ids по patient_id + дате или phone + дате
     # Frontend aggregated_ids используем только как fallback
@@ -1030,34 +1060,55 @@ def _full_update_collect_existing_services(
                 boundary_label,
             )
 
-    def _same_fallback_aggregation_scope(
-        candidate: OnlineQueueEntry,
-    ) -> bool:
-        if candidate.id == entry.id:
-            return True
+    return computed_aggregated_ids
 
-        if entry.visit_id:
-            if candidate.visit_id != entry.visit_id:
-                return False
-            if entry.patient_id is None:
-                return False
-            return candidate.patient_id == entry.patient_id
 
-        if candidate.visit_id is not None:
+def _full_update_same_fallback_aggregation_scope(
+    candidate,
+    entry,
+) -> bool:
+    """Check if a candidate entry is in the same aggregation scope as entry."""
+    if candidate.id == entry.id:
+        return True
+
+    if entry.visit_id:
+        if candidate.visit_id != entry.visit_id:
             return False
+        if entry.patient_id is None:
+            return False
+        return candidate.patient_id == entry.patient_id
 
-        if entry.patient_id is not None:
-            return candidate.patient_id == entry.patient_id
-
-        if entry.phone:
-            same_boundary = (
-                candidate.session_id == entry.session_id
-                if entry.session_id
-                else candidate.queue_id == entry.queue_id
-            )
-            return same_boundary and _queue_phone_matches(candidate.phone, entry.phone)
-
+    if candidate.visit_id is not None:
         return False
+
+    if entry.patient_id is not None:
+        return candidate.patient_id == entry.patient_id
+
+    if entry.phone:
+        same_boundary = (
+            candidate.session_id == entry.session_id
+            if entry.session_id
+            else candidate.queue_id == entry.queue_id
+        )
+        return same_boundary and _queue_phone_matches(candidate.phone, entry.phone)
+
+    return False
+
+
+
+def _full_update_resolve_final_aggregated_ids(
+    db: Session,
+    entry,
+    request,
+    computed_aggregated_ids: list,
+):
+    """Section 4.2: Resolve final_aggregated_ids.
+
+    Uses computed_aggregated_ids if available, otherwise falls back to
+    frontend request.aggregated_ids (filtered by same-scope check).
+    Returns final_aggregated_ids list.
+    """
+    from app.models.online_queue import OnlineQueueEntry
 
     # Используем computed_aggregated_ids; frontend aggregated_ids are only
     # an advisory fallback and must not cross queue-entry identity scopes.
@@ -1079,7 +1130,7 @@ def _full_update_collect_existing_services(
         safe_fallback_ids = [
             candidate.id
             for candidate in fallback_entries
-            if _same_fallback_aggregation_scope(candidate)
+            if _full_update_same_fallback_aggregation_scope(candidate, entry)
         ]
         if entry.id not in safe_fallback_ids:
             safe_fallback_ids.append(entry.id)
@@ -1101,16 +1152,38 @@ def _full_update_collect_existing_services(
     else:
         final_aggregated_ids = []
 
-    # ⭐ DEBUG: Логируем начальное состояние
-    logger.info(
-        "[full_update_online_entry] ⭐ DEBUG: entry.patient_id=%s, final_aggregated_ids=%s, entry.services=%s",
-        entry.patient_id,
-        final_aggregated_ids,
-        entry.services[:200] if entry.services else None,
-    )
+    return final_aggregated_ids
 
-    # ⭐ FIX: Используем final_aggregated_ids для получения всех записей пациента
-    if final_aggregated_ids and len(final_aggregated_ids) > 0:
+
+def _full_update_scan_existing_services(
+    db: Session,
+    entry,
+    final_aggregated_ids: list,
+):
+    """Section 4.3: Scan entries for existing service_ids + queue_times.
+
+    3 sub-branches:
+    1. If final_aggregated_ids: scan those entries.
+    2. Elif entry.patient_id: scan patient entries in same session.
+    3. Else: scan entry.services only.
+
+    Returns (existing_service_ids, existing_service_queue_times).
+    """
+    from app.models.online_queue import OnlineQueueEntry
+
+    existing_service_ids = set()
+    existing_service_queue_times = {}
+
+    def _extract_services(svc_list):
+        for svc in svc_list:
+            svc_id = svc.get("service_id")
+            if svc_id:
+                existing_service_ids.add(svc_id)
+                if svc.get("queue_time") and svc_id not in existing_service_queue_times:
+                    existing_service_queue_times[svc_id] = svc.get("queue_time")
+
+    # Branch 1: scan aggregated entries
+    if final_aggregated_ids:
         logger.info(
             "[full_update_online_entry] ⭐ FIX: Используем aggregated_ids для поиска существующих услуг: %s",
             final_aggregated_ids,
@@ -1120,127 +1193,61 @@ def _full_update_collect_existing_services(
             .filter(OnlineQueueEntry.id.in_(final_aggregated_ids))
             .all()
         )
-
         for agg_entry in all_entries:
-            if agg_entry.services:
-                try:
-                    agg_services = json.loads(agg_entry.services)
-                    # ⭐ FIX: Обрабатываем двойное кодирование JSON
-                    if isinstance(agg_services, str):
-                        agg_services = json.loads(agg_services)
-
-                    if isinstance(agg_services, list):
-                        for svc in agg_services:
-                            svc_id = svc.get('service_id')
-                            if svc_id:
-                                existing_service_ids.add(svc_id)
-                                # ⭐ FIX: Сохраняем оригинальное queue_time
-                                if svc.get('queue_time') and svc_id not in existing_service_queue_times:
-                                    existing_service_queue_times[svc_id] = svc.get('queue_time')
-                except Exception as e:
-                    logger.warning(
-                        "[full_update_online_entry] Ошибка парсинга services для entry %d: %s",
-                        agg_entry.id, e,
-                    )
-
+            svc_list = _full_update_parse_entry_services(agg_entry.services)
+            _extract_services(svc_list)
         logger.info(
             "[full_update_online_entry] ⭐ FIX: Найдено %d существующих услуг из aggregated_ids: %s",
             len(existing_service_ids),
             list(existing_service_ids),
         )
 
-    # Используем queue из FIX 3 блока выше (queue_day уже вычислен)
-
-    # ⭐ FIX: Если aggregated_ids не предоставлен или пустой, используем старую логику
-    # Но ТОЛЬКО если мы ещё не нашли услуги через aggregated_ids
-    if len(existing_service_ids) == 0:
-        if entry.patient_id:
-            # Limit fallback service detection to the same service session.
-            all_patient_entry_filters = [
-                OnlineQueueEntry.patient_id == entry.patient_id,
-            ]
-            if entry.visit_id:
-                all_patient_entry_filters.append(
-                    OnlineQueueEntry.visit_id == entry.visit_id
-                )
-            elif entry.session_id:
-                all_patient_entry_filters.extend(
-                    [
-                        OnlineQueueEntry.visit_id.is_(None),
-                        OnlineQueueEntry.session_id == entry.session_id,
-                    ]
-                )
-            else:
-                all_patient_entry_filters.extend(
-                    [
-                        OnlineQueueEntry.visit_id.is_(None),
-                        OnlineQueueEntry.queue_id == entry.queue_id,
-                    ]
-                )
-
-            all_patient_entries = (
-                db.query(OnlineQueueEntry)
-                .filter(*all_patient_entry_filters)
-                .all()
+    # Branch 2: scan patient entries in same session
+    if len(existing_service_ids) == 0 and entry.patient_id:
+        all_patient_entry_filters = [
+            OnlineQueueEntry.patient_id == entry.patient_id,
+        ]
+        if entry.visit_id:
+            all_patient_entry_filters.append(
+                OnlineQueueEntry.visit_id == entry.visit_id
             )
-
-            logger.info(
-                "[full_update_online_entry] ⭐ FIX: Найдено %d записей пациента в текущей сессии",
-                len(all_patient_entries),
-            )
-
-            for patient_entry in all_patient_entries:
-                if patient_entry.services:
-                    try:
-                        entry_services = json.loads(patient_entry.services)
-                        for svc in entry_services:
-                            svc_id = svc.get('service_id')
-                            if svc_id:
-                                existing_service_ids.add(svc_id)
-                                # ⭐ FIX: Сохраняем оригинальное queue_time
-                                if svc.get('queue_time') and svc_id not in existing_service_queue_times:
-                                    existing_service_queue_times[svc_id] = svc.get('queue_time')
-                    except Exception:
-                        pass
+        elif entry.session_id:
+            all_patient_entry_filters.extend([
+                OnlineQueueEntry.visit_id.is_(None),
+                OnlineQueueEntry.session_id == entry.session_id,
+            ])
         else:
-            # Fallback: только текущая entry (как было раньше)
-            logger.info(
-                "[full_update_online_entry] ⭐ DEBUG: Fallback - patient_id is None or no queue, using entry.services only"
-            )
-            if entry.services:
-                try:
-                    # ⭐ FIX: Обрабатываем двойное кодирование JSON
-                    existing_services = json.loads(entry.services)
-                    # Если результат — строка, значит данные двойно закодированы
-                    if isinstance(existing_services, str):
-                        existing_services = json.loads(existing_services)
-                        logger.warning(
-                            "[full_update_online_entry] ⚠️ Обнаружено двойное кодирование JSON в entry.services"
-                        )
+            all_patient_entry_filters.extend([
+                OnlineQueueEntry.visit_id.is_(None),
+                OnlineQueueEntry.queue_id == entry.queue_id,
+            ])
 
-                    if isinstance(existing_services, list):
-                        logger.info(
-                            "[full_update_online_entry] ⭐ DEBUG: Найдено %d услуг в entry.services: %s",
-                            len(existing_services),
-                            [s.get('service_id') for s in existing_services],
-                        )
-                        for svc in existing_services:
-                            svc_id = svc.get('service_id')
-                            if svc_id:
-                                existing_service_ids.add(svc_id)
-                                # ⭐ FIX: Сохраняем оригинальное queue_time
-                                if svc.get('queue_time') and svc_id not in existing_service_queue_times:
-                                    existing_service_queue_times[svc_id] = svc.get('queue_time')
-                    else:
-                        logger.warning(
-                            "[full_update_online_entry] ⚠️ entry.services не является списком: %s",
-                            type(existing_services).__name__
-                        )
-                except Exception as parse_err:
-                    logger.error(
-                        "[full_update_online_entry] ⭐ DEBUG: Ошибка парсинга entry.services: %s",
-                        parse_err,
-                    )
+        all_patient_entries = (
+            db.query(OnlineQueueEntry)
+            .filter(*all_patient_entry_filters)
+            .all()
+        )
+        logger.info(
+            "[full_update_online_entry] ⭐ FIX: Найдено %d записей пациента в текущей сессии",
+            len(all_patient_entries),
+        )
+        for patient_entry in all_patient_entries:
+            svc_list = _full_update_parse_entry_services(patient_entry.services)
+            _extract_services(svc_list)
+
+    # Branch 3: fallback to entry.services only
+    if len(existing_service_ids) == 0 and not entry.patient_id:
+        logger.info(
+            "[full_update_online_entry] ⭐ DEBUG: Fallback - patient_id is None, using entry.services only"
+        )
+        svc_list = _full_update_parse_entry_services(entry.services)
+        if svc_list:
+            logger.info(
+                "[full_update_online_entry] ⭐ DEBUG: Найдено %d услуг в entry.services: %s",
+                len(svc_list),
+                [s.get("service_id") for s in svc_list],
+            )
+            _extract_services(svc_list)
 
     logger.info(
         "[full_update_online_entry] Существующие услуги: %s, сохранённые queue_times: %s",
@@ -1248,7 +1255,49 @@ def _full_update_collect_existing_services(
         list(existing_service_queue_times.keys()),
     )
 
+    return existing_service_ids, existing_service_queue_times
+
+
+def _full_update_collect_existing_services(
+    db: Session,
+    entry,
+    request,
+):
+    """Section 4.1+4.2: Compute aggregated_ids and collect existing service_ids + queue_times.
+
+    Returns (existing_service_ids, existing_service_queue_times, final_aggregated_ids).
+    """
+    # Section 4.1: Compute aggregated_ids
+    computed_aggregated_ids = _full_update_compute_aggregated_ids(
+        db=db, entry=entry,
+    )
+
+    # Section 4.2: Resolve final_aggregated_ids
+    final_aggregated_ids = _full_update_resolve_final_aggregated_ids(
+        db=db,
+        entry=entry,
+        request=request,
+        computed_aggregated_ids=computed_aggregated_ids,
+    )
+
+    logger.info(
+        "[full_update_online_entry] ⭐ DEBUG: entry.patient_id=%s, final_aggregated_ids=%s, entry.services=%s",
+        entry.patient_id,
+        final_aggregated_ids,
+        entry.services[:200] if entry.services else None,
+    )
+
+    # Section 4.3: Scan entries for existing services
+    existing_service_ids, existing_service_queue_times = (
+        _full_update_scan_existing_services(
+            db=db,
+            entry=entry,
+            final_aggregated_ids=final_aggregated_ids,
+        )
+    )
+
     return existing_service_ids, existing_service_queue_times, final_aggregated_ids
+
 
 
 
