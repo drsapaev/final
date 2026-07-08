@@ -3,7 +3,7 @@ Lab Results Auto-Notification Service
 Сервис автоматических уведомлений о готовности анализов
 """
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import or_

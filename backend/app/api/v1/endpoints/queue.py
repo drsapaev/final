@@ -11,12 +11,12 @@ API endpoints для системы очередей
 
 import logging
 from datetime import date, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from typing import Any
 # from app.models.patient import Patient  # Временно отключено
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db

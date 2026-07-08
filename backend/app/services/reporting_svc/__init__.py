@@ -1,5 +1,6 @@
 """reporting_svc — split from reporting_service.py."""
 from __future__ import annotations
+
 from app.services.reporting_svc._base import *  # noqa: F401, F403
 from app.services.reporting_svc._base import ReportingServiceMixinBase
 from app.services.reporting_svc._core import CoreMixin

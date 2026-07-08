@@ -13,8 +13,14 @@ P0-2 FIX (ENDPOINT-VALIDATION-AUDIT):
      because `from ... import *` does not pick up underscore names, but
      `telegram_webhook/_helpers.py` imports them from this package path.
 """
+# Import endpoint modules to register routes on the shared router.
+from app.api.v1.endpoints.admin_telegram import (
+    _ai_approval,  # noqa: F401
+    _management,  # noqa: F401
+    _settings,  # noqa: F401
+    _staff_actions,  # noqa: F401
+)
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa: F401, F403
-from app.api.v1.endpoints.admin_telegram._helpers import router
 
 # Re-export underscore-prefixed symbols that other modules (notably
 # telegram_webhook/_helpers.py) import from this package path.
@@ -31,6 +37,7 @@ from app.api.v1.endpoints.admin_telegram._helpers import (  # noqa: F401
     _build_staff_bot_status,
     _normalize_staff_role,
     _staff_runtime_reference_hash,
+    router,
     validate_staff_link_start_token,
 )
 from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
@@ -38,12 +45,6 @@ from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
     _get_staff_bot_token_runtime_status,
     confirm_staff_action,
 )
-
-# Import endpoint modules to register routes on the shared router.
-from app.api.v1.endpoints.admin_telegram import _ai_approval  # noqa: F401
-from app.api.v1.endpoints.admin_telegram import _management  # noqa: F401
-from app.api.v1.endpoints.admin_telegram import _settings  # noqa: F401
-from app.api.v1.endpoints.admin_telegram import _staff_actions  # noqa: F401
 
 __all__ = [
     "router",

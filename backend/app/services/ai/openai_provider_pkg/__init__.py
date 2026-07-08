@@ -6,23 +6,23 @@ from __future__ import annotations
 
 from openai import AsyncOpenAI
 
-from app.services.ai.openai_provider_pkg._base import (
-    OpenAIProviderMixinBase,
-    _PROVIDER_TIMEOUT,
-    AIRequest,
-    AIResponse,
-    BaseAIProvider,
-    logger,
-)
-from app.services.ai.openai_provider_pkg._core import CoreMixin
-from app.services.ai.openai_provider_pkg._clinical import ClinicalMixin
-from app.services.ai.openai_provider_pkg._imaging import ImagingMixin
-from app.services.ai.openai_provider_pkg._treatment import TreatmentMixin
-from app.services.ai.openai_provider_pkg._risk import RiskMixin
-from app.services.ai.openai_provider_pkg._text import TextMixin
-from app.services.ai.openai_provider_pkg._scheduling import SchedulingMixin
-from app.services.ai.openai_provider_pkg._documentation import DocumentationMixin
 from app.services.ai.openai_provider_pkg._analytics import AnalyticsMixin
+from app.services.ai.openai_provider_pkg._base import (
+    _PROVIDER_TIMEOUT,
+        AIRequest,  # noqa: F401,
+        AIResponse,  # noqa: F401,
+    BaseAIProvider,
+        OpenAIProviderMixinBase,  # noqa: F401,
+        logger,  # noqa: F401,
+)
+from app.services.ai.openai_provider_pkg._clinical import ClinicalMixin
+from app.services.ai.openai_provider_pkg._core import CoreMixin
+from app.services.ai.openai_provider_pkg._documentation import DocumentationMixin
+from app.services.ai.openai_provider_pkg._imaging import ImagingMixin
+from app.services.ai.openai_provider_pkg._risk import RiskMixin
+from app.services.ai.openai_provider_pkg._scheduling import SchedulingMixin
+from app.services.ai.openai_provider_pkg._text import TextMixin
+from app.services.ai.openai_provider_pkg._treatment import TreatmentMixin
 
 __all__ = ["OpenAIProvider"]
 

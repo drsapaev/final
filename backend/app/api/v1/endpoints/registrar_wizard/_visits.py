@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
+from app.api.v1.endpoints.registrar_wizard._cart import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._settings import VisitResponse  # noqa
-from app.api.v1.endpoints.registrar_wizard._cart import *  # noqa
 
-from typing import Any
+
 @router.get("/registrar/visits", response_model=list[VisitResponse])
 def get_visits(
     db: Session = Depends(get_db),
@@ -200,7 +202,7 @@ def get_visits(
 
         return total_results
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -596,7 +598,7 @@ def get_all_appointments(
             "has_more": offset + limit < len(result),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -1341,7 +1343,7 @@ def complete_visit(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -1373,7 +1375,7 @@ def start_visit(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -1566,7 +1568,7 @@ def confirm_visit_by_registrar(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

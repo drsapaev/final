@@ -62,7 +62,7 @@ def create_branch(
     """Создать филиал"""
     try:
         return branch_management.create_branch(db=db, branch_data=branch_data)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Internal server error",
@@ -170,7 +170,7 @@ def create_equipment(
         return equipment_management.create_equipment(
             db=db, equipment_data=equipment_data
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Internal server error",
@@ -284,7 +284,7 @@ def schedule_maintenance(
         return equipment_management.schedule_maintenance(
             db=db, equipment_id=equipment_id, maintenance_data=maintenance_data
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Internal server error",
@@ -324,7 +324,7 @@ def create_license(
     """Создать лицензию"""
     try:
         return license_management.create_license(db=db, license_data=license_data)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Internal server error",
@@ -444,7 +444,7 @@ def activate_license(
         return license_management.activate_license(
             db=db, license_id=license_id, activation_data=activation_data
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Internal server error",
@@ -481,7 +481,7 @@ def create_backup(
     """Создать задачу резервного копирования"""
     try:
         return backup_management.create_backup_task(db=db, backup_data=backup_data)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Internal server error",

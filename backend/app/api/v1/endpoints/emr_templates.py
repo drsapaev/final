@@ -3,9 +3,10 @@ API endpoints для шаблонов EMR
 """
 
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Any
 
 from app.api.deps import get_current_user
 from app.crud.emr_template import emr_template, emr_version
@@ -39,7 +40,7 @@ async def get_emr_templates(
             templates = emr_template.get_multi(db)
 
         return templates
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -57,7 +58,7 @@ async def get_user_templates(
             db, user_id=current_user.id, specialty=specialty
         )
         return templates
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail="Internal server error",
@@ -75,7 +76,7 @@ async def create_emr_template(
         template_data.created_by = current_user.id
         template = emr_template.create(db, obj_in=template_data)
         return template
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -93,7 +94,7 @@ async def create_template_from_structure(
             db, structure=structure.dict(), created_by=current_user.id
         )
         return template
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -113,7 +114,7 @@ async def get_emr_template(
         return template
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -142,7 +143,7 @@ async def update_emr_template(
         return updated_template
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -161,9 +162,9 @@ async def clone_emr_template(
             db, template_id=template_id, new_name=new_name, created_by=current_user.id
         )
         return cloned_template
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=404, detail="Internal server error")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -189,7 +190,7 @@ async def delete_emr_template(
         return {"message": "Шаблон успешно удален"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -225,7 +226,7 @@ async def load_default_templates(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -242,7 +243,7 @@ async def get_emr_versions(
     try:
         versions = emr_version.get_by_emr(db, emr_id=emr_id, limit=limit)
         return versions
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -266,7 +267,7 @@ async def restore_emr_version(
         return {"message": "Версия успешно восстановлена", "version": restored_version}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )

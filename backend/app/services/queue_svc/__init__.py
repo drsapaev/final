@@ -7,8 +7,8 @@ from __future__ import annotations
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase
 from app.services.queue_svc._core import CoreMixin
-from app.services.queue_svc._operations import OperationsMixin
 from app.services.queue_svc._helpers import HelpersMixin
+from app.services.queue_svc._operations import OperationsMixin
 
 __all__ = ["QueueBusinessService"]
 

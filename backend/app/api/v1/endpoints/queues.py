@@ -1,5 +1,6 @@
 # --- BEGIN app/api/v1/endpoints/queues.py ---
 from dataclasses import asdict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -7,7 +8,6 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.services.online_queue import DayStats, issue_next_ticket, load_stats
 
-from typing import Any
 router = APIRouter(tags=["queues"])
 
 

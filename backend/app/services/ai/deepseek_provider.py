@@ -2,13 +2,11 @@
 DeepSeek провайдер для AI функций - полная реализация
 """
 
-import io
 import json
 import logging
 from typing import Any
 
 import httpx
-from PIL import Image
 
 from ...core.config import settings
 from .base_provider import AIRequest, AIResponse, BaseAIProvider

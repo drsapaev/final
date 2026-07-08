@@ -2,7 +2,7 @@
 API endpoints for Role management
 """
 import logging
-from typing import NoReturn, Any
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session

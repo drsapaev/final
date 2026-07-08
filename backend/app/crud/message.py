@@ -2,7 +2,7 @@
 CRUD операции для сообщений
 """
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session

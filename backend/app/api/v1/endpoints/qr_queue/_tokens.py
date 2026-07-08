@@ -1,8 +1,10 @@
 """Split from qr_queue.py.
 """
 from __future__ import annotations
+
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import router
+
 
 @router.post("/admin/qr-tokens/generate", response_model=QRTokenResponse)
 def generate_qr_token(
@@ -65,7 +67,7 @@ def generate_qr_token(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -124,7 +126,7 @@ def generate_clinic_qr_token(
             "active": True,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

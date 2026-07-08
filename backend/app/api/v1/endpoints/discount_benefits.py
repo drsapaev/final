@@ -170,7 +170,7 @@ async def create_discount(
             "message": "Скидка создана успешно",
             "discount_id": discount.id,
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -274,7 +274,7 @@ async def apply_discount(
                 "final_amount": application.final_amount,
             },
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -298,7 +298,7 @@ async def create_benefit(
             "message": "Льгота создана успешно",
             "benefit_id": benefit.id,
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -356,7 +356,7 @@ async def assign_benefit_to_patient(
             "message": "Льгота назначена пациенту",
             "patient_benefit_id": patient_benefit.id,
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -377,7 +377,7 @@ async def verify_patient_benefit(
         )
 
         return {"success": True, "message": "Льгота верифицирована успешно"}
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -444,7 +444,7 @@ async def apply_benefit(
                 "final_amount": application.final_amount,
             },
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -468,7 +468,7 @@ async def create_loyalty_program(
             "message": "Программа лояльности создана успешно",
             "program_id": program.id,
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -516,7 +516,7 @@ async def enroll_patient_in_loyalty(
             "message": "Пациент записан в программу лояльности",
             "patient_loyalty_id": patient_loyalty.id,
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -544,7 +544,7 @@ async def earn_loyalty_points(
             "message": f"Начислено {points} баллов",
             "points_earned": points,
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -572,7 +572,7 @@ async def redeem_loyalty_points(
             "message": f"Списано {request.points} баллов",
             "discount_amount": discount_amount,
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
@@ -609,7 +609,7 @@ async def calculate_total_discount(
         )
 
         return {"success": True, "calculation": result}
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 

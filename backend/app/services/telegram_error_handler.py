@@ -6,7 +6,7 @@ Telegram Bot Error Handler
 import asyncio
 import logging
 from collections.abc import Callable
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)

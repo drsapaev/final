@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import os
 
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from fastapi import FastAPI
+from slowapi.util import get_remote_address
 
 # Disable rate limiting in test mode to prevent 429 failures
 _TESTING = os.getenv("TESTING", "").lower() in ("1", "true", "yes")

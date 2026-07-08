@@ -2,25 +2,25 @@
 Сервис для генерации расширенных отчетов
 """
 
-import csv
-import json
-import logging
-import os
-from datetime import date, datetime, timedelta
-from io import StringIO
-from typing import Any
+import csv  # noqa: F401
+import json  # noqa: F401
+import logging  # noqa: F401
+import os  # noqa: F401
+from datetime import date, datetime, timedelta  # noqa: F401
+from io import StringIO  # noqa: F401
+from typing import Any  # noqa: F401
 
-import pandas as pd
-from jinja2 import Template
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+import pandas as pd  # noqa: F401
+from jinja2 import Template  # noqa: F401
+from sqlalchemy import func  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.models.appointment import Appointment
-from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.patient import Patient
-from app.models.service import Service
-from app.models.visit import Visit, VisitService
+from app.models.appointment import Appointment  # noqa: F401
+from app.models.clinic import Doctor  # noqa: F401
+from app.models.online_queue import DailyQueue, OnlineQueueEntry  # noqa: F401
+from app.models.patient import Patient  # noqa: F401
+from app.models.service import Service  # noqa: F401
+from app.models.visit import Visit, VisitService  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

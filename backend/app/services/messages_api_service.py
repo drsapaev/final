@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +16,10 @@ from fastapi import HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
-from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message, can_send_message_with_branch
+from app.core.messaging_config import (
+    MESSAGING_PERMISSIONS,
+    can_send_message_with_branch,
+)
 from app.core.messaging_contract import MessageEventType
 from app.models.file_system import File as FileModel
 from app.models.file_system import FileType

@@ -218,7 +218,7 @@ class MorningAssignmentService:
                             f"⚠️ Визит {visit.id}: не удалось присвоить номера"
                         )
 
-                except Exception as e:
+                except Exception:
                     error_msg = "Внутренняя ошибка"
                     logger.error(error_msg)
                     errors.append(error_msg)

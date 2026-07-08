@@ -3,7 +3,8 @@ API endpoints для управления webhook'ами
 """
 
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -32,7 +33,6 @@ from app.schemas.webhook import (
 )
 from app.services.webhook_service import get_webhook_service
 
-from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 

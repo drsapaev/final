@@ -5,7 +5,9 @@ Split from notification_platform_service.py.
 from __future__ import annotations
 
 from app.services.notification_platform._base import *  # noqa: F401, F403
-from app.services.notification_platform._base import NotificationPlatformServiceMixinBase
+from app.services.notification_platform._base import (
+    NotificationPlatformServiceMixinBase,
+)
 
 
 class PolicyMixin(NotificationPlatformServiceMixinBase):

@@ -8,31 +8,31 @@ from __future__ import annotations
 Расширенный Telegram Bot с дополнительными командами и интеграцией с админ-панелью
 """
 
-import asyncio
-import json
-import logging
-from datetime import date, datetime
+import asyncio  # noqa: F401
+import json  # noqa: F401
+import logging  # noqa: F401
+from datetime import date, datetime  # noqa: F401
 
-import httpx
-from sqlalchemy import and_, func
-from sqlalchemy.orm import Session
+import httpx  # noqa: F401
+from sqlalchemy import and_, func  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.crud import (
+from app.crud import (  # noqa: F401
     clinic as crud_doctor,
 )
-from app.crud import (
+from app.crud import (  # noqa: F401
     service as crud_service,
 )
-from app.crud import (
+from app.crud import (  # noqa: F401
     user as crud_user,
 )
-from app.models.appointment import Appointment
-from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue
-from app.models.patient import Patient
-from app.models.service import Service
-from app.models.user import User
-from app.services.telegram_bot import TelegramBotService
+from app.models.appointment import Appointment  # noqa: F401
+from app.models.clinic import Doctor  # noqa: F401
+from app.models.online_queue import DailyQueue  # noqa: F401
+from app.models.patient import Patient  # noqa: F401
+from app.models.service import Service  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.services.telegram_bot import TelegramBotService  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

@@ -3,13 +3,13 @@ API endpoints для управления SMS провайдерами
 """
 
 import logging
-from typing import NoReturn, Any
+from typing import Any, NoReturn
 
-from app.core.rate_limiter import limiter
-from fastapi import APIRouter, Request, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from app.api.deps import require_roles
+from app.core.rate_limiter import limiter
 from app.models.user import User
 from app.services.sms_providers import SMSProviderType, get_sms_manager
 

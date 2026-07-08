@@ -5,16 +5,16 @@ under :mod:`app.services.notifications_pkg`.
 """
 from __future__ import annotations
 
-from app.services.notifications_pkg import (
+from app.services.notifications_pkg import (  # noqa: F401
     NotificationSenderService,
     notification_sender_service,
 )
-from app.services.notifications_pkg._helpers import (
+from app.services.notifications_pkg._helpers import (  # noqa: F401
     _fresh_db,
     _normalize_notification_event_type,
     _normalize_patient_telegram_language,
-    _safe_patient_telegram_value,
     _patient_telegram_event_message,
+    _safe_patient_telegram_value,
 )
 
 # Backward-compat alias: some modules import notification_service

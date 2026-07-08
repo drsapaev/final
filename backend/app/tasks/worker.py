@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -113,6 +112,7 @@ async def run_data_retention(ctx) -> None:
     """Run the daily data retention cleanup. See data_retention.run_scheduled_cleanup."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
+
     from app.services.data_retention import run_scheduled_cleanup
 
     logger.info("job.run_data_retention starting")
@@ -142,6 +142,7 @@ async def run_lab_follow_up_reminders(ctx) -> None:
     """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
+
     from app.services.lab_notification_service import LabNotificationService
 
     logger.info("job.run_lab_follow_up_reminders starting")

@@ -76,9 +76,9 @@ def generate_qr_token(
             current_count=token_data["current_count"],
         )
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -175,7 +175,7 @@ def open_queue(
 
         return QueueOpenResponse(**result)
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -218,7 +218,7 @@ def check_queue_status(
             opened_at=queue_status.get("opened_at"),
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -247,7 +247,7 @@ def get_today_queue(
             stats = crud_queue.get_queue_statistics(db, today)
             return stats
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -281,7 +281,7 @@ def get_queue_stats(
             "by_day": {},
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

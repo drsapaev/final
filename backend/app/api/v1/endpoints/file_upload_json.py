@@ -8,6 +8,7 @@ import logging
 import os
 from binascii import Error as BinasciiError
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -17,7 +18,6 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User
 
-from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 MAX_JSON_UPLOAD_BYTES = 10 * 1024 * 1024

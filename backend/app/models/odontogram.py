@@ -2,7 +2,7 @@
 Odontogram Model
 Модель для хранения данных одонтограммы (стоматологической карты зубов)
 """
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,

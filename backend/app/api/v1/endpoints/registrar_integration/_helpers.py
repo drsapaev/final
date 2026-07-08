@@ -9,27 +9,30 @@ API endpoints для интеграции регистратуры с админ
 Основа: detail.md стр. 85-183
 """
 
-import logging
-from datetime import UTC, date, datetime
-from typing import Any
+import logging  # noqa: F401
+from datetime import UTC, date, datetime  # noqa: F401
+from typing import Any  # noqa: F401
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, text
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
+from pydantic import BaseModel, Field  # noqa: F401
+from sqlalchemy import and_, func, text  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.api.deps import get_db, require_roles
-from app.crud import clinic as crud_clinic
-from app.crud import online_queue as crud_queue
-from app.models.department import Department, DepartmentService
-from app.models.service import Service
-from app.models.user import User
-from app.services.canonical_visit_service import (
+from app.api.deps import get_db, require_roles  # noqa: F401
+from app.crud import clinic as crud_clinic  # noqa: F401
+from app.crud import online_queue as crud_queue  # noqa: F401
+from app.models.department import Department, DepartmentService  # noqa: F401
+from app.models.service import Service  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.services.canonical_visit_service import (  # noqa: F401
     CanonicalVisitResolutionError,
     CanonicalVisitService,
 )
-from app.services.queue_service import queue_service
-from app.services.service_mapping import get_service_code, resolve_queue_group_key
+from app.services.queue_service import queue_service  # noqa: F401
+from app.services.service_mapping import (  # noqa: F401
+    get_service_code,
+    resolve_queue_group_key,
+)
 
 # [OK] Используем прямой SQL вместо импорта модели для избежания конфликта DailyQueue
 # Проблема: DailyQueue определен в двух местах (queue_old.py и online_queue.py)

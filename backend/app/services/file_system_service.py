@@ -11,7 +11,7 @@ import os
 import shutil
 import tempfile
 import zipfile
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -831,7 +831,7 @@ class FileSystemService:
                         await self.upload_file(db, upload_file, file_data, user_id)
                         processed_files += 1
 
-                    except Exception as e:
+                    except Exception:
                         errors.append("Внутренняя ошибка")
 
             return {

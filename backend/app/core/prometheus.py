@@ -47,15 +47,15 @@ _prometheus_initialized = False
 if os.getenv("ENABLE_PROMETHEUS", "1").lower() in ("1", "true", "yes", "on"):
     try:
         from prometheus_client import (
+                CONTENT_TYPE_LATEST,  # noqa: F401,
+                REGISTRY,  # noqa: F401,
+                CollectorRegistry,  # noqa: F401,
             Counter,
             Gauge,
             Histogram,
             Info,
-            generate_latest,
-            CONTENT_TYPE_LATEST,
+                generate_latest,  # noqa: F401,
             make_asgi_app,
-            CollectorRegistry,
-            REGISTRY,
         )
 
         # HTTP request metrics
@@ -156,7 +156,6 @@ def init_prometheus(app: Any) -> None:
     # Add middleware to track HTTP requests
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request
-    from starlette.responses import Response
 
     class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
         """Middleware that records HTTP request count + duration."""

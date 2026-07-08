@@ -6,23 +6,23 @@ from __future__ import annotations
 
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import (
-    LabReportingServiceMixinBase,
-    LabReportingApiRepository,
     LabCatalogAnalyte,
     LabCatalogReferenceRange,
     LabCatalogUnit,
+    LabReportingApiRepository,
+    LabReportingServiceMixinBase,
 )
-from app.services.lab_reporting._orders import OrdersMixin
-from app.services.lab_reporting._templates import TemplatesMixin
 from app.services.lab_reporting._catalog import CatalogMixin
-from app.services.lab_reporting._versions import VersionsMixin
-from app.services.lab_reporting._instances import InstancesMixin
-from app.services.lab_reporting._finalize import FinalizeMixin
-from app.services.lab_reporting._materialization import MaterializationMixin
-from app.services.lab_reporting._context import ContextMixin
-from app.services.lab_reporting._payload import PayloadMixin
 from app.services.lab_reporting._catalog_helpers import CatalogHelpersMixin
+from app.services.lab_reporting._context import ContextMixin
+from app.services.lab_reporting._finalize import FinalizeMixin
+from app.services.lab_reporting._instances import InstancesMixin
+from app.services.lab_reporting._materialization import MaterializationMixin
+from app.services.lab_reporting._orders import OrdersMixin
+from app.services.lab_reporting._payload import PayloadMixin
 from app.services.lab_reporting._rule_engine import RuleEngineMixin
+from app.services.lab_reporting._templates import TemplatesMixin
+from app.services.lab_reporting._versions import VersionsMixin
 
 __all__ = ["LabReportingService"]
 

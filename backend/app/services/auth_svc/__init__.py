@@ -4,11 +4,11 @@ Re-exports AuthenticationService for backward compatibility.
 """
 from __future__ import annotations
 
+from app.services.auth_svc._auth import AuthMixin
 from app.services.auth_svc._base import *  # noqa: F401, F403
 from app.services.auth_svc._base import AuthenticationServiceMixinBase
-from app.services.auth_svc._tokens import TokensMixin
-from app.services.auth_svc._auth import AuthMixin
 from app.services.auth_svc._management import ManagementMixin
+from app.services.auth_svc._tokens import TokensMixin
 
 __all__ = ["AuthenticationService"]
 

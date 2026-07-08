@@ -7,8 +7,8 @@ from __future__ import annotations
 from app.services.print_svc._base import *  # noqa: F401, F403
 from app.services.print_svc._base import PrintServiceMixinBase
 from app.services.print_svc._core import CoreMixin
-from app.services.print_svc._rendering import RenderingMixin
 from app.services.print_svc._helpers import HelpersMixin
+from app.services.print_svc._rendering import RenderingMixin
 
 __all__ = ["PrintService"]
 

@@ -5,42 +5,44 @@ from __future__ import annotations
 API endpoints для управления Telegram в админ панели
 """
 
-import hashlib
-import hmac
-import logging
-import os
-import secrets
-from datetime import UTC, date, datetime, time, timedelta
-from decimal import Decimal
-from html import escape
-from typing import Any, NoReturn
+import hashlib  # noqa: F401
+import hmac  # noqa: F401
+import logging  # noqa: F401
+import os  # noqa: F401
+import secrets  # noqa: F401
+from datetime import UTC, date, datetime, time, timedelta  # noqa: F401
+from decimal import Decimal  # noqa: F401
+from html import escape  # noqa: F401
+from typing import Any, NoReturn  # noqa: F401
 
-import httpx
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+import httpx  # noqa: F401
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status  # noqa: F401
+from pydantic import BaseModel  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.api.deps import get_db, require_roles
-from app.core.config import settings
-from app.crud import audit as crud_audit
-from app.crud import clinic as crud_clinic
-from app.crud import telegram_config as crud_telegram
-from app.models.telegram_config import TelegramStaffConfirmationToken
-from app.models.user import User
-from app.services.telegram_bot import (
+from app.api.deps import get_db, require_roles  # noqa: F401
+from app.core.config import settings  # noqa: F401
+from app.crud import audit as crud_audit  # noqa: F401
+from app.crud import clinic as crud_clinic  # noqa: F401
+from app.crud import telegram_config as crud_telegram  # noqa: F401
+from app.models.telegram_config import TelegramStaffConfirmationToken  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.services.telegram_bot import (  # noqa: F401
     PATIENT_BOT_COMMANDS_RU,
     PATIENT_BOT_COMMANDS_UZ,
     PATIENT_BOT_MENU_BUTTON,
     PATIENT_BOT_PROFILE_TEXTS,
     get_telegram_bot_service,
 )
-from app.services.telegram_staff_action_adapter_service import (
+from app.services.telegram_staff_action_adapter_service import (  # noqa: F401
     TelegramStaffActionAdapterService,
 )
-from app.services.telegram_staff_confirmation_token_service import (
+from app.services.telegram_staff_confirmation_token_service import (  # noqa: F401
     TelegramStaffConfirmationTokenService,
 )
-from app.services.telegram_staff_link_token_service import TelegramStaffLinkTokenService
+from app.services.telegram_staff_link_token_service import (
+    TelegramStaffLinkTokenService,  # noqa: F401
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

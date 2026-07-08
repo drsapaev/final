@@ -3,12 +3,13 @@
 """
 
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import get_current_user
 from app.models.user import User
 
-from typing import Any
 router = APIRouter()
 
 

@@ -35,8 +35,7 @@ import logging
 import os
 import random
 import sys
-from datetime import date, datetime, timedelta, UTC
-from pathlib import Path
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import create_engine, text

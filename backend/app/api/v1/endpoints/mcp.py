@@ -10,7 +10,7 @@ from typing import Any, NoReturn
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from ....api.deps import get_current_user, require_roles
+from ....api.deps import require_roles
 from ....models.user import User
 from ....services.mcp import get_mcp_manager
 

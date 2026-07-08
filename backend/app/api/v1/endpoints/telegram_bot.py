@@ -22,13 +22,13 @@ from sqlalchemy.orm import Session
 from ....api.deps import get_db, require_roles
 from ....crud import telegram_config as crud_telegram
 from ....models.user import User
-from ....services.telegram.bot import telegram_bot
 from ....schemas.notifications import (
     SendAppointmentReminderRequest,
     SendLabNotificationRequest,
     SendTelegramNotificationRequest,
     SetWebhookRequest,
 )
+from ....services.telegram.bot import telegram_bot
 
 logger = logging.getLogger(__name__)
 

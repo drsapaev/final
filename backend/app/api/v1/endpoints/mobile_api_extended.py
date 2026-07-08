@@ -173,7 +173,7 @@ async def search_doctors(
 
         return {"doctors": result, "total_found": len(result)}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -196,7 +196,7 @@ async def get_doctor_schedule(
 
         return {"doctor_id": doctor_id, "schedule": schedule}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -239,7 +239,7 @@ async def search_services(
 
         return {"services": result, "total_found": len(result)}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -270,7 +270,7 @@ async def get_service_categories(
 
         return {"categories": result}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -310,7 +310,7 @@ async def get_queues_status(
 
         return {"queues": result, "last_updated": datetime.now()}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -353,7 +353,7 @@ async def get_my_queue_position(
 
         return {"positions": result}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -411,7 +411,7 @@ async def cancel_appointment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -478,7 +478,7 @@ async def reschedule_appointment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -530,7 +530,7 @@ ID: #{feedback.id}"""
             "feedback_id": feedback.id,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -599,7 +599,7 @@ ID: #{emergency.id}"""
             "contacts": contacts,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -661,7 +661,7 @@ async def update_profile(
             },
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -708,7 +708,7 @@ async def upload_avatar(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -742,7 +742,7 @@ async def update_notification_settings(
             "settings": settings_data,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -765,7 +765,7 @@ async def get_notification_settings(
             "promotions": settings.get("promotions_notifications", False),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -809,7 +809,7 @@ async def get_clinic_info(
 
         return clinic_info
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )

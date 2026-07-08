@@ -393,8 +393,9 @@ class AuthMixin(AuthenticationServiceMixinBase):
     ):
         """Логирует активность пользователя в БД (UserActivity table)."""
         try:
-            from app.models.authentication import UserActivity
             import json as _json
+
+            from app.models.authentication import UserActivity
             activity = UserActivity(
                 user_id=user_id,
                 activity_type=activity_type,

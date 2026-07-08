@@ -293,7 +293,7 @@ class PatientService:
                 description=f"Удален пациент: {patient_name}",
             )
             self.db.commit()
-        except Exception as exc:
+        except Exception:
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -4,6 +4,7 @@ API endpoints для расширенной аналитики AI использ
 
 import logging
 from datetime import date, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -13,7 +14,6 @@ from app.api.deps import get_current_user, get_db, require_roles
 from app.models.user import User
 from app.services.ai_analytics_service import get_ai_analytics_service
 
-from typing import Any
 logger = logging.getLogger(__name__)
 
 router = APIRouter()

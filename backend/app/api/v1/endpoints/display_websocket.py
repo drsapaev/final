@@ -5,9 +5,10 @@ WebSocket endpoints для табло очереди
 
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
+import jwt
 from fastapi import (
     APIRouter,
     Depends,
@@ -16,7 +17,6 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
-import jwt
 from jwt import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
@@ -272,7 +272,7 @@ async def send_announcement_to_board(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -328,7 +328,7 @@ def get_boards_status(
             ),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

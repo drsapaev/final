@@ -6,7 +6,7 @@ import io
 import json
 import logging
 import zipfile
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class EMRExportService:
 
             return export_data
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     async def export_emr_to_xml(
@@ -128,7 +128,7 @@ class EMRExportService:
 
             return csv_content
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     async def export_emr_to_zip(
@@ -167,7 +167,7 @@ class EMRExportService:
             zip_buffer.seek(0)
             return zip_buffer.getvalue()
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     async def import_emr_from_json(
@@ -198,7 +198,7 @@ class EMRExportService:
 
             return emr_data
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     async def import_emr_from_xml(self, xml_data: str) -> dict[str, Any]:
@@ -223,7 +223,7 @@ class EMRExportService:
 
             return emr_data
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     async def import_emr_from_zip(self, zip_data: bytes) -> dict[str, Any]:
@@ -242,7 +242,7 @@ class EMRExportService:
                 json_content = zip_file.read(json_files[0]).decode('utf-8')
                 return await self.import_emr_from_json(json_content)
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     async def validate_import_data(
@@ -306,7 +306,7 @@ class EMRExportService:
                         )
                         validation_result["is_valid"] = False
 
-                except ET.ParseError as e:
+                except ET.ParseError:
                     validation_result["errors"].append("Внутренняя ошибка")
                     validation_result["is_valid"] = False
 
@@ -331,7 +331,7 @@ class EMRExportService:
 
             return validation_result
 
-        except Exception as e:
+        except Exception:
             return {
                 "is_valid": False,
                 "errors": ["Внутренняя ошибка"],

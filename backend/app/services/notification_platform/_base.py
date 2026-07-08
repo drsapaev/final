@@ -2,25 +2,30 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-import logging
-import re
-from datetime import datetime, timedelta, UTC
-from typing import Any
-from zoneinfo import ZoneInfo
+import hashlib  # noqa: F401
+import json  # noqa: F401
+import logging  # noqa: F401
+import re  # noqa: F401
+from datetime import UTC, datetime, timedelta  # noqa: F401
+from typing import Any  # noqa: F401
+from zoneinfo import ZoneInfo  # noqa: F401
 
-from sqlalchemy import func, or_
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import func, or_  # noqa: F401
+from sqlalchemy.orm import Session, selectinload  # noqa: F401
 
-from app.models.notification import NotificationDelivery, NotificationEvent
-from app.models.patient import Patient
-from app.models.user import User
-from app.models.user_profile import UserProfile
-from app.repositories.notification_platform_repository import (
+from app.models.notification import (  # noqa: F401
+    NotificationDelivery,
+    NotificationEvent,
+)
+from app.models.patient import Patient  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.models.user_profile import UserProfile  # noqa: F401
+from app.repositories.notification_platform_repository import (  # noqa: F401
     NotificationPlatformRepository,
 )
-from app.services.notification_websocket import get_notification_ws_manager
+from app.services.notification_websocket import (
+    get_notification_ws_manager,  # noqa: F401
+)
 
 logger = logging.getLogger(__name__)
 

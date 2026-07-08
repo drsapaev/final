@@ -295,7 +295,7 @@ class GeminiProvider(BaseAIProvider):
                     "raw_response": response.text,
                 }
 
-        except Exception as e:
+        except Exception:
             return {"error": "Внутренняя ошибка"}
 
     # Реализация недостающих абстрактных методов

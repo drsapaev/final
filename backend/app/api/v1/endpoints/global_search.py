@@ -5,6 +5,7 @@ Aggregated search across patients, visits, and lab results.
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict
@@ -14,7 +15,6 @@ from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.global_search_api_service import GlobalSearchApiService
 
-from typing import Any
 router = APIRouter(tags=["search"])
 
 GLOBAL_SEARCH_ROLES = (

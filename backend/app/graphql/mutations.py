@@ -2,7 +2,7 @@
 GraphQL мутации для API клиники
 """
 
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 
 import strawberry
 from sqlalchemy import func
@@ -92,7 +92,7 @@ class Mutation:
                 patient=patient_to_type(patient),
             )
 
-        except Exception as e:
+        except Exception:
             return PatientMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -142,7 +142,7 @@ class Mutation:
                 patient=patient_to_type(updated_patient),
             )
 
-        except Exception as e:
+        except Exception:
             return PatientMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -180,7 +180,7 @@ class Mutation:
 
             return MutationResponse(success=True, message="Пациент успешно удален")
 
-        except Exception as e:
+        except Exception:
             return MutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -240,7 +240,7 @@ class Mutation:
                 appointment=appointment_to_type(appointment),
             )
 
-        except Exception as e:
+        except Exception:
             return AppointmentMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -288,7 +288,7 @@ class Mutation:
                 appointment=appointment_to_type(updated_appointment),
             )
 
-        except Exception as e:
+        except Exception:
             return AppointmentMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -333,7 +333,7 @@ class Mutation:
                 appointment=appointment_to_type(updated_appointment),
             )
 
-        except Exception as e:
+        except Exception:
             return AppointmentMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -413,7 +413,7 @@ class Mutation:
                 success=True, message="Визит успешно создан", visit=visit_to_type(visit)
             )
 
-        except Exception as e:
+        except Exception:
             db.rollback()
             return VisitMutationResponse(
                 success=False,
@@ -457,7 +457,7 @@ class Mutation:
                 visit=visit_to_type(updated_visit),
             )
 
-        except Exception as e:
+        except Exception:
             return VisitMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -511,7 +511,7 @@ class Mutation:
                 service=service_to_type(service),
             )
 
-        except Exception as e:
+        except Exception:
             return ServiceMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -549,7 +549,7 @@ class Mutation:
                 service=service_to_type(updated_service),
             )
 
-        except Exception as e:
+        except Exception:
             return ServiceMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -648,7 +648,7 @@ class Mutation:
                 queue_entry=queue_entry_to_type(queue_entry),
             )
 
-        except Exception as e:
+        except Exception:
             db.rollback()
             return QueueMutationResponse(
                 success=False,
@@ -722,7 +722,7 @@ class Mutation:
                 queue_entry=queue_entry_to_type(next_entry),
             )
 
-        except Exception as e:
+        except Exception:
             db.rollback()
             return QueueMutationResponse(
                 success=False,

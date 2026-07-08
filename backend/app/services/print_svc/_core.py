@@ -222,7 +222,7 @@ class CoreMixin(PrintServiceMixinBase):
             template_source = LEGACY_COMMENT_BLOCK_RE.sub("", template.template_content)
             jinja_template = self.jinja_env.from_string(template_source)
             return jinja_template.render(**data)
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
 

@@ -15,8 +15,8 @@ from app.api.deps import require_roles
 from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
 from app.models.user import User
-from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 from app.schemas.notifications import TestWebhookRequest
+from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

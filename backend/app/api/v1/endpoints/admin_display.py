@@ -4,7 +4,7 @@ API endpoints для управления табло в админ панели
 
 import logging
 import shutil
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,8 +35,8 @@ from app.models.display_config import (
     DisplayVideo,
 )
 from app.models.user import User
-from app.schemas.misc_endpoints import DisplayBannerRequest, DisplayTestRequest
 from app.schemas.display_config import DisplayBoardUpdate
+from app.schemas.misc_endpoints import DisplayBannerRequest, DisplayTestRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

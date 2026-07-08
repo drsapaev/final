@@ -1,6 +1,7 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Any
 
 from app.api.deps import get_db, require_roles
 from app.services.analytics_simple_api_service import (

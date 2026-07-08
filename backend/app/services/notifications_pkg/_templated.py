@@ -5,29 +5,17 @@ Split from notifications.py.
 from __future__ import annotations
 
 from app.services.notifications_pkg._base import (
-    NotificationSenderMixinBase,
-    logger,
-    settings,
     Any,
+    NotificationHistory,
+    NotificationHistoryCreate,
+    NotificationSenderMixinBase,
     Session,
-    datetime,
-    UTC,
-    httpx,
-    smtplib,
-    MIMEMultipart,
-    MIMEText,
-    escape,
-    _jinja_env,
+    User,
     crud_notification_history,
     crud_notification_template,
     crud_user_notification_settings,
-    NotificationHistory,
-    User,
-    NotificationHistoryCreate,
-    get_fcm_service,
-    get_notification_platform_service,
-    get_notification_ws_manager,
-    telegram_bot,
+    datetime,
+    logger,
 )
 
 

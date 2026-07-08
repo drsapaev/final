@@ -7,7 +7,7 @@ import logging
 import os
 import shutil
 import subprocess
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session

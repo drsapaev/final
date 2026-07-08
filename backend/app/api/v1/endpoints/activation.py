@@ -1,6 +1,8 @@
 # app/api/v1/endpoints/activation.py
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -19,7 +21,6 @@ from app.schemas.activation import (
 )
 from app.services.activation_admin_service import ActivationAdminService
 
-from typing import Any
 router = APIRouter(prefix="/activation", tags=["activation"])
 
 

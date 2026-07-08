@@ -3,72 +3,29 @@ Split from telegram_webhook.py (5647 LOC → modular).
 """
 from __future__ import annotations
 
-import json
-import os
-import uuid
-import asyncio
-import io
-import time
-import hashlib
-import hmac
 import html
-import ipaddress
 import logging
-import secrets
-import socket
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Any, NoReturn
-from urllib.parse import urlsplit, urlunsplit
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
 from app.api.v1.endpoints.admin_telegram import (
-    PATIENT_BOOKING_ENTRY_ROUTE,
-    PATIENT_MINI_APP_ENTRY_ROUTE,
-    PATIENT_PAYMENT_ENTRY_ROUTE,
-    STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
-    STAFF_BOT_CONFIRMATION_CONTRACT,
-    STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS,
-    STAFF_BOT_READ_ONLY_MENU_CONTRACT,
-    STAFF_LINK_TOKEN_PREFIX,
-    STAFF_LINK_TOKEN_SEPARATOR,
-    _build_staff_bot_status,
-    _get_configured_bot_token,
-    _get_staff_bot_token_runtime_status,
     _normalize_staff_role,
     validate_staff_link_start_token,
 )
-from app.core.config import settings
-from app.crud import audit as crud_audit
 from app.crud import telegram_config as crud_telegram
-from app.crud.appointment import appointment as appointment_crud
-from app.db.session import get_db
-from app.models.appointment import Appointment
-from app.models.clinic import Doctor
 from app.models.lab import LabReportInstance
-from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment, PaymentVisit
-from app.models.payment_invoice import PaymentInvoice
-from app.models.payment_webhook import PaymentWebhook
 from app.models.telegram_config import TelegramMessage, TelegramUser
-from app.models.user import User
 from app.models.visit import Visit
-from app.services.canonical_visit_service import CanonicalVisitService
-from app.services.notification_platform_service import get_notification_platform_service
-from app.services.patient_onboarding_service import PatientOnboardingService
-from app.services.telegram_bot import TelegramBotService, telegram_bot_service
-from app.services.queue_service import QueueBusinessService
 
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
+
 
 async def _handle_staff_read_only_menu(
     update: dict[str, Any], db: Session, bot_service

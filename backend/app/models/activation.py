@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SAEnum

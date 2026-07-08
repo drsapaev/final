@@ -1,8 +1,10 @@
 """Split from qr_queue.py.
 """
 from __future__ import annotations
+
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import router
+
 
 @router.get("/status/{specialist_id}", response_model=QueueStatusResponse)
 def get_queue_status(
@@ -141,7 +143,7 @@ async def call_next_patient(
 
     except HTTPException:
         raise
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")
     except Exception as e:
         logger.error(

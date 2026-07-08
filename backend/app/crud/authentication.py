@@ -2,7 +2,7 @@
 CRUD операции для системы аутентификации
 """
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session

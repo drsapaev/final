@@ -12,9 +12,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.services.ai_feature_gating import RequireAiFeature
 from app.services.doctor_phrase_service import get_doctor_phrase_service
 from app.services.phrase_suggest_api_service import PhraseSuggestApiService
-from app.services.ai_feature_gating import RequireAiFeature
 
 router = APIRouter()
 
@@ -155,7 +155,7 @@ async def index_phrases(
             indexedCount=indexed_count,
             message=f"Indexed {indexed_count} phrases for doctor {request.doctorId}"
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail="Internal server error"
@@ -415,7 +415,7 @@ async def batch_index_emrs(
             durationMs=result.duration_ms,
             errors=result.errors
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail="Internal server error"
@@ -463,7 +463,7 @@ async def index_doctor_emrs(
             totalPhrases=result.total_phrases,
             durationMs=result.duration_ms
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail="Internal server error"

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -13,7 +15,6 @@ from app.schemas.finance import (
     FinanceTransactionUpdate,
 )
 
-from typing import Any
 router = APIRouter()
 
 

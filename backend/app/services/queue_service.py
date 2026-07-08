@@ -1,8 +1,14 @@
 """Backward-compatible shim for queue_svc package."""
 from __future__ import annotations
-from app.services.queue_svc import QueueBusinessService
-from app.services.queue_svc._base import QueueError, QueueValidationError, QueueConflictError, QueueNotFoundError
-from app.services.queue_svc._helpers import get_queue_service
+
+from app.services.queue_svc import QueueBusinessService  # noqa: F401
+from app.services.queue_svc._base import (  # noqa: F401
+    QueueConflictError,
+    QueueError,
+    QueueNotFoundError,
+    QueueValidationError,
+)
+from app.services.queue_svc._helpers import get_queue_service  # noqa: F401
 
 queue_service = QueueBusinessService()
 

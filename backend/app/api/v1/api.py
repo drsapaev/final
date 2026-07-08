@@ -148,7 +148,6 @@ from app.api.v1.endpoints.security_management import (
     router as security_management_router,
 )
 from app.api.v1.endpoints.visit_confirmation import router as visit_confirmation_router
-from app.core.config import settings
 from app.ws import cashier_ws
 
 try:

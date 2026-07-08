@@ -4,19 +4,19 @@ API endpoints для верификации телефонных номеров
 
 import re
 from datetime import datetime
+from typing import Any
 
-from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
-from app.core.rate_limiter import limiter
 from app.api.deps import get_current_user, require_roles
+from app.core.rate_limiter import limiter
 from app.db.session import get_db
 from app.models.user import User
 from app.services.phone_verification_service import get_phone_verification_service
 from app.services.sms_providers import SMSProviderType
 
-from typing import Any
 router = APIRouter()
 
 
@@ -148,7 +148,7 @@ async def send_verification_code(request: Request,
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -198,7 +198,7 @@ async def verify_code(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -229,7 +229,7 @@ async def get_verification_status(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -266,7 +266,7 @@ async def cancel_verification(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -309,7 +309,7 @@ async def update_user_phone(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -328,7 +328,7 @@ async def get_verification_statistics(
 
         return {"statistics": stats, "timestamp": datetime.now().isoformat()}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -392,7 +392,7 @@ async def admin_send_verification_code(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

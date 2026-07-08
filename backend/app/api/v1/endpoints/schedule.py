@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
@@ -9,7 +10,6 @@ from app.api import deps
 from app.crud import schedule as crud
 from app.schemas.schedule import ScheduleCreateIn, ScheduleRowOut
 
-from typing import Any
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 

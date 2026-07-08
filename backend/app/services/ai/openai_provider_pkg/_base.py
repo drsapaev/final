@@ -4,15 +4,15 @@ Split from openai_provider.py (5450 LOC → modular).
 """
 from __future__ import annotations
 
-import base64
-import json
-import logging
-from typing import Any
+import base64  # noqa: F401
+import json  # noqa: F401
+import logging  # noqa: F401
+from typing import Any  # noqa: F401
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI  # noqa: F401
 
-from ....core.config import settings
-from ..base_provider import AIRequest, AIResponse, BaseAIProvider
+from ....core.config import settings  # noqa: F401
+from ..base_provider import AIRequest, AIResponse, BaseAIProvider  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 
-from typing import Any
+
 @router.get("/telegram/templates", response_model=dict[str, Any])
 def get_telegram_templates(
     language: str = "ru",

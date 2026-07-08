@@ -6,15 +6,24 @@ import json
 import logging
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel
 
 from ....api.deps import get_current_user
 from ....core.rbac import AIPermission, require_any_ai_permission
 from ....models.user import User
 from ....services.ai import AIProviderType, ai_manager
-from ....services.mcp import get_mcp_manager
 from ....services.ai_feature_gating import RequireAiFeature
+from ....services.mcp import get_mcp_manager
 
 logger = logging.getLogger(__name__)
 

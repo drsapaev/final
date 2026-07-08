@@ -10,7 +10,7 @@ AI Rate Limiter - Контроль частоты AI запросов.
 import asyncio
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 

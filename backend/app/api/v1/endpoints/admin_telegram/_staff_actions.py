@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 
+
 @router.post("/telegram/staff-actions/{confirmation_id}/confirm", response_model=dict[str, Any])
 def confirm_staff_action(
     confirmation_id: int,

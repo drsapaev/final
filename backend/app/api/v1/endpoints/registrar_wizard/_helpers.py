@@ -9,44 +9,49 @@ API endpoints для мастера регистрации с поддержко
 Расширение существующего registrar_integration.py
 """
 
-import asyncio
-import logging
-from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
-from typing import Any
+import asyncio  # noqa: F401
+import logging  # noqa: F401
+from datetime import UTC, date, datetime, timedelta  # noqa: F401
+from decimal import Decimal  # noqa: F401
+from typing import Any  # noqa: F401
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
-from sqlalchemy import String, literal
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status  # noqa: F401
+from pydantic import BaseModel, Field  # noqa: F401
+from sqlalchemy import String, literal  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.api.deps import get_db, require_roles
-from app.crud import clinic as crud_clinic
-from app.crud import online_queue as crud_queue
-from app.crud.appointment import appointment as crud_appointment
-from app.models.clinic import ClinicSettings, Doctor
-from app.models.doctor_price_override import DoctorPriceOverride
-from app.models.patient import Patient
-from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
-from app.models.service import Service
-from app.models.user import User
-from app.models.visit import Visit, VisitService
-from app.services.notifications import notification_sender_service
-from app.services.online_queue_new_service import (
+from app.api.deps import get_db, require_roles  # noqa: F401
+from app.crud import clinic as crud_clinic  # noqa: F401
+from app.crud import online_queue as crud_queue  # noqa: F401
+from app.crud.appointment import appointment as crud_appointment  # noqa: F401
+from app.models.clinic import ClinicSettings, Doctor  # noqa: F401
+from app.models.doctor_price_override import DoctorPriceOverride  # noqa: F401
+from app.models.patient import Patient  # noqa: F401
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit  # noqa: F401
+from app.models.service import Service  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.models.visit import Visit, VisitService  # noqa: F401
+from app.services.notifications import notification_sender_service  # noqa: F401
+from app.services.online_queue_new_service import (  # noqa: F401
     OnlineQueueNewDomainError,
     OnlineQueueNewService,
 )
-from app.services.payment_provider_manager_factory import get_payment_manager
-from app.services.queue_service import queue_service
-from app.services.registrar_edit_delta_service import (
+from app.services.payment_provider_manager_factory import (
+    get_payment_manager,  # noqa: F401
+)
+from app.services.queue_service import queue_service  # noqa: F401
+from app.services.registrar_edit_delta_service import (  # noqa: F401
     RegistrarEditDeltaItem,
     RegistrarEditDeltaService,
 )
-from app.services.registrar_wizard_queue_assignment_service import (
+from app.services.registrar_wizard_queue_assignment_service import (  # noqa: F401
     RegistrarWizardQueueAssignmentService,
 )
-from app.services.service_mapping import get_service_code, normalize_service_code
-from app.services.visits_api_service import VisitsApiService
+from app.services.service_mapping import (  # noqa: F401
+    get_service_code,
+    normalize_service_code,
+)
+from app.services.visits_api_service import VisitsApiService  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

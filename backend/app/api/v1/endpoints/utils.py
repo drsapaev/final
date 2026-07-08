@@ -2,13 +2,13 @@
 import ipaddress
 import logging
 import socket
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, HTTPException, Query
 
-from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 

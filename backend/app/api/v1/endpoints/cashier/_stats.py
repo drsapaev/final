@@ -32,6 +32,7 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     router,
 )
 
+
 @router.get("/stats", response_model=CashierStatsResponse)
 async def get_cashier_stats(
     db: Session = Depends(deps.get_db),
@@ -125,7 +126,7 @@ async def get_cashier_stats(
 
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -217,7 +218,7 @@ async def export_payments(
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -260,7 +261,7 @@ async def get_hourly_stats(
 
         return [HourlyStatItem(**data) for data in hourly_data.values()]
 
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

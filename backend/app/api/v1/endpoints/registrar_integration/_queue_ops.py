@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
-from typing import Any
+
 @router.get("/registrar/queue-settings", response_model=dict[str, Any])
 def get_registrar_queue_settings(
     db: Session = Depends(get_db),
@@ -109,7 +111,7 @@ def generate_qr_for_registrar(
             "current_count": token_data["current_count"],
         }
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")
     except Exception:
         raise HTTPException(
@@ -248,7 +250,7 @@ def start_queue_visit(
 # ===================== HELPERS ДЛЯ get_today_queues (R-22 decomposition) =====================
 
 
-def _parse_queue_target_date(target_date: str | None) -> "date":
+def _parse_queue_target_date(target_date: str | None) -> date:
     """R-22: Парсинг даты для очереди. Возвращает today если невалидно."""
     from datetime import datetime
     if target_date:
@@ -273,7 +275,7 @@ def _normalize_department_filter(department: str | None) -> set[str] | None:
     return aliases.get(normalized, {normalized})
 
 
-def _load_queue_data_for_date(db: Session, target_day: "date") -> tuple:
+def _load_queue_data_for_date(db: Session, target_day: date) -> tuple:
     """R-22: Загрузка visits, appointments и online entries для даты.
 
     Returns:
@@ -509,7 +511,7 @@ def _process_legacy_appointments(
     appointments: list,
     queues_by_specialty: dict,
     seen_appointment_ids: set,
-    today: "date",
+    today: date,
 ) -> None:
     """R-22 Phase 3: Process legacy Appointment records into specialty queues."""
     from app.models.service import Service
@@ -893,7 +895,7 @@ def _process_appointment_entry(
     db: Session,
     entry_data: Any,
     entry_wrapper: dict,
-    today: "date",
+    today: date,
 ) -> dict | None:
     """R-22 Phase 6: Process an Appointment row into entry fields.
 

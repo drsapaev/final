@@ -512,7 +512,9 @@ class TokensMixin(AuthenticationServiceMixinBase):
 
                     # SECURITY: Отзываем текущий access-токен по jti (если передан).
                     if access_token_jti and access_token_exp:
-                        from app.services.token_blacklist_service import token_blacklist_service
+                        from app.services.token_blacklist_service import (
+                            token_blacklist_service,
+                        )
                         token_blacklist_service.blacklist_token(
                             db,
                             jti=access_token_jti,

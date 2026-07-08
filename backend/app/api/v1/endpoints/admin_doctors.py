@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.core.audit_helper import log_action
 from app.api.deps import get_db
 from app.core.roles import DOCTOR_ROLES
 from app.core.security import require_roles

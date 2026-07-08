@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -391,7 +391,7 @@ class UserDataTransferService:
 
             return True, "Валидация прошла успешно"
 
-        except Exception as e:
+        except Exception:
             return False, "Внутренняя ошибка"
 
     def create_transfer_confirmation_token(

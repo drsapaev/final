@@ -10,6 +10,7 @@ from app.api.deps import require_roles
 from app.graphql.mutations import Mutation
 from app.graphql.resolvers import Query
 
+
 # Создаем GraphQL схему
 # P3: GraphQL query depth limiting to prevent DoS
 def _depth_limit_handler(next_func, source, info, **kwargs):

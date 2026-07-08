@@ -4,7 +4,7 @@ API для управления лимитами онлайн-очередей
 
 import logging
 from datetime import date, datetime
-from typing import NoReturn, Any
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field

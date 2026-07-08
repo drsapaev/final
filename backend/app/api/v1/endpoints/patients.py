@@ -1,7 +1,8 @@
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
-from typing import Any
 
 from app.api import deps
 from app.core.audit import log_critical_change
@@ -347,7 +348,7 @@ def add_family_relation(
             "relation_type": relation_type,
         }
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
 
 

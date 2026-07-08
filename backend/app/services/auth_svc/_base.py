@@ -2,19 +2,19 @@
 Сервис для аутентификации с JWT токенами
 """
 
-import logging
-import secrets
-import uuid
-from datetime import datetime, timedelta, UTC
-from typing import Any
+import logging  # noqa: F401
+import secrets  # noqa: F401
+import uuid  # noqa: F401
+from datetime import UTC, datetime, timedelta  # noqa: F401
+from typing import Any  # noqa: F401
 
-import jwt
-from sqlalchemy import and_, desc, or_
-from sqlalchemy.orm import Session
+import jwt  # noqa: F401
+from sqlalchemy import and_, desc, or_  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.core.config import settings
-from app.core.security import get_password_hash, verify_password
-from app.models.authentication import (
+from app.core.config import settings  # noqa: F401
+from app.core.security import get_password_hash, verify_password  # noqa: F401
+from app.models.authentication import (  # noqa: F401
     EmailVerificationToken,
     LoginAttempt,
     PasswordResetToken,
@@ -22,8 +22,10 @@ from app.models.authentication import (
     SecurityEvent,
     UserSession,
 )
-from app.models.user import User
-from app.services.user_management_service import get_user_management_service
+from app.models.user import User  # noqa: F401
+from app.services.user_management_service import (
+    get_user_management_service,  # noqa: F401
+)
 
 logger = logging.getLogger(__name__)
 

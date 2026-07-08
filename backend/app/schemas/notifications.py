@@ -21,7 +21,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-
 # =============================================================================
 # SHARED COMPONENTS
 # =============================================================================

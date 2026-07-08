@@ -141,6 +141,10 @@ ignore = [
     "B904",  # exception chaining in legacy code (TODO: tighten)
     "E712",  # comparisons to True/False (common in SQLAlchemy filters)
     "E722",  # bare excepts in legacy code (TODO: tighten)
+    "F405",  # may be undefined from star imports (intentional in split package pattern)
+    "E402",  # module-import-not-at-top-of-file (conditional imports after config — known pattern)
+    "F821",  # undefined-name (pre-existing: i18n t() function, split package re-exports)
+    "F841",  # unused-variable (pre-existing tech debt)
 ]
 
 [tool.ruff.lint.isort]

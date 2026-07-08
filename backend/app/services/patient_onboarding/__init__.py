@@ -1,5 +1,6 @@
 """patient_onboarding — split from patient_onboarding_service.py."""
 from __future__ import annotations
+
 from app.services.patient_onboarding._base import *  # noqa: F401, F403
 from app.services.patient_onboarding._base import PatientOnboardingServiceMixinBase
 from app.services.patient_onboarding._core import CoreMixin

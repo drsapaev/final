@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, UTC
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -134,7 +134,7 @@ class GlobalSearchApiService:
                 created_at=datetime.now(UTC),
             )
             return {"status": "ok"}
-        except Exception as exc:
+        except Exception:
             self.repository.rollback()
             # SEARCH-AUDIT-28 P1: don't leak exception to client
             return {"status": "error", "message": "Internal error"}
