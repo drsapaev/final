@@ -237,6 +237,8 @@ function ModalItem({ modal, onClose }) {
           {modal.closable &&
         <button
           style={closeButtonStyle}
+            aria-label="Закрыть"
+            title="Закрыть"
           onClick={() => onClose(modal.id)}
           onMouseOver={(e) => {
             e.target.style.backgroundColor = 'var(--color-background-tertiary)';
@@ -403,6 +405,8 @@ export function Modal({
             {closable &&
           <button
             style={closeButtonStyle}
+            aria-label="Закрыть"
+            title="Закрыть"
             onClick={onClose}
             onMouseOver={(e) => {
               e.target.style.backgroundColor = 'var(--color-background-tertiary)';
