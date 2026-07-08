@@ -1,7 +1,7 @@
 """widen two_factor_backup_codes.code to VARCHAR(64) for SHA-256 hashes (F-AUTH-001)
 
 Revision ID: 0033_widen_backup_code_hash
-Revises: 0032_messages_branch_id_tenant_isolation
+Revises: 0032_messages_branch_id
 Create Date: 2026-07-07
 
 Re-audit AUTH-REAUDIT-28 P0 fix: PR #1941 hashed backup codes with SHA-256
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 
 
 revision = "0033_widen_backup_code_hash"
-down_revision = "0032_messages_branch_id_tenant_isolation"
+down_revision = "0032_messages_branch_id"
 branch_labels = None
 depends_on = None
 
