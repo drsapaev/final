@@ -472,8 +472,11 @@ class TestLabReportingService:
         patched_definitions = deepcopy(lab_reporting_service_module.DEFAULT_LAB_TEMPLATE_DEFINITIONS)
         patched_cbc = next(item for item in patched_definitions if item["code"] == "cbc_oak")
         patched_cbc["initial_version"]["footer_notes"] = "Updated seed footer note"
+        # After the lab_reporting_service.py split, the seed definitions
+        # are consumed from app.services.lab_reporting._payload.
+        import app.services.lab_reporting._payload as _payload_module
         monkeypatch.setattr(
-            lab_reporting_service_module,
+            _payload_module,
             "DEFAULT_LAB_TEMPLATE_DEFINITIONS",
             patched_definitions,
         )
