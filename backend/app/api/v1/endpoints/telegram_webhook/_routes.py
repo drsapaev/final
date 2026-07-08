@@ -26,6 +26,7 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
     get_db,
     logger,
     status,
+    _telegram_update_summary,
 )
 from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403

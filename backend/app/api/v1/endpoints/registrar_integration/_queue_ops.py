@@ -4,6 +4,11 @@ from typing import Any
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
+from app.api.v1.endpoints.registrar_integration._helpers import (
+    _normalize_registration_discount_mode,
+    _serialize_registrar_datetime,
+)  # noqa: F401
+
 
 @router.get("/registrar/queue-settings", response_model=dict[str, Any])
 def get_registrar_queue_settings(

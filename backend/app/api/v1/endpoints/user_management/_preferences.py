@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.user_management._helpers import *  # noqa: F401, F403
-from app.api.v1.endpoints.user_management._helpers import router  # noqa: F401
+from app.api.v1.endpoints.user_management._helpers import (
+    router,
+    _coerce_json_mapping,
+    _normalize_theme,
+)  # noqa: F401
 
 
 @router.get("/me/preferences", response_model=dict[str, Any])

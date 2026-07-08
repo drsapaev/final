@@ -3,6 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
+
+from app.api.v1.endpoints.admin_telegram._helpers import (
+    _build_staff_bot_status,
+    _build_telegram_ai_approval_status,
+)  # noqa: F401
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 
 

@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
-from app.api.v1.endpoints.qr_queue._helpers import router
+from app.api.v1.endpoints.qr_queue._helpers import (
+    router,
+    _ensure_doctor_can_mutate_queue_entry,
+    _queue_phone_matches,
+)
 
 
 @router.put("/online-entry/{entry_id}/update", response_model=dict[str, Any])

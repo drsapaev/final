@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.admin_departments._helpers import *  # noqa: F401, F403
-from app.api.v1.endpoints.admin_departments._helpers import router  # noqa: F401
+from app.api.v1.endpoints.admin_departments._helpers import (
+    router,
+    _collect_department_overview,
+    _ensure_department_integrations,
+)  # noqa: F401
 
 
 @router.get("", response_model=dict)

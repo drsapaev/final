@@ -26,6 +26,22 @@ from app.models.visit import Visit
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 
+from app.api.v1.endpoints.telegram_webhook._helpers import (
+    _extract_staff_link_start_payload,
+    _extract_ticket_qr_start_payload,
+    _localized_main_menu,
+    _localized_notification_consent_menu,
+    _localized_settings_menu,
+    _localized_text,
+    _normalize_patient_language,
+    _patient_payment_entry_url,
+    _telegram_chat_language,
+    _telegram_chat_menu,
+    _telegram_chat_text,
+    _telegram_onboarding_entry_markup,
+    _telegram_settings_message,
+)  # noqa: F401
+
 
 async def _handle_staff_read_only_menu(
     update: dict[str, Any], db: Session, bot_service

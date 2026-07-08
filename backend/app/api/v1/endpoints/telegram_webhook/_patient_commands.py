@@ -39,6 +39,10 @@ from app.models.visit import Visit
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 
+from app.api.v1.endpoints.telegram_webhook._helpers import (
+    _normalize_patient_language,
+)  # noqa: F401
+
 
 async def _send_patient_bot_reply(
     db: Session,

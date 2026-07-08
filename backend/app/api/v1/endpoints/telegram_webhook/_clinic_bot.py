@@ -26,6 +26,30 @@ from app.services.patient_onboarding_service import PatientOnboardingService
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 
+from app.api.v1.endpoints.telegram_webhook._helpers import (
+    _localized_main_menu,
+    _localized_services_menu,
+    _localized_settings_menu,
+    _localized_text,
+    _normalize_patient_button_text,
+    _normalize_patient_language,
+    _parse_patient_mini_app_entry_token,
+    _parse_patient_onboarding_entry_token,
+    _patient_text_handler_aliases,
+    _telegram_booking_entry_markup,
+    _telegram_chat_language,
+    _telegram_chat_menu,
+    _telegram_chat_text,
+    _telegram_patient_cabinet_entry_markup,
+    _telegram_patient_doctors_entry_markup,
+    _telegram_patient_documents_entry_markup,
+    _telegram_patient_forms_entry_markup,
+    _telegram_payment_entry_markup,
+    _telegram_queue_entry_markup,
+    _telegram_settings_message,
+    _telegram_visits_entry_markup,
+)  # noqa: F401
+
 
 async def _handle_clinic_bot_update(
     update: dict[str, Any], db: Session, bot_service
