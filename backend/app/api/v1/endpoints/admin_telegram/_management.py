@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 
-@router.get("/telegram/templates")
+from typing import Any
+@router.get("/telegram/templates", response_model=dict[str, Any])
 def get_telegram_templates(
     language: str = "ru",
     template_type: str | None = None,
@@ -100,7 +101,7 @@ def get_telegram_templates(
         )
 
 
-@router.post("/telegram/send-test-message")
+@router.post("/telegram/send-test-message", response_model=dict[str, Any])
 def send_test_message(
     chat_id: int,
     message: str,
@@ -160,7 +161,7 @@ def send_test_message(
 # ===================== СТАТИСТИКА TELEGRAM =====================
 
 
-@router.get("/telegram/stats")
+@router.get("/telegram/stats", response_model=dict[str, Any])
 def get_telegram_stats(
     days_back: int = 7,
     db: Session = Depends(get_db),
@@ -190,7 +191,7 @@ def get_telegram_stats(
 # ===================== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ =====================
 
 
-@router.get("/telegram/users")
+@router.get("/telegram/users", response_model=dict[str, Any])
 def get_telegram_users(
     skip: int = 0,
     limit: int = 100,
@@ -213,7 +214,7 @@ def get_telegram_users(
 # ===================== ШИРОКОВЕЩАТЕЛЬНЫЕ СООБЩЕНИЯ =====================
 
 
-@router.post("/telegram/broadcast")
+@router.post("/telegram/broadcast", response_model=dict[str, Any])
 def send_broadcast_message(
     message: str,
     target_groups: list[str],  # ["patients", "doctors", "admins"]

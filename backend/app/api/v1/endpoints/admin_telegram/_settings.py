@@ -3,7 +3,8 @@ from __future__ import annotations
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 
-@router.get("/telegram/settings")
+from typing import Any
+@router.get("/telegram/settings", response_model=dict[str, Any])
 def get_telegram_settings(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -42,7 +43,7 @@ def get_telegram_settings(
         )
 
 
-@router.put("/telegram/settings")
+@router.put("/telegram/settings", response_model=dict[str, Any])
 def update_telegram_settings(
     settings: UpdateTelegramSettingsRequest,
     db: Session = Depends(get_db),
@@ -78,7 +79,7 @@ def update_telegram_settings(
         )
 
 
-@router.post("/telegram/test-bot")
+@router.post("/telegram/test-bot", response_model=dict[str, Any])
 def test_telegram_bot(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -157,7 +158,7 @@ def test_telegram_bot(
         )
 
 
-@router.post("/telegram/register-patient-commands")
+@router.post("/telegram/register-patient-commands", response_model=dict[str, Any])
 async def register_patient_bot_commands(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -207,7 +208,7 @@ async def register_patient_bot_commands(
         )
 
 
-@router.post("/telegram/register-staff-commands")
+@router.post("/telegram/register-staff-commands", response_model=dict[str, Any])
 async def register_staff_bot_commands(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -265,7 +266,7 @@ async def register_staff_bot_commands(
         )
 
 
-@router.post("/telegram/set-webhook")
+@router.post("/telegram/set-webhook", response_model=dict[str, Any])
 def set_telegram_webhook(
     payload: TelegramWebhookRequest | None = Body(default=None),
     webhook_url: str | None = Query(default=None),
@@ -346,7 +347,7 @@ def set_telegram_webhook(
         )
 
 
-@router.get("/telegram/webhook-info")
+@router.get("/telegram/webhook-info", response_model=dict[str, Any])
 def get_telegram_webhook_info(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -392,7 +393,7 @@ def get_telegram_webhook_info(
 # ===================== ШАБЛОНЫ СООБЩЕНИЙ =====================
 
 
-@router.get("/telegram/integration-status")
+@router.get("/telegram/integration-status", response_model=dict[str, Any])
 def get_telegram_integration_status(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):

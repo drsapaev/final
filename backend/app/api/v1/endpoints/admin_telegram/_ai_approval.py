@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 
-@router.post("/telegram/ai-approval-alerts")
+@router.post("/telegram/ai-approval-alerts", response_model=dict[str, Any])
 async def send_telegram_ai_approval_alert(
     request: TelegramAiApprovalAlertRequest,
     db: Session = Depends(get_db),
@@ -130,7 +130,7 @@ async def send_telegram_ai_approval_alert(
     }
 
 
-@router.post("/telegram/ai-approval-outcomes")
+@router.post("/telegram/ai-approval-outcomes", response_model=dict[str, Any])
 def capture_telegram_ai_approval_outcome(
     request: TelegramAiApprovalOutcomeRequest,
     db: Session = Depends(get_db),
