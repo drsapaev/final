@@ -15,17 +15,17 @@ from __future__ import annotations
 # Translation table: key → {language_code: translated_string}
 TRANSLATIONS = {
     "error.internal": {
-        "ru": t("error.internal"),
+        "ru": "Внутренняя ошибка сервера",
         "uz": "Ichki server xatosi",
         "en": "Internal server error",
     },
     "error.not_found": {
-        "ru": t("error.not_found"),
+        "ru": "Запись не найдена",
         "uz": "Yozuv topilmadi",
         "en": "Record not found",
     },
     "error.access_denied": {
-        "ru": t("error.access_denied"),
+        "ru": "Доступ запрещён",
         "uz": "Kirish rad etildi",
         "en": "Access denied",
     },
@@ -80,17 +80,17 @@ TRANSLATIONS = {
         "en": "Updated successfully",
     },
     "patient.not_found": {
-        "ru": t("patient.not_found"),
+        "ru": "Пациент не найден",
         "uz": "Bemor topilmadi",
         "en": "Patient not found",
     },
     "doctor.not_found": {
-        "ru": t("doctor.not_found"),
+        "ru": "Врач не найден",
         "uz": "Shifokor topilmadi",
         "en": "Doctor not found",
     },
     "visit.not_found": {
-        "ru": t("visit.not_found"),
+        "ru": "Визит не найден",
         "uz": "Tashrif topilmadi",
         "en": "Visit not found",
     },

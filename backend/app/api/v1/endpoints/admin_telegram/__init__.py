@@ -30,6 +30,7 @@ from app.api.v1.endpoints.admin_telegram._helpers import (  # noqa: F401
     STAFF_LINK_TOKEN_SEPARATOR,
     _build_staff_bot_status,
     _normalize_staff_role,
+    _staff_runtime_reference_hash,
     validate_staff_link_start_token,
 )
 from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
@@ -59,6 +60,7 @@ __all__ = [
     "_get_configured_bot_token",
     "_get_staff_bot_token_runtime_status",
     "_normalize_staff_role",
+    "_staff_runtime_reference_hash",
     "validate_staff_link_start_token",
     "confirm_staff_action",
 ]
