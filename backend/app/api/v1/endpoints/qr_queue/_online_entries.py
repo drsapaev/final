@@ -1166,6 +1166,148 @@ def _full_update_collect_existing_services(
 
 
 
+def _full_update_resolve_target_queue_id(
+    db: Session,
+    entry,
+    service,
+):
+    """Resolve the target DailyQueue ID for a service based on its queue_tag.
+
+    If the service has a queue_tag, find or auto-create the matching DailyQueue.
+    Otherwise, fall back to the entry's original queue_id.
+    """
+    from app.models.online_queue import DailyQueue
+
+    default_queue_id = entry.queue_id
+    if not service.queue_tag:
+        return default_queue_id
+
+    candidate_queue = (
+        db.query(DailyQueue)
+        .filter(
+            DailyQueue.day == entry.queue.day,
+            DailyQueue.queue_tag == service.queue_tag,
+            DailyQueue.active == True,
+        )
+        .first()
+    )
+    if candidate_queue:
+        logger.info(
+            "[full_update_online_entry] 🔀 Услуга %s → очередь %s (ID=%d)",
+            service.name, service.queue_tag, candidate_queue.id,
+        )
+        return candidate_queue.id
+
+    # Auto-create DailyQueue if missing (NOT silent fallback)
+    logger.warning(
+        "[full_update_online_entry] ⚠️ DailyQueue for queue_tag=%s not found, creating...",
+        service.queue_tag,
+    )
+    new_queue = queue_service.get_or_create_daily_queue(
+        db,
+        day=entry.queue.day,
+        specialist_id=entry.queue.specialist_id,
+        queue_tag=service.queue_tag,
+    )
+    logger.info(
+        "[full_update_online_entry] ✅ Created DailyQueue for %s (ID=%d)",
+        service.queue_tag, new_queue.id,
+    )
+    return new_queue.id
+
+
+def _full_update_create_single_independent_entry(
+    db: Session,
+    entry,
+    request,
+    service,
+    service_item_data: dict | None,
+    current_queue_time,
+):
+    """Create a single IndependentQueueEntry for one service.
+
+    Shared logic for both first_fill_qr (additional services) and editing
+    (new services) branches. Computes target queue, next number, price with
+    discounts, and creates the OnlineQueueEntry with services/service_codes JSON.
+    """
+    import json
+    from datetime import datetime
+
+    from sqlalchemy import text
+
+    from app.models.online_queue import OnlineQueueEntry
+
+    target_queue_id = _full_update_resolve_target_queue_id(db, entry, service)
+
+    next_number = db.execute(
+        text("SELECT COALESCE(MAX(number), 0) + 1 FROM queue_entries WHERE queue_id = :qid"),
+        {"qid": target_queue_id},
+    ).scalar()
+
+    quantity = service_item_data.get("quantity", 1) if service_item_data else 1
+    item_price = service.price * quantity
+
+    if service.is_consultation and request.discount_mode in ["repeat", "benefit"]:
+        item_price = 0
+    if request.all_free:
+        item_price = 0
+
+    session_id = get_or_create_session_id(
+        db, entry.patient_id, target_queue_id, entry.queue.day
+    )
+
+    service_code = (
+        service.service_code
+        or get_service_code(service.id, db)
+        or "UNKNOWN"
+    )
+
+    new_entry = OnlineQueueEntry(
+        queue_id=target_queue_id,
+        number=next_number,
+        queue_time=current_queue_time,
+        patient_id=entry.patient_id,
+        patient_name=entry.patient_name,
+        phone=entry.phone,
+        birth_year=entry.birth_year,
+        address=entry.address,
+        status="waiting",
+        source=entry.source or "online",
+        discount_mode=request.discount_mode or entry.discount_mode,
+        visit_id=None,
+        session_id=session_id,
+        services=json.dumps(
+            [
+                {
+                    "service_id": service.id,
+                    "name": service.name,
+                    "code": service_code,
+                    "quantity": quantity,
+                    "price": int(item_price),
+                    "queue_time": current_queue_time.isoformat(),
+                    "cancelled": False,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+        service_codes=json.dumps([service_code], ensure_ascii=False),
+        total_amount=int(item_price),
+    )
+    db.add(new_entry)
+    db.flush()
+
+    logger.info(
+        "[full_update_online_entry] ⭐ Created Independent Entry for %s (ID=%d), queue_id=%d, number=%d, time=%s",
+        service.name,
+        service.id,
+        target_queue_id,
+        next_number,
+        current_queue_time,
+    )
+    return new_entry
+
+
+
 def _full_update_create_independent_entries(
     db: Session,
     entry,
@@ -1257,15 +1399,13 @@ def _full_update_create_independent_entries(
 
         # ⭐ FIX 13: Создаём Independent Queue Entries для дополнительных услуг
         # Эти услуги получают ТЕКУЩЕЕ время, а не QR время
+        # ⭐ FIX 13: Создаём Independent Queue Entries для дополнительных услуг
+        # Эти услуги получают ТЕКУЩЕЕ время, а не QR время
         if new_service_ids:
             from zoneinfo import ZoneInfo
 
-            from sqlalchemy import text
-
-            # ⭐ FIX: Use local Tashkent time, not UTC
             local_tz = ZoneInfo("Asia/Tashkent")
             current_queue_time = datetime.now(local_tz)
-            default_queue_id = entry.queue_id
 
             logger.info(
                 "[full_update_online_entry] ⭐ FIX 13: Creating %d Independent Queue Entries with current time: %s",
@@ -1278,111 +1418,18 @@ def _full_update_create_independent_entries(
                 if not new_service:
                     continue
 
-                # Определение целевой очереди по queue_tag услуги
-                target_queue_id = default_queue_id
-                if new_service.queue_tag:
-                    candidate_queue = (
-                        db.query(DailyQueue)
-                        .filter(
-                            DailyQueue.day == entry.queue.day,
-                            DailyQueue.queue_tag == new_service.queue_tag,
-                            DailyQueue.active == True
-                        )
-                        .first()
-                    )
-                    if candidate_queue:
-                        target_queue_id = candidate_queue.id
-                        logger.info(
-                            "[full_update_online_entry] ⭐ FIX 13: Услуга %s → очередь %s (ID=%d)",
-                            new_service.name, new_service.queue_tag, target_queue_id
-                        )
-                    else:
-                        # ⭐ FIX: Auto-create DailyQueue if missing (NOT silent fallback)
-                        logger.warning(
-                            "[full_update_online_entry] ⚠️ DailyQueue for queue_tag=%s not found, creating...",
-                            new_service.queue_tag
-                        )
-                        new_queue = queue_service.get_or_create_daily_queue(
-                            db,
-                            day=entry.queue.day,
-                            specialist_id=entry.queue.specialist_id,
-                            queue_tag=new_service.queue_tag,
-                        )
-                        target_queue_id = new_queue.id
-                        logger.info(
-                            "[full_update_online_entry] ✅ Created DailyQueue for %s (ID=%d)",
-                            new_service.queue_tag, target_queue_id
-                        )
-                # else: queue_tag is None → fallback to original queue is OK
-
-                # Вычисляем номер в целевой очереди
-                next_number = db.execute(
-                    text("SELECT COALESCE(MAX(number), 0) + 1 FROM queue_entries WHERE queue_id = :qid"),
-                    {"qid": target_queue_id}
-                ).scalar()
-
-                # Рассчитываем цену
-                service_item_data = next((s for s in request.services if s['service_id'] == new_service_id), None)
-                quantity = service_item_data.get('quantity', 1) if service_item_data else 1
-                item_price = new_service.price * quantity
-
-                if new_service.is_consultation and request.discount_mode in ['repeat', 'benefit']:
-                    item_price = 0
-                if request.all_free:
-                    item_price = 0
-
-                # Создаём Independent Queue Entry с ТЕКУЩИМ временем
-                # ⭐ session_id для группировки услуг пациента в одной очереди
-                session_id = get_or_create_session_id(
-                    db, entry.patient_id, target_queue_id, entry.queue.day
+                service_item_data = next(
+                    (s for s in request.services if s["service_id"] == new_service_id), None
+                )
+                _full_update_create_single_independent_entry(
+                    db=db,
+                    entry=entry,
+                    request=request,
+                    service=new_service,
+                    service_item_data=service_item_data,
+                    current_queue_time=current_queue_time,
                 )
 
-                new_entry = OnlineQueueEntry(
-                    queue_id=target_queue_id,
-                    number=next_number,
-                    queue_time=current_queue_time,  # ⭐ ТЕКУЩЕЕ время, НЕ QR время
-                    patient_id=entry.patient_id,
-                    patient_name=entry.patient_name,
-                    phone=entry.phone,
-                    birth_year=entry.birth_year,
-                    address=entry.address,
-                    status="waiting",
-                    source=entry.source or "online",
-                    discount_mode=request.discount_mode or entry.discount_mode,
-                    visit_id=None,
-                    session_id=session_id,  # ⭐ NEW: Session grouping
-                    services=json.dumps([{
-                        "service_id": new_service.id,
-                        "name": new_service.name,
-                        "code": new_service.service_code
-                        or get_service_code(new_service.id, db)
-                        or "UNKNOWN",
-                        "quantity": quantity,
-                        "price": int(item_price),
-                        "queue_time": current_queue_time.isoformat(),
-                        "cancelled": False,
-                    }], ensure_ascii=False),
-                    service_codes=json.dumps(
-                        [
-                            new_service.service_code
-                            or get_service_code(new_service.id, db)
-                            or "UNKNOWN"
-                        ],
-                        ensure_ascii=False,
-                    ),
-                    total_amount=int(item_price),
-                )
-                db.add(new_entry)
-                db.flush()
-
-                logger.info(
-                    "[full_update_online_entry] ⭐ FIX 13: Created Independent Entry for %s (ID=%d), queue_id=%d, number=%d, time=%s",
-                    new_service.name,
-                    new_service_id,
-                    target_queue_id,
-                    next_number,
-                    current_queue_time,
-                )
 
         # ⭐ FIX 2: Создаём Visit для QR-записи при первом заполнении
         if entry.patient_id and entry.visit_id is None and request.services:
@@ -1436,140 +1483,39 @@ def _full_update_create_independent_entries(
         # ⭐ PHASE 2.2 + FIX 13: Создаём ОТДЕЛЬНЫЕ entries для НОВЫХ/дополнительных услуг
         # Каждая новая услуга получает текущее queue_time и новый номер
         # ⭐ FIX 13: Это теперь работает и для First Fill (дополнительные услуги кроме консультации)
+        # ⭐ PHASE 2.2 + FIX 13: Создаём ОТДЕЛЬНЫЕ entries для НОВЫХ/дополнительных услуг
+        # Каждая новая услуга получает текущее queue_time и новый номер
         if new_service_ids:
             from zoneinfo import ZoneInfo
-
-            from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
             logger.info(
                 "[full_update_online_entry] ⭐ Creating %d Independent Queue Entries for additional services",
                 len(new_service_ids),
             )
 
-            # ⭐ FIX: Use local Tashkent time, not UTC
             local_tz = ZoneInfo("Asia/Tashkent")
             current_queue_time = datetime.now(local_tz)
-
-            today = datetime.now(local_tz).date()
-
-            # Мы будем вычислять next_number внутри цикла для каждой целевой очереди
-            # Поэтому предварительный расчет убираем, но оставляем queue_id по умолчанию
-            default_queue_id = entry.queue_id
 
             for new_service_id in new_service_ids:
                 new_service = db.query(Service).filter(Service.id == new_service_id).first()
                 if not new_service:
                     continue
 
-                # ⭐ FIX: Определение целевой очереди (распределение по колонкам)
-                target_queue_id = default_queue_id
-
-                # Если у услуги есть тег (например, 'echokg', 'lab'), ищем соответствующую очередь на сегодня
-                if new_service.queue_tag:
-                     candidate_queue = (
-                         db.query(DailyQueue)
-                         .filter(
-                             DailyQueue.day == entry.queue.day, # Та же дата, что у оригинальной записи
-                             DailyQueue.queue_tag == new_service.queue_tag,
-                             DailyQueue.active == True
-                         )
-                         .first()
-                     )
-                     if candidate_queue:
-                         target_queue_id = candidate_queue.id
-                         logger.info(
-                             "[full_update_online_entry] 🔀 Услуга %s перемещена в очередь %s (ID=%d)",
-                             new_service.name, new_service.queue_tag, target_queue_id
-                         )
-                     else:
-                         # ⭐ FIX: Auto-create DailyQueue if missing (NOT silent fallback)
-                         logger.warning(
-                             "[full_update_online_entry] ⚠️ DailyQueue for queue_tag=%s not found, creating...",
-                             new_service.queue_tag
-                         )
-                         new_queue = queue_service.get_or_create_daily_queue(
-                             db,
-                             day=entry.queue.day,
-                             specialist_id=entry.queue.specialist_id,
-                             queue_tag=new_service.queue_tag,
-                         )
-                         target_queue_id = new_queue.id
-                         logger.info(
-                             "[full_update_online_entry] ✅ Created DailyQueue for %s (ID=%d)",
-                             new_service.queue_tag, target_queue_id
-                         )
-                # else: queue_tag is None → fallback to original queue is OK
-
-                # ⭐ FIX: Вычисляем номер для КОНКРЕТНОЙ целевой очереди
-                # (теперь внутри цикла, так как очередь может меняться)
-                next_number = db.execute(
-                    text("SELECT COALESCE(MAX(number), 0) + 1 FROM queue_entries WHERE queue_id = :qid"),
-                    {"qid": target_queue_id}
-                ).scalar()
-
-                # Рассчитываем цену
-                service_item_data = next((s for s in request.services if s['service_id'] == new_service_id), None)
-                quantity = service_item_data.get('quantity', 1) if service_item_data else 1
-                item_price = new_service.price * quantity
-
-                if new_service.is_consultation and request.discount_mode in ['repeat', 'benefit']:
-                    item_price = 0
-                if request.all_free:
-                    item_price = 0
-
-                # Создаём новую entry
-                # ⭐ session_id для группировки услуг пациента в одной очереди
-                session_id = get_or_create_session_id(
-                    db, entry.patient_id, target_queue_id, entry.queue.day
+                service_item_data = next(
+                    (s for s in request.services if s["service_id"] == new_service_id), None
                 )
-
-                new_entry = OnlineQueueEntry(
-                    queue_id=target_queue_id,
-                    number=next_number,
-                    queue_time=current_queue_time,
-                    patient_id=entry.patient_id,
-                    patient_name=entry.patient_name,
-                    phone=entry.phone,
-                    birth_year=entry.birth_year,
-                    address=entry.address,
-                    status="waiting",
-                    source=entry.source or "online",
-                    discount_mode=request.discount_mode or entry.discount_mode,
-                    visit_id=None,  # ⭐ CRITICAL FIX: Новая услуга = новая independent entry
-                    session_id=session_id,  # ⭐ NEW: Session grouping
-                    services=json.dumps([{
-                        "service_id": new_service.id,
-                        "name": new_service.name,
-                        "code": new_service.service_code
-                        or get_service_code(new_service.id, db)
-                        or "UNKNOWN",
-                        "quantity": quantity,
-                        "price": int(item_price),
-                        "queue_time": current_queue_time.isoformat(),
-                        "cancelled": False,
-                    }], ensure_ascii=False),
-                    service_codes=json.dumps(
-                        [
-                            new_service.service_code
-                            or get_service_code(new_service.id, db)
-                            or "UNKNOWN"
-                        ],
-                        ensure_ascii=False,
-                    ),
-                    total_amount=int(item_price),
-                )
-                db.add(new_entry)
-                db.flush() # Важно сохранить, чтобы следующий next_number (в этой же очереди) был корректным
-
-                logger.info(
-                    "[full_update_online_entry] ⭐ PHASE 2.2: Создана новая entry для услуги %s (ID=%d), queue_id=%d, number=%d",
-                    new_service.name,
-                    new_service_id,
-                    target_queue_id,
-                    next_number,
+                _full_update_create_single_independent_entry(
+                    db=db,
+                    entry=entry,
+                    request=request,
+                    service=new_service,
+                    service_item_data=service_item_data,
+                    current_queue_time=current_queue_time,
                 )
 
             db.flush()  # Сохраняем новые entries
+
+
 
     return queue_time, new_service_ids
 
