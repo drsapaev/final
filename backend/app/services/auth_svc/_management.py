@@ -375,7 +375,7 @@ class ManagementMixin(AuthenticationServiceMixinBase):
             return None
 
 
-def get_authentication_service() -> "AuthenticationService":
+def get_authentication_service() -> AuthenticationService:
     """Получить экземпляр сервиса аутентификации"""
     from app.services.auth_svc import AuthenticationService
     return AuthenticationService()

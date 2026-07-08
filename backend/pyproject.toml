@@ -145,6 +145,7 @@ ignore = [
     "E402",  # module-import-not-at-top-of-file (conditional imports after config — known pattern)
     "F821",  # undefined-name (pre-existing: i18n t() function, split package re-exports)
     "F841",  # unused-variable (pre-existing tech debt)
+    "F811",  # redefined-while-unused (intentional in mixin pattern - methods defined in multiple mixins)
 ]
 
 [tool.ruff.lint.isort]
