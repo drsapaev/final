@@ -492,36 +492,17 @@ def _full_update_finalize_and_respond(
 
 
 
-def _full_update_handle_all_free_visit(
+def _full_update_resolve_visit_metadata(
     db: Session,
     entry,
     request,
-    original_entry_discount_mode: str,
-    patient_data,
-    services_list,
-    service_codes_list,
-    total_amount,
 ):
-    """Section 4.6: If request.all_free, create or update Visit + VisitService records.
-
-    Returns the Visit (or None if all_free is False).
-    """
-    import json
+    """Section 4.6.1: Resolve visit_date, doctor_id, department, and original_total_amount."""
     from datetime import date
     from decimal import Decimal
 
     from app.models.online_queue import DailyQueue
-    from app.models.patient import Patient
     from app.models.service import Service
-    from app.models.visit import Visit, VisitService
-
-    visit = None
-    if not request.all_free:
-        return visit
-
-    logger.info(
-        "[full_update_online_entry] all_free=True, создаем/обновляем Visit для одобрения",
-    )
 
     # Получаем данные из связанной очереди
     queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
@@ -588,6 +569,19 @@ def _full_update_handle_all_free_visit(
                 service.price or Decimal('0')
             ) * service_item.get('quantity', 1)
 
+    return (visit_date, doctor_id, department, original_total_amount)
+
+
+def _full_update_ensure_patient_for_visit(
+    db: Session,
+    entry,
+    patient_data: dict,
+):
+    """Section 4.6.2: Create temp Patient if entry has no patient_id. Returns patient_id_for_visit."""
+    from datetime import date
+
+    from app.models.patient import Patient
+
     # ✅ ИСПРАВЛЕНО: Для QR-пациентов без patient_id нужно создать Patient или пропустить создание Visit
     # Но Visit требует patient_id (nullable=False), поэтому создаем временного пациента если нужно
     patient_id_for_visit = entry.patient_id
@@ -626,6 +620,21 @@ def _full_update_handle_all_free_visit(
             "[full_update_online_entry] Создан временный пациент ID=%d и связан с OnlineQueueEntry",
             patient_id_for_visit,
         )
+
+    return patient_id_for_visit
+
+
+def _full_update_find_existing_visit(
+    db: Session,
+    entry,
+    patient_id_for_visit: int,
+    visit_date,
+):
+    """Section 4.6.3: 3-priority lookup for existing Visit.
+
+    Priority 1: entry.visit_id. Priority 2: patient_id + visit_date.
+    Priority 3: patient_id + visit_date + all_free. Returns Visit or None."""
+    from app.models.visit import Visit
 
     # ✅ ИСПРАВЛЕНО: Улучшенный поиск существующего Visit для предотвращения дублирования
     visit = None
@@ -686,6 +695,125 @@ def _full_update_handle_all_free_visit(
                 "[full_update_online_entry] Найден Visit по patient_id + visit_date + all_free: %d",
                 visit.id,
             )
+
+    return visit
+
+
+def _full_update_add_services_to_visit(
+    db: Session,
+    visit,
+    request,
+    has_paid_invoice: bool,
+):
+    """Section 4.6.4: Add VisitService records to the Visit.
+
+    For each service in request.services, create or update VisitService.
+    All services get price=0 (all_free). Returns list of added/updated service names."""
+    from decimal import Decimal
+
+    from app.models.service import Service
+    from app.models.visit import VisitService
+
+    # ✅ ИСПРАВЛЕНО: Добавляем услуги к Visit (после удаления старых ИЛИ к существующим)
+    added_services = []
+    for service_item in request.services:
+        service = (
+            db.query(Service)
+            .filter(Service.id == service_item['service_id'])
+            .first()
+        )
+        if service:
+            # ✅ Проверяем, нет ли уже такой услуги
+            existing_service = (
+                db.query(VisitService)
+                .filter(
+                VisitService.visit_id == visit.id,
+                    VisitService.service_id == service.id,
+                )
+                .first()
+            )
+
+            if not existing_service:
+                # ⭐ ИСПРАВЛЕНИЕ #2: Добавляем новую услугу (работает и для оплаченных, и для неоплаченных)
+                # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
+                service_code = service.service_code or get_service_code(
+                    service.id, db
+                )
+                visit_service = VisitService(
+                    visit_id=visit.id,
+                    service_id=service.id,
+                    code=service_code,
+                    name=service.name,
+                    qty=service_item.get('quantity', 1),
+                    price=Decimal('0'),  # All Free - всё бесплатно
+                    currency="UZS",
+                )
+                db.add(visit_service)
+                added_services.append(service.name)
+                if has_paid_invoice:
+                    logger.info(
+                        "[full_update_online_entry] ✅ Добавлена НОВАЯ услуга к оплаченному визиту: %s",
+                        service.name,
+                    )
+            else:
+                # Обновляем количество если услуга уже есть
+                existing_service.qty = service_item.get('quantity', 1)
+                added_services.append(f"{service.name} (обновлено)")
+
+    db.flush()  # Коммитим добавление услуг
+    logger.info(
+        "[full_update_online_entry] Visit ID=%d обновлен с услугами для all_free: %s",
+        visit.id,
+        added_services,
+    )
+
+    return added_services
+
+
+def _full_update_handle_all_free_visit(
+    db: Session,
+    entry,
+    request,
+    original_entry_discount_mode: str,
+    patient_data,
+    services_list,
+    service_codes_list,
+    total_amount,
+):
+    """Section 4.6: If request.all_free, create or update Visit + VisitService records.
+
+    Returns the Visit (or None if all_free is False).
+    """
+    from datetime import date
+    from decimal import Decimal
+
+    from app.models.visit import Visit, VisitService
+
+    visit = None
+    if not request.all_free:
+        return visit
+
+    logger.info(
+        "[full_update_online_entry] all_free=True, создаем/обновляем Visit для одобрения",
+    )
+
+    # Section 4.6.1: Resolve visit metadata
+    visit_date, doctor_id, department, original_total_amount = (
+        _full_update_resolve_visit_metadata(db=db, entry=entry, request=request)
+    )
+
+    # Section 4.6.2: Ensure patient exists for Visit
+    patient_id_for_visit = _full_update_ensure_patient_for_visit(
+        db=db, entry=entry, patient_data=patient_data,
+    )
+
+    # Section 4.6.3: Find existing Visit (3-priority lookup)
+    visit = _full_update_find_existing_visit(
+        db=db,
+        entry=entry,
+        patient_id_for_visit=patient_id_for_visit,
+        visit_date=visit_date,
+    )
 
     has_paid_invoice = False
     if visit:
@@ -787,60 +915,18 @@ def _full_update_handle_all_free_visit(
             department,
         )
 
-    # ✅ ИСПРАВЛЕНО: Добавляем услуги к Visit (после удаления старых ИЛИ к существующим)
-    added_services = []
-    for service_item in request.services:
-        service = (
-            db.query(Service)
-            .filter(Service.id == service_item['service_id'])
-            .first()
-        )
-        if service:
-            # ✅ Проверяем, нет ли уже такой услуги
-            existing_service = (
-                db.query(VisitService)
-                .filter(
-                VisitService.visit_id == visit.id,
-                    VisitService.service_id == service.id,
-                )
-                .first()
-            )
 
-            if not existing_service:
-                # ⭐ ИСПРАВЛЕНИЕ #2: Добавляем новую услугу (работает и для оплаченных, и для неоплаченных)
-                # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                service_code = service.service_code or get_service_code(
-                    service.id, db
-                )
-                visit_service = VisitService(
-                    visit_id=visit.id,
-                    service_id=service.id,
-                    code=service_code,
-                    name=service.name,
-                    qty=service_item.get('quantity', 1),
-                    price=Decimal('0'),  # All Free - всё бесплатно
-                    currency="UZS",
-                )
-                db.add(visit_service)
-                added_services.append(service.name)
-                if has_paid_invoice:
-                    logger.info(
-                        "[full_update_online_entry] ✅ Добавлена НОВАЯ услуга к оплаченному визиту: %s",
-                        service.name,
-                    )
-            else:
-                # Обновляем количество если услуга уже есть
-                existing_service.qty = service_item.get('quantity', 1)
-                added_services.append(f"{service.name} (обновлено)")
-
-    db.flush()  # Коммитим добавление услуг
-    logger.info(
-        "[full_update_online_entry] Visit ID=%d обновлен с услугами для all_free: %s",
-        visit.id,
-        added_services,
+    # Section 4.6.4: Add services to Visit
+    _full_update_add_services_to_visit(
+        db=db,
+        visit=visit,
+        request=request,
+        has_paid_invoice=has_paid_invoice,
     )
 
     return visit
+
+
 
 
 def _full_update_collect_existing_services(
