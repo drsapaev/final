@@ -1,12 +1,13 @@
 # app/api/v1/endpoints/health.py
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter
 from sqlalchemy import text
 
 from app.db.session import engine
 
-from typing import Any
 router = APIRouter(tags=["health"])
 
 

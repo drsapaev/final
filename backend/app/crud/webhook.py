@@ -2,7 +2,7 @@
 CRUD операции для webhook'ов
 """
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import and_, desc

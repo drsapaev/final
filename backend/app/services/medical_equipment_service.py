@@ -929,7 +929,7 @@ class MedicalEquipmentService:
                         ),
                         "data": asdict(measurement) if measurement else None,
                     }
-                except Exception as e:
+                except Exception:
                     results["tests"]["measurement"] = {
                         "passed": False,
                         "message": "Внутренняя ошибка",

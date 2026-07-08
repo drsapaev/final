@@ -5,17 +5,15 @@ under :mod:`app.services.lab_reporting`.
 """
 from __future__ import annotations
 
-from app.services.lab_reporting import LabReportingService
-from app.services.lab_reporting._base import (
-    FLAG_SEVERITY_RANKS,
-    LabReportingDomainError,
-)
-from app.services.lab_reporting._base import (
+from app.services.lab_reporting import LabReportingService  # noqa: F401
+from app.services.lab_reporting._base import (  # noqa: F401  # noqa: F401
     DEFAULT_LAB_ANALYTE_DEFINITIONS,
     DEFAULT_LAB_REFERENCE_RANGE_DEFINITIONS,
     DEFAULT_LAB_TEMPLATE_BINDING_DEFINITIONS,
     DEFAULT_LAB_TEMPLATE_DEFINITIONS,
     DEFAULT_LAB_UNIT_DEFINITIONS,
+    FLAG_SEVERITY_RANKS,
+    LabReportingDomainError,
 )
 
 __all__ = [

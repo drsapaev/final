@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -79,4 +79,3 @@ class EMRVersion(Base):
 # - emr_version.py:EMRVersion → table "emr_version_history", column "data"
 # The canonical model is emr_version.py:EMRVersion (has FK + is_current).
 # This alias ensures backward compatibility for code importing from emr_template.
-from app.models.emr_version import EMRVersion as EMRVersionCanonical

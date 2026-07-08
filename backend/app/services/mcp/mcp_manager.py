@@ -4,7 +4,7 @@ MCP Manager - централизованное управление MCP серв
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ...core.config import settings
@@ -132,7 +132,7 @@ class MCPManager:
 
             logger.info("MCP Manager shut down successfully")
 
-        except Exception as e:
+        except Exception:
             logger.error("Internal error")
 
     async def _periodic_health_check(self):
@@ -165,7 +165,7 @@ class MCPManager:
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception:
                 logger.error("Internal error")
 
     async def execute_request(

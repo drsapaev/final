@@ -6,13 +6,14 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
-    DOCTOR_QUEUE_SPECIALTY_VARIANTS,
     DOCTOR_QUEUE_ALLOWED_TAGS,
+    DOCTOR_QUEUE_SPECIALTY_VARIANTS,
     ScheduleNextVisitRequest,
     ScheduleNextVisitResponse,
     ScheduleNextVisitService,
     _doctor_queue_action_flags,
     _doctor_queue_available_actions,
+    _doctor_schedule_patient_context_exists,
     _ensure_legacy_complete_doctor_access,
     _ensure_schedule_next_patient_access,
     _ensure_visit_doctor_access,
@@ -21,9 +22,9 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     _resolve_queue_specialty_variants,
     _serialize_queue_doctor,
     _visit_filter_doctor_id,
-    _doctor_schedule_patient_context_exists,
     router,
 )
+
 
 @router.post("/doctor/visits/schedule-next", response_model=ScheduleNextVisitResponse)
 async def schedule_next_visit(
@@ -278,7 +279,7 @@ def get_today_visits(
 
         return {"success": True, "visits": result, "total_count": len(result)}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -324,7 +325,7 @@ def get_visit_statistics(
             "period": {"date_from": date_from, "date_to": date_to},
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -332,7 +333,7 @@ def get_visit_statistics(
 
     except HTTPException:
         raise
-    except Exception as e:  # noqa: B025  # manual-review: duplicate exception in try block — manual review
+    except Exception:  # noqa: B025  # manual-review: duplicate exception in try block — manual review
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -419,7 +420,7 @@ def get_visit_details(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -481,7 +482,7 @@ def add_service_to_visit(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -532,7 +533,7 @@ def remove_service_from_visit(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

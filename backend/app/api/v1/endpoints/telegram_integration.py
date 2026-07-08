@@ -14,22 +14,22 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.api.deps import get_db, require_roles
+from app.core.config import settings
 from app.crud import patient as crud_patient
 from app.crud import telegram_config as crud_telegram
 from app.models.appointment import Appointment
 from app.models.lab import LabOrder, LabResult
 from app.models.user import User
-from app.services.telegram_service import (
-    get_telegram_service,
-    send_telegram_notification,
-)
 from app.schemas.notifications import (
     SendAppointmentReminderIntegrationRequest,
     SendLabResultsNotificationRequest,
     SendQrCodeRequest,
     SendTelegramIntegrationNotificationRequest,
+)
+from app.services.telegram_service import (
+    get_telegram_service,
+    send_telegram_notification,
 )
 
 router = APIRouter()

@@ -1,27 +1,30 @@
 from __future__ import annotations
 
-import csv
-import hashlib
-import hmac
-import io
-import os
-import re
-from datetime import UTC, datetime, timedelta
-from difflib import SequenceMatcher
-from typing import Any
+import csv  # noqa: F401
+import hashlib  # noqa: F401
+import hmac  # noqa: F401
+import io  # noqa: F401
+import os  # noqa: F401
+import re  # noqa: F401
+from datetime import UTC, datetime, timedelta  # noqa: F401
+from difflib import SequenceMatcher  # noqa: F401
+from typing import Any  # noqa: F401
 
-from fastapi import HTTPException, Request, status
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from fastapi import HTTPException, Request, status  # noqa: F401
+from sqlalchemy import or_  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.crud import audit as crud_audit
-from app.models.audit import AuditLog
-from app.models.clinic import Doctor
-from app.models.patient import Patient
-from app.models.telegram_config import PatientOnboardingRequest, TelegramUser
-from app.models.user import User
-from app.models.visit import Visit
-from app.schemas.patient_onboarding import (
+from app.crud import audit as crud_audit  # noqa: F401
+from app.models.audit import AuditLog  # noqa: F401
+from app.models.clinic import Doctor  # noqa: F401
+from app.models.patient import Patient  # noqa: F401
+from app.models.telegram_config import (  # noqa: F401
+    PatientOnboardingRequest,
+    TelegramUser,
+)
+from app.models.user import User  # noqa: F401
+from app.models.visit import Visit  # noqa: F401
+from app.schemas.patient_onboarding import (  # noqa: F401
     OnboardingAnalyticsSummaryResponse,
     OnboardingMatchReasons,
     OnboardingPatientCandidate,
@@ -31,7 +34,7 @@ from app.schemas.patient_onboarding import (
     RegistrarPatientCreateDecisionRequest,
     RegistrarPatientLinkDecisionRequest,
 )
-from app.services.patient_service import PatientService
+from app.services.patient_service import PatientService  # noqa: F401
 
 ONBOARDING_ACTIVE_STATUSES = {"pending_review", "needs_more_info"}
 ONBOARDING_REQUEST_TTL_DAYS = 14

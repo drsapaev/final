@@ -2,7 +2,7 @@
 API endpoints для интеграции EMR с лабораторными данными
 """
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -176,9 +176,9 @@ async def get_patient_lab_results(
             "abnormal_count": len([r for r in results if r["is_abnormal"]]),
         }
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail="Internal server error",
@@ -206,9 +206,9 @@ async def integrate_lab_results_with_emr(
             "result": result,
         }
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=404, detail="Internal server error")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -246,7 +246,7 @@ async def get_abnormal_lab_results(
             "severity_groups": severity_groups,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -268,7 +268,7 @@ async def get_lab_summary_for_emr(
 
         return {"emr_id": emr_id, "patient_id": patient_id, "summary": summary}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail="Internal server error",
@@ -298,9 +298,9 @@ async def notify_doctor_about_lab_result(
 
         return {"message": "Уведомление врача отправлено", "notification": notification}
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=404, detail="Internal server error")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -387,7 +387,7 @@ async def get_lab_results_trends(
             "total_measurements": len(trend_data),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )

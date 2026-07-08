@@ -10,12 +10,17 @@ that enforce required core fields, size caps, and reject dangerous keys.
 """
 
 import logging
-from typing import NoReturn, Any
+from typing import Any, NoReturn
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+
+from app.api.deps import get_current_user
+
+# EMR-AUDIT-28 P0-4: весь роутер требует Admin/Doctor role.
+# Раньше использовал get_current_user без role check — Patient мог
+# вызывать export и получать произвольный EMR data как downloadable file.
+from app.api.deps import require_roles as _require_emr_export_roles
 from app.core.rate_limiter import limiter
-from fastapi import Request, APIRouter, Depends, HTTPException, Query, Response
-
-from app.api.deps import get_current_user, require_roles
 from app.models.user import User
 from app.schemas.emr_export import (
     EMRExportDataRequest,
@@ -24,10 +29,6 @@ from app.schemas.emr_export import (
 )
 from app.services.emr_export_service import EMRExportService
 
-# EMR-AUDIT-28 P0-4: весь роутер требует Admin/Doctor role.
-# Раньше использовал get_current_user без role check — Patient мог
-# вызывать export и получать произвольный EMR data как downloadable file.
-from app.api.deps import require_roles as _require_emr_export_roles
 router = APIRouter(dependencies=[Depends(_require_emr_export_roles("Admin", "Doctor"))])
 logger = logging.getLogger(__name__)
 

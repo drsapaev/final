@@ -11,7 +11,6 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.audit_helper import log_action
 from app.api.deps import get_current_active_user, get_db, require_roles
 from app.crud import clinic as crud_clinic
 from app.models.user import User

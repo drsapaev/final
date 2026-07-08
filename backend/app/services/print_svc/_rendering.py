@@ -45,7 +45,7 @@ class RenderingMixin(PrintServiceMixinBase):
                     f"Неподдерживаемый тип подключения: {printer.connection_type}"
                 )
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
 
@@ -95,7 +95,7 @@ class RenderingMixin(PrintServiceMixinBase):
                 except Exception:
                     pass
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
 
@@ -128,7 +128,7 @@ class RenderingMixin(PrintServiceMixinBase):
                 "bytes_sent": len(encoded_content),
             }
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
 
@@ -154,7 +154,7 @@ class RenderingMixin(PrintServiceMixinBase):
                 "bytes_sent": len(encoded_content),
             }
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
 
@@ -187,7 +187,7 @@ class RenderingMixin(PrintServiceMixinBase):
                 "bytes_sent": len(encoded_content),
             }
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
 
@@ -282,7 +282,7 @@ class RenderingMixin(PrintServiceMixinBase):
                 except Exception:
                     pass
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
 
@@ -395,7 +395,7 @@ class RenderingMixin(PrintServiceMixinBase):
             else:
                 raise Exception(f"Ошибка печати: {stderr.decode()}")
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
 
@@ -449,7 +449,7 @@ class RenderingMixin(PrintServiceMixinBase):
                 else:
                     return {"status": "offline", "message": "Устройство не найдено"}
 
-        except Exception as e:
+        except Exception:
             return {"status": "error", "message": "Внутренняя ошибка"}
 
 

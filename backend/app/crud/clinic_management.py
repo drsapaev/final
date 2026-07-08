@@ -2,7 +2,7 @@
 CRUD операции для расширенного управления клиникой
 """
 
-from datetime import date, datetime, timedelta, UTC
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session

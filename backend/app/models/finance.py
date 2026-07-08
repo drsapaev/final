@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 

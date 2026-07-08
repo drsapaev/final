@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 
-from typing import Any
+
 @router.post("/registrar/cart", response_model=CartResponse)
 def create_cart_appointments(
     cart_data: CartRequest,
@@ -466,7 +468,7 @@ def get_pending_price_overrides(
 
         return result
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -547,7 +549,7 @@ def approve_price_override(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -711,7 +713,7 @@ def get_all_free_requests(
 
         return result
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -797,7 +799,7 @@ def approve_all_free_request(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

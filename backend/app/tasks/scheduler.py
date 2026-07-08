@@ -35,7 +35,7 @@ async def _enqueue(func_name: str, **kwargs: Any) -> str:
 
     try:
         from arq import create_pool
-        from arq.connections import RedisSettings
+        from arq.connections import RedisSettings  # noqa: F401
 
         from app.tasks.worker import _parse_redis_settings
 

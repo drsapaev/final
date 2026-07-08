@@ -5,6 +5,7 @@ API endpoints для пациентов - управление своими за
 """
 import logging
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,7 +16,6 @@ from app.models.appointment import Appointment
 from app.models.user import User
 from app.services.patient_appointments_api_service import PatientAppointmentsApiService
 
-from typing import Any
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/patient", tags=["patient"])

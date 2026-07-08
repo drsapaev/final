@@ -6,9 +6,7 @@ from datetime import date
 
 import strawberry
 from sqlalchemy import func
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.graphql.types import (
     AppointmentFilter,
     AppointmentStats,
@@ -54,6 +52,7 @@ def get_db_session():
     Возвращает context manager для использования как 'with get_db_session() as db:'.
     """
     from contextlib import contextmanager
+
     from app.db.session import SessionLocal
 
     @contextmanager

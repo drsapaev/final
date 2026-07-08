@@ -377,8 +377,8 @@ class TelegramTemplatesService:
                 # TG-AUDIT-28 P0-6: safe_substitute вместо str.format —
                 # защита от format string injection ({__class__} patterns).
                 # Также HTML-escape всех значений для предотвращения XSS в Telegram.
-                from string import Template
                 from html import escape as _html_escape
+                from string import Template
 
                 _safe_data = {
                     k: _html_escape(str(v)) if v is not None else ""
@@ -399,7 +399,7 @@ class TelegramTemplatesService:
 
             return result
 
-        except Exception as e:
+        except Exception:
             return {
                 "text": "Внутренняя ошибка",
                 "keyboard": None,
@@ -413,8 +413,8 @@ class TelegramTemplatesService:
         TG-AUDIT-28 P0-6: использует string.Template.safe_substitute
         вместо str.format для защиты от format string injection.
         """
-        from string import Template
         from html import escape as _html_escape
+        from string import Template
 
         _safe_data = {
             k: _html_escape(str(v)) if v is not None else ""

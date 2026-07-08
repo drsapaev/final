@@ -7,6 +7,6 @@ callers (ai_manager.py, grok_provider.py) do not need to change.
 """
 from __future__ import annotations
 
-from app.services.ai.openai_provider_pkg import OpenAIProvider
+from app.services.ai.openai_provider_pkg import OpenAIProvider  # noqa: F401
 
 __all__ = ["OpenAIProvider"]

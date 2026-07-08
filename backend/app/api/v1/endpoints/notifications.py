@@ -29,6 +29,10 @@ from app.schemas.notification import (
     NotificationUnreadCountResponse,
     SendNotificationRequest,
 )
+from app.schemas.notifications import (
+    SendSystemAlertRequest,
+    UpdateNotificationPolicyRequest,
+)
 from app.schemas.user_management import (
     UserNotificationSettingsCreate,
     UserNotificationSettingsResponse,
@@ -36,7 +40,6 @@ from app.schemas.user_management import (
 )
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
-from app.schemas.notifications import SendSystemAlertRequest, UpdateNotificationPolicyRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

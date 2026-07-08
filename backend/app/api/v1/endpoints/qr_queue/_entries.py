@@ -1,8 +1,10 @@
 """Split from qr_queue.py.
 """
 from __future__ import annotations
+
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import router
+
 
 @router.post("/entry/{entry_id}/restore-next", response_model=dict[str, Any])
 async def restore_entry_to_next(
@@ -57,8 +59,9 @@ async def restore_entry_to_next(
 
     # UX Audit Stage 3 (Queue WebSocket): broadcast to /ws/queue admin panel.
     try:
-        from app.ws.queue_ws import broadcast_queue_update
         from datetime import date as _date
+
+        from app.ws.queue_ws import broadcast_queue_update
         _date_str = entry.queue.day.strftime("%Y-%m-%d") if hasattr(entry.queue, "day") and entry.queue.day else _date.today().strftime("%Y-%m-%d")
         _dept = f"specialist_{entry.queue.specialist_id}" if entry.queue else "unknown"
         broadcast_queue_update(
@@ -130,8 +133,9 @@ async def mark_entry_no_show(
 
     # UX Audit Stage 3 (Queue WebSocket): broadcast to /ws/queue admin panel.
     try:
-        from app.ws.queue_ws import broadcast_queue_update
         from datetime import date as _date
+
+        from app.ws.queue_ws import broadcast_queue_update
         _date_str = entry.queue.day.strftime("%Y-%m-%d") if hasattr(entry.queue, "day") and entry.queue.day else _date.today().strftime("%Y-%m-%d")
         _dept = f"specialist_{entry.queue.specialist_id}" if entry.queue else "unknown"
         broadcast_queue_update(

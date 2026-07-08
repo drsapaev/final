@@ -2,7 +2,7 @@
 CRUD операции для версий EMR
 """
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session

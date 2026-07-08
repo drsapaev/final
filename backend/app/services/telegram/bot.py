@@ -3,7 +3,6 @@ Telegram бот для системы клиники
 """
 
 import logging
-import os
 from datetime import datetime
 from typing import Any
 
@@ -340,7 +339,7 @@ class ClinicTelegramBot:
                     f"❌ Не удалось встать в очередь:\n{error_msg}"
                 )
 
-        except Exception as e:
+        except Exception:
             logger.error("Internal error")
             await callback.message.answer("❌ Произошла ошибка. Попробуйте позже.")
 

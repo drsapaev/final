@@ -6,13 +6,21 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from app.core.rate_limiter import limiter
-from fastapi import APIRouter, Request, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.api.v1.endpoints.admin_telegram import PATIENT_PAYMENT_ENTRY_ROUTE
 from app.core.config import settings
+from app.core.rate_limiter import limiter
 from app.crud import (
     appointment as crud_appointment,
 )
@@ -30,9 +38,9 @@ from app.models.lab import LabOrder
 from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
+from app.schemas.notifications import SendPaymentConfirmationRequest
 from app.services.telegram_bot import get_telegram_bot_service
 from app.services.telegram_templates import get_telegram_templates_service
-from app.schemas.notifications import SendPaymentConfirmationRequest
 
 router = APIRouter()
 
@@ -328,7 +336,7 @@ async def send_appointment_reminder(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -426,7 +434,7 @@ async def send_lab_results(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -503,7 +511,7 @@ async def send_payment_confirmation(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -516,7 +524,7 @@ BROADCAST_MAX_RECIPIENTS = 1000
 
 @router.post("/broadcast-message", response_model=dict[str, Any])
 @limiter.limit("1/5minute")
-async def send_broadcast_message(request: Request, 
+async def send_broadcast_message(request: Request,
     message: str,
     target_groups: list[str] = Query(
         ..., description="Группы получателей: patients, doctors, admins"
@@ -587,7 +595,7 @@ async def send_broadcast_message(request: Request,
             "target_groups": target_groups,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -623,7 +631,7 @@ async def get_notification_stats(
             "error_rate": 0.0,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -650,7 +658,7 @@ async def schedule_reminder(
             "reminder_type": reminder_type,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

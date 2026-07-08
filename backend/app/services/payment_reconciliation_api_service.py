@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, UTC
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 

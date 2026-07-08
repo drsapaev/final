@@ -15,9 +15,10 @@ Replaced with typed Pydantic request models from app.schemas.ai_gateway.
 Each model enforces field types, length limits, and enum constraints.
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import Any
 
 from app.api.deps import get_db
 from app.core.rbac import (

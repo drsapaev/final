@@ -166,7 +166,7 @@ class PDFService:
 
             return pdf_bytes
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     def generate_pdf_with_reportlab(
@@ -214,7 +214,7 @@ class PDFService:
 
             return pdf_bytes
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     def _get_page_css(self, paper_size: str) -> str:
@@ -258,7 +258,7 @@ class PDFService:
 
             return f"data:image/png;base64,{img_str}"
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     def _build_prescription_reportlab(self, data: dict[str, Any]) -> list:

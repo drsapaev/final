@@ -7,6 +7,7 @@ from __future__ import annotations
 from app.services.billing_service_pkg._base import *  # noqa: F401, F403
 from app.services.billing_service_pkg._base import BillingServiceMixinBase
 
+
 class RemindersMixin(BillingServiceMixinBase):
     """Reminders methods for BillingService."""
 

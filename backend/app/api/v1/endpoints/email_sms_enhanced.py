@@ -13,18 +13,25 @@ query params now take a single Pydantic body model.
 from datetime import datetime
 from typing import Any
 
-from app.core.rate_limiter import limiter
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.core.rate_limiter import limiter
 from app.crud import appointment as crud_appointment
 from app.crud import patient as crud_patient
 from app.models.clinic import Doctor
 from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
-from app.services.email_sms_enhanced import get_email_sms_enhanced_service
 from app.schemas.notifications import (
     SendAppointmentReminderEnhancedRequest,
     SendBulkEmailRequest,
@@ -34,6 +41,7 @@ from app.schemas.notifications import (
     SendLabResultsEnhancedRequest,
     SendPaymentConfirmationEnhancedRequest,
 )
+from app.services.email_sms_enhanced import get_email_sms_enhanced_service
 
 router = APIRouter()
 
@@ -183,7 +191,7 @@ async def send_appointment_reminder_enhanced(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -247,7 +255,7 @@ async def send_lab_results_enhanced(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -308,7 +316,7 @@ async def send_payment_confirmation_enhanced(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -356,7 +364,7 @@ async def send_bulk_email(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -402,7 +410,7 @@ async def send_bulk_sms(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -441,7 +449,7 @@ async def send_custom_email(
             "subject": body.subject,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -473,7 +481,7 @@ async def send_custom_sms(
 
         return {"success": success, "message": message, "phone": body.phone}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -498,7 +506,7 @@ async def get_email_sms_statistics(
             "timestamp": datetime.now().isoformat(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -523,7 +531,7 @@ async def reset_email_sms_statistics(
             "timestamp": datetime.now().isoformat(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -613,7 +621,7 @@ template_type: str = Query("all", description="Тип шаблона: email, sms
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -669,7 +677,7 @@ async def test_email_sending(
             "timestamp": datetime.now().isoformat(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -701,7 +709,7 @@ async def test_sms_sending(
             "timestamp": datetime.now().isoformat(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

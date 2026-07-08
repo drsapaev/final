@@ -95,6 +95,7 @@ async def cashier_websocket(
     # Декодируем JWT и проверяем валидность + роль.
     try:
         import jwt as _jwt
+
         from app.core.config import settings as _settings
         from app.db.session import SessionLocal as _SessionLocal
         from app.models.user import User as _User

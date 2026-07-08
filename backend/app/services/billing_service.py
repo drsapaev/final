@@ -5,6 +5,6 @@ under :mod:`billing_service_pkg`.
 """
 from __future__ import annotations
 
-from app.services.billing_service_pkg import BillingService
+from app.services.billing_service_pkg import BillingService  # noqa: F401
 
 __all__ = ["BillingService"]

@@ -5,13 +5,10 @@ Split from openai_provider.py.
 from __future__ import annotations
 
 from app.services.ai.openai_provider_pkg._base import (
-    OpenAIProviderMixinBase,
     AIRequest,
-    AIResponse,
-    json,
-    logging,
     Any,
-    base64,
+    OpenAIProviderMixinBase,
+    json,
 )
 
 
@@ -71,7 +68,7 @@ class TextMixin(OpenAIProviderMixinBase):
                 # Удаляем временный файл
                 os.unlink(temp_file_path)
 
-        except Exception as e:
+        except Exception:
             return {
                 "error": "Ошибка транскрипции",  # sanitized
                 "text": "",

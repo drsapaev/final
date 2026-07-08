@@ -4,7 +4,7 @@ MCP клиент для медицинских сервисов
 
 import asyncio
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from .base_server import MCPRequest
@@ -68,7 +68,7 @@ class MedicalMCPClient:
             await asyncio.gather(*shutdown_tasks)
             self.initialized = False
             logger.info("All MCP servers shut down successfully")
-        except Exception as e:
+        except Exception:
             logger.error("Internal error")
 
     def _generate_request_id(self) -> str:

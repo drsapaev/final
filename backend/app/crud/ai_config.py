@@ -2,7 +2,7 @@
 CRUD операции для AI конфигурации
 """
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import and_

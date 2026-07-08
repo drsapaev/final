@@ -9,13 +9,12 @@ Replaced with typed Pydantic request models from app.schemas.ai_gateway.
 """
 
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.services.ai_feature_gating import RequireAiFeature
 from app.api.deps import get_db, require_roles
 from app.crud import ai_config as crud_ai
 from app.models.user import User
@@ -27,6 +26,7 @@ from app.schemas.ai_gateway import (
     SuggestICD10IntegrationRequest,
     SymptomCheckerRequest,
 )
+from app.services.ai_feature_gating import RequireAiFeature
 from app.services.ai_service import get_ai_service
 
 router = APIRouter(dependencies=[Depends(RequireAiFeature("ai_integration"))])  # P1-13: feature flag

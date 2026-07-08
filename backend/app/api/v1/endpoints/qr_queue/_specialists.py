@@ -1,8 +1,10 @@
 """Split from qr_queue.py.
 """
 from __future__ import annotations
+
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import router
+
 
 @router.get("/available-specialists", response_model=dict[str, Any])
 def get_available_specialists(

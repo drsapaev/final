@@ -8,6 +8,7 @@ from typing import Any
 
 import argon2 as _argon2
 import jwt
+
 # PASSLIB-STATUS: passlib 1.7.4 is in maintenance mode (no releases since 2020).
 # Current: passlib CryptContext with argon2 + bcrypt schemes.
 # Future: migrate to argon2-cffi directly (remove passlib dependency).

@@ -7,27 +7,34 @@ Split from telegram_webhook.py (5647 LOC → modular).
 Webhook endpoint для обработки входящих сообщений от Telegram
 """
 
-import json, os, uuid, asyncio, io, time
-import hashlib
-import hmac
-import html
-import ipaddress
-import logging
-import secrets
-import socket
-from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
-from typing import Any, NoReturn
-from urllib.parse import urlsplit, urlunsplit
+import hashlib  # noqa: F401
+import hmac  # noqa: F401
+import html  # noqa: F401
+import ipaddress  # noqa: F401
+import json  # noqa: F401
+import logging  # noqa: F401
+import secrets  # noqa: F401
+import socket  # noqa: F401
+from datetime import UTC, date, datetime, timedelta  # noqa: F401
+from decimal import Decimal  # noqa: F401
+from typing import Any, NoReturn  # noqa: F401
+from urllib.parse import urlsplit, urlunsplit  # noqa: F401
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from fastapi import (  # noqa: F401
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
+from fastapi.responses import JSONResponse  # noqa: F401
+from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
+from sqlalchemy import func  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.api.deps import require_roles
-from app.api.v1.endpoints.admin_telegram import (
+from app.api.deps import require_roles  # noqa: F401
+from app.api.v1.endpoints.admin_telegram import (  # noqa: F401
     PATIENT_BOOKING_ENTRY_ROUTE,
     PATIENT_MINI_APP_ENTRY_ROUTE,
     PATIENT_PAYMENT_ENTRY_ROUTE,
@@ -43,26 +50,33 @@ from app.api.v1.endpoints.admin_telegram import (
     _normalize_staff_role,
     validate_staff_link_start_token,
 )
-from app.core.config import settings
-from app.crud import audit as crud_audit
-from app.crud import telegram_config as crud_telegram
-from app.crud.appointment import appointment as appointment_crud
-from app.db.session import get_db
-from app.models.appointment import Appointment
-from app.models.clinic import Doctor
-from app.models.lab import LabReportInstance
-from app.models.notification import NotificationDelivery, NotificationEvent
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.patient import Patient
-from app.models.payment import Payment, PaymentVisit
-from app.models.payment_invoice import PaymentInvoice
-from app.models.payment_webhook import PaymentWebhook
-from app.models.telegram_config import TelegramMessage, TelegramUser
-from app.models.user import User
-from app.models.visit import Visit
-from app.models.webhook import WebhookCall, WebhookCallStatus, WebhookEvent
-from app.schemas import appointment as appointment_schemas
-from app.schemas.patient_onboarding import (
+from app.core.config import settings  # noqa: F401
+from app.crud import audit as crud_audit  # noqa: F401
+from app.crud import telegram_config as crud_telegram  # noqa: F401
+from app.crud.appointment import appointment as appointment_crud  # noqa: F401
+from app.db.session import get_db  # noqa: F401
+from app.models.appointment import Appointment  # noqa: F401
+from app.models.clinic import Doctor  # noqa: F401
+from app.models.lab import LabReportInstance  # noqa: F401
+from app.models.notification import (  # noqa: F401
+    NotificationDelivery,
+    NotificationEvent,
+)
+from app.models.online_queue import DailyQueue, OnlineQueueEntry  # noqa: F401
+from app.models.patient import Patient  # noqa: F401
+from app.models.payment import Payment, PaymentVisit  # noqa: F401
+from app.models.payment_invoice import PaymentInvoice  # noqa: F401
+from app.models.payment_webhook import PaymentWebhook  # noqa: F401
+from app.models.telegram_config import TelegramMessage, TelegramUser  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.models.visit import Visit  # noqa: F401
+from app.models.webhook import (  # noqa: F401
+    WebhookCall,
+    WebhookCallStatus,
+    WebhookEvent,
+)
+from app.schemas import appointment as appointment_schemas  # noqa: F401
+from app.schemas.patient_onboarding import (  # noqa: F401
     OnboardingAnalyticsSummaryResponse,
     OnboardingPatientSearchRequest,
     OnboardingSearchResponse,
@@ -76,17 +90,19 @@ from app.schemas.patient_onboarding import (
     RegistrarPatientCreateDecisionRequest,
     RegistrarPatientLinkDecisionRequest,
 )
-from app.services.lab_report_pdf_service import lab_report_pdf_service
-from app.services.lab_reporting_service import LabReportingService
-from app.services.patient_onboarding_service import PatientOnboardingService
-from app.services.payment_reconciliation_api_service import (
+from app.services.lab_report_pdf_service import lab_report_pdf_service  # noqa: F401
+from app.services.lab_reporting_service import LabReportingService  # noqa: F401
+from app.services.patient_onboarding_service import (
+    PatientOnboardingService,  # noqa: F401
+)
+from app.services.payment_reconciliation_api_service import (  # noqa: F401
     PaymentReconciliationApiService,
 )
-from app.services.telegram_bot import (
+from app.services.telegram_bot import (  # noqa: F401
     get_telegram_bot_service,
     telegram_text_corruption_reason,
 )
-from app.services.telegram_mini_app_init_data import (
+from app.services.telegram_mini_app_init_data import (  # noqa: F401
     TelegramMiniAppInitDataError,
     TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
@@ -96,14 +112,14 @@ from app.services.telegram_mini_app_init_data import (
     save_telegram_mini_app_patient_form_submission,
     validate_telegram_mini_app_init_data,
 )
-from app.services.telegram_staff_confirmation_token_service import (
+from app.services.telegram_staff_confirmation_token_service import (  # noqa: F401
     TelegramStaffConfirmationTokenService,
 )
-from app.services.visit_confirmation_service import (
+from app.services.visit_confirmation_service import (  # noqa: F401
     TELEGRAM_TICKET_QR_PREFIX,
     consume_telegram_ticket_start_token,
 )
-from app.utils.validators import normalize_phone_uz
+from app.utils.validators import normalize_phone_uz  # noqa: F401
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

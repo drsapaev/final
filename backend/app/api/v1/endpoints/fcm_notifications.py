@@ -82,7 +82,7 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
             "device_token": request.device_token,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -107,7 +107,7 @@ async def unregister_fcm_token(
 
         return {"success": True, "message": "FCM токен успешно удален"}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -196,7 +196,7 @@ async def send_fcm_notification(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -250,7 +250,7 @@ async def send_test_fcm_notification(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -286,7 +286,7 @@ async def subscribe_to_topic(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -322,7 +322,7 @@ async def unsubscribe_from_topic(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -363,7 +363,7 @@ async def send_topic_notification(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -381,7 +381,7 @@ async def get_fcm_status(
 
         return {"fcm_service": status_info, "timestamp": datetime.now().isoformat()}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -416,7 +416,7 @@ async def get_user_fcm_tokens(
 
         return {"users": result, "total_count": len(result)}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

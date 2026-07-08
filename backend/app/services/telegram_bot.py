@@ -6,13 +6,10 @@ Telegram Bot сервис для клиники
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-import asyncio
-
-from app.models.telegram_config import TelegramUser
 from sqlalchemy.orm import Session
 
 from app.crud import (
@@ -24,6 +21,7 @@ from app.crud import (
 from app.crud import (
     user as crud_user,
 )
+from app.models.telegram_config import TelegramUser
 
 logger = logging.getLogger(__name__)
 MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024

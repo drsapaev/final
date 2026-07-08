@@ -5,6 +5,6 @@ under :mod:`app.services.ai.mock_provider_pkg`.
 """
 from __future__ import annotations
 
-from app.services.ai.mock_provider_pkg import MockProvider
+from app.services.ai.mock_provider_pkg import MockProvider  # noqa: F401
 
 __all__ = ["MockProvider"]

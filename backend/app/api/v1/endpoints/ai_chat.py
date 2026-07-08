@@ -267,7 +267,7 @@ async def send_message(
             created_at=response.created_at.isoformat()
         )
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=404, detail="Internal server error")
 
 

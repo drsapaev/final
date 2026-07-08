@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.schemas.misc_endpoints import EmrVersionDataRequest
 from app.models.user import User
+from app.schemas.misc_endpoints import EmrVersionDataRequest
 from app.services.emr_versioning_enhanced import emr_versioning_enhanced
 
 router = APIRouter()
@@ -30,7 +30,7 @@ async def get_version_timeline(
 
         return {"emr_id": emr_id, "timeline": timeline, "total_versions": len(timeline)}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -52,9 +52,9 @@ async def compare_versions(
 
         return comparison
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=404, detail="Internal server error")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -80,9 +80,9 @@ async def restore_version_with_backup(
 
         return {"message": "Версия успешно восстановлена", "result": result}
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=404, detail="Internal server error")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -102,7 +102,7 @@ async def get_version_statistics(
 
         return {"emr_id": emr_id, "statistics": statistics}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -145,7 +145,7 @@ async def create_version_with_analysis(
             "created_at": version.created_at,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -188,7 +188,7 @@ async def get_version_details(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -220,7 +220,7 @@ async def delete_version(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -277,5 +277,5 @@ async def export_versions(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")

@@ -8,15 +8,15 @@ from __future__ import annotations
 Сервис для автоматического выставления счетов
 """
 
-import logging
-from datetime import datetime, timedelta, UTC
-from typing import Any
+import logging  # noqa: F401
+from datetime import UTC, datetime, timedelta  # noqa: F401
+from typing import Any  # noqa: F401
 
-from jinja2 import Environment, select_autoescape
-from sqlalchemy.orm import Session
+from jinja2 import Environment, select_autoescape  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.models.appointment import Appointment
-from app.models.billing import (
+from app.models.appointment import Appointment  # noqa: F401
+from app.models.billing import (  # noqa: F401
     BillingRule,
     BillingSettings,
     Invoice,
@@ -28,15 +28,15 @@ from app.models.billing import (
     PaymentReminder,
     RecurrenceType,
 )
-from app.models.enums import PaymentStatus, VisitStatus
+from app.models.enums import PaymentStatus, VisitStatus  # noqa: F401
 
 # ✅ ИСПРАВЛЕНО: BillingPayment удален из импортов - используем только Payment из app.models.payment (SSOT)
-from app.models.patient import Patient
-from app.models.payment import Payment
-from app.models.service import Service
-from app.models.visit import Visit, VisitService
-from app.services.queue_service import queue_service
-from app.services.service_mapping import normalize_service_code
+from app.models.patient import Patient  # noqa: F401
+from app.models.payment import Payment  # noqa: F401
+from app.models.service import Service  # noqa: F401
+from app.models.visit import Visit, VisitService  # noqa: F401
+from app.services.queue_service import queue_service  # noqa: F401
+from app.services.service_mapping import normalize_service_code  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

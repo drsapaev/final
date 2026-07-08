@@ -19,7 +19,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 

@@ -15,7 +15,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-
 # Reuse the validation function from emr_export
 from app.schemas.emr_export import _validate_dict_recursive
 

@@ -5,7 +5,7 @@ Split from print_service.py.
 from __future__ import annotations
 
 from app.services.print_svc._base import *  # noqa: F401, F403
-from app.services.print_svc._base import PrintServiceMixinBase
+from app.services.print_svc._base import PrintServiceMixinBase  # noqa: F401
 
 
 class HelpersMixin(PrintServiceMixinBase):

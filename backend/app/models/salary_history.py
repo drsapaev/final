@@ -2,7 +2,7 @@
 Salary History Model
 Модель для хранения истории изменений зарплат сотрудников
 """
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import (

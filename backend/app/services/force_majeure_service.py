@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, UTC
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session

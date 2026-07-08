@@ -1,5 +1,6 @@
 # app/api/v1/endpoints/visit_payments.py
 from __future__ import annotations
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -23,7 +24,7 @@ def get_visit_payments_summary(
     service = VisitPaymentApiService(db)
     try:
         return service.get_visit_payments_summary()
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -41,7 +42,7 @@ def get_visit_payment_info(
         return service.get_visit_payment_info(visit_id=visit_id)
     except VisitPaymentApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -69,7 +70,7 @@ def get_visits_by_payment_status(
         )
     except VisitPaymentApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -103,7 +104,7 @@ def update_visit_payment_status(
         )
     except VisitPaymentApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -133,7 +134,7 @@ def create_visit_from_payment(
         )
     except VisitPaymentApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

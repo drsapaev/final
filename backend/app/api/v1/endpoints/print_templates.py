@@ -134,7 +134,7 @@ def get_print_templates(
 
         return templates
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -162,7 +162,7 @@ def create_print_template(
         try:
             env = Environment(autoescape=True)
             env.from_string(template_data.template_content)
-        except TemplateError as e:
+        except TemplateError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Internal server error",
@@ -174,7 +174,7 @@ def create_print_template(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -230,7 +230,7 @@ def update_print_template(
             try:
                 env = Environment(autoescape=True)
                 env.from_string(template_data.template_content)
-            except TemplateError as e:
+            except TemplateError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Internal server error",
@@ -244,7 +244,7 @@ def update_print_template(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -308,7 +308,7 @@ def upload_template_file(
         try:
             env = Environment(autoescape=True)
             env.from_string(content.decode('utf-8'))
-        except TemplateError as e:
+        except TemplateError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Internal server error",
@@ -325,7 +325,7 @@ def upload_template_file(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -367,12 +367,12 @@ def preview_template(
             "template_type": template.template_type,
         }
 
-    except TemplateError as e:
+    except TemplateError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Internal server error",
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -418,7 +418,7 @@ def get_default_template(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -514,7 +514,7 @@ def get_print_jobs(
 
         return jobs
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

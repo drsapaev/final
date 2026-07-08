@@ -7,8 +7,8 @@ from __future__ import annotations
 from app.services.lab_report_pdf._base import *  # noqa: F401, F403
 from app.services.lab_report_pdf._base import LabReportPDFServiceMixinBase
 from app.services.lab_report_pdf._core import CoreMixin
-from app.services.lab_report_pdf._reportlab import ReportlabMixin
 from app.services.lab_report_pdf._docx import DocxMixin
+from app.services.lab_report_pdf._reportlab import ReportlabMixin
 
 __all__ = ["LabReportPDFService"]
 

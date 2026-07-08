@@ -32,6 +32,7 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     router,
 )
 
+
 @router.post("/visits/{visit_id}/mark-paid", response_model=dict[str, Any])
 async def mark_visit_as_paid(
     visit_id: int,
@@ -97,7 +98,7 @@ async def mark_visit_as_paid(
             "amount": float(total_amount)
         }
 
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
@@ -128,7 +129,7 @@ async def get_payment_receipt(
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

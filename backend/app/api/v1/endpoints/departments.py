@@ -3,9 +3,10 @@ Departments API endpoint
 Provides department/tab management for registrar panel
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Any
 
 from app.api.deps import get_current_active_user, get_db
 from app.models.user import User

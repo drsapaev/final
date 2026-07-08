@@ -4,7 +4,7 @@ API endpoints для управления информацией о кабине
 
 import logging
 from datetime import date, datetime
-from typing import NoReturn, Any
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel

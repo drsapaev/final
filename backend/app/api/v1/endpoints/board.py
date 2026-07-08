@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.services.online_queue import load_stats
 
-from typing import Any
 router = APIRouter(prefix="/board", tags=["board"])
 
 

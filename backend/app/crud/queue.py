@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 
 from sqlalchemy import MetaData, Table, and_, func, select
 from sqlalchemy.orm import Session

@@ -16,8 +16,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
-from app.core.sentry import init_sentry as init_backend_sentry
 from app.core.prometheus import init_prometheus
+from app.core.sentry import init_sentry as init_backend_sentry
 
 # -----------------------------------------------------------------------------
 # Логирование
@@ -220,7 +220,6 @@ app.add_api_websocket_route("/ws/chat", chat_websocket_handler)  # User-to-user 
 
 # Security headers middleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request as StarletteRequest
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -406,7 +405,7 @@ def detailed_health():
     Public endpoint (no auth) — safe to expose to uptime monitors.
     """
     import time
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
 
     checks = {}
     overall_ok = True
@@ -414,6 +413,7 @@ def detailed_health():
     # 1. Database
     try:
         from sqlalchemy import text as sql_text
+
         from app.db.session import SessionLocal
         db = SessionLocal()
         try:
@@ -428,12 +428,13 @@ def detailed_health():
     # 2. Redis (optional — may not be configured in dev)
     try:
         import redis
+
         from app.core.config import settings
         redis_url = getattr(settings, "ARQ_REDIS_URL", "redis://localhost:6379/0")
         r = redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2)
         r.ping()
         checks["redis"] = {"status": "ok"}
-    except Exception as e:
+    except Exception:
         # Redis is optional in dev — don't fail health check
         checks["redis"] = {"status": "skipped", "reason": "not configured or unreachable"}
 
@@ -473,6 +474,7 @@ def detailed_health():
 
 # Track app start time for uptime calculation
 import time as _time
+
 _app_start_time = _time.time()
 
 
@@ -542,6 +544,7 @@ async def _startup_tasks() -> None:
     # failed due to a transient error). Runs every 5 minutes.
     try:
         import asyncio
+
         from app.db.session import SessionLocal
         from app.services.lab_notification_service import LabNotificationService
 

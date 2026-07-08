@@ -9,12 +9,12 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.models.user import User
-from app.services.dental_api_service import DentalApiDomainError, DentalApiService
 from app.schemas.dental import (
     DentalExaminationRequest,
     DentalProstheticRequest,
     DentalTreatmentRequest,
 )
+from app.services.dental_api_service import DentalApiDomainError, DentalApiService
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ async def get_dental_examinations(
     """
     try:
         return []
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -97,7 +97,7 @@ async def get_treatment_plans(
     """
     try:
         return []
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -130,7 +130,7 @@ async def get_prosthetics(
     """
     try:
         return []
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -164,7 +164,7 @@ async def get_xray_images(
         return {
             "message": "Модуль рентгеновских снимков будет доступен в следующей версии"
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -203,7 +203,7 @@ async def create_dental_price_override(
         )
     except DentalApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
+    except Exception:
         service.rollback()
         raise HTTPException(
             status_code=500, detail="Internal server error"
@@ -247,7 +247,7 @@ async def get_dental_price_overrides(
         ]
     except DentalApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -281,7 +281,7 @@ async def approve_price_override(
         )
     except DentalApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
+    except Exception:
         service.rollback()
         raise HTTPException(
             status_code=500, detail="Internal server error"
@@ -303,7 +303,7 @@ async def get_pending_price_overrides(
     """
     try:
         return DentalApiService(db).get_pending_price_overrides(limit=limit)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail="Internal server error",

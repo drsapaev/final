@@ -6,21 +6,33 @@ Split from telegram_webhook.py (5647 LOC → modular).
 from __future__ import annotations
 
 from typing import Any
+
+from app.api.v1.endpoints.telegram_webhook._clinic_bot import *  # noqa: F401, F403
+from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
+    _handle_clinic_bot_update,
+    _raise_telegram_webhook_internal_error,
+    _validate_webhook_secret,
+)
+
 # Import everything from all submodules (wildcard for backward compat)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
+
+# Specific imports
+from app.api.v1.endpoints.telegram_webhook._helpers import (
+    APIRouter,
+    Depends,
+    Request,
+    Response,
+    get_db,
+    logger,
+    status,
+)
+from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
+from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403
 from app.schemas.notifications import (
     SendMessageRequest,
     TelegramWebhookUpdateRequest,
 )
-from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
-from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403
-from app.api.v1.endpoints.telegram_webhook._clinic_bot import *  # noqa: F401, F403
-# Specific imports
-from app.api.v1.endpoints.telegram_webhook._helpers import APIRouter, Depends, Request, Response, status, get_db, settings, logger
-from app.api.v1.endpoints.telegram_webhook._clinic_bot import _validate_webhook_secret, _handle_clinic_bot_update
-from app.api.v1.endpoints.telegram_webhook._helpers import _read_telegram_webhook_json
-from app.api.v1.endpoints.telegram_webhook._clinic_bot import _acknowledge_webhook_error, _raise_telegram_webhook_internal_error
-from app.services.telegram_bot import TelegramBotService, telegram_bot_service
 
 router = APIRouter()
 

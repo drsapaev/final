@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
-from app.api.v1.endpoints.registrar_wizard._cart import BenefitSettingsResponse
-
 from typing import Any
+
+from app.api.v1.endpoints.registrar_wizard._cart import BenefitSettingsResponse
+from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
+
+
 @router.get("/admin/benefit-settings", summary="Получить настройки льгот", response_model=BenefitSettingsResponse)
 def get_benefit_settings(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
@@ -82,7 +84,7 @@ def get_benefit_settings(
             updated_at=updated_at,
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -160,7 +162,7 @@ def update_benefit_settings(
             },
         }
 
-    except Exception as e:
+    except Exception:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

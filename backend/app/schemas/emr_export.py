@@ -18,7 +18,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-
 # Keys that are dangerous in deserialization contexts — reject them
 # to prevent pickle-style attacks even if the dict is just JSON.
 _DANGEROUS_KEYS = frozenset({

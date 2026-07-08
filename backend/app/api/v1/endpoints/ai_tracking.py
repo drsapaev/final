@@ -3,7 +3,7 @@ API endpoints для трекинга AI моделей
 """
 
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -23,7 +23,7 @@ from app.services.ai_tracking_service import get_ai_tracking_service
 router = APIRouter(dependencies=[Depends(require_ai_permission(AIPermission.VIEW_STATS))])
 
 # Rate limiting on all tracking endpoints
-from app.core.rate_limiter import limiter
+
 logger = logging.getLogger(__name__)
 
 AI_TRACKING_PUBLIC_ERROR = "Internal server error"

@@ -171,7 +171,7 @@ async def get_skin_examinations(
             len(examinations),
         )
         return examinations
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         logger.exception(
             "[derma.examinations] failed to list examinations user_id=%s patient_id=%s",
             getattr(user, "id", None),
@@ -234,7 +234,7 @@ async def create_skin_examination(
     except HTTPException:
         db.rollback()
         raise
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.rollback()
         logger.exception(
             "[derma.examinations] failed to create examination user_id=%s patient_id=%s visit_id=%s",
@@ -291,7 +291,7 @@ async def get_cosmetic_procedures(
             len(procedures),
         )
         return procedures
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         logger.exception(
             "[derma.procedures] failed to list procedures user_id=%s patient_id=%s",
             getattr(user, "id", None),
@@ -353,7 +353,7 @@ async def create_cosmetic_procedure(
     except HTTPException:
         db.rollback()
         raise
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.rollback()
         logger.exception(
             "[derma.procedures] failed to create procedure user_id=%s patient_id=%s visit_id=%s",
@@ -402,7 +402,7 @@ async def create_price_override(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -448,7 +448,7 @@ async def get_price_overrides(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -465,7 +465,7 @@ async def get_photo_gallery(
     """
     try:
         return {"message": "Фотогалерея будет доступна в следующей версии"}
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )

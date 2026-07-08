@@ -3,54 +3,56 @@ API endpoints для интеграции панелей врачей с сис�
 Основа: passport.md стр. 1141-2063
 """
 
-import logging
-import uuid
-from datetime import UTC, date, datetime, timedelta
-from typing import Any
+import logging  # noqa: F401
+import uuid  # noqa: F401
+from datetime import UTC, date, datetime, timedelta  # noqa: F401
+from typing import Any  # noqa: F401
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
+from pydantic import BaseModel, Field, model_validator  # noqa: F401
+from sqlalchemy import and_, or_  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
-from app.api.deps import (  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.api.deps import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     get_db,
     require_roles,
 )
-from app.crud import (  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.crud import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     clinic as crud_clinic,
 )
-from app.crud import (  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.crud import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     visit as crud_visit,
 )
-from app.models.appointment import (  # noqa: E402  # manual-review: conditional import after config — intentional
-    Appointment,  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.models.appointment import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+    Appointment,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
-from app.models.clinic import (  # noqa: E402  # manual-review: conditional import after config — intentional
-    Doctor,  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.models.clinic import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+    Doctor,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
-from app.models.online_queue import (  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.models.online_queue import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     DailyQueue,
     OnlineQueueEntry,
 )
-from app.models.service import (  # noqa: E402  # manual-review: conditional import after config — intentional
-    Service,  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.models.service import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+    Service,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
-from app.models.user import (  # noqa: E402  # manual-review: conditional import after config — intentional
-    User,  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.models.user import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+    User,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
-from app.schemas.misc_endpoints import CompleteVisitRequest  # noqa: E402  # manual-review: conditional import after config — intentional
-from app.models.visit import (  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.models.visit import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     Visit,
     VisitService,
 )
-from app.services.notification_service import (  # noqa: E402  # manual-review: conditional import after config — intentional
-    NotificationService,  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.schemas.misc_endpoints import (
+    CompleteVisitRequest,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
-from app.services.service_mapping import (  # noqa: E402  # manual-review: conditional import after config — intentional
-    get_service_code,  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.services.notification_service import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+    NotificationService,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+)
+from app.services.service_mapping import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+    get_service_code,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
 
 router = APIRouter()

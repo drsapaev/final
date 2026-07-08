@@ -9,7 +9,7 @@ ST-segment, T-wave) plus an interpretation note.
 
 from __future__ import annotations
 
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text

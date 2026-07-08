@@ -8,12 +8,12 @@ Provides endpoints for:
 """
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends
 
 from app.api.deps import require_roles
 
-from typing import Any
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 logger = logging.getLogger(__name__)
 

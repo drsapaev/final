@@ -1,9 +1,12 @@
 
 """P1-9: Telegram webhook update_id dedup table."""
 from __future__ import annotations
+
 from datetime import datetime
-from sqlalchemy import Integer, DateTime, String, Index
+
+from sqlalchemy import DateTime, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.db.base_class import Base
 
 

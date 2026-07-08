@@ -10,7 +10,7 @@ EMRPhraseIndexer - Batch-индексатор для миграции сущес
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -187,7 +187,7 @@ class EMRPhraseIndexer:
                     doctors_now_ready += 1
                     logger.info(f"Doctor {doctor_id} is now ready for autocomplete")
 
-            except Exception as e:
+            except Exception:
                 error_msg = "Internal error"
                 logger.error(error_msg)
                 errors.append(error_msg)

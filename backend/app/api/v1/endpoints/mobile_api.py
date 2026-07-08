@@ -4,7 +4,7 @@
 
 import gzip
 import json
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -19,9 +19,6 @@ from app.crud import (
     lab as crud_lab,
 )
 from app.crud import (
-    notification as crud_notification,
-)
-from app.crud import (
     patient as crud_patient,
 )
 from app.crud import (
@@ -29,7 +26,6 @@ from app.crud import (
 )
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
-from app.services.notification_platform_service import get_notification_platform_service
 from app.schemas.mobile import (
     AppointmentUpcomingOut,
     BookAppointmentRequest,
@@ -41,6 +37,7 @@ from app.schemas.mobile import (
     PatientProfileOut,
 )
 from app.services.mobile_api_service import MobileApiService
+from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
 
 router = APIRouter()
@@ -155,7 +152,7 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -195,7 +192,7 @@ async def get_mobile_patient_profile(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -238,7 +235,7 @@ async def get_upcoming_appointments(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -292,7 +289,7 @@ async def get_appointment_detail(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -349,7 +346,7 @@ async def book_mobile_appointment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -387,7 +384,7 @@ async def get_lab_results(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -435,7 +432,7 @@ async def get_mobile_quick_stats(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -472,7 +469,7 @@ async def get_mobile_notifications(
             for notif in notifications
         ]
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -502,7 +499,7 @@ async def mark_notification_read(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -547,7 +544,7 @@ async def test_push_notification(
                 "timestamp": datetime.now(UTC).isoformat(),
             }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )

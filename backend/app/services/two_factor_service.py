@@ -9,7 +9,7 @@ import io
 import logging
 import secrets
 import time
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import qrcode

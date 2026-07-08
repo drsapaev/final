@@ -6,7 +6,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session

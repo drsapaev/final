@@ -1,5 +1,6 @@
 """Operations mixin for UserManagementService. Split from user_management_service.py."""
 from __future__ import annotations
+
 from app.services.user_mgmt._base import *  # noqa: F401, F403
 from app.services.user_mgmt._base import UserManagementServiceMixinBase
 

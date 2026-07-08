@@ -3,25 +3,25 @@
 Основа: detail.md стр. 3721-3888, passport.md стр. 1925-2063
 """
 
-import asyncio
-import json
-import logging
-import os
-import platform
-import re
-import socket
-import subprocess
-from datetime import datetime, UTC
-from pathlib import Path
-from typing import Any
+import asyncio  # noqa: F401
+import json  # noqa: F401
+import logging  # noqa: F401
+import os  # noqa: F401
+import platform  # noqa: F401
+import re  # noqa: F401
+import socket  # noqa: F401
+import subprocess  # noqa: F401
+from datetime import UTC, datetime  # noqa: F401
+from pathlib import Path  # noqa: F401
+from typing import Any  # noqa: F401
 
-import serial
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-from sqlalchemy.orm import Session
+import serial  # noqa: F401
+from jinja2 import Environment, FileSystemLoader, select_autoescape  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.crud import print_config as crud_print
-from app.models.print_config import PrinterConfig, PrintJob, PrintTemplate
-from app.models.user import User
+from app.crud import print_config as crud_print  # noqa: F401
+from app.models.print_config import PrinterConfig, PrintJob, PrintTemplate  # noqa: F401
+from app.models.user import User  # noqa: F401
 
 logger = logging.getLogger(__name__)
 LEGACY_COMMENT_BLOCK_RE = re.compile(r"{% comment %}.*?{% endcomment %}", re.S)

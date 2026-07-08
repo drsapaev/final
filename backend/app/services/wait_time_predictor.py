@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import date, datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from statistics import mean, median
 from typing import Any
 

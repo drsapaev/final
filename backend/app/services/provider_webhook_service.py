@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -710,7 +710,7 @@ class ProviderWebhookService:
                     "payment_status": "failed" if failed_payment else None,
                     "payment_provider": "kaspi",
                 }
-        except Exception as exc:
+        except Exception:
             logger.exception("Kaspi webhook error")
             return {"status": "error", "message": "Internal server error"}
 

@@ -13,9 +13,9 @@ import logging
 import time
 from collections import defaultdict
 
+import jwt
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
-import jwt
 from jwt import PyJWTError as JWTError
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
@@ -231,7 +231,7 @@ async def chat_websocket_handler(websocket: WebSocket):
             websocket.receive_text(),
             timeout=WS_AUTH_TIMEOUT_SECONDS,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await websocket.close(code=4001, reason="Auth timeout")
         return
     except WebSocketDisconnect:

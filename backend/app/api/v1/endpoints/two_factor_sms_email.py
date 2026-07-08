@@ -3,16 +3,14 @@ API endpoints для SMS/Email двухфакторной аутентифика
 """
 
 import logging
-import random
-import string
-from datetime import datetime, timedelta, UTC
-from typing import NoReturn, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any, NoReturn
 
-from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.core.rate_limiter import limiter
 from app.api.deps import get_current_user
+from app.core.rate_limiter import limiter
 from app.db.session import get_db
 from app.models.user import User
 from app.services.notifications import notification_service
@@ -43,7 +41,7 @@ def raise_two_factor_sms_internal_error(
 
 @router.post("/send-code", response_model=dict[str, Any])
 @limiter.limit("5/minute")  # P1-1: rate limit
-async def send_verification_code(request: Request, 
+async def send_verification_code(request: Request,
     method: str = Query(..., description="Метод отправки: sms или email"),
     phone_number: str | None = Query(None, description="Номер телефона для SMS"),
     email_address: str | None = Query(None, description="Email адрес"),
@@ -174,7 +172,7 @@ async def get_verification_status(
 
 @router.post("/resend-code", response_model=dict[str, Any])
 @limiter.limit("3/minute")  # P1-1: rate limit
-async def resend_verification_code(request: Request, 
+async def resend_verification_code(request: Request,
     method: str = Query(..., description="Метод отправки: sms или email"),
     phone_number: str | None = Query(None, description="Номер телефона для SMS"),
     email_address: str | None = Query(None, description="Email адрес"),

@@ -32,6 +32,7 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     router,
 )
 
+
 @router.get("/pending-payments", response_model=dict[str, Any])
 async def get_pending_payments(
     db: Session = Depends(deps.get_db),
@@ -258,7 +259,7 @@ async def get_pending_payments(
             "pages": math.ceil(total_count / size) if size > 0 else 0
         }
 
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -374,7 +375,7 @@ async def get_payments(
             pages=math.ceil(total_count / size) if size > 0 else 0
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -759,7 +760,7 @@ async def create_payment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
@@ -861,7 +862,7 @@ async def cancel_payment(
             "payment_id": payment_id
         }
 
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
@@ -986,7 +987,9 @@ async def refund_payment(
         # у провайдера (Click/PayMe/Kaspi). Пациент не получал возврат.
         if payment.provider and payment.provider_payment_id:
             try:
-                from app.services.payment_provider_manager_factory import get_payment_manager
+                from app.services.payment_provider_manager_factory import (
+                    get_payment_manager,
+                )
                 _manager = get_payment_manager()
                 _refund_result = _manager.refund_payment(
                     payment.provider,
@@ -1063,7 +1066,7 @@ async def refund_payment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(

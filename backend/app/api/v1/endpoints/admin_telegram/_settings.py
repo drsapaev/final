@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 
-from typing import Any
+
 @router.get("/telegram/settings", response_model=dict[str, Any])
 def get_telegram_settings(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))

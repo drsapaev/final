@@ -4,7 +4,7 @@ API endpoints для аналитики времени ожидания
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import NoReturn, Any
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel

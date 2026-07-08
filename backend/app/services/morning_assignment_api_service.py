@@ -98,7 +98,7 @@ class MorningAssignmentApiService:
                             "message": "Не удалось присвоить номера",
                         }
                     )
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 results.append(
                     {
                         "visit_id": visit_id,

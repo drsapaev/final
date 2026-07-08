@@ -5,7 +5,7 @@
 
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -213,7 +213,7 @@ class AIService:
             else:
                 raise Exception(f"Неподдерживаемый провайдер: {provider.name}")
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     async def _call_openai(self, provider: AIProvider, prompt: str) -> str:
@@ -327,7 +327,7 @@ class AIService:
 
             return full_prompt
 
-        except Exception as e:
+        except Exception:
             raise Exception("Внутренняя ошибка")
 
     def _get_default_complaints_template(self) -> AIPromptTemplate:

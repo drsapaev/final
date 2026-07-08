@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 
-from typing import Any
+
 @router.post("/registrar/invoice/init-payment", response_model=InvoicePaymentResponse)
 def init_invoice_payment(
     payment_req: InvoicePaymentRequest,
@@ -67,7 +69,7 @@ def init_invoice_payment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -178,7 +180,7 @@ def check_invoice_status(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )

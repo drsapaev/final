@@ -3,28 +3,28 @@ API endpoints для кассира
 Специальный модуль для работы с платежами и оплатами через CashierPanel
 """
 
-import logging
-from datetime import date, datetime, UTC
-from decimal import Decimal
-from typing import Any, Generic, TypeVar
+import logging  # noqa: F401
+from datetime import UTC, date, datetime  # noqa: F401
+from decimal import Decimal  # noqa: F401
+from typing import Any, Generic, TypeVar  # noqa: F401
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import or_
-from sqlalchemy.orm import Session, joinedload
+from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
+from fastapi.responses import Response  # noqa: F401
+from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
+from sqlalchemy import or_  # noqa: F401
+from sqlalchemy.orm import Session, joinedload  # noqa: F401
 
-from app.api import deps
-from app.models.patient import Patient
-from app.models.payment import Payment
-from app.models.user import User
-from app.models.visit import Visit
-from app.services.canonical_visit_service import (
+from app.api import deps  # noqa: F401
+from app.models.patient import Patient  # noqa: F401
+from app.models.payment import Payment  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.models.visit import Visit  # noqa: F401
+from app.services.canonical_visit_service import (  # noqa: F401
     CanonicalVisitResolutionError,
     CanonicalVisitService,
 )
-from app.services.notifications import notification_sender_service
-from app.services.payment_read_service import PaymentReadService
+from app.services.notifications import notification_sender_service  # noqa: F401
+from app.services.payment_read_service import PaymentReadService  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

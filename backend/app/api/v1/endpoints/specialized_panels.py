@@ -153,8 +153,8 @@ async def get_specialized_patient_history(
     """
     # Ownership check for non-Admin
     if current_user.role != "Admin" and not current_user.is_superuser:
-        from app.models.visit import Visit
         from app.models.clinic import Doctor
+        from app.models.visit import Visit
         doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
         if not doctor:
             raise HTTPException(status_code=403, detail="Doctor profile not found")

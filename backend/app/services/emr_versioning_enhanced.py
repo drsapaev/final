@@ -4,7 +4,7 @@
 
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session

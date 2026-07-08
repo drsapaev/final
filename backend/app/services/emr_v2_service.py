@@ -9,17 +9,17 @@ Features:
 - Materialized field extraction
 """
 
-import logging
-from datetime import datetime, UTC
-from typing import Any
+import logging  # noqa: F401
+from datetime import UTC, datetime  # noqa: F401
+from typing import Any  # noqa: F401
 
-from sqlalchemy import desc
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy import desc  # noqa: F401
+from sqlalchemy.exc import IntegrityError  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.models.emr_v2 import EMRAuditLog, EMRRecord, EMRRevision
-from app.models.visit import Visit
-from app.services.emr_contract import (
+from app.models.emr_v2 import EMRAuditLog, EMRRecord, EMRRevision  # noqa: F401
+from app.models.visit import Visit  # noqa: F401
+from app.services.emr_contract import (  # noqa: F401
     extract_diagnosis_main,
     extract_icd10_code,
     normalize_emr_data,

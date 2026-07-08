@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
 
-from typing import Any
+
 @router.get("/queues/profiles", response_model=dict[str, Any])
 def get_queue_profiles(
     active_only: bool = Query(True, description="Только активные профили"),

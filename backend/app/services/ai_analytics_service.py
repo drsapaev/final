@@ -14,7 +14,7 @@ clinical or business decisions.
 import hashlib
 import json
 import logging
-from datetime import date, datetime, timedelta, UTC
+from datetime import UTC, date, datetime, timedelta
 from statistics import mean, median
 from typing import Any
 

@@ -3,8 +3,8 @@ API endpoints для двухфакторной аутентификации (2F
 """
 
 import logging
-from datetime import datetime, timedelta, UTC
-from typing import NoReturn, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session

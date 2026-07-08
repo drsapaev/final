@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
-from typing import Any
+
 @router.get("/registrar/departments", response_model=dict[str, Any])
 def get_registrar_departments(
     active_only: bool = Query(True, description="Только активные отделения"),

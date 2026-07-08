@@ -5,7 +5,10 @@ Split from telegram_bot_enhanced.py.
 from __future__ import annotations
 
 from app.services.telegram_bot_enhanced_pkg._base import *  # noqa: F401, F403
-from app.services.telegram_bot_enhanced_pkg._base import EnhancedTelegramBotServiceMixinBase
+from app.services.telegram_bot_enhanced_pkg._base import (
+    EnhancedTelegramBotServiceMixinBase,
+)
+
 
 class AdminMixin(EnhancedTelegramBotServiceMixinBase):
     """Admin methods for EnhancedTelegramBotService."""

@@ -325,7 +325,7 @@ async def compare_versions(
         return diff
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
 
 
@@ -411,7 +411,7 @@ async def save_emr(
                 "last_edited_at": e.last_edited_at.isoformat(),
             },
         )
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
 
 
@@ -471,7 +471,7 @@ async def sign_emr(
         return emr
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
-    except EMRSignedError as e:
+    except EMRSignedError:
         raise HTTPException(status_code=400, detail="Internal server error")
     except ConcurrencyError as e:
         raise HTTPException(
@@ -513,7 +513,7 @@ async def amend_emr(
         return emr
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
     except ConcurrencyError as e:
         raise HTTPException(
@@ -554,7 +554,7 @@ async def restore_emr(
         return emr
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
 
 

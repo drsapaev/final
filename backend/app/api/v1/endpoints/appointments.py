@@ -1,6 +1,6 @@
 # app/api/v1/endpoints/appointments.py
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -20,7 +20,6 @@ from app.services.online_queue import (
     get_or_create_day,
     load_stats,
 )
-from app.services.service_mapping import get_service_code
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
-from typing import Any
+
 @router.get("/registrar/queues/today", response_model=dict[str, Any])
 def get_today_queues(
     target_date: str | None = Query(

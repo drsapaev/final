@@ -20,17 +20,24 @@ ACTIVE: Этот модуль содержит активные, рекомен�
 - docs/QUEUE_SYSTEM_ARCHITECTURE.md - Архитектура системы
 """
 
-import logging
-import re
-from datetime import UTC, date, datetime, timedelta
-from typing import Any
+import logging  # noqa: F401
+import re  # noqa: F401
+from datetime import UTC, date, datetime, timedelta  # noqa: F401
+from typing import Any  # noqa: F401
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from fastapi import (  # noqa: F401
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
+from pydantic import BaseModel, Field  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.api.deps import get_db, require_roles
-from app.models.user import User
+from app.api.deps import get_db, require_roles  # noqa: F401
+from app.models.user import User  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -106,18 +113,18 @@ def _ensure_doctor_can_mutate_queue_entry(
     )
 
 
-from app.services.qr_queue_service import (  # noqa: E402  # manual-review: conditional import after config — intentional
-    QRQueueService,  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.services.qr_queue_service import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+    QRQueueService,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
-from app.services.queue_service import (  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.services.queue_service import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     QueueNotFoundError,
     QueueValidationError,
     queue_service,
 )
-from app.services.queue_session import (  # noqa: E402  # manual-review: conditional import after config — intentional
-    get_or_create_session_id,  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.services.queue_session import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
+    get_or_create_session_id,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
-from app.services.service_mapping import (  # noqa: E402  # manual-review: conditional import after config — intentional
+from app.services.service_mapping import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     get_queue_group_for_service,
     get_service_code,
 )

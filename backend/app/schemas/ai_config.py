@@ -4,8 +4,8 @@ Pydantic схемы для AI конфигурации
 
 from datetime import datetime
 from typing import Any
-
 from urllib.parse import urlparse
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ===================== AI ПРОВАЙДЕРЫ =====================

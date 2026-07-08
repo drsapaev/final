@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta
-from typing import NoReturn, Any
+from typing import Any, NoReturn
 
 from fastapi import (
     APIRouter,

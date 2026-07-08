@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -12,7 +13,6 @@ from app.db.session import get_db
 from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
 
-from typing import Any
 router = APIRouter()
 
 FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]

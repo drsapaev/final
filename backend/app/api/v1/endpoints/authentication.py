@@ -4,13 +4,13 @@ API endpoints для системы аутентификации
 
 import json
 import logging
-from typing import NoReturn, Any
+from typing import Any, NoReturn
 
-from app.core.rate_limiter import limiter
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.rate_limiter import limiter
 from app.crud.authentication import (
     user_activity,
     user_session,
@@ -177,6 +177,7 @@ async def logout(
         if auth_header.lower().startswith("bearer "):
             try:
                 import jwt as _jwt
+
                 from app.core.config import settings as _settings
                 _payload = _jwt.decode(
                     auth_header.split(" ", 1)[1],

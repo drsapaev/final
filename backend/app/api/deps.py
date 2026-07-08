@@ -17,12 +17,12 @@ import inspect
 import logging
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-import jwt
 from jwt import PyJWTError as JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session

@@ -5,39 +5,43 @@ NotificationSenderService but are not methods.
 """
 from __future__ import annotations
 
-import logging
-import smtplib
-from datetime import datetime, UTC
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from html import escape
-from typing import Any
+import logging  # noqa: F401
+import smtplib  # noqa: F401
+from datetime import UTC, datetime  # noqa: F401
+from email.mime.multipart import MIMEMultipart  # noqa: F401
+from email.mime.text import MIMEText  # noqa: F401
+from html import escape  # noqa: F401
+from typing import Any  # noqa: F401
 
-import httpx
-from jinja2 import Environment, select_autoescape
+import httpx  # noqa: F401
+from jinja2 import Environment, select_autoescape  # noqa: F401
 
 # NOTIF-REAUDIT-28 P1-1: autoescape для защиты от SSTI/XSS.
 # Раньше Template(template_text) использовался без autoescape —
 # admin-controlled templates могли выполнять произвольный Python (SSTI),
 # а user data с HTML попадала в email body unescaped.
 _jinja_env = Environment(autoescape=True)
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.core.config import settings
-from app.crud.notification import (
+from app.core.config import settings  # noqa: F401
+from app.crud.notification import (  # noqa: F401
     crud_notification_history,
     crud_notification_template,
 )
-from app.crud.user_management import (
+from app.crud.user_management import (  # noqa: F401
     user_notification_settings as crud_user_notification_settings,
 )
-from app.models.notification import NotificationHistory
-from app.models.user import User
-from app.schemas.notification import NotificationHistoryCreate
-from app.services.fcm_service import get_fcm_service
-from app.services.notification_platform_service import get_notification_platform_service
-from app.services.notification_websocket import get_notification_ws_manager
-from app.services.telegram.bot import telegram_bot
+from app.models.notification import NotificationHistory  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.schemas.notification import NotificationHistoryCreate  # noqa: F401
+from app.services.fcm_service import get_fcm_service  # noqa: F401
+from app.services.notification_platform_service import (
+    get_notification_platform_service,  # noqa: F401
+)
+from app.services.notification_websocket import (
+    get_notification_ws_manager,  # noqa: F401
+)
+from app.services.telegram.bot import telegram_bot  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +54,7 @@ def _fresh_db():
     Использование: `with _fresh_db() as db: sender.send(db, ...)`
     """
     from contextlib import contextmanager
+
     from app.db.session import SessionLocal
 
     @contextmanager

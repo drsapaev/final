@@ -4,7 +4,7 @@ MCP сервер для анализа медицинских изображен
 
 import base64
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager

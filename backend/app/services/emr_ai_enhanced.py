@@ -1,5 +1,6 @@
 """P1-17: Mock service replaced with stub."""
 import logging
+
 logger = logging.getLogger(__name__)
 
 class EMREnhancedAIService:

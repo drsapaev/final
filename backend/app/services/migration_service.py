@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import date, datetime, timedelta, UTC
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import and_, text
@@ -44,7 +44,7 @@ class MigrationService:
                     logger.info(
                         "Старая таблица queue_tickets не найдена, миграция не требуется"
                     )
-            except Exception as e:
+            except Exception:
                 errors.append("Внутренняя ошибка")
 
             # Проверяем целостность данных в новых таблицах

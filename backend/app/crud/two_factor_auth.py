@@ -68,7 +68,7 @@ class CRUDTwoFactorAuth(
         """Обновить время последнего использования"""
         two_factor_auth = self.get_by_user_id(db, user_id)
         if two_factor_auth:
-            from datetime import datetime, UTC
+            from datetime import UTC, datetime
 
             two_factor_auth.last_used = datetime.now(UTC)
             db.commit()

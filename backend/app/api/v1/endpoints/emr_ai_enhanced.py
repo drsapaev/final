@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud import emr
 from app.models.user import User
-from app.services.emr_ai_enhanced import emr_ai_enhanced
 from app.schemas.misc_endpoints import (
     EmrAiCurrentDataRequest,
     EmrAiDoctorPreferencesRequest,
@@ -19,6 +18,7 @@ from app.schemas.misc_endpoints import (
     EmrAiTemplateDataRequest,
 )
 from app.services.ai_feature_gating import RequireAiFeature
+from app.services.emr_ai_enhanced import emr_ai_enhanced
 
 router = APIRouter()
 
@@ -58,7 +58,7 @@ async def generate_smart_template(
             **ai_safety_meta(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -86,7 +86,7 @@ async def get_smart_suggestions(
             **ai_safety_meta(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -115,7 +115,7 @@ async def auto_fill_emr_fields(
             **ai_safety_meta(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -136,7 +136,7 @@ async def validate_emr_data(
             return {**validation_result, **ai_safety_meta()}
         return {"result": validation_result, **ai_safety_meta()}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -160,7 +160,7 @@ async def get_icd10_suggestions(
             **ai_safety_meta(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -186,7 +186,7 @@ async def analyze_patient_data(
             **ai_safety_meta(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -211,7 +211,7 @@ async def get_specialty_templates(
             "field_count": len(template),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -282,7 +282,7 @@ async def enhance_emr_with_ai(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -317,7 +317,7 @@ async def get_emr_quality_analytics(
 
         return analytics
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )

@@ -5,14 +5,14 @@ API endpoints для восстановления паролей
 import logging
 import re
 from datetime import datetime
-from typing import NoReturn, Any
+from typing import Any, NoReturn
 
-from app.core.rate_limiter import limiter
-from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.core.rate_limiter import limiter
 from app.db.session import get_db
 from app.models.user import User
 from app.services.password_reset_service import get_password_reset_service

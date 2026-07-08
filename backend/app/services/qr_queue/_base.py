@@ -4,32 +4,32 @@
 
 from __future__ import annotations
 
-import base64
-import io
-import logging
-import re
-import secrets
-import socket
-from datetime import date, datetime, timedelta, UTC
-from typing import TYPE_CHECKING, Any
+import base64  # noqa: F401
+import io  # noqa: F401
+import logging  # noqa: F401
+import re  # noqa: F401
+import secrets  # noqa: F401
+import socket  # noqa: F401
+from datetime import UTC, date, datetime, timedelta  # noqa: F401
+from typing import TYPE_CHECKING, Any  # noqa: F401
 
-import qrcode
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+import qrcode  # noqa: F401
+from sqlalchemy import func  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
-from app.core.config import settings
-from app.models.clinic import Doctor
-from app.models.online_queue import (
+from app.core.config import settings  # noqa: F401
+from app.models.clinic import Doctor  # noqa: F401
+from app.models.online_queue import (  # noqa: F401
     DailyQueue,
     OnlineQueueEntry,
     QueueJoinSession,
     QueueStatistics,
     QueueToken,
 )
-from app.models.patient import Patient
-from app.models.user import User
-from app.services.queue_domain_service import QueueDomainService
-from app.services.queue_service import (
+from app.models.patient import Patient  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.services.queue_domain_service import QueueDomainService  # noqa: F401
+from app.services.queue_service import (  # noqa: F401
     QueueConflictError,
     QueueNotFoundError,
     QueueValidationError,
@@ -37,7 +37,7 @@ from app.services.queue_service import (
 )
 
 if TYPE_CHECKING:
-    from app.models.visit import Visit
+    pass
 
 logger = logging.getLogger(__name__)
 

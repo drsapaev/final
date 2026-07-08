@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -13,7 +14,6 @@ from app.db.session import get_db
 from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
 
-from typing import Any
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
