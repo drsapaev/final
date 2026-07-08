@@ -4,6 +4,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._settings import VisitResponse  # noqa
 from app.api.v1.endpoints.registrar_wizard._cart import *  # noqa
 
+from typing import Any
 @router.get("/registrar/visits", response_model=list[VisitResponse])
 def get_visits(
     db: Session = Depends(get_db),
@@ -209,7 +210,7 @@ def get_visits(
 # ===================== ПРОСТОЙ ЭНДПОИНТ ДЛЯ ОБЪЕДИНЕНИЯ ДАННЫХ =====================
 
 
-@router.get("/registrar/all-appointments")
+@router.get("/registrar/all-appointments", response_model=dict[str, Any])
 def get_all_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(
@@ -950,7 +951,7 @@ def _run_single_registrar_record_action(
 # === MARK-PAID ENDPOINTS ===
 # ============================================================
 
-@router.post("/registrar/visits/{visit_id}/mark-paid")
+@router.post("/registrar/visits/{visit_id}/mark-paid", response_model=dict[str, Any])
 def mark_visit_as_paid(
     visit_id: int,
     payment_req: MarkPaidRequest | None = Body(default=None),
@@ -1106,7 +1107,7 @@ def mark_visit_as_paid(
 # ===================== ЭНДПОИНТ ДЛЯ ОТМЕТКИ ЗАПИСЕЙ ОНЛАЙН-ОЧЕРЕДИ КАК ОПЛАЧЕННЫХ =====================
 
 
-@router.post("/registrar/queue/entry/{entry_id}/mark-paid")
+@router.post("/registrar/queue/entry/{entry_id}/mark-paid", response_model=dict[str, Any])
 def mark_queue_entry_as_paid(
     entry_id: int,
     payment_req: MarkPaidRequest | None = Body(default=None),
@@ -1311,7 +1312,7 @@ def mark_queue_entry_as_paid(
             detail="Internal server error",
         )
 
-@router.post("/registrar/visits/{visit_id}/complete")
+@router.post("/registrar/visits/{visit_id}/complete", response_model=dict[str, Any])
 def complete_visit(
     visit_id: int,
     db: Session = Depends(get_db),
@@ -1347,7 +1348,7 @@ def complete_visit(
         )
 
 
-@router.post("/registrar/visits/{visit_id}/start-visit")
+@router.post("/registrar/visits/{visit_id}/start-visit", response_model=dict[str, Any])
 def start_visit(
     visit_id: int,
     db: Session = Depends(get_db),

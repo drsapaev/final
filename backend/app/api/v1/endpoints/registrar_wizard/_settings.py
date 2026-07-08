@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
+from app.api.v1.endpoints.registrar_wizard._cart import BenefitSettingsResponse
 
-@router.get("/admin/benefit-settings", summary="Получить настройки льгот")
+from typing import Any
+@router.get("/admin/benefit-settings", summary="Получить настройки льгот", response_model=BenefitSettingsResponse)
 def get_benefit_settings(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ) -> BenefitSettingsResponse:
@@ -87,7 +89,7 @@ def get_benefit_settings(
         )
 
 
-@router.post("/admin/benefit-settings", summary="Обновить настройки льгот")
+@router.post("/admin/benefit-settings", summary="Обновить настройки льгот", response_model=dict[str, Any])
 def update_benefit_settings(
     settings_data: BenefitSettingsRequest,
     db: Session = Depends(get_db),
@@ -180,7 +182,7 @@ class WizardSettingsRequest(BaseModel):
     )
 
 
-@router.get("/admin/wizard-settings", summary="Получить настройки мастера регистрации")
+@router.get("/admin/wizard-settings", summary="Получить настройки мастера регистрации", response_model=dict[str, Any])
 def get_wizard_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -217,7 +219,7 @@ def get_wizard_settings(
         )
 
 
-@router.post("/admin/wizard-settings", summary="Обновить настройки мастера регистрации")
+@router.post("/admin/wizard-settings", summary="Обновить настройки мастера регистрации", response_model=dict[str, Any])
 def update_wizard_settings(
     settings_data: WizardSettingsRequest,
     db: Session = Depends(get_db),

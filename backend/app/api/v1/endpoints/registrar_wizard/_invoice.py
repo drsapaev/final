@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 
+from typing import Any
 @router.post("/registrar/invoice/init-payment", response_model=InvoicePaymentResponse)
 def init_invoice_payment(
     payment_req: InvoicePaymentRequest,
@@ -72,7 +73,7 @@ def init_invoice_payment(
         )
 
 
-@router.get("/registrar/invoice/{invoice_id}/status")
+@router.get("/registrar/invoice/{invoice_id}/status", response_model=dict[str, Any])
 def check_invoice_status(
     invoice_id: int,
     db: Session = Depends(get_db),
