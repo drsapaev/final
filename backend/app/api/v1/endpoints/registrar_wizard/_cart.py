@@ -4,6 +4,13 @@ from typing import Any
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 
+from app.api.v1.endpoints.registrar_wizard._helpers import (
+    _apply_service_discount,
+    _check_repeat_visit_eligibility,
+    _load_registration_discount_settings,
+    _resolve_effective_discount_mode,
+)  # noqa: F401
+
 
 @router.post("/registrar/cart", response_model=CartResponse)
 def create_cart_appointments(

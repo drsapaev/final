@@ -2,6 +2,14 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 
+from app.api.v1.endpoints.admin_telegram._helpers import (
+    _normalize_staff_role,
+    _record_staff_action_execution_failure,
+    _staff_state_change_operation_by_key,
+    _validate_staff_action_target_binding,
+    _validate_staff_action_target_request,
+)  # noqa: F401
+
 
 @router.post("/telegram/staff-actions/{confirmation_id}/confirm", response_model=dict[str, Any])
 def confirm_staff_action(

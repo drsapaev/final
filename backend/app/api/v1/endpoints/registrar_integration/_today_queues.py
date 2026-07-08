@@ -4,6 +4,13 @@ from typing import Any
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
+from app.api.v1.endpoints.registrar_integration._helpers import (
+    _latest_lab_report_summaries_by_visit,
+    _normalize_queue_status_for_registrar,
+    _registrar_available_actions,
+    _resolve_payment_truth,
+)  # noqa: F401
+
 
 @router.get("/registrar/queues/today", response_model=dict[str, Any])
 def get_today_queues(

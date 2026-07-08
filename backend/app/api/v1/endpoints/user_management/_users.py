@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.user_management._helpers import *  # noqa: F401, F403
-from app.api.v1.endpoints.user_management._helpers import router  # noqa: F401
+from app.api.v1.endpoints.user_management._helpers import (
+    router,
+    _find_user_export_file,
+    _safe_user_export_filename,
+    _user_export_mime_type,
+)  # noqa: F401
 
 
 @router.post("/users", response_model=UserResponse)

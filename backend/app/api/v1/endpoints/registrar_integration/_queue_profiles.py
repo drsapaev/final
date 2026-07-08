@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
+
+from app.api.v1.endpoints.registrar_integration._helpers import (
+    _raise_registrar_internal_error,
+)  # noqa: F401
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
 
 
