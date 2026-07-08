@@ -41,7 +41,7 @@ def raise_two_factor_sms_internal_error(
     )
 
 
-@router.post("/send-code", response_model=dict[str,)
+@router.post("/send-code", response_model=dict[str, Any])
 @limiter.limit("5/minute")  # P1-1: rate limit
 async def send_verification_code(request: Request, 
     method: str = Query(..., description="Метод отправки: sms или email"),
@@ -172,7 +172,7 @@ async def get_verification_status(
         )
 
 
-@router.post("/resend-code", response_model=dict[str,)
+@router.post("/resend-code", response_model=dict[str, Any])
 @limiter.limit("3/minute")  # P1-1: rate limit
 async def resend_verification_code(request: Request, 
     method: str = Query(..., description="Метод отправки: sms или email"),
