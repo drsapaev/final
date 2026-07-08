@@ -121,6 +121,82 @@ class FullUpdateOnlineEntryRequest(BaseModel):
     aggregated_ids: list[int] | None = None  # ⭐ FIX: IDs of all merged entries for dedup check
 
 
+def _full_update_find_and_validate_entry(
+    db: Session,
+    entry_id: int,
+    current_user: User,
+):
+    """Find queue entry by ID and validate doctor access."""
+    from app.models.online_queue import OnlineQueueEntry
+
+    entry = (
+        db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    )
+
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
+        )
+
+    logger.info(
+        "[full_update_online_entry] Запись найдена: %s, phone=%s",
+        entry.patient_name,
+        entry.phone,
+    )
+
+    _ensure_doctor_can_mutate_queue_entry(
+        db,
+        entry=entry,
+        current_user=current_user,
+    )
+
+    original_entry_discount_mode = entry.discount_mode
+    return entry, original_entry_discount_mode
+
+
+def _full_update_patient_data(entry, patient_data: dict):
+    """Update patient name, phone, birth_year, address on the queue entry."""
+    if patient_data.get("patient_name"):
+        entry.patient_name = patient_data["patient_name"]
+        logger.info(
+            "[full_update_online_entry] Обновлено ФИО: %s",
+            entry.patient_name,
+        )
+
+    if patient_data.get("phone"):
+        entry.phone = patient_data["phone"]
+        logger.info(
+            "[full_update_online_entry] Обновлен телефон: %s",
+            entry.phone,
+        )
+
+    if patient_data.get("birth_year") is not None:
+        entry.birth_year = patient_data["birth_year"]
+        logger.info(
+            "[full_update_online_entry] Обновлен год рождения: %s",
+            entry.birth_year,
+        )
+
+    if patient_data.get("address"):
+        entry.address = patient_data["address"]
+        logger.info(
+            "[full_update_online_entry] Обновлен адрес: %s",
+            entry.address,
+        )
+
+
+def _full_update_visit_type(entry, request):
+    """Update visit type and discount mode on the queue entry."""
+    entry.visit_type = request.visit_type
+    entry.discount_mode = "all_free" if request.all_free else request.discount_mode
+    logger.info(
+        "[full_update_online_entry] Тип визита: %s, режим скидки: %s, all_free: %s",
+        entry.visit_type,
+        entry.discount_mode,
+        request.all_free,
+    )
+
+
 @router.put("/online-entry/{entry_id}/full-update", response_model=dict[str, Any])
 def full_update_online_entry(
     entry_id: int,
@@ -153,71 +229,14 @@ def full_update_online_entry(
             request.services,
         )
 
-        # 1. Находим запись
-        entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        # 1-3. Find entry, update patient data, update visit type
+        entry, original_entry_discount_mode = _full_update_find_and_validate_entry(
+            db, entry_id, current_user
         )
+        _full_update_patient_data(entry, request.patient_data)
+        _full_update_visit_type(entry, request)
 
-        if not entry:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
-            )
-
-        logger.info(
-            "[full_update_online_entry] Запись найдена: %s, phone=%s",
-            entry.patient_name,
-            entry.phone,
-        )
-
-        # 2. Обновляем данные пациента в OnlineQueueEntry
-        _ensure_doctor_can_mutate_queue_entry(
-            db,
-            entry=entry,
-            current_user=current_user,
-        )
-
-        original_entry_discount_mode = entry.discount_mode
-        patient_data = request.patient_data
-        if patient_data.get('patient_name'):
-            entry.patient_name = patient_data['patient_name']
-            logger.info(
-                "[full_update_online_entry] Обновлено ФИО: %s",
-                entry.patient_name,
-            )
-
-        if patient_data.get('phone'):
-            entry.phone = patient_data['phone']
-            logger.info(
-                "[full_update_online_entry] Обновлен телефон: %s",
-                entry.phone,
-            )
-
-        if patient_data.get('birth_year') is not None:
-            entry.birth_year = patient_data['birth_year']
-            logger.info(
-                "[full_update_online_entry] Обновлен год рождения: %s",
-                entry.birth_year,
-            )
-
-        if patient_data.get('address'):
-            entry.address = patient_data['address']
-            logger.info(
-                "[full_update_online_entry] Обновлен адрес: %s",
-                entry.address,
-            )
-
-        # 3. Обновляем тип визита и режим скидки
-        entry.visit_type = request.visit_type
-        # ✅ ИСПРАВЛЕНО: Если all_free = True, устанавливаем discount_mode = "all_free"
-        entry.discount_mode = "all_free" if request.all_free else request.discount_mode
-        logger.info(
-            "[full_update_online_entry] Тип визита: %s, режим скидки: %s, all_free: %s",
-            entry.visit_type,
-            entry.discount_mode,
-            request.all_free,
-        )
-
-        # 4. Обновляем услуги и рассчитываем сумму
+                # 4. Обновляем услуги и рассчитываем сумму
         # ✅ НОВЫЙ ФОРМАТ: Полные объекты услуг с метаданными
         services_list = []
         service_codes_list = []  # Сохраняем для обратной совместимости
