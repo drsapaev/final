@@ -14,9 +14,13 @@ _SCANNED_DIRS = ("services", "repositories")
 
 # Temporary migration allowlist for legacy direct service-to-service calls.
 # These edges must be moved to context facades/contracts in subsequent tasks.
+# Note: after god-file splits, both the original module path and the split
+# package paths (e.g. billing_service_pkg._base) need to be listed.
 _TEMP_ALLOWED_CROSS_CONTEXT_IMPORTS: set[tuple[str, str]] = {
     ("app.services.appointment_flow_api_service", "app.services.emr_phrase_indexer"),
     ("app.services.billing_service", "app.services.queue_service"),
+    ("app.services.billing_service_pkg._base", "app.services.queue_service"),
+    ("app.services.billing_service_pkg._core", "app.services.queue_service"),
     ("app.services.morning_assignment", "app.services.queue_service"),
     ("app.services.payment_init_service", "app.services.queue_service"),
     ("app.services.payment_webhook", "app.services.visit_payment_integration"),

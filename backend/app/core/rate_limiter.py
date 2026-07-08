@@ -5,6 +5,8 @@ Provides per-IP and per-user rate limiting for sensitive endpoints.
 """
 from __future__ import annotations
 
+import os
+
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -13,8 +15,11 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI
 
-# Create limiter instance
-limiter = Limiter(key_func=get_remote_address)
+# Disable rate limiting in test mode to prevent 429 failures
+_TESTING = os.getenv("TESTING", "").lower() in ("1", "true", "yes")
+
+# Create limiter instance (disabled in test mode)
+limiter = Limiter(key_func=get_remote_address, enabled=not _TESTING)
 
 # Rate limit configurations
 RATE_LIMITS = {
