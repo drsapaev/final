@@ -718,29 +718,370 @@ def _full_update_finalize_and_respond(
 
 
 
-def _full_update_process_services(
+def _full_update_handle_all_free_visit(
     db: Session,
     entry,
     request,
     original_entry_discount_mode: str,
-    current_user,
-    entry_id: int,
+    patient_data,
+    services_list,
+    service_codes_list,
+    total_amount,
 ):
-    """Section 4: Collect existing services, create new entries, calculate totals."""
+    """Section 4.6: If request.all_free, create or update Visit + VisitService records.
+
+    Returns the Visit (or None if all_free is False).
+    """
     import json
-    from datetime import date, datetime
-
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
-    from app.models.patient import Patient
-    from app.models.service import Service
-
-    patient_data = request.patient_data
-    # ✅ НОВЫЙ ФОРМАТ: Полные объекты услуг с метаданными
-
-    # ⭐ FIX: Определяем существующие услуги из ВСЕХ записей пациента за день (не только текущей entry)
-    from datetime import datetime
+    from datetime import date
+    from decimal import Decimal
 
     from app.models.online_queue import DailyQueue
+    from app.models.patient import Patient
+    from app.models.service import Service
+    from app.models.visit import Visit, VisitService
+
+    visit = None
+    if not request.all_free:
+        return visit
+
+    logger.info(
+        "[full_update_online_entry] all_free=True, создаем/обновляем Visit для одобрения",
+    )
+
+    # Получаем данные из связанной очереди
+    queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+    visit_date = queue.day if queue else date.today()
+    doctor_id = queue.specialist_id if queue else None
+
+    # ✅ ИСПРАВЛЕНО: Определяем department из queue_tag или по услугам
+    department = None
+    if queue and queue.queue_tag:
+        # Маппинг queue_tag -> department
+        queue_tag_to_dept = {
+            'cardiology': 'cardiology',
+            'cardio': 'cardiology',
+            'dermatology': 'dermatology',
+            'derma': 'dermatology',
+            'stomatology': 'stomatology',
+            'dentist': 'stomatology',
+            'lab': 'laboratory',
+            'laboratory': 'laboratory',
+            'ecg': 'cardiology',
+            'echokg': 'cardiology',
+        }
+        department = queue_tag_to_dept.get(queue.queue_tag.lower())
+
+    # Если не определили по queue_tag, определяем по услугам
+    if not department and request.services:
+        for service_item in request.services:
+            service = (
+                db.query(Service)
+                .filter(Service.id == service_item['service_id'])
+                .first()
+            )
+            if service:
+                # Resolve department through the queue-group SSOT.
+                service_code = service.service_code or get_service_code(
+                    service.id, db
+                )
+                queue_group = get_queue_group_for_service(service_code)
+                service_group_to_dept = {
+                    'cardiology': 'cardiology',
+                    'ecg': 'cardiology',
+                    'dermatology': 'dermatology',
+                    'dental': 'stomatology',
+                    'laboratory': 'laboratory',
+                }
+                department = service_group_to_dept.get(queue_group)
+                if department:
+                    break
+
+    # Если department все еще не определен, используем значение по умолчанию
+    if not department:
+        department = 'general'
+
+    # Вычисляем оригинальную сумму (без скидки all_free)
+    original_total_amount = Decimal('0')
+    for service_item in request.services:
+        service = (
+            db.query(Service)
+            .filter(Service.id == service_item['service_id'])
+            .first()
+        )
+        if service:
+            original_total_amount += (
+                service.price or Decimal('0')
+            ) * service_item.get('quantity', 1)
+
+    # ✅ ИСПРАВЛЕНО: Для QR-пациентов без patient_id нужно создать Patient или пропустить создание Visit
+    # Но Visit требует patient_id (nullable=False), поэтому создаем временного пациента если нужно
+    patient_id_for_visit = entry.patient_id
+    if not patient_id_for_visit:
+        # ✅ ИСПРАВЛЕНО: Создаем временного пациента используя единую функцию нормализации
+        logger.info(
+            "[full_update_online_entry] Создание временного пациента для QR-записи",
+        )
+        from app.crud.patient import normalize_patient_name
+
+        patient_name = patient_data.get('patient_name', 'Неизвестный пациент')
+        name_parts = normalize_patient_name(full_name=patient_name)
+
+        # Гарантируем, что поля не пустые
+        last_name = name_parts["last_name"] or 'Неизвестный'
+        first_name = name_parts["first_name"] or 'Пациент'
+
+        temp_patient = Patient(
+            last_name=last_name,
+            first_name=first_name,
+            middle_name=name_parts.get("middle_name"),
+            phone=patient_data.get('phone', ''),
+            birth_date=(
+                date(patient_data.get('birth_year', 1990), 1, 1)
+                if patient_data.get('birth_year')
+                else None
+            ),
+            address=patient_data.get('address', ''),
+        )
+        db.add(temp_patient)
+        db.flush()
+        patient_id_for_visit = temp_patient.id
+        # ✅ Связываем OnlineQueueEntry с созданным пациентом
+        entry.patient_id = patient_id_for_visit
+        logger.info(
+            "[full_update_online_entry] Создан временный пациент ID=%d и связан с OnlineQueueEntry",
+            patient_id_for_visit,
+        )
+
+    # ✅ ИСПРАВЛЕНО: Улучшенный поиск существующего Visit для предотвращения дублирования
+    visit = None
+
+    # Приоритет 1: Ищем по entry.visit_id (если уже связан)
+    if entry.visit_id:
+        visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
+        if visit:
+            if visit.patient_id != patient_id_for_visit:
+                logger.warning(
+                    "[full_update_online_entry] entry visit owner mismatch entry_id=%d visit_id=%d",
+                    entry.id,
+                    visit.id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Queue entry visit does not belong to the queue patient",
+                )
+            logger.info(
+                "[full_update_online_entry] Найден Visit по entry.visit_id: %d",
+                visit.id,
+            )
+
+    # Приоритет 2: Если не найден, ищем по patient_id + visit_date (без фильтра по discount_mode)
+    # Это важно, так как при первом редактировании может быть создан Visit с другим discount_mode
+    if not visit and patient_id_for_visit:
+        visit = (
+            db.query(Visit)
+            .filter(
+            Visit.id == entry.visit_id,
+            Visit.patient_id == patient_id_for_visit,
+                Visit.visit_date == visit_date,
+            )
+            .order_by(Visit.created_at.desc())
+            .first()
+        )  # Берем самый последний
+        if visit:
+            logger.info(
+                "[full_update_online_entry] Найден Visit по patient_id + visit_date: %d, discount_mode=%s",
+                visit.id,
+                visit.discount_mode,
+            )
+
+    # Приоритет 3: Если все еще не найден, ищем по patient_id + visit_date + discount_mode="all_free"
+    if not visit and patient_id_for_visit:
+        visit = (
+            db.query(Visit)
+            .filter(
+            Visit.id == entry.visit_id,
+            Visit.patient_id == patient_id_for_visit,
+            Visit.visit_date == visit_date,
+                Visit.discount_mode == "all_free",
+            )
+            .first()
+        )
+        if visit:
+            logger.info(
+                "[full_update_online_entry] Найден Visit по patient_id + visit_date + all_free: %d",
+                visit.id,
+            )
+
+    has_paid_invoice = False
+    if visit:
+        # ✅ ИСПРАВЛЕНО: Обновляем существующий Visit (не создаем новый)
+        logger.info(
+            "[full_update_online_entry] Обновление существующего Visit ID=%d",
+            visit.id,
+        )
+        # ⭐ ИСПРАВЛЕНИЕ #2: Проверяем есть ли оплаченный инвойс перед удалением услуг
+        from app.models.payment_invoice import (
+            PaymentInvoice,
+            PaymentInvoiceVisit,
+        )
+
+        has_paid_invoice = (
+            db.query(PaymentInvoiceVisit)
+            .join(PaymentInvoice)
+            .filter(
+            PaymentInvoiceVisit.visit_id == visit.id,
+                PaymentInvoice.status == 'paid',
+            )
+            .first()
+        )
+
+        if has_paid_invoice:
+            # ⚠️ Визит УЖЕ оплачен - НЕ меняем платежный режим/статус и НЕ удаляем существующие услуги.
+            # Только добавляем новые услуги к уже существующим.
+            entry.discount_mode = original_entry_discount_mode
+            logger.warning(
+                "[full_update_online_entry] ⚠️ Visit %d имеет оплаченный инвойс - НЕ меняем payment state и НЕ удаляем услуги, только добавляем новые",
+                visit.id,
+            )
+            deleted_count = 0
+        else:
+            visit.approval_status = (
+                "pending"  # Сбрасываем статус на pending при обновлении
+            )
+            visit.discount_mode = "all_free"  # Убеждаемся, что режим правильный
+            visit.department = department  # Обновляем department
+            visit.doctor_id = doctor_id  # Обновляем doctor_id
+
+            # ✅ Визит не оплачен - безопасно удалять и пересоздавать услуги
+            deleted_count = (
+                db.query(VisitService)
+                .filter(VisitService.visit_id == visit.id)
+                .delete()
+            )
+            db.flush()  # Коммитим удаление перед добавлением новых
+            logger.info(
+                "[full_update_online_entry] Удалено старых услуг: %d",
+                deleted_count,
+            )
+
+        # ✅ Связываем OnlineQueueEntry с Visit (если еще не связан)
+        if not entry.visit_id or entry.visit_id != visit.id:
+            entry.visit_id = visit.id
+            logger.info(
+                "[full_update_online_entry] Связан OnlineQueueEntry %d с Visit %d",
+                entry.id,
+                visit.id,
+            )
+
+        # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
+        if not has_paid_invoice and entry.discount_mode != "all_free":
+            entry.discount_mode = "all_free"
+            logger.info(
+                "[full_update_online_entry] Синхронизирован discount_mode в OnlineQueueEntry %d с Visit %d",
+                entry.id,
+                visit.id,
+            )
+    else:
+        # ✅ Создаем новый Visit только если действительно не найден существующий
+        logger.info(
+            "[full_update_online_entry] Создание нового Visit для all_free (существующий не найден)",
+        )
+        visit = Visit(
+            patient_id=patient_id_for_visit,
+            doctor_id=doctor_id,
+            visit_date=visit_date,
+            visit_time=None,  # Время не сохраняется в OnlineQueueEntry
+            department=department,
+            discount_mode="all_free",
+            approval_status="pending",
+            notes=f"All Free заявка из онлайн записи #{entry.id}",
+            source="online",  # ✅ SSOT: QR-запись
+        )
+        db.add(visit)
+        db.flush()  # Получаем ID визита
+
+        # Связываем OnlineQueueEntry с Visit
+        entry.visit_id = visit.id
+
+        # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
+        entry.discount_mode = "all_free"
+
+        logger.info(
+            "[full_update_online_entry] Visit создан с ID=%d, department=%s, discount_mode синхронизирован",
+            visit.id,
+            department,
+        )
+
+    # ✅ ИСПРАВЛЕНО: Добавляем услуги к Visit (после удаления старых ИЛИ к существующим)
+    added_services = []
+    for service_item in request.services:
+        service = (
+            db.query(Service)
+            .filter(Service.id == service_item['service_id'])
+            .first()
+        )
+        if service:
+            # ✅ Проверяем, нет ли уже такой услуги
+            existing_service = (
+                db.query(VisitService)
+                .filter(
+                VisitService.visit_id == visit.id,
+                    VisitService.service_id == service.id,
+                )
+                .first()
+            )
+
+            if not existing_service:
+                # ⭐ ИСПРАВЛЕНИЕ #2: Добавляем новую услугу (работает и для оплаченных, и для неоплаченных)
+                # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
+                service_code = service.service_code or get_service_code(
+                    service.id, db
+                )
+                visit_service = VisitService(
+                    visit_id=visit.id,
+                    service_id=service.id,
+                    code=service_code,
+                    name=service.name,
+                    qty=service_item.get('quantity', 1),
+                    price=Decimal('0'),  # All Free - всё бесплатно
+                    currency="UZS",
+                )
+                db.add(visit_service)
+                added_services.append(service.name)
+                if has_paid_invoice:
+                    logger.info(
+                        "[full_update_online_entry] ✅ Добавлена НОВАЯ услуга к оплаченному визиту: %s",
+                        service.name,
+                    )
+            else:
+                # Обновляем количество если услуга уже есть
+                existing_service.qty = service_item.get('quantity', 1)
+                added_services.append(f"{service.name} (обновлено)")
+
+    db.flush()  # Коммитим добавление услуг
+    logger.info(
+        "[full_update_online_entry] Visit ID=%d обновлен с услугами для all_free: %s",
+        visit.id,
+        added_services,
+    )
+
+    return visit
+
+
+def _full_update_collect_existing_services(
+    db: Session,
+    entry,
+    request,
+):
+    """Section 4.1+4.2: Compute aggregated_ids and collect existing service_ids + queue_times.
+
+    Returns (existing_service_ids, existing_service_queue_times, final_aggregated_ids).
+    """
+    import json
+    from datetime import date
+
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
     existing_service_ids = set()
     # ⭐ FIX PHASE 2: Сохраняем оригинальные queue_times для существующих услуг
@@ -1047,64 +1388,40 @@ def _full_update_process_services(
         list(existing_service_queue_times.keys()),
     )
 
-    # Определяем новые услуги (которые не были в entry.services)
-    new_service_ids = []
-    for service_item in request.services:
-        if service_item['service_id'] not in existing_service_ids:
-            new_service_ids.append(service_item['service_id'])
+    return existing_service_ids, existing_service_queue_times, final_aggregated_ids
 
-    logger.info(
-        "[full_update_online_entry] ⭐ DEBUG: Новые услуги для добавления: %s",
-        new_service_ids,
-    )
-    logger.info(
-        "[full_update_online_entry] ⭐ DEBUG: request.services содержит: %s",
-        [s['service_id'] for s in request.services],
-    )
-    logger.info(
-        "[full_update_online_entry] ⭐ DEBUG: existing_service_ids: %s",
-        list(existing_service_ids),
-    )
 
-    # Определяем: это первичная регистрация или редактирование?
-    # ⭐ DEBUG: Добавляем логирование для отладки
-    logger.info(
-        "[full_update_online_entry] DEBUG: entry.queue_time=%s, entry.services=%s (type=%s, len=%s)",
-        entry.queue_time,
-        entry.services[:100] if entry.services else None,
-        type(entry.services).__name__,
-        len(entry.services) if entry.services else 0,
-    )
 
-    # ⭐ FIX: Улучшенная логика определения первичной регистрации
-    # Считаем "первичной регистрацией" ТОЛЬКО если queue_time = None
-    # Если есть entry.services (даже пустой JSON []), но queue_time есть - это редактирование
-    has_services = False
-    if entry.services:
-        try:
-            parsed = json.loads(entry.services) if isinstance(entry.services, str) else entry.services
-            has_services = len(parsed) > 0
-        except (json.JSONDecodeError, TypeError):
-            has_services = False
+def _full_update_create_independent_entries(
+    db: Session,
+    entry,
+    request,
+    existing_service_ids: set,
+    existing_service_queue_times: dict,
+    is_initial_registration: bool,
+    is_first_fill_qr: bool,
+    new_service_ids: list,
+):
+    """Section 4.4: Create Independent Queue Entries for new/additional services.
 
-    # ⭐ FIX CRITICAL: Улучшенная логика определения первичной регистрации
-    # Для QR-записей: если entry.services пустой И мы не нашли услуг в БД для этого пациента — это "первое заполнение"
-    # Если услуги в БД найдены (даже если в этой конкретной entry пусто), значит это редактирование (добавление новых)
-    is_first_fill_qr = (
-        not has_services
-        and entry.queue_time is not None
-        and entry.source == "online"
-        and len(existing_service_ids) == 0  # ⭐ FIX: Только если вообще нет услуг у пациента
-    )
-    is_initial_registration = entry.queue_time is None
+    Handles 3 branches:
+    - is_initial_registration: just returns the effective queue_time.
+    - is_first_fill_qr: finds the consultation service (gets QR time),
+      creates IndependentQueueEntry for each additional service (gets current time),
+      creates a Visit for the QR entry.
+    - else (editing): creates IndependentQueueEntry for each new_service_id.
 
-    logger.info(
-        "[full_update_online_entry] DEBUG: has_services=%s, is_initial_registration=%s, is_first_fill_qr=%s, source=%s",
-        has_services,
-        is_initial_registration,
-        is_first_fill_qr,
-        entry.source,
-    )
+    Mutates existing_service_queue_times (adds consultation queue_time).
+    May reassign new_service_ids (in the first_fill_qr branch, new_service_ids
+    is reduced to additional_service_ids — consultation is excluded).
+    Returns (queue_time, new_service_ids) so the orchestrator sees the
+    updated list.
+    """
+    import json
+    from datetime import date, datetime
+
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.service import Service
 
     if is_initial_registration:
         # Первичная регистрация - обновляем текущую entry со всеми услугами
@@ -1480,6 +1797,39 @@ def _full_update_process_services(
 
             db.flush()  # Сохраняем новые entries
 
+    return queue_time, new_service_ids
+
+
+
+def _full_update_update_current_entry_services(
+    db: Session,
+    entry,
+    request,
+    existing_service_queue_times: dict,
+    new_service_ids: list,
+    is_initial_registration: bool,
+    is_first_fill_qr: bool,
+    queue_time,
+):
+    """Section 4.5: Populate entry.services / service_codes / total_amount from request.services.
+
+    Skips services already created as Independent Queue Entries (new_service_ids).
+    For existing services, preserves original queue_time.
+    For new services on initial registration / first-fill, uses registration queue_time.
+    For new services on edit, skips (already created as separate entries).
+
+    Mutates entry.services, entry.service_codes, entry.total_amount,
+    and entry.queue_time (on initial registration only).
+    Returns (services_list, service_codes_list, total_amount).
+    """
+    import json
+
+    from app.models.service import Service
+
+    services_list = []
+    service_codes_list = []
+    total_amount = 0
+
     # ⭐ Обрабатываем услуги для текущей entry
     # При первичной регистрации - добавляем все услуги
     # При редактировании - добавляем только СУЩЕСТВУЮЩИЕ услуги (новые уже созданы как отдельные entries)
@@ -1619,335 +1969,132 @@ def _full_update_process_services(
         total_amount,
     )
 
-    # ✅ НОВОЕ: Если all_free = True, создаем или обновляем Visit для одобрения
-    visit = None  # ✅ Инициализируем переменную visit для использования в проверках после коммита
-    if request.all_free:
-        from decimal import Decimal
+    return services_list, service_codes_list, total_amount
 
-        from app.models.online_queue import DailyQueue
-        from app.models.visit import Visit, VisitService
 
-        logger.info(
-            "[full_update_online_entry] all_free=True, создаем/обновляем Visit для одобрения",
+
+def _full_update_process_services(
+    db: Session,
+    entry,
+    request,
+    original_entry_discount_mode: str,
+    current_user,
+    entry_id: int,
+):
+    """Section 4: Collect existing services, create new entries, calculate totals."""
+    import json
+    from datetime import date, datetime
+
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.patient import Patient
+    from app.models.service import Service
+
+    patient_data = request.patient_data
+    # ✅ НОВЫЙ ФОРМАТ: Полные объекты услуг с метаданными
+
+    # ⭐ FIX: Определяем существующие услуги из ВСЕХ записей пациента за день (не только текущей entry)
+    from datetime import datetime
+
+    from app.models.online_queue import DailyQueue
+
+    existing_service_ids, existing_service_queue_times, final_aggregated_ids = (
+        _full_update_collect_existing_services(db=db, entry=entry, request=request)
+    )
+
+    # Определяем новые услуги (которые не были в entry.services)
+    new_service_ids = []
+    for service_item in request.services:
+        if service_item['service_id'] not in existing_service_ids:
+            new_service_ids.append(service_item['service_id'])
+
+    logger.info(
+        "[full_update_online_entry] ⭐ DEBUG: Новые услуги для добавления: %s",
+        new_service_ids,
+    )
+    logger.info(
+        "[full_update_online_entry] ⭐ DEBUG: request.services содержит: %s",
+        [s['service_id'] for s in request.services],
+    )
+    logger.info(
+        "[full_update_online_entry] ⭐ DEBUG: existing_service_ids: %s",
+        list(existing_service_ids),
+    )
+
+    # Определяем: это первичная регистрация или редактирование?
+    # ⭐ DEBUG: Добавляем логирование для отладки
+    logger.info(
+        "[full_update_online_entry] DEBUG: entry.queue_time=%s, entry.services=%s (type=%s, len=%s)",
+        entry.queue_time,
+        entry.services[:100] if entry.services else None,
+        type(entry.services).__name__,
+        len(entry.services) if entry.services else 0,
+    )
+
+    # ⭐ FIX: Улучшенная логика определения первичной регистрации
+    # Считаем "первичной регистрацией" ТОЛЬКО если queue_time = None
+    # Если есть entry.services (даже пустой JSON []), но queue_time есть - это редактирование
+    has_services = False
+    if entry.services:
+        try:
+            parsed = json.loads(entry.services) if isinstance(entry.services, str) else entry.services
+            has_services = len(parsed) > 0
+        except (json.JSONDecodeError, TypeError):
+            has_services = False
+
+    # ⭐ FIX CRITICAL: Улучшенная логика определения первичной регистрации
+    # Для QR-записей: если entry.services пустой И мы не нашли услуг в БД для этого пациента — это "первое заполнение"
+    # Если услуги в БД найдены (даже если в этой конкретной entry пусто), значит это редактирование (добавление новых)
+    is_first_fill_qr = (
+        not has_services
+        and entry.queue_time is not None
+        and entry.source == "online"
+        and len(existing_service_ids) == 0  # ⭐ FIX: Только если вообще нет услуг у пациента
+    )
+    is_initial_registration = entry.queue_time is None
+
+    logger.info(
+        "[full_update_online_entry] DEBUG: has_services=%s, is_initial_registration=%s, is_first_fill_qr=%s, source=%s",
+        has_services,
+        is_initial_registration,
+        is_first_fill_qr,
+        entry.source,
+    )
+
+    queue_time, new_service_ids = _full_update_create_independent_entries(
+        db=db,
+        entry=entry,
+        request=request,
+        existing_service_ids=existing_service_ids,
+        existing_service_queue_times=existing_service_queue_times,
+        is_initial_registration=is_initial_registration,
+        is_first_fill_qr=is_first_fill_qr,
+        new_service_ids=new_service_ids,
+    )
+
+    services_list, service_codes_list, total_amount = (
+        _full_update_update_current_entry_services(
+            db=db,
+            entry=entry,
+            request=request,
+            existing_service_queue_times=existing_service_queue_times,
+            new_service_ids=new_service_ids,
+            is_initial_registration=is_initial_registration,
+            is_first_fill_qr=is_first_fill_qr,
+            queue_time=queue_time,
         )
+    )
 
-        # Получаем данные из связанной очереди
-        queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
-        visit_date = queue.day if queue else date.today()
-        doctor_id = queue.specialist_id if queue else None
-
-        # ✅ ИСПРАВЛЕНО: Определяем department из queue_tag или по услугам
-        department = None
-        if queue and queue.queue_tag:
-            # Маппинг queue_tag -> department
-            queue_tag_to_dept = {
-                'cardiology': 'cardiology',
-                'cardio': 'cardiology',
-                'dermatology': 'dermatology',
-                'derma': 'dermatology',
-                'stomatology': 'stomatology',
-                'dentist': 'stomatology',
-                'lab': 'laboratory',
-                'laboratory': 'laboratory',
-                'ecg': 'cardiology',
-                'echokg': 'cardiology',
-            }
-            department = queue_tag_to_dept.get(queue.queue_tag.lower())
-
-        # Если не определили по queue_tag, определяем по услугам
-        if not department and request.services:
-            for service_item in request.services:
-                service = (
-                    db.query(Service)
-                    .filter(Service.id == service_item['service_id'])
-                    .first()
-                )
-                if service:
-                    # Resolve department through the queue-group SSOT.
-                    service_code = service.service_code or get_service_code(
-                        service.id, db
-                    )
-                    queue_group = get_queue_group_for_service(service_code)
-                    service_group_to_dept = {
-                        'cardiology': 'cardiology',
-                        'ecg': 'cardiology',
-                        'dermatology': 'dermatology',
-                        'dental': 'stomatology',
-                        'laboratory': 'laboratory',
-                    }
-                    department = service_group_to_dept.get(queue_group)
-                    if department:
-                        break
-
-        # Если department все еще не определен, используем значение по умолчанию
-        if not department:
-            department = 'general'
-
-        # Вычисляем оригинальную сумму (без скидки all_free)
-        original_total_amount = Decimal('0')
-        for service_item in request.services:
-            service = (
-                db.query(Service)
-                .filter(Service.id == service_item['service_id'])
-                .first()
-            )
-            if service:
-                original_total_amount += (
-                    service.price or Decimal('0')
-                ) * service_item.get('quantity', 1)
-
-        # ✅ ИСПРАВЛЕНО: Для QR-пациентов без patient_id нужно создать Patient или пропустить создание Visit
-        # Но Visit требует patient_id (nullable=False), поэтому создаем временного пациента если нужно
-        patient_id_for_visit = entry.patient_id
-        if not patient_id_for_visit:
-            # ✅ ИСПРАВЛЕНО: Создаем временного пациента используя единую функцию нормализации
-            logger.info(
-                "[full_update_online_entry] Создание временного пациента для QR-записи",
-            )
-            from app.crud.patient import normalize_patient_name
-
-            patient_name = patient_data.get('patient_name', 'Неизвестный пациент')
-            name_parts = normalize_patient_name(full_name=patient_name)
-
-            # Гарантируем, что поля не пустые
-            last_name = name_parts["last_name"] or 'Неизвестный'
-            first_name = name_parts["first_name"] or 'Пациент'
-
-            temp_patient = Patient(
-                last_name=last_name,
-                first_name=first_name,
-                middle_name=name_parts.get("middle_name"),
-                phone=patient_data.get('phone', ''),
-                birth_date=(
-                    date(patient_data.get('birth_year', 1990), 1, 1)
-                    if patient_data.get('birth_year')
-                    else None
-                ),
-                address=patient_data.get('address', ''),
-            )
-            db.add(temp_patient)
-            db.flush()
-            patient_id_for_visit = temp_patient.id
-            # ✅ Связываем OnlineQueueEntry с созданным пациентом
-            entry.patient_id = patient_id_for_visit
-            logger.info(
-                "[full_update_online_entry] Создан временный пациент ID=%d и связан с OnlineQueueEntry",
-                patient_id_for_visit,
-            )
-
-        # ✅ ИСПРАВЛЕНО: Улучшенный поиск существующего Visit для предотвращения дублирования
-        visit = None
-
-        # Приоритет 1: Ищем по entry.visit_id (если уже связан)
-        if entry.visit_id:
-            visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
-            if visit:
-                if visit.patient_id != patient_id_for_visit:
-                    logger.warning(
-                        "[full_update_online_entry] entry visit owner mismatch entry_id=%d visit_id=%d",
-                        entry.id,
-                        visit.id,
-                    )
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="Queue entry visit does not belong to the queue patient",
-                    )
-                logger.info(
-                    "[full_update_online_entry] Найден Visit по entry.visit_id: %d",
-                    visit.id,
-                )
-
-        # Приоритет 2: Если не найден, ищем по patient_id + visit_date (без фильтра по discount_mode)
-        # Это важно, так как при первом редактировании может быть создан Visit с другим discount_mode
-        if not visit and patient_id_for_visit:
-            visit = (
-                db.query(Visit)
-                .filter(
-                Visit.id == entry.visit_id,
-                Visit.patient_id == patient_id_for_visit,
-                    Visit.visit_date == visit_date,
-                )
-                .order_by(Visit.created_at.desc())
-                .first()
-            )  # Берем самый последний
-            if visit:
-                logger.info(
-                    "[full_update_online_entry] Найден Visit по patient_id + visit_date: %d, discount_mode=%s",
-                    visit.id,
-                    visit.discount_mode,
-                )
-
-        # Приоритет 3: Если все еще не найден, ищем по patient_id + visit_date + discount_mode="all_free"
-        if not visit and patient_id_for_visit:
-            visit = (
-                db.query(Visit)
-                .filter(
-                Visit.id == entry.visit_id,
-                Visit.patient_id == patient_id_for_visit,
-                Visit.visit_date == visit_date,
-                    Visit.discount_mode == "all_free",
-                )
-                .first()
-            )
-            if visit:
-                logger.info(
-                    "[full_update_online_entry] Найден Visit по patient_id + visit_date + all_free: %d",
-                    visit.id,
-                )
-
-        has_paid_invoice = False
-        if visit:
-            # ✅ ИСПРАВЛЕНО: Обновляем существующий Visit (не создаем новый)
-            logger.info(
-                "[full_update_online_entry] Обновление существующего Visit ID=%d",
-                visit.id,
-            )
-            # ⭐ ИСПРАВЛЕНИЕ #2: Проверяем есть ли оплаченный инвойс перед удалением услуг
-            from app.models.payment_invoice import (
-                PaymentInvoice,
-                PaymentInvoiceVisit,
-            )
-
-            has_paid_invoice = (
-                db.query(PaymentInvoiceVisit)
-                .join(PaymentInvoice)
-                .filter(
-                PaymentInvoiceVisit.visit_id == visit.id,
-                    PaymentInvoice.status == 'paid',
-                )
-                .first()
-            )
-
-            if has_paid_invoice:
-                # ⚠️ Визит УЖЕ оплачен - НЕ меняем платежный режим/статус и НЕ удаляем существующие услуги.
-                # Только добавляем новые услуги к уже существующим.
-                entry.discount_mode = original_entry_discount_mode
-                logger.warning(
-                    "[full_update_online_entry] ⚠️ Visit %d имеет оплаченный инвойс - НЕ меняем payment state и НЕ удаляем услуги, только добавляем новые",
-                    visit.id,
-                )
-                deleted_count = 0
-            else:
-                visit.approval_status = (
-                    "pending"  # Сбрасываем статус на pending при обновлении
-                )
-                visit.discount_mode = "all_free"  # Убеждаемся, что режим правильный
-                visit.department = department  # Обновляем department
-                visit.doctor_id = doctor_id  # Обновляем doctor_id
-
-                # ✅ Визит не оплачен - безопасно удалять и пересоздавать услуги
-                deleted_count = (
-                    db.query(VisitService)
-                    .filter(VisitService.visit_id == visit.id)
-                    .delete()
-                )
-                db.flush()  # Коммитим удаление перед добавлением новых
-                logger.info(
-                    "[full_update_online_entry] Удалено старых услуг: %d",
-                    deleted_count,
-                )
-
-            # ✅ Связываем OnlineQueueEntry с Visit (если еще не связан)
-            if not entry.visit_id or entry.visit_id != visit.id:
-                entry.visit_id = visit.id
-                logger.info(
-                    "[full_update_online_entry] Связан OnlineQueueEntry %d с Visit %d",
-                    entry.id,
-                    visit.id,
-                )
-
-            # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
-            if not has_paid_invoice and entry.discount_mode != "all_free":
-                entry.discount_mode = "all_free"
-                logger.info(
-                    "[full_update_online_entry] Синхронизирован discount_mode в OnlineQueueEntry %d с Visit %d",
-                    entry.id,
-                    visit.id,
-                )
-        else:
-            # ✅ Создаем новый Visit только если действительно не найден существующий
-            logger.info(
-                "[full_update_online_entry] Создание нового Visit для all_free (существующий не найден)",
-            )
-            visit = Visit(
-                patient_id=patient_id_for_visit,
-                doctor_id=doctor_id,
-                visit_date=visit_date,
-                visit_time=None,  # Время не сохраняется в OnlineQueueEntry
-                department=department,
-                discount_mode="all_free",
-                approval_status="pending",
-                notes=f"All Free заявка из онлайн записи #{entry.id}",
-                source="online",  # ✅ SSOT: QR-запись
-            )
-            db.add(visit)
-            db.flush()  # Получаем ID визита
-
-            # Связываем OnlineQueueEntry с Visit
-            entry.visit_id = visit.id
-
-            # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
-            entry.discount_mode = "all_free"
-
-            logger.info(
-                "[full_update_online_entry] Visit создан с ID=%d, department=%s, discount_mode синхронизирован",
-                visit.id,
-                department,
-            )
-
-        # ✅ ИСПРАВЛЕНО: Добавляем услуги к Visit (после удаления старых ИЛИ к существующим)
-        added_services = []
-        for service_item in request.services:
-            service = (
-                db.query(Service)
-                .filter(Service.id == service_item['service_id'])
-                .first()
-            )
-            if service:
-                # ✅ Проверяем, нет ли уже такой услуги
-                existing_service = (
-                    db.query(VisitService)
-                    .filter(
-                    VisitService.visit_id == visit.id,
-                        VisitService.service_id == service.id,
-                    )
-                    .first()
-                )
-
-                if not existing_service:
-                    # ⭐ ИСПРАВЛЕНИЕ #2: Добавляем новую услугу (работает и для оплаченных, и для неоплаченных)
-                    # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                    service_code = service.service_code or get_service_code(
-                        service.id, db
-                    )
-                    visit_service = VisitService(
-                        visit_id=visit.id,
-                        service_id=service.id,
-                        code=service_code,
-                        name=service.name,
-                        qty=service_item.get('quantity', 1),
-                        price=Decimal('0'),  # All Free - всё бесплатно
-                        currency="UZS",
-                    )
-                    db.add(visit_service)
-                    added_services.append(service.name)
-                    if has_paid_invoice:
-                        logger.info(
-                            "[full_update_online_entry] ✅ Добавлена НОВАЯ услуга к оплаченному визиту: %s",
-                            service.name,
-                        )
-                else:
-                    # Обновляем количество если услуга уже есть
-                    existing_service.qty = service_item.get('quantity', 1)
-                    added_services.append(f"{service.name} (обновлено)")
-
-        db.flush()  # Коммитим добавление услуг
-        logger.info(
-            "[full_update_online_entry] Visit ID=%d обновлен с услугами для all_free: %s",
-            visit.id,
-            added_services,
-        )
-
+    # Section 4.6: If all_free, create or update Visit + VisitService records
+    visit = _full_update_handle_all_free_visit(
+        db=db,
+        entry=entry,
+        request=request,
+        original_entry_discount_mode=original_entry_discount_mode,
+        patient_data=patient_data,
+        services_list=services_list,
+        service_codes_list=service_codes_list,
+        total_amount=total_amount,
+    )
 
     return services_list, service_codes_list, total_amount, visit
 
