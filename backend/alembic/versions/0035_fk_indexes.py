@@ -32,7 +32,7 @@ INDEXES = [
     ("refund_requests", "patient_id"),
     ("refund_requests", "payment_id"),
     ("refund_requests", "visit_id"),
-    ("refund_requests", "requested_by"),
+    ("refund_requests", "processed_by"),
     ("patient_deposits", "patient_id"),
     ("patient_deposit_transactions", "deposit_id"),
     ("patient_deposit_transactions", "created_by"),
