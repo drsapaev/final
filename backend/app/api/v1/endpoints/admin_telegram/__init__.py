@@ -35,6 +35,7 @@ from app.api.v1.endpoints.admin_telegram._helpers import (  # noqa: F401
 from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
     _get_configured_bot_token,
     _get_staff_bot_token_runtime_status,
+    confirm_staff_action,
 )
 
 # Import endpoint modules to register routes on the shared router.
@@ -59,4 +60,5 @@ __all__ = [
     "_get_staff_bot_token_runtime_status",
     "_normalize_staff_role",
     "validate_staff_link_start_token",
+    "confirm_staff_action",
 ]

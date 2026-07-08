@@ -12,4 +12,7 @@ from app.api.v1.endpoints.registrar_wizard import _cart  # noqa: F401
 from app.api.v1.endpoints.registrar_wizard import _settings  # noqa: F401
 from app.api.v1.endpoints.registrar_wizard import _visits  # noqa: F401
 
-__all__ = ["router"]
+# Re-export models used by tests
+from app.api.v1.endpoints.registrar_wizard._cart import AllFreeVisitResponse, PriceOverrideListResponse  # noqa: F401
+
+__all__ = ["router", "AllFreeVisitResponse", "PriceOverrideListResponse"]
