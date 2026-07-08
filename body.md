@@ -1,39 +1,49 @@
-refactor: deduplicate IndependentQueueEntry creation (406→210 LOC) (#2032)
+🎨 Palette: Add ARIA labels to Modal close buttons
 
-_full_update_create_independent_entries had ~120 lines of near-identical
-code duplicated between the first_fill_qr branch (additional services)
-and the editing branch (new services). Both branches:
+## Summary
 
-  1. Resolve target_queue_id (by queue_tag, or auto-create DailyQueue)
-  2. Compute next_number via SQL
-  3. Compute item_price with discounts (repeat/benefit/all_free)
-  4. Create OnlineQueueEntry with services/service_codes JSON
+- Added `aria-label="Закрыть"` and `title="Закрыть"` to the native close `button` instances in `frontend/src/components/common/Modal.jsx`.
+- These buttons are rendered with an "×" character and had no accessible name. This causes screen readers to read out unhelpful generic names (like "button") or the raw character "times" instead of clarifying that it closes the modal.
+- Provides a clear accessible name to screen readers indicating the action ("Закрыть").
+- Provides a native browser tooltip for visual users using a mouse.
 
-Extracted 2 shared helpers:
+## Cyclic Execution Evidence
 
-1. _full_update_resolve_target_queue_id (48 LOC) — resolves the target
-   DailyQueue ID for a service based on its queue_tag. Finds existing
-   queue by day+tag+active, or auto-creates via queue_service.
+- Fresh main sync: branch created from current origin/main
+- Clean workspace: inspected before edits; only frontend components changed
+- Branch: palette/modal-close-accessibility
+- Scope gate: allowed frontend component files; denied backend runtime, migrations, and generated output
+- Red-check handling: fix any failed docs/gate check in this same PR before merge
 
-2. _full_update_create_single_independent_entry (89 LOC) — creates one
-   IndependentQueueEntry for a service: resolves target queue, computes
-   next_number, computes price with discounts, creates the entry with
-   services/service_codes JSON.
+## Contract Impact
 
-Both branches now call _full_update_create_single_independent_entry in
-a simple loop, reducing the function from 406 to 210 LOC.
+not applicable - purely visual accessibility change, no API, websocket, event, or frontend consumer contract changed.
 
-Test results (SQLite local): 14 pass / 8 fail (unchanged from PR #2031).
-No regressions. Remaining 8 failures are pre-existing environmental
-(SQLite vs Postgres).
+## RBAC / Permissions
 
-Function sizes after this PR:
-  _full_update_create_independent_entries:   210 lines (was 406)
-  _full_update_resolve_target_queue_id:       48 lines (new)
-  _full_update_create_single_independent_entry: 89 lines (new)
+not applicable - no route, endpoint, guard, role helper, or auth-sensitive behavior changed.
 
-All full_update_* functions are now ≤210 LOC except:
-  _full_update_handle_all_free_visit:        349 lines (future work)
-  _full_update_collect_existing_services:    320 lines (future work)
+## Notification / Realtime
 
-Co-authored-by: Z User <z@container>
+not applicable - no notification, websocket, chat, or realtime behavior changed.
+
+## Frontend Resilience
+
+- Empty data proof: not applicable, visual change
+- Partial data proof: not applicable, visual change
+- Forbidden secondary path behavior: not applicable
+- Missing draft/resource behavior: not applicable
+- Stale route/deep-link behavior: not applicable
+
+## Scope Gate
+
+- Allowed paths: frontend/src/components/**
+- Denied paths: backend runtime, migrations, generated output
+- Migration/docs/test impact: frontend tests run to confirm no regressions
+- Rollback note: revert the frontend component changes
+
+## Validation
+
+- Targeted tests or smoke run: frontend tests (Vitest) and linter checks run locally
+- Result: passed
+- Not checked: runtime app behavior, beyond the visual/accessible label addition
