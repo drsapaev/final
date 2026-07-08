@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
 from pydantic import BaseModel
 
 from ....api.deps import get_current_user
@@ -108,9 +108,10 @@ class ECGInterpretRequest(BaseModel):
     provider: AIProviderType | None = None
 
 
-@router.get("/providers")
-async def get_available_providers(
-    current_user: User = Depends(get_current_user),
+@router.get("/providers", response_model=dict[str, Any])
+async def get_available_providers(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """Получить список доступных AI провайдеров"""
     return {
@@ -121,7 +122,7 @@ async def get_available_providers(
     }
 
 
-@router.post("/complaint-to-plan")
+@router.post("/complaint-to-plan", response_model=dict[str, Any])
 async def analyze_complaint(
     request: ComplaintAnalysisRequest, current_user: User = Depends(get_current_user)
 ) -> dict[str, Any]:
@@ -181,7 +182,7 @@ async def analyze_complaint(
         _raise_ai_internal_error(e)
 
 
-@router.post("/icd-suggest")
+@router.post("/icd-suggest", response_model=list[dict[str, str]])
 async def suggest_icd10_codes(
     request: ICD10SuggestRequest, current_user: User = Depends(get_current_user)
 ) -> list[dict[str, str]]:
@@ -204,7 +205,7 @@ async def suggest_icd10_codes(
         _raise_ai_internal_error(e)
 
 
-@router.post("/lab-interpret")
+@router.post("/lab-interpret", response_model=dict[str, Any])
 async def interpret_lab_results(
     request: LabInterpretRequest, current_user: User = Depends(get_current_user)
 ) -> dict[str, Any]:
@@ -233,7 +234,7 @@ async def interpret_lab_results(
         _raise_ai_internal_error(e)
 
 
-@router.post("/skin-analyze")
+@router.post("/skin-analyze", response_model=dict[str, Any])
 async def analyze_skin(
     image: UploadFile = File(...),
     metadata: str | None = Form(None),
@@ -272,7 +273,7 @@ async def analyze_skin(
         _raise_ai_internal_error(e)
 
 
-@router.post("/ecg-interpret")
+@router.post("/ecg-interpret", response_model=dict[str, Any])
 async def interpret_ecg(
     request: ECGInterpretRequest, current_user: User = Depends(get_current_user)
 ) -> dict[str, Any]:

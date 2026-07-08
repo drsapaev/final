@@ -4,7 +4,7 @@ API endpoints для аналитики времени ожидания
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -188,7 +188,7 @@ async def get_service_wait_analytics(
         raise_wait_time_internal_error("get_service_wait_analytics", e)
 
 
-@router.get("/wait-time-summary")
+@router.get("/wait-time-summary", response_model=dict[str, Any])
 async def get_wait_time_summary(
     days: int = Query(7, ge=1, le=30, description="Количество дней для анализа"),
     department: str | None = Query(None, description="Фильтр по отделению"),
@@ -231,7 +231,7 @@ async def get_wait_time_summary(
         raise_wait_time_internal_error("get_wait_time_summary", e)
 
 
-@router.get("/wait-time-comparison")
+@router.get("/wait-time-comparison", response_model=dict[str, Any])
 async def get_wait_time_comparison(
     current_start: str = Query(..., description="Начало текущего периода (YYYY-MM-DD)"),
     current_end: str = Query(..., description="Конец текущего периода (YYYY-MM-DD)"),
@@ -319,7 +319,7 @@ async def get_wait_time_comparison(
         raise_wait_time_internal_error("get_wait_time_comparison", e)
 
 
-@router.get("/wait-time-heatmap")
+@router.get("/wait-time-heatmap", response_model=dict[str, Any])
 async def get_wait_time_heatmap(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),

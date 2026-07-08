@@ -17,7 +17,7 @@ from app.db.session import get_db
 router = APIRouter(prefix="/observability", tags=["observability"])
 
 
-@router.get("/sla", dependencies=[Depends(deps.require_roles("Admin"))])
+@router.get("/sla", dependencies=[Depends(deps.require_roles("Admin"))], response_model=dict[str, Any])
 def get_sla_snapshot(db: Session = Depends(get_db)) -> dict[str, Any]:
     """
     Return current SLA snapshot and trigger SLA alerts check.
@@ -38,7 +38,7 @@ def get_sla_snapshot(db: Session = Depends(get_db)) -> dict[str, Any]:
     }
 
 
-@router.get("/alerts", dependencies=[Depends(deps.require_roles("Admin"))])
+@router.get("/alerts", dependencies=[Depends(deps.require_roles("Admin"))], response_model=dict[str, Any])
 def get_observability_alerts(hours: int = 24) -> dict[str, Any]:
     """Return recent alerts emitted by SLA guardrails."""
     alerts = alert_manager.get_recent_alerts(hours=hours)
@@ -58,7 +58,8 @@ def get_observability_alerts(hours: int = 24) -> dict[str, Any]:
     }
 
 
-@router.get("/metrics", response_class=PlainTextResponse, include_in_schema=False)
+@router.get("/metrics", response_class=PlainTextResponse, include_in_schema=False, response_model=None  # PlainTextResponse is not a Pydantic model
+)
 def get_prometheus_metrics(db: Session = Depends(get_db)) -> PlainTextResponse:
     """
     Prometheus-style metrics endpoint.

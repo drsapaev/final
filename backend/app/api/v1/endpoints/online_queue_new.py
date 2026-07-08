@@ -3,6 +3,7 @@ API endpoints для онлайн-очереди согласно detail.md ст
 """
 
 from datetime import date, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -87,7 +88,7 @@ def generate_qr_token(
 # ===================== ВСТУПЛЕНИЕ В ОЧЕРЕДЬ =====================
 
 
-@router.post("/online-queue/join")
+@router.post("/online-queue/join", response_model=dict[str, Any])
 def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
     """
     Вступление в онлайн-очередь
@@ -184,7 +185,7 @@ def open_queue(
 # ===================== ПРОВЕРКА СТАТУСА =====================
 
 
-@router.get("/online-queue/status")
+@router.get("/online-queue/status", response_model=dict[str, Any])
 def check_queue_status(
     day: date = Query(..., description="Дата"),
     specialist_id: int = Query(..., description="ID специалиста"),
@@ -227,7 +228,7 @@ def check_queue_status(
 # ===================== ПОЛУЧЕНИЕ ОЧЕРЕДИ =====================
 
 
-@router.get("/online-queue/today")
+@router.get("/online-queue/today", response_model=dict[str, Any])
 def get_today_queue(
     specialist_id: int | None = Query(None, description="ID специалиста"),
     db: Session = Depends(get_db),
@@ -256,7 +257,7 @@ def get_today_queue(
 # ===================== АДМИНИСТРИРОВАНИЕ =====================
 
 
-@router.get("/online-queue/stats")
+@router.get("/online-queue/stats", response_model=dict[str, Any])
 def get_queue_stats(
     days_back: int = Query(7, ge=1, le=30, description="Дней назад"),
     db: Session = Depends(get_db),
@@ -287,7 +288,7 @@ def get_queue_stats(
         )
 
 
-@router.post("/online-queue/entries/{entry_id}/cancel")
+@router.post("/online-queue/entries/{entry_id}/cancel", response_model=dict[str, Any])
 def cancel_queue_entry(
     entry_id: int,
     db: Session = Depends(get_db),

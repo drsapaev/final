@@ -5,6 +5,7 @@
 import gzip
 import json
 from datetime import datetime, UTC
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
@@ -477,7 +478,7 @@ async def get_mobile_notifications(
         )
 
 
-@router.post("/notifications/{notification_id}/read")
+@router.post("/notifications/{notification_id}/read", response_model=dict[str, Any])
 async def mark_notification_read(
     notification_id: int,
     current_user=Depends(get_current_user),
@@ -507,7 +508,7 @@ async def mark_notification_read(
         )
 
 
-@router.get("/health")
+@router.get("/health", response_model=dict[str, Any])
 async def mobile_health_check():
     """Проверка здоровья мобильного API"""
     return {
@@ -518,7 +519,7 @@ async def mobile_health_check():
     }
 
 
-@router.post("/notifications/test-push")
+@router.post("/notifications/test-push", response_model=dict[str, Any])
 async def test_push_notification(
     current_user=Depends(get_current_user), db: Session = Depends(get_db)
 ):

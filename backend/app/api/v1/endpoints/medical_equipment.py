@@ -107,9 +107,10 @@ class StatisticsResponse(BaseModel):
 # ===================== УСТРОЙСТВА =====================
 
 
-@router.get("/devices")
-async def get_all_devices(
-    db: Session = Depends(get_db),
+@router.get("/devices", response_model=dict[str, Any])
+async def get_all_devices(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.DOCTOR, Roles.REGISTRAR])),
 ):
@@ -147,7 +148,7 @@ async def get_all_devices(
         raise _medical_equipment_http_error("get_all_devices", e) from e
 
 
-@router.get("/devices/{device_id}")
+@router.get("/devices/{device_id}", response_model=dict[str, Any])
 async def get_device(
     device_id: str,
     db: Session = Depends(get_db),
@@ -187,7 +188,7 @@ async def get_device(
         raise _medical_equipment_http_error("get_device", e) from e
 
 
-@router.get("/devices/type/{device_type}")
+@router.get("/devices/type/{device_type}", response_model=dict[str, Any])
 async def get_devices_by_type(
     device_type: str,
     db: Session = Depends(get_db),
@@ -244,7 +245,7 @@ async def get_devices_by_type(
 # ===================== ПОДКЛЮЧЕНИЕ И УПРАВЛЕНИЕ =====================
 
 
-@router.post("/devices/{device_id}/connect")
+@router.post("/devices/{device_id}/connect", response_model=dict[str, Any])
 async def connect_device(
     device_id: str,
     db: Session = Depends(get_db),
@@ -275,7 +276,7 @@ async def connect_device(
         raise _medical_equipment_http_error("connect_device", e) from e
 
 
-@router.post("/devices/{device_id}/disconnect")
+@router.post("/devices/{device_id}/disconnect", response_model=dict[str, Any])
 async def disconnect_device(
     device_id: str,
     db: Session = Depends(get_db),
@@ -306,7 +307,7 @@ async def disconnect_device(
         raise _medical_equipment_http_error("disconnect_device", e) from e
 
 
-@router.get("/devices/{device_id}/status")
+@router.get("/devices/{device_id}/status", response_model=dict[str, Any])
 async def get_device_status(
     device_id: str,
     db: Session = Depends(get_db),
@@ -374,7 +375,7 @@ async def take_measurement(
         raise _medical_equipment_http_error("take_measurement", e) from e
 
 
-@router.get("/measurements")
+@router.get("/measurements", response_model=dict[str, Any])
 async def get_measurements(
     device_id: str | None = Query(None, description="ID устройства"),
     patient_id: str | None = Query(None, description="ID пациента"),
@@ -453,7 +454,7 @@ async def get_measurements(
 # ===================== КАЛИБРОВКА И ДИАГНОСТИКА =====================
 
 
-@router.post("/devices/{device_id}/calibrate")
+@router.post("/devices/{device_id}/calibrate", response_model=dict[str, Any])
 async def calibrate_device(
     device_id: str,
     db: Session = Depends(get_db),
@@ -515,7 +516,7 @@ async def run_device_diagnostics(
 # ===================== КОНФИГУРАЦИЯ =====================
 
 
-@router.put("/devices/{device_id}/config")
+@router.put("/devices/{device_id}/config", response_model=dict[str, Any])
 async def update_device_config(
     device_id: str,
     request: DeviceConfigRequest,
@@ -585,7 +586,7 @@ async def get_device_statistics(
         raise _medical_equipment_http_error("get_device_statistics", e) from e
 
 
-@router.get("/statistics/overview")
+@router.get("/statistics/overview", response_model=dict[str, Any])
 async def get_equipment_overview(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -638,7 +639,7 @@ async def get_equipment_overview(
 # ===================== ЭКСПОРТ =====================
 
 
-@router.get("/measurements/export")
+@router.get("/measurements/export", response_model=dict[str, Any])
 async def export_measurements(
     format: str = Query("json", pattern="^(json|csv)$", description="Формат экспорта"),
     device_id: str | None = Query(None, description="ID устройства"),
@@ -696,7 +697,7 @@ async def export_measurements(
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
 
 
-@router.post("/quick-measurement/{device_type}")
+@router.post("/quick-measurement/{device_type}", response_model=dict[str, Any])
 async def quick_measurement(
     device_type: str,
     patient_id: str | None = Query(None, description="ID пациента"),
@@ -772,7 +773,7 @@ async def quick_measurement(
 # ===================== ИНФОРМАЦИЯ О СИСТЕМЕ =====================
 
 
-@router.get("/device-types")
+@router.get("/device-types", response_model=dict[str, Any])
 async def get_device_types(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.DOCTOR, Roles.REGISTRAR])),
@@ -791,7 +792,7 @@ async def get_device_types(
     }
 
 
-@router.get("/connection-types")
+@router.get("/connection-types", response_model=dict[str, Any])
 async def get_connection_types(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN])),

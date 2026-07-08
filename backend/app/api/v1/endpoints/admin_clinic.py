@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
@@ -173,7 +174,7 @@ def update_ticket_print_settings(
 # ===================== ЗАГРУЗКА ЛОГОТИПА =====================
 
 
-@router.post("/clinic/logo")
+@router.post("/clinic/logo", response_model=dict[str, Any])
 def upload_clinic_logo(
     file: UploadFile = File(...), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -226,7 +227,7 @@ def upload_clinic_logo(
 # ===================== НАСТРОЙКИ ОЧЕРЕДЕЙ =====================
 
 
-@router.get("/queue/settings")
+@router.get("/queue/settings", response_model=dict[str, Any])
 def get_queue_settings(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -238,7 +239,7 @@ def get_queue_settings(
         raise _admin_clinic_http_error(e) from e
 
 
-@router.put("/queue/settings")
+@router.put("/queue/settings", response_model=dict[str, Any])
 def update_queue_settings(
     settings: QueueSettingsUpdate,
     db: Session = Depends(get_db),
@@ -258,7 +259,7 @@ def update_queue_settings(
         raise _admin_clinic_http_error(e) from e
 
 
-@router.post("/queue/test")
+@router.post("/queue/test", response_model=dict[str, Any])
 def test_queue_generation(
     request: QueueTestRequest,
     db: Session = Depends(get_db),
@@ -308,7 +309,7 @@ def test_queue_generation(
 # ===================== ИНФОРМАЦИЯ О СИСТЕМЕ =====================
 
 
-@router.get("/system/info")
+@router.get("/system/info", response_model=dict[str, Any])
 def get_system_info(current_user: User = Depends(require_roles("Admin"))):
     """Получить информацию о системе"""
     try:

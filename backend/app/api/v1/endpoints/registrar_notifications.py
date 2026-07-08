@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -100,8 +100,9 @@ class NotificationStatsResponse(BaseModel):
 
 
 @router.get("/registrars", response_model=RegistrarListResponse)
-async def get_active_registrars(
-    department: str | None = None,
+async def get_active_registrars(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+department: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "Registrar"])),
 ):

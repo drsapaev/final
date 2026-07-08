@@ -347,7 +347,7 @@ async def create_blood_test(
         _raise_cardio_internal_error("create_blood_test", e)
 
 
-@router.get("/risk-assessment", summary="Оценка рисков (deprecated)")
+@router.get("/risk-assessment", summary="Оценка рисков (deprecated)", response_model=dict[str, Any])
 async def get_risk_assessment(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*CARDIO_ROLES)),

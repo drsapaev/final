@@ -5,8 +5,13 @@ Split from telegram_webhook.py (5647 LOC → modular).
 """
 from __future__ import annotations
 
+from typing import Any
 # Import everything from all submodules (wildcard for backward compat)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
+from app.schemas.notifications import (
+    SendMessageRequest,
+    TelegramWebhookUpdateRequest,
+)
 from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import *  # noqa: F401, F403
@@ -128,6 +133,7 @@ def get_registrar_patient_onboarding_analytics_summary(
 @router.get(
     "/onboarding/requests/export",
     operation_id="telegram_registrar_export_patient_onboarding_requests_csv",
+response_model=dict[str, Any],
 )
 def export_registrar_patient_onboarding_requests_csv(
     status_filter: str = "",
@@ -258,6 +264,7 @@ def reject_patient_onboarding_request(
 @router.post(
     "/mini-app/appointments/preview",
     operation_id="telegram_mini_app_preview_appointment_booking",
+response_model=dict[str, Any],
 )
 def preview_mini_app_appointment_booking(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
@@ -276,6 +283,7 @@ def preview_mini_app_appointment_booking(
 @router.post(
     "/mini-app/forms/submissions",
     operation_id="telegram_mini_app_submit_patient_form",
+response_model=dict[str, Any],
 )
 def submit_mini_app_patient_form(
     request_body: TelegramMiniAppPatientFormSubmissionRequest,
@@ -293,6 +301,7 @@ def submit_mini_app_patient_form(
 @router.post(
     "/mini-app/cabinet/summary",
     operation_id="telegram_mini_app_patient_cabinet_summary",
+response_model=dict[str, Any],
 )
 def preview_mini_app_patient_cabinet_summary(
     request_body: TelegramMiniAppPatientCabinetSummaryRequest,
@@ -309,6 +318,7 @@ def preview_mini_app_patient_cabinet_summary(
 @router.post(
     "/mini-app/reports/download",
     operation_id="telegram_mini_app_patient_report_download",
+response_model=dict[str, Any],
 )
 def download_mini_app_patient_report(
     request_body: TelegramMiniAppPatientReportDownloadRequest,
@@ -322,6 +332,7 @@ def download_mini_app_patient_report(
 @router.post(
     "/mini-app/patient/manifest",
     operation_id="telegram_mini_app_patient_manifest",
+response_model=dict[str, Any],
 )
 def preview_mini_app_patient_manifest(
     request_body: TelegramMiniAppPatientManifestRequest,
@@ -335,6 +346,7 @@ def preview_mini_app_patient_manifest(
 @router.post(
     "/mini-app/forms/preview",
     operation_id="telegram_mini_app_preview_patient_forms",
+response_model=dict[str, Any],
 )
 def preview_mini_app_patient_forms(
     request_body: TelegramMiniAppPatientFormsPreviewRequest,
@@ -353,6 +365,7 @@ def preview_mini_app_patient_forms(
     "/mini-app/appointments",
     status_code=status.HTTP_201_CREATED,
     operation_id="telegram_mini_app_create_appointment_booking",
+response_model=dict[str, Any],
 )
 def create_mini_app_appointment_booking(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
@@ -391,15 +404,16 @@ def create_mini_app_appointment_booking(
     }
 
 
-@router.post("/webhook")
+@router.post("/webhook", response_model=dict[str, Any])
 async def telegram_webhook(
-    update: dict[str, Any], request: Request, db: Session = Depends(get_db)
+    body: TelegramWebhookUpdateRequest, request: Request, db: Session = Depends(get_db)
 ):
     """
     Webhook endpoint для получения обновлений от Telegram
     """
     try:
         _validate_webhook_secret(request, db)
+        update = body.model_dump(exclude_none=True)
         logger.info(
             "Telegram webhook update accepted",
             extra=_telegram_update_summary(update),
@@ -430,7 +444,7 @@ async def telegram_webhook(
         )
 
 
-@router.get("/webhook")
+@router.get("/webhook", response_model=dict[str, Any])
 async def verify_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Проверка webhook (для верификации)
@@ -449,12 +463,12 @@ async def verify_webhook(request: Request, db: Session = Depends(get_db)):
         )
 
 
-@router.post("/send-message")
+@router.post("/send-message", response_model=dict[str, Any])
 async def send_message_to_user(
     chat_id: int,
     message: str,
     parse_mode: str = "HTML",
-    reply_markup: dict[str, Any] = None,
+    body: SendMessageRequest = SendMessageRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -468,7 +482,7 @@ async def send_message_to_user(
             await bot_service.initialize(db)
 
         success = await bot_service._send_message(
-            chat_id=chat_id, text=message, reply_markup=reply_markup
+            chat_id=chat_id, text=message, reply_markup=body.reply_markup
         )
 
         if success:
@@ -489,7 +503,7 @@ async def send_message_to_user(
         )
 
 
-@router.get("/bot-info", operation_id="telegram_webhook_get_bot_info")
+@router.get("/bot-info", operation_id="telegram_webhook_get_bot_info", response_model=dict[str, Any])
 async def get_bot_info(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),

@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from typing import Any
 # from app.models.patient import Patient  # Временно отключено
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
@@ -307,7 +308,7 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
         return QueueJoinResponse(success=False, message=f"Ошибка сервера: {str(e)}")
 
 
-@router.get("/statistics/{specialist_id}")
+@router.get("/statistics/{specialist_id}", response_model=dict[str, Any])
 def get_queue_statistics(
     specialist_id: int,
     day: date = Query(default_factory=date.today, description="День для статистики"),
@@ -368,7 +369,7 @@ def get_queue_statistics(
     }
 
 
-@router.post("/open")
+@router.post("/open", response_model=dict[str, Any])
 def open_queue(
     day: date = Query(..., description="День очереди"),
     specialist_id: int = Query(..., description="ID специалиста"),
@@ -415,7 +416,7 @@ def open_queue(
 
 
 # UX Audit Registrar #7: close_queue — закрытие приёма (reopen online QR booking).
-@router.post("/close")
+@router.post("/close", response_model=dict[str, Any])
 def close_queue(
     day: date = Query(..., description="День очереди"),
     specialist_id: int = Query(..., description="ID специалиста"),
@@ -527,7 +528,7 @@ def get_today_queue(
     # (exception_handlers.py)
 
 
-@router.post("/call/{entry_id}")
+@router.post("/call/{entry_id}", response_model=dict[str, Any])
 def call_patient(
     entry_id: int,
     db: Session = Depends(get_db),

@@ -1,6 +1,11 @@
 """
 API endpoints для интеграции с Telegram ботом
 Основа: passport.md стр. 2064-2570
+
+P0-6 FIX (ENDPOINT-VALIDATION-AUDIT):
+Previously these endpoints accepted `request: dict[str, Any]` with no
+validation. Replaced with typed Pydantic request models from
+app.schemas.notifications.
 """
 
 from datetime import datetime
@@ -19,6 +24,12 @@ from app.models.user import User
 from app.services.telegram_service import (
     get_telegram_service,
     send_telegram_notification,
+)
+from app.schemas.notifications import (
+    SendAppointmentReminderIntegrationRequest,
+    SendLabResultsNotificationRequest,
+    SendQrCodeRequest,
+    SendTelegramIntegrationNotificationRequest,
 )
 
 router = APIRouter()
@@ -107,9 +118,9 @@ def _ensure_lab_notification_belongs_to_phone(
 # ===================== УВЕДОМЛЕНИЯ =====================
 
 
-@router.post("/send-notification")
+@router.post("/send-notification", response_model=dict[str, Any])
 async def send_notification(
-    request: dict[str, Any],
+    request: SendTelegramIntegrationNotificationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
@@ -118,16 +129,11 @@ async def send_notification(
     Отправка уведомления пациенту
     """
     try:
-        chat_id = request.get("chat_id")
-        template_key = request.get("template_key")
-        data = request.get("data", {})
-        language = request.get("language", "ru")
-
-        if not chat_id or not template_key:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не указан chat_id или template_key",
-            )
+        chat_id = request.chat_id
+        template_key = request.template_key
+        data = request.data
+        language = request.language
+        # Validation already done by Pydantic
 
         # Отправляем уведомление в фоне
         background_tasks.add_task(
@@ -150,9 +156,9 @@ async def send_notification(
         )
 
 
-@router.post("/appointment-reminder")
+@router.post("/appointment-reminder", response_model=dict[str, Any])
 async def send_appointment_reminder(
-    request: dict[str, Any],
+    request: SendAppointmentReminderIntegrationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -161,14 +167,9 @@ async def send_appointment_reminder(
     Отправка напоминания о записи
     """
     try:
-        patient_phone = request.get("patient_phone")
-        appointment_data = request.get("appointment_data")
-
-        if not patient_phone or not appointment_data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не указан телефон пациента или данные записи",
-            )
+        patient_phone = request.patient_phone
+        appointment_data = request.appointment_data.model_dump(exclude_none=True)
+        # Validation already done by Pydantic
 
         # Ищем Telegram пользователя по телефону
         telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient_phone)
@@ -223,9 +224,9 @@ async def send_appointment_reminder(
         )
 
 
-@router.post("/lab-results-notification")
+@router.post("/lab-results-notification", response_model=dict[str, Any])
 async def send_lab_results_notification(
-    request: dict[str, Any],
+    request: SendLabResultsNotificationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
@@ -234,14 +235,9 @@ async def send_lab_results_notification(
     Уведомление о готовности результатов анализов
     """
     try:
-        patient_phone = request.get("patient_phone")
-        lab_data = request.get("lab_data")
-
-        if not patient_phone or not lab_data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не указан телефон пациента или данные анализов",
-            )
+        patient_phone = request.patient_phone
+        lab_data = request.lab_data.model_dump(exclude_none=True)
+        # Validation already done by Pydantic
 
         # Ищем Telegram пользователя
         telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient_phone)
@@ -296,9 +292,9 @@ async def send_lab_results_notification(
 # ===================== QR КОДЫ =====================
 
 
-@router.post("/send-qr-code")
+@router.post("/send-qr-code", response_model=dict[str, Any])
 async def send_qr_code(
-    request: dict[str, Any],
+    request: SendQrCodeRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -307,14 +303,9 @@ async def send_qr_code(
     Отправка QR кода для онлайн-очереди
     """
     try:
-        patient_phone = request.get("patient_phone")
-        qr_data = request.get("qr_data")
-
-        if not patient_phone or not qr_data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не указан телефон пациента или данные QR",
-            )
+        patient_phone = request.patient_phone
+        qr_data = request.qr_data.model_dump(exclude_none=True)
+        # Validation already done by Pydantic
 
         # Ищем Telegram пользователя
         telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient_phone)
@@ -365,7 +356,7 @@ async def send_qr_code(
 # ===================== УПРАВЛЕНИЕ БОТОМ =====================
 
 
-@router.get("/bot-status")
+@router.get("/bot-status", response_model=dict[str, Any])
 def get_bot_status(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -408,7 +399,7 @@ def get_bot_status(
         )
 
 
-@router.get("/users")
+@router.get("/users", response_model=dict[str, Any])
 def get_telegram_users(
     active_only: bool = True,
     limit: int = 50,
@@ -454,7 +445,7 @@ def get_telegram_users(
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
 
 
-@router.post("/quick/appointment-reminder")
+@router.post("/quick/appointment-reminder", response_model=dict[str, Any])
 async def quick_appointment_reminder(
     patient_phone: str,
     doctor_name: str,
@@ -486,7 +477,7 @@ async def quick_appointment_reminder(
     )
 
 
-@router.post("/quick/qr-notification")
+@router.post("/quick/qr-notification", response_model=dict[str, Any])
 async def quick_qr_notification(
     patient_phone: str,
     doctor_name: str,

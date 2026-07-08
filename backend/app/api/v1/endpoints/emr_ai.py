@@ -10,11 +10,15 @@ from sqlalchemy.orm import Session
 
 from app.core.rbac import AIPermission, require_any_ai_permission
 from app.db.session import get_db
-from app.services.ai_feature_gating import RequireAiFeature
 from app.models.user import User
+from app.schemas.misc_endpoints import (
+    EmrAiEmrDataRequest,
+    EmrAiPatientDataRequest,
+    EmrAiTemplateDataRequest,
+)
 from app.services.emr_ai_service import get_emr_ai_service
 
-router = APIRouter(dependencies=[Depends(RequireAiFeature("ai_emr_legacy"))])  # P1-13: feature flag
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 EMR_AI_ACCESS = require_any_ai_permission(
@@ -47,7 +51,7 @@ def ai_safety_meta() -> dict[str, Any]:
     }
 
 
-@router.post("/suggestions/diagnosis")
+@router.post("/suggestions/diagnosis", response_model=dict[str, Any])
 async def get_diagnosis_suggestions(
     symptoms: list[str],
     specialty: str = Query("general", description="Специализация врача"),
@@ -69,7 +73,7 @@ async def get_diagnosis_suggestions(
         _raise_emr_ai_internal_error("get_diagnosis_suggestions", e)
 
 
-@router.post("/suggestions/treatment")
+@router.post("/suggestions/treatment", response_model=dict[str, Any])
 async def get_treatment_suggestions(
     diagnosis: str,
     specialty: str = Query("general", description="Специализация врача"),
@@ -92,7 +96,7 @@ async def get_treatment_suggestions(
         _raise_emr_ai_internal_error("get_treatment_suggestions", e)
 
 
-@router.post("/suggestions/icd10")
+@router.post("/suggestions/icd10", response_model=dict[str, Any])
 async def get_icd10_suggestions(
     diagnosis_text: str,
     db: Session = Depends(get_db),
@@ -113,10 +117,10 @@ async def get_icd10_suggestions(
         _raise_emr_ai_internal_error("get_icd10_suggestions", e)
 
 
-@router.post("/auto-fill")
+@router.post("/auto-fill", response_model=dict[str, Any])
 async def auto_fill_emr_fields(
-    template_structure: dict[str, Any],
-    patient_data: dict[str, Any],
+    template_structure: EmrAiTemplateDataRequest,
+    patient_data: EmrAiPatientDataRequest,
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
     current_user: User = Depends(EMR_AI_ACCESS),
@@ -125,12 +129,12 @@ async def auto_fill_emr_fields(
     try:
         ai_service = await get_emr_ai_service()
         filled_data = await ai_service.auto_fill_emr_fields(
-            template_structure, patient_data, specialty
+            template_structure.model_dump(exclude_none=True), patient_data.model_dump(exclude_none=True), specialty
         )
 
         return {
             "filled_data": filled_data,
-            "template_structure": template_structure,
+            "template_structure": template_structure.model_dump(exclude_none=True),
             "specialty": specialty,
             **ai_safety_meta(),
         }
@@ -138,10 +142,10 @@ async def auto_fill_emr_fields(
         _raise_emr_ai_internal_error("auto_fill_emr_fields", e)
 
 
-@router.post("/validate")
+@router.post("/validate", response_model=dict[str, Any])
 async def validate_emr_data(
-    emr_data: dict[str, Any],
-    template_structure: dict[str, Any],
+    emr_data: EmrAiEmrDataRequest,
+    template_structure: EmrAiTemplateDataRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(EMR_AI_ACCESS),
 ):
@@ -149,7 +153,7 @@ async def validate_emr_data(
     try:
         ai_service = await get_emr_ai_service()
         validation_result = await ai_service.validate_emr_data(
-            emr_data, template_structure
+            emr_data.model_dump(exclude_none=True), template_structure.model_dump(exclude_none=True)
         )
 
         if isinstance(validation_result, dict):
@@ -159,9 +163,9 @@ async def validate_emr_data(
         _raise_emr_ai_internal_error("validate_emr_data", e)
 
 
-@router.post("/suggestions/ai")
+@router.post("/suggestions/ai", response_model=dict[str, Any])
 async def get_ai_suggestions(
-    emr_data: dict[str, Any],
+    emr_data: EmrAiEmrDataRequest,
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
     current_user: User = Depends(EMR_AI_ACCESS),
@@ -169,7 +173,7 @@ async def get_ai_suggestions(
     """Получить общие AI предложения для EMR"""
     try:
         ai_service = await get_emr_ai_service()
-        suggestions = await ai_service.get_ai_suggestions(emr_data, specialty)
+        suggestions = await ai_service.get_ai_suggestions(emr_data.model_dump(exclude_none=True), specialty)
 
         return {
             "suggestions": suggestions,
@@ -181,7 +185,7 @@ async def get_ai_suggestions(
         _raise_emr_ai_internal_error("get_ai_suggestions", e)
 
 
-@router.get("/suggestions/health")
+@router.get("/suggestions/health", response_model=dict[str, Any])
 async def ai_health_check(current_user: User = Depends(EMR_AI_ACCESS)):
     """Проверка здоровья AI сервиса"""
     return {

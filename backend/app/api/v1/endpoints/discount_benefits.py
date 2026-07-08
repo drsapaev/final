@@ -3,6 +3,7 @@ API endpoints для системы скидок и льгот
 """
 
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -152,7 +153,7 @@ class RedeemPointsRequest(BaseModel):
 # === СКИДКИ ===
 
 
-@router.post("/discounts")
+@router.post("/discounts", response_model=dict[str, Any])
 async def create_discount(
     discount_data: DiscountCreate,
     db: Session = Depends(get_db),
@@ -173,7 +174,7 @@ async def create_discount(
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
-@router.get("/discounts")
+@router.get("/discounts", response_model=dict[str, Any])
 async def get_discounts(
     active_only: bool = Query(True),
     service_ids: list[int] | None = Query(None),
@@ -209,7 +210,7 @@ async def get_discounts(
     }
 
 
-@router.put("/discounts/{discount_id}")
+@router.put("/discounts/{discount_id}", response_model=dict[str, Any])
 async def update_discount(
     discount_id: int,
     discount_data: DiscountUpdate,
@@ -229,7 +230,7 @@ async def update_discount(
     return {"success": True, "message": "Скидка обновлена успешно"}
 
 
-@router.delete("/discounts/{discount_id}")
+@router.delete("/discounts/{discount_id}", response_model=dict[str, Any])
 async def delete_discount(
     discount_id: int,
     db: Session = Depends(get_db),
@@ -245,7 +246,7 @@ async def delete_discount(
     return {"success": True, "message": "Скидка деактивирована успешно"}
 
 
-@router.post("/discounts/apply")
+@router.post("/discounts/apply", response_model=dict[str, Any])
 async def apply_discount(
     request: ApplyDiscountRequest,
     db: Session = Depends(get_db),
@@ -280,7 +281,7 @@ async def apply_discount(
 # === ЛЬГОТЫ ===
 
 
-@router.post("/benefits")
+@router.post("/benefits", response_model=dict[str, Any])
 async def create_benefit(
     benefit_data: BenefitCreate,
     db: Session = Depends(get_db),
@@ -301,7 +302,7 @@ async def create_benefit(
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
-@router.get("/benefits")
+@router.get("/benefits", response_model=dict[str, Any])
 async def get_benefits(
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
@@ -330,7 +331,7 @@ async def get_benefits(
     }
 
 
-@router.post("/benefits/assign")
+@router.post("/benefits/assign", response_model=dict[str, Any])
 async def assign_benefit_to_patient(
     request: PatientBenefitCreate,
     db: Session = Depends(get_db),
@@ -359,7 +360,7 @@ async def assign_benefit_to_patient(
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
-@router.post("/benefits/verify/{patient_benefit_id}")
+@router.post("/benefits/verify/{patient_benefit_id}", response_model=dict[str, Any])
 async def verify_patient_benefit(
     patient_benefit_id: int,
     notes: str | None = None,
@@ -380,7 +381,7 @@ async def verify_patient_benefit(
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
-@router.get("/benefits/patient/{patient_id}")
+@router.get("/benefits/patient/{patient_id}", response_model=dict[str, Any])
 async def get_patient_benefits(
     patient_id: int,
     active_only: bool = Query(True),
@@ -415,7 +416,7 @@ async def get_patient_benefits(
     }
 
 
-@router.post("/benefits/apply")
+@router.post("/benefits/apply", response_model=dict[str, Any])
 async def apply_benefit(
     request: ApplyBenefitRequest,
     db: Session = Depends(get_db),
@@ -450,7 +451,7 @@ async def apply_benefit(
 # === ПРОГРАММЫ ЛОЯЛЬНОСТИ ===
 
 
-@router.post("/loyalty-programs")
+@router.post("/loyalty-programs", response_model=dict[str, Any])
 async def create_loyalty_program(
     program_data: LoyaltyProgramCreate,
     db: Session = Depends(get_db),
@@ -471,7 +472,7 @@ async def create_loyalty_program(
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
-@router.get("/loyalty-programs")
+@router.get("/loyalty-programs", response_model=dict[str, Any])
 async def get_loyalty_programs(
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
@@ -499,7 +500,7 @@ async def get_loyalty_programs(
     }
 
 
-@router.post("/loyalty-programs/enroll")
+@router.post("/loyalty-programs/enroll", response_model=dict[str, Any])
 async def enroll_patient_in_loyalty(
     patient_id: int,
     program_id: int,
@@ -519,7 +520,7 @@ async def enroll_patient_in_loyalty(
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
-@router.post("/loyalty-programs/earn-points")
+@router.post("/loyalty-programs/earn-points", response_model=dict[str, Any])
 async def earn_loyalty_points(
     request: EarnPointsRequest,
     db: Session = Depends(get_db),
@@ -547,7 +548,7 @@ async def earn_loyalty_points(
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
-@router.post("/loyalty-programs/redeem-points")
+@router.post("/loyalty-programs/redeem-points", response_model=dict[str, Any])
 async def redeem_loyalty_points(
     request: RedeemPointsRequest,
     db: Session = Depends(get_db),
@@ -575,7 +576,7 @@ async def redeem_loyalty_points(
         raise HTTPException(status_code=400, detail="Ошибка операции")
 
 
-@router.get("/loyalty-programs/balance/{patient_id}/{program_id}")
+@router.get("/loyalty-programs/balance/{patient_id}/{program_id}", response_model=dict[str, Any])
 async def get_loyalty_balance(
     patient_id: int,
     program_id: int,
@@ -592,7 +593,7 @@ async def get_loyalty_balance(
 # === КОМПЛЕКСНЫЕ ОПЕРАЦИИ ===
 
 
-@router.post("/calculate-discount")
+@router.post("/calculate-discount", response_model=dict[str, Any])
 async def calculate_total_discount(
     request: DiscountCalculationRequest,
     db: Session = Depends(get_db),
@@ -615,7 +616,7 @@ async def calculate_total_discount(
 # === АНАЛИТИКА ===
 
 
-@router.get("/analytics/discounts")
+@router.get("/analytics/discounts", response_model=dict[str, Any])
 async def get_discount_analytics(
     start_date: datetime | None = Query(None),
     end_date: datetime | None = Query(None),
@@ -629,7 +630,7 @@ async def get_discount_analytics(
     return {"success": True, "analytics": analytics}
 
 
-@router.get("/analytics/benefits")
+@router.get("/analytics/benefits", response_model=dict[str, Any])
 async def get_benefit_analytics(
     start_date: datetime | None = Query(None),
     end_date: datetime | None = Query(None),
@@ -643,7 +644,7 @@ async def get_benefit_analytics(
     return {"success": True, "analytics": analytics}
 
 
-@router.get("/analytics/loyalty")
+@router.get("/analytics/loyalty", response_model=dict[str, Any])
 async def get_loyalty_analytics(
     program_id: int | None = Query(None),
     db: Session = Depends(get_db),

@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -95,9 +95,10 @@ class JobStatusResponse(BaseModel):
 # ===================== ПРИНТЕРЫ =====================
 
 
-@router.get("/printers")
-async def get_all_printers(
-    db: Session = Depends(get_db),
+@router.get("/printers", response_model=dict[str, Any])
+async def get_all_printers(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR])),
 ):
@@ -135,7 +136,7 @@ async def get_all_printers(
         )
 
 
-@router.get("/printers/{provider_name}")
+@router.get("/printers/{provider_name}", response_model=dict[str, Any])
 async def get_printers_by_provider(
     provider_name: str,
     db: Session = Depends(get_db),
@@ -183,7 +184,7 @@ async def get_printers_by_provider(
         )
 
 
-@router.get("/printers/{provider_name}/{printer_id}")
+@router.get("/printers/{provider_name}/{printer_id}", response_model=dict[str, Any])
 async def get_printer_info(
     provider_name: str,
     printer_id: str,
@@ -372,7 +373,7 @@ async def get_job_status(
         )
 
 
-@router.post("/jobs/{provider_name}/{job_id}/cancel")
+@router.post("/jobs/{provider_name}/{job_id}/cancel", response_model=dict[str, Any])
 async def cancel_job(
     provider_name: str,
     job_id: str,
@@ -425,7 +426,7 @@ class QuickPrintPrescriptionRequest(BaseModel):
     doctor_name: str
 
 
-@router.post("/quick-print/prescription")
+@router.post("/quick-print/prescription", response_model=dict[str, Any])
 async def quick_print_prescription(
     request: QuickPrintPrescriptionRequest,
     db: Session = Depends(get_db),
@@ -476,7 +477,7 @@ class QuickPrintTicketRequest(BaseModel):
     cabinet: str
 
 
-@router.post("/quick-print/ticket")
+@router.post("/quick-print/ticket", response_model=dict[str, Any])
 async def quick_print_ticket(
     request: QuickPrintTicketRequest,
     db: Session = Depends(get_db),
@@ -521,7 +522,7 @@ async def quick_print_ticket(
 # ===================== ТЕСТИРОВАНИЕ =====================
 
 
-@router.post("/test/{provider_name}/{printer_id}")
+@router.post("/test/{provider_name}/{printer_id}", response_model=dict[str, Any])
 async def test_printer(
     provider_name: str,
     printer_id: str,
@@ -578,7 +579,7 @@ async def test_printer(
 # ===================== СТАТИСТИКА =====================
 
 
-@router.get("/statistics")
+@router.get("/statistics", response_model=dict[str, Any])
 async def get_printing_statistics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

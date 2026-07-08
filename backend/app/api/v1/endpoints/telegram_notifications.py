@@ -32,6 +32,7 @@ from app.models.user import User
 from app.models.visit import Visit
 from app.services.telegram_bot import get_telegram_bot_service
 from app.services.telegram_templates import get_telegram_templates_service
+from app.schemas.notifications import SendPaymentConfirmationRequest
 
 router = APIRouter()
 
@@ -242,7 +243,7 @@ def _ensure_payment_confirmation_belongs_to_patient(
         )
 
 
-@router.post("/send-appointment-reminder")
+@router.post("/send-appointment-reminder", response_model=dict[str, Any])
 async def send_appointment_reminder(
     appointment_id: int,
     reminder_type: str = Query("24h", description="Тип напоминания: 24h, 2h, 30m"),
@@ -334,7 +335,7 @@ async def send_appointment_reminder(
         )
 
 
-@router.post("/send-lab-results")
+@router.post("/send-lab-results", response_model=dict[str, Any])
 async def send_lab_results(
     patient_id: int,
     lab_result_ids: list[int],
@@ -432,16 +433,17 @@ async def send_lab_results(
         )
 
 
-@router.post("/send-payment-confirmation")
+@router.post("/send-payment-confirmation", response_model=dict[str, Any])
 async def send_payment_confirmation(
     patient_id: int,
-    payment_data: dict[str, Any],
+    body: SendPaymentConfirmationRequest,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
     """Отправить подтверждение платежа"""
     try:
+        payment_data = body.payment_data.model_dump(exclude_none=True)
         # Получаем данные пациента
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
@@ -491,7 +493,7 @@ async def send_payment_confirmation(
             return {
                 "success": True,
                 "message": "Подтверждение платежа отправлено",
-                "amount": payment_data.get("amount"),
+                "amount": payment_data.get("amount"),  # already a dict from body.payment_data
             }
         else:
             raise HTTPException(
@@ -512,7 +514,7 @@ async def send_payment_confirmation(
 BROADCAST_MAX_RECIPIENTS = 1000
 
 
-@router.post("/broadcast-message")
+@router.post("/broadcast-message", response_model=dict[str, Any])
 @limiter.limit("1/5minute")
 async def send_broadcast_message(request: Request, 
     message: str,
@@ -592,7 +594,7 @@ async def send_broadcast_message(request: Request,
         )
 
 
-@router.get("/notification-stats")
+@router.get("/notification-stats", response_model=dict[str, Any])
 async def get_notification_stats(
     days_back: int = Query(7, description="Количество дней назад"),
     db: Session = Depends(get_db),
@@ -628,7 +630,7 @@ async def get_notification_stats(
         )
 
 
-@router.post("/schedule-reminder")
+@router.post("/schedule-reminder", response_model=dict[str, Any])
 async def schedule_reminder(
     appointment_id: int,
     reminder_time: str,  # ISO datetime string

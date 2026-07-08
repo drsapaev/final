@@ -35,6 +35,7 @@ from app.models.display_config import (
     DisplayVideo,
 )
 from app.models.user import User
+from app.schemas.misc_endpoints import DisplayBannerRequest, DisplayTestRequest
 from app.schemas.display_config import DisplayBoardUpdate
 
 router = APIRouter()
@@ -141,7 +142,7 @@ def _serialize_theme(theme: DisplayTheme) -> dict[str, Any]:
 # ===================== УПРАВЛЕНИЕ ТАБЛО =====================
 
 
-@router.get("/display/boards")
+@router.get("/display/boards", response_model=dict[str, Any])
 def get_display_boards(
     active_only: bool = True,
     db: Session = Depends(get_db),
@@ -160,7 +161,7 @@ def get_display_boards(
         raise _admin_display_http_error(e) from e
 
 
-@router.get("/display/boards/{board_id}")
+@router.get("/display/boards/{board_id}", response_model=dict[str, Any])
 def get_display_board(
     board_id: int,
     db: Session = Depends(get_db),
@@ -183,7 +184,7 @@ def get_display_board(
         raise _admin_display_http_error(e) from e
 
 
-@router.put("/display/boards/{board_id}")
+@router.put("/display/boards/{board_id}", response_model=dict[str, Any])
 def update_display_board(
     board_id: int,
     board_data: DisplayBoardUpdate,
@@ -220,7 +221,7 @@ def update_display_board(
 # ===================== БАННЕРЫ =====================
 
 
-@router.get("/display/boards/{board_id}/banners")
+@router.get("/display/boards/{board_id}/banners", response_model=dict[str, Any])
 def get_display_banners(
     board_id: int,
     active_only: bool = True,
@@ -235,10 +236,10 @@ def get_display_banners(
         raise _admin_display_http_error(e) from e
 
 
-@router.post("/display/boards/{board_id}/banners")
+@router.post("/display/boards/{board_id}/banners", response_model=dict[str, Any])
 def create_display_banner(
     board_id: int,
-    banner_data: dict[str, Any],
+    banner_data: DisplayBannerRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -250,7 +251,7 @@ def create_display_banner(
         raise _admin_display_http_error(e) from e
 
 
-@router.post("/display/upload-banner")
+@router.post("/display/upload-banner", response_model=dict[str, Any])
 def upload_banner_image(
     file: UploadFile = File(...), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -302,7 +303,7 @@ def upload_banner_image(
 # ===================== ТЕМЫ =====================
 
 
-@router.get("/display/themes")
+@router.get("/display/themes", response_model=dict[str, Any])
 def get_display_themes(
     active_only: bool = True,
     db: Session = Depends(get_db),
@@ -325,17 +326,17 @@ def get_display_themes(
 # ===================== ТЕСТИРОВАНИЕ ТАБЛО =====================
 
 
-@router.post("/display/boards/{board_id}/test")
+@router.post("/display/boards/{board_id}/test", response_model=dict[str, Any])
 def test_display_board(
     board_id: int,
-    test_data: dict[str, Any],
+    test_data: DisplayTestRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Тестировать табло"""
     try:
         ensure_default_display_config(db)
-        test_type = test_data.get("test_type", "call")
+        test_type = test_data.test_type
 
         if test_type == "call":
             # Тестовый вызов пациента
@@ -370,7 +371,7 @@ def test_display_board(
 # ===================== СТАТИСТИКА ТАБЛО =====================
 
 
-@router.get("/display/stats")
+@router.get("/display/stats", response_model=dict[str, Any])
 def get_display_stats(
     days_back: int = 7,
     db: Session = Depends(get_db),

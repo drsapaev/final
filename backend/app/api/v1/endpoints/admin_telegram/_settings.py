@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
+from app.schemas.notifications import UpdateTelegramSettingsRequest
 
-@router.get("/telegram/settings")
+from typing import Any
+@router.get("/telegram/settings", response_model=dict[str, Any])
 def get_telegram_settings(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -41,26 +43,27 @@ def get_telegram_settings(
         )
 
 
-@router.put("/telegram/settings")
+@router.put("/telegram/settings", response_model=dict[str, Any])
 def update_telegram_settings(
-    settings: dict[str, Any],
+    settings: UpdateTelegramSettingsRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить настройки Telegram"""
     try:
+        # P0-6 FIX: Pydantic model validates + types all fields.
         # TG-AUDIT-28 P0-5: фильтруем masked bot_token placeholder.
         # GET /telegram/settings возвращает bot_token как "***скрыт***";
         # фронтенд отправляет его обратно при Save; без фильтра backend
         # записал бы masked значение в DB → бот ломается.
-        if settings and isinstance(settings, dict):
-            bt = settings.get("bot_token")
-            if bt and isinstance(bt, str) and "***" in bt:
-                settings = {k: v for k, v in settings.items() if k != "bot_token"}
+        settings_dict = settings.model_dump(exclude_none=True)
+        bt = settings_dict.get("bot_token")
+        if bt and isinstance(bt, str) and "***" in bt:
+            settings_dict = {k: v for k, v in settings_dict.items() if k != "bot_token"}
 
         # Обновляем настройки в категории "telegram"
         updated_settings = crud_clinic.update_settings_batch(
-            db, "telegram", settings, current_user.id
+            db, "telegram", settings_dict, current_user.id
         )
 
         return {
@@ -76,7 +79,7 @@ def update_telegram_settings(
         )
 
 
-@router.post("/telegram/test-bot")
+@router.post("/telegram/test-bot", response_model=dict[str, Any])
 def test_telegram_bot(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -155,7 +158,7 @@ def test_telegram_bot(
         )
 
 
-@router.post("/telegram/register-patient-commands")
+@router.post("/telegram/register-patient-commands", response_model=dict[str, Any])
 async def register_patient_bot_commands(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -205,7 +208,7 @@ async def register_patient_bot_commands(
         )
 
 
-@router.post("/telegram/register-staff-commands")
+@router.post("/telegram/register-staff-commands", response_model=dict[str, Any])
 async def register_staff_bot_commands(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -263,7 +266,7 @@ async def register_staff_bot_commands(
         )
 
 
-@router.post("/telegram/set-webhook")
+@router.post("/telegram/set-webhook", response_model=dict[str, Any])
 def set_telegram_webhook(
     payload: TelegramWebhookRequest | None = Body(default=None),
     webhook_url: str | None = Query(default=None),
@@ -344,7 +347,7 @@ def set_telegram_webhook(
         )
 
 
-@router.get("/telegram/webhook-info")
+@router.get("/telegram/webhook-info", response_model=dict[str, Any])
 def get_telegram_webhook_info(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -390,7 +393,7 @@ def get_telegram_webhook_info(
 # ===================== ШАБЛОНЫ СООБЩЕНИЙ =====================
 
 
-@router.get("/telegram/integration-status")
+@router.get("/telegram/integration-status", response_model=dict[str, Any])
 def get_telegram_integration_status(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -605,7 +608,3 @@ def get_telegram_integration_status(
             e,
         )
 
-
-# ============================================================
-# === TEMPLATES & MESSAGING ENDPOINTS ===
-# ============================================================

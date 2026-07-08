@@ -408,7 +408,7 @@ async def create_price_override(
         )
 
 
-@router.get("/price-overrides", summary="Получить изменения цен")
+@router.get("/price-overrides", summary="Получить изменения цен", response_model=list[PriceOverrideResponse])
 async def get_price_overrides(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
@@ -454,7 +454,7 @@ async def get_price_overrides(
         )
 
 
-@router.get("/photo-gallery", summary="Фотогалерея")
+@router.get("/photo-gallery", summary="Фотогалерея", response_model=dict[str, Any])
 async def get_photo_gallery(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),

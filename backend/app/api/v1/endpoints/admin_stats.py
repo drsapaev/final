@@ -28,7 +28,7 @@ def raise_admin_stats_error(action: str, public_detail: str, exc: Exception) -> 
     raise HTTPException(status_code=500, detail=public_detail)
 
 
-@router.get("/stats", summary="Общая статистика для админ-панели")
+@router.get("/stats", summary="Общая статистика для админ-панели", response_model=dict[str, Any])
 def get_admin_stats(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
@@ -127,7 +127,7 @@ def get_admin_stats(
         )
 
 
-@router.get("/quick-stats", summary="Быстрая статистика для дашборда")
+@router.get("/quick-stats", summary="Быстрая статистика для дашборда", response_model=dict[str, Any])
 def get_quick_stats(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
@@ -185,7 +185,7 @@ def get_quick_stats(
         )
 
 
-@router.get("/recent-activities", summary="Последние действия для дашборда")
+@router.get("/recent-activities", summary="Последние действия для дашборда", response_model=dict[str, Any])
 def get_recent_activities(
     limit: int = Query(10, ge=1, le=50, description="Количество записей"),
     db: Session = Depends(get_db),
@@ -384,7 +384,7 @@ def get_recent_activities(
         )
 
 
-@router.get("/activity-chart", summary="Данные для графика активности")
+@router.get("/activity-chart", summary="Данные для графика активности", response_model=dict[str, Any])
 def get_activity_chart(
     days: int = Query(7, ge=1, le=30, description="Количество дней для графика"),
     db: Session = Depends(get_db),
@@ -477,7 +477,7 @@ def get_activity_chart(
         )
 
 
-@router.get("/analytics/overview", summary="Обзор аналитики для админ-панели")
+@router.get("/analytics/overview", summary="Обзор аналитики для админ-панели", response_model=dict[str, Any])
 def get_analytics_overview(
     period: str = Query(
         "week", description="Период: today, week, month, quarter, year"
@@ -639,7 +639,7 @@ def get_analytics_overview(
         )
 
 
-@router.get("/analytics/charts", summary="Данные для графиков аналитики")
+@router.get("/analytics/charts", summary="Данные для графиков аналитики", response_model=dict[str, Any])
 def get_analytics_charts(
     period: str = Query(
         "week", description="Период: today, week, month, quarter, year"

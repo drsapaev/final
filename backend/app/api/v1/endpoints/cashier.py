@@ -387,7 +387,7 @@ async def _emit_payment_notification(
 
 # ===================== API ENDPOINTS =====================
 
-@router.get("/pending-payments")
+@router.get("/pending-payments", response_model=dict[str, Any])
 async def get_pending_payments(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
@@ -734,7 +734,7 @@ async def get_cashier_stats(
         )
 
 
-@router.get("/payments/export")
+@router.get("/payments/export", response_model=dict[str, Any])
 async def export_payments(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
@@ -1364,7 +1364,7 @@ async def get_payment_by_id(
     )
 
 
-@router.post("/payments/{payment_id}/cancel")
+@router.post("/payments/{payment_id}/cancel", response_model=dict[str, Any])
 async def cancel_payment(
     payment_id: int,
     cancel_data: CancelPaymentRequest,
@@ -1429,7 +1429,7 @@ async def cancel_payment(
         )
 
 
-@router.post("/visits/{visit_id}/mark-paid")
+@router.post("/visits/{visit_id}/mark-paid", response_model=dict[str, Any])
 async def mark_visit_as_paid(
     visit_id: int,
     db: Session = Depends(deps.get_db),
@@ -1505,7 +1505,7 @@ async def mark_visit_as_paid(
 
 # ===================== ВОЗВРАТ СРЕДСТВ =====================
 
-@router.post("/payments/{payment_id}/confirm")
+@router.post("/payments/{payment_id}/confirm", response_model=dict[str, Any])
 async def confirm_payment(
     payment_id: int,
     db: Session = Depends(deps.get_db),
@@ -1709,7 +1709,7 @@ async def refund_payment(
 
 # ===================== ПЕЧАТЬ ЧЕКА =====================
 
-@router.get("/payments/{payment_id}/receipt")
+@router.get("/payments/{payment_id}/receipt", response_model=dict[str, Any])
 async def get_payment_receipt(
     payment_id: int,
     db: Session = Depends(deps.get_db),

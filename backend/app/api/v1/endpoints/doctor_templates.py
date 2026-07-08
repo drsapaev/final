@@ -20,6 +20,7 @@ from app.models.doctor_templates import (
 from app.models.user import User
 from app.services.doctor_templates_service import DoctorTemplatesService
 
+from typing import Any
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/doctor-templates", tags=["Doctor Templates"])
 
@@ -69,6 +70,7 @@ async def get_treatment_templates(
 @router.delete(
     "/treatment/{template_id}",
     summary="Удалить шаблон лечения",
+response_model=dict[str, Any],
 )
 async def delete_treatment_template(
     template_id: str,
@@ -117,6 +119,7 @@ async def get_all_templates(
 @router.post(
     "/treatment/{template_id}/pin",
     summary="📌 Закрепить шаблон",
+response_model=dict[str, Any],
 )
 async def pin_template(
     template_id: str,
@@ -144,6 +147,7 @@ async def pin_template(
 @router.delete(
     "/treatment/{template_id}/pin",
     summary="Открепить шаблон",
+response_model=dict[str, Any],
 )
 async def unpin_template(
     template_id: str,
@@ -180,6 +184,7 @@ class UpdateTemplateRequest(PydanticBaseModel):
 @router.put(
     "/treatment/{template_id}",
     summary="✏️ Редактировать шаблон",
+response_model=dict[str, Any],
 )
 async def update_template(
     template_id: str,

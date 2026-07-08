@@ -5,6 +5,7 @@ Provides department/tab management for registrar panel
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.api.deps import get_current_active_user, get_db
 from app.models.user import User
@@ -16,8 +17,8 @@ from app.services.departments_api_service import (
 router = APIRouter()
 
 
-@router.get("/active")
-@router.get("")
+@router.get("/active", response_model=dict[str, Any])
+@router.get("", response_model=dict[str, Any])
 async def get_departments(
     active_only: bool = True,
     db: Session = Depends(get_db),
@@ -31,7 +32,7 @@ async def get_departments(
     return DepartmentsApiService(db).get_departments(active_only=active_only)
 
 
-@router.get("/{department_id}")
+@router.get("/{department_id}", response_model=dict[str, Any])
 async def get_department(
     department_id: int,
     db: Session = Depends(get_db),

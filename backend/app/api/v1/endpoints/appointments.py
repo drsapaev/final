@@ -417,7 +417,7 @@ def create_appointment(
     return appointment
 
 
-@router.get("/pending-payments", include_in_schema=False)
+@router.get("/pending-payments", include_in_schema=False, response_model=dict[str, Any])
 async def get_pending_payments(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
@@ -709,7 +709,7 @@ def update_appointment(
     return appointment
 
 
-@router.delete("/{appointment_id}")
+@router.delete("/{appointment_id}", response_model=dict[str, Any])
 def delete_appointment(
     *,
     db: Session = Depends(deps.get_db),
@@ -729,7 +729,7 @@ def delete_appointment(
     return {"message": "Запись успешно отменена"}
 
 
-@router.get("/doctor/{doctor_id}/schedule")
+@router.get("/doctor/{doctor_id}/schedule", response_model=dict[str, Any])
 def get_doctor_schedule(
     *,
     db: Session = Depends(deps.get_db),
@@ -744,7 +744,7 @@ def get_doctor_schedule(
     return schedule
 
 
-@router.get("/department/{department}/schedule")
+@router.get("/department/{department}/schedule", response_model=dict[str, Any])
 def get_department_schedule(
     *,
     db: Session = Depends(deps.get_db),
@@ -763,7 +763,8 @@ def get_department_schedule(
 
 # Сохраняем существующие endpoints для совместимости
 @router.post(
-    "/open-day", name="open_day", dependencies=[Depends(deps.require_roles("Admin"))]
+    "/open-day", name="open_day", dependencies=[Depends(deps.require_roles("Admin"))],
+    response_model=dict[str, Any],
 )
 def open_day(
     department: str = Query(..., description="Например ENT"),
@@ -815,7 +816,7 @@ def open_day(
     }
 
 
-@router.get("/stats", name="stats")
+@router.get("/stats", name="stats", response_model=dict[str, Any])
 def stats(
     department: str = Query(...),
     # принимаем все варианты имени даты; внутри нормализуем к одной строке
@@ -841,7 +842,8 @@ def stats(
 
 
 @router.post(
-    "/close", name="close_day", dependencies=[Depends(deps.require_roles("Admin"))]
+    "/close", name="close_day", dependencies=[Depends(deps.require_roles("Admin"))],
+    response_model=dict[str, Any],
 )
 def close_day(
     department: str = Query(..., description="Например ENT"),
@@ -869,7 +871,7 @@ def close_day(
     }
 
 
-@router.get("/qrcode", name="qrcode_png")
+@router.get("/qrcode", name="qrcode_png", response_model=dict[str, Any])
 def qrcode_png(
     department: str = Query(...),
     date_str: str | None = Query(None),

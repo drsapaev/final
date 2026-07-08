@@ -389,6 +389,15 @@ api_router.include_router(schedule.router, tags=["schedule"])
 # Legacy queue router (для обратной совместимости)
 # ⚠️ DEPRECATED: Используйте /queue/qr-tokens/* или /queue/join/* из qr_queue.py
 api_router.include_router(queue_router, prefix="/queue/legacy", tags=["queue-legacy"])
+# NOTE: cardio/derma/dental routers each define their own prefix at
+# APIRouter() declaration (cardio.py:24 `prefix="/cardio"`, derma.py:27
+# `prefix="/derma"`, dental.py:16 `prefix="/dental"`), so they mount at
+# /api/v1/cardio/*, /api/v1/derma/*, /api/v1/dental/* respectively.
+# The ENDPOINT-VALIDATION-AUDIT report flagged these as P0-1 shadowing
+# conflicts — that was a FALSE POSITIVE because the audit script did not
+# detect the APIRouter(prefix=...) constructor argument (it only saw
+# `@router.post("/examinations")` literals). See audit methodology
+# limitations in /home/z/my-project/download/ENDPOINT_VALIDATION_AUDIT_REPORT.md.
 api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])

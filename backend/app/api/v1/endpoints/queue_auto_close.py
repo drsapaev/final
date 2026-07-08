@@ -15,7 +15,7 @@ from app.services.queue_auto_close import QueueAutoCloseService
 router = APIRouter()
 
 
-@router.post("/check-and-close")
+@router.post("/check-and-close", response_model=dict[str, Any])
 async def check_and_close_expired_queues(
     current_user: User = Depends(require_roles(["admin", "registrar"])),
     db: Session = Depends(get_db),
@@ -39,7 +39,7 @@ async def check_and_close_expired_queues(
         )
 
 
-@router.get("/pending-close")
+@router.get("/pending-close", response_model=list[dict[str, Any]])
 async def get_queues_pending_close(
     current_user: User = Depends(require_roles(["admin", "registrar"])),
     db: Session = Depends(get_db),
@@ -59,7 +59,7 @@ async def get_queues_pending_close(
         )
 
 
-@router.post("/force-close/{queue_id}")
+@router.post("/force-close/{queue_id}", response_model=dict[str, Any])
 async def force_close_queue(
     queue_id: int,
     current_user: User = Depends(require_roles(["admin", "registrar"])),
@@ -82,7 +82,7 @@ async def force_close_queue(
         )
 
 
-@router.get("/auto-close-status")
+@router.get("/auto-close-status", response_model=dict[str, Any])
 async def get_auto_close_status(
     current_user: User = Depends(require_roles(["admin"])),
     db: Session = Depends(get_db),

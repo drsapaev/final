@@ -1,6 +1,11 @@
 """
 API endpoints для AI интеграции в панелях врачей
 Основа: passport.md стр. 3325-3888, detail.md стр. 3889-4282
+
+P0-5 FIX (ENDPOINT-VALIDATION-AUDIT):
+Previously these endpoints accepted `request: dict[str, Any]` with no
+validation, allowing prompt injection, mass-assignment, and schema drift.
+Replaced with typed Pydantic request models from app.schemas.ai_gateway.
 """
 
 import logging
@@ -14,6 +19,14 @@ from app.services.ai_feature_gating import RequireAiFeature
 from app.api.deps import get_db, require_roles
 from app.crud import ai_config as crud_ai
 from app.models.user import User
+from app.schemas.ai_gateway import (
+    AnalyzeComplaintsIntegrationRequest,
+    AnalyzeDocumentIntegrationRequest,
+    InterpretLabResultsIntegrationRequest,
+    QuickDiagnosisHelpRequest,
+    SuggestICD10IntegrationRequest,
+    SymptomCheckerRequest,
+)
 from app.services.ai_service import get_ai_service
 
 router = APIRouter(dependencies=[Depends(RequireAiFeature("ai_integration"))])  # P1-13: feature flag
@@ -37,9 +50,9 @@ def _ai_integration_http_error(exc: Exception, operation: str) -> HTTPException:
 # ===================== АНАЛИЗ ЖАЛОБ ПАЦИЕНТОВ =====================
 
 
-@router.post("/analyze-complaints")
+@router.post("/analyze-complaints", response_model=dict[str, Any])
 async def analyze_patient_complaints(
-    request: dict[str, Any],
+    request: AnalyzeComplaintsIntegrationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
@@ -50,18 +63,14 @@ async def analyze_patient_complaints(
     Из passport.md стр. 3325: жалобы → план обследования
     """
     try:
-        complaints_text = request.get("complaints")
-        specialty = request.get("specialty", "general")
-        language = request.get("language", "ru")
-
-        if not complaints_text:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Текст жалоб не указан"
-            )
+        # Use `complaints` field; fall back to `complaint` if only that's provided
+        complaints_text = request.complaints or request.complaint or ""
 
         async with await get_ai_service(db) as ai_service:
             result = await ai_service.analyze_complaints(
-                complaints_text=complaints_text, specialty=specialty, language=language
+                complaints_text=complaints_text,
+                specialty=request.specialty,
+                language=request.language,
             )
 
             return result
@@ -75,9 +84,9 @@ async def analyze_patient_complaints(
 # ===================== ПОДБОР КОДОВ МКБ-10 =====================
 
 
-@router.post("/suggest-icd10")
+@router.post("/suggest-icd10", response_model=dict[str, Any])
 async def suggest_icd10_codes(
-    request: dict[str, Any],
+    request: SuggestICD10IntegrationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
@@ -88,18 +97,11 @@ async def suggest_icd10_codes(
     Из passport.md стр. 3456: автоматический подбор МКБ-10
     """
     try:
-        diagnosis = request.get("diagnosis")
-        specialty = request.get("specialty", "general")
-        language = request.get("language", "ru")
-
-        if not diagnosis:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Диагноз не указан"
-            )
-
         async with await get_ai_service(db) as ai_service:
             result = await ai_service.suggest_icd10(
-                diagnosis=diagnosis, specialty=specialty, language=language
+                diagnosis=request.diagnosis,
+                specialty=request.specialty,
+                language=request.language,
             )
 
             return result
@@ -113,9 +115,9 @@ async def suggest_icd10_codes(
 # ===================== АНАЛИЗ ДОКУМЕНТОВ =====================
 
 
-@router.post("/analyze-document")
+@router.post("/analyze-document", response_model=dict[str, Any])
 async def analyze_medical_document(
-    request: dict[str, Any],
+    request: AnalyzeDocumentIntegrationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
 ):
@@ -124,21 +126,11 @@ async def analyze_medical_document(
     Из passport.md стр. 3678: анализ документов и извлечение данных
     """
     try:
-        document_text = request.get("document_text")
-        document_type = request.get("document_type", "medical_report")
-        specialty = request.get("specialty", "general")
-
-        if not document_text:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Текст документа не указан",
-            )
-
         async with await get_ai_service(db) as ai_service:
             result = await ai_service.analyze_document(
-                document_text=document_text,
-                document_type=document_type,
-                specialty=specialty,
+                document_text=request.document_text,
+                document_type=request.document_type,
+                specialty=request.specialty,
             )
 
             return result
@@ -152,9 +144,9 @@ async def analyze_medical_document(
 # ===================== ИНТЕРПРЕТАЦИЯ ЛАБОРАТОРНЫХ АНАЛИЗОВ =====================
 
 
-@router.post("/interpret-lab-results")
+@router.post("/interpret-lab-results", response_model=dict[str, Any])
 async def interpret_lab_results(
-    request: dict[str, Any],
+    request: InterpretLabResultsIntegrationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
 ):
@@ -163,41 +155,30 @@ async def interpret_lab_results(
     Из passport.md стр. 3567: AI анализ лабораторных данных
     """
     try:
-        lab_results = request.get("lab_results")
-        patient_age = request.get("patient_age")
-        patient_gender = request.get("patient_gender", "unknown")
-        specialty = request.get("specialty", "general")
-
-        if not lab_results:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Результаты анализов не указаны",
-            )
-
         # Формируем текст для анализа
-        if isinstance(lab_results, list):
+        if isinstance(request.lab_results, list):
             results_text = "\\n".join(
                 [
-                    f"{result.get('parameter', '')}: {result.get('value', '')} {result.get('unit', '')}"
-                    for result in lab_results
+                    f"{(item.parameter or item.name or '')}: {item.value or ''} {item.unit or ''}"
+                    for item in request.lab_results
                 ]
             )
         else:
-            results_text = str(lab_results)
+            results_text = str(request.lab_results)
 
         async with await get_ai_service(db) as ai_service:
             result = await ai_service.analyze_document(
                 document_text=results_text,
                 document_type="lab_results",
-                specialty=specialty,
+                specialty=request.specialty,
             )
 
             # Дополняем контекстом пациента
-            if result.get("success"):
+            if isinstance(result, dict) and result.get("success"):
                 result["patient_context"] = {
-                    "age": patient_age,
-                    "gender": patient_gender,
-                    "specialty": specialty,
+                    "age": request.patient_age,
+                    "gender": request.patient_gender,
+                    "specialty": request.specialty,
                 }
 
             return result
@@ -211,9 +192,9 @@ async def interpret_lab_results(
 # ===================== ПОМОЩЬ ПО СИМПТОМАМ =====================
 
 
-@router.post("/symptom-checker")
+@router.post("/symptom-checker", response_model=dict[str, Any])
 async def check_symptoms(
-    request: dict[str, Any],
+    request: SymptomCheckerRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
@@ -222,22 +203,15 @@ async def check_symptoms(
     Помощь для триажа в регистратуре
     """
     try:
-        symptoms = request.get("symptoms", [])
-
-        if not symptoms:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Симптомы не указаны"
-            )
-
         # Формируем текст симптомов
-        symptoms_text = "\\n".join([f"• {symptom}" for symptom in symptoms])
+        symptoms_text = "\\n".join([f"• {symptom}" for symptom in request.symptoms])
 
         async with await get_ai_service(db) as ai_service:
             result = await ai_service.analyze_complaints(
                 complaints_text=f"Симптомы:\\n{symptoms_text}", specialty="general"
             )
 
-            if result.get("success"):
+            if isinstance(result, dict) and result.get("success"):
                 # Добавляем рекомендации по триажу
                 result["triage_recommendations"] = {
                     "urgency_level": "medium",  # low, medium, high, critical
@@ -260,7 +234,7 @@ async def check_symptoms(
 # ===================== СТАТИСТИКА AI =====================
 
 
-@router.get("/usage-stats")
+@router.get("/usage-stats", response_model=dict[str, Any])
 def get_ai_usage_stats(
     days_back: int = 7,
     db: Session = Depends(get_db),
@@ -322,9 +296,9 @@ def get_ai_usage_stats(
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
 
 
-@router.post("/quick/diagnosis-help")
+@router.post("/quick/diagnosis-help", response_model=dict[str, Any])
 async def quick_diagnosis_help(
-    request: dict[str, Any],
+    request: QuickDiagnosisHelpRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Doctor", "cardio", "cardiology", "derma", "dentist")
@@ -334,8 +308,8 @@ async def quick_diagnosis_help(
     Быстрая помощь с диагнозом
     """
     try:
-        symptoms = request.get("symptoms", "")
-        current_diagnosis = request.get("current_diagnosis", "")
+        symptoms = request.symptoms
+        current_diagnosis = request.current_diagnosis
 
         # Объединяем симптомы и предварительный диагноз
         combined_text = f"Симптомы: {symptoms}"

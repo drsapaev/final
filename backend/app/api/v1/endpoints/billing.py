@@ -16,6 +16,7 @@ from app.models.user import User
 from app.services.billing_api_service import BillingApiDomainError, BillingApiService
 from app.services.billing_service import BillingService
 
+from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -288,7 +289,7 @@ def update_invoice(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.delete("/invoices/{invoice_id}")
+@router.delete("/invoices/{invoice_id}", response_model=dict[str, Any])
 def delete_invoice(
     invoice_id: int,
     db: Session = Depends(deps.get_db),
@@ -302,7 +303,7 @@ def delete_invoice(
     return {"message": "Счет удален"}
 
 
-@router.get("/invoices/{invoice_id}/html")
+@router.get("/invoices/{invoice_id}/html", response_model=dict[str, Any])
 def get_invoice_html(
     invoice_id: int,
     template_id: int | None = None,
@@ -321,7 +322,7 @@ def get_invoice_html(
         raise _billing_http_error(e, "get_invoice_html") from e
 
 
-@router.post("/invoices/{invoice_id}/send")
+@router.post("/invoices/{invoice_id}/send", response_model=dict[str, Any])
 def send_invoice(
     invoice_id: int,
     background_tasks: BackgroundTasks,
@@ -362,7 +363,7 @@ def record_payment(
         raise HTTPException(status_code=400, detail="Internal server error")
 
 
-@router.get("/payments")
+@router.get("/payments", response_model=dict[str, Any])
 def get_payments(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -381,7 +382,7 @@ def get_payments(
     return BillingApiService(db).serialize_payments(payments)
 
 
-@router.post("/auto-generate/visit/{visit_id}")
+@router.post("/auto-generate/visit/{visit_id}", response_model=dict[str, Any])
 def auto_generate_invoice_for_visit(
     visit_id: int,
     db: Session = Depends(deps.get_db),
@@ -401,7 +402,7 @@ def auto_generate_invoice_for_visit(
         return {"message": "Счет не создан - нет подходящих правил или услуг"}
 
 
-@router.post("/auto-generate/appointment/{appointment_id}")
+@router.post("/auto-generate/appointment/{appointment_id}", response_model=dict[str, Any])
 def auto_generate_invoice_for_appointment(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
@@ -421,7 +422,7 @@ def auto_generate_invoice_for_appointment(
         return {"message": "Счет не создан - нет подходящих правил или услуг"}
 
 
-@router.post("/process-recurring")
+@router.post("/process-recurring", response_model=dict[str, Any])
 def process_recurring_invoices(
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
@@ -436,7 +437,7 @@ def process_recurring_invoices(
     return {"message": "Обработка периодических счетов запущена"}
 
 
-@router.post("/send-reminders")
+@router.post("/send-reminders", response_model=dict[str, Any])
 def send_payment_reminders(
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
@@ -451,7 +452,7 @@ def send_payment_reminders(
     return {"message": "Отправка напоминаний запущена"}
 
 
-@router.get("/settings")
+@router.get("/settings", response_model=dict[str, Any])
 def get_billing_settings(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(require_roles(*BILLING_ADMIN_ROLES)),
@@ -483,7 +484,7 @@ def get_billing_settings(
     }
 
 
-@router.put("/settings")
+@router.put("/settings", response_model=dict[str, Any])
 def update_billing_settings(
     settings_data: BillingSettingsUpdate,
     db: Session = Depends(deps.get_db),
@@ -500,7 +501,7 @@ def update_billing_settings(
     return {"message": "Настройки обновлены"}
 
 
-@router.get("/analytics")
+@router.get("/analytics", response_model=dict[str, Any])
 def get_billing_analytics(
     date_from: date | None = None,
     date_to: date | None = None,

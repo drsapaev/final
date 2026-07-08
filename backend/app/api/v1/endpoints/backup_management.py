@@ -5,7 +5,7 @@ Backup Management API Endpoints
 """
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -15,7 +15,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/backup/create")
+@router.post("/backup/create", response_model=dict)
 async def create_backup(
     backup_type: str = "manual",
     db: Session = Depends(get_db),
@@ -38,9 +38,10 @@ async def create_backup(
         )
 
 
-@router.get("/backup/list")
-async def list_backups(
-    db: Session = Depends(get_db),
+@router.get("/backup/list", response_model=dict)
+async def list_backups(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db),
     current_user=Depends(require_roles("Admin")),
 ) -> dict:
     """
@@ -63,7 +64,7 @@ async def list_backups(
         )
 
 
-@router.post("/backup/restore/{backup_filename}")
+@router.post("/backup/restore/{backup_filename}", response_model=dict)
 async def restore_backup(
     backup_filename: str,
     db: Session = Depends(get_db),
@@ -88,7 +89,7 @@ async def restore_backup(
         )
 
 
-@router.get("/backup/verify/{backup_filename}")
+@router.get("/backup/verify/{backup_filename}", response_model=dict)
 async def verify_backup(
     backup_filename: str,
     db: Session = Depends(get_db),

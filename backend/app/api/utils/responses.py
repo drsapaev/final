@@ -16,6 +16,12 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+try:
+    from app.core.i18n import t
+except ImportError:
+    def t(key: str, language: str | None = None) -> str:
+        return key
+
 # ===================== ERROR RESPONSES =====================
 
 def not_found(message: str = "Ресурс не найден") -> None:

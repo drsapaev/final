@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.api.deps import get_db, require_roles
 from app.services.analytics_simple_api_service import (
@@ -10,7 +11,7 @@ from app.services.analytics_simple_api_service import (
 router = APIRouter()
 
 
-@router.get("/quick-stats")
+@router.get("/quick-stats", response_model=dict[str, Any])
 async def get_quick_stats(
     current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
     db: Session = Depends(get_db),
@@ -23,7 +24,7 @@ async def get_quick_stats(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/dashboard")
+@router.get("/dashboard", response_model=dict[str, Any])
 async def get_dashboard_data(
     current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
     db: Session = Depends(get_db),
@@ -36,7 +37,7 @@ async def get_dashboard_data(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/trends")
+@router.get("/trends", response_model=dict[str, Any])
 async def get_trends_analytics(
     days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
     current_user=Depends(require_roles(["admin", "doctor", "nurse"])),

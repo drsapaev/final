@@ -32,6 +32,7 @@ from app.schemas.webhook import (
 )
 from app.services.webhook_service import get_webhook_service
 
+from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -210,7 +211,7 @@ async def update_webhook(
         )
 
 
-@router.delete("/{webhook_id}")
+@router.delete("/{webhook_id}", response_model=dict[str, Any])
 async def delete_webhook(
     *,
     db: Session = Depends(get_db),
@@ -590,7 +591,7 @@ async def webhook_bulk_action(
 # ===================== СОБЫТИЯ =====================
 
 
-@router.post("/events/trigger", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/events/trigger", status_code=status.HTTP_202_ACCEPTED, response_model=dict[str, Any])
 async def trigger_webhook_event(
     *,
     db: Session = Depends(get_db),
@@ -633,7 +634,7 @@ async def trigger_webhook_event(
 # ===================== ОЧИСТКА =====================
 
 
-@router.post("/cleanup/calls")
+@router.post("/cleanup/calls", response_model=dict[str, Any])
 async def cleanup_webhook_calls(
     *,
     db: Session = Depends(get_db),
@@ -664,7 +665,7 @@ async def cleanup_webhook_calls(
         )
 
 
-@router.post("/cleanup/events")
+@router.post("/cleanup/events", response_model=dict[str, Any])
 async def cleanup_webhook_events(
     *,
     db: Session = Depends(get_db),

@@ -17,6 +17,7 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User
 
+from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 MAX_JSON_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -30,7 +31,7 @@ class FileUploadRequest(BaseModel):
     description: str = None
 
 
-@router.post("/upload-json")
+@router.post("/upload-json", response_model=dict[str, Any])
 async def upload_file_json(
     request: FileUploadRequest,
     db: Session = Depends(get_db),

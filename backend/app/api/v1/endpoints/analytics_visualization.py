@@ -3,6 +3,7 @@ API endpoints для визуализации аналитических дан�
 """
 
 from datetime import datetime, UTC
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -22,7 +23,7 @@ router = APIRouter()
 FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
 
 
-@router.get("/dashboard")
+@router.get("/dashboard", response_model=dict[str, Any])
 async def get_dashboard_visualization(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -84,7 +85,7 @@ async def get_dashboard_visualization(
     }
 
 
-@router.get("/kpi")
+@router.get("/kpi", response_model=dict[str, Any])
 async def get_kpi_visualization(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -134,7 +135,7 @@ async def get_kpi_visualization(
     }
 
 
-@router.get("/doctors/performance")
+@router.get("/doctors/performance", response_model=dict[str, Any])
 async def get_doctor_performance_visualization(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -185,7 +186,7 @@ async def get_doctor_performance_visualization(
     }
 
 
-@router.get("/patients")
+@router.get("/patients", response_model=dict[str, Any])
 async def get_patient_analytics_visualization(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -231,7 +232,7 @@ async def get_patient_analytics_visualization(
     }
 
 
-@router.get("/revenue")
+@router.get("/revenue", response_model=dict[str, Any])
 async def get_revenue_analytics_visualization(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -281,7 +282,7 @@ async def get_revenue_analytics_visualization(
     }
 
 
-@router.get("/comprehensive")
+@router.get("/comprehensive", response_model=dict[str, Any])
 async def get_comprehensive_visualization(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -352,7 +353,7 @@ async def get_comprehensive_visualization(
     }
 
 
-@router.get("/chart-types")
+@router.get("/chart-types", response_model=dict[str, Any])
 async def get_supported_chart_types(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
@@ -409,7 +410,7 @@ async def get_supported_chart_types(
     }
 
 
-@router.get("/health")
+@router.get("/health", response_model=dict[str, Any])
 async def visualization_health_check():
     """Проверка здоровья сервиса визуализации"""
     return {

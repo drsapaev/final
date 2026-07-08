@@ -8,10 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.api.deps import get_current_user
 from app.models.user import User
 
+from typing import Any
 router = APIRouter()
 
 
-@router.get("/documentation/endpoints")
+@router.get("/documentation/endpoints", response_model=dict[str, Any])
 async def get_detailed_endpoints_documentation(
     category: str | None = Query(None, description="Категория эндпоинтов"),
     current_user: User = Depends(get_current_user),
@@ -558,7 +559,7 @@ async def get_detailed_endpoints_documentation(
     return documentation
 
 
-@router.get("/documentation/examples")
+@router.get("/documentation/examples", response_model=dict[str, Any])
 async def get_api_examples(
     endpoint: str | None = Query(None, description="Конкретный эндпоинт"),
     current_user: User = Depends(get_current_user),
@@ -570,9 +571,9 @@ async def get_api_examples(
             "login": {
                 "curl": "curl -X POST 'http://localhost:18000/api/v1/auth/login' -H 'Content-Type: application/x-www-form-urlencoded' -d 'username=YOUR_ADMIN_USERNAME&password=REPLACE_WITH_ADMIN_PASSWORD'",
                 "python": """
-import httpx
+import requests
 
-response = httpx.post(
+response = requests.post(
     'http://localhost:18000/api/v1/auth/login',
     data={'username': 'YOUR_ADMIN_USERNAME', 'password': 'REPLACE_WITH_ADMIN_PASSWORD'}
 )
@@ -595,7 +596,7 @@ const token = data.access_token;
             "create_patient": {
                 "curl": "curl -X POST 'http://localhost:18000/api/v1/patients/' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"full_name\": \"Иван Иванов\", \"phone\": \"+998901234567\", \"birth_date\": \"1990-01-01\", \"gender\": \"male\"}'",
                 "python": """
-import httpx
+import requests
 
 headers = {'Authorization': f'Bearer {token}'}
 data = {
@@ -604,7 +605,7 @@ data = {
     'birth_date': '1990-01-01',
     'gender': 'male'
 }
-response = httpx.post(
+response = requests.post(
     'http://localhost:18000/api/v1/patients/',
     headers=headers,
     json=data
@@ -631,7 +632,7 @@ const response = await fetch('http://localhost:18000/api/v1/patients/', {
             "create_visit": {
                 "curl": "curl -X POST 'http://localhost:18000/api/v1/visits/' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"patient_id\": 1, \"service_id\": 1, \"payment_amount\": 100000, \"notes\": \"Консультация\"}'",
                 "python": """
-import httpx
+import requests
 
 headers = {'Authorization': f'Bearer {token}'}
 data = {
@@ -640,7 +641,7 @@ data = {
     'payment_amount': 100000,
     'notes': 'Консультация'
 }
-response = httpx.post(
+response = requests.post(
     'http://localhost:18000/api/v1/visits/',
     headers=headers,
     json=data
@@ -676,7 +677,7 @@ const response = await fetch('http://localhost:18000/api/v1/visits/', {
     return examples
 
 
-@router.get("/documentation/status-codes")
+@router.get("/documentation/status-codes", response_model=dict[str, Any])
 async def get_status_codes_documentation():
     """Получить документацию по кодам ответов"""
 
@@ -736,7 +737,7 @@ async def get_status_codes_documentation():
     return status_codes
 
 
-@router.get("/documentation/authentication")
+@router.get("/documentation/authentication", response_model=dict[str, Any])
 async def get_authentication_documentation():
     """Получить документацию по аутентификации"""
 

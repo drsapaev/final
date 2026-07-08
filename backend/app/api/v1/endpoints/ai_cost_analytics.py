@@ -21,7 +21,7 @@ from app.services.ai.cost_tracker import get_cost_tracker
 router = APIRouter()
 
 
-@router.get("/cost-summary")
+@router.get("/cost-summary", response_model=dict[str, Any])
 async def get_cost_summary(
     days_back: int = Query(30, ge=1, le=365, description="Период в днях"),
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
@@ -44,7 +44,7 @@ async def get_cost_summary(
     return tracker.get_period_cost(days_back=days_back)
 
 
-@router.get("/budget-status")
+@router.get("/budget-status", response_model=dict[str, Any])
 async def get_budget_status(
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
@@ -64,7 +64,7 @@ async def get_budget_status(
     return tracker.check_budget_status(settings.AI_MONTHLY_BUDGET_USD)
 
 
-@router.get("/provider-stats")
+@router.get("/provider-stats", response_model=list[dict[str, Any]])
 async def get_provider_stats(
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
@@ -84,7 +84,7 @@ async def get_provider_stats(
     return tracker.get_provider_stats()
 
 
-@router.get("/my-usage")
+@router.get("/my-usage", response_model=dict[str, Any])
 async def get_my_usage(
     days_back: int = Query(30, ge=1, le=365),
     current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
@@ -113,7 +113,7 @@ async def get_my_usage(
     }
 
 
-@router.get("/pricing")
+@router.get("/pricing", response_model=dict[str, Any])
 async def get_pricing_info(
     current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
@@ -132,9 +132,10 @@ async def get_pricing_info(
     }
 
 
-@router.get("/alerts")
-async def get_active_alerts(
-    current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
+@router.get("/alerts", response_model=dict[str, Any])
+async def get_active_alerts(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+current_user: User = Depends(require_ai_permission(AIPermission.VIEW_STATS)),
     db: Session = Depends(get_db)
 ) -> dict[str, Any]:
     """

@@ -12,13 +12,14 @@ from app.db.session import get_db
 from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
 
+from typing import Any
 router = APIRouter()
 
 CLINICAL_ADVANCED_ANALYTICS_ROLES = ["admin", "doctor", "nurse"]
 FINANCIAL_ADVANCED_ANALYTICS_ROLES = ["admin", "manager"]
 
 
-@router.get("/kpi")
+@router.get("/kpi", response_model=dict[str, Any])
 async def get_kpi_metrics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -43,7 +44,7 @@ async def get_kpi_metrics(
     return AnalyticsService.calculate_statistics(db, start, end, department)
 
 
-@router.get("/doctors/performance")
+@router.get("/doctors/performance", response_model=dict[str, Any])
 async def get_doctor_performance(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -67,7 +68,7 @@ async def get_doctor_performance(
     return analytics_service.get_doctor_performance(db, start, end, department)
 
 
-@router.get("/patients/advanced")
+@router.get("/patients/advanced", response_model=dict[str, Any])
 async def get_advanced_patient_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -90,7 +91,7 @@ async def get_advanced_patient_analytics(
     return analytics_service.get_patient_analytics(db, start, end)
 
 
-@router.get("/revenue/advanced")
+@router.get("/revenue/advanced", response_model=dict[str, Any])
 async def get_advanced_revenue_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -114,7 +115,7 @@ async def get_advanced_revenue_analytics(
     return AnalyticsService.calculate_revenue(db, start, end, department)
 
 
-@router.get("/predictive")
+@router.get("/predictive", response_model=dict[str, Any])
 async def get_predictive_analytics(
     days_ahead: int = Query(
         30, ge=1, le=365, description="Количество дней для прогноза"
@@ -127,7 +128,7 @@ async def get_predictive_analytics(
     return analytics_service.get_predictive_analytics(db, days_ahead)
 
 
-@router.get("/comprehensive/advanced")
+@router.get("/comprehensive/advanced", response_model=dict[str, Any])
 async def get_advanced_comprehensive_report(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -165,7 +166,7 @@ async def get_advanced_comprehensive_report(
     return report
 
 
-@router.get("/health")
+@router.get("/health", response_model=dict[str, Any])
 async def analytics_health_check():
     """Проверка здоровья сервиса аналитики"""
     return {

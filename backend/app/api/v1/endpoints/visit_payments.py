@@ -1,5 +1,6 @@
 # app/api/v1/endpoints/visit_payments.py
 from __future__ import annotations
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -13,7 +14,7 @@ from app.services.visit_payment_api_service import (
 router = APIRouter()
 
 
-@router.get("/visit-payments/summary", summary="Сводка по платежам визитов")
+@router.get("/visit-payments/summary", summary="Сводка по платежам визитов", response_model=dict[str, Any])
 def get_visit_payments_summary(
     db: Session = Depends(get_db),
     _: dict = Depends(require_roles("Admin", "Registrar")),
@@ -28,7 +29,7 @@ def get_visit_payments_summary(
             detail="Internal server error",
         )
 
-@router.get("/visit-payments/{visit_id}", summary="Информация о платеже для визита")
+@router.get("/visit-payments/{visit_id}", summary="Информация о платеже для визита", response_model=dict[str, Any])
 def get_visit_payment_info(
     visit_id: int,
     db: Session = Depends(get_db),
@@ -48,7 +49,8 @@ def get_visit_payment_info(
 
 
 @router.get(
-    "/visit-payments/by-status/{payment_status}", summary="Визиты по статусу платежа"
+    "/visit-payments/by-status/{payment_status}", summary="Визиты по статусу платежа",
+    response_model=dict[str, Any],
 )
 def get_visits_by_payment_status(
     payment_status: str,
@@ -75,7 +77,8 @@ def get_visits_by_payment_status(
 
 
 @router.post(
-    "/visit-payments/{visit_id}/update-status", summary="Обновление статуса платежа"
+    "/visit-payments/{visit_id}/update-status", summary="Обновление статуса платежа",
+    response_model=dict[str, Any],
 )
 def update_visit_payment_status(
     visit_id: int,
@@ -109,6 +112,7 @@ def update_visit_payment_status(
 @router.post(
     "/visit-payments/{visit_id}/create-from-payment",
     summary="Создание визита из платежа",
+response_model=dict[str, Any],
 )
 def create_visit_from_payment(
     visit_id: int,

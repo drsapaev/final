@@ -4,7 +4,7 @@ API endpoints для двухфакторной аутентификации (2F
 
 import logging
 from datetime import datetime, timedelta, UTC
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -462,7 +462,18 @@ async def regenerate_backup_codes(
 async def get_trusted_devices(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    """Получить список доверенных устройств"""
+    """Получить список доверенных устройств.
+
+    P0-3 NOTE (ENDPOINT-VALIDATION-AUDIT): FastAPI uses first-registration-
+    wins for route resolution. This router (two_factor_auth.py) is mounted
+    at /2fa BEFORE two_factor_devices.py in api.py (line 336 vs 342), so
+    this handler takes precedence for GET /2fa/devices. The duplicate
+    handler in two_factor_devices.py::get_trusted_devices is dead code
+    and has been removed.
+
+    Frontend expects `response.data.devices` (matching this handler's
+    TwoFactorDeviceListResponse schema).
+    """
     try:
         devices = two_factor_device.get_trusted_devices(db, current_user.id)
         return TwoFactorDeviceListResponse(devices=devices, total=len(devices))
@@ -471,13 +482,20 @@ async def get_trusted_devices(
         raise_two_factor_internal_error("getting trusted devices", e)
 
 
-@router.delete("/devices/{device_id}")
+@router.delete("/devices/{device_id}", response_model=dict[str, Any])
 async def untrust_device(
     device_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Отозвать доверие к устройству"""
+    """Отозвать доверие к устройству.
+
+    P0-3 NOTE (ENDPOINT-VALIDATION-AUDIT): This handler wins over the
+    duplicate in two_factor_devices.py::revoke_device because two_factor_auth
+    is mounted first. Note this handler takes device_id:int while
+    two_factor_devices took device_id:str — they are NOT API-compatible.
+    The duplicate has been removed from two_factor_devices.py.
+    """
     try:
         # Проверяем, что устройство принадлежит пользователю
         device = two_factor_device.get(device_id)
@@ -503,7 +521,7 @@ async def untrust_device(
         raise_two_factor_internal_error("untrusting device", e)
 
 
-@router.get("/health")
+@router.get("/health", response_model=dict[str, Any])
 async def two_factor_health_check():
     """Проверка здоровья сервиса 2FA"""
     return {

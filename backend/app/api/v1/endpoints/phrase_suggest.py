@@ -162,7 +162,7 @@ async def index_phrases(
         )
 
 
-@router.get("/phrase-stats/{doctor_id}")
+@router.get("/phrase-stats/{doctor_id}", response_model=dict[str, Any])
 async def get_phrase_stats(
     doctor_id: int,
     db: Session = Depends(deps.get_db),

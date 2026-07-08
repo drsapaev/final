@@ -28,6 +28,7 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 
+from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,7 @@ def _build_target_path(safe_filename: str, file_hash: str) -> tuple[Path, str]:
     return target_path, storage_name
 
 
-@router.post("/upload-simple")
+@router.post("/upload-simple", response_model=dict[str, Any])
 async def upload_file_simple(
     file: UploadFile = File(...),
     title: str | None = Form(None),

@@ -6,6 +6,7 @@ API endpoints для печати документов
 import asyncio
 import logging
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -213,7 +214,7 @@ async def print_lab_results(
 # ===================== УПРАВЛЕНИЕ ПРИНТЕРАМИ =====================
 
 
-@router.get("/printers")
+@router.get("/printers", response_model=dict[str, Any])
 def get_printers(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -269,7 +270,7 @@ def get_printers(
         )
 
 
-@router.get("/printers/{printer_name}/status")
+@router.get("/printers/{printer_name}/status", response_model=dict[str, Any])
 def get_printer_status(
     printer_name: str,
     db: Session = Depends(get_db),
@@ -295,7 +296,7 @@ def get_printer_status(
         )
 
 
-@router.post("/printers/{printer_name}/test")
+@router.post("/printers/{printer_name}/test", response_model=dict[str, Any])
 def test_printer(
     printer_name: str,
     db: Session = Depends(get_db),

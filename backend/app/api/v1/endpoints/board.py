@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.services.online_queue import load_stats
 
+from typing import Any
 router = APIRouter(prefix="/board", tags=["board"])
 
 
-@router.get("/state", summary="Состояние очереди для табло")
+@router.get("/state", summary="Состояние очереди для табло", response_model=dict[str, Any])
 def board_state(
     department: str = Query(..., min_length=1, max_length=64),
     date: str = Query(..., description="YYYY-MM-DD"),

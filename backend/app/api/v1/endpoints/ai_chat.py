@@ -188,7 +188,7 @@ async def get_session(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.delete("/sessions/{session_id}")
+@router.delete("/sessions/{session_id}", response_model=dict[str, Any])
 async def delete_session(
     session_id: int,
     current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
@@ -271,7 +271,7 @@ async def send_message(
         raise HTTPException(status_code=404, detail="Internal server error")
 
 
-@router.post("/messages/{message_id}/feedback")
+@router.post("/messages/{message_id}/feedback", response_model=dict[str, Any])
 async def add_feedback(
     message_id: int,
     request: ChatFeedbackCreate,

@@ -7,7 +7,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -416,8 +416,9 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
 
 
 @router.get("", response_model=dict)
-def list_departments(
-    active_only: bool = False,
+def list_departments(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+active_only: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
@@ -953,128 +954,19 @@ def _legacy_departments_overview_payload(
     }
 
 
-@router.post("/{department_id}/initialize", response_model=dict)
-def initialize_department(  # noqa: F811  # manual-review: intentional redefinition for compatibility
-    department_id: int,
-    payload: dict[str, Any] | None = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """Инициализировать отделение - создать настройки очередей и регистрации"""
-    department = db.query(Department).filter(Department.id == department_id).first()
-    if not department:
-        raise HTTPException(status_code=404, detail="Department not found")
-
-    try:
-        # Создаем настройки очереди если их нет
-        queue_settings = (
-            db.query(DepartmentQueueSettings)
-            .filter(DepartmentQueueSettings.department_id == department_id)
-            .first()
-        )
-
-        if not queue_settings:
-            queue_settings = DepartmentQueueSettings(
-                department_id=department_id,
-                enabled=True,
-                queue_type="mixed",
-                queue_prefix=payload.get("queue_prefix") if payload else None,
-                max_daily_queue=payload.get("max_daily_queue", 50) if payload else 50,
-                avg_wait_time=20,
-                show_on_display=True,
-                auto_close_time="09:00",
-            )
-            db.add(queue_settings)
-
-        # Создаем настройки регистрации если их нет
-        reg_settings = (
-            db.query(DepartmentRegistrationSettings)
-            .filter(DepartmentRegistrationSettings.department_id == department_id)
-            .first()
-        )
-
-        if not reg_settings:
-            reg_settings = DepartmentRegistrationSettings(
-                department_id=department_id,
-                online_booking_enabled=True,
-                requires_confirmation=False,
-                min_booking_hours=2,
-                max_booking_days=30,
-                auto_assign_doctor=False,
-                allow_walkin=True,
-            )
-            db.add(reg_settings)
-
-        # Создаем дефолтную услугу если переданы данные
-        if payload and (payload.get("service_name") or payload.get("service_code")):
-            # Проверяем, что услуга не существует
-            existing_service = (
-                db.query(Service)
-                .filter(
-                    or_(
-                        Service.code == payload.get("service_code"),
-                        Service.service_code == payload.get("service_code"),
-                    )
-                )
-                .first()
-            )
-
-            if not existing_service:
-                # Находим категорию услуги
-                category = None
-                if payload.get("service_category_code"):
-                    category = (
-                        db.query(ServiceCategory)
-                        .filter(
-                            ServiceCategory.code == payload.get("service_category_code")
-                        )
-                        .first()
-                    )
-
-                service = Service(
-                    name=payload.get(
-                        "service_name", f"Услуга отделения {department.name_ru}"
-                    ),
-                    code=payload.get("service_code"),
-                    department_key=department.key,
-                    category_code=payload.get("service_category_code"),
-                    service_code=payload.get("service_code"),
-                    price=payload.get("service_price", 0),
-                    currency=payload.get("service_currency", "UZS"),
-                    active=True,
-                    requires_doctor=True,
-                    category_id=category.id if category else None,
-                )
-                db.add(service)
-
-                # Создаем связь с отделением
-                dept_service = DepartmentService(
-                    department_id=department_id,
-                    service=service,
-                    is_default=True,
-                    display_order=1,
-                    price_override=payload.get("service_price"),
-                )
-                db.add(dept_service)
-
-        db.commit()
-
-        return {
-            "success": True,
-            "message": f"Отделение '{department.name_ru}' инициализировано",
-        }
-
-    except Exception as e:
-        db.rollback()
-        logger.warning(
-            "Admin department initialization failed department_id=%s error_type=%s",
-            department_id,
-            type(e).__name__,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=ADMIN_DEPARTMENTS_PUBLIC_ERROR,
-        ) from e
+# P0-4 FIX (ENDPOINT-VALIDATION-AUDIT):
+# A DUPLICATE initialize_department handler was previously defined here
+# (lines 956-1077 in the pre-fix file). It accepted `payload: dict[str, Any]`
+# (unvalidated body) and was dead code — FastAPI uses first-registration-
+# wins, so the canonical handler at line 574 (which accepts
+# `integration: DepartmentIntegrationOptions | None` and is properly
+# typed) was always the one executed.
+# The duplicate was marked `# noqa: F811  # manual-review: intentional
+# redefinition for compatibility` but the "compatibility" claim was
+# incorrect — both handlers registered the same route, only the first
+# could ever be reached. Removed the dead duplicate. This also removes
+# one P0 unvalidated-body endpoint (admin_departments.py:957 was on the
+# P0 list with `payload: dict[str, Any] | None`).
 
 
 # ============================================================

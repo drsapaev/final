@@ -10,6 +10,11 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.user import User
 from app.services.dental_api_service import DentalApiDomainError, DentalApiService
+from app.schemas.dental import (
+    DentalExaminationRequest,
+    DentalProstheticRequest,
+    DentalTreatmentRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +52,7 @@ class DentalPriceOverrideResponse(BaseModel):
     created_at: datetime
 
 
-@router.get("/examinations", summary="Стоматологические осмотры")
+@router.get("/examinations", summary="Стоматологические осмотры", response_model=list[dict[str, Any]])
 async def get_dental_examinations(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
@@ -65,9 +70,9 @@ async def get_dental_examinations(
         )
 
 
-@router.post("/examinations", summary="Создать стоматологический осмотр")
+@router.post("/examinations", summary="Создать стоматологический осмотр", response_model=dict[str, Any])
 async def create_dental_examination(
-    examination_data: dict[str, Any],
+    examination_data: DentalExaminationRequest,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
 ) -> dict[str, Any]:
@@ -80,7 +85,7 @@ async def create_dental_examination(
     )
 
 
-@router.get("/treatments", summary="Планы лечения")
+@router.get("/treatments", summary="Планы лечения", response_model=list[dict[str, Any]])
 async def get_treatment_plans(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
@@ -98,9 +103,9 @@ async def get_treatment_plans(
         )
 
 
-@router.post("/treatments", summary="Создать план лечения")
+@router.post("/treatments", summary="Создать план лечения", response_model=dict[str, Any])
 async def create_treatment_plan(
-    treatment_data: dict[str, Any],
+    treatment_data: DentalTreatmentRequest,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
 ) -> dict[str, Any]:
@@ -113,7 +118,7 @@ async def create_treatment_plan(
     )
 
 
-@router.get("/prosthetics", summary="Протезирование")
+@router.get("/prosthetics", summary="Протезирование", response_model=list[dict[str, Any]])
 async def get_prosthetics(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
@@ -131,9 +136,9 @@ async def get_prosthetics(
         )
 
 
-@router.post("/prosthetics", summary="Создать протез")
+@router.post("/prosthetics", summary="Создать протез", response_model=dict[str, Any])
 async def create_prosthetic(
-    prosthetic_data: dict[str, Any],
+    prosthetic_data: DentalProstheticRequest,
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
 ) -> dict[str, Any]:
@@ -146,7 +151,7 @@ async def create_prosthetic(
     )
 
 
-@router.get("/xray", summary="Рентгеновские снимки")
+@router.get("/xray", summary="Рентгеновские снимки", response_model=dict[str, Any])
 async def get_xray_images(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
@@ -205,7 +210,7 @@ async def create_dental_price_override(
         )
 
 
-@router.get("/price-overrides", summary="Получить изменения цен стоматолога")
+@router.get("/price-overrides", summary="Получить изменения цен стоматолога", response_model=list[DentalPriceOverrideResponse])
 async def get_dental_price_overrides(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
@@ -254,7 +259,8 @@ class PriceOverrideApprovalRequest(BaseModel):
 
 
 @router.put(
-    "/price-override/{override_id}/approve", summary="Одобрить/отклонить изменение цены"
+    "/price-override/{override_id}/approve", summary="Одобрить/отклонить изменение цены",
+    response_model=dict[str, Any],
 )
 async def approve_price_override(
     override_id: int,
@@ -283,7 +289,8 @@ async def approve_price_override(
 
 
 @router.get(
-    "/price-overrides/pending", summary="Получить ожидающие одобрения изменения цен"
+    "/price-overrides/pending", summary="Получить ожидающие одобрения изменения цен",
+    response_model=dict[str, Any],
 )
 async def get_pending_price_overrides(
     db: Session = Depends(deps.get_db),

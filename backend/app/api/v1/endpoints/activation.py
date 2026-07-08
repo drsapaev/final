@@ -19,6 +19,7 @@ from app.schemas.activation import (
 )
 from app.services.activation_admin_service import ActivationAdminService
 
+from typing import Any
 router = APIRouter(prefix="/activation", tags=["activation"])
 
 
@@ -105,7 +106,7 @@ async def activation_list(
     return ActivationListOut(items=items, total=total)
 
 
-@router.post("/revoke", summary="Отозвать ключ (Admin)")
+@router.post("/revoke", summary="Отозвать ключ (Admin)", response_model=dict[str, Any])
 async def activation_revoke(
     body: ActivationRevokeIn,
     db: Session = Depends(get_db),
@@ -116,7 +117,7 @@ async def activation_revoke(
     return {"ok": True}
 
 
-@router.post("/extend", summary="Продлить ключ (Admin)")
+@router.post("/extend", summary="Продлить ключ (Admin)", response_model=dict[str, Any])
 async def activation_extend(
     body: ActivationExtendIn,
     db: Session = Depends(get_db),

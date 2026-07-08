@@ -32,19 +32,19 @@ INDEXES = [
     ("refund_requests", "patient_id"),
     ("refund_requests", "payment_id"),
     ("refund_requests", "visit_id"),
-    ("refund_requests", "requested_by"),
+    ("refund_requests", "processed_by"),
     ("patient_deposits", "patient_id"),
-    ("patient_deposit_transactions", "deposit_id"),
-    ("patient_deposit_transactions", "created_by"),
+    ("deposit_transactions", "deposit_id"),
+    ("deposit_transactions", "performed_by"),
     # telegram
     ("telegram_users", "patient_id"),
     ("telegram_users", "user_id"),
-    ("telegram_messages", "telegram_user_id"),
-    ("telegram_messages", "patient_id"),
-    ("telegram_staff_action_confirmations", "staff_user_id"),
-    ("telegram_staff_link_tokens", "user_id"),
+    ("telegram_messages", "chat_id"),
+    ("telegram_messages", "sent_by_user_id"),
+    ("telegram_staff_confirmation_tokens", "staff_user_id"),
+    ("telegram_staff_link_tokens", "staff_user_id"),
     # doctor_phrase_history
-    ("doctor_phrase_history", "user_id"),
+    ("doctor_phrase_history", "doctor_id"),
     # global_search_audit
     ("global_search_audit", "user_id"),
 ]

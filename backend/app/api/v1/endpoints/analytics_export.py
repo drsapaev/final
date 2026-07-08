@@ -4,6 +4,7 @@ API endpoints для экспорта аналитических отчетов
 
 import logging
 from datetime import datetime, UTC
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
@@ -26,7 +27,7 @@ CLINICAL_ANALYTICS_EXPORT_ROLES = ["admin", "doctor", "nurse"]
 FINANCIAL_ANALYTICS_EXPORT_ROLES = ["admin", "manager"]
 
 
-@router.get("/formats")
+@router.get("/formats", response_model=dict[str, Any])
 async def get_export_formats(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(CLINICAL_ANALYTICS_EXPORT_ROLES)),
@@ -48,7 +49,7 @@ async def get_export_formats(
         ) from e
 
 
-@router.get("/kpi/export/{format}")
+@router.get("/kpi/export/{format}", response_model=dict[str, Any])
 async def export_kpi_report(
     format: str,
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
@@ -95,7 +96,7 @@ async def export_kpi_report(
     )
 
 
-@router.get("/comprehensive/export/{format}")
+@router.get("/comprehensive/export/{format}", response_model=dict[str, Any])
 async def export_comprehensive_report(
     format: str,
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
@@ -169,7 +170,7 @@ async def export_comprehensive_report(
     )
 
 
-@router.get("/doctors/performance/export/{format}")
+@router.get("/doctors/performance/export/{format}", response_model=dict[str, Any])
 async def export_doctor_performance_report(
     format: str,
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
@@ -217,7 +218,7 @@ async def export_doctor_performance_report(
     )
 
 
-@router.get("/revenue/export/{format}")
+@router.get("/revenue/export/{format}", response_model=dict[str, Any])
 async def export_revenue_report(
     format: str,
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
@@ -264,7 +265,7 @@ async def export_revenue_report(
     )
 
 
-@router.get("/health")
+@router.get("/health", response_model=dict[str, Any])
 async def export_health_check():
     """Проверка здоровья сервиса экспорта"""
     return {

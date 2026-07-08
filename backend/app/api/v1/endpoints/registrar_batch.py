@@ -178,7 +178,8 @@ async def batch_update_patient_entries(
 
 @router.delete(
     "/patients/{patient_id}/entries/{date}",
-    summary="Отменить все записи пациента за день"
+    summary="Отменить все записи пациента за день",
+    response_model=dict[str, Any],
 )
 async def cancel_all_patient_entries(
     patient_id: int = Path(..., description="ID пациента"),

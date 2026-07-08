@@ -4,7 +4,7 @@ API эндпоинты для управления фича-флагами
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -113,8 +113,9 @@ class BulkToggleRequest(BaseModel):
 
 
 @router.get("/admin/feature-flags", response_model=list[FeatureFlagResponse])
-def get_all_feature_flags(
-    category: str | None = None,
+def get_all_feature_flags(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+category: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -313,7 +314,7 @@ def toggle_feature_flag(
     )
 
 
-@router.post("/admin/feature-flags/bulk-toggle")
+@router.post("/admin/feature-flags/bulk-toggle", response_model=dict[str, Any])
 def bulk_toggle_feature_flags(
     request: BulkToggleRequest,
     http_request: Request,
@@ -353,7 +354,7 @@ def bulk_toggle_feature_flags(
     }
 
 
-@router.delete("/admin/feature-flags/{flag_key}")
+@router.delete("/admin/feature-flags/{flag_key}", response_model=dict[str, Any])
 def delete_feature_flag(
     flag_key: str,
     reason: str | None = None,
@@ -437,7 +438,7 @@ def get_feature_flag_status(
     return FeatureFlagStatusResponse(key=flag_key, enabled=enabled, config=config)
 
 
-@router.get("/feature-flags/status")
+@router.get("/feature-flags/status", response_model=dict[str, Any])
 # ADM-AUDIT-28 P0-3: was PUBLIC (no auth)
 def get_multiple_feature_flags_status(
     keys: str,

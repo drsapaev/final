@@ -26,6 +26,7 @@ from app.core.config import settings
 from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
 from app.models.user import User
+from app.schemas.misc_endpoints import AnnouncementRequest, CallPatientRequest
 from app.services.display_websocket import get_display_manager
 from app.services.display_websocket_api_service import (
     DisplayWebSocketApiDomainError,
@@ -118,9 +119,9 @@ async def websocket_display_board(
 # ===================== УПРАВЛЕНИЕ ТАБЛО =====================
 
 
-@router.post("/call-patient")
+@router.post("/call-patient", response_model=dict[str, Any])
 async def call_patient_to_board(
-    request: dict[str, Any],
+    request: CallPatientRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
@@ -128,14 +129,9 @@ async def call_patient_to_board(
     Вызов пациента с трансляцией на табло
     """
     try:
-        entry_id = request.get("entry_id")
-        board_ids = request.get("board_ids", [])  # Конкретные табло или все
-
-        if not entry_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не указан ID записи в очереди",
-            )
+        entry_id = request.entry_id
+        board_ids = request.board_ids
+        # Validation already done by Pydantic
 
         return await DisplayWebSocketApiService(db).call_patient(
             entry_id=entry_id,
@@ -236,9 +232,9 @@ async def _send_department_queue_state(websocket: WebSocket, department: str):
         db.close()
 
 
-@router.post("/announcement")
+@router.post("/announcement", response_model=dict[str, Any])
 async def send_announcement_to_board(
-    request: dict[str, Any],
+    request: AnnouncementRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
@@ -246,16 +242,11 @@ async def send_announcement_to_board(
     Отправка объявления на табло
     """
     try:
-        text = request.get("text")
-        announcement_type = request.get("type", "info")  # info, warning, emergency
-        duration = request.get("duration", 60)
-        board_ids = request.get("board_ids", [])
-
-        if not text:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Текст объявления не указан",
-            )
+        text = request.text
+        announcement_type = request.type
+        duration = request.duration
+        board_ids = request.board_ids
+        # Validation already done by Pydantic
 
         # Транслируем объявление
         manager = get_display_manager()
@@ -288,7 +279,7 @@ async def send_announcement_to_board(
         )
 
 
-@router.get("/boards/status")
+@router.get("/boards/status", response_model=dict[str, Any])
 def get_boards_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -347,7 +338,7 @@ def get_boards_status(
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
 
 
-@router.post("/quick/call-next")
+@router.post("/quick/call-next", response_model=dict[str, Any])
 async def quick_call_next_patient(
     specialty: str,
     board_id: str | None = None,

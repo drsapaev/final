@@ -4,7 +4,10 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
-from jose import jwt
+try:
+    from jose import jwt
+except ImportError:
+    import jwt
 
 from app.services.ai_chat_api_service import AIChatApiDomainError, AIChatApiService
 
