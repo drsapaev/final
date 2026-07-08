@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
-@router.get("/registrar/queues/today")
+from typing import Any
+@router.get("/registrar/queues/today", response_model=dict[str, Any])
 def get_today_queues(
     target_date: str | None = Query(
         None, description="Дата (YYYY-MM-DD), по умолчанию сегодня"
@@ -608,7 +609,7 @@ def get_today_queues(
 # ===================== КАЛЕНДАРЬ ЗАПИСЕЙ =====================
 
 
-@router.get("/registrar/calendar")
+@router.get("/registrar/calendar", response_model=dict[str, Any])
 def get_registrar_calendar(
     start_date: date = Query(..., description="Начальная дата"),
     end_date: date = Query(..., description="Конечная дата"),
@@ -935,7 +936,7 @@ def create_queue_entries_batch(
 # ===================== КОНВЕРТАЦИЯ DOCTOR_ID → USER_ID =====================
 
 
-@router.get("/registrar-integration/doctors/{doctor_id}/user-id")
+@router.get("/registrar-integration/doctors/{doctor_id}/user-id", response_model=dict[str, Any])
 def get_doctor_user_id(
     doctor_id: int,
     db: Session = Depends(get_db),

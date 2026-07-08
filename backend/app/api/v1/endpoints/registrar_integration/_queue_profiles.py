@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
+from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
 
-@router.get("/queues/profiles")
+from typing import Any
+@router.get("/queues/profiles", response_model=dict[str, Any])
 def get_queue_profiles(
     active_only: bool = Query(True, description="Только активные профили"),
     db: Session = Depends(get_db),
@@ -100,7 +102,7 @@ def get_queue_profiles(
         }
 
 
-@router.get("/queues/profiles/public")
+@router.get("/queues/profiles/public", response_model=dict[str, Any])
 def get_queue_profiles_public(
     db: Session = Depends(get_db),
 ):
@@ -225,7 +227,7 @@ class QueueProfileUpdate(BaseModel):
     color: str | None = Field(None, max_length=20)
 
 
-@router.post("/queues/profiles")
+@router.post("/queues/profiles", response_model=dict[str, Any])
 def create_queue_profile(
     profile_data: QueueProfileCreate,
     db: Session = Depends(get_db),
@@ -287,7 +289,7 @@ def create_queue_profile(
         _raise_registrar_internal_error("create queue profile", e)
 
 
-@router.put("/queues/profiles/{profile_key}")
+@router.put("/queues/profiles/{profile_key}", response_model=dict[str, Any])
 def update_queue_profile(
     profile_key: str,
     profile_data: QueueProfileUpdate,
@@ -342,7 +344,7 @@ def update_queue_profile(
         _raise_registrar_internal_error("update queue profile", e)
 
 
-@router.delete("/queues/profiles/{profile_key}")
+@router.delete("/queues/profiles/{profile_key}", response_model=dict[str, Any])
 def delete_queue_profile(
     profile_key: str,
     db: Session = Depends(get_db),
@@ -379,9 +381,9 @@ def delete_queue_profile(
         _raise_registrar_internal_error("delete queue profile", e)
 
 
-@router.post("/queues/profiles/reorder")
+@router.post("/queues/profiles/reorder", response_model=dict[str, Any])
 def reorder_queue_profiles(
-    orders: dict,  # {"profile_key": new_order, ...}
+    orders: ReorderQueueProfilesRequest,  # {"profile_key": new_order, ...}
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):

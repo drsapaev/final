@@ -219,7 +219,7 @@ async def get_my_appointment(
     )
 
 
-@router.post("/appointments/{appointment_id}/cancel")
+@router.post("/appointments/{appointment_id}/cancel", response_model=dict[str, Any])
 @router.post("/appointments/{appointment_id}/cancel", response_model=dict[str, Any])
 async def cancel_my_appointment(
     appointment_id: int,
@@ -272,7 +272,7 @@ async def cancel_my_appointment(
     }
 
 
-@router.post("/appointments/{appointment_id}/reschedule")
+@router.post("/appointments/{appointment_id}/reschedule", response_model=dict[str, Any])
 async def reschedule_my_appointment(
     appointment_id: int,
     request: RescheduleRequest,

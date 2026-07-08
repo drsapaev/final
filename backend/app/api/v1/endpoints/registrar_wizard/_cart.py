@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 
+from typing import Any
 @router.post("/registrar/cart", response_model=CartResponse)
 def create_cart_appointments(
     cart_data: CartRequest,
@@ -407,7 +408,8 @@ def _price_override_available_actions(override_status: str) -> list[str]:
 
 
 @router.get(
-    "/registrar/price-overrides", summary="Получить все изменения цен для одобрения"
+    "/registrar/price-overrides", summary="Получить все изменения цен для одобрения",
+    response_model=list[PriceOverrideListResponse],
 )
 def get_pending_price_overrides(
     db: Session = Depends(get_db),
@@ -472,7 +474,8 @@ def get_pending_price_overrides(
 
 
 @router.post(
-    "/registrar/price-override/approve", summary="Одобрить или отклонить изменение цены"
+    "/registrar/price-override/approve", summary="Одобрить или отклонить изменение цены",
+    response_model=dict[str, Any],
 )
 def approve_price_override(
     approval_data: PriceOverrideApprovalRequest,
@@ -587,7 +590,8 @@ def _all_free_available_actions(approval_status: str) -> list[str]:
 
 
 @router.get(
-    "/admin/all-free-requests", summary="Получить заявки All Free для одобрения"
+    "/admin/all-free-requests", summary="Получить заявки All Free для одобрения",
+    response_model=list[AllFreeVisitResponse],
 )
 def get_all_free_requests(
     db: Session = Depends(get_db),
@@ -715,7 +719,8 @@ def get_all_free_requests(
 
 
 @router.post(
-    "/admin/all-free-approve", summary="Одобрить или отклонить заявку All Free"
+    "/admin/all-free-approve", summary="Одобрить или отклонить заявку All Free",
+    response_model=dict[str, Any],
 )
 def approve_all_free_request(
     approval_data: AllFreeApprovalRequest,

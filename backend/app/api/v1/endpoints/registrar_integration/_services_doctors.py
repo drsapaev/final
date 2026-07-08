@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
-@router.get("/registrar/services")
+from typing import Any
+@router.get("/registrar/services", response_model=dict[str, Any])
 def get_registrar_services(
     specialty: str | None = Query(None, description="Фильтр по специальности"),
     active_only: bool = Query(True, description="Только активные услуги"),
@@ -158,7 +159,7 @@ def get_registrar_services(
 # ===================== ВРАЧИ И РАСПИСАНИЯ =====================
 
 
-@router.get("/registrar/doctors")
+@router.get("/registrar/doctors", response_model=dict[str, Any])
 def get_registrar_doctors(
     specialty: str | None = Query(None, description="Фильтр по специальности"),
     with_schedule: bool = Query(True, description="Включить расписание"),

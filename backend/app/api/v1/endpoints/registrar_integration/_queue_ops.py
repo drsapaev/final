@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
-@router.get("/registrar/queue-settings")
+from typing import Any
+@router.get("/registrar/queue-settings", response_model=dict[str, Any])
 def get_registrar_queue_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -72,7 +73,7 @@ def get_registrar_queue_settings(
 # ===================== QR КОДЫ ДЛЯ РЕГИСТРАТУРЫ =====================
 
 
-@router.post("/registrar/generate-qr")
+@router.post("/registrar/generate-qr", response_model=dict[str, Any])
 def generate_qr_for_registrar(
     day: date = Query(..., description="Дата"),
     specialist_id: int = Query(..., description="ID специалиста"),
@@ -120,7 +121,7 @@ def generate_qr_for_registrar(
 # ===================== ОТКРЫТИЕ ПРИЕМА =====================
 
 
-@router.post("/registrar/open-reception")
+@router.post("/registrar/open-reception", response_model=dict[str, Any])
 def open_reception(
     day: date = Query(..., description="Дата"),
     specialist_id: int = Query(..., description="ID специалиста"),
@@ -151,7 +152,7 @@ def open_reception(
 # ===================== УПРАВЛЕНИЕ ОЧЕРЕДЯМИ =====================
 
 
-@router.post("/registrar/queue/{entry_id}/start-visit")
+@router.post("/registrar/queue/{entry_id}/start-visit", response_model=dict[str, Any])
 def start_queue_visit(
     entry_id: int,
     db: Session = Depends(get_db),
