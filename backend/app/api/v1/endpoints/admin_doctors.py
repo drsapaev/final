@@ -1,6 +1,7 @@
 """API endpoints для управления врачами в админ панели."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
@@ -127,8 +128,9 @@ def get_doctors(
 
 
 @router.get("/doctors/available-users", response_model=list[DoctorUserOption])
-def get_available_doctor_users(
-    doctor_id: int | None = Query(
+def get_available_doctor_users(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+doctor_id: int | None = Query(
         None,
         description="ID редактируемого врача, чтобы вернуть уже привязанного пользователя",
     ),
@@ -173,7 +175,7 @@ def get_available_doctor_users(
     ]
 
 
-@router.get("/doctors/stats")
+@router.get("/doctors/stats", response_model=dict[str, Any])
 def get_doctors_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -261,7 +263,7 @@ def update_doctor(
         raise _admin_doctors_http_error(exc, "update_doctor") from exc
 
 
-@router.delete("/doctors/{doctor_id}")
+@router.delete("/doctors/{doctor_id}", response_model=dict[str, Any])
 def delete_doctor(
     doctor_id: int,
     db: Session = Depends(get_db),
@@ -344,7 +346,7 @@ def create_schedule(
         raise _admin_doctors_http_error(exc, "create_schedule") from exc
 
 
-@router.get("/specialties")
+@router.get("/specialties", response_model=dict[str, Any])
 def get_specialties(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),

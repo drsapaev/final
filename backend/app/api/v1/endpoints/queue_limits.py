@@ -4,7 +4,7 @@ API для управления лимитами онлайн-очередей
 
 import logging
 from datetime import date, datetime
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -115,7 +115,7 @@ def get_queue_limits(
 # ===================== ОБНОВЛЕНИЕ ЛИМИТОВ =====================
 
 
-@router.put("/queue-limits")
+@router.put("/queue-limits", response_model=dict[str, Any])
 def update_queue_limits(
     limits: list[QueueLimitUpdate],
     db: Session = Depends(get_db),
@@ -168,7 +168,7 @@ def get_queue_status_with_limits(
 # ===================== ИНДИВИДУАЛЬНЫЕ ЛИМИТЫ ДЛЯ ВРАЧЕЙ =====================
 
 
-@router.put("/doctor-queue-limit")
+@router.put("/doctor-queue-limit", response_model=dict[str, Any])
 def set_doctor_queue_limit(
     limit_data: DoctorQueueLimit,
     db: Session = Depends(get_db),
@@ -196,7 +196,7 @@ def set_doctor_queue_limit(
 # ===================== СБРОС ЛИМИТОВ =====================
 
 
-@router.post("/reset-queue-limits")
+@router.post("/reset-queue-limits", response_model=dict[str, Any])
 def reset_queue_limits(
     specialty: str | None = Query(
         None, description="Сбросить лимиты для конкретной специальности"

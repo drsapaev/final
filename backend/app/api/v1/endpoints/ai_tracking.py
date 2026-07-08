@@ -4,6 +4,7 @@ API endpoints для трекинга AI моделей
 
 import logging
 from datetime import datetime, UTC
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -88,7 +89,7 @@ async def get_ai_provider_stats(
         raise _ai_tracking_http_error(e, "get_ai_provider_stats") from e
 
 
-@router.get("/models/current")
+@router.get("/models/current", response_model=dict[str, Any])
 async def get_current_ai_models(db: Session = Depends(get_db)):
     """
     Получить информацию о текущих AI моделях
@@ -128,7 +129,7 @@ async def get_current_ai_models(db: Session = Depends(get_db)):
         raise _ai_tracking_http_error(e, "get_current_ai_models") from e
 
 
-@router.get("/requests/recent")
+@router.get("/requests/recent", response_model=dict[str, Any])
 async def get_recent_ai_requests(
     limit: int = Query(50, ge=1, le=200, description="Количество записей"),
     db: Session = Depends(get_db),
@@ -148,7 +149,7 @@ async def get_recent_ai_requests(
         raise _ai_tracking_http_error(e, "get_recent_ai_requests") from e
 
 
-@router.get("/models/performance")
+@router.get("/models/performance", response_model=dict[str, Any])
 async def get_ai_models_performance(
     days_back: int = Query(7, ge=1, le=30, description="Количество дней назад"),
     db: Session = Depends(get_db),
@@ -248,7 +249,7 @@ async def get_ai_models_performance(
         raise _ai_tracking_http_error(e, "get_ai_models_performance") from e
 
 
-@router.get("/models/usage-trends")
+@router.get("/models/usage-trends", response_model=dict[str, Any])
 async def get_ai_usage_trends(
     days_back: int = Query(30, ge=7, le=90, description="Количество дней назад"),
     db: Session = Depends(get_db),

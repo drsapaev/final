@@ -9,6 +9,7 @@ from app.api import deps
 from app.crud import schedule as crud
 from app.schemas.schedule import ScheduleCreateIn, ScheduleRowOut
 
+from typing import Any
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
@@ -69,7 +70,7 @@ async def create_template(
     return row
 
 
-@router.delete("/{id}", summary="Удалить расписание")
+@router.delete("/{id}", summary="Удалить расписание", response_model=dict[str, Any])
 async def delete_template(
     id: int = Path(..., ge=1),
     db: Session = Depends(deps.get_db),
@@ -84,7 +85,7 @@ async def delete_template(
 # Новые endpoints для интеграции с панелью регистратора
 
 
-@router.get("/weekly", summary="Расписание на неделю")
+@router.get("/weekly", summary="Расписание на неделю", response_model=dict[str, Any])
 async def get_weekly_schedule(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
@@ -115,7 +116,7 @@ async def get_weekly_schedule(
     return weekly_schedule
 
 
-@router.get("/daily", summary="Расписание на день")
+@router.get("/daily", summary="Расписание на день", response_model=dict[str, Any])
 async def get_daily_schedule(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
@@ -139,13 +140,15 @@ async def get_daily_schedule(
     return daily_schedule
 
 
-@router.get("/available-slots", summary="Доступные слоты для записи")
+@router.get("/available-slots", summary="Доступные слоты для записи", response_model=dict[str, Any])
 async def get_available_slots(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
     date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
     department: str = Query(..., description="Отделение"),
     doctor_id: int | None = Query(default=None, description="ID врача"),
+    limit: int = Query(default=100, ge=1, le=500, description="Макс. слотов"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
 ):
     """
     Получить доступные слоты времени для записи на конкретную дату
@@ -160,10 +163,11 @@ async def get_available_slots(
     available_slots = crud.get_available_slots(
         db, target_date=target_date, department=department, doctor_id=doctor_id
     )
-    return available_slots
+    # P1 FIX: cap results to prevent unbounded response
+    return available_slots[offset:offset + limit]
 
 
-@router.get("/doctors", summary="Список врачей по отделениям")
+@router.get("/doctors", summary="Список врачей по отделениям", response_model=dict[str, Any])
 async def get_doctors_by_department(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
@@ -176,7 +180,7 @@ async def get_doctors_by_department(
     return doctors
 
 
-@router.get("/departments", summary="Список отделений")
+@router.get("/departments", summary="Список отделений", response_model=dict[str, Any])
 async def get_departments(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),

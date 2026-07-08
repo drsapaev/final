@@ -8,6 +8,7 @@ import httpx
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, HTTPException, Query
 
+from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ async def _fetch_public_preview(client: httpx.AsyncClient, url: str) -> httpx.Re
     raise HTTPException(status_code=400, detail="Too many redirects")
 
 
-@router.get("/link-preview")
+@router.get("/link-preview", response_model=dict[str, Any])
 async def get_link_preview(url: str = Query(..., description="The URL to preview")):
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:

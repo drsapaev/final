@@ -89,7 +89,7 @@ def get_user_data_summary(
         )
 
 
-@router.get("/users/search")
+@router.get("/users/search", response_model=dict[str, Any])
 def search_users_for_transfer(
     query: str = Query(
         ..., min_length=2, description="Поисковый запрос (имя, телефон, email)"
@@ -185,7 +185,7 @@ def transfer_user_data(
         )
 
 
-@router.post("/transfer/request-confirmation")
+@router.post("/transfer/request-confirmation", response_model=dict[str, Any])
 def request_transfer_confirmation(
     request: DataTransferRequest,
     db: Session = Depends(get_db),
@@ -239,7 +239,7 @@ def request_transfer_confirmation(
         )
 
 
-@router.post("/transfer/confirm")
+@router.post("/transfer/confirm", response_model=dict[str, Any])
 def confirm_data_transfer(
     request: TransferConfirmationRequest,
     db: Session = Depends(get_db),
@@ -276,7 +276,7 @@ def confirm_data_transfer(
 # ===================== ИСТОРИЯ И СТАТИСТИКА =====================
 
 
-@router.get("/transfer/history")
+@router.get("/transfer/history", response_model=dict[str, Any])
 def get_transfer_history(
     user_id: int | None = Query(None, description="ID пользователя для фильтрации"),
     limit: int = Query(50, ge=1, le=100, description="Количество записей"),
@@ -308,7 +308,7 @@ def get_transfer_history(
         )
 
 
-@router.get("/transfer/statistics")
+@router.get("/transfer/statistics", response_model=dict[str, Any])
 def get_transfer_statistics(
     period_days: int = Query(30, ge=1, le=365, description="Период в днях"),
     db: Session = Depends(get_db),
@@ -342,7 +342,7 @@ def get_transfer_statistics(
 # ===================== ВАЛИДАЦИЯ И УТИЛИТЫ =====================
 
 
-@router.post("/transfer/validate")
+@router.post("/transfer/validate", response_model=dict[str, Any])
 def validate_transfer_request(
     source_user_id: int = Query(..., description="ID пользователя-источника"),
     target_user_id: int = Query(..., description="ID пользователя-получателя"),
@@ -376,9 +376,10 @@ def validate_transfer_request(
         )
 
 
-@router.get("/transfer/data-types")
-def get_available_data_types(
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+@router.get("/transfer/data-types", response_model=dict[str, Any])
+def get_available_data_types(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+current_user: User = Depends(require_roles("Admin", "Registrar"))
 ):
     """
     Получить список доступных типов данных для передачи

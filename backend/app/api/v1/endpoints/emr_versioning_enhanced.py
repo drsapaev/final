@@ -8,13 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.schemas.misc_endpoints import EmrVersionDataRequest
 from app.models.user import User
 from app.services.emr_versioning_enhanced import emr_versioning_enhanced
 
 router = APIRouter()
 
 
-@router.get("/{emr_id}/versions/timeline")
+@router.get("/{emr_id}/versions/timeline", response_model=Any)
 async def get_version_timeline(
     emr_id: int,
     limit: int = Query(50, ge=1, le=100, description="Максимальное количество версий"),
@@ -35,7 +36,7 @@ async def get_version_timeline(
         )
 
 
-@router.get("/{emr_id}/versions/compare")
+@router.get("/{emr_id}/versions/compare", response_model=Any)
 async def compare_versions(
     emr_id: int,
     version1_id: int = Query(..., description="ID первой версии"),
@@ -59,7 +60,7 @@ async def compare_versions(
         )
 
 
-@router.post("/{emr_id}/versions/{version_id}/restore")
+@router.post("/{emr_id}/versions/{version_id}/restore", response_model=Any)
 async def restore_version_with_backup(
     emr_id: int,
     version_id: int,
@@ -87,7 +88,7 @@ async def restore_version_with_backup(
         )
 
 
-@router.get("/{emr_id}/versions/statistics")
+@router.get("/{emr_id}/versions/statistics", response_model=Any)
 async def get_version_statistics(
     emr_id: int,
     db: Session = Depends(deps.get_db),
@@ -107,10 +108,10 @@ async def get_version_statistics(
         )
 
 
-@router.post("/{emr_id}/versions/create")
+@router.post("/{emr_id}/versions/create", response_model=Any)
 async def create_version_with_analysis(
     emr_id: int,
-    version_data: dict[str, Any],
+    version_data: EmrVersionDataRequest,
     change_type: str = Query(..., description="Тип изменения"),
     change_description: str | None = Query(None, description="Описание изменения"),
     db: Session = Depends(deps.get_db),
@@ -118,6 +119,7 @@ async def create_version_with_analysis(
 ) -> Any:
     """Создать версию EMR с анализом изменений"""
     try:
+        version_data = version_data.model_dump(exclude_none=True)
         # Получаем предыдущую версию для анализа
         from app.crud.emr_template import emr_version
 
@@ -147,7 +149,7 @@ async def create_version_with_analysis(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/{emr_id}/versions/{version_id}/details")
+@router.get("/{emr_id}/versions/{version_id}/details", response_model=Any)
 async def get_version_details(
     emr_id: int,
     version_id: int,
@@ -192,7 +194,7 @@ async def get_version_details(
         )
 
 
-@router.delete("/{emr_id}/versions/{version_id}")
+@router.delete("/{emr_id}/versions/{version_id}", response_model=Any)
 async def delete_version(
     emr_id: int,
     version_id: int,
@@ -222,7 +224,7 @@ async def delete_version(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/{emr_id}/versions/export")
+@router.get("/{emr_id}/versions/export", response_model=Any)
 async def export_versions(
     emr_id: int,
     format: str = Query("json", description="Формат экспорта: json, csv"),

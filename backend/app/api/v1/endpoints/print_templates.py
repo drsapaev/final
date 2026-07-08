@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.crud import print_config as crud_print
 from app.models.user import User
+from app.schemas.misc_endpoints import PrintTemplatePreviewRequest
 from app.schemas.print_config import (
     PrintJobOut,
     PrintTemplateCreate,
@@ -180,7 +181,7 @@ def create_print_template(
         )
 
 
-@router.get("/templates/types")
+@router.get("/templates/types", response_model=dict[str, Any])
 def get_template_types(
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor"))
 ):
@@ -250,7 +251,7 @@ def update_print_template(
         )
 
 
-@router.delete("/templates/{template_id}")
+@router.delete("/templates/{template_id}", response_model=dict[str, Any])
 def delete_print_template(
     template_id: int,
     db: Session = Depends(get_db),
@@ -274,7 +275,7 @@ def delete_print_template(
 # ===================== ЗАГРУЗКА ФАЙЛОВ ШАБЛОНОВ =====================
 
 
-@router.post("/templates/upload/{template_type}")
+@router.post("/templates/upload/{template_type}", response_model=dict[str, Any])
 def upload_template_file(
     template_type: str,
     file: UploadFile = File(...),
@@ -334,10 +335,10 @@ def upload_template_file(
 # ===================== ПРЕДВАРИТЕЛЬНЫЙ ПРОСМОТР =====================
 
 
-@router.post("/templates/{template_id}/preview")
+@router.post("/templates/{template_id}/preview", response_model=dict[str, Any])
 def preview_template(
     template_id: int,
-    preview_data: dict[str, Any],
+    preview_data: PrintTemplatePreviewRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
@@ -353,6 +354,7 @@ def preview_template(
             )
 
         # Рендерим шаблон с тестовыми данными
+        preview_data = preview_data.model_dump(exclude_none=True)
         env = Environment(autoescape=True)
         jinja_template = env.from_string(template.template_content)
 
@@ -380,7 +382,7 @@ def preview_template(
 # ===================== СТАНДАРТНЫЕ ШАБЛОНЫ =====================
 
 
-@router.get("/templates/default/{template_type}")
+@router.get("/templates/default/{template_type}", response_model=dict[str, Any])
 def get_default_template(
     template_type: str,
     language: str = "ru",

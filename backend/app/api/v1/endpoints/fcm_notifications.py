@@ -58,7 +58,7 @@ class FCMTopicNotificationRequest(BaseModel):
     condition: str | None = None
 
 
-@router.post("/register-token")
+@router.post("/register-token", response_model=dict[str, Any])
 async def register_fcm_token(  # P1-7: token ownership validated via current_user
     request: FCMTokenRequest,
     current_user: User = Depends(get_current_user),
@@ -89,7 +89,7 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
         )
 
 
-@router.delete("/unregister-token")
+@router.delete("/unregister-token", response_model=dict[str, Any])
 async def unregister_fcm_token(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -114,7 +114,7 @@ async def unregister_fcm_token(
         )
 
 
-@router.post("/send-notification")
+@router.post("/send-notification", response_model=dict[str, Any])
 async def send_fcm_notification(
     request: FCMNotificationRequest,
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
@@ -203,7 +203,7 @@ async def send_fcm_notification(
         )
 
 
-@router.post("/send-test-notification")
+@router.post("/send-test-notification", response_model=dict[str, Any])
 async def send_test_fcm_notification(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -257,7 +257,7 @@ async def send_test_fcm_notification(
         )
 
 
-@router.post("/subscribe-topic")
+@router.post("/subscribe-topic", response_model=dict[str, Any])
 async def subscribe_to_topic(
     request: FCMTopicRequest,
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
@@ -293,7 +293,7 @@ async def subscribe_to_topic(
         )
 
 
-@router.post("/unsubscribe-topic")
+@router.post("/unsubscribe-topic", response_model=dict[str, Any])
 async def unsubscribe_from_topic(
     request: FCMTopicRequest,
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
@@ -329,7 +329,7 @@ async def unsubscribe_from_topic(
         )
 
 
-@router.post("/send-topic-notification")
+@router.post("/send-topic-notification", response_model=dict[str, Any])
 async def send_topic_notification(
     request: FCMTopicNotificationRequest,
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
@@ -370,7 +370,7 @@ async def send_topic_notification(
         )
 
 
-@router.get("/status")
+@router.get("/status", response_model=dict[str, Any])
 async def get_fcm_status(
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"]))
 ):
@@ -388,7 +388,7 @@ async def get_fcm_status(
         )
 
 
-@router.get("/user-tokens")
+@router.get("/user-tokens", response_model=dict[str, Any])
 async def get_user_fcm_tokens(
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
     db: Session = Depends(get_db),

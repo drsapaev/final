@@ -1,6 +1,13 @@
 """
 Расширенные API endpoints для Email и SMS уведомлений
 Поддержка массовых рассылок, шаблонов и аналитики
+
+P0-6 FIX (ENDPOINT-VALIDATION-AUDIT):
+Previously these endpoints accepted `template_data: dict[str, Any] | None`,
+`payment_data: dict[str, Any]`, and `recipients: list[dict[str, Any]]`
+with no validation. Replaced with typed Pydantic request models from
+app.schemas.notifications. Endpoints that previously took individual
+query params now take a single Pydantic body model.
 """
 
 from datetime import datetime
@@ -18,6 +25,15 @@ from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.email_sms_enhanced import get_email_sms_enhanced_service
+from app.schemas.notifications import (
+    SendAppointmentReminderEnhancedRequest,
+    SendBulkEmailRequest,
+    SendBulkSmsRequest,
+    SendCustomEmailRequest,
+    SendCustomSmsRequest,
+    SendLabResultsEnhancedRequest,
+    SendPaymentConfirmationEnhancedRequest,
+)
 
 router = APIRouter()
 
@@ -101,22 +117,23 @@ def _ensure_payment_confirmation_belongs_to_patient(
         )
 
 
-@router.post("/send-appointment-reminder-enhanced")
+@router.post("/send-appointment-reminder-enhanced", response_model=dict[str, Any])
 async def send_appointment_reminder_enhanced(
     appointment_id: int,
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: dict[str, Any] | None = None,
+    body: SendAppointmentReminderEnhancedRequest = SendAppointmentReminderEnhancedRequest(),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
     """Расширенное напоминание о записи"""
     try:
+        template_data = body.template_data.model_dump(exclude_none=True) if body.template_data else None
         # Получаем данные записи
         appointment = crud_appointment.get_appointment(db, appointment_id)
         if not appointment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
+                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
             )
 
         # Получаем данные пациента
@@ -126,7 +143,7 @@ async def send_appointment_reminder_enhanced(
         patient = crud_patient.get_patient(db, appointment.patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
             )
 
         # Подготавливаем данные
@@ -173,23 +190,24 @@ async def send_appointment_reminder_enhanced(
         )
 
 
-@router.post("/send-lab-results-enhanced")
+@router.post("/send-lab-results-enhanced", response_model=dict[str, Any])
 async def send_lab_results_enhanced(
     patient_id: int,
     lab_results_id: int,
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: dict[str, Any] | None = None,
+    body: SendLabResultsEnhancedRequest = SendLabResultsEnhancedRequest(),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
     """Расширенная отправка результатов анализов"""
     try:
+        template_data = body.template_data.model_dump(exclude_none=True) if body.template_data else None
         # Получаем данные пациента
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
             )
 
         # Здесь должна быть логика получения данных анализов
@@ -236,23 +254,24 @@ async def send_lab_results_enhanced(
         )
 
 
-@router.post("/send-payment-confirmation-enhanced")
+@router.post("/send-payment-confirmation-enhanced", response_model=dict[str, Any])
 async def send_payment_confirmation_enhanced(
     patient_id: int,
-    payment_data: dict[str, Any],
+    body: SendPaymentConfirmationEnhancedRequest,
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: dict[str, Any] | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
     """Расширенное подтверждение платежа"""
     try:
+        payment_data = body.payment_data.model_dump(exclude_none=True)
+        template_data = body.template_data.model_dump(exclude_none=True) if body.template_data else None
         # Получаем данные пациента
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
             )
 
         # Подготавливаем данные
@@ -296,15 +315,11 @@ async def send_payment_confirmation_enhanced(
         )
 
 
-@router.post("/send-bulk-email")
+@router.post("/send-bulk-email", response_model=dict[str, Any])
 @limiter.limit("1/5minute")
-async def send_bulk_email(request: Request, 
-    recipients: list[dict[str, Any]],
-    subject: str,
-    template_name: str | None = None,
-    template_data: dict[str, Any] | None = None,
-    html_content: str | None = None,
-    text_content: str | None = None,
+async def send_bulk_email(
+    request: Request,
+    body: SendBulkEmailRequest,
     batch_size: int = Query(50, description="Размер батча"),
     delay_between_batches: float = Query(
         1.0, description="Задержка между батчами (сек)"
@@ -315,11 +330,8 @@ async def send_bulk_email(request: Request,
 ):
     """Массовая отправка email"""
     try:
-        if not recipients:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Список получателей пуст",
-            )
+        recipients = [r.model_dump(exclude_none=True) for r in body.recipients]
+        # Validation already done by Pydantic (min 1, max 1000 recipients)
 
         # Получаем сервис
         service = get_email_sms_enhanced_service()
@@ -327,11 +339,11 @@ async def send_bulk_email(request: Request,
         # Отправляем массовую рассылку
         result = await service.send_bulk_email(
             recipients=recipients,
-            subject=subject,
-            template_name=template_name,
-            template_data=template_data,
-            html_content=html_content,
-            text_content=text_content,
+            subject=body.subject,
+            template_name=body.template_name,
+            template_data=body.template_data.model_dump(exclude_none=True) if body.template_data else None,
+            html_content=body.html_content,
+            text_content=body.text_content,
             batch_size=batch_size,
             delay_between_batches=delay_between_batches,
         )
@@ -351,13 +363,11 @@ async def send_bulk_email(request: Request,
         )
 
 
-@router.post("/send-bulk-sms")
+@router.post("/send-bulk-sms", response_model=dict[str, Any])
 @limiter.limit("1/5minute")
-async def send_bulk_sms(request: Request, 
-    recipients: list[dict[str, Any]],
-    message: str | None = None,
-    template_name: str | None = None,
-    template_data: dict[str, Any] | None = None,
+async def send_bulk_sms(
+    request: Request,
+    body: SendBulkSmsRequest,
     batch_size: int = Query(100, description="Размер батча"),
     delay_between_batches: float = Query(
         0.5, description="Задержка между батчами (сек)"
@@ -368,11 +378,8 @@ async def send_bulk_sms(request: Request,
 ):
     """Массовая отправка SMS"""
     try:
-        if not recipients:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Список получателей пуст",
-            )
+        recipients = [r.model_dump(exclude_none=True) for r in body.recipients]
+        # Validation already done by Pydantic
 
         # Получаем сервис
         service = get_email_sms_enhanced_service()
@@ -380,9 +387,9 @@ async def send_bulk_sms(request: Request,
         # Отправляем массовую рассылку
         result = await service.send_bulk_sms(
             recipients=recipients,
-            message=message,
-            template_name=template_name,
-            template_data=template_data,
+            message=body.message,
+            template_name=body.template_name,
+            template_data=body.template_data.model_dump(exclude_none=True) if body.template_data else None,
             batch_size=batch_size,
             delay_between_batches=delay_between_batches,
         )
@@ -402,15 +409,9 @@ async def send_bulk_sms(request: Request,
         )
 
 
-@router.post("/send-custom-email")
+@router.post("/send-custom-email", response_model=dict[str, Any])
 async def send_custom_email(
-    to_email: str,
-    subject: str,
-    template_name: str | None = None,
-    template_data: dict[str, Any] | None = None,
-    html_content: str | None = None,
-    text_content: str | None = None,
-    attachments: list[dict[str, Any]] | None = None,
+    body: SendCustomEmailRequest,
     priority: str = Query("normal", description="Приоритет: normal, high"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
@@ -423,21 +424,21 @@ async def send_custom_email(
 
         # Отправляем email
         success, message = await service.send_email_enhanced(
-            to_email=to_email,
-            subject=subject,
-            template_name=template_name,
-            template_data=template_data,
-            html_content=html_content,
-            text_content=text_content,
-            attachments=attachments,
+            to_email=str(body.to_email),
+            subject=body.subject,
+            template_name=body.template_name,
+            template_data=body.template_data.model_dump(exclude_none=True) if body.template_data else None,
+            html_content=body.html_content,
+            text_content=body.text_content,
+            attachments=body.attachments,
             priority=priority,
         )
 
         return {
             "success": success,
             "message": message,
-            "to_email": to_email,
-            "subject": subject,
+            "to_email": str(body.to_email),
+            "subject": body.subject,
         }
 
     except Exception as e:
@@ -447,13 +448,9 @@ async def send_custom_email(
         )
 
 
-@router.post("/send-custom-sms")
+@router.post("/send-custom-sms", response_model=dict[str, Any])
 async def send_custom_sms(
-    phone: str,
-    message: str | None = None,
-    template_name: str | None = None,
-    template_data: dict[str, Any] | None = None,
-    sender: str | None = None,
+    body: SendCustomSmsRequest,
     priority: str = Query("normal", description="Приоритет: normal, high"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
@@ -466,15 +463,15 @@ async def send_custom_sms(
 
         # Отправляем SMS
         success, message = await service.send_sms_enhanced(
-            phone=phone,
-            message=message,
-            template_name=template_name,
-            template_data=template_data,
-            sender=sender,
+            phone=body.phone,
+            message=body.message,
+            template_name=body.template_name,
+            template_data=body.template_data.model_dump(exclude_none=True) if body.template_data else None,
+            sender=body.sender,
             priority=priority,
         )
 
-        return {"success": success, "message": message, "phone": phone}
+        return {"success": success, "message": message, "phone": body.phone}
 
     except Exception as e:
         raise HTTPException(
@@ -483,7 +480,7 @@ async def send_custom_sms(
         )
 
 
-@router.get("/statistics")
+@router.get("/statistics", response_model=dict[str, Any])
 async def get_email_sms_statistics(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -508,7 +505,7 @@ async def get_email_sms_statistics(
         )
 
 
-@router.post("/reset-statistics")
+@router.post("/reset-statistics", response_model=dict[str, Any])
 async def reset_email_sms_statistics(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -533,9 +530,10 @@ async def reset_email_sms_statistics(
         )
 
 
-@router.get("/templates")
-async def get_available_templates(
-    template_type: str = Query("all", description="Тип шаблона: email, sms, all"),
+@router.get("/templates", response_model=dict[str, Any])
+async def get_available_templates(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+template_type: str = Query("all", description="Тип шаблона: email, sms, all"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
@@ -622,7 +620,7 @@ async def get_available_templates(
         )
 
 
-@router.post("/test-email")
+@router.post("/test-email", response_model=dict[str, Any])
 async def test_email_sending(
     to_email: str,
     subject: str = "Тестовое письмо",
@@ -678,7 +676,7 @@ async def test_email_sending(
         )
 
 
-@router.post("/test-sms")
+@router.post("/test-sms", response_model=dict[str, Any])
 async def test_sms_sending(
     phone: str,
     message: str = "Тестовое SMS от Programma Clinic",

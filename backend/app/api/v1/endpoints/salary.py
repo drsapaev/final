@@ -65,7 +65,7 @@ def _model_to_dict(model: BaseModel) -> dict:
 # ===================== ИСТОРИЯ ЗАРПЛАТ =====================
 
 
-@router.get("/history/{user_id}", summary="История зарплат сотрудника")
+@router.get("/history/{user_id}", summary="История зарплат сотрудника", response_model=list[dict[str, Any]])
 async def get_salary_history(
     user_id: int,
     db: Session = Depends(deps.get_db),
@@ -81,7 +81,7 @@ async def get_salary_history(
         _raise_salary_internal_error("get_salary_history", exc)
 
 
-@router.post("/change", summary="Изменить зарплату")
+@router.post("/change", summary="Изменить зарплату", response_model=dict[str, Any])
 async def create_salary_change(
     data: SalaryChangeCreate,
     db: Session = Depends(deps.get_db),
@@ -101,7 +101,7 @@ async def create_salary_change(
         _raise_salary_internal_error("create_salary_change", exc)
 
 
-@router.put("/change/{record_id}/confirm", summary="Подтвердить изменение")
+@router.put("/change/{record_id}/confirm", summary="Подтвердить изменение", response_model=dict[str, Any])
 async def confirm_salary_change(
     record_id: int,
     db: Session = Depends(deps.get_db),
@@ -123,7 +123,7 @@ async def confirm_salary_change(
 # ===================== ВЫПЛАТЫ =====================
 
 
-@router.get("/payments/{user_id}", summary="История выплат")
+@router.get("/payments/{user_id}", summary="История выплат", response_model=list[dict[str, Any]])
 async def get_salary_payments(
     user_id: int,
     db: Session = Depends(deps.get_db),
@@ -144,7 +144,7 @@ async def get_salary_payments(
         _raise_salary_internal_error("get_salary_payments", exc)
 
 
-@router.post("/payment", summary="Создать запись о выплате")
+@router.post("/payment", summary="Создать запись о выплате", response_model=dict[str, Any])
 async def create_salary_payment(
     data: SalaryPaymentCreate,
     db: Session = Depends(deps.get_db),
@@ -161,7 +161,7 @@ async def create_salary_payment(
         _raise_salary_internal_error("create_salary_payment", exc)
 
 
-@router.put("/payment/{payment_id}/status", summary="Обновить статус выплаты")
+@router.put("/payment/{payment_id}/status", summary="Обновить статус выплаты", response_model=dict[str, Any])
 async def update_payment_status(
     payment_id: int,
     status: str,
@@ -188,7 +188,7 @@ async def update_payment_status(
         _raise_salary_internal_error("update_payment_status", exc)
 
 
-@router.get("/summary/{user_id}", summary="Сводка по зарплате")
+@router.get("/summary/{user_id}", summary="Сводка по зарплате", response_model=dict[str, Any])
 async def get_salary_summary(
     user_id: int,
     year: int,

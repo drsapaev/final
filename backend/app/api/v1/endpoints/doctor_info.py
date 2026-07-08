@@ -250,7 +250,7 @@ async def get_appointment_doctor_info(
         )
 
 
-@router.get("/doctors/{doctor_id}/formatted-info")
+@router.get("/doctors/{doctor_id}/formatted-info", response_model=dict[str, Any])
 async def get_formatted_doctor_info(
     doctor_id: int,
     db: Session = Depends(get_db),
@@ -276,7 +276,7 @@ async def get_formatted_doctor_info(
         )
 
 
-@router.get("/departments/{department_id}/formatted-info")
+@router.get("/departments/{department_id}/formatted-info", response_model=dict[str, Any])
 async def get_formatted_department_info(
     department_id: int,
     db: Session = Depends(get_db),

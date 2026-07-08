@@ -6,10 +6,11 @@ from sqlalchemy import text
 
 from app.db.session import engine
 
+from typing import Any
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health", summary="Простой healthcheck + проверка БД")
+@router.get("/health", summary="Простой healthcheck + проверка БД", response_model=dict[str, Any])
 def get_health():
     db_status = "ok"
     try:
@@ -21,6 +22,6 @@ def get_health():
 
 
 # Небольшой алиас — кое-где фронт стучится в /status
-@router.get("/status", summary="Короткий статус сервера")
+@router.get("/status", summary="Короткий статус сервера", response_model=dict[str, Any])
 def get_status():
     return {"status": "ok"}

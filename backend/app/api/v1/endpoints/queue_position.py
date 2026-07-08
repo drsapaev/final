@@ -349,7 +349,7 @@ async def send_waiting_reminder(
 
 # ========================= СТАТИСТИКА =========================
 
-@router.get("/stats/queue/{queue_id}")
+@router.get("/stats/queue/{queue_id}", response_model=dict[str, Any])
 async def get_queue_positions_stats(
     queue_id: int,
     db: Session = Depends(get_db),

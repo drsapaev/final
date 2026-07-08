@@ -11,6 +11,13 @@ from app.api import deps
 from app.crud import emr
 from app.models.user import User
 from app.services.emr_ai_enhanced import emr_ai_enhanced
+from app.schemas.misc_endpoints import (
+    EmrAiCurrentDataRequest,
+    EmrAiDoctorPreferencesRequest,
+    EmrAiEmrDataRequest,
+    EmrAiPatientDataRequest,
+    EmrAiTemplateDataRequest,
+)
 from app.services.ai_feature_gating import RequireAiFeature
 
 router = APIRouter()
@@ -27,23 +34,21 @@ def ai_safety_meta() -> dict[str, Any]:
     }
 
 
-@router.post("/generate-smart-template", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
+@router.post("/generate-smart-template", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
 async def generate_smart_template(
     specialty: str = Query(..., description="Специализация врача"),
-    patient_data: dict[str, Any] = None,
-    doctor_preferences: dict[str, Any] | None = None,
+    patient_data: EmrAiPatientDataRequest = EmrAiPatientDataRequest(),
+    doctor_preferences: EmrAiDoctorPreferencesRequest | None = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Генерация умного шаблона EMR на основе данных пациента"""
     try:
-        if patient_data is None:
-            patient_data = {}
-
+        # patient_data is now a Pydantic model (defaults to empty dict)
         template = await emr_ai_enhanced.generate_smart_template(
             specialty=specialty,
-            patient_data=patient_data,
-            doctor_preferences=doctor_preferences,
+            patient_data=patient_data.model_dump(exclude_none=True),
+            doctor_preferences=doctor_preferences.model_dump(exclude_none=True) if doctor_preferences else None,
         )
 
         return {
@@ -59,21 +64,19 @@ async def generate_smart_template(
         )
 
 
-@router.post("/smart-suggestions", dependencies=[Depends(RequireAiFeature("ai_smart_suggestions"))])
+@router.post("/smart-suggestions", dependencies=[Depends(RequireAiFeature("ai_smart_suggestions"))], response_model=Any)
 async def get_smart_suggestions(
     field_name: str = Query(..., description="Название поля"),
-    current_data: dict[str, Any] = None,
+    current_data: EmrAiCurrentDataRequest = EmrAiCurrentDataRequest(),
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Получить умные подсказки для поля EMR"""
     try:
-        if current_data is None:
-            current_data = {}
-
+        # current_data is now a Pydantic model (defaults to empty dict)
         suggestions = await emr_ai_enhanced.get_smart_suggestions(
-            current_data=current_data, field_name=field_name, specialty=specialty
+            current_data=current_data.model_dump(exclude_none=True), field_name=field_name, specialty=specialty
         )
 
         return {
@@ -89,10 +92,10 @@ async def get_smart_suggestions(
         )
 
 
-@router.post("/auto-fill", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
+@router.post("/auto-fill", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
 async def auto_fill_emr_fields(
-    template_structure: dict[str, Any],
-    patient_data: dict[str, Any],
+    template_structure: EmrAiTemplateDataRequest,
+    patient_data: EmrAiPatientDataRequest,
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
@@ -100,8 +103,8 @@ async def auto_fill_emr_fields(
     """Автоматическое заполнение полей EMR"""
     try:
         filled_data = await emr_ai_enhanced.auto_fill_emr_fields(
-            template_structure=template_structure,
-            patient_data=patient_data,
+            template_structure=template_structure.model_dump(exclude_none=True),
+            patient_data=patient_data.model_dump(exclude_none=True),
             specialty=specialty,
         )
 
@@ -116,9 +119,9 @@ async def auto_fill_emr_fields(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/validate", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
+@router.post("/validate", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
 async def validate_emr_data(
-    emr_data: dict[str, Any],
+    emr_data: EmrAiEmrDataRequest,
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
@@ -126,7 +129,7 @@ async def validate_emr_data(
     """Валидация данных EMR с AI подсказками"""
     try:
         validation_result = await emr_ai_enhanced.validate_emr_data(
-            emr_data=emr_data, specialty=specialty
+            emr_data=emr_data.model_dump(exclude_none=True), specialty=specialty
         )
 
         if isinstance(validation_result, dict):
@@ -137,7 +140,7 @@ async def validate_emr_data(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/icd10-suggestions", dependencies=[Depends(RequireAiFeature("ai_icd10_suggestion"))])
+@router.post("/icd10-suggestions", dependencies=[Depends(RequireAiFeature("ai_icd10_suggestion"))], response_model=Any)
 async def get_icd10_suggestions(
     diagnosis_text: str = Query(..., description="Текст диагноза"),
     specialty: str = Query("general", description="Специализация врача"),
@@ -163,15 +166,15 @@ async def get_icd10_suggestions(
         )
 
 
-@router.post("/analyze-patient", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
+@router.post("/analyze-patient", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
 async def analyze_patient_data(
-    patient_data: dict[str, Any],
+    patient_data: EmrAiPatientDataRequest,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Анализ данных пациента для персонализации EMR"""
     try:
-        analysis = await emr_ai_enhanced._analyze_patient_data(patient_data)
+        analysis = await emr_ai_enhanced._analyze_patient_data(patient_data.model_dump(exclude_none=True))
 
         return {
             "analysis": analysis,
@@ -189,7 +192,7 @@ async def analyze_patient_data(
         )
 
 
-@router.get("/templates/specialty/{specialty}")
+@router.get("/templates/specialty/{specialty}", response_model=Any)
 async def get_specialty_templates(
     specialty: str,
     db: Session = Depends(deps.get_db),
@@ -214,7 +217,7 @@ async def get_specialty_templates(
         )
 
 
-@router.post("/emr/{emr_id}/ai-enhance", dependencies=[Depends(RequireAiFeature("ai_smart_template"))])
+@router.post("/emr/{emr_id}/ai-enhance", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
 async def enhance_emr_with_ai(
     emr_id: int,
     enhancement_type: str = Query(
@@ -283,7 +286,7 @@ async def enhance_emr_with_ai(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/analytics/quality")
+@router.get("/analytics/quality", response_model=Any)
 async def get_emr_quality_analytics(
     specialty: str | None = Query(None, description="Фильтр по специализации"),
     date_from: str | None = Query(None, description="Дата начала"),

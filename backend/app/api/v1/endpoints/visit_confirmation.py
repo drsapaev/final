@@ -93,7 +93,7 @@ def confirm_visit_by_pwa(
         _raise_http_error(exc)
 
 
-@router.get("/visits/info/{token}")
+@router.get("/visits/info/{token}", response_model=dict[str, Any])
 def get_visit_info_by_token(token: str, db: Session = Depends(get_db)):
     """Получение информации о визите по токену (без подтверждения)."""
     service = VisitConfirmationService(db)

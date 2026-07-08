@@ -158,7 +158,7 @@ async def move_queue_entry(
         )
 
 
-@router.get("/status/by-specialist/")
+@router.get("/status/by-specialist/", response_model=dict[str, Any])
 async def get_queue_status_by_specialist(
     specialist_id: int,
     day: date,
@@ -186,7 +186,7 @@ async def get_queue_status_by_specialist(
         )
 
 
-@router.get("/status/{queue_id}")
+@router.get("/status/{queue_id}", response_model=dict[str, Any])
 async def get_queue_status(
     queue_id: int,
     db: Session = Depends(get_db),

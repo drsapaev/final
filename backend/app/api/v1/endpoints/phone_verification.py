@@ -16,6 +16,7 @@ from app.models.user import User
 from app.services.phone_verification_service import get_phone_verification_service
 from app.services.sms_providers import SMSProviderType
 
+from typing import Any
 router = APIRouter()
 
 
@@ -100,9 +101,9 @@ class UpdatePhoneRequest(BaseModel):
         return v
 
 
-@router.post("/send-code")
+@router.post("/send-code", response_model=dict[str, Any])
 @limiter.limit("5/minute")  # P1-1: rate limit
-async def send_verification_code(request: Request, 
+async def send_verification_code(request: Request,
     request_data: SendVerificationCodeRequest, current_user: User = Depends(get_current_user)
 ):
     """Отправка кода верификации"""
@@ -154,7 +155,7 @@ async def send_verification_code(request: Request,
         )
 
 
-@router.post("/verify-code")
+@router.post("/verify-code", response_model=dict[str, Any])
 async def verify_code(
     request_data: VerifyCodeRequest, current_user: User = Depends(get_current_user)
 ):
@@ -204,7 +205,7 @@ async def verify_code(
         )
 
 
-@router.get("/status")
+@router.get("/status", response_model=dict[str, Any])
 async def get_verification_status(
     phone: str = Query(..., description="Номер телефона в формате +998XXXXXXXXX"),
     purpose: str = Query("verification", description="Цель верификации"),
@@ -235,7 +236,7 @@ async def get_verification_status(
         )
 
 
-@router.delete("/cancel")
+@router.delete("/cancel", response_model=dict[str, Any])
 async def cancel_verification(
     phone: str = Query(..., description="Номер телефона в формате +998XXXXXXXXX"),
     purpose: str = Query("verification", description="Цель верификации"),
@@ -272,7 +273,7 @@ async def cancel_verification(
         )
 
 
-@router.put("/update-phone")
+@router.put("/update-phone", response_model=dict[str, Any])
 async def update_user_phone(
     request_data: UpdatePhoneRequest,
     current_user: User = Depends(get_current_user),
@@ -315,7 +316,7 @@ async def update_user_phone(
         )
 
 
-@router.get("/statistics")
+@router.get("/statistics", response_model=dict[str, Any])
 async def get_verification_statistics(
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"]))
 ):
@@ -334,7 +335,7 @@ async def get_verification_statistics(
         )
 
 
-@router.post("/admin/send-code")
+@router.post("/admin/send-code", response_model=dict[str, Any])
 async def admin_send_verification_code(
     phone: str = Query(..., description="Номер телефона в формате +998XXXXXXXXX"),
     purpose: str = Query("verification", description="Цель верификации"),

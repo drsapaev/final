@@ -16,6 +16,7 @@ from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
 from app.models.user import User
 from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
+from app.schemas.notifications import TestWebhookRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -99,7 +100,7 @@ def _telegram_enhanced_test_failure(exc: Exception) -> dict[str, Any]:
     }
 
 
-@router.post("/webhook/enhanced")
+@router.post("/webhook/enhanced", response_model=dict[str, Any])
 async def telegram_webhook_enhanced(request: Request, db: Session = Depends(get_db)):
     """Обработка webhook от Telegram для расширенного бота"""
     try:
@@ -126,7 +127,7 @@ async def telegram_webhook_enhanced(request: Request, db: Session = Depends(get_
         _raise_telegram_enhanced_internal_error("telegram_webhook_enhanced", e)
 
 
-@router.get("/webhook/info")
+@router.get("/webhook/info", response_model=dict[str, Any])
 async def webhook_info(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -157,9 +158,9 @@ async def webhook_info(
         _raise_telegram_enhanced_internal_error("webhook_info", e)
 
 
-@router.post("/webhook/test")
+@router.post("/webhook/test", response_model=dict[str, Any])
 async def test_webhook(
-    test_data: dict[str, Any],
+    test_data: TestWebhookRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -171,12 +172,13 @@ async def test_webhook(
             await bot.initialize(db)
 
         # Обрабатываем тестовые данные
-        await bot.process_webhook_update(test_data, db)
+        test_data_dict = test_data.model_dump(exclude_none=True)
+        await bot.process_webhook_update(test_data_dict, db)
 
         return {
             "status": "success",
             "message": "Test webhook processed successfully",
-            "processed_data": test_data,
+            "processed_data": test_data_dict,
         }
 
     except HTTPException:

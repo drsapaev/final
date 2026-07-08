@@ -4,7 +4,7 @@ API endpoints для управления информацией о кабине
 
 import logging
 from datetime import date, datetime
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -113,7 +113,7 @@ def get_queues_cabinet_info(
         _raise_queue_cabinet_internal_error("get_queues_cabinet_info", exc)
 
 
-@router.get("/queues/{queue_id}/cabinet-info")
+@router.get("/queues/{queue_id}/cabinet-info", response_model=dict[str, Any])
 def get_queue_cabinet_info(
     queue_id: int,
     db: Session = Depends(get_db),
@@ -136,7 +136,7 @@ def get_queue_cabinet_info(
 # ===================== ОБНОВЛЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
 
 
-@router.put("/queues/{queue_id}/cabinet-info")
+@router.put("/queues/{queue_id}/cabinet-info", response_model=dict[str, Any])
 def update_queue_cabinet_info(
     queue_id: int,
     cabinet_info: CabinetInfo,
@@ -167,7 +167,7 @@ def update_queue_cabinet_info(
         _raise_queue_cabinet_internal_error("update_queue_cabinet_info", exc)
 
 
-@router.put("/queues/cabinet-info/bulk")
+@router.put("/queues/cabinet-info/bulk", response_model=dict[str, Any])
 def bulk_update_cabinet_info(
     request: BulkCabinetUpdateRequest,
     db: Session = Depends(get_db),
@@ -197,7 +197,7 @@ def bulk_update_cabinet_info(
 # ===================== СИНХРОНИЗАЦИЯ С ТАБЛИЦЕЙ DOCTORS =====================
 
 
-@router.post("/queues/sync-cabinet-info")
+@router.post("/queues/sync-cabinet-info", response_model=dict[str, Any])
 def sync_cabinet_info_from_doctors(
     day: str | None = Query(
         None, description="Дата для синхронизации (по умолчанию сегодня)"
@@ -229,7 +229,7 @@ def sync_cabinet_info_from_doctors(
 # ===================== СТАТИСТИКА ПО КАБИНЕТАМ =====================
 
 
-@router.get("/queues/cabinet-statistics")
+@router.get("/queues/cabinet-statistics", response_model=dict[str, Any])
 def get_cabinet_statistics(
     date_from: str | None = Query(None, description="Дата начала в формате YYYY-MM-DD"),
     date_to: str | None = Query(

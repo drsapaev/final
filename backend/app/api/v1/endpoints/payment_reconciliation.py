@@ -19,7 +19,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/reconcile/all")
+@router.post("/reconcile/all", response_model=dict)
 async def reconcile_all_providers(
     start_date: date = Query(..., description="Start date for reconciliation"),
     end_date: date = Query(..., description="End date for reconciliation"),
@@ -42,7 +42,7 @@ async def reconcile_all_providers(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.post("/reconcile/{provider}")
+@router.post("/reconcile/{provider}", response_model=dict)
 async def reconcile_provider(
     provider: str,
     start_date: date = Query(..., description="Start date for reconciliation"),
@@ -67,7 +67,7 @@ async def reconcile_provider(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/reconcile/report")
+@router.get("/reconcile/report", response_model=dict)
 async def get_reconciliation_report(
     start_date: date = Query(None, description="Start date (defaults to 7 days ago)"),
     end_date: date = Query(None, description="End date (defaults to today)"),
@@ -90,7 +90,7 @@ async def get_reconciliation_report(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/reconcile/missing/{provider}")
+@router.get("/reconcile/missing/{provider}", response_model=dict)
 async def get_missing_payments(
     provider: str,
     days: int = Query(7, ge=1, le=90, description="Number of days to look back"),
@@ -110,7 +110,7 @@ async def get_missing_payments(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/reconcile/alerts")
+@router.get("/reconcile/alerts", response_model=dict)
 async def get_reconciliation_alerts(
     threshold: float = Query(1000.0, description="Minimum difference to alert on"),
     db: Session = Depends(get_db),

@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
 
+from typing import Any
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -373,7 +374,7 @@ def _build_trends(context: dict) -> list[dict]:
     ]
 
 
-@router.get("/predictive")
+@router.get("/predictive", response_model=dict[str, Any])
 async def get_predictive_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -423,7 +424,7 @@ async def get_predictive_analytics(
     }
 
 
-@router.get("/predictive/accuracy")
+@router.get("/predictive/accuracy", response_model=dict[str, Any])
 async def get_prediction_accuracy(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -454,7 +455,7 @@ async def get_prediction_accuracy(
     }
 
 
-@router.get("/predictive/scenarios")
+@router.get("/predictive/scenarios", response_model=dict[str, Any])
 async def get_scenario_analysis(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -504,7 +505,7 @@ async def get_scenario_analysis(
     }
 
 
-@router.get("/predictive/insights")
+@router.get("/predictive/insights", response_model=dict[str, Any])
 async def get_predictive_insights(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),

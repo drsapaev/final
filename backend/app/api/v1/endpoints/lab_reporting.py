@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 
 from datetime import datetime, UTC
 
@@ -264,9 +265,10 @@ def list_lab_orders(
 # registrar_integration, чтобы не дублировать ~1700 строк логики.
 # Возвращает плоский массив записей (а не nested queues[]) — это
 # упрощает frontend и убирает промежуточную нормализацию.
-@router.get("/queue/today")
-def list_lab_queue_today(
-    target_date: str | None = Query(default=None, description="Дата (YYYY-MM-DD), по умолчанию сегодня"),
+@router.get("/queue/today", response_model=dict[str, Any])
+def list_lab_queue_today(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+target_date: str | None = Query(default=None, description="Дата (YYYY-MM-DD), по умолчанию сегодня"),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
@@ -353,8 +355,9 @@ def list_lab_queue_today(
 
 
 @router.get("/catalog/units", response_model=list[LabCatalogUnitOut])
-def list_lab_catalog_units(
-    db: Session = Depends(get_db),
+def list_lab_catalog_units(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
     service = LabReportingService(db)
@@ -362,8 +365,9 @@ def list_lab_catalog_units(
 
 
 @router.get("/catalog/analytes", response_model=list[LabCatalogAnalyteOut])
-def list_lab_catalog_analytes(
-    category: str | None = Query(default=None, max_length=64),
+def list_lab_catalog_analytes(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+category: str | None = Query(default=None, max_length=64),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
@@ -375,8 +379,9 @@ def list_lab_catalog_analytes(
     "/catalog/reference-ranges",
     response_model=list[LabCatalogReferenceRangeOut],
 )
-def list_lab_catalog_reference_ranges(
-    analyte_code: str | None = Query(default=None, max_length=64),
+def list_lab_catalog_reference_ranges(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+analyte_code: str | None = Query(default=None, max_length=64),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
@@ -385,8 +390,9 @@ def list_lab_catalog_reference_ranges(
 
 
 @router.get("/templates", response_model=list[LabReportTemplateSummaryOut])
-def list_lab_templates(
-    db: Session = Depends(get_db),
+def list_lab_templates(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
     service = LabReportingService(db)
@@ -689,7 +695,7 @@ def mark_lab_report_printed(
         _handle_domain_error(exc)
 
 
-@router.get("/report-instances/{instance_id}/pdf")
+@router.get("/report-instances/{instance_id}/pdf", response_model=dict[str, Any])
 def download_lab_report_pdf(
     instance_id: int,
     db: Session = Depends(get_db),

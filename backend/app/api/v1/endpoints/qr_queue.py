@@ -360,7 +360,7 @@ def generate_qr_token(
         )
 
 
-@router.post("/admin/qr-tokens/generate-clinic")
+@router.post("/admin/qr-tokens/generate-clinic", response_model=dict[str, Any])
 def generate_clinic_qr_token(
     request: ClinicQRTokenGenerateRequest,
     db: Session = Depends(get_db),
@@ -419,8 +419,12 @@ def generate_clinic_qr_token(
         )
 
 
-@router.get("/available-specialists")
-def get_available_specialists(db: Session = Depends(get_db)):
+@router.get("/available-specialists", response_model=dict[str, Any])
+def get_available_specialists(
+    db: Session = Depends(get_db),
+    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+):
     """
     Получает список доступных специалистов для QR-регистрации (публичный эндпоинт)
     Используется для динамического отображения списка специалистов в интерфейсе QR-регистрации
@@ -436,6 +440,8 @@ def get_available_specialists(db: Session = Depends(get_db)):
             db.query(Doctor)
             .filter(Doctor.active == True)
             .options(joinedload(Doctor.user))
+            .offset(offset)
+            .limit(limit)
             .all()
         )
 
@@ -622,7 +628,7 @@ def start_join_session(
         )
 
 
-@router.post("/join/complete")
+@router.post("/join/complete", response_model=dict[str, Any])
 def complete_join_session(
     request: JoinSessionCompleteRequest, db: Session = Depends(get_db)
 ):
@@ -835,6 +841,8 @@ async def call_next_patient(
 def get_active_qr_tokens(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
+    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
 ):
     """
     Получает активные QR токены пользователя
@@ -844,10 +852,11 @@ def get_active_qr_tokens(
 
     tokens = service.get_active_qr_tokens(current_user.id)
 
-    return [ActiveQRTokenResponse(**token) for token in tokens]
+    # P1 FIX: cap results to prevent unbounded response
+    return [ActiveQRTokenResponse(**token) for token in tokens[offset:offset + limit]]
 
 
-@router.delete("/admin/qr-tokens/{token}")
+@router.delete("/admin/qr-tokens/{token}", response_model=dict[str, Any])
 def deactivate_qr_token(
     token: str,
     db: Session = Depends(get_db),
@@ -883,7 +892,7 @@ class SetIncompleteRequest(BaseModel):
     reason: str = Field(..., min_length=3, max_length=200, description="Причина незавершённости")
 
 
-@router.post("/entry/{entry_id}/restore-next")
+@router.post("/entry/{entry_id}/restore-next", response_model=dict[str, Any])
 async def restore_entry_to_next(
     entry_id: int,
     request: RestoreToNextRequest,
@@ -959,7 +968,7 @@ async def restore_entry_to_next(
     }
 
 
-@router.post("/entry/{entry_id}/no-show")
+@router.post("/entry/{entry_id}/no-show", response_model=dict[str, Any])
 async def mark_entry_no_show(
     entry_id: int,
     db: Session = Depends(get_db),
@@ -1031,7 +1040,7 @@ async def mark_entry_no_show(
     }
 
 
-@router.post("/entry/{entry_id}/diagnostics")
+@router.post("/entry/{entry_id}/diagnostics", response_model=dict[str, Any])
 def send_entry_to_diagnostics(
     entry_id: int,
     db: Session = Depends(get_db),
@@ -1081,7 +1090,7 @@ def send_entry_to_diagnostics(
     }
 
 
-@router.post("/entry/{entry_id}/incomplete")
+@router.post("/entry/{entry_id}/incomplete", response_model=dict[str, Any])
 def mark_entry_incomplete(
     entry_id: int,
     request: SetIncompleteRequest,
@@ -1135,7 +1144,7 @@ def mark_entry_incomplete(
 # ===================== СТАТИСТИКА И АНАЛИТИКА =====================
 
 
-@router.get("/admin/queue-analytics/{specialist_id}")
+@router.get("/admin/queue-analytics/{specialist_id}", response_model=dict[str, Any])
 def get_queue_analytics(
     specialist_id: int,
     start_date: str | None = None,
@@ -1252,7 +1261,7 @@ class UpdateOnlineEntryRequest(BaseModel):
     address: str | None = None
 
 
-@router.put("/online-entry/{entry_id}/update")
+@router.put("/online-entry/{entry_id}/update", response_model=dict[str, Any])
 def update_online_entry(
     entry_id: int,
     request: UpdateOnlineEntryRequest,
@@ -1367,7 +1376,7 @@ class FullUpdateOnlineEntryRequest(BaseModel):
     aggregated_ids: list[int] | None = None  # ⭐ FIX: IDs of all merged entries for dedup check
 
 
-@router.put("/online-entry/{entry_id}/full-update")
+@router.put("/online-entry/{entry_id}/full-update", response_model=dict[str, Any])
 def full_update_online_entry(
     entry_id: int,
     request: FullUpdateOnlineEntryRequest,

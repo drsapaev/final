@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -48,7 +49,7 @@ def _build_payment_provider_payload(
     }
 
 
-@router.get("/quick-stats")
+@router.get("/quick-stats", response_model=dict[str, Any])
 async def get_quick_stats(
     current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
@@ -61,7 +62,7 @@ async def get_quick_stats(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/dashboard")
+@router.get("/dashboard", response_model=dict[str, Any])
 async def get_dashboard_data(
     current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
@@ -74,7 +75,7 @@ async def get_dashboard_data(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/trends")
+@router.get("/trends", response_model=dict[str, Any])
 async def get_trends_analytics(
     days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
     current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
@@ -98,7 +99,7 @@ async def get_trends_analytics(
         ) from e
 
 
-@router.get("/appointment-flow")
+@router.get("/appointment-flow", response_model=dict[str, Any])
 async def get_appointment_flow_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -121,7 +122,7 @@ async def get_appointment_flow_analytics(
     return AnalyticsService.get_appointment_flow_analytics(db, start, end, department)
 
 
-@router.get("/revenue-breakdown")
+@router.get("/revenue-breakdown", response_model=dict[str, Any])
 async def get_revenue_breakdown_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -144,7 +145,7 @@ async def get_revenue_breakdown_analytics(
     return AnalyticsService.get_revenue_breakdown_analytics(db, start, end, department)
 
 
-@router.get("/payment-providers")
+@router.get("/payment-providers", response_model=dict[str, Any])
 async def get_payment_provider_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),

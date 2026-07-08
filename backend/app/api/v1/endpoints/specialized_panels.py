@@ -3,6 +3,7 @@ API эндпоинты для специализированных панеле�
 """
 
 from datetime import date
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -19,7 +20,7 @@ router = APIRouter()
 FINANCIAL_SPECIALIZED_PANEL_ROLES = ("Admin", "Manager")
 
 
-@router.get("/cardiology/patients")
+@router.get("/cardiology/patients", response_model=dict[str, Any])
 async def get_cardiology_patients(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -35,7 +36,7 @@ async def get_cardiology_patients(
     )
 
 
-@router.get("/cardiology/visits")
+@router.get("/cardiology/visits", response_model=dict[str, Any])
 async def get_cardiology_visits(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -57,7 +58,7 @@ async def get_cardiology_visits(
     )
 
 
-@router.get("/cardiology/analytics")
+@router.get("/cardiology/analytics", response_model=dict[str, Any])
 async def get_cardiology_analytics(
     start_date: date | None = Query(None),
     end_date: date | None = Query(None),
@@ -71,7 +72,7 @@ async def get_cardiology_analytics(
     )
 
 
-@router.get("/dentistry/patients")
+@router.get("/dentistry/patients", response_model=dict[str, Any])
 async def get_dentistry_patients(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -87,7 +88,7 @@ async def get_dentistry_patients(
     )
 
 
-@router.get("/dentistry/visits")
+@router.get("/dentistry/visits", response_model=dict[str, Any])
 async def get_dentistry_visits(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -109,7 +110,7 @@ async def get_dentistry_visits(
     )
 
 
-@router.get("/dentistry/analytics")
+@router.get("/dentistry/analytics", response_model=dict[str, Any])
 async def get_dentistry_analytics(
     start_date: date | None = Query(None),
     end_date: date | None = Query(None),
@@ -123,7 +124,7 @@ async def get_dentistry_analytics(
     )
 
 
-@router.get("/specialized/services")
+@router.get("/specialized/services", response_model=dict[str, Any])
 async def get_specialized_services(
     department: str | None = Query(
         None, description="Отделение: cardiology, dentistry"
@@ -135,7 +136,7 @@ async def get_specialized_services(
     return SpecializedPanelsApiService(db).get_specialized_services(department=department)
 
 
-@router.get("/specialized/patient-history/{patient_id}")
+@router.get("/specialized/patient-history/{patient_id}", response_model=dict[str, Any])
 async def get_specialized_patient_history(
     patient_id: int,
     department: str | None = Query(
@@ -172,7 +173,7 @@ async def get_specialized_patient_history(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/specialized/statistics")
+@router.get("/specialized/statistics", response_model=dict[str, Any])
 async def get_specialized_statistics(
     start_date: date | None = Query(None),
     end_date: date | None = Query(None),

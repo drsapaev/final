@@ -2,7 +2,7 @@
 API endpoints for Role management
 """
 import logging
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -169,7 +169,7 @@ async def update_role(
         _raise_roles_internal_error("update_role", e)
 
 
-@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT, )
 async def delete_role(
     role_id: int,
     db: Session = Depends(get_db),

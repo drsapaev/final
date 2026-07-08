@@ -36,6 +36,7 @@ from app.schemas.user_management import (
 )
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
+from app.schemas.notifications import SendSystemAlertRequest, UpdateNotificationPolicyRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -262,7 +263,7 @@ def _normalize_notification_policy_payload(
     return normalized_policy
 
 
-@router.post("/send-appointment-reminder")
+@router.post("/send-appointment-reminder", response_model=dict[str, Any])
 async def send_appointment_reminder(
     background_tasks: BackgroundTasks,
     patient_id: int,
@@ -297,7 +298,7 @@ async def send_appointment_reminder(
     }
 
 
-@router.post("/send-visit-confirmation")
+@router.post("/send-visit-confirmation", response_model=dict[str, Any])
 async def send_visit_confirmation(
     background_tasks: BackgroundTasks,
     visit_id: int,
@@ -336,7 +337,7 @@ async def send_visit_confirmation(
     }
 
 
-@router.post("/send-payment-notification")
+@router.post("/send-payment-notification", response_model=dict[str, Any])
 async def send_payment_notification(
     background_tasks: BackgroundTasks,
     visit_id: int,
@@ -376,7 +377,7 @@ async def send_payment_notification(
     }
 
 
-@router.post("/send-queue-update")
+@router.post("/send-queue-update", response_model=dict[str, Any])
 async def send_queue_update(
     background_tasks: BackgroundTasks,
     department: str,
@@ -404,16 +405,17 @@ async def send_queue_update(
     }
 
 
-@router.post("/send-system-alert")
+@router.post("/send-system-alert", response_model=dict[str, Any])
 async def send_system_alert(
     background_tasks: BackgroundTasks,
     alert_type: str,
     message: str,
-    details: dict[str, Any] | None = None,
+    body: SendSystemAlertRequest = SendSystemAlertRequest(),
     current_user: User = Depends(require_roles(["admin"])),
     db: Session = Depends(get_db),
 ):
     """Отправка системного оповещения (только для админов)"""
+    details = body.details.model_dump(exclude_none=True) if body.details else None
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
         notification_sender_service.send_system_alert,
@@ -432,7 +434,7 @@ async def send_system_alert(
     }
 
 
-@router.post("/test-notifications")
+@router.post("/test-notifications", response_model=dict[str, Any])
 async def test_notifications(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(require_roles(["admin"])),
@@ -489,7 +491,7 @@ async def test_notifications(
     }
 
 
-@router.get("/notification-status")
+@router.get("/notification-status", response_model=dict[str, Any])
 async def get_notification_status(
     current_user: User = Depends(require_roles(["admin"])),
 ):
@@ -555,7 +557,7 @@ async def update_notification_template(
     return crud_notification_template.update(db, db_obj=template, obj_in=template_data)
 
 
-@router.delete("/templates/{template_id}")
+@router.delete("/templates/{template_id}", response_model=dict[str, Any])
 async def delete_notification_template(
     template_id: int,
     current_user: User = Depends(require_roles(["admin"])),
@@ -822,7 +824,7 @@ async def update_user_notification_settings(
     return crud_user_notification_settings.update(db, db_obj=settings, obj_in=settings_data)
 
 
-@router.get("/settings/{user_id}/policy")
+@router.get("/settings/{user_id}/policy", response_model=dict[str, Any])
 async def get_user_notification_policy(
     user_id: int,
     current_user: User = Depends(get_current_user),
@@ -842,16 +844,17 @@ async def get_user_notification_policy(
     }
 
 
-@router.put("/settings/{user_id}/policy")
+@router.put("/settings/{user_id}/policy", response_model=dict[str, Any])
 async def update_user_notification_policy(
     user_id: int,
-    policy_data: dict[str, Any],
+    body: UpdateNotificationPolicyRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Обновление runtime policy-override для anti-noise (mute/snooze/DND + controls)."""
     _assert_notification_policy_access(current_user=current_user, user_id=user_id)
     platform_service = get_notification_platform_service(db)
+    policy_data = body.model_dump(exclude_none=True)
     normalized_policy = _normalize_notification_policy_payload(
         policy_data=policy_data,
         platform_service=platform_service,

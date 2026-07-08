@@ -5,7 +5,7 @@ API endpoints для восстановления паролей
 import logging
 import re
 from datetime import datetime
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from app.core.rate_limiter import limiter
 from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
@@ -103,9 +103,9 @@ class PasswordResetConfirmRequest(BaseModel):
         return v
 
 
-@router.post("/initiate")  # P1-1: rate limit deferred (request param conflict)
+@router.post("/initiate", response_model=dict[str, Any])  # P1-1: rate limit deferred (request param conflict)
 @limiter.limit("3/minute")  # P1-1: rate limit
-async def initiate_password_reset(request: Request, 
+async def initiate_password_reset(request: Request,
     request_data: PasswordResetInitiateRequest, db: Session = Depends(get_db)
 ):
     """Инициация сброса пароля"""
@@ -146,7 +146,7 @@ async def initiate_password_reset(request: Request,
         raise_password_reset_internal_error("initiate_password_reset", e)
 
 
-@router.post("/verify-phone")
+@router.post("/verify-phone", response_model=dict[str, Any])
 async def verify_phone_for_reset(
     request_data: PhoneVerificationRequest, db: Session = Depends(get_db)
 ):
@@ -193,7 +193,7 @@ async def verify_phone_for_reset(
         raise_password_reset_internal_error("verify_phone_for_reset", e)
 
 
-@router.post("/confirm")
+@router.post("/confirm", response_model=dict[str, Any])
 async def confirm_password_reset(
     request_data: PasswordResetConfirmRequest, db: Session = Depends(get_db)
 ):
@@ -228,7 +228,7 @@ async def confirm_password_reset(
         raise_password_reset_internal_error("confirm_password_reset", e)
 
 
-@router.get("/validate-token")
+@router.get("/validate-token", response_model=dict[str, Any])
 async def validate_reset_token(
     token: str = Query(..., description="Токен сброса пароля"),
     db: Session = Depends(get_db),
@@ -262,7 +262,7 @@ async def validate_reset_token(
         raise_password_reset_internal_error("validate_reset_token", e)
 
 
-@router.get("/statistics")
+@router.get("/statistics", response_model=dict[str, Any])
 async def get_password_reset_statistics(
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"]))
 ):

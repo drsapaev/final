@@ -41,6 +41,7 @@ from app.models.service import (  # noqa: E402  # manual-review: conditional imp
 from app.models.user import (  # noqa: E402  # manual-review: conditional import after config — intentional
     User,  # noqa: E402  # manual-review: conditional import after config — intentional
 )
+from app.schemas.misc_endpoints import CompleteVisitRequest  # noqa: E402  # manual-review: conditional import after config — intentional
 from app.models.visit import (  # noqa: E402  # manual-review: conditional import after config — intentional
     Visit,
     VisitService,
@@ -317,7 +318,7 @@ class ScheduleNextVisitResponse(BaseModel):
 # ===================== ОЧЕРЕДЬ ВРАЧА =====================
 
 
-@router.get("/doctor/{specialty}/queue/today")
+@router.get("/doctor/{specialty}/queue/today", response_model=dict[str, Any])
 def get_doctor_queue_today(
     specialty: str,
     db: Session = Depends(get_db),
@@ -538,7 +539,7 @@ def get_doctor_queue_today(
 # ===================== УПРАВЛЕНИЕ СТАТУСАМИ ПАЦИЕНТОВ =====================
 
 
-@router.post("/doctor/queue/{entry_id}/call")
+@router.post("/doctor/queue/{entry_id}/call", response_model=dict[str, Any])
 def call_patient(
     entry_id: int,
     db: Session = Depends(get_db),
@@ -660,7 +661,7 @@ def call_patient(
         )
 
 
-@router.post("/doctor/queue/{entry_id}/start-visit")
+@router.post("/doctor/queue/{entry_id}/start-visit", response_model=dict[str, Any])
 def start_patient_visit(
     entry_id: int,
     db: Session = Depends(get_db),
@@ -758,10 +759,10 @@ def start_patient_visit(
         )
 
 
-@router.post("/doctor/queue/{entry_id}/complete")
+@router.post("/doctor/queue/{entry_id}/complete", response_model=dict[str, Any])
 def complete_patient_visit(
     entry_id: int,
-    visit_data: dict[str, Any] | None = None,
+    visit_data: CompleteVisitRequest = CompleteVisitRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles(
@@ -784,6 +785,7 @@ def complete_patient_visit(
     Из passport.md стр. 1425: POST /api/visits/:id/complete
     """
     try:
+        visit_data = visit_data.model_dump(exclude_none=True) if visit_data else {}
         from app.models.appointment import Appointment
         from app.models.online_queue import OnlineQueueEntry
         from app.models.visit import Visit
@@ -1040,7 +1042,7 @@ def complete_patient_visit(
 # ===================== УСЛУГИ ДЛЯ ВРАЧА =====================
 
 
-@router.get("/doctor/{specialty}/services")
+@router.get("/doctor/{specialty}/services", response_model=dict[str, Any])
 def get_doctor_services(
     specialty: str,
     db: Session = Depends(get_db),
@@ -1127,7 +1129,7 @@ def get_doctor_services(
 # ===================== ИНФОРМАЦИЯ О ВРАЧЕ =====================
 
 
-@router.get("/doctor/my-info")
+@router.get("/doctor/my-info", response_model=dict[str, Any])
 def get_doctor_info(
     db: Session = Depends(get_db),
     current_user: User = Depends(
@@ -1211,7 +1213,7 @@ def get_doctor_info(
 # ===================== КАЛЕНДАРЬ ВРАЧА =====================
 
 
-@router.get("/doctor/calendar")
+@router.get("/doctor/calendar", response_model=dict[str, Any])
 def get_doctor_calendar(
     start_date: date = Query(..., description="Начальная дата"),
     end_date: date = Query(..., description="Конечная дата"),
@@ -1271,7 +1273,7 @@ def get_doctor_calendar(
 # ===================== СТАТИСТИКА ВРАЧА =====================
 
 
-@router.get("/doctor/stats")
+@router.get("/doctor/stats", response_model=dict[str, Any])
 def get_doctor_stats(
     days_back: int = Query(7, ge=1, le=30, description="Дней назад"),
     db: Session = Depends(get_db),
@@ -1568,7 +1570,7 @@ async def schedule_next_visit(
 # ===================== УПРАВЛЕНИЕ ВИЗИТАМИ =====================
 
 
-@router.get("/doctor/visits/today")
+@router.get("/doctor/visits/today", response_model=dict[str, Any])
 def get_today_visits(
     db: Session = Depends(get_db),
     current_user: User = Depends(
@@ -1645,7 +1647,7 @@ def get_today_visits(
         )
 
 
-@router.get("/doctor/visits/statistics")
+@router.get("/doctor/visits/statistics", response_model=dict[str, Any])
 def get_visit_statistics(
     date_from: str | None = Query(
         None, description="Дата начала в формате YYYY-MM-DD"
@@ -1699,7 +1701,7 @@ def get_visit_statistics(
             detail="Internal server error",
         )
 
-@router.get("/doctor/visits/{visit_id}")
+@router.get("/doctor/visits/{visit_id}", response_model=dict[str, Any])
 def get_visit_details(
     visit_id: int,
     db: Session = Depends(get_db),
@@ -1785,7 +1787,7 @@ def get_visit_details(
         )
 
 
-@router.put("/doctor/visits/{visit_id}/add-service")
+@router.put("/doctor/visits/{visit_id}/add-service", response_model=dict[str, Any])
 def add_service_to_visit(
     visit_id: int,
     service_id: int,
@@ -1847,7 +1849,7 @@ def add_service_to_visit(
         )
 
 
-@router.delete("/doctor/visits/{visit_id}/services/{visit_service_id}")
+@router.delete("/doctor/visits/{visit_id}/services/{visit_service_id}", response_model=dict[str, Any])
 def remove_service_from_visit(
     visit_id: int,
     visit_service_id: int,

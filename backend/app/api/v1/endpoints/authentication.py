@@ -4,7 +4,7 @@ API endpoints для системы аутентификации
 
 import json
 import logging
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from app.core.rate_limiter import limiter
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -454,7 +454,7 @@ async def get_paginated_user_sessions(
         raise_authentication_internal_error("get_user_sessions", e)
 
 
-@router.delete("/sessions/{session_id}")
+@router.delete("/sessions/{session_id}", response_model=dict[str, Any])
 async def delete_user_session(
     session_id: int,
     request_data: SessionRevokeRequest,
@@ -568,7 +568,7 @@ async def get_auth_status(
         raise_authentication_internal_error("get_auth_status", e)
 
 
-@router.get("/health")
+@router.get("/health", response_model=dict[str, Any])
 async def auth_health_check():
     """Проверка здоровья сервиса аутентификации"""
     return {
@@ -595,7 +595,7 @@ async def auth_health_check():
 # ===================== УПРАВЛЕНИЕ СЕССИЯМИ =====================
 
 
-@router.get("/sessions/current")
+@router.get("/sessions/current", response_model=dict[str, Any])
 async def get_current_session(
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -643,7 +643,7 @@ async def get_current_session(
 # регистрирует маршруты в порядке объявления, и второй shadowed первый.
 
 
-@router.post("/sessions/{session_id}/revoke")
+@router.post("/sessions/{session_id}/revoke", response_model=dict[str, Any])
 async def revoke_user_session(
     session_id: int,
     reason: str = Query("manual", description="Причина отзыва сессии"),
@@ -689,7 +689,7 @@ async def revoke_user_session(
         )
 
 
-@router.post("/sessions/revoke-all")
+@router.post("/sessions/revoke-all", response_model=dict[str, Any])
 async def revoke_all_sessions(
     request: Request,
     except_current: bool = Query(True, description="Исключить текущую сессию"),
@@ -733,7 +733,7 @@ async def revoke_all_sessions(
         )
 
 
-@router.post("/sessions/cleanup")
+@router.post("/sessions/cleanup", response_model=dict[str, Any])
 async def cleanup_expired_sessions(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -769,7 +769,7 @@ async def cleanup_expired_sessions(
         )
 
 
-@router.get("/sessions/{session_id}")
+@router.get("/sessions/{session_id}", response_model=dict[str, Any])
 async def get_session_info(
     session_id: int,
     current_user: User = Depends(get_current_user),

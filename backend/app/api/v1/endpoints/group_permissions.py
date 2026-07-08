@@ -125,7 +125,7 @@ def get_user_permissions(
         ) from e
 
 
-@router.get("/users/{user_id}/permissions/check")
+@router.get("/users/{user_id}/permissions/check", response_model=dict[str, Any])
 def check_user_permission(
     user_id: int,
     permission: str = Query(..., description="Код разрешения для проверки"),
@@ -218,7 +218,7 @@ def get_group_permissions_summary(
         )
 
 
-@router.post("/groups/{group_id}/roles")
+@router.post("/groups/{group_id}/roles", response_model=dict[str, Any])
 def assign_role_to_group(
     group_id: int,
     request: AssignRoleRequest,
@@ -251,7 +251,7 @@ def assign_role_to_group(
         )
 
 
-@router.delete("/groups/{group_id}/roles/{role_id}")
+@router.delete("/groups/{group_id}/roles/{role_id}", response_model=dict[str, Any])
 def revoke_role_from_group(
     group_id: int,
     role_id: int,
@@ -282,7 +282,7 @@ def revoke_role_from_group(
         )
 
 
-@router.post("/groups/{group_id}/users")
+@router.post("/groups/{group_id}/users", response_model=dict[str, Any])
 def add_user_to_group(
     group_id: int,
     request: AddUserToGroupRequest,
@@ -317,7 +317,7 @@ def add_user_to_group(
         )
 
 
-@router.delete("/groups/{group_id}/users/{user_id}")
+@router.delete("/groups/{group_id}/users/{user_id}", response_model=dict[str, Any])
 def remove_user_from_group(
     group_id: int,
     user_id: int,
@@ -408,7 +408,7 @@ def get_permissions(
 # ===================== ПЕРЕОПРЕДЕЛЕНИЯ РАЗРЕШЕНИЙ =====================
 
 
-@router.post("/users/permission-override")
+@router.post("/users/permission-override", response_model=dict[str, Any])
 def create_permission_override(
     request: PermissionOverrideRequest,
     db: Session = Depends(get_db),
@@ -444,7 +444,7 @@ def create_permission_override(
 # ===================== КЭШ И СТАТИСТИКА =====================
 
 
-@router.post("/cache/clear")
+@router.post("/cache/clear", response_model=dict[str, Any])
 def clear_permissions_cache(
     current_user: User = Depends(require_roles("Admin", "SuperAdmin"))
 ):
@@ -470,7 +470,7 @@ def clear_permissions_cache(
         )
 
 
-@router.get("/cache/stats")
+@router.get("/cache/stats", response_model=dict[str, Any])
 def get_cache_stats(current_user: User = Depends(require_roles("Admin", "SuperAdmin"))):
     """
     Получить статистику кэша разрешений

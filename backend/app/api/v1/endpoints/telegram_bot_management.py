@@ -4,6 +4,7 @@ API endpoints для управления расширенным Telegram бот
 
 import logging
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -81,6 +82,7 @@ async def get_telegram_bot_stats(
 @router.post(
     "/send-notification",
     operation_id="telegram_bot_management_send_notification",
+response_model=dict[str, Any],
 )
 async def send_telegram_notification(
     request: TelegramNotificationRequest,
@@ -138,7 +140,7 @@ async def send_telegram_notification(
         ) from e
 
 
-@router.post("/send-admin-alert")
+@router.post("/send-admin-alert", response_model=dict[str, Any])
 async def send_admin_alert(
     message: str,
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
@@ -166,7 +168,7 @@ async def send_admin_alert(
         raise _telegram_bot_management_http_error(e, "send_admin_alert") from e
 
 
-@router.get("/users-with-telegram")
+@router.get("/users-with-telegram", response_model=dict[str, Any])
 async def get_users_with_telegram(
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
     db: Session = Depends(get_db),
@@ -179,7 +181,7 @@ async def get_users_with_telegram(
         raise _telegram_bot_management_http_error(e, "get_users_with_telegram") from e
 
 
-@router.post("/test-bot")
+@router.post("/test-bot", response_model=dict[str, Any])
 async def test_telegram_bot(
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
     db: Session = Depends(get_db),
@@ -220,7 +222,7 @@ async def test_telegram_bot(
         raise _telegram_bot_management_http_error(e, "test_telegram_bot") from e
 
 
-@router.post("/broadcast-system-message")
+@router.post("/broadcast-system-message", response_model=dict[str, Any])
 async def broadcast_system_message(
     message: str,
     message_type: str = "info",  # info, warning, error, success
@@ -270,7 +272,7 @@ async def broadcast_system_message(
         raise _telegram_bot_management_http_error(e, "broadcast_system_message") from e
 
 
-@router.get("/bot-commands")
+@router.get("/bot-commands", response_model=dict[str, Any])
 async def get_bot_commands(
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"]))
 ):

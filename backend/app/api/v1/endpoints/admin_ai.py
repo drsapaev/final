@@ -3,6 +3,7 @@ API endpoints для управления AI в админ панели
 """
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -140,7 +141,7 @@ def update_ai_provider(
         raise _admin_ai_http_error(e, "update_ai_provider") from e
 
 
-@router.delete("/ai/providers/{provider_id}")
+@router.delete("/ai/providers/{provider_id}", response_model=dict[str, Any])
 def delete_ai_provider(
     provider_id: int,
     db: Session = Depends(get_db),
@@ -249,7 +250,7 @@ def test_ai_provider(
 # ===================== СИСТЕМНЫЕ НАСТРОЙКИ =====================
 
 
-@router.get("/ai/settings")
+@router.get("/ai/settings", response_model=dict[str, Any])
 def get_ai_settings(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -261,7 +262,7 @@ def get_ai_settings(
         raise _admin_ai_http_error(e, "get_ai_settings") from e
 
 
-@router.put("/ai/settings")
+@router.put("/ai/settings", response_model=dict[str, Any])
 def update_ai_settings(
     settings: AISystemSettings,
     db: Session = Depends(get_db),

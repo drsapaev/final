@@ -224,7 +224,7 @@ async def submit_telemetry(
     )
 
 
-@router.get("/status")
+@router.get("/status", response_model=dict[str, Any])
 async def telemetry_status():
     """Check if telemetry is enabled"""
     return {

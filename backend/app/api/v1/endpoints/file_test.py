@@ -9,10 +9,11 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 
+from typing import Any
 router = APIRouter()
 
 
-@router.get("/test")
+@router.get("/test", response_model=dict[str, Any])
 async def test_files(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
@@ -25,7 +26,7 @@ async def test_files(
     }
 
 
-@router.post("/test-upload")
+@router.post("/test-upload", response_model=dict[str, Any])
 async def test_upload(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):

@@ -338,7 +338,7 @@ async def generate_doctor_performance_report(
         )
 
 
-@router.get("/daily-summary")
+@router.get("/daily-summary", response_model=dict[str, Any])
 async def get_daily_summary(
     target_date: date | None = Query(
         None, description="Дата для сводки (по умолчанию сегодня)"
@@ -368,9 +368,10 @@ async def get_daily_summary(
         )
 
 
-@router.get("/available-reports")
-async def get_available_reports(
-    current_user: User = Depends(get_current_user),
+@router.get("/available-reports", response_model=dict[str, Any])
+async def get_available_reports(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
 ):
     """Получает список доступных типов отчетов"""
@@ -388,7 +389,7 @@ async def get_available_reports(
         )
 
 
-@router.post("/cleanup")
+@router.post("/cleanup", response_model=dict[str, Any])
 async def cleanup_old_reports(
     days: int = Query(
         30, ge=1, le=365, description="Количество дней для хранения отчетов"
@@ -412,9 +413,10 @@ async def cleanup_old_reports(
         raise_report_internal_error("cleanup", "Ошибка очистки старых отчетов", e)
 
 
-@router.get("/files")
-async def list_report_files(
-    db: Session = Depends(get_db),
+@router.get("/files", response_model=dict[str, Any])
+async def list_report_files(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
 ):
@@ -454,7 +456,7 @@ async def list_report_files(
         )
 
 
-@router.get("/download/{filename}")
+@router.get("/download/{filename}", response_model=dict[str, Any])
 async def download_report_file(
     filename: str,
     db: Session = Depends(get_db),

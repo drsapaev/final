@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
 
+from typing import Any
 router = APIRouter()
 
 FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
@@ -166,7 +167,7 @@ def _build_kpi_trend_rows(
     return rows
 
 
-@router.get("/kpi-metrics")
+@router.get("/kpi-metrics", response_model=dict[str, Any])
 async def get_kpi_metrics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -240,7 +241,7 @@ async def get_kpi_metrics(
     }
 
 
-@router.get("/kpi-trends")
+@router.get("/kpi-trends", response_model=dict[str, Any])
 async def get_kpi_trends(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -269,7 +270,7 @@ async def get_kpi_trends(
     }
 
 
-@router.get("/kpi-comparison")
+@router.get("/kpi-comparison", response_model=dict[str, Any])
 async def get_kpi_comparison(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),

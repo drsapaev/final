@@ -200,7 +200,3 @@ def capture_telegram_ai_approval_outcome(
         "domain_mutation": False,
     }
 
-
-# ============================================================
-# === STAFF ACTION ENDPOINTS ===
-# ============================================================

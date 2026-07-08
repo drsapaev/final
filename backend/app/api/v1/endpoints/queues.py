@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.services.online_queue import DayStats, issue_next_ticket, load_stats
 
+from typing import Any
 router = APIRouter(tags=["queues"])
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=dict[str, Any])
 def stats(
     department: str,
     d: str | None = Query(None),
@@ -28,7 +29,7 @@ def stats(
     return asdict(s)
 
 
-@router.post("/next-ticket")
+@router.post("/next-ticket", response_model=dict[str, Any])
 def next_ticket(
     department: str,
     d: str | None = Query(None),

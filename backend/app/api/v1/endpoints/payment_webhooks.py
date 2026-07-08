@@ -136,7 +136,7 @@ def _strip_internal_payment_fields(result: dict[str, Any]) -> dict[str, Any]:
     return sanitized
 
 
-@router.post("/click")
+@router.post("/click", response_model=dict[str, Any])
 async def click_webhook(
     request: Request, db: Session = Depends(get_db)
 ) -> dict[str, Any]:
@@ -151,7 +151,7 @@ async def click_webhook(
     return _strip_internal_payment_fields(result)
 
 
-@router.post("/payme")
+@router.post("/payme", response_model=dict[str, Any])
 async def payme_webhook(
     request: Request, db: Session = Depends(get_db)
 ) -> dict[str, Any]:
@@ -167,7 +167,7 @@ async def payme_webhook(
     return _strip_internal_payment_fields(result)
 
 
-@router.post("/kaspi")
+@router.post("/kaspi", response_model=dict[str, Any])
 async def kaspi_webhook(
     request: Request, db: Session = Depends(get_db)
 ) -> dict[str, Any]:

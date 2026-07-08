@@ -15,6 +15,7 @@ from app.models.user import User
 from app.services.backup_service import BackupService, get_backup_service
 from app.services.monitoring_service import get_monitoring_service
 
+from typing import Any
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -130,9 +131,10 @@ async def _create_full_backup_task(backup_service: BackupService, include_files:
         _log_system_management_error("create_full_backup_task", e)
 
 
-@router.get("/backup/list")
-async def list_backups(
-    db: Session = Depends(get_db),
+@router.get("/backup/list", response_model=dict[str, Any])
+async def list_backups(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
 ):
@@ -147,7 +149,7 @@ async def list_backups(
         raise _system_management_http_error("list_backups", e) from e
 
 
-@router.get("/backup/{backup_name}")
+@router.get("/backup/{backup_name}", response_model=dict[str, Any])
 async def get_backup_info(
     backup_name: str,
     db: Session = Depends(get_db),
@@ -170,7 +172,7 @@ async def get_backup_info(
         raise _system_management_http_error("get_backup_info", e) from e
 
 
-@router.post("/backup/{backup_name}/restore")
+@router.post("/backup/{backup_name}/restore", response_model=dict[str, Any])
 async def restore_backup(
     backup_name: str,
     request: RestoreRequest,
@@ -205,7 +207,7 @@ async def restore_backup(
         raise _system_management_http_error("restore_backup", e) from e
 
 
-@router.delete("/backup/{backup_name}")
+@router.delete("/backup/{backup_name}", response_model=dict[str, Any])
 async def delete_backup(
     backup_name: str,
     db: Session = Depends(get_db),
@@ -226,7 +228,7 @@ async def delete_backup(
 # ===================== МОНИТОРИНГ =====================
 
 
-@router.get("/monitoring/health")
+@router.get("/monitoring/health", response_model=dict[str, Any])
 async def get_system_health(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
@@ -242,7 +244,7 @@ async def get_system_health(
         raise _system_management_http_error("get_system_health", e) from e
 
 
-@router.get("/monitoring/metrics/system")
+@router.get("/monitoring/metrics/system", response_model=dict[str, Any])
 async def get_system_metrics(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
@@ -258,7 +260,7 @@ async def get_system_metrics(
         raise _system_management_http_error("get_system_metrics", e) from e
 
 
-@router.get("/monitoring/metrics/application")
+@router.get("/monitoring/metrics/application", response_model=dict[str, Any])
 async def get_application_metrics(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
@@ -274,7 +276,7 @@ async def get_application_metrics(
         raise _system_management_http_error("get_application_metrics", e) from e
 
 
-@router.get("/monitoring/metrics/history")
+@router.get("/monitoring/metrics/history", response_model=dict[str, Any])
 async def get_metrics_history(
     hours: int = Query(24, ge=1, le=168, description="Количество часов истории"),
     current_user: User = Depends(get_current_user),
@@ -296,7 +298,7 @@ async def get_metrics_history(
         raise _system_management_http_error("get_metrics_history", e) from e
 
 
-@router.get("/monitoring/metrics/summary")
+@router.get("/monitoring/metrics/summary", response_model=dict[str, Any])
 async def get_metrics_summary(
     hours: int = Query(24, ge=1, le=168, description="Количество часов для анализа"),
     current_user: User = Depends(get_current_user),
@@ -313,7 +315,7 @@ async def get_metrics_summary(
         raise _system_management_http_error("get_metrics_summary", e) from e
 
 
-@router.get("/monitoring/alerts")
+@router.get("/monitoring/alerts", response_model=dict[str, Any])
 async def get_alerts(
     severity: str | None = Query(None, pattern="^(critical|warning|info)$"),
     limit: int = Query(100, ge=1, le=1000),
@@ -336,7 +338,7 @@ async def get_alerts(
         raise _system_management_http_error("get_alerts", e) from e
 
 
-@router.get("/monitoring/thresholds")
+@router.get("/monitoring/thresholds", response_model=dict[str, Any])
 async def get_monitoring_thresholds(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN])),
@@ -352,7 +354,7 @@ async def get_monitoring_thresholds(
         raise _system_management_http_error("get_monitoring_thresholds", e) from e
 
 
-@router.put("/monitoring/thresholds")
+@router.put("/monitoring/thresholds", response_model=dict[str, Any])
 async def update_monitoring_thresholds(
     thresholds: MonitoringThresholds,
     current_user: User = Depends(get_current_user),
@@ -376,7 +378,7 @@ async def update_monitoring_thresholds(
 # ===================== УТИЛИТЫ =====================
 
 
-@router.post("/monitoring/collect")
+@router.post("/monitoring/collect", response_model=dict[str, Any])
 async def collect_metrics_now(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN])),
@@ -396,7 +398,7 @@ async def collect_metrics_now(
         raise _system_management_http_error("collect_metrics_now", e) from e
 
 
-@router.get("/system/status")
+@router.get("/system/status", response_model=dict[str, Any])
 async def get_system_status(current_user: User = Depends(get_current_user)):
     """Получает краткий статус системы (доступно всем авторизованным пользователям)"""
     try:

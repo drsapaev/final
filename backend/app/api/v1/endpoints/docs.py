@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
 
+from typing import Any
 router = APIRouter()
 
 
-@router.get("/api-docs", response_class=HTMLResponse)
+@router.get("/api-docs", response_class=HTMLResponse, response_model=dict[str, Any])
 async def get_api_docs():
     """Полная документация API с примерами"""
     html_content = """
@@ -225,7 +226,7 @@ async def get_api_docs():
     return HTMLResponse(content=html_content)
 
 
-@router.get("/api-schema")
+@router.get("/api-schema", response_model=dict[str, Any])
 async def get_api_schema():
     """Получить JSON схему API"""
     schema = {
@@ -317,7 +318,7 @@ async def get_api_schema():
     return schema
 
 
-@router.get("/endpoints-summary")
+@router.get("/endpoints-summary", response_model=dict[str, Any])
 async def get_endpoints_summary(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):

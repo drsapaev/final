@@ -11,6 +11,7 @@ from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.morning_assignment_api_service import MorningAssignmentApiService
 
+from typing import Any
 router = APIRouter()
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
@@ -111,7 +112,7 @@ def get_morning_assignment_stats(
         ) from e
 
 
-@router.post("/admin/morning-assignment/manual")
+@router.post("/admin/morning-assignment/manual", response_model=dict[str, Any])
 def manual_assignment_for_visits(
     request: ManualAssignmentRequest,
     db: Session = Depends(get_db),
@@ -140,7 +141,7 @@ def manual_assignment_for_visits(
 # ===================== ИНФОРМАЦИОННЫЕ ЭНДПОИНТЫ =====================
 
 
-@router.get("/admin/morning-assignment/pending-visits")
+@router.get("/admin/morning-assignment/pending-visits", response_model=dict[str, Any])
 def get_pending_visits(
     target_date: str | None = Query(
         None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
@@ -169,7 +170,7 @@ def get_pending_visits(
         ) from e
 
 
-@router.get("/admin/morning-assignment/queue-summary")
+@router.get("/admin/morning-assignment/queue-summary", response_model=dict[str, Any])
 def get_queue_summary(
     target_date: str | None = Query(
         None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"

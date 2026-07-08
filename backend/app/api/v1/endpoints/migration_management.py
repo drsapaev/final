@@ -321,7 +321,7 @@ def cleanup_old_queue_data(
 # ===================== СТАТИСТИКА МИГРАЦИЙ =====================
 
 
-@router.get("/admin/migration/stats")
+@router.get("/admin/migration/stats", response_model=dict[str, Any])
 def get_migration_stats(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -342,7 +342,7 @@ def get_migration_stats(
 # ===================== ПРОВЕРКА МИГРАЦИЙ =====================
 
 
-@router.get("/admin/migration/health")
+@router.get("/admin/migration/health", response_model=dict[str, Any])
 def check_migration_health(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):

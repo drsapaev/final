@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from fastapi import (
     APIRouter,
@@ -224,7 +224,7 @@ async def get_file(
         raise_file_system_internal_error("get_file", e)
 
 
-@router.get("/{file_id}/download")
+@router.get("/{file_id}/download", response_model=dict[str, Any])
 async def download_file(
     file_id: int,
     db: Session = Depends(get_db),
@@ -251,7 +251,7 @@ async def download_file(
         raise_file_system_internal_error("download_file", e)
 
 
-@router.get("/{file_id}/preview")
+@router.get("/{file_id}/preview", response_model=dict[str, Any])
 async def preview_file(
     file_id: int,
     db: Session = Depends(get_db),
@@ -501,7 +501,7 @@ async def replace_file_content(
         raise_file_system_internal_error("replace_file_content", e)
 
 
-@router.delete("/{file_id}")
+@router.delete("/{file_id}", response_model=dict[str, Any])
 async def delete_file(
     request: Request,
     file_id: int,
@@ -691,7 +691,7 @@ async def import_files(
         raise_file_system_internal_error("import_files", e)
 
 
-@router.post("/cleanup")
+@router.post("/cleanup", response_model=dict[str, Any])
 async def cleanup_files(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):

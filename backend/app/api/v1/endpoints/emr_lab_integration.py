@@ -135,7 +135,7 @@ def _ensure_lab_result_notification_scope(
         raise HTTPException(status_code=403, detail="Access denied")
 
 
-@router.get("/patients/{patient_id}/lab-results")
+@router.get("/patients/{patient_id}/lab-results", response_model=Any)
 async def get_patient_lab_results(
     patient_id: int,
     date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
@@ -185,7 +185,7 @@ async def get_patient_lab_results(
         )
 
 
-@router.post("/emr/{emr_id}/integrate-lab-results")
+@router.post("/emr/{emr_id}/integrate-lab-results", response_model=Any)
 async def integrate_lab_results_with_emr(
     emr_id: int,
     lab_result_ids: list[int],
@@ -214,7 +214,7 @@ async def integrate_lab_results_with_emr(
         )
 
 
-@router.get("/patients/{patient_id}/abnormal-lab-results")
+@router.get("/patients/{patient_id}/abnormal-lab-results", response_model=Any)
 async def get_abnormal_lab_results(
     patient_id: int,
     days: int = Query(30, ge=1, le=365, description="Количество дней для поиска"),
@@ -252,7 +252,7 @@ async def get_abnormal_lab_results(
         )
 
 
-@router.get("/emr/{emr_id}/lab-summary")
+@router.get("/emr/{emr_id}/lab-summary", response_model=Any)
 async def get_lab_summary_for_emr(
     emr_id: int,
     patient_id: int,
@@ -275,7 +275,7 @@ async def get_lab_summary_for_emr(
         )
 
 
-@router.post("/lab-results/{result_id}/notify-doctor")
+@router.post("/lab-results/{result_id}/notify-doctor", response_model=Any)
 async def notify_doctor_about_lab_result(
     result_id: int,
     patient_id: int,
@@ -306,7 +306,7 @@ async def notify_doctor_about_lab_result(
         )
 
 
-@router.get("/lab-results/statistics", deprecated=True)
+@router.get("/lab-results/statistics", deprecated=True, response_model=Any)
 async def get_lab_results_statistics(
     date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
     date_to: str | None = Query(None, description="Дата окончания (YYYY-MM-DD)"),
@@ -324,7 +324,7 @@ async def get_lab_results_statistics(
         detail="This endpoint is deprecated. Use GET /lab/report-instances for real lab data.",
     )
 
-@router.get("/lab-results/trends")
+@router.get("/lab-results/trends", response_model=Any)
 async def get_lab_results_trends(
     patient_id: int,
     test_type: str = Query(..., description="Тип теста"),

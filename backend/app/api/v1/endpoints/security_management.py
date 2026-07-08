@@ -15,6 +15,7 @@ from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.confirmation_security import ConfirmationSecurityService
 
+from typing import Any
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,7 @@ def get_security_config(
 # ===================== ПРОВЕРКА ТОКЕНА =====================
 
 
-@router.get("/admin/security/validate-token/{token}")
+@router.get("/admin/security/validate-token/{token}", response_model=dict[str, Any])
 def validate_token_security(
     token: str,
     db: Session = Depends(get_db),
@@ -195,7 +196,7 @@ def validate_token_security(
 # ===================== ПРИНУДИТЕЛЬНАЯ ОЧИСТКА RATE LIMITS =====================
 
 
-@router.post("/admin/security/reset-rate-limits")
+@router.post("/admin/security/reset-rate-limits", response_model=dict[str, Any])
 def reset_rate_limits(
     target_type: str = Query(
         ..., pattern="^(ip|patient|all)$", description="Тип цели для сброса"
@@ -242,7 +243,7 @@ def reset_rate_limits(
 # ===================== БЛОКИРОВКА/РАЗБЛОКИРОВКА =====================
 
 
-@router.post("/admin/security/block-ip/{ip}")
+@router.post("/admin/security/block-ip/{ip}", response_model=dict[str, Any])
 def block_ip_address(
     ip: str,
     reason: str = Query(..., description="Причина блокировки"),
@@ -277,7 +278,7 @@ def block_ip_address(
         raise _security_management_http_error(e) from e
 
 
-@router.delete("/admin/security/block-ip/{ip}")
+@router.delete("/admin/security/block-ip/{ip}", response_model=dict[str, Any])
 def unblock_ip_address(
     ip: str,
     db: Session = Depends(get_db),

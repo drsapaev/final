@@ -6,6 +6,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import (
     APIRouter,
@@ -28,6 +29,7 @@ from app.crud.user_management import (
 )
 from app.db.session import get_db
 from app.models.user import User
+from app.schemas.misc_endpoints import UserPreferencesRequest
 from app.schemas.user_management import (
     UserAuditLogResponse,
     UserBulkActionRequest,
@@ -138,7 +140,7 @@ def _coerce_json_mapping(value, default=None):
 # IMPORTANT: These must be BEFORE /users/{user_id} routes!
 # ============================================
 
-@router.get("/me/preferences")
+@router.get("/me/preferences", response_model=dict[str, Any])
 async def get_current_user_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -214,9 +216,9 @@ async def get_current_user_preferences(
         }
 
 
-@router.put("/me/preferences")
+@router.put("/me/preferences", response_model=dict[str, Any])
 async def update_current_user_preferences(
-    preferences_data: dict,
+    preferences_data: UserPreferencesRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -227,7 +229,7 @@ async def update_current_user_preferences(
     try:
         return UserManagementApiService(db).update_current_user_preferences(
             current_user_id=current_user.id,
-            preferences_data=preferences_data,
+            preferences_data=preferences_data.model_dump(exclude_none=True),
         )
 
     except Exception as e:
@@ -358,7 +360,7 @@ async def update_user(
         )
 
 
-@router.delete("/users/{user_id}")
+@router.delete("/users/{user_id}", response_model=dict[str, Any])
 async def delete_user(
     user_id: int,
     transfer_to: int | None = Query(
@@ -949,8 +951,10 @@ async def export_users(
         )
 
 
-@router.get("/users/export/files")
-async def list_export_files(current_user: User = Depends(require_roles("Admin"))):
+@router.get("/users/export/files", response_model=dict[str, Any])
+async def list_export_files(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+current_user: User = Depends(require_roles("Admin"))):
     """Получить список файлов экспорта"""
     try:
         export_dir = USER_EXPORT_DIR
@@ -993,7 +997,7 @@ async def list_export_files(current_user: User = Depends(require_roles("Admin"))
         )
 
 
-@router.get("/users/export/download/{filename}")
+@router.get("/users/export/download/{filename}", response_model=dict[str, Any])
 async def download_export_file(
     filename: str, current_user: User = Depends(require_roles("Admin"))
 ):
@@ -1017,7 +1021,7 @@ async def download_export_file(
         )
 
 
-@router.delete("/users/export/files/{filename}")
+@router.delete("/users/export/files/{filename}", response_model=dict[str, Any])
 async def delete_export_file(
     filename: str, current_user: User = Depends(require_roles("Admin"))
 ):
@@ -1041,7 +1045,7 @@ async def delete_export_file(
         )
 
 
-@router.get("/users/health")
+@router.get("/users/health", response_model=dict[str, Any])
 async def user_management_health_check():
     """Проверка здоровья сервиса управления пользователями"""
     return {

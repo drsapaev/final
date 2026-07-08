@@ -1,5 +1,11 @@
 """
 Telegram Bot API endpoints
+
+P0-6 FIX (ENDPOINT-VALIDATION-AUDIT):
+Previously these endpoints accepted `notification_data: dict[str, Any]`,
+`reminder_data: dict[str, Any]`, `lab_data: dict[str, Any]`, and
+`webhook_data: dict[str, str]` with no validation. Replaced with typed
+Pydantic request models from app.schemas.notifications.
 """
 
 import hmac
@@ -17,6 +23,12 @@ from ....api.deps import get_db, require_roles
 from ....crud import telegram_config as crud_telegram
 from ....models.user import User
 from ....services.telegram.bot import telegram_bot
+from ....schemas.notifications import (
+    SendAppointmentReminderRequest,
+    SendLabNotificationRequest,
+    SendTelegramNotificationRequest,
+    SetWebhookRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +87,7 @@ def _validate_webhook_secret(request: Request, db: Session) -> None:
         )
 
 
-@router.post("/webhook")
+@router.post("/webhook", response_model=dict[str, Any])
 async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
     """Webhook для получения обновлений от Telegram"""
     try:
@@ -110,9 +122,9 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
         )
 
 
-@router.post("/set-webhook")
+@router.post("/set-webhook", response_model=dict[str, Any])
 async def set_telegram_webhook(
-    webhook_data: dict[str, str],
+    webhook_data: SetWebhookRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -121,9 +133,8 @@ async def set_telegram_webhook(
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
-        webhook_url = webhook_data.get("webhook_url")
-        if not webhook_url:
-            raise HTTPException(status_code=400, detail="webhook_url required")
+        webhook_url = webhook_data.webhook_url
+        # Validation (URL format) already done by Pydantic
 
         secret_token = secrets.token_urlsafe(32)
         success = await telegram_bot.setup_webhook(webhook_url, secret_token=secret_token)
@@ -160,7 +171,7 @@ async def set_telegram_webhook(
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.delete("/webhook")
+@router.delete("/webhook", response_model=dict[str, Any])
 async def remove_telegram_webhook(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -196,7 +207,7 @@ async def remove_telegram_webhook(
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.get("/info")
+@router.get("/info", response_model=dict[str, Any])
 async def get_bot_info(current_user: User = Depends(require_roles("Admin"))):
     """Получение информации о боте"""
     try:
@@ -241,9 +252,9 @@ async def get_bot_info(current_user: User = Depends(require_roles("Admin"))):
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.post("/send-notification")
+@router.post("/send-notification", response_model=dict[str, Any])
 async def send_telegram_notification(
-    notification_data: dict[str, Any],
+    notification_data: SendTelegramNotificationRequest,
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Отправка уведомления через Telegram бота"""
@@ -251,11 +262,9 @@ async def send_telegram_notification(
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
-        user_id = notification_data.get("user_id")
-        message = notification_data.get("message")
-
-        if not user_id or not message:
-            raise HTTPException(status_code=400, detail="user_id and message required")
+        user_id = notification_data.user_id
+        message = notification_data.message
+        # Validation already done by Pydantic
 
         success = await telegram_bot.send_notification(user_id, message)
 
@@ -276,9 +285,9 @@ async def send_telegram_notification(
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.post("/send-appointment-reminder")
+@router.post("/send-appointment-reminder", response_model=dict[str, Any])
 async def send_appointment_reminder(
-    reminder_data: dict[str, Any],
+    reminder_data: SendAppointmentReminderRequest,
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
     """Отправка напоминания о визите"""
@@ -286,13 +295,9 @@ async def send_appointment_reminder(
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
-        user_id = reminder_data.get("user_id")
-        appointment_data = reminder_data.get("appointment")
-
-        if not user_id or not appointment_data:
-            raise HTTPException(
-                status_code=400, detail="user_id and appointment data required"
-            )
+        user_id = reminder_data.user_id
+        appointment_data = reminder_data.appointment.model_dump(exclude_none=True)
+        # Validation already done by Pydantic
 
         await telegram_bot.send_appointment_reminder(user_id, appointment_data)
 
@@ -308,9 +313,9 @@ async def send_appointment_reminder(
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.post("/send-lab-notification")
+@router.post("/send-lab-notification", response_model=dict[str, Any])
 async def send_lab_results_notification(
-    lab_data: dict[str, Any],
+    lab_data: SendLabNotificationRequest,
     current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
 ):
     """Уведомление о готовности результатов анализов"""
@@ -318,13 +323,9 @@ async def send_lab_results_notification(
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
-        user_id = lab_data.get("user_id")
-        results_info = lab_data.get("results")
-
-        if not user_id or not results_info:
-            raise HTTPException(
-                status_code=400, detail="user_id and results data required"
-            )
+        user_id = lab_data.user_id
+        results_info = lab_data.results.model_dump(exclude_none=True)
+        # Validation already done by Pydantic
 
         await telegram_bot.send_lab_results_ready(user_id, results_info)
 
@@ -340,7 +341,7 @@ async def send_lab_results_notification(
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=dict[str, Any])
 async def get_telegram_stats(current_user: User = Depends(require_roles("Admin"))):
     """Статистика Telegram бота"""
     try:

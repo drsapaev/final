@@ -6,7 +6,7 @@ import logging
 import random
 import string
 from datetime import datetime, timedelta, UTC
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from fastapi import Request, APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -41,7 +41,7 @@ def raise_two_factor_sms_internal_error(
     )
 
 
-@router.post("/send-code")
+@router.post("/send-code", response_model=dict[str,)
 @limiter.limit("5/minute")  # P1-1: rate limit
 async def send_verification_code(request: Request, 
     method: str = Query(..., description="Метод отправки: sms или email"),
@@ -108,7 +108,7 @@ async def send_verification_code(request: Request,
         raise_two_factor_sms_internal_error("send-code", "Ошибка отправки кода", e)
 
 
-@router.post("/verify-code")
+@router.post("/verify-code", response_model=dict[str, Any])
 async def verify_verification_code(
     method: str = Query(..., description="Метод верификации: sms или email"),
     code: str = Query(..., description="Код подтверждения"),
@@ -150,7 +150,7 @@ async def verify_verification_code(
         raise_two_factor_sms_internal_error("verify-code", "Ошибка проверки кода", e)
 
 
-@router.get("/verification-status")
+@router.get("/verification-status", response_model=dict[str, Any])
 async def get_verification_status(
     method: str = Query(..., description="Метод: sms или email"),
     db: Session = Depends(get_db),
@@ -172,7 +172,7 @@ async def get_verification_status(
         )
 
 
-@router.post("/resend-code")
+@router.post("/resend-code", response_model=dict[str,)
 @limiter.limit("3/minute")  # P1-1: rate limit
 async def resend_verification_code(request: Request, 
     method: str = Query(..., description="Метод отправки: sms или email"),
@@ -252,7 +252,7 @@ async def resend_verification_code(request: Request,
         )
 
 
-@router.get("/supported-methods")
+@router.get("/supported-methods", response_model=dict[str, Any])
 async def get_supported_methods():
     """Получить список поддерживаемых методов 2FA"""
     return {
@@ -282,7 +282,7 @@ async def get_supported_methods():
     }
 
 
-@router.get("/security-logs")
+@router.get("/security-logs", response_model=dict[str, Any])
 async def get_security_logs(
     limit: int = Query(50, description="Количество записей"),
     offset: int = Query(0, description="Смещение"),
@@ -305,7 +305,7 @@ async def get_security_logs(
         )
 
 
-@router.get("/recovery-methods")
+@router.get("/recovery-methods", response_model=dict[str, Any])
 async def get_recovery_methods(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):

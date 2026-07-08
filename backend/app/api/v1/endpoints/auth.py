@@ -42,7 +42,7 @@ def _ensure_legacy_login_enabled() -> None:
         )
 
 
-@router.post("/login")
+@router.post("/login", response_model=Any)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)
 ) -> Any:

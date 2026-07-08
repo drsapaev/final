@@ -122,7 +122,7 @@ def update_branch(
     return branch
 
 
-@router.delete("/branches/{branch_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/branches/{branch_id}", status_code=status.HTTP_204_NO_CONTENT, )
 def delete_branch(
     *,
     db: Session = Depends(get_db),
@@ -238,7 +238,7 @@ def update_equipment(
     return equipment
 
 
-@router.delete("/equipment/{equipment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/equipment/{equipment_id}", status_code=status.HTTP_204_NO_CONTENT, )
 def delete_equipment(
     *,
     db: Session = Depends(get_db),
@@ -400,7 +400,7 @@ def update_license(
     return license
 
 
-@router.delete("/licenses/{license_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/licenses/{license_id}", status_code=status.HTTP_204_NO_CONTENT, )
 def delete_license(
     *,
     db: Session = Depends(get_db),
@@ -539,7 +539,7 @@ def update_backup(
     return backup
 
 
-@router.delete("/backups/{backup_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/backups/{backup_id}", status_code=status.HTTP_204_NO_CONTENT, )
 def delete_backup(
     *,
     db: Session = Depends(get_db),

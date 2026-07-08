@@ -13,6 +13,7 @@ from app.schemas.finance import (
     FinanceTransactionUpdate,
 )
 
+from typing import Any
 router = APIRouter()
 
 
@@ -117,7 +118,7 @@ def update_finance_transaction(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
 
-@router.delete("/admin/finance/transactions/{transaction_id}")
+@router.delete("/admin/finance/transactions/{transaction_id}", response_model=dict[str, Any])
 def delete_finance_transaction(
     transaction_id: int,
     db: Session = Depends(get_db),

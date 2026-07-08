@@ -1,7 +1,4 @@
-"""Admin Telegram helpers, constants, and utility functions.
-
-Split from admin_telegram.py (3343 LOC → modular).
-"""
+"""Admin Telegram helpers, constants, imports."""
 from __future__ import annotations
 
 """
@@ -1760,7 +1757,3 @@ def _validate_staff_action_target_binding(
         return "target_binding_mismatch"
     return None
 
-
-# ============================================================
-# === AI APPROVAL ENDPOINTS ===
-# ============================================================

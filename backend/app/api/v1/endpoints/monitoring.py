@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import require_roles
 
+from typing import Any
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def _monitoring_public_error(operation: str, exc: Exception) -> dict:
     return {"error": MONITORING_PUBLIC_ERROR}
 
 
-@router.get("/query-stats", dependencies=[Depends(require_roles(["Admin"]))])
+@router.get("/query-stats", dependencies=[Depends(require_roles(["Admin"]))], response_model=dict[str, Any])
 def get_query_stats():
     """
     Get database query statistics.
@@ -47,7 +48,7 @@ def get_query_stats():
         return _monitoring_public_error("get_query_stats", e)
 
 
-@router.get("/alerts", dependencies=[Depends(require_roles(["Admin"]))])
+@router.get("/alerts", dependencies=[Depends(require_roles(["Admin"]))], response_model=dict[str, Any])
 def get_alerts(hours: int = 24):
     """
     Get recent alerts.
@@ -80,7 +81,7 @@ def get_alerts(hours: int = 24):
         return _monitoring_public_error("get_alerts", e)
 
 
-@router.get("/missing-indexes", dependencies=[Depends(require_roles(["Admin"]))])
+@router.get("/missing-indexes", dependencies=[Depends(require_roles(["Admin"]))], response_model=dict[str, Any])
 def get_missing_indexes():
     """
     Check for missing recommended database indexes.
@@ -102,7 +103,7 @@ def get_missing_indexes():
         return _monitoring_public_error("get_missing_indexes", e)
 
 
-@router.post("/reset-query-stats", dependencies=[Depends(require_roles(["Admin"]))])
+@router.post("/reset-query-stats", dependencies=[Depends(require_roles(["Admin"]))], response_model=dict[str, Any])
 def reset_query_stats():
     """Reset query statistics"""
     try:

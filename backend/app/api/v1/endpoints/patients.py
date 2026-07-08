@@ -1,6 +1,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.api import deps
 from app.core.audit import log_critical_change
@@ -159,7 +160,7 @@ def update_patient(
     )
 
 
-@router.delete("/{patient_id}")
+@router.delete("/{patient_id}", response_model=dict[str, Any])
 def delete_patient(
     *,
     request: Request,
@@ -173,7 +174,7 @@ def delete_patient(
     )
 
 
-@router.get("/{patient_id}/appointments")
+@router.get("/{patient_id}/appointments", response_model=dict[str, Any])
 def get_patient_appointments(
     *,
     db: Session = Depends(deps.get_db),
@@ -195,7 +196,7 @@ def get_patient_appointments(
 # ===================== SOFT-DELETE ENDPOINTS =====================
 
 
-@router.delete("/{patient_id}/soft", status_code=status.HTTP_200_OK)
+@router.delete("/{patient_id}/soft", status_code=status.HTTP_200_OK, response_model=dict[str, Any])
 def soft_delete_patient(
     *,
     request: Request,
@@ -231,7 +232,7 @@ def soft_delete_patient(
     return {"message": "Пациент помечен как удалённый", "patient_id": patient_id}
 
 
-@router.post("/{patient_id}/restore", status_code=status.HTTP_200_OK)
+@router.post("/{patient_id}/restore", status_code=status.HTTP_200_OK, response_model=dict[str, Any])
 def restore_patient(
     *,
     request: Request,
@@ -269,7 +270,7 @@ def restore_patient(
 # ===================== FAMILY RELATIONS ENDPOINTS =====================
 
 
-@router.get("/{patient_id}/family")
+@router.get("/{patient_id}/family", response_model=dict[str, Any])
 def get_patient_family(
     *,
     db: Session = Depends(deps.get_db),
@@ -302,7 +303,7 @@ def get_patient_family(
     }
 
 
-@router.post("/{patient_id}/family", status_code=status.HTTP_201_CREATED)
+@router.post("/{patient_id}/family", status_code=status.HTTP_201_CREATED, response_model=dict[str, Any])
 def add_family_relation(
     *,
     request: Request,
@@ -350,7 +351,7 @@ def add_family_relation(
         raise HTTPException(status_code=400, detail="Internal server error")
 
 
-@router.delete("/{patient_id}/family/{relation_id}", status_code=status.HTTP_200_OK)
+@router.delete("/{patient_id}/family/{relation_id}", status_code=status.HTTP_200_OK, response_model=dict[str, Any])
 def remove_family_relation(
     *,
     db: Session = Depends(deps.get_db),
@@ -370,7 +371,7 @@ def remove_family_relation(
     return {"message": "Связь удалена", "relation_id": relation_id}
 
 
-@router.get("/{patient_id}/primary-contact")
+@router.get("/{patient_id}/primary-contact", response_model=dict[str, Any])
 def get_primary_contact(
     *,
     db: Session = Depends(deps.get_db),

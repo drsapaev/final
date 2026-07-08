@@ -635,7 +635,7 @@ def mark_appointment_paid(
     return paid_appointment
 
 
-@router.get("/{appointment_id}/status")
+@router.get("/{appointment_id}/status", response_model=dict[str, Any])
 def get_appointment_status(
     appointment_id: int,
     db: Session = Depends(deps.get_db),

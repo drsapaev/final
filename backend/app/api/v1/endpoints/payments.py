@@ -203,7 +203,9 @@ class ProvidersResponse(BaseModel):
 
 
 @router.get("/providers", response_model=ProvidersResponse)
-def get_available_providers(db: Session = Depends(get_db)) -> ProvidersResponse:
+def get_available_providers(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db)) -> ProvidersResponse:
     """Получение списка доступных провайдеров платежей"""
     service = PaymentReadService(db, get_payment_manager())
     try:
@@ -332,7 +334,7 @@ def get_visit_payments(
     return PaymentListResponse(**service.get_visit_payments(visit_id=visit_id))
 
 
-@router.post("/{payment_id}/cancel")
+@router.post("/{payment_id}/cancel", response_model=dict[str, Any])
 def cancel_payment(
     payment_id: int,
     db: Session = Depends(get_db),
@@ -378,7 +380,7 @@ def test_init_payment(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
-@router.get("/{payment_id}/receipt")
+@router.get("/{payment_id}/receipt", response_model=dict[str, Any])
 def generate_receipt(
     payment_id: int,
     format_type: str = "pdf",
@@ -399,7 +401,7 @@ def generate_receipt(
         )
 
 
-@router.get("/{payment_id}/receipt/download")
+@router.get("/{payment_id}/receipt/download", response_model=dict[str, Any])
 def download_receipt(
     payment_id: int,
     db: Session = Depends(get_db),

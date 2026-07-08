@@ -7,12 +7,17 @@ AI Gateway Endpoints - Унифицированный API для всех AI о�
 - RBAC через permissions
 - Rate limiting
 - Аудит
-"""
 
-from typing import Any
+P0-5 FIX (ENDPOINT-VALIDATION-AUDIT):
+Previously these endpoints accepted `request: dict[str, Any]` with no
+validation, allowing prompt injection, mass-assignment, and schema drift.
+Replaced with typed Pydantic request models from app.schemas.ai_gateway.
+Each model enforces field types, length limits, and enum constraints.
+"""
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.api.deps import get_db
 from app.core.rbac import (
@@ -21,6 +26,17 @@ from app.core.rbac import (
     require_any_ai_permission,
 )
 from app.models.user import User
+from app.schemas.ai_gateway import (
+    AnalyzeComplaintsRequest,
+    AnalyzeDocumentRequest,
+    AnalyzeECGRequest,
+    AnalyzeSkinRequest,
+    DifferentialDiagnosisRequest,
+    DrugInteractionRequest,
+    InterpretLabRequest,
+    SuggestICD10Request,
+    SymptomCheckRequest,
+)
 from app.services.ai import (
     AIResponse,
     AITaskType,
@@ -37,7 +53,7 @@ router = APIRouter()
 
 @router.post("/analyze-complaints", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def analyze_complaints(
-    request: dict[str, Any],
+    request: AnalyzeComplaintsRequest,
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
     db: Session = Depends(get_db)
 ):
@@ -58,9 +74,9 @@ async def analyze_complaints(
 
     response = await gateway.execute(
         task_type=AITaskType.COMPLAINT_ANALYSIS,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id,
-        specialty=request.get("specialty")
+        specialty=request.specialty
     )
 
     return response
@@ -68,7 +84,7 @@ async def analyze_complaints(
 
 @router.post("/suggest-icd10", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_icd10_suggestion"))])
 async def suggest_icd10(
-    request: dict[str, Any],
+    request: SuggestICD10Request,
     current_user: User = Depends(require_ai_permission(AIPermission.SUGGEST_ICD10)),
     db: Session = Depends(get_db)
 ):
@@ -87,7 +103,7 @@ async def suggest_icd10(
 
     response = await gateway.execute(
         task_type=AITaskType.ICD10_SUGGESTION,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id
     )
 
@@ -96,7 +112,7 @@ async def suggest_icd10(
 
 @router.post("/differential-diagnosis", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def differential_diagnosis(
-    request: dict[str, Any],
+    request: DifferentialDiagnosisRequest,
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
     db: Session = Depends(get_db)
 ):
@@ -116,7 +132,7 @@ async def differential_diagnosis(
 
     response = await gateway.execute(
         task_type=AITaskType.DIFFERENTIAL_DIAGNOSIS,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id
     )
 
@@ -129,7 +145,7 @@ async def differential_diagnosis(
 
 @router.post("/interpret-lab", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def interpret_lab_results(
-    request: dict[str, Any],
+    request: InterpretLabRequest,
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_LAB)),
     db: Session = Depends(get_db)
 ):
@@ -152,7 +168,7 @@ async def interpret_lab_results(
 
     response = await gateway.execute(
         task_type=AITaskType.LAB_INTERPRETATION,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id
     )
 
@@ -165,7 +181,7 @@ async def interpret_lab_results(
 
 @router.post("/analyze-skin", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def analyze_skin(
-    request: dict[str, Any],
+    request: AnalyzeSkinRequest,
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_IMAGE)),
     db: Session = Depends(get_db)
 ):
@@ -188,7 +204,7 @@ async def analyze_skin(
 
     response = await gateway.execute(
         task_type=AITaskType.SKIN_ANALYSIS,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id,
         specialty="dermatology"
     )
@@ -198,7 +214,7 @@ async def analyze_skin(
 
 @router.post("/analyze-ecg", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def analyze_ecg(
-    request: dict[str, Any],
+    request: AnalyzeECGRequest,
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_IMAGE)),
     db: Session = Depends(get_db)
 ):
@@ -222,7 +238,7 @@ async def analyze_ecg(
 
     response = await gateway.execute(
         task_type=AITaskType.ECG_INTERPRETATION,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id,
         specialty="cardiology"
     )
@@ -236,7 +252,7 @@ async def analyze_ecg(
 
 @router.post("/symptom-check", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def symptom_check(
-    request: dict[str, Any],
+    request: SymptomCheckRequest,
     current_user: User = Depends(require_ai_permission(AIPermission.SYMPTOM_CHECK)),
     db: Session = Depends(get_db)
 ):
@@ -259,7 +275,7 @@ async def symptom_check(
 
     response = await gateway.execute(
         task_type=AITaskType.SYMPTOM_CHECK,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id
     )
 
@@ -278,7 +294,7 @@ async def symptom_check(
 
 @router.post("/analyze-document", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def analyze_document(
-    request: dict[str, Any],
+    request: AnalyzeDocumentRequest,
     current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_DOCUMENT)),
     db: Session = Depends(get_db)
 ):
@@ -297,7 +313,7 @@ async def analyze_document(
 
     response = await gateway.execute(
         task_type=AITaskType.DOCUMENT_ANALYSIS,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id
     )
 
@@ -310,7 +326,7 @@ async def analyze_document(
 
 @router.post("/drug-interaction", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
 async def check_drug_interaction(
-    request: dict[str, Any],
+    request: DrugInteractionRequest,
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
     db: Session = Depends(get_db)
 ):
@@ -328,7 +344,7 @@ async def check_drug_interaction(
 
     response = await gateway.execute(
         task_type=AITaskType.DRUG_INTERACTION,
-        payload=request,
+        payload=request.model_dump(exclude_none=True),
         user_id=current_user.id
     )
 
@@ -339,7 +355,7 @@ async def check_drug_interaction(
 # HEALTH & ADMIN ENDPOINTS
 # =============================================================================
 
-@router.get("/health")
+@router.get("/health", response_model=dict[str, Any])
 async def ai_health_check(
     current_user: User = Depends(require_any_ai_permission(
         AIPermission.ADMIN_AI, AIPermission.VIEW_STATS
@@ -354,7 +370,7 @@ async def ai_health_check(
     return await gateway.health_check()
 
 
-@router.get("/rate-limit-status")
+@router.get("/rate-limit-status", response_model=dict[str, Any])
 async def get_rate_limit_status(
     current_user: User = Depends(require_ai_permission(AIPermission.DIAGNOSE)),
     db: Session = Depends(get_db)
@@ -368,7 +384,7 @@ async def get_rate_limit_status(
     return limiter.get_user_usage(current_user.id)
 
 
-@router.post("/admin/reset-circuit-breaker")
+@router.post("/admin/reset-circuit-breaker", response_model=dict[str, Any])
 async def reset_circuit_breaker(
     provider: str = Query(..., description="Provider name (openai, gemini, deepseek)"),
     current_user: User = Depends(require_ai_permission(AIPermission.ADMIN_AI)),
@@ -390,7 +406,7 @@ async def reset_circuit_breaker(
     }
 
 
-@router.post("/admin/clear-cache")
+@router.post("/admin/clear-cache", response_model=dict[str, Any])
 async def clear_ai_cache(
     current_user: User = Depends(require_ai_permission(AIPermission.ADMIN_AI)),
     db: Session = Depends(get_db)

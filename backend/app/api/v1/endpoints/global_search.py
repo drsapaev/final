@@ -14,6 +14,7 @@ from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.global_search_api_service import GlobalSearchApiService
 
+from typing import Any
 router = APIRouter(tags=["search"])
 
 GLOBAL_SEARCH_ROLES = (
@@ -125,7 +126,7 @@ class LogClickRequest(BaseModel):
     query: str
 
 
-@router.post("/global-search/log-click")
+@router.post("/global-search/log-click", response_model=dict[str, Any])
 async def log_search_click(
     request: LogClickRequest,
     db: Session = Depends(get_db),

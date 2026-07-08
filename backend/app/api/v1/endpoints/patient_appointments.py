@@ -15,15 +15,14 @@ from app.models.appointment import Appointment
 from app.models.user import User
 from app.services.patient_appointments_api_service import PatientAppointmentsApiService
 
+from typing import Any
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/patient", tags=["patient"])
 
 
-# ============================================================================
-# Schemas
-# ============================================================================
-
+# =====================================================================# Schemas
+# =====================================================================
 class PatientAppointmentResponse(BaseModel):
     """Ответ с информацией о записи для пациента"""
     id: int
@@ -68,10 +67,8 @@ class AvailableSlotResponse(BaseModel):
     doctor_name: str
 
 
-# ============================================================================
-# Helper functions
-# ============================================================================
-
+# =====================================================================# Helper functions
+# =====================================================================
 
 def can_modify_appointment(appointment: Appointment, min_hours: int = 24) -> tuple[bool, float]:
     """
@@ -123,10 +120,8 @@ def extract_department_value(appointment: Appointment) -> str | None:
     return getattr(department, "key", None) or getattr(department, "name_ru", None)
 
 
-# ============================================================================
-# Endpoints
-# ============================================================================
-
+# =====================================================================# Endpoints
+# =====================================================================
 @router.get("/appointments", response_model=list[PatientAppointmentResponse])
 async def get_my_appointments(
     db: Session = Depends(deps.get_db),
@@ -225,6 +220,7 @@ async def get_my_appointment(
 
 
 @router.post("/appointments/{appointment_id}/cancel")
+@router.post("/appointments/{appointment_id}/cancel", response_model=dict[str, Any])
 async def cancel_my_appointment(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
@@ -361,6 +357,8 @@ async def get_available_slots(
     appointment_id: int,
     date_from: str = Query(..., description="Начальная дата YYYY-MM-DD"),
     date_to: str | None = Query(None, description="Конечная дата YYYY-MM-DD"),
+    limit: int = Query(default=100, ge=1, le=500, description="Макс. слотов"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
@@ -433,4 +431,4 @@ async def get_my_results(
             file_url=None
         ))
 
-    return results
+    return results[offset:offset + limit] if isinstance(results, list) else results

@@ -318,8 +318,9 @@ def _row_to_out(r) -> ServiceOut:
     response_model=list[ServiceCategoryOut],
     summary="Список категорий услуг",
 )
-async def list_service_categories(
-    db: Session = Depends(get_db),
+async def list_service_categories(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
+db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
     active: bool | None = Query(default=None),
 ):
@@ -367,7 +368,7 @@ async def update_service_category(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.delete("/categories/{category_id}", summary="Удалить категорию услуг")
+@router.delete("/categories/{category_id}", summary="Удалить категорию услуг", response_model=dict[str, Any])
 async def delete_service_category(
     category_id: int,
     db: Session = Depends(get_db),
@@ -649,7 +650,7 @@ async def update_service(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.delete("/{service_id}", summary="Удалить услугу")
+@router.delete("/{service_id}", summary="Удалить услугу", response_model=dict[str, Any])
 async def delete_service(
     service_id: int,
     db: Session = Depends(get_db),
@@ -681,9 +682,12 @@ class DoctorOut(BaseModel):
 )
 async def list_doctors_temp(
     db: Session = Depends(get_db),
+    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+    offset: int = Query(default=0, ge=0, description="Смещение"),
 ):
     """Delegate temporary doctor listing to the service layer."""
-    return ServicesApiService(db).list_doctors_temp()
+    # P1 FIX: cap results to prevent unbounded response
+    return ServicesApiService(db).list_doctors_temp()[offset:offset + limit]
 
 
 # ==================== ИСТОРИЯ ИЗМЕНЕНИЙ УСЛУГ (AUDIT LOG) ====================

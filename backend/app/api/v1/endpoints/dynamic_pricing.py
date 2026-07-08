@@ -253,7 +253,7 @@ def update_pricing_rule(
         _raise_dynamic_pricing_internal_error("update_pricing_rule", e)
 
 
-@router.delete("/pricing-rules/{rule_id}")
+@router.delete("/pricing-rules/{rule_id}", response_model=dict[str, Any])
 def delete_pricing_rule(
     rule_id: int,
     db: Session = Depends(deps.get_db),
@@ -270,7 +270,7 @@ def delete_pricing_rule(
         _raise_dynamic_pricing_internal_error("delete_pricing_rule", e)
 
 
-@router.post("/calculate-price")
+@router.post("/calculate-price", response_model=dict[str, Any])
 def calculate_price(
     request: PriceCalculationRequest,
     db: Session = Depends(deps.get_db),
@@ -358,7 +358,7 @@ def update_service_package(
         _raise_dynamic_pricing_internal_error("update_service_package", e)
 
 
-@router.delete("/service-packages/{package_id}")
+@router.delete("/service-packages/{package_id}", response_model=dict[str, Any])
 def delete_service_package(
     package_id: int,
     db: Session = Depends(deps.get_db),
@@ -375,7 +375,7 @@ def delete_service_package(
         _raise_dynamic_pricing_internal_error("delete_service_package", e)
 
 
-@router.post("/purchase-package")
+@router.post("/purchase-package", response_model=dict[str, Any])
 def purchase_package(
     request: PackagePurchaseRequest,
     db: Session = Depends(deps.get_db),
@@ -406,7 +406,7 @@ def purchase_package(
         _raise_dynamic_pricing_internal_error("purchase_package", e)
 
 
-@router.post("/update-dynamic-prices")
+@router.post("/update-dynamic-prices", response_model=dict[str, Any])
 def update_dynamic_prices(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin")),
@@ -419,7 +419,7 @@ def update_dynamic_prices(
         _raise_dynamic_pricing_internal_error("update_dynamic_prices", e)
 
 
-@router.get("/pricing-analytics")
+@router.get("/pricing-analytics", response_model=dict[str, Any])
 def get_pricing_analytics(
     start_date: datetime | None = Query(None),
     end_date: datetime | None = Query(None),
@@ -434,7 +434,7 @@ def get_pricing_analytics(
         _raise_dynamic_pricing_internal_error("get_pricing_analytics", e)
 
 
-@router.get("/price-history/{service_id}")
+@router.get("/price-history/{service_id}", response_model=dict[str, Any])
 def get_price_history(
     service_id: int,
     skip: int = Query(0, ge=0),

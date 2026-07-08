@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
+from app.schemas.notifications import UpdateTelegramSettingsRequest
 
 @router.get("/telegram/settings")
 def get_telegram_settings(
@@ -43,24 +44,25 @@ def get_telegram_settings(
 
 @router.put("/telegram/settings")
 def update_telegram_settings(
-    settings: dict[str, Any],
+    settings: UpdateTelegramSettingsRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить настройки Telegram"""
     try:
+        # P0-6 FIX: Pydantic model validates + types all fields.
         # TG-AUDIT-28 P0-5: фильтруем masked bot_token placeholder.
         # GET /telegram/settings возвращает bot_token как "***скрыт***";
         # фронтенд отправляет его обратно при Save; без фильтра backend
         # записал бы masked значение в DB → бот ломается.
-        if settings and isinstance(settings, dict):
-            bt = settings.get("bot_token")
-            if bt and isinstance(bt, str) and "***" in bt:
-                settings = {k: v for k, v in settings.items() if k != "bot_token"}
+        settings_dict = settings.model_dump(exclude_none=True)
+        bt = settings_dict.get("bot_token")
+        if bt and isinstance(bt, str) and "***" in bt:
+            settings_dict = {k: v for k, v in settings_dict.items() if k != "bot_token"}
 
         # Обновляем настройки в категории "telegram"
         updated_settings = crud_clinic.update_settings_batch(
-            db, "telegram", settings, current_user.id
+            db, "telegram", settings_dict, current_user.id
         )
 
         return {
@@ -605,7 +607,3 @@ def get_telegram_integration_status(
             e,
         )
 
-
-# ============================================================
-# === TEMPLATES & MESSAGING ENDPOINTS ===
-# ============================================================

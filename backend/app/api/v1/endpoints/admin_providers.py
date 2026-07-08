@@ -1,5 +1,6 @@
 # app/api/v1/endpoints/admin_providers.py
 from __future__ import annotations
+from typing import Any
 
 import logging
 
@@ -153,7 +154,7 @@ def update_existing_provider(
         raise _admin_providers_http_error(e) from e
 
 
-@router.delete("/admin/providers/{provider_id}", summary="Удаление провайдера")
+@router.delete("/admin/providers/{provider_id}", summary="Удаление провайдера", response_model=dict[str, Any])
 def delete_existing_provider(
     provider_id: int,
     db: Session = Depends(get_db),
@@ -187,7 +188,8 @@ def delete_existing_provider(
 
 
 @router.get(
-    "/admin/providers/{provider_id}/test", summary="Тест подключения к провайдеру"
+    "/admin/providers/{provider_id}/test", summary="Тест подключения к провайдеру",
+    response_model=dict[str, Any],
 )
 def test_provider_connection(
     provider_id: int,
@@ -223,7 +225,7 @@ def test_provider_connection(
         raise _admin_providers_http_error(e) from e
 
 
-@router.get("/admin/providers/{provider_id}/stats", summary="Статистика провайдера")
+@router.get("/admin/providers/{provider_id}/stats", summary="Статистика провайдера", response_model=dict[str, Any])
 def get_provider_stats(
     provider_id: int,
     db: Session = Depends(get_db),
@@ -261,7 +263,7 @@ def get_provider_stats(
         raise _admin_providers_http_error(e) from e
 
 
-@router.post("/admin/providers/bulk-update", summary="Массовое обновление провайдеров")
+@router.post("/admin/providers/bulk-update", summary="Массовое обновление провайдеров", response_model=dict[str, Any])
 def bulk_update_providers(
     updates: list[dict],  # Список обновлений: [{"id": 1, "updates": {...}}, ...]
     db: Session = Depends(get_db),

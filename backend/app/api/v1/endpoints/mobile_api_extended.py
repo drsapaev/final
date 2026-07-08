@@ -3,6 +3,7 @@
 """
 
 from datetime import date, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
@@ -126,7 +127,7 @@ class NotificationSettingsRequest(BaseModel):
 # ==================== ВРАЧИ И УСЛУГИ ====================
 
 
-@router.post("/doctors/search")
+@router.post("/doctors/search", response_model=dict[str, Any])
 async def search_doctors(
     request: DoctorSearchRequest,
     current_user: User = Depends(get_current_user),
@@ -176,7 +177,7 @@ async def search_doctors(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/doctors/{doctor_id}/schedule")
+@router.get("/doctors/{doctor_id}/schedule", response_model=dict[str, Any])
 async def get_doctor_schedule(
     doctor_id: int,
     date_from: str = Query(..., description="Дата начала в формате YYYY-MM-DD"),
@@ -201,7 +202,7 @@ async def get_doctor_schedule(
         )
 
 
-@router.post("/services/search")
+@router.post("/services/search", response_model=dict[str, Any])
 async def search_services(
     request: ServiceSearchRequest,
     current_user: User = Depends(get_current_user),
@@ -242,7 +243,7 @@ async def search_services(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/services/categories")
+@router.get("/services/categories", response_model=dict[str, Any])
 async def get_service_categories(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -278,7 +279,7 @@ async def get_service_categories(
 # ==================== ОЧЕРЕДИ ====================
 
 
-@router.get("/queues/status")
+@router.get("/queues/status", response_model=dict[str, Any])
 async def get_queues_status(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -315,7 +316,7 @@ async def get_queues_status(
         )
 
 
-@router.get("/queues/my-position")
+@router.get("/queues/my-position", response_model=dict[str, Any])
 async def get_my_queue_position(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -361,7 +362,7 @@ async def get_my_queue_position(
 # ==================== УПРАВЛЕНИЕ ЗАПИСЯМИ ====================
 
 
-@router.post("/appointments/cancel")
+@router.post("/appointments/cancel", response_model=dict[str, Any])
 async def cancel_appointment(
     request: AppointmentCancelRequest,
     current_user: User = Depends(get_current_user),
@@ -414,7 +415,7 @@ async def cancel_appointment(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/appointments/reschedule")
+@router.post("/appointments/reschedule", response_model=dict[str, Any])
 async def reschedule_appointment(
     request: AppointmentRescheduleRequest,
     current_user: User = Depends(get_current_user),
@@ -484,7 +485,7 @@ async def reschedule_appointment(
 # ==================== ОБРАТНАЯ СВЯЗЬ ====================
 
 
-@router.post("/feedback")
+@router.post("/feedback", response_model=dict[str, Any])
 async def submit_feedback(
     request: FeedbackRequest,
     current_user: User = Depends(get_current_user),
@@ -538,7 +539,7 @@ ID: #{feedback.id}"""
 # ==================== ЭКСТРЕННАЯ ПОМОЩЬ ====================
 
 
-@router.post("/emergency/contact")
+@router.post("/emergency/contact", response_model=dict[str, Any])
 async def emergency_contact(
     request: EmergencyContactRequest,
     current_user: User = Depends(get_current_user),
@@ -607,7 +608,7 @@ ID: #{emergency.id}"""
 # ==================== ПРОФИЛЬ И НАСТРОЙКИ ====================
 
 
-@router.put("/profile")
+@router.put("/profile", response_model=dict[str, Any])
 async def update_profile(
     request: ProfileUpdateRequest,
     current_user: User = Depends(get_current_user),
@@ -666,7 +667,7 @@ async def update_profile(
         )
 
 
-@router.post("/profile/avatar")
+@router.post("/profile/avatar", response_model=dict[str, Any])
 async def upload_avatar(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
@@ -713,7 +714,7 @@ async def upload_avatar(
         )
 
 
-@router.put("/settings/notifications")
+@router.put("/settings/notifications", response_model=dict[str, Any])
 async def update_notification_settings(
     request: NotificationSettingsRequest,
     current_user: User = Depends(get_current_user),
@@ -747,7 +748,7 @@ async def update_notification_settings(
         )
 
 
-@router.get("/settings/notifications")
+@router.get("/settings/notifications", response_model=dict[str, Any])
 async def get_notification_settings(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -773,7 +774,7 @@ async def get_notification_settings(
 # ==================== ДОПОЛНИТЕЛЬНЫЕ ENDPOINTS ====================
 
 
-@router.get("/clinic/info")
+@router.get("/clinic/info", response_model=dict[str, Any])
 async def get_clinic_info(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -814,7 +815,7 @@ async def get_clinic_info(
         )
 
 
-@router.get("/version")
+@router.get("/version", response_model=dict[str, Any])
 async def get_api_version():
     """Версия мобильного API"""
     return {

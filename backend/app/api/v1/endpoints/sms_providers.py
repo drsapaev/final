@@ -3,7 +3,7 @@ API endpoints для управления SMS провайдерами
 """
 
 import logging
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from app.core.rate_limiter import limiter
 from fastapi import APIRouter, Request, Depends, HTTPException, status
@@ -122,7 +122,7 @@ async def get_sms_providers(current_user: User = Depends(require_roles(["Admin"]
         _raise_sms_provider_internal_error("get_sms_providers", exc)
 
 
-@router.get("/balance/{provider}")
+@router.get("/balance/{provider}", response_model=dict[str, Any])
 async def get_provider_balance(
     provider: str, current_user: User = Depends(require_roles(["Admin"]))
 ):
@@ -148,7 +148,7 @@ async def get_provider_balance(
         _raise_sms_provider_internal_error("get_provider_balance", exc)
 
 
-@router.post("/test")
+@router.post("/test", response_model=dict[str, Any])
 @limiter.limit("10/minute")
 async def test_sms_sending(request: Request,
     request_data: SMSTestRequest, current_user: User = Depends(require_roles(["Admin"]))
@@ -187,7 +187,7 @@ async def test_sms_sending(request: Request,
         _raise_sms_provider_internal_error("test_sms_sending", exc)
 
 
-@router.post("/send-2fa-code")
+@router.post("/send-2fa-code", response_model=dict[str, Any])
 async def send_2fa_code(
     phone: str,
     code: str,
@@ -228,7 +228,7 @@ async def send_2fa_code(
         _raise_sms_provider_internal_error("send_2fa_code", exc)
 
 
-@router.get("/status/{message_id}")
+@router.get("/status/{message_id}", response_model=dict[str, Any])
 async def get_message_status(
     message_id: str,
     provider: str,

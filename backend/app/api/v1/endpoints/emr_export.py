@@ -1,15 +1,27 @@
 """
 API endpoints для экспорта и импорта EMR данных
+
+P0-7 FIX (ENDPOINT-VALIDATION-AUDIT):
+Previously these endpoints accepted `emr_data: dict`, `json_data: dict`,
+and `data: dict` with no validation, allowing PHI schema drift, memory
+abuse via oversized payloads, and potential deserialization attacks.
+Replaced with typed Pydantic request models from app.schemas.emr_export
+that enforce required core fields, size caps, and reject dangerous keys.
 """
 
 import logging
-from typing import NoReturn
+from typing import NoReturn, Any
 
 from app.core.rate_limiter import limiter
 from fastapi import Request, APIRouter, Depends, HTTPException, Query, Response
 
 from app.api.deps import get_current_user, require_roles
 from app.models.user import User
+from app.schemas.emr_export import (
+    EMRExportDataRequest,
+    EMRImportJsonRequest,
+    EMRValidateDataRequest,
+)
 from app.services.emr_export_service import EMRExportService
 
 # EMR-AUDIT-28 P0-4: весь роутер требует Admin/Doctor role.
@@ -31,7 +43,7 @@ def _raise_emr_export_internal_error(operation: str, exc: Exception) -> NoReturn
     raise HTTPException(status_code=500, detail=EMR_EXPORT_PUBLIC_ERROR) from exc
 
 
-@router.get("/formats")
+@router.get("/formats", response_model=dict[str, Any])
 async def get_export_formats(current_user: User = Depends(get_current_user)):
     """Получить список поддерживаемых форматов экспорта"""
     try:
@@ -47,7 +59,7 @@ async def get_export_formats(current_user: User = Depends(get_current_user)):
         _raise_emr_export_internal_error("get_export_formats", e)
 
 
-@router.get("/formats/import")
+@router.get("/formats/import", response_model=dict[str, Any])
 async def get_import_formats(current_user: User = Depends(get_current_user)):
     """Получить список поддерживаемых форматов импорта"""
     try:
@@ -63,10 +75,10 @@ async def get_import_formats(current_user: User = Depends(get_current_user)):
         _raise_emr_export_internal_error("get_import_formats", e)
 
 
-@router.post("/export/json")
+@router.post("/export/json", response_model=dict[str, Any])
 @limiter.limit("5/minute")  # P1-1: rate limit (export)
-async def export_emr_to_json(request: Request, 
-    emr_data: dict,
+async def export_emr_to_json(request: Request,
+    body: EMRExportDataRequest,
     include_versions: bool = Query(False, description="Включить версии EMR"),
     include_templates: bool = Query(False, description="Включить шаблоны"),
     include_attachments: bool = Query(False, description="Включить вложения"),
@@ -77,7 +89,7 @@ async def export_emr_to_json(request: Request,
         export_service = EMRExportService()
 
         json_data = await export_service.export_emr_to_json(
-            emr_data=emr_data,
+            emr_data=body.model_dump(exclude_none=True),
             include_versions=include_versions,
             include_templates=include_templates,
             include_attachments=include_attachments,
@@ -92,9 +104,9 @@ async def export_emr_to_json(request: Request,
         _raise_emr_export_internal_error("export_emr_to_json", e)
 
 
-@router.post("/export/xml")
+@router.post("/export/xml", response_model=dict[str, Any])
 async def export_emr_to_xml(
-    emr_data: dict,
+    body: EMRExportDataRequest,
     include_versions: bool = Query(False, description="Включить версии EMR"),
     current_user: User = Depends(get_current_user),
 ):
@@ -103,7 +115,8 @@ async def export_emr_to_xml(
         export_service = EMRExportService()
 
         xml_data = await export_service.export_emr_to_xml(
-            emr_data=emr_data, include_versions=include_versions
+            emr_data=body.model_dump(exclude_none=True),
+            include_versions=include_versions,
         )
 
         return Response(
@@ -115,9 +128,9 @@ async def export_emr_to_xml(
         _raise_emr_export_internal_error("export_emr_to_xml", e)
 
 
-@router.post("/export/csv")
+@router.post("/export/csv", response_model=dict[str, Any])
 async def export_emr_to_csv(
-    emr_data: dict,
+    body: EMRExportDataRequest,
     fields: list[str] | None = Query(None, description="Поля для экспорта"),
     current_user: User = Depends(get_current_user),
 ):
@@ -126,7 +139,8 @@ async def export_emr_to_csv(
         export_service = EMRExportService()
 
         csv_data = await export_service.export_emr_to_csv(
-            emr_data=emr_data, fields=fields
+            emr_data=body.model_dump(exclude_none=True),
+            fields=fields,
         )
 
         return Response(
@@ -138,9 +152,9 @@ async def export_emr_to_csv(
         _raise_emr_export_internal_error("export_emr_to_csv", e)
 
 
-@router.post("/export/zip")
+@router.post("/export/zip", response_model=dict[str, Any])
 async def export_emr_to_zip(
-    emr_data: dict,
+    body: EMRExportDataRequest,
     include_attachments: bool = Query(True, description="Включить вложения"),
     current_user: User = Depends(get_current_user),
 ):
@@ -149,7 +163,8 @@ async def export_emr_to_zip(
         export_service = EMRExportService()
 
         zip_data = await export_service.export_emr_to_zip(
-            emr_data=emr_data, include_attachments=include_attachments
+            emr_data=body.model_dump(exclude_none=True),
+            include_attachments=include_attachments,
         )
 
         return Response(
@@ -161,15 +176,18 @@ async def export_emr_to_zip(
         _raise_emr_export_internal_error("export_emr_to_zip", e)
 
 
-@router.post("/import/json")
+@router.post("/import/json", response_model=dict[str, Any])
 async def import_emr_from_json(
-    json_data: dict, current_user: User = Depends(get_current_user)
+    body: EMRImportJsonRequest,
+    current_user: User = Depends(get_current_user),
 ):
     """Импорт EMR из JSON формата"""
     try:
         export_service = EMRExportService()
 
-        emr_data = await export_service.import_emr_from_json(json_data)
+        emr_data = await export_service.import_emr_from_json(
+            body.model_dump(exclude_none=True)
+        )
 
         return {
             "success": True,
@@ -180,7 +198,7 @@ async def import_emr_from_json(
         _raise_emr_export_internal_error("import_emr_from_json", e)
 
 
-@router.post("/import/xml")
+@router.post("/import/xml", response_model=dict[str, Any])
 async def import_emr_from_xml(
     xml_data: str, current_user: User = Depends(get_current_user)
 ):
@@ -199,7 +217,7 @@ async def import_emr_from_xml(
         _raise_emr_export_internal_error("import_emr_from_xml", e)
 
 
-@router.post("/import/zip")
+@router.post("/import/zip", response_model=dict[str, Any])
 async def import_emr_from_zip(
     zip_data: bytes, current_user: User = Depends(get_current_user)
 ):
@@ -218,9 +236,9 @@ async def import_emr_from_zip(
         _raise_emr_export_internal_error("import_emr_from_zip", e)
 
 
-@router.post("/validate")
+@router.post("/validate", response_model=dict[str, Any])
 async def validate_import_data(
-    data: dict,
+    body: EMRValidateDataRequest,
     format_type: str = Query("json", description="Тип формата данных"),
     current_user: User = Depends(get_current_user),
 ):
@@ -229,7 +247,8 @@ async def validate_import_data(
         export_service = EMRExportService()
 
         validation_result = await export_service.validate_import_data(
-            data=data, format_type=format_type
+            data=body.model_dump(exclude_none=True),
+            format_type=format_type,
         )
 
         return {
@@ -241,9 +260,9 @@ async def validate_import_data(
         _raise_emr_export_internal_error("validate_import_data", e)
 
 
-@router.post("/estimate-size")
+@router.post("/estimate-size", response_model=dict[str, Any])
 async def estimate_export_size(
-    emr_data: dict,
+    body: EMRExportDataRequest,
     format_type: str = Query("json", description="Тип формата экспорта"),
     current_user: User = Depends(get_current_user),
 ):
@@ -252,7 +271,8 @@ async def estimate_export_size(
         export_service = EMRExportService()
 
         size_info = await export_service.estimate_export_size(
-            emr_data=emr_data, format_type=format_type
+            emr_data=body.model_dump(exclude_none=True),
+            format_type=format_type,
         )
 
         return {
@@ -264,7 +284,7 @@ async def estimate_export_size(
         _raise_emr_export_internal_error("estimate_export_size", e)
 
 
-@router.get("/templates/export")
+@router.get("/templates/export", response_model=dict[str, Any])
 async def get_export_templates(current_user: User = Depends(get_current_user)):
     """Получить шаблоны для экспорта EMR"""
     try:
@@ -316,7 +336,7 @@ async def get_export_templates(current_user: User = Depends(get_current_user)):
         _raise_emr_export_internal_error("get_export_templates", e)
 
 
-@router.get("/statistics")
+@router.get("/statistics", response_model=dict[str, Any])
 async def get_export_statistics(current_user: User = Depends(get_current_user)):
     """Получить статистику экспорта/импорта"""
     try:

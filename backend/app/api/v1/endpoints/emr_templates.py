@@ -5,6 +5,7 @@ API endpoints для шаблонов EMR
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.api.deps import get_current_user
 from app.crud.emr_template import emr_template, emr_version
@@ -168,7 +169,7 @@ async def clone_emr_template(
         )
 
 
-@router.delete("/templates/{template_id}")
+@router.delete("/templates/{template_id}", response_model=dict[str, Any])
 async def delete_emr_template(
     template_id: int,
     db: Session = Depends(get_db),
@@ -194,7 +195,7 @@ async def delete_emr_template(
         )
 
 
-@router.get("/templates/default/load")
+@router.get("/templates/default/load", response_model=dict[str, Any])
 async def load_default_templates(
     db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
@@ -247,7 +248,7 @@ async def get_emr_versions(
         )
 
 
-@router.post("/emr/{emr_id}/versions/{version_id}/restore")
+@router.post("/emr/{emr_id}/versions/{version_id}/restore", response_model=dict[str, Any])
 async def restore_emr_version(
     emr_id: int,
     version_id: int,

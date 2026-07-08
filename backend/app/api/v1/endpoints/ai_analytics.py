@@ -13,6 +13,7 @@ from app.api.deps import get_current_user, get_db, require_roles
 from app.models.user import User
 from app.services.ai_analytics_service import get_ai_analytics_service
 
+from typing import Any
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -110,7 +111,7 @@ class TrainingDatasetResponse(BaseModel):
 # ===================== ENDPOINTS =====================
 
 
-@router.post("/track-usage")
+@router.post("/track-usage", response_model=dict[str, Any])
 async def track_ai_usage(
     request: AIUsageTrackingRequest,
     db: Session = Depends(get_db),
@@ -314,7 +315,7 @@ async def generate_training_dataset(
         raise _ai_analytics_http_error(e, "generate_training_dataset") from e
 
 
-@router.get("/usage-summary")
+@router.get("/usage-summary", response_model=dict[str, Any])
 async def get_ai_usage_summary(
     days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
     db: Session = Depends(get_db),
@@ -358,7 +359,7 @@ async def get_ai_usage_summary(
         raise _ai_analytics_http_error(e, "get_ai_usage_summary") from e
 
 
-@router.get("/function-performance/{function_name}")
+@router.get("/function-performance/{function_name}", response_model=dict[str, Any])
 async def get_function_performance(
     function_name: str,
     days: int = Query(7, ge=1, le=90, description="Количество дней для анализа"),
@@ -408,7 +409,7 @@ async def get_function_performance(
         raise _ai_analytics_http_error(e, "get_function_performance") from e
 
 
-@router.get("/cost-analysis")
+@router.get("/cost-analysis", response_model=dict[str, Any])
 async def get_ai_cost_analysis(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
@@ -480,7 +481,7 @@ async def get_ai_cost_analysis(
         raise _ai_analytics_http_error(e, "get_ai_cost_analysis") from e
 
 
-@router.get("/model-comparison")
+@router.get("/model-comparison", response_model=dict[str, Any])
 async def compare_ai_models(
     function: str = Query(..., description="AI функция для сравнения"),
     days: int = Query(30, ge=7, le=180, description="Период для сравнения"),

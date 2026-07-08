@@ -7,17 +7,16 @@ import json
 import logging
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from ....api.deps import get_current_user, require_roles
 from ....models.user import User
 from ....services.mcp import get_mcp_manager
-from ....services.ai_feature_gating import RequireAiFeature
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(dependencies=[Depends(RequireAiFeature("mcp_tools"))])  # P1-13: feature flag
+router = APIRouter()
 # AI-REAUDIT-28 P1-13: удалены redundant inline role checks —
 # require_roles dependency уже enforcing RBAC.
 
@@ -68,7 +67,7 @@ def raise_mcp_internal_error(action: str, exc: Exception) -> NoReturn:
 # === MCP Management Endpoints ===
 
 
-@router.get("/status")
+@router.get("/status", response_model=dict[str, Any])
 async def get_mcp_status(
     current_user: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:
@@ -84,7 +83,7 @@ async def get_mcp_status(
         raise_mcp_internal_error("get_mcp_status", e)
 
 
-@router.get("/health")
+@router.get("/health", response_model=dict[str, Any])
 async def mcp_health_check(
     current_user: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:
@@ -100,7 +99,7 @@ async def mcp_health_check(
         raise_mcp_internal_error("mcp_health_check", e)
 
 
-@router.get("/metrics")
+@router.get("/metrics", response_model=dict[str, Any])
 async def get_mcp_metrics(
     server: str | None = None, current_user: User = Depends(require_roles("Admin"))
 ) -> dict[str, Any]:
@@ -114,7 +113,7 @@ async def get_mcp_metrics(
         raise_mcp_internal_error("get_mcp_metrics", e)
 
 
-@router.get("/circuit-breaker")
+@router.get("/circuit-breaker", response_model=dict[str, Any])
 async def get_circuit_breaker_status(
     current_user: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:
@@ -133,7 +132,7 @@ async def get_circuit_breaker_status(
         raise_mcp_internal_error("get_circuit_breaker_status", e)
 
 
-@router.post("/reset-metrics")
+@router.post("/reset-metrics", response_model=dict[str, Any])
 async def reset_mcp_metrics(
     current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician")),
 ) -> dict[str, Any]:
@@ -164,7 +163,7 @@ class MCPComplaintRequest(BaseModel):
     provider: str | None = None
 
 
-@router.post("/complaint/analyze")
+@router.post("/complaint/analyze", response_model=dict[str, Any])
 async def mcp_analyze_complaint(
     request: MCPComplaintRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -221,9 +220,9 @@ async def mcp_analyze_complaint(
         raise_mcp_internal_error("mcp_analyze_complaint", e)
 
 
-@router.post("/complaint/validate")
+@router.post("/complaint/validate", response_model=dict[str, Any])
 async def mcp_validate_complaint(
-    complaint: str = Body(..., description="Patient complaint text"),  # P1-16: moved from query to body current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
+    complaint: str, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
     """Валидация жалоб через MCP"""
     try:
@@ -241,7 +240,7 @@ async def mcp_validate_complaint(
         raise_mcp_internal_error("mcp_validate_complaint", e)
 
 
-@router.get("/complaint/templates")
+@router.get("/complaint/templates", response_model=dict[str, Any])
 async def mcp_get_complaint_templates(
     specialty: str | None = None, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -274,7 +273,7 @@ class MCPICD10Request(BaseModel):
     max_suggestions: int = 5
 
 
-@router.post("/icd10/suggest")
+@router.post("/icd10/suggest", response_model=dict[str, Any])
 async def mcp_suggest_icd10(
     request: MCPICD10Request, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -388,7 +387,7 @@ async def mcp_suggest_icd10(
         }
 
 
-@router.post("/icd10/validate")
+@router.post("/icd10/validate", response_model=dict[str, Any])
 async def mcp_validate_icd10(
     code: str,
     symptoms: list[str] | None = None,
@@ -411,7 +410,7 @@ async def mcp_validate_icd10(
         raise_mcp_internal_error("mcp_validate_icd10", e)
 
 
-@router.get("/icd10/search")
+@router.get("/icd10/search", response_model=dict[str, Any])
 async def mcp_search_icd10(
     query: str,
     category: str | None = None,
@@ -447,7 +446,7 @@ class MCPLabRequest(BaseModel):
     include_recommendations: bool = True
 
 
-@router.post("/lab/interpret")
+@router.post("/lab/interpret", response_model=dict[str, Any])
 async def mcp_interpret_lab_results(
     request: MCPLabRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -480,7 +479,7 @@ async def mcp_interpret_lab_results(
         raise_mcp_internal_error("mcp_interpret_lab_results", e)
 
 
-@router.post("/lab/check-critical")
+@router.post("/lab/check-critical", response_model=dict[str, Any])
 async def mcp_check_critical_values(
     results: list[dict[str, Any]], current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -500,7 +499,7 @@ async def mcp_check_critical_values(
         raise_mcp_internal_error("mcp_check_critical_values", e)
 
 
-@router.get("/lab/normal-ranges")
+@router.get("/lab/normal-ranges", response_model=dict[str, Any])
 async def mcp_get_normal_ranges(
     test_name: str | None = None,
     patient_gender: str | None = None,
@@ -525,7 +524,7 @@ async def mcp_get_normal_ranges(
 # === Medical Imaging via MCP ===
 
 
-@router.post("/imaging/analyze")
+@router.post("/imaging/analyze", response_model=dict[str, Any])
 async def mcp_analyze_image(
     image: UploadFile = File(...),
     image_type: str = Form(...),
@@ -567,7 +566,7 @@ async def mcp_analyze_image(
         raise_mcp_internal_error("mcp_analyze_image", e)
 
 
-@router.post("/imaging/skin-lesion")
+@router.post("/imaging/skin-lesion", response_model=dict[str, Any])
 async def mcp_analyze_skin_lesion(
     image: UploadFile = File(...),
     lesion_info: str | None = Form(None),
@@ -608,7 +607,7 @@ async def mcp_analyze_skin_lesion(
         raise_mcp_internal_error("mcp_analyze_skin_lesion", e)
 
 
-@router.get("/imaging/types")
+@router.get("/imaging/types", response_model=dict[str, Any])
 async def mcp_get_imaging_types(
     category: str | None = None, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -638,7 +637,7 @@ class MCPBatchRequest(BaseModel):
     parallel: bool = True
 
 
-@router.post("/batch")
+@router.post("/batch", response_model=list[dict[str, Any]])
 async def mcp_batch_process(
     request: MCPBatchRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> list[dict[str, Any]]:
@@ -661,7 +660,7 @@ async def mcp_batch_process(
 # === Server Capabilities ===
 
 
-@router.get("/capabilities")
+@router.get("/capabilities", response_model=dict[str, Any])
 async def mcp_get_capabilities(
     server: str | None = None, current_user: User = Depends(require_roles("Admin"))
 ) -> dict[str, Any]:

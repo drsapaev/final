@@ -3,6 +3,7 @@ API для управления настройками платежных про
 """
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -38,7 +39,7 @@ def get_payment_provider_settings(
     return PaymentSettingsService(db).get_payment_settings()
 
 
-@router.post("/admin/payment-provider-settings")
+@router.post("/admin/payment-provider-settings", response_model=dict[str, Any])
 def update_payment_provider_settings(
     settings: PaymentProviderSettings,
     db: Session = Depends(get_db),
@@ -90,7 +91,7 @@ def test_payment_provider(
         )
 
 
-@router.get("/admin/payment-providers-info")
+@router.get("/admin/payment-providers-info", response_model=dict[str, Any])
 def get_payment_providers_info(current_user: User = Depends(require_roles("Admin"))):
     """
     Получение информации о доступных провайдерах

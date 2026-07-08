@@ -7,6 +7,10 @@ from __future__ import annotations
 
 # Import everything from all submodules (wildcard for backward compat)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
+from app.schemas.notifications import (
+    SendMessageRequest,
+    TelegramWebhookUpdateRequest,
+)
 from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import *  # noqa: F401, F403
@@ -393,13 +397,14 @@ def create_mini_app_appointment_booking(
 
 @router.post("/webhook")
 async def telegram_webhook(
-    update: dict[str, Any], request: Request, db: Session = Depends(get_db)
+    body: TelegramWebhookUpdateRequest, request: Request, db: Session = Depends(get_db)
 ):
     """
     Webhook endpoint для получения обновлений от Telegram
     """
     try:
         _validate_webhook_secret(request, db)
+        update = body.model_dump(exclude_none=True)
         logger.info(
             "Telegram webhook update accepted",
             extra=_telegram_update_summary(update),
@@ -454,7 +459,7 @@ async def send_message_to_user(
     chat_id: int,
     message: str,
     parse_mode: str = "HTML",
-    reply_markup: dict[str, Any] = None,
+    body: SendMessageRequest = SendMessageRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -468,7 +473,7 @@ async def send_message_to_user(
             await bot_service.initialize(db)
 
         success = await bot_service._send_message(
-            chat_id=chat_id, text=message, reply_markup=reply_markup
+            chat_id=chat_id, text=message, reply_markup=body.reply_markup
         )
 
         if success:
