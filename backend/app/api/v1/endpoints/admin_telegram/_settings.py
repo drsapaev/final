@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import requests  # noqa: F401
+
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 
 from app.api.v1.endpoints.admin_telegram._helpers import (
