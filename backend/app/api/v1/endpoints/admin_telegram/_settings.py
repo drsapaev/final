@@ -8,6 +8,9 @@ from app.api.v1.endpoints.admin_telegram._helpers import (
     _build_staff_bot_status,
     _build_telegram_ai_approval_status,
 )  # noqa: F401
+from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
+    TelegramWebhookRequest,
+)
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 
 

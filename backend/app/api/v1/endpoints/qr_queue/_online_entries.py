@@ -8,6 +8,7 @@ from app.api.v1.endpoints.qr_queue._helpers import (
     _ensure_doctor_can_mutate_queue_entry,
     _queue_phone_matches,
 )
+from app.api.v1.endpoints.qr_queue._analytics import UpdateOnlineEntryRequest  # noqa: F401
 
 
 @router.put("/online-entry/{entry_id}/update", response_model=dict[str, Any])
