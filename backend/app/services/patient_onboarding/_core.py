@@ -6,6 +6,7 @@ from app.services.patient_onboarding._base import PatientOnboardingServiceMixinB
 from app.services.patient_onboarding._base import (  # noqa: F401
     _as_aware_utc,
     _clean_text,
+    _encode_candidate_id,
     _mask_name,
     _mask_phone,
     _normalize_phone,
