@@ -277,10 +277,12 @@ def restore_queue_data(
             error=result.get("error"),
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
+            detail=f"Ошибка восстановления: {str(e)}",
         ) from e
 
 

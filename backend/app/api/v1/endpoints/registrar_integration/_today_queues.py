@@ -10,6 +10,7 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
     _registrar_available_actions,
     _resolve_payment_truth,
 )  # noqa: F401
+from app.services.queue_service import queue_service  # noqa: F401
 
 
 from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F401
