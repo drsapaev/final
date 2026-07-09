@@ -18,6 +18,20 @@ from app.models.visit import Visit
 logger = logging.getLogger(__name__)
 
 
+def _as_aware_utc(value: datetime) -> datetime:
+    """Return ``value`` as a timezone-aware UTC datetime.
+
+    SQLAlchemy ``DateTime(timezone=True)`` columns return aware datetimes on
+    PostgreSQL but naive datetimes on SQLite (used by the test suite). Mixing
+    naive and aware datetimes in comparisons raises ``TypeError``. Normalize
+    every datetime read from the database to aware UTC before comparing with
+    ``datetime.now(UTC)``.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 @dataclass
 class SecurityCheckResult:
     """Результат проверки безопасности"""
@@ -107,7 +121,7 @@ class ConfirmationSecurityService:
             # 2. Проверяем срок действия токена
             if (
                 visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.now(UTC)
+                and _as_aware_utc(visit.confirmation_expires_at) < datetime.now(UTC)
             ):
                 logger.debug("Confirmation token expired visit_id=%s", visit.id)
                 self._log_security_event(
@@ -452,7 +466,7 @@ class ConfirmationSecurityService:
 
             # 3. Проверяем временные аномалии
             if visit.created_at:
-                time_since_creation = datetime.now(UTC) - visit.created_at
+                time_since_creation = datetime.now(UTC) - _as_aware_utc(visit.created_at)
                 if (
                     time_since_creation.total_seconds() < 60
                 ):  # Слишком быстро после создания

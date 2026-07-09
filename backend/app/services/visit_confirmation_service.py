@@ -72,6 +72,20 @@ def _as_utc_naive(value: datetime) -> datetime:
     return value.astimezone(UTC).replace(tzinfo=None)
 
 
+def _as_aware_utc(value: datetime) -> datetime:
+    """Return ``value`` as a timezone-aware UTC datetime.
+
+    SQLAlchemy ``DateTime(timezone=True)`` columns return aware datetimes on
+    PostgreSQL but naive datetimes on SQLite (used by the test suite). Mixing
+    naive and aware datetimes in comparisons raises ``TypeError``. Normalize
+    every datetime read from the database to aware UTC before comparing with
+    ``datetime.now(UTC)``.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _ticket_qr_signature(body: str) -> str:
     digest = hmac.new(
         settings.SECRET_KEY.encode("utf-8"),
@@ -135,7 +149,7 @@ def consume_telegram_ticket_start_token(db, token: str) -> Visit | None:
     if not visit:
         return None
 
-    if visit.confirmation_expires_at and _as_utc_naive(visit.confirmation_expires_at) < now:
+    if visit.confirmation_expires_at and _as_aware_utc(visit.confirmation_expires_at) < now:
         return None
 
     updated = (
@@ -336,7 +350,7 @@ class VisitConfirmationService:
 
             if (
                 visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.now(UTC)
+                and _as_aware_utc(visit.confirmation_expires_at) < datetime.now(UTC)
             ):
                 raise VisitConfirmationDomainError(
                     status_code=400,
@@ -388,7 +402,7 @@ class VisitConfirmationService:
 
             if (
                 visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.now(UTC)
+                and _as_aware_utc(visit.confirmation_expires_at) < datetime.now(UTC)
             ):
                 raise VisitConfirmationDomainError(
                     status_code=400,
@@ -796,7 +810,9 @@ class VisitConfirmationService:
         )
         token = build_telegram_ticket_start_token(expires_at=expires_at)
         visit.confirmation_token = _hash_telegram_ticket_start_token(token)
-        visit.confirmation_expires_at = expires_at
+        # Store naive UTC for backward compatibility with existing rows that
+        # were written before the schema migrated to ``DateTime(timezone=True)``.
+        visit.confirmation_expires_at = _as_utc_naive(expires_at)
         return f"https://t.me/{bot_username}?start={token}"
 
     def _resolve_telegram_bot_username(self) -> str | None:

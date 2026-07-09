@@ -11,6 +11,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _resolve_payment_truth,
 )  # noqa: F401
 from app.api.v1.endpoints.registrar_wizard._settings import VisitResponse  # noqa
+from app.services.visit_confirmation_service import _as_aware_utc  # noqa: F401
 
 
 @router.get("/registrar/visits", response_model=list[VisitResponse])
@@ -1578,7 +1579,7 @@ def confirm_visit_by_registrar(
         # Проверяем что токен не истек
         if (
             visit.confirmation_expires_at
-            and visit.confirmation_expires_at < datetime.now(UTC)
+            and _as_aware_utc(visit.confirmation_expires_at) < datetime.now(UTC)
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
