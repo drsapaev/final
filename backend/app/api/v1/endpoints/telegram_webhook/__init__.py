@@ -32,6 +32,7 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (  # noqa: F401
     TELEGRAM_STAFF_LINK_REJECTED_MESSAGE,
     TELEGRAM_STAFF_LINK_REPLY_MARKUP,
     TELEGRAM_TICKET_QR_PREFIX,
+    _build_patient_onboarding_entry_token,
     _localized_main_menu,
     _localized_notification_consent_menu,
     _localized_services_menu,
@@ -79,6 +80,7 @@ __all__ = [
     "TELEGRAM_STAFF_LINK_REPLY_MARKUP",
     "TELEGRAM_TICKET_QR_PREFIX",
     # Functions from _helpers
+    "_build_patient_onboarding_entry_token",
     "_localized_main_menu",
     "_localized_notification_consent_menu",
     "_localized_services_menu",
