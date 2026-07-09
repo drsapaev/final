@@ -7,8 +7,10 @@ from app.services.patient_onboarding._base import (  # noqa: F401
     _as_aware_utc,
     _clean_text,
     _mask_name,
+    _mask_phone,
     _normalize_phone,
     _phone_matches,
+    _safe_name_part,
     _utc_now,
 )
 
