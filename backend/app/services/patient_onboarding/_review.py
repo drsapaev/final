@@ -4,6 +4,9 @@ from __future__ import annotations
 from app.services.patient_onboarding._base import *  # noqa: F401, F403
 from app.services.patient_onboarding._base import PatientOnboardingServiceMixinBase
 from app.services.patient_onboarding._base import (  # noqa: F401
+    _as_aware_utc,
+    _clean_text,
+    _mask_name,
     _request_payload,
     _safe_note,
     _safe_note_hash,
