@@ -15,6 +15,7 @@ from app.api import deps
 from app.models.appointment import Appointment
 from app.models.user import User
 from app.services.patient_appointments_api_service import PatientAppointmentsApiService
+from app.core.i18n import t  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -405,6 +406,7 @@ async def get_my_results(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
     limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0, description="Смещение"),
 ):
     """
     Получить результаты анализов пациента.

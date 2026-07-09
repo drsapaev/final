@@ -1349,6 +1349,11 @@ def _build_staff_bot_next_slice(token_contract: dict[str, Any]) -> str:
 def _build_staff_bot_status(
     webhook_set: bool, staff_bot_token_status: dict[str, Any] | None = None
 ) -> dict[str, Any]:
+    from app.api.v1.endpoints.admin_telegram._staff_actions import (
+        _build_staff_bot_token_contract,
+        _build_staff_command_registration_contract,
+    )
+
     role_menus = _build_staff_role_menus_summary()
     token_status = staff_bot_token_status or {
         "configured": False,

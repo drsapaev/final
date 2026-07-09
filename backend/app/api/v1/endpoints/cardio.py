@@ -20,6 +20,7 @@ from app.schemas.cardio import (
     CardioECGRecordCreate,
     CardioECGRecordOut,
 )
+from app.core.i18n import t  # noqa: F401
 
 router = APIRouter(prefix="/cardio", tags=["cardio"])
 logger = logging.getLogger(__name__)

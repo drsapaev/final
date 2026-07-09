@@ -3,6 +3,7 @@
 Split from notifications.py.
 """
 from __future__ import annotations
+from app.services.notifications_pkg._helpers import _normalize_notification_event_type  # noqa: F401
 
 from app.services.notifications_pkg._base import (
     UTC,
@@ -108,6 +109,7 @@ class ChannelsMixin(NotificationSenderMixinBase):
         """Отправка SMS уведомления"""
         try:
             from app.services.sms_providers import get_sms_manager
+
 
             sms_manager = get_sms_manager()
             response = await sms_manager.send_sms(phone, message)

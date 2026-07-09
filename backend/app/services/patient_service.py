@@ -19,6 +19,7 @@ from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.services.notifications import notification_sender_service
 from app.services.patient_validation import PatientValidationService
+from app.core.i18n import t  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

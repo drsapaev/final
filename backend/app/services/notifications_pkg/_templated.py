@@ -3,6 +3,7 @@
 Split from notifications.py.
 """
 from __future__ import annotations
+from app.services.notifications_pkg._helpers import _normalize_notification_event_type  # noqa: F401
 
 from app.services.notifications_pkg._base import (
     Any,
@@ -369,6 +370,7 @@ class TemplatedMixin(NotificationSenderMixinBase):
     ) -> list[NotificationHistory]:
         """Отправка уведомления об оплате"""
         from app.crud import patient as patient_crud
+
 
         # Получаем данные пациента
         canonical_notification_type = _normalize_notification_event_type(

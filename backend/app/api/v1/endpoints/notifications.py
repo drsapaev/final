@@ -40,6 +40,7 @@ from app.schemas.user_management import (
 )
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
+from app.core.i18n import t  # noqa: F401
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

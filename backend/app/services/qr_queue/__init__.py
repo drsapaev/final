@@ -12,6 +12,8 @@ from app.services.qr_queue._sessions import SessionsMixin
 from app.services.qr_queue._specialists import SpecialistsMixin
 from app.services.qr_queue._tokens import TokensMixin
 from app.services.qr_queue._visits import VisitsMixin
+from app.services.queue_domain_service import QueueDomainService  # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
 __all__ = ["QRQueueService"]
 

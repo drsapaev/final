@@ -3,8 +3,11 @@
 Split from openai_provider.py.
 """
 from __future__ import annotations
+from openai import AsyncOpenAI  # noqa: F401
+from app.services.ai.openai_provider_pkg._base import _PROVIDER_TIMEOUT  # noqa: F401
 
 from app.services.ai.openai_provider_pkg._base import (
+
     AIRequest,
     AIResponse,
     OpenAIProviderMixinBase,
