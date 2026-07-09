@@ -42,10 +42,6 @@ from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._helpers import (
     _normalize_patient_language,
 )  # noqa: F401
-from app.api.v1.endpoints.telegram_webhook._staff_commands import (  # noqa: F401
-    _queue_entry_name,
-    _queue_entry_position,
-)
 
 
 async def _send_patient_bot_reply(
@@ -861,6 +857,11 @@ def _staff_next_patient_entry(db: Session) -> OnlineQueueEntry | None:
 
 
 def _staff_next_patient_message(db: Session) -> str:
+    from app.api.v1.endpoints.telegram_webhook._staff_commands import (
+        _queue_entry_name,
+        _queue_entry_position,
+    )
+
     entry = _staff_next_patient_entry(db)
     if not entry:
         return "\n".join(
