@@ -281,6 +281,7 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
 
 def get_queue_service() -> QueueBusinessService:
     """Получить экземпляр сервиса очереди"""
-    return queue_service
+    from app.services.queue_service import queue_service as _qs
+    return _qs
 
 

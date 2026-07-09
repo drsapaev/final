@@ -499,9 +499,7 @@ def get_settings() -> Settings:
         logger.info("[FIX:CORS] Using legacy CORS_ORIGINS env variable for backend CORS config")
 
     # ✅ SECURITY: Production-specific validations
-    # NOTE: All production checks are skipped when TESTING=1 to allow CI to run
-    # without real SMS provider credentials, encryption keys, etc.
-    if env in ("prod", "production") and not os.environ.get("TESTING"):
+    if env in ("prod", "production"):
         errors = []
         warnings_list = []
 
@@ -565,8 +563,8 @@ def get_settings() -> Settings:
             )
 
         # AI-REAUDIT-28 P0-8: ENCRYPTION_KEY обязателен в production.
-        # Без него AI provider API keys хранятся plaintext в ai_providers.api_key.
-        if not s.ENCRYPTION_KEY:
+        # Skipped in test environments.
+        if not os.environ.get("TESTING") and not s.ENCRYPTION_KEY:
             errors.append(
                 "ENCRYPTION_KEY must be set in production — "
                 "without it, AI provider API keys are stored in plaintext."
@@ -579,11 +577,8 @@ def get_settings() -> Settings:
                 "The /payments/test-init endpoint bypasses audit logging."
             )
 
-        # NOTIF-REAUDIT-28 P0-4: в production должен быть настроен реальный
-        # SMS-провайдер (Eskiz или PlayMobile). MockSMSProvider молча
-        # "успешно" отправляет SMS без реальной доставки — password reset,
-        # 2FA, напоминания silently fail.
-        if not s.ESKIZ_EMAIL and not s.PLAYMOBILE_API_KEY:
+        # NOTIF-REAUDIT-28 P0-4: SMS provider check — skipped in test environments.
+        if not os.environ.get("TESTING") and not s.ESKIZ_EMAIL and not s.PLAYMOBILE_API_KEY:
             errors.append(
                 "At least one real SMS provider must be configured in production "
                 "(ESKIZ_EMAIL or PLAYMOBILE_API_KEY). MockSMSProvider is not allowed."
