@@ -48,6 +48,20 @@ from app.schemas.notifications import (
 from app.api.v1.endpoints.telegram_webhook._helpers import router  # noqa: F401
 
 
+from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
+    _build_mini_app_appointment_booking_preview_from_request,
+    _build_mini_app_patient_cabinet_summary_from_request,
+    _build_mini_app_patient_forms_preview_from_request,
+    _build_mini_app_patient_manifest_from_request,
+    _build_mini_app_patient_report_download_response,
+    _handle_clinic_bot_update,
+    _raise_telegram_webhook_internal_error,
+    _save_mini_app_patient_form_submission_from_request,
+    _telegram_bot_info_failure,
+    _telegram_user_from_onboarding_request_auth,
+    _validate_webhook_secret,
+)
+
 def _is_duplicate_update(db, update_id: int | None) -> bool:
     """P1-9: check if this Telegram update was already processed."""
     if update_id is None:
