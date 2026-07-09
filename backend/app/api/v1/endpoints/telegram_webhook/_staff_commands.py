@@ -42,9 +42,11 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
     _telegram_settings_message,
 )  # noqa: F401
 from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401
+    _linked_staff_for_chat,
     _normalize_staff_button_text,
     _send_patient_bot_reply,
     _staff_read_only_commands,
+    _staff_read_only_item_labels,
     _staff_state_change_operation_for_command,
 )
 
