@@ -48,6 +48,7 @@ class NotificationSenderService(
     """
 
     def __init__(self, db=None):
+        super().__init__()
         self._db = db
         self._email_settings = None
         self._sms_settings = None

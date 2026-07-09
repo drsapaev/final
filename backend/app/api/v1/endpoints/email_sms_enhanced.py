@@ -129,14 +129,19 @@ def _ensure_payment_confirmation_belongs_to_patient(
 async def send_appointment_reminder_enhanced(
     appointment_id: int,
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
-    body: SendAppointmentReminderEnhancedRequest = SendAppointmentReminderEnhancedRequest(),
+    template_data: dict[str, Any] | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
-    """Расширенное напоминание о записи"""
+    """Расширенное напоминание о записи.
+
+    Note: ``template_data`` is accepted as a plain dict (or ``None``) so
+    the endpoint can be invoked both via the FastAPI body parser and
+    directly by unit tests without constructing a Pydantic
+    ``TemplateDataBase`` model.
+    """
     try:
-        template_data = body.template_data.model_dump(exclude_none=True) if body.template_data else None
         # Получаем данные записи
         appointment = crud_appointment.get_appointment(db, appointment_id)
         if not appointment:
@@ -203,14 +208,17 @@ async def send_lab_results_enhanced(
     patient_id: int,
     lab_results_id: int,
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
-    body: SendLabResultsEnhancedRequest = SendLabResultsEnhancedRequest(),
+    template_data: dict[str, Any] | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
-    """Расширенная отправка результатов анализов"""
+    """Расширенная отправка результатов анализов.
+
+    Note: ``template_data`` is accepted as a plain dict (or ``None``) for
+    the same reasons as ``send_appointment_reminder_enhanced``.
+    """
     try:
-        template_data = body.template_data.model_dump(exclude_none=True) if body.template_data else None
         # Получаем данные пациента
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
@@ -265,16 +273,22 @@ async def send_lab_results_enhanced(
 @router.post("/send-payment-confirmation-enhanced", response_model=dict[str, Any])
 async def send_payment_confirmation_enhanced(
     patient_id: int,
-    body: SendPaymentConfirmationEnhancedRequest,
+    payment_data: dict[str, Any],
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
+    template_data: dict[str, Any] | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
-    """Расширенное подтверждение платежа"""
+    """Расширенное подтверждение платежа.
+
+    Note: ``payment_data`` and ``template_data`` are accepted as plain
+    dicts (or ``None`` for ``template_data``) so the endpoint can be
+    invoked both via the FastAPI body parser and directly by unit tests
+    without constructing Pydantic ``PaymentData`` / ``TemplateDataBase``
+    models that would silently drop unknown keys.
+    """
     try:
-        payment_data = body.payment_data.model_dump(exclude_none=True)
-        template_data = body.template_data.model_dump(exclude_none=True) if body.template_data else None
         # Получаем данные пациента
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:

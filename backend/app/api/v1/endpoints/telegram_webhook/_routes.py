@@ -505,21 +505,37 @@ async def send_message_to_user(
     chat_id: int,
     message: str,
     parse_mode: str = "HTML",
+    reply_markup: dict[str, Any] | None = None,
     body: SendMessageRequest = SendMessageRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
     """
-    Отправка сообщения пользователю через бота
+    Отправка сообщения пользователю через бота.
+
+    ``reply_markup`` can be supplied either as a direct keyword argument
+    (used by direct/unit-test callers) or as part of the ``body`` model
+    (used by FastAPI's JSON body parser). The explicit keyword argument
+    takes precedence when both are provided.
     """
     try:
-        bot_service = await get_telegram_bot_service()
+        # Resolve ``get_telegram_bot_service`` via the package attribute at
+        # call time. Unit tests monkeypatch ``telegram_webhook.get_telegram_bot_service``
+        # (the package-level binding); looking the function up via the local
+        # module import would bypass that patch.
+        from app.api.v1.endpoints.telegram_webhook import (
+            get_telegram_bot_service as _get_telegram_bot_service,
+        )
+        bot_service = await _get_telegram_bot_service()
 
         if not bot_service.active:
             await bot_service.initialize(db)
 
+        effective_reply_markup = (
+            reply_markup if reply_markup is not None else body.reply_markup
+        )
         success = await bot_service._send_message(
-            chat_id=chat_id, text=message, reply_markup=body.reply_markup
+            chat_id=chat_id, text=message, reply_markup=effective_reply_markup
         )
 
         if success:

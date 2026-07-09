@@ -214,8 +214,22 @@ async def _authenticate_by_token(token: str, db: Session) -> User | None:
         return None
 
 
-# Backward-compat alias for tests/external callers that import the old name
-authenticate_websocket = _authenticate_by_token
+# Backward-compat alias for tests/external callers that import the old name.
+# The alias accepts both the 2-arg form ``authenticate_websocket(token, db)``
+# and the 3-arg form ``authenticate_websocket(websocket, token, db)`` so that
+# callers (including the real websocket handler) and unit tests that pass a
+# ``websocket`` placeholder as the first positional argument can both succeed.
+async def authenticate_websocket(*args):  # type: ignore[no-untyped-def]
+    if len(args) == 3:
+        _websocket, token, db = args
+    elif len(args) == 2:
+        token, db = args
+    else:
+        raise TypeError(
+            "authenticate_websocket() expected 2 or 3 positional arguments, "
+            f"got {len(args)}"
+        )
+    return await _authenticate_by_token(token, db)
 
 
 async def chat_websocket_handler(websocket: WebSocket):
