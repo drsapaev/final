@@ -20,6 +20,7 @@ from app.api.v1.endpoints.admin_telegram import (
     _settings,  # noqa: F401
     _staff_actions,  # noqa: F401
 )
+import requests  # noqa: F401
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa: F401, F403
 
 # Re-export underscore-prefixed symbols that other modules (notably
@@ -45,9 +46,16 @@ from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
     _get_staff_bot_token_runtime_status,
     confirm_staff_action,
 )
+from app.api.v1.endpoints.admin_telegram._helpers import (  # noqa: F401
+    issue_staff_link_start_token,
+)
+from app.api.v1.endpoints.admin_telegram._settings import (  # noqa: F401
+    get_telegram_webhook_info,
+)
 
 __all__ = [
     "router",
+    "requests",
     "PATIENT_BOOKING_ENTRY_ROUTE",
     "PATIENT_MINI_APP_ENTRY_ROUTE",
     "PATIENT_PAYMENT_ENTRY_ROUTE",
@@ -64,4 +72,6 @@ __all__ = [
     "_staff_runtime_reference_hash",
     "validate_staff_link_start_token",
     "confirm_staff_action",
+    "issue_staff_link_start_token",
+    "get_telegram_webhook_info",
 ]
