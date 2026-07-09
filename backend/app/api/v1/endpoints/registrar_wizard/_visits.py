@@ -218,6 +218,387 @@ def get_visits(
 # ===================== ПРОСТОЙ ЭНДПОИНТ ДЛЯ ОБЪЕДИНЕНИЯ ДАННЫХ =====================
 
 
+def _serialize_appointments_for_listing(
+    db: Session,
+    date_from: str | None,
+    date_to: str | None,
+    search: str | None,
+    limit: int,
+    offset: int,
+):
+    """Fetch and serialize Appointment records for the all-appointments listing."""
+    from datetime import datetime
+
+    from sqlalchemy import func, or_
+
+    from app.models.appointment import Appointment
+    from app.models.patient import Patient
+
+    # 1. Получаем старые appointments с фильтрацией
+    appointments_query = db.query(Appointment)
+
+    # Применяем фильтры по дате
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+            appointments_query = appointments_query.filter(
+                Appointment.appointment_date >= from_date
+            )
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+            appointments_query = appointments_query.filter(
+                Appointment.appointment_date <= to_date
+            )
+        except ValueError:
+            pass
+
+    patient_search_name = func.trim(
+        func.coalesce(Patient.last_name, "")
+        + literal(" ")
+        + func.coalesce(Patient.first_name, "")
+        + literal(" ")
+        + func.coalesce(Patient.middle_name, "")
+    )
+
+    # Применяем поиск
+    if search:
+        # Для поиска по телефону извлекаем только цифры
+        search_digits = ''.join(filter(str.isdigit, search))
+
+        if search_digits:
+            # Поиск по ФИО, телефону и ID записи (включая только цифры)
+            appointments_query = appointments_query.join(
+                Patient, Appointment.patient_id == Patient.id
+            ).filter(
+                or_(
+                    patient_search_name.ilike(f"%{search}%"),
+                    Patient.phone.ilike(f"%{search}%"),
+                    func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(
+                        f"%{search_digits}%"
+                    ),
+                    Appointment.id.cast(String).ilike(f"%{search_digits}%"),
+                )
+            )
+        else:
+            # Если нет цифр, ищем только по ФИО
+            appointments_query = appointments_query.join(
+                Patient, Appointment.patient_id == Patient.id
+            ).filter(patient_search_name.ilike(f"%{search}%"))
+
+    appointments = (
+        appointments_query.order_by(Appointment.created_at.desc())
+        .limit(limit // 2)
+        .all()
+    )
+    for apt in appointments:
+        related_visit = None
+        # Получаем имя пациента
+        patient_fio = None
+        if apt.patient_id:
+            patient = db.query(Patient).filter(Patient.id == apt.patient_id).first()
+            if patient:
+                patient_fio = patient.short_name()
+
+        # Преобразуем ID услуг в названия для appointments
+        service_names = []
+        service_codes = []
+        total_amount = 0
+
+        if apt.services and isinstance(apt.services, list):
+            from app.models.service import Service
+
+            for service_id in apt.services:
+                try:
+                    service_id_int = int(service_id)
+                    service = (
+                        db.query(Service)
+                        .filter(Service.id == service_id_int)
+                        .first()
+                    )
+                    if service:
+                        service_names.append(service.name)
+                        service_code = service.service_code or get_service_code(
+                            service.id, db
+                        )
+                        if service_code:
+                            service_codes.append(service_code)
+                        if service.price:
+                            total_amount += float(service.price)
+                except (ValueError, TypeError):
+                    # Если service_id не число, возможно это уже название
+                    service_names.append(str(service_id))
+
+        # Определяем payment_status для Appointment по Payment table.
+        try:
+            from sqlalchemy import and_
+
+            related_visit = (
+                db.query(Visit)
+                .filter(
+                    and_(
+                        Visit.patient_id == apt.patient_id,
+                        Visit.visit_date == apt.appointment_date,
+                        Visit.doctor_id == apt.doctor_id,
+                    )
+                )
+                .first()
+            )
+        except Exception:
+            related_visit = None
+
+        visit_type = _normalize_registration_discount_mode(
+            getattr(apt, 'visit_type', None)
+        )
+        appointment_payment_processed_at = getattr(apt, 'payment_processed_at', None)
+        payment_status, payment_type = _resolve_payment_truth(
+            db,
+            visit_id=related_visit.id if related_visit else None,
+            legacy_paid_at=appointment_payment_processed_at,
+        )
+
+        result.append(
+            {
+                'id': apt.id,
+                'appointment_id': apt.id,
+                'visit_id': related_visit.id if related_visit else None,
+                'patient_id': apt.patient_id,
+                'patient_fio': patient_fio,
+                'doctor_id': apt.doctor_id,
+                'department': apt.department,
+                'appointment_date': apt.appointment_date,
+                'appointment_time': apt.appointment_time,
+                'status': _preserve_operational_status_on_payment(apt.status),
+                'services': service_names,  # Преобразованные названия услуг
+                'service_codes': service_codes,  # Коды услуг для фильтрации
+                'total_amount': total_amount,  # Общая сумма услуг
+                'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
+                'payment_type': payment_type,
+                'visit_type': visit_type,  # Тип визита для совместимости
+                'notes': apt.notes,
+                'created_at': apt.created_at,
+                'source': 'appointments',
+                'queue_numbers': [],  # Старые appointments не имеют номеров в новых очередях
+                'confirmation_status': 'none',  # Старые appointments не требуют подтверждения
+                'confirmed_at': None,
+                'confirmed_by': None,
+            }
+        )
+
+    return result
+
+
+def _serialize_visits_for_listing(
+    db: Session,
+    date_from: str | None,
+    date_to: str | None,
+    search: str | None,
+    limit: int,
+    offset: int,
+):
+    """Fetch and serialize Visit records for the all-appointments listing."""
+    from datetime import datetime
+
+    from sqlalchemy import func, or_
+
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    # 2. Получаем новые visits с фильтрацией
+    visits_query = db.query(Visit)
+
+    # Применяем фильтры по дате
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+            visits_query = visits_query.filter(Visit.visit_date >= from_date)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+            visits_query = visits_query.filter(Visit.visit_date <= to_date)
+        except ValueError:
+            pass
+
+    # Применяем поиск
+    if search:
+        # Для поиска по телефону извлекаем только цифры
+        search_digits = ''.join(filter(str.isdigit, search))
+
+        if search_digits:
+            # Поиск по ФИО, телефону и ID записи (включая только цифры)
+            visits_query = visits_query.join(
+                Patient, Visit.patient_id == Patient.id
+            ).filter(
+                or_(
+                    Patient.full_name.ilike(f"%{search}%"),
+                    Patient.phone.ilike(f"%{search}%"),
+                    func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(
+                        f"%{search_digits}%"
+                    ),
+                    Visit.id.cast(String).ilike(f"%{search_digits}%"),
+                )
+            )
+        else:
+            # Если нет цифр, ищем только по ФИО
+            visits_query = visits_query.join(
+                Patient, Visit.patient_id == Patient.id
+            ).filter(Patient.full_name.ilike(f"%{search}%"))
+
+    visits = visits_query.order_by(Visit.created_at.desc()).limit(limit // 2).all()
+    for visit in visits:
+        # Получаем имя пациента
+        patient_fio = None
+        if visit.patient_id:
+            patient = (
+                db.query(Patient).filter(Patient.id == visit.patient_id).first()
+            )
+            if patient:
+                patient_fio = patient.short_name()
+
+        # Получаем услуги визита
+        from app.models.service import Service
+        from app.models.visit import VisitService
+
+        visit_services = (
+            db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+        )
+        service_names = []
+        service_codes = []
+        total_amount = 0
+
+        for vs in visit_services:
+            service_price = 0
+            if vs.price is not None:  # Используем сохраненную цену (включая 0)
+                service_price = float(vs.price)
+            elif vs.service_id:  # Fallback - ищем цену в таблице services
+                service = (
+                    db.query(Service).filter(Service.id == vs.service_id).first()
+                )
+                if service and service.price:
+                    service_price = float(service.price)
+
+            total_amount += service_price * (vs.qty or 1)
+
+            if vs.name:  # Используем сохраненное имя
+                service_names.append(vs.name)
+                if vs.code:
+                    service_codes.append(normalize_service_code(vs.code))
+            else:  # Fallback - ищем в таблице services
+                service = (
+                    db.query(Service).filter(Service.id == vs.service_id).first()
+                )
+                if service:
+                    service_names.append(service.name)
+                    service_code = service.service_code or get_service_code(
+                        service.id, db
+                    )
+                    if service_code:
+                        service_codes.append(service_code)
+
+        # Получаем информацию о номерах в очередях для визита
+        queue_numbers = []
+        confirmation_status = None
+
+        if visit.visit_date == date.today():
+            # Ищем записи в очередях для этого визита
+            from app.models.online_queue import DailyQueue, OnlineQueueEntry
+
+            queue_entries = (
+                db.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.visit_id == visit.id)
+                .all()
+            )
+
+            for entry in queue_entries:
+                queue = (
+                    db.query(DailyQueue)
+                    .filter(DailyQueue.id == entry.queue_id)
+                    .first()
+                )
+                if queue:
+                    queue_names = {
+                        "ecg": "ЭКГ",
+                        "cardiology_common": "Кардиолог",
+                        "dermatology": "Дерматолог",
+                        "stomatology": "Стоматолог",
+                        "cosmetology": "Косметолог",
+                        "lab": "Лаборатория",
+                        "general": "Общая очередь",
+                    }
+
+                    queue_numbers.append(
+                        {
+                            "queue_tag": queue.queue_tag or "general",
+                            "queue_name": queue_names.get(
+                                queue.queue_tag or "general",
+                                queue.queue_tag or "Общая",
+                            ),
+                            "number": entry.number,
+                            "status": entry.status,
+                        }
+                    )
+
+        # Определяем статус подтверждения
+        if visit.status == "pending_confirmation":
+            confirmation_status = "pending"
+        elif visit.confirmed_at:
+            confirmation_status = "confirmed"
+        else:
+            confirmation_status = "none"
+
+        payment_status, payment_type = _resolve_payment_truth(
+            db,
+            visit_id=visit.id,
+            legacy_paid_at=getattr(visit, 'payment_processed_at', None),
+        )
+        discount_mode = _normalize_registration_discount_mode(
+            getattr(visit, 'discount_mode', None)
+        )
+
+        result.append(
+            {
+                'id': visit.id + 20000,  # Смещение для избежания конфликтов
+                'appointment_id': None,
+                'visit_id': visit.id,
+                'patient_id': visit.patient_id,
+                'patient_fio': patient_fio,
+                'doctor_id': visit.doctor_id,
+                'department': visit.department,
+                'appointment_date': visit.visit_date,
+                'appointment_time': visit.visit_time,
+                'status': _preserve_operational_status_on_payment(visit.status),
+                'services': service_names,  # Реальные названия услуг
+                'service_codes': service_codes,  # Коды услуг для фильтрации
+                'total_amount': total_amount,  # Общая сумма услуг
+                'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
+                'payment_type': payment_type,
+                'discount_mode': discount_mode,  # Тип визита для отображения
+                'approval_status': visit.approval_status,  # [OK] ДОБАВЛЕНО: Статус одобрения для all_free
+                'notes': visit.notes,
+                'created_at': visit.created_at,
+                'source': 'visits',
+                'queue_numbers': queue_numbers,  # Номера в очередях
+                'confirmation_status': confirmation_status,  # Статус подтверждения
+                'confirmed_at': (
+                    visit.confirmed_at.isoformat() if visit.confirmed_at else None
+                ),
+                'confirmed_by': visit.confirmed_by,
+            }
+        )
+
+    # Сортируем по дате создания
+    result.sort(key=lambda x: x['created_at'], reverse=True)
+
+    # Применяем пагинацию
+    paginated_result = result[offset : offset + limit]
+
+    return result
+
+
 @router.get("/registrar/all-appointments", response_model=dict[str, Any])
 def get_all_appointments(
     db: Session = Depends(get_db),
@@ -243,365 +624,31 @@ def get_all_appointments(
 ):
     """Простое объединение appointments + visits для фронтенда"""
     try:
-        from datetime import datetime
-
-        from sqlalchemy import func, or_
-
-        from app.models.appointment import Appointment
-        from app.models.patient import Patient
-        from app.models.visit import Visit
-
-        result = []
-
-        # 1. Получаем старые appointments с фильтрацией
-        appointments_query = db.query(Appointment)
-
-        # Применяем фильтры по дате
-        if date_from:
-            try:
-                from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
-                appointments_query = appointments_query.filter(
-                    Appointment.appointment_date >= from_date
-                )
-            except ValueError:
-                pass
-        if date_to:
-            try:
-                to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
-                appointments_query = appointments_query.filter(
-                    Appointment.appointment_date <= to_date
-                )
-            except ValueError:
-                pass
-
-        patient_search_name = func.trim(
-            func.coalesce(Patient.last_name, "")
-            + literal(" ")
-            + func.coalesce(Patient.first_name, "")
-            + literal(" ")
-            + func.coalesce(Patient.middle_name, "")
+        appointments = _serialize_appointments_for_listing(
+            db=db,
+            date_from=date_from,
+            date_to=date_to,
+            search=search,
+            limit=limit,
+            offset=offset,
         )
 
-        # Применяем поиск
-        if search:
-            # Для поиска по телефону извлекаем только цифры
-            search_digits = ''.join(filter(str.isdigit, search))
-
-            if search_digits:
-                # Поиск по ФИО, телефону и ID записи (включая только цифры)
-                appointments_query = appointments_query.join(
-                    Patient, Appointment.patient_id == Patient.id
-                ).filter(
-                    or_(
-                        patient_search_name.ilike(f"%{search}%"),
-                        Patient.phone.ilike(f"%{search}%"),
-                        func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(
-                            f"%{search_digits}%"
-                        ),
-                        Appointment.id.cast(String).ilike(f"%{search_digits}%"),
-                    )
-                )
-            else:
-                # Если нет цифр, ищем только по ФИО
-                appointments_query = appointments_query.join(
-                    Patient, Appointment.patient_id == Patient.id
-                ).filter(patient_search_name.ilike(f"%{search}%"))
-
-        appointments = (
-            appointments_query.order_by(Appointment.created_at.desc())
-            .limit(limit // 2)
-            .all()
+        visits = _serialize_visits_for_listing(
+            db=db,
+            date_from=date_from,
+            date_to=date_to,
+            search=search,
+            limit=limit,
+            offset=offset,
         )
-        for apt in appointments:
-            related_visit = None
-            # Получаем имя пациента
-            patient_fio = None
-            if apt.patient_id:
-                patient = db.query(Patient).filter(Patient.id == apt.patient_id).first()
-                if patient:
-                    patient_fio = patient.short_name()
 
-            # Преобразуем ID услуг в названия для appointments
-            service_names = []
-            service_codes = []
-            total_amount = 0
-
-            if apt.services and isinstance(apt.services, list):
-                from app.models.service import Service
-
-                for service_id in apt.services:
-                    try:
-                        service_id_int = int(service_id)
-                        service = (
-                            db.query(Service)
-                            .filter(Service.id == service_id_int)
-                            .first()
-                        )
-                        if service:
-                            service_names.append(service.name)
-                            service_code = service.service_code or get_service_code(
-                                service.id, db
-                            )
-                            if service_code:
-                                service_codes.append(service_code)
-                            if service.price:
-                                total_amount += float(service.price)
-                    except (ValueError, TypeError):
-                        # Если service_id не число, возможно это уже название
-                        service_names.append(str(service_id))
-
-            # Определяем payment_status для Appointment по Payment table.
-            try:
-                from sqlalchemy import and_
-
-                related_visit = (
-                    db.query(Visit)
-                    .filter(
-                        and_(
-                            Visit.patient_id == apt.patient_id,
-                            Visit.visit_date == apt.appointment_date,
-                            Visit.doctor_id == apt.doctor_id,
-                        )
-                    )
-                    .first()
-                )
-            except Exception:
-                related_visit = None
-
-            visit_type = _normalize_registration_discount_mode(
-                getattr(apt, 'visit_type', None)
-            )
-            appointment_payment_processed_at = getattr(apt, 'payment_processed_at', None)
-            payment_status, payment_type = _resolve_payment_truth(
-                db,
-                visit_id=related_visit.id if related_visit else None,
-                legacy_paid_at=appointment_payment_processed_at,
-            )
-
-            result.append(
-                {
-                    'id': apt.id,
-                    'appointment_id': apt.id,
-                    'visit_id': related_visit.id if related_visit else None,
-                    'patient_id': apt.patient_id,
-                    'patient_fio': patient_fio,
-                    'doctor_id': apt.doctor_id,
-                    'department': apt.department,
-                    'appointment_date': apt.appointment_date,
-                    'appointment_time': apt.appointment_time,
-                    'status': _preserve_operational_status_on_payment(apt.status),
-                    'services': service_names,  # Преобразованные названия услуг
-                    'service_codes': service_codes,  # Коды услуг для фильтрации
-                    'total_amount': total_amount,  # Общая сумма услуг
-                    'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
-                    'payment_type': payment_type,
-                    'visit_type': visit_type,  # Тип визита для совместимости
-                    'notes': apt.notes,
-                    'created_at': apt.created_at,
-                    'source': 'appointments',
-                    'queue_numbers': [],  # Старые appointments не имеют номеров в новых очередях
-                    'confirmation_status': 'none',  # Старые appointments не требуют подтверждения
-                    'confirmed_at': None,
-                    'confirmed_by': None,
-                }
-            )
-
-        # 2. Получаем новые visits с фильтрацией
-        visits_query = db.query(Visit)
-
-        # Применяем фильтры по дате
-        if date_from:
-            try:
-                from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
-                visits_query = visits_query.filter(Visit.visit_date >= from_date)
-            except ValueError:
-                pass
-        if date_to:
-            try:
-                to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
-                visits_query = visits_query.filter(Visit.visit_date <= to_date)
-            except ValueError:
-                pass
-
-        # Применяем поиск
-        if search:
-            # Для поиска по телефону извлекаем только цифры
-            search_digits = ''.join(filter(str.isdigit, search))
-
-            if search_digits:
-                # Поиск по ФИО, телефону и ID записи (включая только цифры)
-                visits_query = visits_query.join(
-                    Patient, Visit.patient_id == Patient.id
-                ).filter(
-                    or_(
-                        Patient.full_name.ilike(f"%{search}%"),
-                        Patient.phone.ilike(f"%{search}%"),
-                        func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(
-                            f"%{search_digits}%"
-                        ),
-                        Visit.id.cast(String).ilike(f"%{search_digits}%"),
-                    )
-                )
-            else:
-                # Если нет цифр, ищем только по ФИО
-                visits_query = visits_query.join(
-                    Patient, Visit.patient_id == Patient.id
-                ).filter(Patient.full_name.ilike(f"%{search}%"))
-
-        visits = visits_query.order_by(Visit.created_at.desc()).limit(limit // 2).all()
-        for visit in visits:
-            # Получаем имя пациента
-            patient_fio = None
-            if visit.patient_id:
-                patient = (
-                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
-                )
-                if patient:
-                    patient_fio = patient.short_name()
-
-            # Получаем услуги визита
-            from app.models.service import Service
-            from app.models.visit import VisitService
-
-            visit_services = (
-                db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
-            )
-            service_names = []
-            service_codes = []
-            total_amount = 0
-
-            for vs in visit_services:
-                service_price = 0
-                if vs.price is not None:  # Используем сохраненную цену (включая 0)
-                    service_price = float(vs.price)
-                elif vs.service_id:  # Fallback - ищем цену в таблице services
-                    service = (
-                        db.query(Service).filter(Service.id == vs.service_id).first()
-                    )
-                    if service and service.price:
-                        service_price = float(service.price)
-
-                total_amount += service_price * (vs.qty or 1)
-
-                if vs.name:  # Используем сохраненное имя
-                    service_names.append(vs.name)
-                    if vs.code:
-                        service_codes.append(normalize_service_code(vs.code))
-                else:  # Fallback - ищем в таблице services
-                    service = (
-                        db.query(Service).filter(Service.id == vs.service_id).first()
-                    )
-                    if service:
-                        service_names.append(service.name)
-                        service_code = service.service_code or get_service_code(
-                            service.id, db
-                        )
-                        if service_code:
-                            service_codes.append(service_code)
-
-            # Получаем информацию о номерах в очередях для визита
-            queue_numbers = []
-            confirmation_status = None
-
-            if visit.visit_date == date.today():
-                # Ищем записи в очередях для этого визита
-                from app.models.online_queue import DailyQueue, OnlineQueueEntry
-
-                queue_entries = (
-                    db.query(OnlineQueueEntry)
-                    .filter(OnlineQueueEntry.visit_id == visit.id)
-                    .all()
-                )
-
-                for entry in queue_entries:
-                    queue = (
-                        db.query(DailyQueue)
-                        .filter(DailyQueue.id == entry.queue_id)
-                        .first()
-                    )
-                    if queue:
-                        queue_names = {
-                            "ecg": "ЭКГ",
-                            "cardiology_common": "Кардиолог",
-                            "dermatology": "Дерматолог",
-                            "stomatology": "Стоматолог",
-                            "cosmetology": "Косметолог",
-                            "lab": "Лаборатория",
-                            "general": "Общая очередь",
-                        }
-
-                        queue_numbers.append(
-                            {
-                                "queue_tag": queue.queue_tag or "general",
-                                "queue_name": queue_names.get(
-                                    queue.queue_tag or "general",
-                                    queue.queue_tag or "Общая",
-                                ),
-                                "number": entry.number,
-                                "status": entry.status,
-                            }
-                        )
-
-            # Определяем статус подтверждения
-            if visit.status == "pending_confirmation":
-                confirmation_status = "pending"
-            elif visit.confirmed_at:
-                confirmation_status = "confirmed"
-            else:
-                confirmation_status = "none"
-
-            payment_status, payment_type = _resolve_payment_truth(
-                db,
-                visit_id=visit.id,
-                legacy_paid_at=getattr(visit, 'payment_processed_at', None),
-            )
-            discount_mode = _normalize_registration_discount_mode(
-                getattr(visit, 'discount_mode', None)
-            )
-
-            result.append(
-                {
-                    'id': visit.id + 20000,  # Смещение для избежания конфликтов
-                    'appointment_id': None,
-                    'visit_id': visit.id,
-                    'patient_id': visit.patient_id,
-                    'patient_fio': patient_fio,
-                    'doctor_id': visit.doctor_id,
-                    'department': visit.department,
-                    'appointment_date': visit.visit_date,
-                    'appointment_time': visit.visit_time,
-                    'status': _preserve_operational_status_on_payment(visit.status),
-                    'services': service_names,  # Реальные названия услуг
-                    'service_codes': service_codes,  # Коды услуг для фильтрации
-                    'total_amount': total_amount,  # Общая сумма услуг
-                    'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
-                    'payment_type': payment_type,
-                    'discount_mode': discount_mode,  # Тип визита для отображения
-                    'approval_status': visit.approval_status,  # [OK] ДОБАВЛЕНО: Статус одобрения для all_free
-                    'notes': visit.notes,
-                    'created_at': visit.created_at,
-                    'source': 'visits',
-                    'queue_numbers': queue_numbers,  # Номера в очередях
-                    'confirmation_status': confirmation_status,  # Статус подтверждения
-                    'confirmed_at': (
-                        visit.confirmed_at.isoformat() if visit.confirmed_at else None
-                    ),
-                    'confirmed_by': visit.confirmed_by,
-                }
-            )
-
-        # Сортируем по дате создания
-        result.sort(key=lambda x: x['created_at'], reverse=True)
-
-        # Применяем пагинацию
-        paginated_result = result[offset : offset + limit]
+        result = appointments + visits
 
         return {
-            "data": paginated_result,
+            "items": result,
             "total": len(result),
             "limit": limit,
             "offset": offset,
-            "has_more": offset + limit < len(result),
         }
 
     except Exception:

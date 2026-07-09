@@ -13,6 +13,562 @@ from app.models.user import User
 router = APIRouter()
 
 
+
+def _build_authentication_docs():
+    """Build the authentication section of the endpoint documentation."""
+    return {
+        "description": "Эндпоинты для аутентификации и авторизации",
+        "endpoints": {
+            "POST /api/v1/auth/login": {
+                "description": "Вход в систему",
+                "request_body": {
+                    "type": "form-data",
+                    "fields": {
+                        "username": {
+                            "type": "string",
+                            "required": True,
+                            "example": "YOUR_ADMIN_USERNAME",
+                        },
+                        "password": {
+                            "type": "string",
+                            "required": True,
+                            "example": "REPLACE_WITH_ADMIN_PASSWORD",
+                        },
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Успешная аутентификация",
+                        "example": {
+                            "access_token": "<jwt-access-token>",
+                            "token_type": "bearer",
+                        },
+                    },
+                    "401": {
+                        "description": "Неверные учетные данные",
+                        "example": {"detail": "Incorrect username or password"},
+                    },
+                },
+            },
+            "POST /api/v1/auth/refresh": {
+                "description": "Обновление токена доступа",
+                "request_body": {
+                    "type": "json",
+                    "fields": {
+                        "refresh_token": {"type": "string", "required": True}
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Токен обновлен",
+                        "example": {
+                            "access_token": "<jwt-access-token>",
+                            "token_type": "bearer",
+                        },
+                    }
+                },
+            },
+        },
+    },
+
+
+def _build_users_docs():
+    """Build the users section of the endpoint documentation."""
+    return {
+        "description": "Управление пользователями системы",
+        "endpoints": {
+            "GET /api/v1/users/": {
+                "description": "Получить список всех пользователей",
+                "authorization": "Admin only",
+                "query_parameters": {
+                    "skip": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Количество пропускаемых записей",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Максимальное количество записей",
+                    },
+                    "role": {"type": "string", "description": "Фильтр по роли"},
+                },
+                "responses": {
+                    "200": {
+                        "description": "Список пользователей",
+                        "example": [
+                            {
+                                "id": 1,
+                                "username": "YOUR_ADMIN_USERNAME",
+                                "email": "operator@example.com",
+                                "role": "Admin",
+                                "is_active": True,
+                                "created_at": "2025-01-29T10:00:00Z",
+                            }
+                        ],
+                    }
+                },
+            },
+            "GET /api/v1/users/me": {
+                "description": "Получить информацию о текущем пользователе",
+                "authorization": "Authenticated users",
+                "responses": {
+                    "200": {
+                        "description": "Информация о пользователе",
+                        "example": {
+                            "id": 1,
+                            "username": "YOUR_ADMIN_USERNAME",
+                            "email": "operator@example.com",
+                            "role": "Admin",
+                            "is_active": True,
+                        },
+                    }
+                },
+            },
+            "POST /api/v1/users/": {
+                "description": "Создать нового пользователя",
+                "authorization": "Admin only",
+                "request_body": {
+                    "type": "json",
+                    "fields": {
+                        "username": {
+                            "type": "string",
+                            "required": True,
+                            "example": "doctor1",
+                        },
+                        "email": {
+                            "type": "string",
+                            "required": True,
+                            "example": "doctor@clinic.com",
+                        },
+                        "password": {
+                            "type": "string",
+                            "required": True,
+                            "example": "REPLACE_WITH_USER_PASSWORD",
+                        },
+                        "role": {
+                            "type": "string",
+                            "required": True,
+                            "example": "Doctor",
+                        },
+                        "is_active": {"type": "boolean", "default": True},
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "Пользователь создан",
+                        "example": {
+                            "id": 2,
+                            "username": "doctor1",
+                            "email": "doctor@clinic.com",
+                            "role": "Doctor",
+                            "is_active": True,
+                        },
+                    }
+                },
+            },
+        },
+    },
+
+
+def _build_patients_docs():
+    """Build the patients section of the endpoint documentation."""
+    return {
+        "description": "Управление пациентами",
+        "endpoints": {
+            "GET /api/v1/patients/": {
+                "description": "Получить список пациентов",
+                "authorization": "Authenticated users",
+                "query_parameters": {
+                    "skip": {"type": "integer", "default": 0},
+                    "limit": {"type": "integer", "default": 100},
+                    "search": {
+                        "type": "string",
+                        "description": "Поиск по имени или телефону",
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Список пациентов",
+                        "example": [
+                            {
+                                "id": 1,
+                                "full_name": "Иван Иванов",
+                                "phone": "+998901234567",
+                                "birth_date": "1990-01-01",
+                                "gender": "male",
+                                "created_at": "2025-01-29T10:00:00Z",
+                            }
+                        ],
+                    }
+                },
+            },
+            "POST /api/v1/patients/": {
+                "description": "Создать нового пациента",
+                "authorization": "Authenticated users",
+                "request_body": {
+                    "type": "json",
+                    "fields": {
+                        "full_name": {
+                            "type": "string",
+                            "required": True,
+                            "example": "Иван Иванов",
+                        },
+                        "phone": {
+                            "type": "string",
+                            "required": True,
+                            "example": "+998901234567",
+                        },
+                        "birth_date": {
+                            "type": "string",
+                            "required": True,
+                            "example": "1990-01-01",
+                        },
+                        "gender": {
+                            "type": "string",
+                            "required": True,
+                            "example": "male",
+                        },
+                        "address": {
+                            "type": "string",
+                            "example": "Ташкент, ул. Навои, 1",
+                        },
+                        "notes": {
+                            "type": "string",
+                            "example": "Аллергия на пенициллин",
+                        },
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "Пациент создан",
+                        "example": {
+                            "id": 1,
+                            "full_name": "Иван Иванов",
+                            "phone": "+998901234567",
+                            "birth_date": "1990-01-01",
+                            "gender": "male",
+                        },
+                    }
+                },
+            },
+        },
+    },
+
+
+def _build_visits_docs():
+    """Build the visits section of the endpoint documentation."""
+    return {
+        "description": "Управление визитами пациентов",
+        "endpoints": {
+            "GET /api/v1/visits/": {
+                "description": "Получить список визитов",
+                "authorization": "Authenticated users",
+                "query_parameters": {
+                    "skip": {"type": "integer", "default": 0},
+                    "limit": {"type": "integer", "default": 100},
+                    "patient_id": {
+                        "type": "integer",
+                        "description": "Фильтр по пациенту",
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Фильтр по статусу",
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Список визитов",
+                        "example": [
+                            {
+                                "id": 1,
+                                "patient_id": 1,
+                                "service_id": 1,
+                                "payment_amount": 100000,
+                                "status": "completed",
+                                "notes": "Консультация",
+                                "created_at": "2025-01-29T10:00:00Z",
+                            }
+                        ],
+                    }
+                },
+            },
+            "POST /api/v1/visits/": {
+                "description": "Создать новый визит",
+                "authorization": "Authenticated users",
+                "request_body": {
+                    "type": "json",
+                    "fields": {
+                        "patient_id": {
+                            "type": "integer",
+                            "required": True,
+                            "example": 1,
+                        },
+                        "service_id": {
+                            "type": "integer",
+                            "required": True,
+                            "example": 1,
+                        },
+                        "payment_amount": {
+                            "type": "number",
+                            "required": True,
+                            "example": 100000,
+                        },
+                        "notes": {"type": "string", "example": "Консультация"},
+                        "status": {
+                            "type": "string",
+                            "default": "scheduled",
+                            "example": "scheduled",
+                        },
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "Визит создан",
+                        "example": {
+                            "id": 1,
+                            "patient_id": 1,
+                            "service_id": 1,
+                            "payment_amount": 100000,
+                            "status": "scheduled",
+                        },
+                    }
+                },
+            },
+        },
+    },
+
+
+def _build_payments_docs():
+    """Build the payments section of the endpoint documentation."""
+    return {
+        "description": "Управление платежами",
+        "endpoints": {
+            "GET /api/v1/payments/": {
+                "description": "Получить список платежей",
+                "authorization": "Authenticated users",
+                "query_parameters": {
+                    "skip": {"type": "integer", "default": 0},
+                    "limit": {"type": "integer", "default": 100},
+                    "visit_id": {
+                        "type": "integer",
+                        "description": "Фильтр по визиту",
+                    },
+                    "provider": {
+                        "type": "string",
+                        "description": "Фильтр по провайдеру",
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Список платежей",
+                        "example": [
+                            {
+                                "id": 1,
+                                "visit_id": 1,
+                                "amount": 100000,
+                                "provider": "payme",
+                                "status": "success",
+                                "transaction_id": "txn_123456",
+                                "created_at": "2025-01-29T10:00:00Z",
+                            }
+                        ],
+                    }
+                },
+            },
+            "POST /api/v1/payments/": {
+                "description": "Создать новый платеж",
+                "authorization": "Authenticated users",
+                "request_body": {
+                    "type": "json",
+                    "fields": {
+                        "visit_id": {
+                            "type": "integer",
+                            "required": True,
+                            "example": 1,
+                        },
+                        "amount": {
+                            "type": "number",
+                            "required": True,
+                            "example": 100000,
+                        },
+                        "provider": {
+                            "type": "string",
+                            "required": True,
+                            "example": "payme",
+                        },
+                        "transaction_id": {
+                            "type": "string",
+                            "example": "txn_123456",
+                        },
+                        "status": {
+                            "type": "string",
+                            "default": "pending",
+                            "example": "pending",
+                        },
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "Платеж создан",
+                        "example": {
+                            "id": 1,
+                            "visit_id": 1,
+                            "amount": 100000,
+                            "provider": "payme",
+                            "status": "pending",
+                        },
+                    }
+                },
+            },
+        },
+    },
+
+
+def _build_analytics_docs():
+    """Build the analytics section of the endpoint documentation."""
+    return {
+        "description": "Аналитика и отчеты",
+        "endpoints": {
+            "GET /api/v1/analytics/payment-providers": {
+                "description": "Аналитика по провайдерам платежей",
+                "authorization": "Admin, Doctor, Nurse",
+                "query_parameters": {
+                    "start_date": {
+                        "type": "string",
+                        "description": "Начальная дата (YYYY-MM-DD)",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "Конечная дата (YYYY-MM-DD)",
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Аналитика по провайдерам",
+                        "example": {
+                            "total_transactions": 150,
+                            "total_amount": 15000000,
+                            "providers": {
+                                "payme": {
+                                    "count": 100,
+                                    "amount": 10000000,
+                                    "success_rate": 95.5,
+                                }
+                            },
+                        },
+                    }
+                },
+            },
+            "GET /api/v1/analytics/revenue-breakdown": {
+                "description": "Детальная аналитика доходов",
+                "authorization": "Admin, Doctor, Nurse",
+                "query_parameters": {
+                    "start_date": {
+                        "type": "string",
+                        "description": "Начальная дата (YYYY-MM-DD)",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "Конечная дата (YYYY-MM-DD)",
+                    },
+                    "department": {
+                        "type": "string",
+                        "description": "Фильтр по отделению",
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Детальная аналитика доходов",
+                        "example": {
+                            "total_revenue": 15000000,
+                            "total_transactions": 150,
+                            "average_transaction": 100000,
+                            "provider_breakdown": {
+                                "payme": {
+                                    "count": 100,
+                                    "total_amount": 10000000,
+                                    "average_amount": 100000,
+                                }
+                            },
+                            "daily_revenue": [
+                                {"date": "2025-01-29", "amount": 5000000}
+                            ],
+                        },
+                    }
+                },
+            },
+        },
+    },
+
+
+def _build_notifications_docs():
+    """Build the notifications section of the endpoint documentation."""
+    return {
+        "description": "Система уведомлений",
+        "endpoints": {
+            "GET /api/v1/notifications/templates": {
+                "description": "Получить шаблоны уведомлений",
+                "authorization": "Authenticated users",
+                "responses": {
+                    "200": {
+                        "description": "Список шаблонов",
+                        "example": [
+                            {
+                                "id": 1,
+                                "name": "appointment_reminder",
+                                "type": "appointment",
+                                "channel": "email",
+                                "subject": "Напоминание о записи",
+                                "content": "Уважаемый {{patient_name}}, напоминаем о записи на {{appointment_date}}",
+                            }
+                        ],
+                    }
+                },
+            },
+            "POST /api/v1/notifications/send": {
+                "description": "Отправить уведомление",
+                "authorization": "Authenticated users",
+                "request_body": {
+                    "type": "json",
+                    "fields": {
+                        "template_id": {
+                            "type": "integer",
+                            "required": True,
+                            "example": 1,
+                        },
+                        "recipient": {
+                            "type": "string",
+                            "required": True,
+                            "example": "user@example.com",
+                        },
+                        "channel": {
+                            "type": "string",
+                            "required": True,
+                            "example": "email",
+                        },
+                        "variables": {
+                            "type": "object",
+                            "example": {"patient_name": "Иван Иванов"},
+                        },
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Уведомление отправлено",
+                        "example": {
+                            "id": 1,
+                            "status": "sent",
+                            "sent_at": "2025-01-29T10:00:00Z",
+                        },
+                    }
+                },
+            },
+        },
+    }
+
+
+
 @router.get("/documentation/endpoints", response_model=dict[str, Any])
 async def get_detailed_endpoints_documentation(
     category: str | None = Query(None, description="Категория эндпоинтов"),
@@ -21,532 +577,13 @@ async def get_detailed_endpoints_documentation(
     """Получить детальную документацию по эндпоинтам"""
 
     documentation = {
-        "authentication": {
-            "description": "Эндпоинты для аутентификации и авторизации",
-            "endpoints": {
-                "POST /api/v1/auth/login": {
-                    "description": "Вход в систему",
-                    "request_body": {
-                        "type": "form-data",
-                        "fields": {
-                            "username": {
-                                "type": "string",
-                                "required": True,
-                                "example": "YOUR_ADMIN_USERNAME",
-                            },
-                            "password": {
-                                "type": "string",
-                                "required": True,
-                                "example": "REPLACE_WITH_ADMIN_PASSWORD",
-                            },
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Успешная аутентификация",
-                            "example": {
-                                "access_token": "<jwt-access-token>",
-                                "token_type": "bearer",
-                            },
-                        },
-                        "401": {
-                            "description": "Неверные учетные данные",
-                            "example": {"detail": "Incorrect username or password"},
-                        },
-                    },
-                },
-                "POST /api/v1/auth/refresh": {
-                    "description": "Обновление токена доступа",
-                    "request_body": {
-                        "type": "json",
-                        "fields": {
-                            "refresh_token": {"type": "string", "required": True}
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Токен обновлен",
-                            "example": {
-                                "access_token": "<jwt-access-token>",
-                                "token_type": "bearer",
-                            },
-                        }
-                    },
-                },
-            },
-        },
-        "users": {
-            "description": "Управление пользователями системы",
-            "endpoints": {
-                "GET /api/v1/users/": {
-                    "description": "Получить список всех пользователей",
-                    "authorization": "Admin only",
-                    "query_parameters": {
-                        "skip": {
-                            "type": "integer",
-                            "default": 0,
-                            "description": "Количество пропускаемых записей",
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "default": 100,
-                            "description": "Максимальное количество записей",
-                        },
-                        "role": {"type": "string", "description": "Фильтр по роли"},
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Список пользователей",
-                            "example": [
-                                {
-                                    "id": 1,
-                                    "username": "YOUR_ADMIN_USERNAME",
-                                    "email": "operator@example.com",
-                                    "role": "Admin",
-                                    "is_active": True,
-                                    "created_at": "2025-01-29T10:00:00Z",
-                                }
-                            ],
-                        }
-                    },
-                },
-                "GET /api/v1/users/me": {
-                    "description": "Получить информацию о текущем пользователе",
-                    "authorization": "Authenticated users",
-                    "responses": {
-                        "200": {
-                            "description": "Информация о пользователе",
-                            "example": {
-                                "id": 1,
-                                "username": "YOUR_ADMIN_USERNAME",
-                                "email": "operator@example.com",
-                                "role": "Admin",
-                                "is_active": True,
-                            },
-                        }
-                    },
-                },
-                "POST /api/v1/users/": {
-                    "description": "Создать нового пользователя",
-                    "authorization": "Admin only",
-                    "request_body": {
-                        "type": "json",
-                        "fields": {
-                            "username": {
-                                "type": "string",
-                                "required": True,
-                                "example": "doctor1",
-                            },
-                            "email": {
-                                "type": "string",
-                                "required": True,
-                                "example": "doctor@clinic.com",
-                            },
-                            "password": {
-                                "type": "string",
-                                "required": True,
-                                "example": "REPLACE_WITH_USER_PASSWORD",
-                            },
-                            "role": {
-                                "type": "string",
-                                "required": True,
-                                "example": "Doctor",
-                            },
-                            "is_active": {"type": "boolean", "default": True},
-                        },
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Пользователь создан",
-                            "example": {
-                                "id": 2,
-                                "username": "doctor1",
-                                "email": "doctor@clinic.com",
-                                "role": "Doctor",
-                                "is_active": True,
-                            },
-                        }
-                    },
-                },
-            },
-        },
-        "patients": {
-            "description": "Управление пациентами",
-            "endpoints": {
-                "GET /api/v1/patients/": {
-                    "description": "Получить список пациентов",
-                    "authorization": "Authenticated users",
-                    "query_parameters": {
-                        "skip": {"type": "integer", "default": 0},
-                        "limit": {"type": "integer", "default": 100},
-                        "search": {
-                            "type": "string",
-                            "description": "Поиск по имени или телефону",
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Список пациентов",
-                            "example": [
-                                {
-                                    "id": 1,
-                                    "full_name": "Иван Иванов",
-                                    "phone": "+998901234567",
-                                    "birth_date": "1990-01-01",
-                                    "gender": "male",
-                                    "created_at": "2025-01-29T10:00:00Z",
-                                }
-                            ],
-                        }
-                    },
-                },
-                "POST /api/v1/patients/": {
-                    "description": "Создать нового пациента",
-                    "authorization": "Authenticated users",
-                    "request_body": {
-                        "type": "json",
-                        "fields": {
-                            "full_name": {
-                                "type": "string",
-                                "required": True,
-                                "example": "Иван Иванов",
-                            },
-                            "phone": {
-                                "type": "string",
-                                "required": True,
-                                "example": "+998901234567",
-                            },
-                            "birth_date": {
-                                "type": "string",
-                                "required": True,
-                                "example": "1990-01-01",
-                            },
-                            "gender": {
-                                "type": "string",
-                                "required": True,
-                                "example": "male",
-                            },
-                            "address": {
-                                "type": "string",
-                                "example": "Ташкент, ул. Навои, 1",
-                            },
-                            "notes": {
-                                "type": "string",
-                                "example": "Аллергия на пенициллин",
-                            },
-                        },
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Пациент создан",
-                            "example": {
-                                "id": 1,
-                                "full_name": "Иван Иванов",
-                                "phone": "+998901234567",
-                                "birth_date": "1990-01-01",
-                                "gender": "male",
-                            },
-                        }
-                    },
-                },
-            },
-        },
-        "visits": {
-            "description": "Управление визитами пациентов",
-            "endpoints": {
-                "GET /api/v1/visits/": {
-                    "description": "Получить список визитов",
-                    "authorization": "Authenticated users",
-                    "query_parameters": {
-                        "skip": {"type": "integer", "default": 0},
-                        "limit": {"type": "integer", "default": 100},
-                        "patient_id": {
-                            "type": "integer",
-                            "description": "Фильтр по пациенту",
-                        },
-                        "status": {
-                            "type": "string",
-                            "description": "Фильтр по статусу",
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Список визитов",
-                            "example": [
-                                {
-                                    "id": 1,
-                                    "patient_id": 1,
-                                    "service_id": 1,
-                                    "payment_amount": 100000,
-                                    "status": "completed",
-                                    "notes": "Консультация",
-                                    "created_at": "2025-01-29T10:00:00Z",
-                                }
-                            ],
-                        }
-                    },
-                },
-                "POST /api/v1/visits/": {
-                    "description": "Создать новый визит",
-                    "authorization": "Authenticated users",
-                    "request_body": {
-                        "type": "json",
-                        "fields": {
-                            "patient_id": {
-                                "type": "integer",
-                                "required": True,
-                                "example": 1,
-                            },
-                            "service_id": {
-                                "type": "integer",
-                                "required": True,
-                                "example": 1,
-                            },
-                            "payment_amount": {
-                                "type": "number",
-                                "required": True,
-                                "example": 100000,
-                            },
-                            "notes": {"type": "string", "example": "Консультация"},
-                            "status": {
-                                "type": "string",
-                                "default": "scheduled",
-                                "example": "scheduled",
-                            },
-                        },
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Визит создан",
-                            "example": {
-                                "id": 1,
-                                "patient_id": 1,
-                                "service_id": 1,
-                                "payment_amount": 100000,
-                                "status": "scheduled",
-                            },
-                        }
-                    },
-                },
-            },
-        },
-        "payments": {
-            "description": "Управление платежами",
-            "endpoints": {
-                "GET /api/v1/payments/": {
-                    "description": "Получить список платежей",
-                    "authorization": "Authenticated users",
-                    "query_parameters": {
-                        "skip": {"type": "integer", "default": 0},
-                        "limit": {"type": "integer", "default": 100},
-                        "visit_id": {
-                            "type": "integer",
-                            "description": "Фильтр по визиту",
-                        },
-                        "provider": {
-                            "type": "string",
-                            "description": "Фильтр по провайдеру",
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Список платежей",
-                            "example": [
-                                {
-                                    "id": 1,
-                                    "visit_id": 1,
-                                    "amount": 100000,
-                                    "provider": "payme",
-                                    "status": "success",
-                                    "transaction_id": "txn_123456",
-                                    "created_at": "2025-01-29T10:00:00Z",
-                                }
-                            ],
-                        }
-                    },
-                },
-                "POST /api/v1/payments/": {
-                    "description": "Создать новый платеж",
-                    "authorization": "Authenticated users",
-                    "request_body": {
-                        "type": "json",
-                        "fields": {
-                            "visit_id": {
-                                "type": "integer",
-                                "required": True,
-                                "example": 1,
-                            },
-                            "amount": {
-                                "type": "number",
-                                "required": True,
-                                "example": 100000,
-                            },
-                            "provider": {
-                                "type": "string",
-                                "required": True,
-                                "example": "payme",
-                            },
-                            "transaction_id": {
-                                "type": "string",
-                                "example": "txn_123456",
-                            },
-                            "status": {
-                                "type": "string",
-                                "default": "pending",
-                                "example": "pending",
-                            },
-                        },
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Платеж создан",
-                            "example": {
-                                "id": 1,
-                                "visit_id": 1,
-                                "amount": 100000,
-                                "provider": "payme",
-                                "status": "pending",
-                            },
-                        }
-                    },
-                },
-            },
-        },
-        "analytics": {
-            "description": "Аналитика и отчеты",
-            "endpoints": {
-                "GET /api/v1/analytics/payment-providers": {
-                    "description": "Аналитика по провайдерам платежей",
-                    "authorization": "Admin, Doctor, Nurse",
-                    "query_parameters": {
-                        "start_date": {
-                            "type": "string",
-                            "description": "Начальная дата (YYYY-MM-DD)",
-                        },
-                        "end_date": {
-                            "type": "string",
-                            "description": "Конечная дата (YYYY-MM-DD)",
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Аналитика по провайдерам",
-                            "example": {
-                                "total_transactions": 150,
-                                "total_amount": 15000000,
-                                "providers": {
-                                    "payme": {
-                                        "count": 100,
-                                        "amount": 10000000,
-                                        "success_rate": 95.5,
-                                    }
-                                },
-                            },
-                        }
-                    },
-                },
-                "GET /api/v1/analytics/revenue-breakdown": {
-                    "description": "Детальная аналитика доходов",
-                    "authorization": "Admin, Doctor, Nurse",
-                    "query_parameters": {
-                        "start_date": {
-                            "type": "string",
-                            "description": "Начальная дата (YYYY-MM-DD)",
-                        },
-                        "end_date": {
-                            "type": "string",
-                            "description": "Конечная дата (YYYY-MM-DD)",
-                        },
-                        "department": {
-                            "type": "string",
-                            "description": "Фильтр по отделению",
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Детальная аналитика доходов",
-                            "example": {
-                                "total_revenue": 15000000,
-                                "total_transactions": 150,
-                                "average_transaction": 100000,
-                                "provider_breakdown": {
-                                    "payme": {
-                                        "count": 100,
-                                        "total_amount": 10000000,
-                                        "average_amount": 100000,
-                                    }
-                                },
-                                "daily_revenue": [
-                                    {"date": "2025-01-29", "amount": 5000000}
-                                ],
-                            },
-                        }
-                    },
-                },
-            },
-        },
-        "notifications": {
-            "description": "Система уведомлений",
-            "endpoints": {
-                "GET /api/v1/notifications/templates": {
-                    "description": "Получить шаблоны уведомлений",
-                    "authorization": "Authenticated users",
-                    "responses": {
-                        "200": {
-                            "description": "Список шаблонов",
-                            "example": [
-                                {
-                                    "id": 1,
-                                    "name": "appointment_reminder",
-                                    "type": "appointment",
-                                    "channel": "email",
-                                    "subject": "Напоминание о записи",
-                                    "content": "Уважаемый {{patient_name}}, напоминаем о записи на {{appointment_date}}",
-                                }
-                            ],
-                        }
-                    },
-                },
-                "POST /api/v1/notifications/send": {
-                    "description": "Отправить уведомление",
-                    "authorization": "Authenticated users",
-                    "request_body": {
-                        "type": "json",
-                        "fields": {
-                            "template_id": {
-                                "type": "integer",
-                                "required": True,
-                                "example": 1,
-                            },
-                            "recipient": {
-                                "type": "string",
-                                "required": True,
-                                "example": "user@example.com",
-                            },
-                            "channel": {
-                                "type": "string",
-                                "required": True,
-                                "example": "email",
-                            },
-                            "variables": {
-                                "type": "object",
-                                "example": {"patient_name": "Иван Иванов"},
-                            },
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Уведомление отправлено",
-                            "example": {
-                                "id": 1,
-                                "status": "sent",
-                                "sent_at": "2025-01-29T10:00:00Z",
-                            },
-                        }
-                    },
-                },
-            },
-        },
+        "authentication": _build_authentication_docs(),
+        "users": _build_users_docs(),
+        "patients": _build_patients_docs(),
+        "visits": _build_visits_docs(),
+        "payments": _build_payments_docs(),
+        "analytics": _build_analytics_docs(),
+        "notifications": _build_notifications_docs(),
     }
 
     if category:
@@ -558,6 +595,8 @@ async def get_detailed_endpoints_documentation(
             )
 
     return documentation
+
+
 
 
 @router.get("/documentation/examples", response_model=dict[str, Any])
