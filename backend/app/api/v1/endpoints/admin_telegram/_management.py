@@ -5,6 +5,10 @@ from typing import Any
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 
 
+from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
+    _get_configured_bot_token,
+)
+
 @router.get("/telegram/templates", response_model=dict[str, Any])
 def get_telegram_templates(
     language: str = "ru",

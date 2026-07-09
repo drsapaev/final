@@ -12,6 +12,25 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
 )  # noqa: F401
 
 
+from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F401
+    _build_queue_payload,
+    _detect_ecg_services,
+    _ensure_specialty_queue,
+    _get_visit_created_at,
+    _get_visit_queue_time,
+    _load_queue_data_for_date,
+    _normalize_department_filter,
+    _parse_queue_target_date,
+    _process_appointment_entry,
+    _process_legacy_appointments,
+    _process_online_queue_entries,
+    _process_online_queue_entry,
+    _process_visit_entry,
+    _resolve_queue_entry_metadata,
+    _same_patient_queue_entry_for_visit,
+    _serialize_queue_entry,
+)
+
 def _resolve_entry_department(
     db: Session,
     entry_type: str,

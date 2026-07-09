@@ -82,6 +82,37 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
 )  # noqa: F401
 
 
+from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401
+    _is_patient_settings_context_template,
+    _latest_patient_bot_template_key,
+    _send_patient_bot_reply,
+    _upsert_ticket_qr_telegram_user,
+)
+from app.api.v1.endpoints.telegram_webhook._staff_commands import (  # noqa: F401
+    _billing_totals,
+    _build_lab_report_pdf,
+    _clinic_payments_message,
+    _clinic_queue_message,
+    _clinic_status_message,
+    _clinic_visits_message,
+    _format_money,
+    _handle_contact_link,
+    _handle_staff_link_start,
+    _handle_staff_read_only_menu,
+    _handle_ticket_qr_start,
+    _latest_ready_lab_report_instances,
+    _message_chat_id,
+    _message_from_update,
+    _message_text,
+    _patient_display_name,
+    _patient_for_telegram_chat,
+    _patient_recent_visits,
+    _patient_today_queue_entries,
+    _send_clinic_lab_results,
+    _send_language_choice,
+    _set_notification_consent,
+)
+
 async def _dispatch_clinic_bot_update(
     update: dict[str, Any],
     db: Session,
