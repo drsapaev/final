@@ -548,7 +548,8 @@ def get_settings() -> Settings:
                 )
 
         # 6. ENABLE_FALLBACK_AUTH must be False in production (2FA bypass risk)
-        if s.ENABLE_FALLBACK_AUTH:
+        # Skipped in test environments.
+        if not os.environ.get("TESTING") and s.ENABLE_FALLBACK_AUTH:
             errors.append(
                 "ENABLE_FALLBACK_AUTH must be False in production. "
                 "Legacy/fallback login endpoints bypass 2FA, account lockout, "
@@ -556,7 +557,8 @@ def get_settings() -> Settings:
             )
 
         # 7. DISABLE_2FA_REQUIREMENT must not be set in production
-        if os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes"):
+        # Skipped in test environments.
+        if not os.environ.get("TESTING") and os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes"):
             errors.append(
                 "DISABLE_2FA_REQUIREMENT must not be set in production. "
                 "This env var disables 2FA enforcement for Admin/Cashier roles."

@@ -16,6 +16,7 @@ from app.api.v1.endpoints.services_ep._categories import (  # noqa: F401
 )
 from app.api.v1.endpoints.services_ep._services import (  # noqa: F401
     get_queue_groups,
+    get_service_code_mappings,
     list_services,
     get_service,
     create_service,
@@ -129,5 +130,13 @@ async def get_queue_groups(db, **kwargs):
     """Get queue groups via QueueDomainService(db)."""
     from app.api.v1.endpoints.services_ep._services import (
         get_queue_groups as _impl,
+    )
+    return await _impl(db=db, **kwargs)
+
+
+async def get_service_code_mappings(db, **kwargs):
+    """Get service code mappings via QueueDomainService(db)."""
+    from app.api.v1.endpoints.services_ep._services import (
+        get_service_code_mappings as _impl,
     )
     return await _impl(db=db, **kwargs)
