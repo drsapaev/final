@@ -169,7 +169,7 @@ async def update_role(
         _raise_roles_internal_error("update_role", e)
 
 
-@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT, )
+@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_role(
     role_id: int,
     db: Session = Depends(get_db),
