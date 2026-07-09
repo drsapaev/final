@@ -47,10 +47,15 @@ from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
     confirm_staff_action,
 )
 from app.api.v1.endpoints.admin_telegram._helpers import (  # noqa: F401
+    _build_telegram_ai_approval_status,
     issue_staff_link_start_token,
 )
 from app.api.v1.endpoints.admin_telegram._settings import (  # noqa: F401
     get_telegram_webhook_info,
+)
+from app.api.v1.endpoints.admin_telegram._ai_approval import (  # noqa: F401
+    send_telegram_ai_approval_alert,
+    capture_telegram_ai_approval_outcome,
 )
 
 __all__ = [
@@ -74,4 +79,7 @@ __all__ = [
     "confirm_staff_action",
     "issue_staff_link_start_token",
     "get_telegram_webhook_info",
+    "_build_telegram_ai_approval_status",
+    "send_telegram_ai_approval_alert",
+    "capture_telegram_ai_approval_outcome",
 ]
