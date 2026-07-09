@@ -44,6 +44,7 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
 from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401
     _normalize_staff_button_text,
     _send_patient_bot_reply,
+    _staff_read_only_commands,
 )
 
 
