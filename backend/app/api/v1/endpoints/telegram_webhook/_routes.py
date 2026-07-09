@@ -9,8 +9,16 @@ from typing import Any
 
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
+    _build_mini_app_appointment_booking_preview_from_request,
+    _build_mini_app_patient_cabinet_summary_from_request,
+    _build_mini_app_patient_forms_preview_from_request,
+    _build_mini_app_patient_manifest_from_request,
+    _build_mini_app_patient_report_download_response,
     _handle_clinic_bot_update,
     _raise_telegram_webhook_internal_error,
+    _save_mini_app_patient_form_submission_from_request,
+    _telegram_bot_info_failure,
+    _telegram_user_from_onboarding_request_auth,
     _validate_webhook_secret,
 )
 

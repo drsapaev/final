@@ -42,6 +42,10 @@ from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._helpers import (
     _normalize_patient_language,
 )  # noqa: F401
+from app.api.v1.endpoints.telegram_webhook._staff_commands import (  # noqa: F401
+    _queue_entry_name,
+    _queue_entry_position,
+)
 
 
 async def _send_patient_bot_reply(
