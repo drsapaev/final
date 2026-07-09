@@ -57,9 +57,7 @@ from app.api.v1.endpoints import (
     emr_ai,
     emr_ai_enhanced,
     emr_export,
-    # P2 cleanup: emr_lab_integration router removed — was dead code.
-    # All lab data flows through /lab/report-instances (lab_reporting.py).
-    # The /emr/lab/* endpoints had 0 frontend callers and returned stub data.
+    emr_lab_integration,
     emr_templates,
     emr_v2,
     emr_versioning_enhanced,
@@ -317,8 +315,9 @@ api_router.include_router(
 api_router.include_router(
     emr_versioning_enhanced.router, prefix="/emr/versions", tags=["emr-versioning"]
 )
-# P2 cleanup: emr_lab_integration router removed — was dead code with 0 frontend callers.
-# All lab data flows through /lab/report-instances (lab_reporting.py).
+api_router.include_router(
+    emr_lab_integration.router, prefix="/emr/lab", tags=["emr-lab"]
+)
 api_router.include_router(emr_export.router, prefix="/emr/export", tags=["emr-export"])
 api_router.include_router(
     advanced_analytics.router, prefix="/analytics/advanced", tags=["advanced-analytics"]
