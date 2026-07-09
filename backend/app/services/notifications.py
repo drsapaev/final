@@ -5,6 +5,8 @@ under :mod:`app.services.notifications_pkg`.
 """
 from __future__ import annotations
 
+from datetime import datetime  # noqa: F401
+
 from app.services.notifications_pkg import (  # noqa: F401
     NotificationSenderService,
     notification_sender_service,
