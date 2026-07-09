@@ -12,7 +12,7 @@ argon2-cffi>=21.3,<26.0
 cryptography>=42.0,<46.0  # F-009: AES encryption for encryption_service.py
 email-validator>=2.0,<3.0  # email validation for schemas/user_management.py
 starlette>=0.40,<0.50  # directly imported in middleware/* (also transitive via FastAPI)
-reportlab>=4.0,<4.6
+reportlab>=4.0,<5.1
 qrcode[pil]>=7.4,<8.3
 pydantic[email]>=2.7,<2.13  # email validator extra (pins email-validator transitively)
 # pyotp removed — code uses custom TOTP implementation (see services/two_factor_service.py)

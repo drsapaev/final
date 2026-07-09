@@ -91,7 +91,7 @@ dependencies = [
   "cryptography>=42.0,<46.0",
 
   # PDF & documents
-  "reportlab>=4.0,<4.6",
+  "reportlab>=4.0,<5.1",
   "weasyprint>=68.1,<70.0",
   "qrcode[pil]>=7.4,<8.3",
   "pillow>=12.2.0,<13.0.0",
