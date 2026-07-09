@@ -26,6 +26,13 @@ from app.services.patient_onboarding_service import PatientOnboardingService
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 
+from app.api.v1.endpoints.telegram_webhook._staff_commands import (  # noqa: F401
+    _handle_staff_link_start,
+    _handle_ticket_qr_start,
+    _handle_contact_link,
+    _handle_staff_read_only_menu,
+)
+
 from app.api.v1.endpoints.telegram_webhook._helpers import (
     _localized_main_menu,
     _localized_services_menu,
