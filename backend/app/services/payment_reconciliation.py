@@ -21,6 +21,20 @@ logger = logging.getLogger(__name__)
 SUPPORTED_RECONCILIATION_PROVIDERS = ("click", "payme", "kaspi")
 
 
+def _as_aware_utc(value: datetime) -> datetime:
+    """Return ``value`` as a timezone-aware UTC datetime.
+
+    SQLAlchemy ``DateTime(timezone=True)`` columns return aware datetimes on
+    PostgreSQL but naive datetimes on SQLite (used by the test suite). Mixing
+    naive and aware datetimes in comparisons or arithmetic raises
+    ``TypeError``. Normalize every datetime read from the database to aware
+    UTC before comparing with ``datetime.now(UTC)``.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 class PaymentReconciliationService:
     """Service for payment reconciliation"""
 
@@ -234,7 +248,7 @@ class PaymentReconciliationService:
                         "currency": payment.currency,
                         "created_at": payment.created_at.isoformat(),
                         "status": payment.status,
-                        "days_pending": (datetime.now(UTC) - payment.created_at).days,
+                        "days_pending": (datetime.now(UTC) - _as_aware_utc(payment.created_at)).days,
                     })
 
             return missing
