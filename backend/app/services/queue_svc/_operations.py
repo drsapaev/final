@@ -5,12 +5,13 @@ Split from queue_service.py.
 from __future__ import annotations
 
 from app.services.queue_svc._base import *  # noqa: F401, F403
-from app.services.queue_svc._base import QueueBusinessServiceMixinBase
+from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
 
 
 class OperationsMixin(QueueBusinessServiceMixinBase):
     """Operations methods."""
 
+    @classmethod
     def check_queue_time_window(
         cls, target_date: date, queue_opened_at: datetime | None = None
     ) -> tuple[bool, str]:
@@ -20,7 +21,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         Returns:
             (is_allowed, message)
         """
-        now = datetime.now()
+        now = _now()
         today = now.date()
         current_time = now.time()
 
@@ -390,7 +391,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         """
         queue_settings = self._load_queue_settings(db)
         timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
-        now_local = datetime.now(timezone)
+        now_local = _now(timezone)
 
         day = target_date
         if day is None:
@@ -516,7 +517,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
         queue_settings = self._load_queue_settings(db)
         timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
-        now_local = datetime.now(timezone)
+        now_local = _now(timezone)
 
         expires_cmp = queue_token.expires_at
         if expires_cmp:

@@ -30,6 +30,20 @@ from app.services.queue_session import (  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
+def _now(tz=None) -> datetime:
+    """Return the current datetime, honoring test monkeypatches.
+
+    Tests freeze time by patching ``app.services.queue_service.datetime`` with
+    a ``FixedDateTime`` subclass. The split modules under ``queue_svc`` import
+    ``datetime`` directly from the stdlib, so a plain ``datetime.now()`` would
+    bypass the patch. Look the class up via the public shim module at call
+    time so the patched class (if any) is used.
+    """
+    from app.services import queue_service
+
+    return queue_service.datetime.now(tz)
+
+
 class QueueError(Exception):
     """Базовое исключение для сервиса очереди."""
 

@@ -5,7 +5,7 @@ Split from queue_service.py.
 from __future__ import annotations
 
 from app.services.queue_svc._base import *  # noqa: F401, F403
-from app.services.queue_svc._base import QueueBusinessServiceMixinBase
+from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
 
 
 class CoreMixin(QueueBusinessServiceMixinBase):
@@ -117,7 +117,7 @@ class CoreMixin(QueueBusinessServiceMixinBase):
         except Exception:
             logger.warning("Unknown timezone '%s', falling back to Asia/Tashkent", tz)
             zone = ZoneInfo("Asia/Tashkent")
-        return datetime.now(zone)
+        return _now(zone)
 
 
     def normalize_queue_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
