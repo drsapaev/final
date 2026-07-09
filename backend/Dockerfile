@@ -6,8 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 # Install system dependencies
+# libmagic1: required by python-magic (F-003 audio magic bytes validation)
+# libpango-1.0-0 libcairo2 libgdk-pixbuf2.0-0: required by weasyprint (PDF generation)
+# libffi-dev: required by argon2-cffi (password hashing)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libfreetype6 libjpeg62-turbo zlib1g ca-certificates bash postgresql-client \
+      libmagic1 libpango-1.0-0 libcairo2 libgdk-pixbuf2.0-0 libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

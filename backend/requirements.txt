@@ -9,10 +9,13 @@ alembic>=1.13,<1.19
 PyJWT>=2.8,<3.0  # migrated from python-jose (archived, CVE-2024-33664)
 passlib[argon2]>=1.7,<1.8
 argon2-cffi>=21.3,<26.0
+cryptography>=42.0,<46.0  # F-009: AES encryption for encryption_service.py
+email-validator>=2.0,<3.0  # email validation for schemas/user_management.py
+starlette>=0.40,<0.50  # directly imported in middleware/* (also transitive via FastAPI)
 reportlab>=4.0,<4.6
 qrcode[pil]>=7.4,<8.3
-pydantic[email]
-pyotp>=2.9,<2.10
+pydantic[email]>=2.7,<2.13  # email validator extra (pins email-validator transitively)
+# pyotp removed — code uses custom TOTP implementation (see services/two_factor_service.py)
 requests>=2.34.2,<3.0
 httpx>=0.25,<0.29
 python-multipart>=0.0.32,<0.0.33
@@ -33,7 +36,6 @@ protobuf>=5.29.6,<6.0.0
 pillow>=12.2.0,<13.0.0
 aiogram>=3.28.2,<4.0.0
 pandas>=3.0.3,<4.0.0
-packaging>=21.0,<24.0
 psutil>=5.9.0,<6.0.0
 strawberry-graphql>=0.315.5
 
@@ -47,4 +49,5 @@ defusedxml>=0.7.1,<0.8
 slowapi==0.1.9
 
 # F-003: Magic bytes validation for audio uploads
+# System dependency required: apt-get install libmagic1 (see Dockerfile)
 python-magic==0.4.27
