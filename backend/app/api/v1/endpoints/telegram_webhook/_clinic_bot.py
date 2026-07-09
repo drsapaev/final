@@ -31,6 +31,7 @@ from app.api.v1.endpoints.telegram_webhook._staff_commands import (  # noqa: F40
     _handle_ticket_qr_start,
     _handle_contact_link,
     _handle_staff_read_only_menu,
+    _message_from_update,
 )
 
 from app.api.v1.endpoints.telegram_webhook._helpers import (
