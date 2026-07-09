@@ -158,7 +158,7 @@ async def send_notification(
 
 @router.post("/appointment-reminder", response_model=dict[str, Any])
 async def send_appointment_reminder(
-    request: SendAppointmentReminderIntegrationRequest,
+    request: SendAppointmentReminderIntegrationRequest | dict[str, Any],
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -167,6 +167,8 @@ async def send_appointment_reminder(
     Отправка напоминания о записи
     """
     try:
+        if isinstance(request, dict):
+            request = SendAppointmentReminderIntegrationRequest(**request)
         patient_phone = request.patient_phone
         appointment_data = request.appointment_data.model_dump(exclude_none=True)
         # Validation already done by Pydantic
@@ -226,7 +228,7 @@ async def send_appointment_reminder(
 
 @router.post("/lab-results-notification", response_model=dict[str, Any])
 async def send_lab_results_notification(
-    request: SendLabResultsNotificationRequest,
+    request: SendLabResultsNotificationRequest | dict[str, Any],
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
@@ -235,6 +237,8 @@ async def send_lab_results_notification(
     Уведомление о готовности результатов анализов
     """
     try:
+        if isinstance(request, dict):
+            request = SendLabResultsNotificationRequest(**request)
         patient_phone = request.patient_phone
         lab_data = request.lab_data.model_dump(exclude_none=True)
         # Validation already done by Pydantic
