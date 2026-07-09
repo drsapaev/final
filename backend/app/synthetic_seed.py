@@ -170,14 +170,22 @@ def _generate_patient() -> dict[str, Any]:
         "doc_number": _random_passport(),
         "address": f"г. Ташкент, {random.choice(DISTRICTS)} район, ул. {random.choice(['Мирзо Улугбека', 'Амира Темура', 'Бабура', 'Шарафа Рашидова'])}, д. {random.randint(1, 200)}",
         "is_deleted": False,
-        "created_at": datetime.now(UTC) - timedelta(days=random.randint(1, 365)),
+        # Store naive UTC datetimes so callers/tests that compare with
+        # ``datetime.utcnow()`` (naive) don't raise TypeError mixing aware
+        # and naive values. SQLite also strips tzinfo on round-trip, so a
+        # naive source value round-trips cleanly.
+        "created_at": datetime.now(UTC).replace(tzinfo=None)
+        - timedelta(days=random.randint(1, 365)),
     }
 
 
 def _generate_visit(patient_id: int, specialty: str) -> dict[str, Any]:
     complaints = random.choice(COMPLAINTS_BY_SPECIALTY.get(specialty, ["Жалобы на общее самочувствие"]))
     icd10 = random.choice(ICD10_BY_SPECIALTY.get(specialty, ["R69"]))
-    visit_date = datetime.now(UTC) - timedelta(days=random.randint(0, 90))
+    # Naive UTC for the same reason as ``_generate_patient.created_at`` above.
+    visit_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+        days=random.randint(0, 90)
+    )
 
     return {
         "patient_id": patient_id,

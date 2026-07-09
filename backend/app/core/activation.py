@@ -23,6 +23,21 @@ from app.models.activation import (
 
 logger = logging.getLogger(__name__)
 
+
+def _as_aware_utc(value: datetime) -> datetime:
+    """Return ``value`` as a timezone-aware UTC datetime.
+
+    SQLAlchemy ``DateTime(timezone=True)`` columns return aware datetimes on
+    PostgreSQL but naive datetimes on SQLite (used by the test suite). Mixing
+    naive and aware datetimes in comparisons raises ``TypeError``. Normalize
+    every datetime read from the database to aware UTC before comparing with
+    ``datetime.now(UTC)``.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 # ---------- Машинный идентификатор (серверный) ----------
 
 
@@ -158,7 +173,7 @@ def _activate_key(db: Session, *, key: str, commit: bool) -> ActivateResult:
         )
 
     # Проверим срок
-    if row.expiry_date and datetime.now(UTC) > row.expiry_date:
+    if row.expiry_date and datetime.now(UTC) > _as_aware_utc(row.expiry_date):
         row.status = ActivationStatus.EXPIRED
         db.flush()
         if commit:
@@ -236,7 +251,7 @@ def validate_server_activation(db: Session) -> Status:
     if row.status == ActivationStatus.REVOKED:
         return Status(ok=False, reason="REVOKED", key=row.key, machine_hash=mh)
 
-    if row.expiry_date and datetime.now(UTC) > row.expiry_date:
+    if row.expiry_date and datetime.now(UTC) > _as_aware_utc(row.expiry_date):
         row.status = ActivationStatus.EXPIRED
         db.flush()
         db.commit()

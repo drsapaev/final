@@ -37,6 +37,20 @@ from app.schemas.user_management import (
 )
 
 
+def _as_aware_utc(value: datetime) -> datetime:
+    """Return ``value`` as a timezone-aware UTC datetime.
+
+    SQLAlchemy ``DateTime(timezone=True)`` columns return aware datetimes on
+    PostgreSQL but naive datetimes on SQLite (used by the test suite). Mixing
+    naive and aware datetimes in comparisons raises ``TypeError``. Normalize
+    every datetime read from the database to aware UTC before comparing with
+    ``datetime.now(UTC)``.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 class CRUDUserProfile(CRUDBase[UserProfile, UserProfileCreate, UserProfileUpdate]):
     """CRUD операции для профилей пользователей"""
 
@@ -135,7 +149,7 @@ class CRUDUserProfile(CRUDBase[UserProfile, UserProfileCreate, UserProfileUpdate
         """Проверить, заблокирован ли пользователь"""
         profile = self.get_by_user_id(db, user_id)
         if profile and profile.locked_until:
-            return profile.locked_until > datetime.now(UTC)
+            return _as_aware_utc(profile.locked_until) > datetime.now(UTC)
         return False
 
 

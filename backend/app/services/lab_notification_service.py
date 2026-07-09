@@ -19,6 +19,20 @@ from app.services.notifications import notification_sender_service
 logger = logging.getLogger(__name__)
 
 
+def _as_aware_utc(value: datetime) -> datetime:
+    """Return ``value`` as a timezone-aware UTC datetime.
+
+    SQLAlchemy ``DateTime(timezone=True)`` columns return aware datetimes on
+    PostgreSQL but naive datetimes on SQLite (used by the test suite). Mixing
+    naive and aware datetimes in comparisons or arithmetic raises
+    ``TypeError``. Normalize every datetime read from the database to aware
+    UTC before comparing with ``datetime.now(UTC)``.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 class LabNotificationService:
     """
     Сервис автоматических уведомлений о результатах анализов
@@ -355,7 +369,7 @@ class LabNotificationService:
                 patient = self.db.query(Patient).filter(Patient.id == order.patient_id).first()
 
                 if patient:
-                    days_until = (order.follow_up_date - datetime.now(UTC)).days
+                    days_until = (_as_aware_utc(order.follow_up_date) - datetime.now(UTC)).days
 
                     message = f"""
 📅 Напоминание о повторном анализе
