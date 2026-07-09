@@ -53,6 +53,7 @@ from app.api.v1.endpoints.telegram_webhook._routes import (  # noqa: F401
     send_message_to_user,
 )
 from app.api.v1.endpoints.telegram_webhook._staff_commands import (  # noqa: F401
+    _build_lab_report_pdf,
     _clinic_payments_message,
     _clinic_queue_message,
     _clinic_visits_message,
@@ -95,6 +96,7 @@ __all__ = [
     # Functions from _patient_commands
     "_send_patient_bot_reply",
     # Functions from _staff_commands
+    "_build_lab_report_pdf",
     "_clinic_payments_message",
     "_clinic_queue_message",
     "_clinic_visits_message",

@@ -507,6 +507,18 @@ class RestMixin(NotificationPlatformServiceMixinBase):
 
 
 def get_notification_platform_service(db: Session) -> NotificationPlatformService:
-    return NotificationPlatformService(db)
+    return _resolve_platform_service_class()(db)
+
+
+def _resolve_platform_service_class():
+    # Local helper kept for backward-compat with code that monkeypatches
+    # ``app.services.notification_platform_service.get_notification_ws_manager``
+    # and similar shims. Resolved lazily to avoid the circular import that
+    # occurs because ``app.services.notification_platform`` imports this
+    # mixin module before ``NotificationPlatformService`` is defined.
+    from app.services.notification_platform import NotificationPlatformService
+
+    return NotificationPlatformService
+
 
 

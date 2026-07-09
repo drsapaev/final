@@ -6,13 +6,17 @@ from app.services.patient_onboarding._base import PatientOnboardingServiceMixinB
 from app.services.patient_onboarding._base import (  # noqa: F401
     _as_aware_utc,
     _clean_text,
+    _decode_candidate_id,
+    _default_review_message,
     _mask_name,
     _mask_phone,
+    _patient_ref,
     _request_payload,
     _safe_note,
     _safe_note_hash,
     _utc_now,
 )
+from app.services.patient_service import PatientService  # noqa: F401
 
 
 class ReviewMixin(PatientOnboardingServiceMixinBase):
