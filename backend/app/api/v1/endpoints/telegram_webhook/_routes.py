@@ -43,7 +43,9 @@ from app.schemas.notifications import (
     TelegramWebhookUpdateRequest,
 )
 
-router = APIRouter()
+# Use the shared router from _helpers (not a new instance) so that routes
+# registered here are visible when api.py imports telegram_webhook.router.
+from app.api.v1.endpoints.telegram_webhook._helpers import router  # noqa: F401
 
 
 def _is_duplicate_update(db, update_id: int | None) -> bool:
