@@ -3,6 +3,12 @@ from __future__ import annotations
 
 from app.services.patient_onboarding._base import *  # noqa: F401, F403
 from app.services.patient_onboarding._base import PatientOnboardingServiceMixinBase
+from app.services.patient_onboarding._base import (  # noqa: F401
+    _request_payload,
+    _safe_note,
+    _safe_note_hash,
+    _utc_now,
+)
 
 
 class ReviewMixin(PatientOnboardingServiceMixinBase):
