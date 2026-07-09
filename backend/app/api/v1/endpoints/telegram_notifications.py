@@ -445,14 +445,20 @@ async def send_lab_results(
 @router.post("/send-payment-confirmation", response_model=dict[str, Any])
 async def send_payment_confirmation(
     patient_id: int,
-    body: SendPaymentConfirmationRequest,
+    payment_data: dict[str, Any],
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
-    """Отправить подтверждение платежа"""
+    """Отправить подтверждение платежа.
+
+    Note: ``payment_data`` is accepted as a plain dict so that callers
+    (both the FastAPI body parser and direct unit-test invocations)
+    can pass through arbitrary payment metadata without going through a
+    Pydantic ``PaymentData`` model that would silently drop unknown
+    keys such as ``transaction_id`` / ``receipt_link``.
+    """
     try:
-        payment_data = body.payment_data.model_dump(exclude_none=True)
         # Получаем данные пациента
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:

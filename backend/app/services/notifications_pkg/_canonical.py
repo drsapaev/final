@@ -81,9 +81,6 @@ class CanonicalMixin(NotificationSenderMixinBase):
 
         return await self.send_telegram(message, chat_id=str(telegram_user.chat_id))
 
-    @staticmethod
-
-
     async def send_canonical_notification_to_user(
         self,
         *,
