@@ -41,6 +41,10 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
     _telegram_onboarding_entry_markup,
     _telegram_settings_message,
 )  # noqa: F401
+from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401
+    _normalize_staff_button_text,
+    _send_patient_bot_reply,
+)
 
 
 async def _handle_staff_read_only_menu(
