@@ -47,7 +47,8 @@ class NotificationSenderService(
     Composed of focused mixin modules under notifications_pkg/.
     """
 
-    def __init__(self):
+    def __init__(self, db=None):
+        self._db = db
         self._email_settings = None
         self._sms_settings = None
 
