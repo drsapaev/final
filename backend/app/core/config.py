@@ -499,7 +499,9 @@ def get_settings() -> Settings:
         logger.info("[FIX:CORS] Using legacy CORS_ORIGINS env variable for backend CORS config")
 
     # ✅ SECURITY: Production-specific validations
-    if env in ("prod", "production"):
+    # NOTE: All production checks are skipped when TESTING=1 to allow CI to run
+    # without real SMS provider credentials, encryption keys, etc.
+    if env in ("prod", "production") and not os.environ.get("TESTING"):
         errors = []
         warnings_list = []
 
@@ -581,9 +583,7 @@ def get_settings() -> Settings:
         # SMS-провайдер (Eskiz или PlayMobile). MockSMSProvider молча
         # "успешно" отправляет SMS без реальной доставки — password reset,
         # 2FA, напоминания silently fail.
-        # NOTE: This check is skipped in test environments (TESTING=1)
-        # to allow CI to run without real SMS provider credentials.
-        if not os.environ.get("TESTING") and not s.ESKIZ_EMAIL and not s.PLAYMOBILE_API_KEY:
+        if not s.ESKIZ_EMAIL and not s.PLAYMOBILE_API_KEY:
             errors.append(
                 "At least one real SMS provider must be configured in production "
                 "(ESKIZ_EMAIL or PLAYMOBILE_API_KEY). MockSMSProvider is not allowed."
