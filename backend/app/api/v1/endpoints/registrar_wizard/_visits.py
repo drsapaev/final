@@ -294,6 +294,7 @@ def _serialize_appointments_for_listing(
         .limit(limit // 2)
         .all()
     )
+    result = []
     for apt in appointments:
         related_visit = None
         # Получаем имя пациента
@@ -450,6 +451,7 @@ def _serialize_visits_for_listing(
             ).filter(Patient.full_name.ilike(f"%{search}%"))
 
     visits = visits_query.order_by(Visit.created_at.desc()).limit(limit // 2).all()
+    result = []
     for visit in visits:
         # Получаем имя пациента
         patient_fio = None
@@ -646,7 +648,7 @@ def get_all_appointments(
         result = appointments + visits
 
         return {
-            "items": result,
+            "data": result,
             "total": len(result),
             "limit": limit,
             "offset": offset,

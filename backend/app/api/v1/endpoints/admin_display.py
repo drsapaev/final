@@ -142,7 +142,7 @@ def _serialize_theme(theme: DisplayTheme) -> dict[str, Any]:
 # ===================== УПРАВЛЕНИЕ ТАБЛО =====================
 
 
-@router.get("/display/boards", response_model=dict[str, Any])
+@router.get("/display/boards", response_model=list[dict[str, Any]])
 def get_display_boards(
     active_only: bool = True,
     db: Session = Depends(get_db),
@@ -303,7 +303,7 @@ def upload_banner_image(
 # ===================== ТЕМЫ =====================
 
 
-@router.get("/display/themes", response_model=dict[str, Any])
+@router.get("/display/themes", response_model=list[dict[str, Any]])
 def get_display_themes(
     active_only: bool = True,
     db: Session = Depends(get_db),

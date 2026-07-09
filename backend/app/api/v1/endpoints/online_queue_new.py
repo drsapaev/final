@@ -88,7 +88,7 @@ def generate_qr_token(
 # ===================== ВСТУПЛЕНИЕ В ОЧЕРЕДЬ =====================
 
 
-@router.post("/online-queue/join", response_model=dict[str, Any])
+@router.post("/online-queue/join", response_model=QueueJoinResponse | QueueJoinError)
 def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
     """
     Вступление в онлайн-очередь

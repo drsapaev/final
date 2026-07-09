@@ -583,9 +583,15 @@ class OperationsMixin(UserManagementServiceMixinBase):
 
 # Глобальный экземпляр сервиса
 
+_user_management_service: "UserManagementService | None" = None
 
-def get_user_management_service() -> UserManagementService:
+
+def get_user_management_service() -> "UserManagementService":
     """Получить экземпляр сервиса управления пользователями"""
-    return user_management_service
+    global _user_management_service
+    if _user_management_service is None:
+        from app.services.user_mgmt import UserManagementService
+        _user_management_service = UserManagementService()
+    return _user_management_service
 
 

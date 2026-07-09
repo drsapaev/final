@@ -1257,7 +1257,9 @@ def _build_mini_app_patient_report_download_response(
         )
 
     try:
-        filename, pdf_bytes, _caption = _build_lab_report_pdf(db, report)
+        from app.api.v1.endpoints import telegram_webhook
+
+        filename, pdf_bytes, _caption = telegram_webhook._build_lab_report_pdf(db, report)
     except Exception as exc:
         _raise_telegram_webhook_internal_error(
             "mini_app_patient_report_download",
