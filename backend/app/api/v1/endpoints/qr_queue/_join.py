@@ -63,7 +63,7 @@ def start_join_session(
         )
 
 
-@router.post("/join/complete", response_model=dict[str, Any])
+@router.post("/join/complete", response_model=JoinSessionCompleteResponse | JoinSessionCompleteMultipleResponse)
 def complete_join_session(
     request: JoinSessionCompleteRequest, db: Session = Depends(get_db)
 ):

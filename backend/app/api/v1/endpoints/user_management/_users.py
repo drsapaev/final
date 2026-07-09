@@ -638,7 +638,9 @@ async def get_user_stats(
 ):
     """Получить статистику пользователей"""
     try:
-        service = get_user_management_service()
+        from app.api.v1.endpoints import user_management
+
+        service = user_management.get_user_management_service()
         stats = service.get_user_stats(db)
 
         return UserStatsResponse(**stats)
@@ -818,7 +820,9 @@ async def get_user(
             detail="Нет доступа к данным другого пользователя",
         )
     try:
-        service = get_user_management_service()
+        from app.api.v1.endpoints import user_management
+
+        service = user_management.get_user_management_service()
         profile_data = service.get_user_profile(db, user_id)
 
         if not profile_data:

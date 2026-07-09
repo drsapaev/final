@@ -274,7 +274,6 @@ def add_service(
 @router.post(
     "/visits/{visit_id}/status",
     summary="Смена статуса визита",
-response_model=dict[str, Any],
 )
 def set_status(
     visit_id: int,
@@ -332,13 +331,11 @@ def set_status(
     "/visits/{visit_id}/reschedule",
     dependencies=[Depends(require_roles("Admin", "Registrar"))],
     summary="Перенести визит на конкретную дату (new_date в формате YYYY-MM-DD)",
-response_model=dict[str, Any],
 )
 @router.post(
     "/{visit_id}/reschedule",
     dependencies=[Depends(require_roles("Admin", "Registrar"))],
     summary="Перенести визит на конкретную дату (legacy alias)",
-response_model=dict[str, Any],
 )
 def reschedule_visit(
     visit_id: int,
@@ -417,13 +414,11 @@ def reschedule_visit(
     "/visits/{visit_id}/reschedule/tomorrow",
     dependencies=[Depends(require_roles("Admin", "Registrar"))],
     summary="Перенести визит на завтра (planned_date = today + 1)",
-response_model=dict[str, Any],
 )
 @router.post(
     "/{visit_id}/reschedule/tomorrow",
     dependencies=[Depends(require_roles("Admin", "Registrar"))],
     summary="Перенести визит на завтра (legacy alias)",
-response_model=dict[str, Any],
 )
 def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
     t = _visits(db)

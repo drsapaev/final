@@ -11,6 +11,7 @@ from app.services.qr_queue._base import QRQueueServiceMixinBase
 class SpecialistsMixin(QRQueueServiceMixinBase):
     """Specialists methods for QRQueueService."""
 
+    @staticmethod
     def _normalize_specialty_key(value: Any) -> str:
         normalized = str(value or "").strip().lower()
         aliases = {
@@ -23,8 +24,6 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
         return aliases.get(normalized, normalized)
 
     @staticmethod
-
-
     def _queue_profile_icon(key: str, configured_icon: str | None) -> str:
         emoji_map = {
             "cardiology": "❤️",
