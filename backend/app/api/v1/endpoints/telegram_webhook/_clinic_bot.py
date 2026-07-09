@@ -51,6 +51,68 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
 )  # noqa: F401
 
 
+async def _dispatch_clinic_bot_update(
+    update: dict[str, Any],
+    db: Session,
+    bot_service,
+    start_handler,
+    command_handlers: dict,
+    text_handlers: dict,
+) -> bool:
+    """Dispatch a clinic bot update to the appropriate handler."""
+    dispatch = getattr(bot_service, "process_patient_bot_update", None)
+    if callable(dispatch):
+        return await dispatch(
+            update,
+            db,
+            staff_start_handler=_handle_staff_link_start,
+            staff_menu_handler=_handle_staff_read_only_menu,
+            ticket_start_handler=_handle_ticket_qr_start,
+            contact_handler=_handle_contact_link,
+            start_handler=start_handler,
+            command_handlers=command_handlers,
+            text_handlers=text_handlers,
+        )
+
+    if await _handle_staff_link_start(update, db, bot_service):
+        return True
+
+    if await _handle_staff_read_only_menu(update, db, bot_service):
+        return True
+
+    if await _handle_ticket_qr_start(update, db, bot_service):
+        return True
+
+    message = _message_from_update(update)
+    if not message:
+        return False
+
+    chat_id = _message_chat_id(message)
+    if chat_id is None:
+        return False
+
+    if await _handle_contact_link(message, db, bot_service):
+        return True
+
+    existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+    if existing_telegram_user is None:
+        _upsert_ticket_qr_telegram_user(db, message, notifications_enabled=False)
+        db.commit()
+
+    text = _message_text(message)
+    command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
+    handler = command_handlers.get(command) or text_handlers.get(
+        _normalize_patient_button_text(text)
+    )
+    if command == "/start":
+        await start_handler(chat_id, message)
+        return True
+    if handler:
+        await handler(chat_id)
+        return True
+    return False
+
+
 async def _handle_clinic_bot_update(
     update: dict[str, Any], db: Session, bot_service
 ) -> bool:
@@ -392,57 +454,16 @@ async def _handle_clinic_bot_update(
         ]
     )
 
-    dispatch = getattr(bot_service, "process_patient_bot_update", None)
-    if callable(dispatch):
-        return await dispatch(
-            update,
-            db,
-            staff_start_handler=_handle_staff_link_start,
-            staff_menu_handler=_handle_staff_read_only_menu,
-            ticket_start_handler=_handle_ticket_qr_start,
-            contact_handler=_handle_contact_link,
-            start_handler=start_handler,
-            command_handlers=command_handlers,
-            text_handlers=text_handlers,
-        )
-
-    if await _handle_staff_link_start(update, db, bot_service):
-        return True
-
-    if await _handle_staff_read_only_menu(update, db, bot_service):
-        return True
-
-    if await _handle_ticket_qr_start(update, db, bot_service):
-        return True
-
-    message = _message_from_update(update)
-    if not message:
-        return False
-
-    chat_id = _message_chat_id(message)
-    if chat_id is None:
-        return False
-
-    if await _handle_contact_link(message, db, bot_service):
-        return True
-
-    existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
-    if existing_telegram_user is None:
-        _upsert_ticket_qr_telegram_user(db, message, notifications_enabled=False)
-        db.commit()
-
-    text = _message_text(message)
-    command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
-    handler = command_handlers.get(command) or text_handlers.get(
-        _normalize_patient_button_text(text)
+    # Dispatch the update to the appropriate handler
+    return await _dispatch_clinic_bot_update(
+        update=update,
+        db=db,
+        bot_service=bot_service,
+        start_handler=start_handler,
+        command_handlers=command_handlers,
+        text_handlers=text_handlers,
     )
-    if command == "/start":
-        await start_handler(chat_id, message)
-        return True
-    if handler:
-        await handler(chat_id)
-        return True
-    return False
+
 
 
 class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
