@@ -1,6 +1,7 @@
 """Service layer for specialized_panels endpoints."""
 
 from __future__ import annotations
+from app.core.i18n import t  # noqa: F401
 
 from dataclasses import dataclass
 from datetime import date

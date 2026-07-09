@@ -23,6 +23,7 @@ from app.schemas.derma import (
     DermaProcedureOut,
 )
 from app.services.derma_api_service import DermaApiDomainError, DermaApiService
+from app.core.i18n import t  # noqa: F401
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 logger = logging.getLogger(__name__)

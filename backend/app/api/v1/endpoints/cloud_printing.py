@@ -445,8 +445,8 @@ async def quick_print_prescription(
         }
 
         job_id = await printing_service.print_medical_document(
-            provider_name=provider_name,
-            printer_id=printer_id,
+            provider_name=request.provider_name,
+            printer_id=request.printer_id,
             document_type="prescription",
             patient_data=patient_data,
             template_data=template_data,
@@ -496,8 +496,8 @@ async def quick_print_ticket(
         }
 
         job_id = await printing_service.print_medical_document(
-            provider_name=provider_name,
-            printer_id=printer_id,
+            provider_name=request.provider_name,
+            printer_id=request.printer_id,
             document_type="ticket",
             patient_data=patient_data,
             template_data=template_data,

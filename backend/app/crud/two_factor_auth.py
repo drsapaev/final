@@ -3,6 +3,7 @@ CRUD операции для двухфакторной аутентификац
 """
 
 
+from datetime import UTC
 from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
 

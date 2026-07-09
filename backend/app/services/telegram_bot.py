@@ -22,6 +22,7 @@ from app.crud import (
     user as crud_user,
 )
 from app.models.telegram_config import TelegramUser
+import requests  # noqa: F401
 
 logger = logging.getLogger(__name__)
 MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024

@@ -15,6 +15,7 @@ from app.api import deps
 from app.services.ai_feature_gating import RequireAiFeature
 from app.services.doctor_phrase_service import get_doctor_phrase_service
 from app.services.phrase_suggest_api_service import PhraseSuggestApiService
+from fastapi import status  # noqa: F401
 
 router = APIRouter()
 

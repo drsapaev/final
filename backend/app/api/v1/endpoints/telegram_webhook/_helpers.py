@@ -121,6 +121,7 @@ from app.services.visit_confirmation_service import (  # noqa: F401
 )
 from app.utils.validators import normalize_phone_uz  # noqa: F401
 
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -1348,6 +1349,10 @@ def _telegram_service_entry_markup(
     section: str,
     button_text_key: str,
 ) -> dict[str, Any] | None:
+    from app.api.v1.endpoints.telegram_webhook._staff_commands import (
+        _patient_for_telegram_chat,
+    )
+
     telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
         return None

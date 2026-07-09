@@ -41,6 +41,7 @@ from app.models.visit import Visit
 from app.schemas.notifications import SendPaymentConfirmationRequest
 from app.services.telegram_bot import get_telegram_bot_service
 from app.services.telegram_templates import get_telegram_templates_service
+from app.core.i18n import t  # noqa: F401
 
 router = APIRouter()
 

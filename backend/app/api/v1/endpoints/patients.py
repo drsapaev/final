@@ -16,6 +16,7 @@ from app.services.patient_portal_service import (
     PatientPortalService,
 )
 from app.services.patient_service import PatientService
+from app.core.i18n import t  # noqa: F401
 
 router = APIRouter()
 

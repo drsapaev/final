@@ -45,6 +45,7 @@ from app.schemas.file_system import (
 from app.services.file_system_api_service import FileSystemApiService
 from app.services.file_system_service import get_file_system_service
 from app.utils.file_validator import validate_upload_file
+from app.core.i18n import t  # noqa: F401
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
