@@ -685,7 +685,10 @@ def _status_counts(rows: list[tuple[Any, Any]]) -> dict[str, int]:
 
 def _format_money(amount: Any) -> str:
     value = amount if isinstance(amount, Decimal) else Decimal(str(amount or 0))
-    return f"{value.quantize(Decimal('0.01'))} UZS"
+    normalized = value.quantize(Decimal("0.01"))
+    if normalized == normalized.to_integral_value():
+        return f"{int(normalized):,}".replace(",", " ")
+    return f"{normalized:,.2f}".replace(",", " ")
 
 
 def _queue_status_counts(db: Session) -> dict[str, int]:
