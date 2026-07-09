@@ -149,9 +149,11 @@ class FileSystemService:
         expires_at = getattr(share, "expires_at", None)
         if expires_at is None:
             return True
-        now = (
-            datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.now(UTC)
-        )
+        # Normalize naive datetimes to UTC so we can compare with datetime.now(UTC).
+        # Legacy callers/tests may store naive expires_at (e.g. datetime.utcnow()).
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        now = datetime.now(UTC)
         return expires_at > now
 
     @staticmethod

@@ -42,10 +42,22 @@ _CACHE_TS: datetime | None = None
 _CACHE_TTL = timedelta(minutes=5)
 
 
+def _to_aware_utc(dt: datetime) -> datetime:
+    """Normalize a datetime to timezone-aware UTC.
+
+    Tests and legacy callers may store naive datetimes (e.g. ``datetime.utcnow()``)
+    into ``_CACHE_TS``. Comparing aware ``datetime.now(UTC)`` against a naive
+    cache timestamp raises ``TypeError``. Treat naive timestamps as UTC.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
 def _ensure_cache_fresh(db: Session) -> None:
     """Refresh cache if older than TTL."""
     global _CACHE, _CACHE_TS
-    if _CACHE_TS is not None and datetime.now(UTC) - _CACHE_TS < _CACHE_TTL:
+    if _CACHE_TS is not None and datetime.now(UTC) - _to_aware_utc(_CACHE_TS) < _CACHE_TTL:
         return
 
     logger.info("wait_time_predictor: refreshing cache...")
