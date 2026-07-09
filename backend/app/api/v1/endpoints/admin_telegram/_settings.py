@@ -12,6 +12,7 @@ from app.api.v1.endpoints.admin_telegram._helpers import (
 )  # noqa: F401
 from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
     TelegramWebhookRequest,
+    webhook_info_error_response,
 )
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 
