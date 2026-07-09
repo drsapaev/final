@@ -8,6 +8,7 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
     _normalize_registration_discount_mode,
     _serialize_registrar_datetime,
 )  # noqa: F401
+from app.services.queue_service import queue_service  # noqa: F401
 
 
 @router.get("/registrar/queue-settings", response_model=dict[str, Any])
