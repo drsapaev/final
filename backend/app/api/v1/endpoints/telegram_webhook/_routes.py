@@ -457,7 +457,12 @@ async def telegram_webhook(
         )
 
         # Получаем сервис бота
-        bot_service = await get_telegram_bot_service()
+        # Resolve via package namespace so monkeypatch of
+        # telegram_webhook.get_telegram_bot_service takes effect.
+        from app.api.v1.endpoints.telegram_webhook import (
+            get_telegram_bot_service as _get_telegram_bot_service,
+        )
+        bot_service = await _get_telegram_bot_service()
 
         # Инициализируем бота если нужно
         if not bot_service.active:
