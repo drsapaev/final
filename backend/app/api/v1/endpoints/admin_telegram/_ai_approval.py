@@ -74,7 +74,12 @@ async def send_telegram_ai_approval_alert(
         protected_url,
         request.metrics,
     )
-    bot_service = await get_telegram_bot_service()
+    # Resolve via package namespace so monkeypatch of
+    # admin_telegram.get_telegram_bot_service takes effect.
+    from app.api.v1.endpoints.admin_telegram import (
+        get_telegram_bot_service as _get_telegram_bot_service,
+    )
+    bot_service = await _get_telegram_bot_service()
     if not bool(getattr(bot_service, "active", False)):
         await bot_service.initialize(db)
     if not getattr(bot_service, "bot_token", None):

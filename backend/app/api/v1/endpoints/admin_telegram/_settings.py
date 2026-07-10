@@ -267,7 +267,11 @@ async def register_staff_bot_commands(
             )
 
         commands = _staff_bot_read_only_command_payload()
-        bot_service = await get_telegram_bot_service()
+        # Resolve via package namespace so monkeypatch takes effect.
+        from app.api.v1.endpoints.admin_telegram import (
+            get_telegram_bot_service as _get_telegram_bot_service,
+        )
+        bot_service = await _get_telegram_bot_service()
         ok, error = await bot_service.set_staff_bot_commands(
             staff_bot_token, commands=commands
         )
