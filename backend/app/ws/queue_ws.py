@@ -218,15 +218,25 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
 
     Раньше принимал любой `Bearer foo` или `?token=anything` — anonymous
     пользователи получали доступ ко всем обновлениям очереди (PHI leak).
+
+    PR-4: prefer Authorization header over ?token= query param. Query
+    param still accepted for backward compat but emits a deprecation
+    warning via the caller.
     """
     if os.getenv("WS_DEV_ALLOW", "0") == "1":
         return True
-    # Extract token from header or query param
+    # Extract token from header (preferred) or query param (legacy)
     auth = headers.get("authorization") or headers.get("Authorization")
     token = None
     if auth and auth.lower().startswith("bearer "):
         token = auth.split(" ", 1)[1].strip()
     elif token_qs:
+        # PR-4: query-string JWT is insecure — log deprecation
+        log.warning(
+            "WS auth via ?token= query param is deprecated and insecure "
+            "(use Authorization header or Sec-WebSocket-Protocol subprotocol); "
+            "path=ws/queue"
+        )
         token = token_qs.strip()
     if not token:
         return False
@@ -302,6 +312,13 @@ async def ws_queue(
         websocket.url.path,
         websocket.url.query,
     )
+
+    # PR-4: also extract token from subprotocol/Authorization header
+    # so clients don't need to put JWT in the URL.
+    from app.api.v1.endpoints.ws_token import extract_ws_token
+    secure_token = extract_ws_token(websocket)
+    if secure_token and not token:
+        token = secure_token
 
     # ✅ SECURITY: Check environment - only allow DEV bypass in development
     env = os.getenv("ENV", "dev").lower()
