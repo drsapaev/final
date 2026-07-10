@@ -467,7 +467,12 @@ async def telegram_webhook(
         if await _handle_clinic_bot_update(update, db, bot_service):
             return {"status": "ok", "handled": "clinic_bot_update"}
 
-        await bot_service.process_webhook_update(update, db)
+        # If _handle_clinic_bot_update returned False, the update was not
+        # handled by any clinic bot handler. Try the legacy
+        # process_webhook_update method as a fallback.
+        process_wh = getattr(bot_service, "process_webhook_update", None)
+        if callable(process_wh):
+            await process_wh(update, db)
 
         return {"status": "ok"}
 
