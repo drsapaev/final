@@ -447,3 +447,15 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "migration: Тесты миграций")
     config.addinivalue_line("markers", "confirmation: Тесты подтверждения визитов")
     config.addinivalue_line("markers", "queue: Тесты очередей")
+
+
+@pytest.fixture(scope="function")
+def admin_auth_headers(client, admin_user, admin_password):
+    """Alias for auth_headers — some tests use admin_auth_headers."""
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": admin_user.username, "password": admin_password},
+    )
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
