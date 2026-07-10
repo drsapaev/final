@@ -879,7 +879,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                     </div>
                                                 </div>
                                                 <div className="conv-action">
-                                                    <Plus size={16} color='var(--mac-accent-blue)' />
+                                                    <Plus size={16} color="var(--mac-accent-blue)" />
                                                 </div>
                                             </div>
               )
@@ -1083,6 +1083,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                         {['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) =>
                             <button
                               key={emoji}
+                              aria-label={`React with ${emoji}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleReaction(item.id, emoji);
