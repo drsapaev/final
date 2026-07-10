@@ -18,8 +18,13 @@ from app.api.deps import get_current_user
 import importlib
 crud_appointment = importlib.import_module("app.crud.appointment")
 crud_lab = importlib.import_module("app.crud.lab")
-crud_patient = importlib.import_module("app.crud.patient")
 crud_user = importlib.import_module("app.crud.user")
+# patient is special: app/crud/__init__.py exports `patient = CRUDPatient(...)`
+# via `from .patient import *`. `from app.crud import patient` returns the
+# *instance* (which has methods like get_patient_by_phone). Module-level
+# functions like get_patient_by_user_id live on the module itself.
+# Use the instance for method calls, import the module functions directly.
+from app.crud import patient as crud_patient  # CRUDPatient instance (for methods)
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
 from app.schemas.mobile import (
