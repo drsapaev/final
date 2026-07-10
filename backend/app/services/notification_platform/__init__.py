@@ -37,7 +37,11 @@ class NotificationPlatformService(
     @property
     def ws_manager(self):
         if self._ws_manager is None:
-            self._ws_manager = get_notification_ws_manager()
+            # Resolve via the shim module so tests that monkeypatch
+            # notification_platform_service.get_notification_ws_manager
+            # see the patched value.
+            from app.services import notification_platform_service as _nps
+            self._ws_manager = _nps.get_notification_ws_manager()
         return self._ws_manager
 
     @ws_manager.setter
