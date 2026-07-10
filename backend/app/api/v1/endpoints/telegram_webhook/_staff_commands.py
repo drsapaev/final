@@ -300,7 +300,13 @@ async def _handle_ticket_qr_start(update: dict[str, Any], db: Session, bot_servi
 
     token, message = extracted
     chat_id = (message.get("chat") or {}).get("id")
-    visit = consume_telegram_ticket_start_token(db, token)
+    # Резолвим ``consume_telegram_ticket_start_token`` через атрибут пакета
+    # ``telegram_webhook`` во время вызова, чтобы monkeypatch-и, выполненные
+    # тестами на ``telegram_webhook.consume_telegram_ticket_start_token``,
+    # реально подменяли функцию, которая используется в этом обработчике.
+    from app.api.v1.endpoints import telegram_webhook as _telegram_webhook_pkg
+
+    visit = _telegram_webhook_pkg.consume_telegram_ticket_start_token(db, token)
     if visit:
         if chat_id is None:
             db.rollback()
@@ -942,6 +948,14 @@ def _log_lab_report_document_send(
 
 
 async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> None:
+    # Резолвим ``_latest_ready_lab_report_instances`` и ``_build_lab_report_pdf``
+    # через атрибут пакета ``telegram_webhook`` во время вызова, чтобы
+    # monkeypatch-и тестов на ``telegram_webhook._latest_ready_lab_report_instances``
+    # и ``telegram_webhook._build_lab_report_pdf`` подменяли функции, которые
+    # реально используются этим обработчиком (иначе локальные ссылки модуля
+    # остаются указывать на оригинальные функции).
+    from app.api.v1.endpoints import telegram_webhook as _telegram_webhook_pkg
+
     telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
     language = _telegram_chat_language(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
@@ -955,7 +969,9 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
         )
         return
 
-    instances = _latest_ready_lab_report_instances(db, telegram_user.patient_id)
+    instances = _telegram_webhook_pkg._latest_ready_lab_report_instances(
+        db, telegram_user.patient_id
+    )
     if not instances:
         await _send_patient_bot_reply(
             db,
@@ -978,7 +994,9 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
     sent_count = 0
     for instance in instances:
         try:
-            filename, pdf_bytes, caption = _build_lab_report_pdf(db, instance)
+            filename, pdf_bytes, caption = _telegram_webhook_pkg._build_lab_report_pdf(
+                db, instance
+            )
             if language == TELEGRAM_LANGUAGE_UZ:
                 report_date = (
                     instance.finalized_at or instance.created_at or datetime.now(UTC)

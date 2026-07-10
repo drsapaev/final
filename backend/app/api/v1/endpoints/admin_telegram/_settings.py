@@ -389,8 +389,11 @@ def get_telegram_webhook_info(
         if not bot_token:
             return {"webhook_set": False, "message": "Токен бота не настроен"}
 
-        # Получаем информацию о webhook
-        response = httpx.get(
+        # Получаем информацию о webhook.
+        # Используем ``requests.get`` (а не ``httpx.get``), чтобы позволить
+        # тестам monkeypatch-ить ``admin_telegram.requests.get`` и подменять
+        # исходящий HTTP-запрос к Telegram API.
+        response = requests.get(
             f"https://api.telegram.org/bot{bot_token}/getWebhookInfo", timeout=10
         )
 
