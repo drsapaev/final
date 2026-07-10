@@ -210,6 +210,19 @@ class FCMService:
             "results": results
         }
 
+    def get_status(self) -> dict[str, Any]:
+        """Return a serializable snapshot of FCM service configuration.
+
+        PR-2: previously the /fcm/status endpoint called a non-existent
+        ``get_status`` method and crashed with HTTP 500.
+        """
+        return {
+            "active": self.active,
+            "project_id": self.project_id,
+            "credentials_loaded": self.credentials is not None,
+            "fcm_url": self.fcm_url if self.active else None,
+        }
+
 
 # Глобальный экземпляр FCM сервиса
 fcm_service = FCMService()

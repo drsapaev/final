@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -47,6 +47,12 @@ class User(Base):
 
     # FCM Device Token for Push Notifications
     device_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # PR-2: Mobile device metadata for FCM (was missing — caused 500s)
+    device_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    device_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    push_notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
 
     # Метаданные
     created_at: Mapped[DateTime | None] = mapped_column(

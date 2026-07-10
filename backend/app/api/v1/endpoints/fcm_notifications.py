@@ -66,15 +66,17 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
 ):
     """Регистрация FCM токена пользователя"""
     try:
-        # Обновляем токен пользователя
-        user_data = {
-            "fcm_token": request.device_token,
-            "device_type": request.device_type,
-            "device_info": request.device_info,
-            "push_notifications_enabled": True,
-        }
-
-        crud_user.update_user(db, user_id=current_user.id, user_data=user_data)
+        # PR-2: persist to existing User.device_token + new mobile metadata columns
+        crud_user.update_user(
+            db,
+            user_id=current_user.id,
+            user_data={
+                "device_token": request.device_token,
+                "device_type": request.device_type,
+                "device_info": request.device_info,
+                "push_notifications_enabled": True,
+            },
+        )
 
         return {
             "success": True,
@@ -82,6 +84,8 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
             "device_token": request.device_token,
         }
 
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -95,18 +99,22 @@ async def unregister_fcm_token(
 ):
     """Отмена регистрации FCM токена"""
     try:
-        # Удаляем токен пользователя
-        user_data = {
-            "fcm_token": None,
-            "device_type": None,
-            "device_info": None,
-            "push_notifications_enabled": False,
-        }
-
-        crud_user.update_user(db, user_id=current_user.id, user_data=user_data)
+        # PR-2: clear device_token + mobile metadata
+        crud_user.update_user(
+            db,
+            user_id=current_user.id,
+            user_data={
+                "device_token": None,
+                "device_type": None,
+                "device_info": None,
+                "push_notifications_enabled": False,
+            },
+        )
 
         return {"success": True, "message": "FCM токен успешно удален"}
 
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -131,12 +139,14 @@ async def send_fcm_notification(
 
         device_tokens = []
 
-        # Получаем токены по user_ids
+        # Получаем токены по user_ids (PR-2: device_token is the real column)
         if request.user_ids:
             users = crud_user.get_users_by_ids(db, user_ids=request.user_ids)
             for user in users:
-                if user.fcm_token and user.push_notifications_enabled:
-                    device_tokens.append(user.fcm_token)
+                token = getattr(user, "device_token", None)
+                push_on = getattr(user, "push_notifications_enabled", True)
+                if token and push_on:
+                    device_tokens.append(token)
 
         # Добавляем прямо указанные токены
         if request.device_tokens:
@@ -216,7 +226,8 @@ async def send_test_fcm_notification(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="FCM сервис не настроен"
             )
 
-        if not current_user.fcm_token:
+        # PR-2: device_token is the real column name on User
+        if not current_user.device_token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="FCM токен не зарегистрирован",
@@ -224,7 +235,7 @@ async def send_test_fcm_notification(
 
         # Отправляем тестовое уведомление
         result = await fcm_service.send_notification(
-            device_token=current_user.fcm_token,
+            device_token=current_user.device_token,
             title="Тестовое уведомление",
             body=f"Привет, {current_user.full_name or current_user.username}! FCM работает корректно.",
             data={
@@ -381,6 +392,8 @@ async def get_fcm_status(
 
         return {"fcm_service": status_info, "timestamp": datetime.now().isoformat()}
 
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -395,27 +408,34 @@ async def get_user_fcm_tokens(
 ):
     """Список пользователей с FCM токенами"""
     try:
+        # PR-2: device_token is the real column; last_login lives on UserProfile
         users_with_tokens = crud_user.get_users_with_fcm_tokens(db)
 
         result = []
         for user in users_with_tokens:
+            token = getattr(user, "device_token", None) or ""
+            # last_login is on UserProfile (user.profile), not User
+            profile = getattr(user, "profile", None)
+            last_login = getattr(profile, "last_login", None) if profile else None
             result.append(
                 {
                     "user_id": user.id,
                     "username": user.username,
                     "full_name": user.full_name,
-                    "fcm_token": "[redacted]" if user.fcm_token else None,
-                    "fcm_token_length": len(user.fcm_token or ""),
-                    "device_type": user.device_type,
-                    "push_enabled": user.push_notifications_enabled,
+                    "fcm_token": "[redacted]" if token else None,
+                    "fcm_token_length": len(token),
+                    "device_type": getattr(user, "device_type", None),
+                    "push_enabled": getattr(user, "push_notifications_enabled", False),
                     "last_login": (
-                        user.last_login.isoformat() if user.last_login else None
+                        last_login.isoformat() if last_login else None
                     ),
                 }
             )
 
         return {"users": result, "total_count": len(result)}
 
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
