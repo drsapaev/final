@@ -32,7 +32,13 @@ class NotificationPlatformService(
     def __init__(self, db: Session):
         self.db = db
         self.repository = NotificationPlatformRepository(db)
-        self.ws_manager = get_notification_ws_manager()
+        self._ws_manager = None
+
+    @property
+    def ws_manager(self):
+        if self._ws_manager is None:
+            self._ws_manager = get_notification_ws_manager()
+        return self._ws_manager
 
     # ------------------------------------------------------------------
     # Normalization helpers
