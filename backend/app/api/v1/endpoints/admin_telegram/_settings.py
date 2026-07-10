@@ -124,7 +124,7 @@ def test_telegram_bot(
             )
 
         # Тестируем подключение к API Telegram
-        response = requests.get(
+        response = httpx.get(
             f"https://api.telegram.org/bot{bot_token}/getMe", timeout=10
         )
 
@@ -323,7 +323,7 @@ def set_telegram_webhook(
         secret_token = secrets.token_urlsafe(32)
 
         # Устанавливаем webhook
-        response = requests.post(
+        response = httpx.post(
             f"https://api.telegram.org/bot{bot_token}/setWebhook",
             json={"url": selected_webhook_url, "secret_token": secret_token},
             timeout=10,
@@ -390,7 +390,7 @@ def get_telegram_webhook_info(
             return {"webhook_set": False, "message": "Токен бота не настроен"}
 
         # Получаем информацию о webhook
-        response = requests.get(
+        response = httpx.get(
             f"https://api.telegram.org/bot{bot_token}/getWebhookInfo", timeout=10
         )
 

@@ -14,16 +14,9 @@ class CoreMixin(NotificationPlatformServiceMixinBase):
     """Core methods."""
 
     def __init__(self, db: Session):
-        # Resolve ``get_notification_ws_manager`` via the
-        # ``notification_platform_service`` shim at call time so unit tests
-        # that monkeypatch ``notification_platform_service.get_notification_ws_manager``
-        # see the patched value.
-        from app.services.notification_platform_service import (
-            get_notification_ws_manager as _get_notification_ws_manager,
-        )
         self.db = db
         self.repository = NotificationPlatformRepository(db)
-        self.ws_manager = _get_notification_ws_manager()
+        self.ws_manager = get_notification_ws_manager()
 
     # ------------------------------------------------------------------
     # Normalization helpers

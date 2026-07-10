@@ -44,7 +44,6 @@ from app.api.v1.endpoints.admin_telegram._helpers import (  # noqa: F401
 from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
     _get_configured_bot_token,
     _get_staff_bot_token_runtime_status,
-    _staff_bot_read_only_command_payload,
     confirm_staff_action,
 )
 from app.api.v1.endpoints.admin_telegram._helpers import (  # noqa: F401
@@ -76,7 +75,6 @@ __all__ = [
     "_build_staff_bot_status",
     "_get_configured_bot_token",
     "_get_staff_bot_token_runtime_status",
-    "_staff_bot_read_only_command_payload",
     "_normalize_staff_role",
     "_staff_runtime_reference_hash",
     "validate_staff_link_start_token",

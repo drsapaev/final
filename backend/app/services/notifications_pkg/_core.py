@@ -43,7 +43,6 @@ class CoreMixin(NotificationSenderMixinBase):
         return get_notification_platform_service(db)
 
 
-    @staticmethod
     def _extract_prefixed_user_id(actor_ref: str | None, prefix: str) -> int | None:
         normalized = str(actor_ref or "").strip().lower()
         expected_prefix = prefix.lower()

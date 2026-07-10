@@ -1000,13 +1000,7 @@ def _staff_paid_invoices_message(db: Session) -> str:
 
 
 def _staff_reconciliation_alerts_message(db: Session) -> str:
-    # Resolve via the package attribute at call time so unit tests that
-    # monkeypatch ``telegram_webhook.PaymentReconciliationApiService``
-    # see the patched value.
-    from app.api.v1.endpoints.telegram_webhook import (
-        PaymentReconciliationApiService as _PaymentReconciliationApiService,
-    )
-    result = _PaymentReconciliationApiService(db).get_reconciliation_alerts(
+    result = PaymentReconciliationApiService(db).get_reconciliation_alerts(
         threshold=float(RECONCILIATION_ALERT_THRESHOLD)
     )
     alerts = result.get("alerts") or []

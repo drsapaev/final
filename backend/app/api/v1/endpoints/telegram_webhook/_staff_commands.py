@@ -300,13 +300,7 @@ async def _handle_ticket_qr_start(update: dict[str, Any], db: Session, bot_servi
 
     token, message = extracted
     chat_id = (message.get("chat") or {}).get("id")
-    # Resolve via the package attribute at call time so unit tests that
-    # monkeypatch ``telegram_webhook.consume_telegram_ticket_start_token``
-    # see the patched value.
-    from app.api.v1.endpoints.telegram_webhook import (
-        consume_telegram_ticket_start_token as _consume_telegram_ticket_start_token,
-    )
-    visit = _consume_telegram_ticket_start_token(db, token)
+    visit = consume_telegram_ticket_start_token(db, token)
     if visit:
         if chat_id is None:
             db.rollback()
@@ -961,13 +955,7 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
         )
         return
 
-    # Resolve via the package attribute at call time so unit tests that
-    # monkeypatch ``telegram_webhook._latest_ready_lab_report_instances``
-    # see the patched value.
-    from app.api.v1.endpoints.telegram_webhook import (
-        _latest_ready_lab_report_instances as _resolve_latest_ready_lab_report_instances,
-    )
-    instances = _resolve_latest_ready_lab_report_instances(db, telegram_user.patient_id)
+    instances = _latest_ready_lab_report_instances(db, telegram_user.patient_id)
     if not instances:
         await _send_patient_bot_reply(
             db,
@@ -988,12 +976,9 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
         "telegram_patient_lab_results_found",
     )
     sent_count = 0
-    from app.api.v1.endpoints.telegram_webhook import (
-        _build_lab_report_pdf as _resolve_build_lab_report_pdf,
-    )
     for instance in instances:
         try:
-            filename, pdf_bytes, caption = _resolve_build_lab_report_pdf(db, instance)
+            filename, pdf_bytes, caption = _build_lab_report_pdf(db, instance)
             if language == TELEGRAM_LANGUAGE_UZ:
                 report_date = (
                     instance.finalized_at or instance.created_at or datetime.now(UTC)
