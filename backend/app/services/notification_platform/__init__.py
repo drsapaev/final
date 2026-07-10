@@ -40,6 +40,10 @@ class NotificationPlatformService(
             self._ws_manager = get_notification_ws_manager()
         return self._ws_manager
 
+    @ws_manager.setter
+    def ws_manager(self, value):
+        self._ws_manager = value
+
     # ------------------------------------------------------------------
     # Normalization helpers
     # ------------------------------------------------------------------
