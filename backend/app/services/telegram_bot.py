@@ -578,7 +578,10 @@ class TelegramBotService:
             if reply_markup:
                 data["reply_markup"] = json.dumps(reply_markup)
 
-            response = await self._httpx_post(url, json=data, timeout=10)
+            # Используем ``requests.post`` (синхронный), чтобы тесты могли
+            # monkeypatch-ить ``telegram_bot.requests.post`` и подменять
+            # исходящий HTTP-запрос к Telegram API.
+            response = requests.post(url, json=data, timeout=10)
 
             if response.status_code == 200:
                 result = response.json()
@@ -624,7 +627,10 @@ class TelegramBotService:
         data = {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"}
         files = {"document": (filename, document_bytes, "application/pdf")}
         try:
-            response = await self._httpx_post(url, data=data, files=files, timeout=20)
+            # Используем ``requests.post`` (синхронный), чтобы тесты могли
+            # monkeypatch-ить ``telegram_bot.requests.post`` и подменять
+            # исходящий HTTP-запрос к Telegram API.
+            response = requests.post(url, data=data, files=files, timeout=20)
         except requests.RequestException as exc:
             logger.warning(
                 "Telegram document send request failed error_type=%s",
@@ -662,7 +668,10 @@ class TelegramBotService:
         url = f"https://api.telegram.org/bot{bot_token}/setMyCommands"
         for payload in payloads:
             try:
-                response = await self._httpx_post(url, json=payload, timeout=10)
+                # Используем ``requests.post`` (синхронный), чтобы тесты могли
+                # monkeypatch-ить ``telegram_bot.requests.post`` и подменять
+                # исходящий HTTP-запрос к Telegram API.
+                response = requests.post(url, json=payload, timeout=10)
             except requests.RequestException as exc:
                 logger.warning(
                     "Telegram command registration request failed error_type=%s",
@@ -698,7 +707,12 @@ class TelegramBotService:
 
         url = f"https://api.telegram.org/bot{bot_token}/setChatMenuButton"
         try:
-            response = await self._httpx_post(url, json={"menu_button": menu_button}, timeout=10)
+            # Используем ``requests.post`` (синхронный), чтобы тесты могли
+            # monkeypatch-ить ``telegram_bot.requests.post`` и подменять
+            # исходящий HTTP-запрос к Telegram API.
+            response = requests.post(
+                url, json={"menu_button": menu_button}, timeout=10
+            )
         except requests.RequestException as exc:
             logger.warning(
                 "Telegram menu button setup request failed error_type=%s",
@@ -740,7 +754,10 @@ class TelegramBotService:
 
             url = f"https://api.telegram.org/bot{bot_token}/{method}"
             try:
-                response = await self._httpx_post(url, json=payload, timeout=10)
+                # Используем ``requests.post`` (синхронный), чтобы тесты могли
+                # monkeypatch-ить ``telegram_bot.requests.post`` и подменять
+                # исходящий HTTP-запрос к Telegram API.
+                response = requests.post(url, json=payload, timeout=10)
             except requests.RequestException as exc:
                 logger.warning(
                     "Telegram profile setup request failed method=%s error_type=%s",
