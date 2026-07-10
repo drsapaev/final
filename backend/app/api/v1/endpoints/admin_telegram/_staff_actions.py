@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import requests  # noqa: F401
+
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 
 from app.api.v1.endpoints.admin_telegram._helpers import (
@@ -536,7 +538,7 @@ def _get_configured_bot_username(db: Session) -> str | None:
 
 
 def _fetch_telegram_webhook_info(bot_token: str) -> dict[str, Any]:
-    response = httpx.get(
+    response = requests.get(
         f"https://api.telegram.org/bot{bot_token}/getWebhookInfo", timeout=10
     )
     response.raise_for_status()

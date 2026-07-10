@@ -14,6 +14,20 @@ from app.api.v1.endpoints.admin_telegram._helpers import (
 )  # noqa: F401
 
 
+async def _resolve_telegram_bot_service():
+    """Resolve ``get_telegram_bot_service`` via the package attribute at call time.
+
+    Unit tests monkeypatch ``admin_telegram.get_telegram_bot_service`` (the
+    package-level binding); looking the function up via the local module
+    import would bypass that patch.
+    """
+    from app.api.v1.endpoints.admin_telegram import (
+        get_telegram_bot_service as _get_telegram_bot_service,
+    )
+    return await _get_telegram_bot_service()
+
+
+
 @router.post("/telegram/ai-approval-alerts", response_model=dict[str, Any])
 async def send_telegram_ai_approval_alert(
     request: TelegramAiApprovalAlertRequest,
@@ -74,7 +88,7 @@ async def send_telegram_ai_approval_alert(
         protected_url,
         request.metrics,
     )
-    bot_service = await get_telegram_bot_service()
+    bot_service = await _resolve_telegram_bot_service()
     if not bool(getattr(bot_service, "active", False)):
         await bot_service.initialize(db)
     if not getattr(bot_service, "bot_token", None):

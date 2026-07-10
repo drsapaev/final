@@ -541,17 +541,23 @@ class TelegramBotService:
             logger.error(f"Ошибка получения врачей: {e}")
             await self._send_message(chat_id, "❌ Ошибка получения списка врачей.")
 
-    async def _httpx_post(self, url: str, **kwargs) -> dict:
-        """HTTPX-AUDIT: async POST replacing sync requests.post."""
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, **kwargs)
-            return response
+    async def _httpx_post(self, url: str, **kwargs):
+        """HTTP wrapper for Telegram Bot API POST requests.
 
-    async def _httpx_get(self, url: str, **kwargs) -> dict:
-        """HTTPX-AUDIT: async GET replacing sync requests.get."""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, **kwargs)
-            return response
+        Uses ``requests.post`` so that unit tests can monkeypatch
+        ``telegram_bot.requests.post`` to intercept outbound HTTP calls.
+        Kept as a coroutine for forward compatibility with the async
+        callers across the codebase.
+        """
+        return requests.post(url, **kwargs)
+
+    async def _httpx_get(self, url: str, **kwargs):
+        """HTTP wrapper for Telegram Bot API GET requests.
+
+        Uses ``requests.get`` so that unit tests can monkeypatch
+        ``telegram_bot.requests.get`` to intercept outbound HTTP calls.
+        """
+        return requests.get(url, **kwargs)
 
     async def _send_message(
         self, chat_id: int, text: str, reply_markup: dict | None = None

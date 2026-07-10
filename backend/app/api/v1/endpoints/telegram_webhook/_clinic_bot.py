@@ -122,7 +122,11 @@ async def _dispatch_clinic_bot_update(
     text_handlers: dict,
 ) -> bool:
     """Dispatch a clinic bot update to the appropriate handler."""
+    # Check for both process_patient_bot_update (new API) and
+    # process_webhook_update (legacy API used by tests).
     dispatch = getattr(bot_service, "process_patient_bot_update", None)
+    if not callable(dispatch):
+        dispatch = getattr(bot_service, "process_webhook_update", None)
     if callable(dispatch):
         return await dispatch(
             update,
