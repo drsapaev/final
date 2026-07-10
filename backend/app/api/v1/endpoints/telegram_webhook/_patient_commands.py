@@ -1000,7 +1000,12 @@ def _staff_paid_invoices_message(db: Session) -> str:
 
 
 def _staff_reconciliation_alerts_message(db: Session) -> str:
-    result = PaymentReconciliationApiService(db).get_reconciliation_alerts(
+    # Resolve via package namespace so monkeypatch of
+    # telegram_webhook.PaymentReconciliationApiService takes effect.
+    from app.api.v1.endpoints.telegram_webhook import (
+        PaymentReconciliationApiService as _PRAS,
+    )
+    result = _PRAS(db).get_reconciliation_alerts(
         threshold=float(RECONCILIATION_ALERT_THRESHOLD)
     )
     alerts = result.get("alerts") or []
