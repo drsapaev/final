@@ -367,7 +367,7 @@ def get_last_visit(db: Session, patient_id: int) -> Appointment | None:
 
 
 def get_upcoming_appointments(
-    db: Session, patient_id: int, limit: int = 10
+    db: Session, patient_id: int, limit: int = 10, offset: int = 0
 ) -> list[Appointment]:
     """Получить предстоящие записи пациента"""
     from datetime import datetime
@@ -383,6 +383,7 @@ def get_upcoming_appointments(
             )
         )
         .order_by(Appointment.appointment_date.asc())
+        .offset(offset)
         .limit(limit)
         .all()
     )

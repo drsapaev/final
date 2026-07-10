@@ -12,18 +12,14 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.crud import (
-    appointment as crud_appointment,
-)
-from app.crud import (
-    lab as crud_lab,
-)
-from app.crud import (
-    patient as crud_patient,
-)
-from app.crud import (
-    user as crud_user,
-)
+# PR-3: import the modules directly (not via app.crud.__init__ which
+# re-exports the CRUDAppointment *instance* named `appointment` and shadows
+# the module of the same name). Using importlib avoids the shadowing.
+import importlib
+crud_appointment = importlib.import_module("app.crud.appointment")
+crud_lab = importlib.import_module("app.crud.lab")
+crud_patient = importlib.import_module("app.crud.patient")
+crud_user = importlib.import_module("app.crud.user")
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
 from app.schemas.mobile import (
@@ -179,20 +175,19 @@ async def get_mobile_patient_profile(
 
         return PatientProfileOut(
             id=patient.id,
-            fio=patient.fio,
-            phone=patient.phone,
-            birth_year=patient.birth_year,
+            fio=patient.short_name(),
+            phone=patient.phone or "",
+            birth_year=patient.birth_date.year if patient.birth_date else None,
             address=patient.address,
-            telegram_id=patient.telegram_id,
+            telegram_id=None,  # PR-3: telegram_id is on User/onboarding tables, not Patient
             created_at=patient.created_at,
-            last_visit=last_visit.appointment_date if last_visit else None,
-            total_visits=total_visits,
-            upcoming_appointments=upcoming_appointments,
         )
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        import logging, traceback
+        logging.getLogger(__name__).error('GET /patients/me failed: %s\n%s', e, traceback.format_exc())
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -218,13 +213,20 @@ async def get_upcoming_appointments(
 
         result = []
         for appointment in appointments:
-            services = [service.service.title for service in appointment.services]  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
+            # PR-3: appointment.doctor is a Doctor, name lives on Doctor.user.full_name
+            doctor = appointment.doctor
+            doctor_name = "Врач"
+            specialty = "Врач"
+            if doctor is not None:
+                specialty = doctor.specialty or "Врач"
+                if doctor.user is not None:
+                    doctor_name = doctor.user.full_name or doctor.user.username or "Врач"
 
             result.append(
                 AppointmentUpcomingOut(
                     id=appointment.id,
-                    doctor_name=appointment.doctor.name,
-                    specialty=appointment.doctor.specialty or "Врач",
+                    doctor_name=doctor_name,
+                    specialty=specialty,
                     appointment_date=appointment.appointment_date,
                     status=appointment.status,
                     clinic_address="Главный филиал",
@@ -235,7 +237,9 @@ async def get_upcoming_appointments(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        import logging, traceback
+        logging.getLogger(__name__).error('GET /appointments/upcoming failed: %s\n%s', e, traceback.format_exc())
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -261,30 +265,32 @@ async def get_appointment_detail(
         if not appointment or appointment.patient_id != patient.id:
             raise HTTPException(status_code=404, detail="Запись не найдена")
 
-        services = []
-        for service in appointment.services:
-            services.append(
-                {
-                    "id": service.service_id,
-                    "title": service.service.title,
-                    "price": service.price,
-                    "quantity": service.quantity,
-                }
-            )
+        # PR-3: appointment.services is a JSON list[str], not a relationship.
+        # appointment.doctor is now a relationship (added in this PR).
+        # Doctor name lives on doctor.user.full_name.
+        doctor = appointment.doctor
+        doctor_name = "Врач"
+        specialty = "Врач"
+        if doctor is not None:
+            specialty = doctor.specialty or "Врач"
+            if doctor.user is not None:
+                doctor_name = doctor.user.full_name or doctor.user.username or "Врач"
 
+        # complaint / diagnosis / total_cost are not real Appointment columns
+        # — return None rather than crash. (Mobile schema marks them optional.)
         return MobileAppointmentDetailOut(
             id=appointment.id,
             patient_id=appointment.patient_id,
-            doctor_id=appointment.doctor_id,
-            doctor_name=appointment.doctor.name,
-            specialty=appointment.doctor.specialty or "Врач",
+            doctor_id=appointment.doctor_id or 0,
+            doctor_name=doctor_name,
+            specialty=specialty,
             appointment_date=appointment.appointment_date,
             status=appointment.status,
-            complaint=appointment.complaint,
-            diagnosis=appointment.diagnosis,
-            total_cost=appointment.total_cost,
+            complaint=getattr(appointment, "complaint", None),
+            diagnosis=getattr(appointment, "diagnosis", None),
+            total_cost=getattr(appointment, "total_cost", None),
             created_at=appointment.created_at,
-            updated_at=appointment.updated_at,
+            updated_at=appointment.updated_at or appointment.created_at,
         )
 
     except HTTPException:
@@ -328,17 +334,27 @@ async def book_mobile_appointment(
                     db, appointment_id=appointment.id, service_id=service_id
                 )
 
-        # Получаем информацию о враче
-        doctor = crud_user.get_user(db, user_id=request.doctor_id)
+        # PR-3: doctor lives in the doctors table, not users. Use clinic CRUD.
+        from app.crud import clinic as crud_clinic
+        doctor = crud_clinic.get_doctor_by_id(db, doctor_id=request.doctor_id)
+        doctor_name = "Врач"
+        specialty = "Врач"
+        if doctor is not None:
+            specialty = doctor.specialty or "Врач"
+            if doctor.user is not None:
+                doctor_name = doctor.user.full_name or doctor.user.username or "Врач"
 
         # Отправляем уведомление
         # Используем notification_sender_service
-        await notification_sender_service.send_appointment_confirmation(db, appointment.id)
+        try:
+            await notification_sender_service.send_appointment_confirmation(db, appointment.id)
+        except Exception:
+            pass  # Don't fail booking if notification fails
 
         return AppointmentUpcomingOut(
             id=appointment.id,
-            doctor_name=doctor.name,
-            specialty=doctor.specialty or "Врач",
+            doctor_name=doctor_name,
+            specialty=specialty,
             appointment_date=appointment.appointment_date,
             status=appointment.status,
             clinic_address="Главный филиал",
@@ -368,23 +384,27 @@ async def get_lab_results(
             db, patient_id=patient.id, limit=limit, offset=offset
         )
 
+        # PR-3: get_patient_lab_results returns list[dict] (Core Table autoload),
+        # not ORM objects. Field names also differ from the schema — adapt.
         return [
             LabResultOut(
-                id=result.id,
-                test_name=result.test_name,
-                result_value=result.result,
-                reference_range=result.normal_range,
-                unit=result.unit,
-                result_date=result.test_date,
-                status=result.status,
-                notes=result.doctor_notes,
+                id=result["id"] if "id" in result else result.get("lab_results_id", 0),
+                test_name=result.get("test_name") or "",
+                result_value=result.get("value") or "",
+                reference_range=result.get("ref_range") or "",
+                unit=result.get("unit") or "",
+                result_date=result.get("created_at") or datetime.utcnow(),
+                status="abnormal" if result.get("abnormal") else "normal",
+                notes=result.get("notes"),
             )
             for result in results
         ]
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        import logging, traceback
+        logging.getLogger(__name__).error('GET /lab/results failed: %s\n%s', e, traceback.format_exc())
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
