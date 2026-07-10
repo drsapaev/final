@@ -228,3 +228,121 @@ def search_users(db: Session, query: str, limit: int = 10) -> list[User]:
 def get(db: Session, id: int) -> User | None:
     """Получить пользователя по ID"""
     return db.query(User).filter(User.id == id).first()
+
+
+# === PR-1: Mobile API wrappers ===
+
+from app.models.user_profile import UserProfile, UserNotificationSettings
+
+# Coarse endpoint keys → list of concrete UserNotificationSettings columns.
+# PR-1 deliberately keeps a small, well-documented mapping; full granularity
+# can be wired up once the mobile request schema is updated to use real
+# column names.
+_NOTIFICATION_KEY_MAP: dict[str, list[str]] = {
+    "push_notifications": [
+        "push_appointment_reminder",
+        "push_appointment_cancellation",
+        "push_appointment_confirmation",
+    ],
+    "sms_notifications": [
+        "sms_appointment_reminder",
+        "sms_appointment_cancellation",
+        "sms_appointment_confirmation",
+    ],
+    "email_notifications": [
+        "email_appointment_reminder",
+        "email_appointment_cancellation",
+        "email_appointment_confirmation",
+    ],
+    "appointment_reminders": [
+        "push_appointment_reminder",
+        "sms_appointment_reminder",
+        "email_appointment_reminder",
+    ],
+    "lab_results_notifications": [
+        "push_system_updates",
+        "email_system_updates",
+    ],
+    "promotions_notifications": [
+        "email_newsletter",
+    ],
+}
+
+
+def _ensure_notification_settings(db: Session, user_id: int) -> UserNotificationSettings | None:
+    """Return the user's UserNotificationSettings, creating linked
+    UserProfile + UserNotificationSettings rows if they don't exist yet.
+    Returns None only if the user itself is missing.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        return None
+
+    profile = user.profile
+    if profile is None:
+        profile = UserProfile(user_id=user.id)
+        db.add(profile)
+        db.flush()
+        db.refresh(profile)
+
+    settings = user.notification_settings
+    if settings is None:
+        settings = UserNotificationSettings(
+            user_id=user.id,
+            profile_id=profile.id,
+        )
+        db.add(settings)
+        db.flush()
+        db.refresh(settings)
+    return settings
+
+
+def update_notification_settings(
+    db: Session,
+    *,
+    user_id: int,
+    settings: dict[str, bool],
+) -> None:
+    """Map coarse mobile-app keys to concrete UserNotificationSettings columns
+    and upsert the user's settings row. Unknown keys are ignored.
+    """
+    notif = _ensure_notification_settings(db, user_id)
+    if notif is None:
+        return
+    for coarse_key, columns in _NOTIFICATION_KEY_MAP.items():
+        if coarse_key not in settings:
+            continue
+        value = bool(settings[coarse_key])
+        for col in columns:
+            if hasattr(notif, col):
+                setattr(notif, col, value)
+    db.commit()
+
+
+def get_notification_settings(
+    db: Session,
+    *,
+    user_id: int,
+) -> dict[str, bool]:
+    """Load the user's notification settings and map concrete columns back
+    to the coarse mobile-app keys. Returns defaults (all True except
+    ``promotions_notifications`` which is False) if no row exists.
+    """
+    notif = _ensure_notification_settings(db, user_id)
+    defaults: dict[str, bool] = {
+        "push_notifications": True,
+        "sms_notifications": True,
+        "email_notifications": True,
+        "appointment_reminders": True,
+        "lab_results_notifications": True,
+        "promotions_notifications": False,
+    }
+    if notif is None:
+        return defaults
+    result: dict[str, bool] = {}
+    for coarse_key, columns in _NOTIFICATION_KEY_MAP.items():
+        # Use the first mapped column's value as the representative for the
+        # coarse key (PR-1 doesn't try to aggregate, to keep semantics simple).
+        first_col = columns[0]
+        result[coarse_key] = bool(getattr(notif, first_col, defaults[coarse_key]))
+    return result

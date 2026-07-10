@@ -410,3 +410,70 @@ def add_appointment_service(db: Session, appointment_id: int, service_id: int) -
         return True
     except Exception:
         return False
+
+
+# === PR-1: Mobile API wrappers ===
+
+
+def cancel_appointment(
+    db: Session,
+    *,
+    appointment_id: int,
+    reason: str | None = None,
+) -> bool:
+    """Module-level wrapper for the mobile cancel_appointment endpoint.
+
+    Delegates to ``appointment.cancel_appointment`` (instance method) and
+    stores the optional ``reason`` in the appointment's ``notes`` field.
+    Returns ``True`` if the appointment was found and cancelled.
+    """
+    apt = appointment.cancel_appointment(db, appointment_id=appointment_id)
+    if apt is None:
+        return False
+    if reason:
+        apt.notes = (apt.notes or "") + f"\n[Отмена] {reason}"
+        db.commit()
+    return True
+
+
+def reschedule_appointment(
+    db: Session,
+    *,
+    appointment_id: int,
+    new_datetime: datetime,
+    reason: str | None = None,
+) -> bool:
+    """Module-level wrapper for the mobile reschedule_appointment endpoint.
+
+    Updates ``appointment_date`` (Date) and ``appointment_time`` (HH:MM str)
+    from the supplied ``new_datetime``. Optional ``reason`` is appended to
+    ``notes``. Returns ``True`` on success, ``False`` if not found.
+    """
+    apt = get_appointment(db, appointment_id)
+    if apt is None:
+        return False
+    apt.appointment_date = new_datetime.date()
+    apt.appointment_time = new_datetime.strftime("%H:%M")
+    apt.updated_at = datetime.now(UTC)
+    if reason:
+        apt.notes = (apt.notes or "") + f"\n[Перенос] {reason}"
+    db.commit()
+    return True
+
+
+def count_doctor_patients(db: Session, doctor_id: int) -> int:
+    """Count distinct patients who have ever booked with the doctor."""
+    return (
+        db.query(Appointment.patient_id)
+        .filter(Appointment.doctor_id == doctor_id)
+        .distinct()
+        .count()
+    )
+
+
+def get_doctor_avg_rating(db: Session, doctor_id: int) -> float | None:
+    """PR-1 stub: no rating model exists yet.
+
+    TODO: introduce a Review/Rating model and implement a real average.
+    """
+    return None

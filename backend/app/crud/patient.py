@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
 from typing import Any
 
 from sqlalchemy import and_, or_
@@ -601,3 +602,55 @@ def search_patients(db: Session, query: str, limit: int = 10) -> list[Patient]:
     # Сортируем и ограничиваем
     sorted_patients = sorted(patients, key=get_relevance_score, reverse=True)
     return sorted_patients[:limit]
+
+
+# === PR-1: Mobile API wrappers ===
+
+
+def update_patient(
+    db: Session, *, patient_id: int, update_data: dict[str, Any]
+) -> Patient | None:
+    """Module-level wrapper used by the mobile API endpoints.
+
+    Updates any ``hasattr``-safe attribute on the Patient model with values
+    from ``update_data``. Returns the refreshed Patient or ``None`` if not
+    found. Fields that don't exist on the model are silently skipped.
+    """
+    patient_obj = (
+        db.query(Patient)
+        .filter(Patient.id == patient_id, Patient.is_deleted.is_(False))
+        .first()
+    )
+    if not patient_obj:
+        return None
+
+    for field, value in update_data.items():
+        if hasattr(patient_obj, field):
+            setattr(patient_obj, field, value)
+
+    db.commit()
+    db.refresh(patient_obj)
+    return patient_obj
+
+
+def create_feedback(db: Session, feedback_data: dict[str, Any]) -> Any:
+    """PR-1 stub for the mobile feedback endpoint.
+
+    TODO: create a real ``Feedback`` model + Alembic migration in a follow-up
+    PR. For now we return an opaque ``SimpleNamespace(id=0)`` so the endpoint
+    contract (``feedback_id`` field) is preserved without persisting data.
+    """
+    return SimpleNamespace(id=0)
+
+
+def create_emergency_contact(
+    db: Session, emergency_data: dict[str, Any]
+) -> Any:
+    """PR-1 stub for the mobile emergency contact endpoint.
+
+    TODO: create a real ``EmergencyContact`` model + Alembic migration in a
+    follow-up PR. For now we return an opaque ``SimpleNamespace(id=0)`` so
+    the endpoint contract (``emergency_id`` field) is preserved without
+    persisting data.
+    """
+    return SimpleNamespace(id=0)

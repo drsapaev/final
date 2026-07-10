@@ -432,3 +432,140 @@ def update_queue_settings(
     update_settings_batch(db, "queue", updates, user_id)
 
     return get_queue_settings(db)
+
+
+# === PR-1: Mobile API wrappers ===
+
+from datetime import date as _date  # noqa: E402
+from datetime import timedelta as _timedelta  # noqa: E402
+
+
+def search_doctors(
+    db: Session,
+    *,
+    specialty: str | None = None,
+    name: str | None = None,
+    available_date: str | None = None,
+    limit: int = 10,
+) -> list[Doctor]:
+    """Search doctors by specialty and/or name (ILIKE on user.full_name).
+
+    ``available_date`` is currently ignored (no DaySchedule exists) but
+    accepted to preserve the endpoint contract.
+    """
+    query = db.query(Doctor).filter(Doctor.active == True)  # noqa: E712
+
+    if specialty:
+        query = query.filter(Doctor.specialty == specialty)
+
+    if name:
+        # Name lives on the linked User; join via user_id.
+        from app.models.user import User
+
+        query = query.join(User, Doctor.user_id == User.id, isouter=True)
+        query = query.filter(User.full_name.ilike(f"%{name}%"))
+
+    return query.limit(limit).all()
+
+
+def is_doctor_available_today(db: Session, doctor_id: int) -> bool:
+    """Return True if the doctor has an active Schedule row for today's weekday."""
+    today_weekday = _date.today().weekday()  # 0=Monday, 6=Sunday
+    return (
+        db.query(Schedule)
+        .filter(
+            Schedule.doctor_id == doctor_id,
+            Schedule.weekday == today_weekday,
+            Schedule.active == True,  # noqa: E712
+        )
+        .first()
+        is not None
+    )
+
+
+def get_next_available_slot(db: Session, doctor_id: int) -> str | None:
+    """Return ISO date of the next weekday with an active Schedule row, or None."""
+    today = _date.today()
+    for offset in range(7):
+        candidate = today + _timedelta(days=offset)
+        if (
+            db.query(Schedule)
+            .filter(
+                Schedule.doctor_id == doctor_id,
+                Schedule.weekday == candidate.weekday(),
+                Schedule.active == True,  # noqa: E712
+            )
+            .first()
+            is not None
+        ):
+            return candidate.isoformat()
+    return None
+
+
+def get_doctor_schedule(
+    db: Session,
+    *,
+    doctor_id: int,
+    date_from: _date,
+    date_to: _date,
+) -> list[dict[str, Any]]:
+    """Return a per-day schedule grid for a doctor over ``[date_from, date_to]``.
+
+    Each day maps to a dict with the date (ISO), weekday Schedule row (if any),
+    and the list of appointments on that day.
+    """
+    schedules = (
+        db.query(Schedule)
+        .filter(
+            Schedule.doctor_id == doctor_id,
+            Schedule.active == True,  # noqa: E712
+        )
+        .all()
+    )
+    schedules_by_weekday: dict[int, Schedule] = {s.weekday: s for s in schedules}
+
+    from app.models.appointment import Appointment
+
+    appointments = (
+        db.query(Appointment)
+        .filter(
+            Appointment.doctor_id == doctor_id,
+            Appointment.appointment_date >= date_from,
+            Appointment.appointment_date <= date_to,
+            Appointment.status != "cancelled",
+        )
+        .order_by(Appointment.appointment_date, Appointment.appointment_time)
+        .all()
+    )
+    appts_by_date: dict[_date, list[Appointment]] = {}
+    for appt in appointments:
+        appts_by_date.setdefault(appt.appointment_date, []).append(appt)
+
+    grid: list[dict[str, Any]] = []
+    current = date_from
+    while current <= date_to:
+        sched = schedules_by_weekday.get(current.weekday())
+        appts = appts_by_date.get(current, [])
+        grid.append(
+            {
+                "date": current.isoformat(),
+                "weekday": current.weekday(),
+                "start_time": (
+                    sched.start_time.isoformat() if sched and sched.start_time else None
+                ),
+                "end_time": (
+                    sched.end_time.isoformat() if sched and sched.end_time else None
+                ),
+                "appointments": [
+                    {
+                        "id": a.id,
+                        "appointment_time": a.appointment_time,
+                        "patient_id": a.patient_id,
+                        "status": a.status,
+                    }
+                    for a in appts
+                ],
+            }
+        )
+        current += _timedelta(days=1)
+    return grid

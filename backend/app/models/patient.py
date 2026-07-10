@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     func,
     literal,
 )
@@ -46,6 +47,12 @@ class Patient(Base):
     doc_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     doc_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     address: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    # PR-1: Mobile API medical-domain fields (AUDIT_PR1_MOBILE_EXTENDED.md).
+    # Backed by Alembic migration 0037_patient_medical_fields.
+    emergency_contact: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    allergies: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chronic_conditions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
