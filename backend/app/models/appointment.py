@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 
 if TYPE_CHECKING:
+    from app.models.clinic import Doctor
     from app.models.department import Department
 
 
@@ -75,3 +76,6 @@ class Appointment(Base):
 
     # Relationships
     department: Mapped[Department] = relationship(back_populates="appointments")
+    # PR-3: Added doctor relationship so mobile_api endpoints can read
+    # appointment.doctor without a separate CRUD lookup.
+    doctor: Mapped[Doctor | None] = relationship("Doctor", foreign_keys=[doctor_id])

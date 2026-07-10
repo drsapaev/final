@@ -5,12 +5,13 @@ from sqlalchemy.orm import Session
 
 
 def _orders(db: Session) -> Table:
-    md = MetaData(bind=db.get_bind())
+    # PR-3: SQLAlchemy 2.x removed MetaData(bind=...) — use autoload only.
+    md = MetaData()
     return Table("lab_orders", md, autoload_with=db.get_bind())
 
 
 def _results(db: Session) -> Table:
-    md = MetaData(bind=db.get_bind())
+    md = MetaData()
     return Table("lab_results", md, autoload_with=db.get_bind())
 
 
