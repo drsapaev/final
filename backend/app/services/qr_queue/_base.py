@@ -44,6 +44,21 @@ logger = logging.getLogger(__name__)
 JOIN_SESSION_PROCESSING_STATUS = "joining"
 
 
+def _now(tz=None) -> datetime:
+    """Return the current datetime, honoring test monkeypatches.
+
+    Tests freeze time by patching ``app.services.qr_queue_service.datetime``
+    (and ``app.services.queue_service.datetime``) with a ``FixedDateTime``
+    subclass. The split modules under ``qr_queue`` import ``datetime``
+    directly from the stdlib, so a plain ``datetime.now()`` would bypass the
+    patch. Look the class up via the public shim module at call time so the
+    patched class (if any) is used.
+    """
+    from app.services import qr_queue_service
+
+    return qr_queue_service.datetime.now(tz)
+
+
 
 
 class QRQueueServiceMixinBase:

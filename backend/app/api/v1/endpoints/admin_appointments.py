@@ -102,7 +102,7 @@ def _resolve_effective_cabinet(
     return effective, queue_cabinet, warnings
 
 
-@router.get("", response_model=dict[str, Any])
+@router.get("", response_model=list[dict[str, Any]])
 def list_admin_appointments(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),

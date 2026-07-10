@@ -1140,9 +1140,29 @@ def _patient_mini_app_entry_token_signature(body: str) -> str:
     return _base36_encode(int.from_bytes(digest[:12], "big"))
 
 
+def _patient_mini_app_entry_token_ttl_seconds() -> int:
+    """Return the configured entry-token TTL, honoring test monkeypatches.
+
+    Tests freeze the TTL by patching
+    ``telegram_webhook.PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS``. The split
+    ``_helpers`` module imports the constant directly, so a plain module-level
+    lookup would bypass the patch. Resolve via the public package namespace at
+    call time so the patched value (if any) is used.
+    """
+    from app.api.v1.endpoints import telegram_webhook as _tw
+
+    return int(
+        getattr(
+            _tw,
+            "PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS",
+            PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS,
+        )
+    )
+
+
 def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
     expires_at = datetime.now(UTC) + timedelta(
-        seconds=PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS
+        seconds=_patient_mini_app_entry_token_ttl_seconds()
     )
     body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(
         [
@@ -1161,7 +1181,7 @@ def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
 
 def _build_patient_onboarding_entry_token(chat_id: int, section: str = "appointments") -> str:
     expires_at = datetime.now(UTC) + timedelta(
-        seconds=PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS
+        seconds=_patient_mini_app_entry_token_ttl_seconds()
     )
     body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(
         [

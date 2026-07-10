@@ -47,7 +47,12 @@ def get_departments_overview(
     """
     Получить реальные показатели по отделениям (очередь, услуги, визиты)
     """
-    overview = _collect_department_overview(db)
+    # Resolve via the package namespace so tests can monkeypatch
+    # ``admin_departments._collect_department_overview`` and have the patch
+    # take effect on the live endpoint.
+    from app.api.v1.endpoints import admin_departments as _admin_departments
+
+    overview = _admin_departments._collect_department_overview(db)
     return {
         "success": True,
         "data": overview,

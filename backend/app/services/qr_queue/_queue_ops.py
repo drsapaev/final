@@ -5,7 +5,7 @@ Split from qr_queue_service.py.
 from __future__ import annotations
 
 from app.services.qr_queue._base import *  # noqa: F401, F403
-from app.services.qr_queue._base import QRQueueServiceMixinBase
+from app.services.qr_queue._base import QRQueueServiceMixinBase, _now
 
 
 class QueueOpsMixin(QRQueueServiceMixinBase):
@@ -324,7 +324,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 if target_date == today:
                     from app.services.queue_service import QueueBusinessService
 
-                    now = datetime.now()
+                    now = _now()
                     current_time = now.time()
                     start_time = QueueBusinessService.ONLINE_QUEUE_START_TIME  # 07:00
 
@@ -421,7 +421,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         # ✅ ИСПРАВЛЕНИЕ: Проверяем время только если это сегодня
         # ⚠️ ВАЖНО: Для общего QR daily_queue может быть None (если очереди еще не созданы)
         # В этом случае мы уже вернули результат выше, так что здесь daily_queue всегда существует
-        now = datetime.now()
+        now = _now()
         today = date.today()
 
         # Если QR для будущей даты - разрешаем запись
