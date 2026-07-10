@@ -230,6 +230,56 @@ def get(db: Session, id: int) -> User | None:
     return db.query(User).filter(User.id == id).first()
 
 
+# === PR-2: FCM token management wrappers ===
+
+# Whitelisted fields that update_user is allowed to set on the User model.
+# Keep this explicit to prevent mass-assignment from arbitrary API payloads.
+_USER_UPDATABLE_FIELDS: set[str] = {
+    "device_token",
+    "device_type",
+    "device_info",
+    "push_notifications_enabled",
+    "full_name",
+    "email",
+    "is_active",
+}
+
+
+def update_user(db: Session, *, user_id: int, user_data: dict) -> User | None:
+    """Update whitelisted fields on a User row.
+
+    PR-2: Previously the FCM endpoints called a non-existent `crud_user.update_user`
+    and crashed with HTTP 500. This wrapper accepts a partial dict and only
+    writes attributes that exist on the User model and are in the whitelist.
+    Returns the updated User, or None if the user was not found.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        return None
+    for key, value in user_data.items():
+        if key in _USER_UPDATABLE_FIELDS and hasattr(User, key):
+            setattr(user, key, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def get_users_by_ids(db: Session, *, user_ids: list[int]) -> list[User]:
+    """Return Users whose id is in user_ids. PR-2: was missing, FCM endpoints crashed."""
+    if not user_ids:
+        return []
+    stmt = select(User).where(User.id.in_(user_ids))
+    return list(db.execute(stmt).scalars().all())
+
+
+def get_users_with_fcm_tokens(db: Session) -> list[User]:
+    """Return all Users that have a non-empty device_token. PR-2: was missing."""
+    stmt = select(User).where(User.device_token.isnot(None)).where(
+        User.device_token != ""
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
 # === PR-1: Mobile API wrappers ===
 
 from app.models.user_profile import UserProfile, UserNotificationSettings
