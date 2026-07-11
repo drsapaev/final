@@ -1348,13 +1348,12 @@ const AppointmentWizardV2 = ({
     ].filter(Boolean);
 
     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
-    // Раньше: window.confirm('Создать запись?\n\n' + summaryLines.join('\n'))
-    // Теперь: macOS-style ConfirmDialog через useConfirm.
+    // PR-24: parameterize title/CTA by editMode so user sees "Обновить" not "Создать"
     const confirmed = await confirm({
-      title: 'Создать запись',
-      message: 'Создать запись с указанными данными?',
+      title: editMode ? 'Обновить запись' : 'Создать запись',
+      message: editMode ? 'Обновить запись с указанными данными?' : 'Создать запись с указанными данными?',
       description: summaryLines.join('\n'),
-      confirmLabel: 'Создать',
+      confirmLabel: editMode ? 'Обновить' : 'Создать',
       cancelLabel: 'Отмена',
       intent: 'primary',
     });
@@ -2591,6 +2590,35 @@ const AppointmentWizardV2 = ({
   };
 
   // Кастомный заголовок для Шага 1
+  // PR-24: show edit-mode banner when editing
+  const editModeBanner = editMode ? (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '4px 10px',
+      borderRadius: 'var(--mac-radius-sm)',
+      background: 'rgba(59, 130, 246, 0.12)',
+      color: '#2563eb',
+      fontSize: '12px',
+      fontWeight: 600,
+      marginBottom: '4px'
+    }}>
+      ✏️ Редактирование записи
+      {initialData?.source_kind === 'online' || initialData?.source === 'online' ? (
+        <span style={{
+          padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
+          background: 'rgba(139, 92, 246, 0.15)', color: '#7c3aed'
+        }}>QR</span>
+      ) : (
+        <span style={{
+          padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
+          background: 'rgba(100, 116, 139, 0.15)', color: '#64748b'
+        }}>Desk</span>
+      )}
+    </div>
+  ) : null;
+
   const Step1Header =
   <div style={wizardHeaderShellStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)', minWidth: 0 }}>
@@ -2598,8 +2626,9 @@ const AppointmentWizardV2 = ({
           <Check size={18} />
         </div>
         <div style={{ minWidth: 0 }}>
+          {editModeBanner}
           <h3 style={wizardHeaderTitleStyle}>
-            Регистрация пациента
+            {editMode ? 'Редактирование записи' : 'Регистрация пациента'}
           </h3>
           <p style={wizardHeaderSubtitleStyle}>
             Шаг 1 из 2 · данные пациента и карточка записи

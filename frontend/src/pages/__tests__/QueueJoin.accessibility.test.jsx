@@ -109,7 +109,7 @@ describe('QueueJoin Accessibility & UX', () => {
   it('exposes labeled required fields and announces validation errors', async () => {
     renderQueueJoin();
 
-    fireEvent.click(await screen.findByRole('button', { name: /давом этиш/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /продолжить/i }));
 
     expect(await screen.findByLabelText(/фио/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/номер телефона/i)).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe('QueueJoin Accessibility & UX', () => {
   it('persists in-progress form state for the same QR token', async () => {
     const view = renderQueueJoin('persist-token');
 
-    fireEvent.click(await screen.findByRole('button', { name: /давом этиш/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /продолжить/i }));
 
     const nameInput = await screen.findByLabelText(/фио/i);
     const phoneInput = screen.getByLabelText(/номер телефона/i);
@@ -139,7 +139,7 @@ describe('QueueJoin Accessibility & UX', () => {
     view.unmount();
 
     renderQueueJoin('persist-token');
-    fireEvent.click(await screen.findByRole('button', { name: /давом этиш/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /продолжить/i }));
 
     expect(await screen.findByLabelText(/фио/i)).toHaveValue('Тест Пациент');
     expect(screen.getByLabelText(/номер телефона/i)).toHaveValue('+998 (90) 123-45-67');
@@ -186,7 +186,7 @@ describe('QueueJoin Accessibility & UX', () => {
     renderQueueJoin('clinic-wide-real-id-token');
 
     fireEvent.click(await screen.findByLabelText(/кардиолог/i));
-    fireEvent.click(screen.getByRole('button', { name: /давом этиш/i }));
+    fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
 
     fireEvent.change(await screen.findByLabelText(/фио/i), {
       target: { value: 'Тест Пациент' },
@@ -231,6 +231,6 @@ describe('QueueJoin Accessibility & UX', () => {
     const retryButton = await screen.findByRole('button', { name: /Попробовать снова/i });
     fireEvent.click(retryButton);
 
-    expect(await screen.findByRole('button', { name: /давом этиш/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /продолжить/i })).toBeInTheDocument();
   });
 });
