@@ -365,20 +365,36 @@ def delete_queue_profile(
     """
     try:
         from app.models.queue_profile import QueueProfile
+        from app.models.service import Service
 
         # Find profile
         profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
 
+        # PR-22: cascade cleanup — clear queue_tag from services that
+        # matched this profile's tags. Without this, services keep
+        # orphaned queue_tags that silently disappear from registrar.
+        tags_to_clean = profile.queue_tags or []
+        services_cleaned = 0
+        if tags_to_clean:
+            services = db.query(Service).filter(
+                Service.queue_tag.in_(tags_to_clean)
+            ).all()
+            for svc in services:
+                if svc.queue_tag in tags_to_clean:
+                    svc.queue_tag = None
+                    services_cleaned += 1
+
         db.delete(profile)
         db.commit()
 
-        logger.info(f"Deleted QueueProfile: {profile_key}")
+        logger.info(f"Deleted QueueProfile: {profile_key} (cleaned {services_cleaned} services)")
 
         return {
             "success": True,
             "message": f"Profile '{profile_key}' deleted successfully",
+            "services_cleaned": services_cleaned,
         }
 
     except HTTPException:

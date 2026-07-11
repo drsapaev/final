@@ -40,6 +40,11 @@ const UserManagement = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  // PR-22: pagination state (was hardcoded per_page=100, no pagination UI)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const perPage = 50;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentProfile, setCurrentProfile] = useState(null);
   const [deleteDialogMode, setDeleteDialogMode] = useState('confirm');
@@ -74,8 +79,16 @@ const UserManagement = () => {
 
 
   useEffect(() => {
-    loadUsers();
+    loadUsers(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // PR-22: reload when filters or search change
+  useEffect(() => {
+    setCurrentPage(1);
+    loadUsers(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, roleFilter, statusFilter]);
 
   useEffect(() => {
     let isMounted = true;
@@ -139,12 +152,18 @@ const UserManagement = () => {
     };
   }, [actionsMenuUser]);
 
-  const loadUsers = async () => {
+  const loadUsers = async (page = currentPage) => {
     try {
       setLoading(true);
-      // Request up to 100 users per page to show all users
-      const response = await api.get('/users/users', { params: { per_page: 100 } });
+      // PR-22: use pagination — was per_page=100 with no pagination UI
+      const params = { page, per_page: perPage };
+      if (roleFilter) params.role = roleFilter;
+      if (statusFilter) params.status = statusFilter;
+      if (searchTerm) params.search = searchTerm;
+      const response = await api.get('/users/users', { params });
       setUsers(response.data.users || response.data || []);
+      setTotalPages(response.data.total_pages || 1);
+      setTotalUsers(response.data.total || 0);
       setError('');
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка подключения к серверу';
@@ -165,7 +184,7 @@ const UserManagement = () => {
         setSuccess('Пользователь успешно создан');
       }
       setError('');
-      loadUsers();
+      loadUsers(currentPage);
       setShowUserModal(false);
       setSelectedUser(null);
     } catch (err) {
@@ -193,7 +212,7 @@ const UserManagement = () => {
       await api.delete(`/users/users/${selectedUser.id}`);
       setSuccess('Пользователь успешно удален');
       setError('');
-      loadUsers();
+      loadUsers(currentPage);
       setShowDeleteDialog(false);
       setSelectedUser(null);
     } catch (err) {
@@ -228,7 +247,7 @@ const UserManagement = () => {
       await api.put(`/users/users/${selectedUser.id}`, { is_active: false });
       setSuccess('Пользователь деактивирован');
       setError('');
-      loadUsers();
+      loadUsers(currentPage);
       setShowDeleteDialog(false);
       setSelectedUser(null);
       setDeleteDialogMode('confirm');
@@ -259,7 +278,7 @@ const UserManagement = () => {
       await api.put(`/users/users/${userId}`, { is_active: !isActive });
       setSuccess(`Пользователь ${!isActive ? 'активирован' : 'деактивирован'}`);
       setError('');
-      loadUsers();
+      loadUsers(currentPage);
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка изменения статуса пользователя';
       setError(errorMessage);
@@ -526,7 +545,7 @@ const UserManagement = () => {
             <label className="admin-d-block-mb-6-fs-13-fw-500-vis-hidden">Действие</label>
             <Button
               variant="secondary"
-              onClick={loadUsers}
+              onClick={() => loadUsers(currentPage)}
               startIcon={<RefreshCw size={16} />}
               className="admin-w-100pct-jc-center"
               disabled={loading}>
@@ -543,7 +562,32 @@ const UserManagement = () => {
           data={filteredUsers}
           loading={loading}
           hoverable />
-        
+
+        {/* PR-22: Pagination controls */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid var(--mac-border)' }}>
+            <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+              Всего: {totalUsers} · Страница {currentPage} из {totalPages}
+            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={currentPage <= 1 || loading}
+                onClick={() => { setCurrentPage(p => p - 1); loadUsers(currentPage - 1); }}>
+                ← Назад
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={currentPage >= totalPages || loading}
+                onClick={() => { setCurrentPage(p => p + 1); loadUsers(currentPage + 1); }}>
+                Вперёд →
+              </Button>
+            </div>
+          </div>
+        )}
+
       </MacOSCard>
 
       {/* Actions Menu */}
