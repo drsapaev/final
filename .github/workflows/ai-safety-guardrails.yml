@@ -139,6 +139,14 @@ jobs:
           for i in {1..30}; do
             if curl -sf http://127.0.0.1:18000/api/v1/health >/dev/null; then
               echo "Backend ready"
+              # Debug: test login
+              echo "Testing login as qa_doctor@clinic.com..."
+              curl -sf -X POST http://127.0.0.1:18000/api/v1/authentication/login \
+                -H "Content-Type: application/json" \
+                -d '{"username":"qa_doctor@clinic.com","password":"QA_PASSWORD_123"}' \
+                -w "\nHTTP status: %{http_code}\n" || true
+              echo "---server.log tail---"
+              tail -30 server.log || true
               exit 0
             fi
             sleep 2
