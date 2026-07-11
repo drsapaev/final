@@ -19,6 +19,7 @@ import {
   Checkbox,
   Input } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import { adaptTimeFields } from '../utils/registrarAggregation';
 import './cardiology.css';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
 import EcgTab from '../components/cardiology/EcgTab';
@@ -676,9 +677,7 @@ const MacOSCardiologistPanelUnified = () => {
                   queue_position: entry.queue_position,
                   doctor: entry.doctor_name || 'Врач',
                   specialty: queue.specialty,
-                  created_at: entry.created_at,
-                  appointment_date: entry.created_at ? entry.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-                  appointment_time: entry.visit_time || '',
+                  ...adaptTimeFields(entry, data),
                   status: entry.status ?? null,
                   cost: entry.cost || 0
                 });

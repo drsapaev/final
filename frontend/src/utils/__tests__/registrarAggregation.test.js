@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  adaptTimeFields,
   aggregatePatientsForAllDepartments,
   sortRegistrarRowsForPresentation
 } from '../registrarAggregation';
@@ -430,5 +431,86 @@ describe('sortRegistrarRowsForPresentation', () => {
     ]);
 
     expect(sorted.map((row) => row.id)).toEqual([7, 9]);
+  });
+});
+
+describe('adaptTimeFields (PR-11)', () => {
+  it('passes through all 6 time fields from a flat entry', () => {
+    const entry = {
+      id: 1,
+      created_at: '2026-07-11T09:25:00+00:00',
+      queue_time: '2026-07-11T14:30:00+05:00',
+      updated_at: '2026-07-11T14:35:00+05:00',
+      last_changed_at: '2026-07-11T14:35:00+05:00',
+      display_time_kind: 'queue_time',
+      timezone: 'Asia/Tashkent',
+    };
+
+    const result = adaptTimeFields(entry, { timezone: 'Asia/Tashkent' });
+
+    expect(result.created_at).toBe('2026-07-11T09:25:00+00:00');
+    expect(result.queue_time).toBe('2026-07-11T14:30:00+05:00');
+    expect(result.updated_at).toBe('2026-07-11T14:35:00+05:00');
+    expect(result.last_changed_at).toBe('2026-07-11T14:35:00+05:00');
+    expect(result.display_time_kind).toBe('queue_time');
+    expect(result.timezone).toBe('Asia/Tashkent');
+  });
+
+  it('falls back queue_time to created_at when queue_time is missing', () => {
+    const entry = {
+      id: 2,
+      created_at: '2026-07-11T09:25:00+00:00',
+    };
+
+    const result = adaptTimeFields(entry, {});
+
+    expect(result.queue_time).toBe('2026-07-11T09:25:00+00:00');
+    expect(result.display_time_kind).toBe('created_at');
+  });
+
+  it('uses data.timezone fallback when entry.timezone is missing', () => {
+    const entry = { id: 3, created_at: '2026-07-11T09:25:00+00:00' };
+
+    const result = adaptTimeFields(entry, { timezone: 'Asia/Tashkent' });
+
+    expect(result.timezone).toBe('Asia/Tashkent');
+  });
+
+  it('falls back to Asia/Tashkent when no timezone is provided anywhere', () => {
+    const entry = { id: 4, created_at: '2026-07-11T09:25:00+00:00' };
+
+    const result = adaptTimeFields(entry, {});
+
+    expect(result.timezone).toBe('Asia/Tashkent');
+  });
+
+  it('handles entry with nested data wrapper', () => {
+    const entry = {
+      id: 5,
+      data: {
+        created_at: '2026-07-11T09:25:00+00:00',
+        queue_time: '2026-07-11T14:30:00+05:00',
+        updated_at: '2026-07-11T14:35:00+05:00',
+      },
+    };
+
+    const result = adaptTimeFields(entry, { timezone: 'Asia/Tashkent' });
+
+    expect(result.created_at).toBe('2026-07-11T09:25:00+00:00');
+    expect(result.queue_time).toBe('2026-07-11T14:30:00+05:00');
+    expect(result.updated_at).toBe('2026-07-11T14:35:00+05:00');
+  });
+
+  it('falls back updated_at to last_changed_at and vice versa', () => {
+    const entry = {
+      id: 6,
+      created_at: '2026-07-11T09:25:00+00:00',
+      last_changed_at: '2026-07-11T14:35:00+05:00',
+    };
+
+    const result = adaptTimeFields(entry, {});
+
+    expect(result.updated_at).toBe('2026-07-11T14:35:00+05:00');
+    expect(result.last_changed_at).toBe('2026-07-11T14:35:00+05:00');
   });
 });

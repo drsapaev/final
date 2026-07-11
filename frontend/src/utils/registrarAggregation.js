@@ -12,6 +12,44 @@ export const getRecordAmount = (appointment) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
+/**
+ * PR-11: Unified time-field adaptation for registrar/doctor/specialty panels.
+ *
+ * Extracts the 6 time-related fields that EnhancedAppointmentsTable's
+ * getRegistrarTimestampDisplay() needs to render "Очередь" / "Создано" +
+ * "Изменено" indicator correctly.
+ *
+ * Before PR-11, only RegistrarPanel.adaptEntry passed these through.
+ * Cardio/Derma/Dental panels dropped them, causing:
+ *   - "Очередь" label never showed (fell back to "Создано")
+ *   - "Изменено" indicator never rendered after services added
+ *
+ * Usage:
+ *   import { adaptTimeFields } from '../utils/registrarAggregation';
+ *   const row = { ...otherFields, ...adaptTimeFields(entry, data) };
+ *
+ * @param {Object} entry - backend queue entry (from /registrar/queues/today)
+ * @param {Object} [data] - top-level response (for timezone fallback)
+ * @returns {Object} { created_at, queue_time, updated_at, last_changed_at, display_time_kind, timezone }
+ */
+export const adaptTimeFields = (entry, data) => {
+  const fullEntry = entry?.data || entry || {};
+  const sourceEntry = entry || {};
+
+  const createdAt = fullEntry.created_at || sourceEntry.created_at || null;
+  const hasQueueTime = Boolean(fullEntry.queue_time || sourceEntry.queue_time);
+  const queueTime = fullEntry.queue_time || sourceEntry.queue_time || createdAt;
+
+  return {
+    created_at: createdAt,
+    queue_time: queueTime,
+    updated_at: fullEntry.updated_at || fullEntry.last_changed_at || sourceEntry.updated_at || sourceEntry.last_changed_at || null,
+    last_changed_at: fullEntry.last_changed_at || fullEntry.updated_at || sourceEntry.last_changed_at || sourceEntry.updated_at || null,
+    display_time_kind: fullEntry.display_time_kind || sourceEntry.display_time_kind || (hasQueueTime ? 'queue_time' : 'created_at'),
+    timezone: fullEntry.timezone || sourceEntry.timezone || data?.timezone || 'Asia/Tashkent',
+  };
+};
+
 export const getRegistrarPresentationSortTime = (record) => {
   const value = record?.queue_time || record?.created_at || null;
   if (!value) return 0;

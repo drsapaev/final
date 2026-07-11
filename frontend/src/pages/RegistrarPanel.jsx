@@ -76,6 +76,7 @@ import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
 // Note: formatNetworkErrorMessage + isNetworkFetchError moved to useRegistrarData.js (Decomp 4)
 import { getErrorMessage } from '../utils/errorHandler';
 import {
+  adaptTimeFields,
   aggregatePatientsForAllDepartments as aggregateRegistrarPatients,
   sortRegistrarRowsForPresentation
 } from '../utils/registrarAggregation';
@@ -394,12 +395,9 @@ const RegistrarPanel = () => {
               canonical_status: fullEntry.canonical_status ?? canonicalStatus,
               queue_status: fullEntry.queue_status ?? canonicalStatus,
               record_type: fullEntry.record_type ?? fullEntry.type ?? entry.record_type ?? entry.type ?? null,
-              created_at: fullEntry.created_at || null,
+              ...adaptTimeFields(entry, data),
+              // Keep queueTime (computed above) as queue_time fallback for backward compat
               queue_time: queueTime,
-              updated_at: fullEntry.updated_at || fullEntry.last_changed_at || null,
-              last_changed_at: fullEntry.last_changed_at || fullEntry.updated_at || null,
-              display_time_kind: fullEntry.display_time_kind || (fullEntry.queue_time ? 'queue_time' : 'created_at'),
-              timezone: fullEntry.timezone || data.timezone || 'Asia/Tashkent',
               discount_mode: fullEntry.discount_mode ?? null,
               approval_status: fullEntry.approval_status || null,
               available_actions: Array.isArray(fullEntry.available_actions) ? fullEntry.available_actions : [],
