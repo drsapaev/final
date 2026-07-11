@@ -40,7 +40,10 @@ const UserModal = ({
   // Fallback roles if API fails
   const roleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
     { value: 'Admin', label: 'Администратор' },
-    { value: 'Doctor', label: 'Врач' },
+    { value: 'Doctor', label: 'Врач (общий)' },
+    { value: 'cardio', label: 'Кардиолог' },
+    { value: 'derma', label: 'Дерматолог' },
+    { value: 'dentist', label: 'Стоматолог' },
     { value: 'Nurse', label: 'Медсестра' },
     { value: 'Receptionist', label: 'Регистратор' },
     { value: 'Cashier', label: 'Кассир' },

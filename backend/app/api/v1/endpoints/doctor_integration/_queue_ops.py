@@ -299,21 +299,39 @@ def call_patient(
                 detail="Врач не найден для этой очереди",
             )
 
-        if (
-            current_user.role != "Admin"
-            and doctor.user_id
-            and doctor.user_id != current_user.id
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет прав для работы с этой очередью",
-            )
+        # PR-26: Allow any doctor of the same specialty to call patients
+        # from this queue. Previously, only the queue owner (doctor.user_id
+        # matching current_user.id) could call — which broke when multiple
+        # doctors of the same specialty shared a queue.
+        # Now: Admin can always call; any doctor can call from queues
+        # where the queue's doctor has the same specialty as the caller.
+        if current_user.role != "Admin":
+            caller_doctor = db.query(Doctor).filter(
+                Doctor.user_id == current_user.id,
+                Doctor.active == True,
+            ).first()
+
+            if not caller_doctor:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Только врач может вызывать пациентов",
+                )
+
+            # Allow if caller is the queue owner OR has the same specialty
+            if doctor.user_id != current_user.id:
+                caller_specialty = (caller_doctor.specialty or "").lower().strip()
+                queue_specialty = (doctor.specialty or "").lower().strip()
+                if not caller_specialty or not queue_specialty or caller_specialty != queue_specialty:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Нет прав для работы с этой очередью — вы не владелец и специальность не совпадает",
+                    )
 
         # Обновляем статус на "вызван"
         if "call" not in _doctor_queue_available_actions(queue_entry):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Р’С‹Р·РІР°С‚СЊ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ waiting, С‚РµРєСѓС‰РёР№: {queue_entry.status}",
+                detail=f"Вызывать можно только waiting, текущий: {queue_entry.status}",
             )
 
         changed_at = datetime.now(UTC)
@@ -411,15 +429,19 @@ def start_patient_visit(
                 detail="Врач не найден для этой очереди",
             )
 
-        if (
-            current_user.role != "Admin"
-            and doctor.user_id
-            and doctor.user_id != current_user.id
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет прав для работы с этой очередью",
-            )
+        # PR-26: same-specialty doctors can also work with this queue
+        if current_user.role != "Admin" and doctor.user_id and doctor.user_id != current_user.id:
+            caller_doctor = db.query(Doctor).filter(
+                Doctor.user_id == current_user.id, Doctor.active == True,
+            ).first()
+            if not caller_doctor:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Только врач может работать с этой очередью")
+            caller_specialty = (caller_doctor.specialty or "").lower().strip()
+            queue_specialty = (doctor.specialty or "").lower().strip()
+            if not caller_specialty or not queue_specialty or caller_specialty != queue_specialty:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью")
 
         # Обновляем статус
         if "start_visit" not in _doctor_queue_available_actions(queue_entry):

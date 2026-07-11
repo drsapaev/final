@@ -255,31 +255,34 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 f"Врач с ID {specialist_id} не найден. Невозможно создать очередь."
             )
         # ✅ ИСПРАВЛЕНО: Используем doctor.id для specialist_id (ForeignKey на doctors.id)
-        # DailyQueue.specialist_id должен быть doctor.id
         actual_specialist_id = doctor.id
 
-        # ⭐ SSOT FIX: Сначала ищем очередь по (day, queue_tag), игнорируя specialist_id
-        # Это предотвращает создание дубликатов очередей с разными specialist_id
-        if queue_tag:
-            # Ищем существующую очередь по queue_tag (более приоритетно)
-            existing_by_tag = db.query(DailyQueue).filter(
-                DailyQueue.day == day,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active == True,
-            ).first()
-            if existing_by_tag:
-                return existing_by_tag
-
-        # Fallback: ищем по specialist_id (для legacy совместимости или без queue_tag)
+        # PR-26: ARCHITECTURE FIX — queue is owned by DOCTOR, not by queue_tag.
+        #
+        # Previous code searched by (day, queue_tag) IGNORING specialist_id,
+        # which caused all doctors of the same specialty to share ONE queue.
+        # This broke multi-doctor clinics: second cardiologist got 403 when
+        # calling patients from a queue owned by the first cardiologist.
+        #
+        # New logic: search by (day, specialist_id) first.
+        # queue_tag is still stored for routing/display but does NOT
+        # override the per-doctor ownership.
         query = db.query(DailyQueue).filter(
             DailyQueue.day == day,
             DailyQueue.specialist_id == actual_specialist_id,
+            DailyQueue.active == True,
         )
         if queue_tag:
             query = query.filter(DailyQueue.queue_tag == queue_tag)
         daily_queue = query.first()
         if daily_queue:
             return daily_queue
+
+        # Fallback: if no queue exists for this specific doctor on this day,
+        # check if there's an active queue for the same queue_tag+day that
+        # belongs to a DIFFERENT doctor (legacy shared-queue scenario).
+        # We do NOT reuse it — we create a new per-doctor queue instead.
+        # This is the correct behavior: each doctor has their own queue.
 
         settings = self._load_queue_settings(db)
         queue_start_hour = settings.get("queue_start_hour", 7)

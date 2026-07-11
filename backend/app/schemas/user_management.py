@@ -517,7 +517,7 @@ class UserCreateRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=8, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: str = Field(..., pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$")
+    role: str = Field(..., pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|derma|dentist)$")
     is_active: bool | None = True
     is_superuser: bool | None = False
     must_change_password: bool | None = False  # Требуется смена пароля при первом входе

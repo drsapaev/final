@@ -239,19 +239,22 @@ class CoreMixin(UserManagementServiceMixinBase):
             # registrar doctor selector, and schedules until admin manually
             # links them via AdminDoctors → "Add doctor" → pick user.
             doctor_created = False
-            if user_data.role in ("Doctor", "Cardiologist", "Dermatologist", "Dentist"):
+            if user_data.role in ("Doctor", "Cardiologist", "Dermatologist", "Dentist", "cardio", "derma", "dentist"):
                 existing_doctor = (
                     db.query(Doctor)
                     .filter(Doctor.user_id == user.id)
                     .first()
                 )
                 if not existing_doctor:
-                    # Derive a sensible default specialty from the role
+                    # PR-26: map role to specialty including lowercase cardio/derma/dentist
                     specialty_map = {
                         "Doctor": "general",
                         "Cardiologist": "cardiology",
                         "Dermatologist": "dermatology",
                         "Dentist": "dentistry",
+                        "cardio": "cardiology",
+                        "derma": "dermatology",
+                        "dentist": "dentistry",
                     }
                     new_doctor = Doctor(
                         user_id=user.id,
