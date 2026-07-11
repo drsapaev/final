@@ -2,7 +2,7 @@
 CRUD операции для работы с визитами
 """
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import and_, desc
@@ -279,7 +279,11 @@ def add_visit_service(
     quantity: int = 1,
     custom_price: float | None = None,
 ) -> VisitService:
-    """Добавить услугу к визиту"""
+    """Добавить услугу к визиту.
+
+    PR-10: bumps visit.updated_at so the "Изменено" timestamp in
+    registrar/doctor tables reflects doctor-side service additions.
+    """
     # Получаем цену услуги
     service = db.query(Service).filter(Service.id == service_id).first()
     price = (
@@ -298,19 +302,28 @@ def add_visit_service(
         service_id=service_id,
         quantity=quantity,
         price=price,
-        custom_price=custom_price,
         code=service_code,
         name=service.name if service else "",
     )
 
     db.add(visit_service)
+
+    # PR-10: bump visit.updated_at so frontend "Изменено" indicator fires.
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if visit is not None:
+        visit.updated_at = datetime.now(UTC)
+
     db.commit()
     db.refresh(visit_service)
     return visit_service
 
 
 def remove_visit_service(db: Session, visit_service_id: int) -> bool:
-    """Удалить услугу из визита"""
+    """Удалить услугу из визита.
+
+    PR-10: bumps visit.updated_at so the "Изменено" timestamp in
+    registrar/doctor tables reflects doctor-side service removals.
+    """
     visit_service = (
         db.query(VisitService).filter(VisitService.id == visit_service_id).first()
     )
@@ -318,7 +331,14 @@ def remove_visit_service(db: Session, visit_service_id: int) -> bool:
     if not visit_service:
         return False
 
+    visit_id = visit_service.visit_id
     db.delete(visit_service)
+
+    # PR-10: bump visit.updated_at so frontend "Изменено" indicator fires.
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if visit is not None:
+        visit.updated_at = datetime.now(UTC)
+
     db.commit()
     return True
 
