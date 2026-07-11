@@ -109,6 +109,7 @@ from .file_system import (
     FileVersion,
 )
 from .finance import FinanceTransaction
+from .feature_flags import FeatureFlag, FeatureFlagHistory
 from .global_search_audit import GlobalSearchAudit
 
 # КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!
@@ -330,6 +331,9 @@ __all__ = [
     "RelationType",
     # Global Search Audit
     "GlobalSearchAudit",
+    # Feature Flags
+    "FeatureFlag",
+    "FeatureFlagHistory",
     # AI Chat
     "AIChatSession",
     "AIChatMessage",

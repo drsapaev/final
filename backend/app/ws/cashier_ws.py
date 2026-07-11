@@ -75,19 +75,20 @@ async def cashier_websocket(
     - Новых платежах
     - Изменениях статусов
 
-    PAY-REAUDIT-28 P0-3: JWT-токен обязателен. Извлекается из query-параметра
-    `token`. Без валидного токена и роли Admin/Cashier соединение закрывается
-    с кодом 4401. Раньше эндпоинт принимал любые соединения и транслировал
-    PHI (patient_id, visit_id, amount) всем подписчикам.
+    PAY-REAUDIT-28 P0-3: JWT-токен обязателен. Без валидного токена и роли
+    Admin/Cashier соединение закрывается с кодом 4401. Раньше эндпоинт
+    принимал любые соединения и транслировал PHI (patient_id, visit_id,
+    amount) всем подписчикам.
+
+    PR-4: token is extracted via ``extract_ws_token`` — preferred sources
+    are Sec-WebSocket-Protocol subprotocol ``bearer.<jwt>`` and
+    Authorization header. Query param ``?token=`` still works but emits
+    a deprecation warning (it leaks in proxy logs / Referer).
     """
-    token = websocket.query_params.get("token")
-    # P1-6: also accept subprotocol
-    if not token and websocket.headers.get("sec-websocket-protocol"):
-        protocols = websocket.headers.get("sec-websocket-protocol", "").split(", ")
-        for proto in protocols:
-            if proto.startswith("bearer."):
-                token = proto[7:]
-                break
+    # PR-4: use shared helper for token extraction (preferred: subprotocol,
+    # Authorization header; fallback: ?token= query param with warning).
+    from app.api.v1.endpoints.ws_token import extract_ws_token
+    token = extract_ws_token(websocket)
     if not token:
         await websocket.close(code=4401)
         return

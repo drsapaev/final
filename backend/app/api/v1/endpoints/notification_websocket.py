@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
+from app.api.v1.endpoints.ws_token import extract_ws_token
 from app.db.session import SessionLocal
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notification_websocket import get_notification_ws_manager
@@ -18,15 +19,20 @@ router = APIRouter()
 @router.websocket("/ws/notifications/connect")
 async def websocket_notifications(
     websocket: WebSocket,
-    # P1-6: accept token from query param OR Sec-WebSocket-Protocol subprotocol
-    token: str | None = Query(None, description="JWT token (legacy, use subprotocol)"),
 ):
-    """Realtime notification channel with server-owned inbox sync."""
+    """Realtime notification channel with server-owned inbox sync.
+
+    PR-4: token is now extracted via ``extract_ws_token`` — preferred
+    sources are Sec-WebSocket-Protocol subprotocol ``bearer.<jwt>`` and
+    Authorization header. Query param ``?token=`` still works but emits
+    a deprecation warning (it leaks in proxy logs / Referer).
+    """
     db = SessionLocal()
     manager = get_notification_ws_manager()
     authenticated_user = None
 
     try:
+        token = extract_ws_token(websocket)
         authenticated_user = await authenticate_websocket_token(token, db)
         if not authenticated_user:
             await websocket.close(

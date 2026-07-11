@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
+from app.api.v1.endpoints.ws_token import extract_ws_token
 from app.core.config import settings
 from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
@@ -64,10 +65,15 @@ async def authenticate_websocket_token(
 
 @router.websocket("/ws/board/{board_id}")
 async def websocket_display_board(
-    websocket: WebSocket, board_id: str, token: str | None = None
+    websocket: WebSocket, board_id: str,
 ):
     """
-    WebSocket подключение для табло очереди с аутентификацией
+    WebSocket подключение для табло очереди с аутентификацией.
+
+    PR-4: token is extracted via ``extract_ws_token`` — preferred
+    sources are Sec-WebSocket-Protocol subprotocol ``bearer.<jwt>`` and
+    Authorization header. Query param ``?token=`` still works but emits
+    a deprecation warning (it leaks in proxy logs / Referer).
     """
     manager = get_display_manager()
     db = SessionLocal()
@@ -76,6 +82,7 @@ async def websocket_display_board(
         # QUEUE-AUDIT-28 P0-2: token REQUIRED (was optional).
         # Раньше anonymous пользователи получали все patient names + positions
         # + doctors + cabinets через /ws/board/{board_id}.
+        token = extract_ws_token(websocket)
         if not token:
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Token required"
@@ -154,7 +161,7 @@ async def call_patient_to_board(
 
 @router.websocket("/ws/queue/{department}")
 async def websocket_queue_department(
-    websocket: WebSocket, department: str, token: str | None = None
+    websocket: WebSocket, department: str,
 ):
     """
     WebSocket подключение для очереди по отделению
@@ -165,6 +172,14 @@ async def websocket_queue_department(
     - queue.called: пациент вызван
     - queue.completed: пациент обслужен
     - queue.cancelled: запись отменена
+
+    PR-4: token is extracted via ``extract_ws_token`` — preferred sources
+    are Sec-WebSocket-Protocol subprotocol ``bearer.<jwt>`` and
+    Authorization header. Query param ``?token=`` still works but emits
+    a deprecation warning. Note: this endpoint currently does NOT
+    enforce token presence (no auth check) — that's a separate audit
+    item (PR-5). This PR only ensures that when auth IS added, the
+    token can come from a secure source.
     """
     manager = get_display_manager()
 

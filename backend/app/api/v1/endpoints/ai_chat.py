@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.v1.endpoints.ws_token import extract_ws_token
 from app.core.config import settings
 from app.core.messaging_contract import CONTRACT_VERSION
 from app.core.rbac import AIPermission, has_permission, require_ai_permission
@@ -313,11 +314,15 @@ async def authenticate_websocket(token: str, db: Session) -> User | None:
 @router.websocket("/ws")
 async def chat_websocket(
     websocket: WebSocket,
-    token: str = Query(..., description="JWT token for authentication"),
     db: Session = Depends(get_db)
 ):
     """
     WebSocket для real-time AI чата с streaming.
+
+    PR-4: token is extracted via ``extract_ws_token`` — preferred sources
+    are Sec-WebSocket-Protocol subprotocol ``bearer.<jwt>`` and
+    Authorization header. Query param ``?token=`` still works but emits
+    a deprecation warning (it leaks in proxy logs / Referer).
 
     Protocol:
 
@@ -346,6 +351,14 @@ async def chat_websocket(
     ```
     """
     await websocket.accept()
+
+    # PR-4: extract JWT from secure sources (subprotocol/header preferred,
+    # query string as deprecated fallback).
+    token = extract_ws_token(websocket)
+
+    if not token:
+        await websocket.close(code=4001, reason="Authentication required")
+        return
 
     # Аутентификация
     user = await authenticate_websocket(token, db)
