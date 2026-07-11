@@ -573,3 +573,112 @@ async def test_push_notification(
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
+
+
+# ==================== PR-6: Missing endpoints ====================
+
+
+@router.get("/doctors", response_model=list[dict[str, Any]])
+async def list_mobile_doctors(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+    specialty: str | None = Query(None, description="Filter by specialty"),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """List doctors for the mobile app (PR-6).
+
+    Returns a mobile-friendly list of doctors with id, name, specialty.
+    Optional specialty filter.
+    """
+    try:
+        from app.crud import clinic as crud_clinic
+        if specialty:
+            doctors = crud_clinic.get_doctors_by_specialty(db, specialty=specialty)
+        else:
+            doctors = crud_clinic.get_doctors(db, active_only=True)
+        # Limit
+        doctors = doctors[:limit]
+
+        result = []
+        for doctor in doctors:
+            name = "Врач"
+            if doctor.user is not None:
+                name = doctor.user.full_name or doctor.user.username or "Врач"
+            result.append({
+                "id": doctor.id,
+                "name": name,
+                "specialty": doctor.specialty,
+                "cabinet": doctor.cabinet,
+                "active": doctor.active,
+            })
+        return result
+
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Internal server error"
+        )
+
+
+@router.post("/attest", response_model=dict[str, Any])
+async def attest_device(
+    request: dict[str, Any],
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Verify device attestation (PR-6).
+
+    Accepts Play Integrity token (Android) or Device Check token (iOS).
+    Returns verification status.
+
+    PR-6 MVP: accepts the token and returns 'pending' — actual verification
+    against Google Play Integrity API / Apple Device Check API requires
+    server-side credentials and is out of scope for this PR. The endpoint
+    exists so the mobile app can submit tokens; verification will be
+    implemented in a follow-up PR.
+    """
+    try:
+        platform = (request.get("platform") or "").lower()
+        if platform not in ("android", "ios"):
+            raise HTTPException(
+                status_code=400,
+                detail="platform must be 'android' or 'ios'",
+            )
+
+        if platform == "android":
+            token = request.get("integrity_token")
+            if not token:
+                raise HTTPException(
+                    status_code=400,
+                    detail="integrity_token is required for Android",
+                )
+            # TODO PR-7: verify token via Google Play Integrity API
+            # For now, accept and return pending
+            return {
+                "status": "pending",
+                "platform": "android",
+                "message": "Play Integrity token received; verification pending",
+                "user_id": current_user.id,
+            }
+        else:  # ios
+            token = request.get("device_token")
+            if not token:
+                raise HTTPException(
+                    status_code=400,
+                    detail="device_token is required for iOS",
+                )
+            # TODO PR-7: verify token via Apple Device Check API
+            return {
+                "status": "pending",
+                "platform": "ios",
+                "message": "Device Check token received; verification pending",
+                "user_id": current_user.id,
+            }
+
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Internal server error"
+        )
