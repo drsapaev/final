@@ -14,7 +14,7 @@ from app.api.v1.endpoints.services_ep._helpers import router  # noqa: F401
 async def list_service_categories(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
     offset: int = Query(default=0, ge=0, description="Смещение"),
 db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
     active: bool | None = Query(default=None),
 ):
     """Delegate category listing to the service layer."""
@@ -27,7 +27,7 @@ db: Session = Depends(get_db),
 async def create_service_category(
     category_data: ServiceCategoryCreate,
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin")),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Delegate category creation to the service layer."""
     try:
@@ -47,7 +47,7 @@ async def update_service_category(
     category_id: int,
     category_data: ServiceCategoryUpdate,
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin")),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Delegate category updates to the service layer."""
     try:
@@ -65,7 +65,7 @@ async def update_service_category(
 async def delete_service_category(
     category_id: int,
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin")),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Delegate category deletion to the service layer."""
     try:
