@@ -115,6 +115,9 @@ class DoctorOut(DoctorBase):
     id: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    # PR-21: include department fields so AdminDoctors can show "Отделение"
+    department_id: int | None = None
+    department: str | None = None
 
     # Связанные данные
     user: dict[str, Any] | None = None

@@ -86,6 +86,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     const [error, setError] = useState(null);
     const [editingProfile, setEditingProfile] = useState(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
+    // PR-21: load departments for department_key Select in ProfileForm
+    const [departments, setDepartments] = useState([]);
 
     // ⭐ New: Search and filter
     const [searchTerm, setSearchTerm] = useState('');
@@ -115,6 +117,10 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
     useEffect(() => {
         loadProfiles();
+        // PR-21: load departments for department_key Select
+        api.get('/admin/departments').then(res => {
+            setDepartments(res.data?.data || []);
+        }).catch(err => logger.error('Failed to load departments:', err));
     }, [loadProfiles]);
 
     // ⭐ New: Filtered profiles
@@ -560,6 +566,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         onCancel={() => setShowCreateForm(false)}
                         saving={saving}
                         isDark={isDark}
+                        departments={departments}
                     />
                 )}
 
@@ -713,6 +720,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         saving={saving}
                         isDark={isDark}
                         isEdit
+                        departments={departments}
                     />
                 )}
                 {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
@@ -722,7 +730,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     );
 };
 // Profile form component with show_on_qr_page support
-const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false }) => {
+const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }) => {
     const [formData, setFormData] = useState({
         key: profile?.key || '',
         title: profile?.title || '',
@@ -827,6 +835,23 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             placeholder="cardio, cardiology, cardiology_common"
                         />
                         <div className="admin-qp-hint">Разделяйте запятыми. Записи с этими тегами появятся на вкладке.</div>
+                    </div>
+
+                    {/* PR-21: Department key Select */}
+                    <div className="admin-qp-field">
+                        <label className="admin-qp-label">Отделение (необязательно)</label>
+                        <select
+                            className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn"
+                            style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
+                            value={formData.department_key}
+                            onChange={e => setFormData({ ...formData, department_key: e.target.value })}
+                        >
+                            <option value="">— Не привязано —</option>
+                            {departments.map(d => (
+                                <option key={d.key} value={d.key}>{d.name_ru || d.key}</option>
+                            ))}
+                        </select>
+                        <div className="admin-qp-hint">Привязка к отделению для синхронизации данных</div>
                     </div>
 
                     {/* Order */}
