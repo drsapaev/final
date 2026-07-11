@@ -125,6 +125,30 @@ const QueueTable = ({
                                 </td>
                                 <td className="qt-table-cell-primary">
                                     {entry.patient_name || entry.name || '—'}
+                                    {/* PR-23 P0 #3: source badge (QR vs Desk) */}
+                                    {entry.source === 'online' || entry.source_kind === 'online_queue' || entry.source === 'qr' ? (
+                                        <span style={{
+                                            display: 'inline-block',
+                                            marginLeft: '6px',
+                                            padding: '1px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '10px',
+                                            fontWeight: 600,
+                                            background: 'rgba(139, 92, 246, 0.15)',
+                                            color: '#7c3aed'
+                                        }}>QR</span>
+                                    ) : (
+                                        <span style={{
+                                            display: 'inline-block',
+                                            marginLeft: '6px',
+                                            padding: '1px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '10px',
+                                            fontWeight: 500,
+                                            background: 'rgba(100, 116, 139, 0.15)',
+                                            color: '#64748b'
+                                        }}>Desk</span>
+                                    )}
                                 </td>
                                 <td className="qt-table-cell-phone">
                                     {entry.patient_phone || entry.phone || '—'}

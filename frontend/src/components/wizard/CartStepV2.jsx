@@ -100,13 +100,14 @@ const CartStepV2 = ({
 
   const displayedServices = getDisplayedServices();
 
-  // Обработка выбора услуги
+  // PR-23 P0 #2: clicking a service that's already in cart increments quantity
+  // instead of toggling it off. Remove is via the X button in the cart mini-card.
   const handleServiceToggle = (service) => {
-    const isInCart = cart?.items?.some((item) => item.service_id === service.id);
+    const existingItem = cart?.items?.find((item) => item.service_id === service.id);
 
-    if (isInCart) {
-      const cartItem = cart.items.find((item) => item.service_id === service.id);
-      onRemoveFromCart(cartItem.id);
+    if (existingItem) {
+      // Already in cart → increment quantity
+      onUpdateItem?.(existingItem.id, 'quantity', (existingItem.quantity || 1) + 1);
     } else {
       onAddToCart(service);
     }
@@ -280,7 +281,7 @@ const CartStepV2 = ({
           fontSize: 'var(--mac-font-size-sm)',
           color: 'var(--mac-text-secondary)'
         }}>
-          <span>Выбрано: {cart?.items?.length || 0} шт.</span>
+          <span>Выбрано: {cart?.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0} шт.</span>
           <span style={{ color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
             Итого: {cartTotal.toLocaleString()} сум
           </span>
@@ -442,7 +443,20 @@ const CartStepV2 = ({
             const displayName = getServiceName ? getServiceName(item) : item.service_name || 'Неизвестная услуга';
             const service = servicesData?.find((s) => s.id === item.service_id);
             const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);
-            const doctorOptions = normalizedDoctorsData;
+
+            // PR-23 P0 #1: filter doctors by service specialty/department_key
+            // so registrar can't assign a cardiologist to a dermatology consult
+            const serviceDepartmentKey = String(service?.department_key || '').toLowerCase().trim();
+            const filteredDoctors = serviceDepartmentKey
+              ? normalizedDoctorsData.filter((d) => {
+                  const docSpecialty = String(d.specialty || '').toLowerCase().trim();
+                  // Match if doctor's specialty matches service's department_key,
+                  // or if doctor has no specialty (show all as fallback)
+                  return !docSpecialty || docSpecialty === serviceDepartmentKey ||
+                    docSpecialty.includes(serviceDepartmentKey) || serviceDepartmentKey.includes(docSpecialty);
+                })
+              : normalizedDoctorsData;
+            const doctorOptions = filteredDoctors.length > 0 ? filteredDoctors : normalizedDoctorsData;
 
             return (
               <div key={item.id} style={{
@@ -455,7 +469,7 @@ const CartStepV2 = ({
                 border: '1px solid var(--mac-border)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
-                minWidth: requiresDoctor ? '220px' : 'auto'
+                minWidth: requiresDoctor ? '240px' : 'auto'
               }}>
                   <div style={{
                   display: 'flex',
@@ -463,9 +477,28 @@ const CartStepV2 = ({
                   gap: 'var(--mac-spacing-2)',
                   whiteSpace: 'nowrap'
                 }}>
-                    <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
+                    <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
                       {displayName}
                     </span>
+                    {/* PR-23 P0 #2: quantity stepper */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <button
+                        onClick={() => {
+                          const newQty = (item.quantity || 1) - 1;
+                          if (newQty <= 0) {
+                            onRemoveFromCart(item.id);
+                          } else {
+                            onUpdateItem?.(item.id, 'quantity', newQty);
+                          }
+                        }}
+                        aria-label={`Decrease quantity for ${displayName}`}
+                        style={{ border: '1px solid var(--mac-border)', background: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)', cursor: 'pointer', borderRadius: '3px', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', lineHeight: 1 }}>−</button>
+                      <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: 600 }}>{item.quantity || 1}</span>
+                      <button
+                        onClick={() => onUpdateItem?.(item.id, 'quantity', (item.quantity || 1) + 1)}
+                        aria-label={`Increase quantity for ${displayName}`}
+                        style={{ border: '1px solid var(--mac-border)', background: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)', cursor: 'pointer', borderRadius: '3px', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', lineHeight: 1 }}>+</button>
+                    </div>
                     <button
                     onClick={() => onRemoveFromCart(item.id)}
                     aria-label={`Remove ${displayName} from appointment cart`}
@@ -508,6 +541,11 @@ const CartStepV2 = ({
                             {getDoctorDisplayName(doctor)}{doctor.specialty ? ` · ${doctor.specialty}` : ''}{doctor.cabinet ? ` · каб. ${doctor.cabinet}` : ''}
                           </option>)}
                       </select>
+                      {filteredDoctors.length === 0 && normalizedDoctorsData.length > 0 && (
+                        <span style={{ fontSize: '10px', color: 'var(--mac-text-tertiary)' }}>
+                          Нет врача для этого отделения — показаны все
+                        </span>
+                      )}
                     </div>
                 }
                 </div>);
