@@ -110,6 +110,10 @@ jobs:
           ADMIN_HASH = DOCTOR_HASH  # same password for CI
           REGISTRAR_HASH = DOCTOR_HASH
 
+          # Debug: verify hash works before seeding
+          print('Hash verify check:', pwd_context.verify('QA_PASSWORD_123', DOCTOR_HASH))
+          print('Hash length:', len(DOCTOR_HASH))
+
           e = create_engine(os.environ['DATABASE_URL'])
           with e.begin() as c:
             for username, email, role, pw_hash in [
