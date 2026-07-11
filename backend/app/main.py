@@ -288,6 +288,14 @@ app.add_middleware(ObservabilityMiddleware)
 log.info("Observability middleware registered")
 
 # -----------------------------------------------------------------------------
+# Idempotency Middleware (PR-6: prevents duplicate POST/PUT/PATCH submissions)
+# -----------------------------------------------------------------------------
+from app.middleware.idempotency_middleware import IdempotencyMiddleware  # noqa: E402
+
+app.add_middleware(IdempotencyMiddleware)
+log.info("Idempotency middleware registered")
+
+# -----------------------------------------------------------------------------
 # CSRF Protection Middleware (optional, enable via CSRF_ENABLED=1)
 # -----------------------------------------------------------------------------
 CSRF_ENABLED = os.getenv("CSRF_ENABLED", "0") == "1"
