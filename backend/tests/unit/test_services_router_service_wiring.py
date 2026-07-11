@@ -6,7 +6,7 @@ from app.services.queue_domain_service import QueueDomainService
 from app.services.services_api_service import ServicesApiService
 
 
-def test_service_categories_endpoint_delegates_to_service(client, monkeypatch) -> None:
+def test_service_categories_endpoint_delegates_to_service(client, auth_headers, monkeypatch) -> None:
     captured = {}
 
     def fake_list_service_categories(self, *, active):
@@ -29,14 +29,14 @@ def test_service_categories_endpoint_delegates_to_service(client, monkeypatch) -
         fake_list_service_categories,
     )
 
-    response = client.get("/api/v1/services/categories", params={"active": "true"})
+    response = client.get("/api/v1/services/categories", params={"active": "true"}, headers=auth_headers)
 
     assert response.status_code == 200
     assert response.json()[0]["code"] == "CARDIO"
     assert captured["active"] is True
 
 
-def test_get_service_endpoint_delegates_to_service(client, monkeypatch) -> None:
+def test_get_service_endpoint_delegates_to_service(client, auth_headers, monkeypatch) -> None:
     captured = {}
 
     def fake_get_service(self, *, service_id: int):
@@ -64,7 +64,7 @@ def test_get_service_endpoint_delegates_to_service(client, monkeypatch) -> None:
 
     monkeypatch.setattr(ServicesApiService, "get_service", fake_get_service)
 
-    response = client.get("/api/v1/services/42")
+    response = client.get("/api/v1/services/42", headers=auth_headers)
 
     assert response.status_code == 200
     payload = response.json()

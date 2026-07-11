@@ -241,7 +241,7 @@ async def repair_service_code_drift(
 async def create_service(
     service_data: ServiceCreate,
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin")),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Delegate service creation to the service layer."""
     try:
@@ -256,7 +256,7 @@ async def update_service(
     service_id: int,
     service_data: ServiceUpdate,
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin")),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Delegate service updates to the service layer."""
     try:
@@ -275,7 +275,7 @@ async def update_service(
 async def delete_service(
     service_id: int,
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin")),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Delegate service deletion to the service layer."""
     try:
@@ -450,7 +450,7 @@ async def resolve_service_endpoint(
     service_id: int | None = Query(None, description="ID услуги"),
     code: str | None = Query(None, description="Код услуги"),
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
 ):
     """
     Универсальный endpoint для разрешения услуги.
@@ -507,7 +507,7 @@ class ServiceBatchUpdateResponse(BaseModel):
 async def batch_update_services(
     request: ServiceBatchUpdateRequest,
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin")),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """
     Массовое обновление нескольких услуг одновременно.
@@ -623,7 +623,7 @@ async def get_service_code_mappings(
 async def get_service(
     service_id: int,
     db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
 ):
     """Delegate service lookup to the service layer."""
     service = ServicesApiService(db).get_service(service_id=service_id)
