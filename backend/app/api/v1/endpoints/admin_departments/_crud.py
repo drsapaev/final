@@ -137,6 +137,156 @@ def create_department(
     }
 
 
+# ==================== PR-18: BULK OPERATIONS ====================
+# IMPORTANT: These static routes MUST be registered BEFORE /{department_id}
+# routes, otherwise FastAPI matches /{department_id} first and treats
+# "bulk-delete" as a department_id value.
+
+
+@router.post("/bulk", response_model=dict)
+def bulk_create_departments(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """
+    Массовое создание отделений (CSV импорт).
+
+    PR-18: Frontend DepartmentManagement.jsx calls this endpoint for CSV
+    import. Body: { departments: [{name_ru, name_uz, key, ...}, ...] }
+    """
+    departments_data = payload.get("departments", [])
+    if not departments_data or not isinstance(departments_data, list):
+        raise HTTPException(status_code=400, detail="departments list is required")
+
+    created = 0
+    skipped = 0
+    errors = []
+
+    for idx, dept_data in enumerate(departments_data):
+        try:
+            key = dept_data.get("key", "").strip().lower()
+            if not key:
+                errors.append(f"Row {idx + 1}: key is required")
+                skipped += 1
+                continue
+
+            existing = db.query(Department).filter(Department.key == key).first()
+            if existing:
+                skipped += 1
+                continue
+
+            department = Department(
+                key=key,
+                name_ru=dept_data.get("name_ru", key),
+                name_uz=dept_data.get("name_uz", ""),
+                icon=dept_data.get("icon", "Layers"),
+                color=dept_data.get("color", "#3b82f6"),
+                display_order=int(dept_data.get("display_order", 999)),
+                active=dept_data.get("active", True),
+                description=dept_data.get("description", ""),
+            )
+            db.add(department)
+            db.flush()
+
+            _ensure_department_integrations(db, department)
+            created += 1
+        except Exception as exc:
+            errors.append(f"Row {idx + 1}: {str(exc)}")
+            skipped += 1
+
+    db.commit()
+
+    return {
+        "success": True,
+        "created": created,
+        "skipped": skipped,
+        "errors": errors,
+        "message": f"Импортировано {created} отделений, пропущено {skipped}",
+    }
+
+
+@router.delete("/bulk-delete", response_model=dict)
+def bulk_delete_departments(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """
+    Массовое удаление отделений.
+
+    PR-18: Frontend DepartmentManagement.jsx calls this endpoint for bulk
+    delete. Body: { ids: [1, 2, 3] }
+    """
+    ids = payload.get("ids", [])
+    if not ids or not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="ids list is required")
+
+    deleted = 0
+    not_found = 0
+
+    for dept_id in ids:
+        department = db.query(Department).filter(Department.id == dept_id).first()
+        if not department:
+            not_found += 1
+            continue
+        db.delete(department)
+        deleted += 1
+
+    db.commit()
+
+    return {
+        "success": True,
+        "deleted": deleted,
+        "not_found": not_found,
+        "message": f"Удалено {deleted} отделений",
+    }
+
+
+@router.patch("/bulk-activate", response_model=dict)
+def bulk_activate_departments(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """
+    Массовая активация/деактивация отделений.
+
+    PR-18: Frontend DepartmentManagement.jsx calls this endpoint for bulk
+    activate/deactivate. Body: { ids: [1, 2, 3], active: true/false }
+    """
+    ids = payload.get("ids", [])
+    active = payload.get("active")
+    if not ids or not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="ids list is required")
+    if active is None:
+        raise HTTPException(status_code=400, detail="active boolean is required")
+
+    updated = 0
+    not_found = 0
+
+    for dept_id in ids:
+        department = db.query(Department).filter(Department.id == dept_id).first()
+        if not department:
+            not_found += 1
+            continue
+        department.active = bool(active)
+        updated += 1
+
+    db.commit()
+
+    action = "активировано" if active else "деактивировано"
+    return {
+        "success": True,
+        "updated": updated,
+        "not_found": not_found,
+        "message": f"{action.capitalize()} {updated} отделений",
+    }
+
+
+# ==================== END BULK OPERATIONS ====================
+
+
 @router.put("/{department_id}", response_model=dict)
 def update_department(
     department_id: int,
@@ -673,149 +823,5 @@ def remove_doctor_from_department(
     db.commit()
 
     return {"success": True, "message": "Doctor removed from department"}
-
-
-# ==================== PR-18: BULK OPERATIONS ====================
-
-
-@router.post("/bulk", response_model=dict)
-def bulk_create_departments(
-    payload: dict,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Массовое создание отделений (CSV импорт).
-
-    PR-18: Frontend DepartmentManagement.jsx calls this endpoint for CSV
-    import. Body: { departments: [{name_ru, name_uz, key, ...}, ...] }
-    """
-    departments_data = payload.get("departments", [])
-    if not departments_data or not isinstance(departments_data, list):
-        raise HTTPException(status_code=400, detail="departments list is required")
-
-    created = 0
-    skipped = 0
-    errors = []
-
-    for idx, dept_data in enumerate(departments_data):
-        try:
-            key = dept_data.get("key", "").strip().lower()
-            if not key:
-                errors.append(f"Row {idx + 1}: key is required")
-                skipped += 1
-                continue
-
-            existing = db.query(Department).filter(Department.key == key).first()
-            if existing:
-                skipped += 1
-                continue
-
-            department = Department(
-                key=key,
-                name_ru=dept_data.get("name_ru", key),
-                name_uz=dept_data.get("name_uz", ""),
-                icon=dept_data.get("icon", "Layers"),
-                color=dept_data.get("color", "#3b82f6"),
-                display_order=int(dept_data.get("display_order", 999)),
-                active=dept_data.get("active", True),
-                description=dept_data.get("description", ""),
-            )
-            db.add(department)
-            db.flush()
-
-            _ensure_department_integrations(db, department)
-            created += 1
-        except Exception as exc:
-            errors.append(f"Row {idx + 1}: {str(exc)}")
-            skipped += 1
-
-    db.commit()
-
-    return {
-        "success": True,
-        "created": created,
-        "skipped": skipped,
-        "errors": errors,
-        "message": f"Импортировано {created} отделений, пропущено {skipped}",
-    }
-
-
-@router.delete("/bulk-delete", response_model=dict)
-def bulk_delete_departments(
-    payload: dict,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Массовое удаление отделений.
-
-    PR-18: Frontend DepartmentManagement.jsx calls this endpoint for bulk
-    delete. Body: { ids: [1, 2, 3] }
-    """
-    ids = payload.get("ids", [])
-    if not ids or not isinstance(ids, list):
-        raise HTTPException(status_code=400, detail="ids list is required")
-
-    deleted = 0
-    not_found = 0
-
-    for dept_id in ids:
-        department = db.query(Department).filter(Department.id == dept_id).first()
-        if not department:
-            not_found += 1
-            continue
-        db.delete(department)
-        deleted += 1
-
-    db.commit()
-
-    return {
-        "success": True,
-        "deleted": deleted,
-        "not_found": not_found,
-        "message": f"Удалено {deleted} отделений",
-    }
-
-
-@router.patch("/bulk-activate", response_model=dict)
-def bulk_activate_departments(
-    payload: dict,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Массовая активация/деактивация отделений.
-
-    PR-18: Frontend DepartmentManagement.jsx calls this endpoint for bulk
-    activate/deactivate. Body: { ids: [1, 2, 3], active: true/false }
-    """
-    ids = payload.get("ids", [])
-    active = payload.get("active")
-    if not ids or not isinstance(ids, list):
-        raise HTTPException(status_code=400, detail="ids list is required")
-    if active is None:
-        raise HTTPException(status_code=400, detail="active boolean is required")
-
-    updated = 0
-    not_found = 0
-
-    for dept_id in ids:
-        department = db.query(Department).filter(Department.id == dept_id).first()
-        if not department:
-            not_found += 1
-            continue
-        department.active = bool(active)
-        updated += 1
-
-    db.commit()
-
-    action = "активировано" if active else "деактивировано"
-    return {
-        "success": True,
-        "updated": updated,
-        "not_found": not_found,
-        "message": f"{action.capitalize()} {updated} отделений",
-    }
 
 
