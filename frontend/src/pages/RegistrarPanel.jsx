@@ -71,7 +71,7 @@ import PaymentManager from '../components/payment/PaymentManager';
 // import EditPatientModal from '../components/common/EditPatientModal';
 
 // Утилиты для работы с датами
-import { getLocalDateString } from '../utils/dateUtils';
+import { getLocalDateString, formatRegistrarDate } from '../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
 // Note: formatNetworkErrorMessage + isNetworkFetchError moved to useRegistrarData.js (Decomp 4)
 import { getErrorMessage } from '../utils/errorHandler';
@@ -1530,7 +1530,9 @@ const RegistrarPanel = () => {
                   </h2>
                   <p className="registrar-workflow-meta">
                     {showCalendar ?
-                    new Date(historyDate).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' }) :
+                    // PR-13: use formatRegistrarDate to avoid browser-local timezone issues
+                    // historyDate is YYYY-MM-DD (Tashkent), parse as Tashkent midnight
+                    formatRegistrarDate(`${historyDate}T00:00:00+05:00`, language === 'ru' ? 'ru-RU' : 'uz-UZ') :
                     t('today')} · {filteredAppointments.length} {t('tabs_appointments')}
                   </p>
                 </div>

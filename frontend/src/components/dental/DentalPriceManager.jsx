@@ -17,6 +17,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
+import { formatRegistrarDate } from '../../utils/dateUtils';
 
 /**
  * Компонент для указания цены стоматологом после лечения
@@ -298,7 +299,7 @@ const DentalPriceManager = ({
                         </span>
                       </div>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {new Date(override.created_at).toLocaleDateString('ru-RU')}
+                        {formatRegistrarDate(override.created_at, 'ru-RU')}
                       </span>
                     </div>
                     

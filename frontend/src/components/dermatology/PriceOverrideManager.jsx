@@ -16,6 +16,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
+import { formatRegistrarDate } from '../../utils/dateUtils';
 
 /**
  * Компонент для управления изменениями цен дерматологом
@@ -519,7 +520,7 @@ const PriceOverrideManager = ({
                     fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-tertiary)'
                   }}>
-                        {new Date(override.created_at).toLocaleDateString('ru-RU')}
+                        {formatRegistrarDate(override.created_at, 'ru-RU')}
                       </span>
                     </div>
                     
