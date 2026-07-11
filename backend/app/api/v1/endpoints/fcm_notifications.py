@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints._error_logging import log_endpoint_error  # PR-7
 from app.api.deps import get_current_user, require_roles
 from app.crud import user as crud_user
 from app.db.session import get_db

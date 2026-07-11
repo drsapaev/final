@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints._error_logging import log_endpoint_error  # PR-7
 from app.api.deps import get_current_user
 from app.crud import (
     clinic as crud_doctor,
@@ -210,7 +211,8 @@ async def search_doctors(
 
         return {"doctors": result, "total_found": len(result)}
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -233,7 +235,8 @@ async def get_doctor_schedule(
 
         return {"doctor_id": doctor_id, "schedule": schedule}
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -280,7 +283,8 @@ async def search_services(
 
         return {"services": result, "total_found": len(result)}
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -311,7 +315,8 @@ async def get_service_categories(
 
         return {"categories": result}
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -358,7 +363,8 @@ async def get_queues_status(
 
         return {"queues": result, "last_updated": datetime.now()}
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -409,7 +415,8 @@ async def get_my_queue_position(
 
         return {"positions": result}
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -462,7 +469,8 @@ async def cancel_appointment(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -524,7 +532,8 @@ async def reschedule_appointment(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -566,7 +575,8 @@ async def submit_feedback(
             "feedback_id": feedback_id,
         }
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -624,7 +634,8 @@ async def emergency_contact(
             "contacts": contacts,
         }
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -695,7 +706,8 @@ async def update_profile(
             },
         }
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -753,7 +765,8 @@ async def upload_avatar(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -787,7 +800,8 @@ async def update_notification_settings(
             "settings": settings_data,
         }
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -810,7 +824,8 @@ async def get_notification_settings(
             "promotions": settings.get("promotions_notifications", False),
         }
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -854,7 +869,8 @@ async def get_clinic_info(
 
         return clinic_info
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )

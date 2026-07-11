@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints._error_logging import log_endpoint_error  # PR-7
 from app.api.deps import get_current_user
 # PR-3: import the modules directly (not via app.crud.__init__ which
 # re-exports the CRUDAppointment *instance* named `appointment` and shadows
@@ -153,7 +154,8 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -300,7 +302,8 @@ async def get_appointment_detail(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -367,7 +370,8 @@ async def book_mobile_appointment(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -457,7 +461,8 @@ async def get_mobile_quick_stats(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -494,7 +499,8 @@ async def get_mobile_notifications(
             for notif in notifications
         ]
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -524,7 +530,8 @@ async def mark_notification_read(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -569,7 +576,8 @@ async def test_push_notification(
                 "timestamp": datetime.now(UTC).isoformat(),
             }
 
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -615,7 +623,8 @@ async def list_mobile_doctors(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
@@ -678,7 +687,8 @@ async def attest_device(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
