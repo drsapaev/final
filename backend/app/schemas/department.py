@@ -126,7 +126,8 @@ class DepartmentRegistrationSettingsResponse(BaseModel):
 class DepartmentBase(BaseModel):
     """Базовая схема отделения"""
 
-    key: str = Field(..., max_length=50)
+    # PR-20: validate key format — must match queue_tag pattern
+    key: str = Field(..., max_length=50, pattern=r"^[a-z][a-z0-9_]*$")
     name_ru: str = Field(..., max_length=200)
     name_uz: str | None = Field(None, max_length=200)
     icon: str | None = Field("folder", max_length=50)
@@ -148,7 +149,7 @@ class DepartmentCreate(DepartmentBase):
 class DepartmentUpdate(BaseModel):
     """Обновление отделения"""
 
-    key: str | None = Field(None, max_length=50)
+    key: str | None = Field(None, max_length=50, pattern=r"^[a-z][a-z0-9_]*$")
     name_ru: str | None = Field(None, max_length=200)
     name_uz: str | None = Field(None, max_length=200)
     icon: str | None = Field(None, max_length=50)

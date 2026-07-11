@@ -272,26 +272,12 @@ const DepartmentManagement = () => {
       setIntegrationForm(DEFAULT_INTEGRATION_OPTIONS);
       setServiceMapping(DEFAULT_SERVICE_MAPPING);
 
-      // ✅ НОВОЕ: Создание услуги при создании отделения (если включено)
-      if (serviceMapping.create_service && serviceMapping.service_name) {
-        try {
-          const serviceData = {
-            name: serviceMapping.service_name,
-            category_code: serviceMapping.service_category_code || null,
-            service_code: serviceMapping.service_code_pattern || null,
-            department_key: formData.key,
-            queue_tag: serviceMapping.queue_tag || null,
-            price: serviceMapping.service_price ? parseFloat(serviceMapping.service_price) : null,
-            currency: 'UZS',
-            active: true
-          };
-          await api.post('/services', serviceData);
-          toast.success('Услуга создана автоматически');
-        } catch (err) {
-          logger.error('Ошибка создания услуги:', err);
-          toast.warning('Отделение создано, но услуга не была создана: ' + (err.response?.data?.detail || 'Ошибка'));
-        }
-      }
+      // PR-20: Removed frontend POST /services call — backend's
+      // _ensure_department_integrations already creates a default service
+      // with name "Консультация {department.name_ru}". The frontend call
+      // was causing DOUBLE service creation (one from frontend, one from
+      // backend). If admin wants a custom service, they can create it
+      // separately in ServiceCatalog after the department is created.
 
       await loadDepartments();
       broadcastDepartmentsUpdate();
@@ -330,26 +316,8 @@ const DepartmentManagement = () => {
       await api.put(`/admin/departments/${editingDepartment.id}`, formData);
       toast.success('Отделение обновлено');
 
-      // ✅ НОВОЕ: Создание услуги при редактировании (если включено)
-      if (serviceMapping.create_service && serviceMapping.service_name) {
-        try {
-          const serviceData = {
-            name: serviceMapping.service_name,
-            category_code: serviceMapping.service_category_code || null,
-            service_code: serviceMapping.service_code_pattern || null,
-            department_key: formData.key,
-            queue_tag: serviceMapping.queue_tag || null,
-            price: serviceMapping.service_price ? parseFloat(serviceMapping.service_price) : null,
-            currency: 'UZS',
-            active: true
-          };
-          await api.post('/services', serviceData);
-          toast.success('Услуга создана');
-        } catch (err) {
-          logger.error('Ошибка создания услуги:', err);
-          toast.warning('Отделение обновлено, но услуга не была создана: ' + (err.response?.data?.detail || 'Ошибка'));
-        }
-      }
+      // PR-20: Removed frontend POST /services call (same as create handler).
+      // Backend already handles default service via _ensure_department_integrations.
 
       setShowEditModal(false);
       setEditingDepartment(null);

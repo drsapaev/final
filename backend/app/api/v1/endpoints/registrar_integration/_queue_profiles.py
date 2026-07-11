@@ -208,7 +208,7 @@ def _get_emoji_for_key(key: str) -> str:
 
 class QueueProfileCreate(BaseModel):
     """Schema for creating a new QueueProfile"""
-    key: str = Field(..., min_length=1, max_length=50, description="Unique key (e.g., 'cardiology')")
+    key: str = Field(..., min_length=1, max_length=50, pattern=r"^[a-z][a-z0-9_]*$", description="Unique key (e.g., 'cardiology')")
     title: str = Field(..., min_length=1, max_length=100, description="English title")
     title_ru: str | None = Field(None, max_length=100, description="Russian title")
     queue_tags: list[str] = Field(default=[], description="List of queue_tag values for this profile")
