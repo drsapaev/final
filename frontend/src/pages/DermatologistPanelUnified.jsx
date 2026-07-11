@@ -476,7 +476,7 @@ const DermatologistPanelUnified = () => {
                     queue_position: entry.queue_position,
                     doctor: entry.doctor_name || 'Врач',
                     specialty: queue.specialty,
-                    ...adaptTimeFields(entry, data),
+                    ...adaptTimeFields(entry, queuesData),
                     status: entry.status ?? null,
                     cost: entry.cost || 0,
                     visit_id: entry.visit_id || null
