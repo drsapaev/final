@@ -363,7 +363,10 @@ def delete_department(
     """
     Удалить отделение
 
-    Доступно только для администраторов
+    Доступно только для администраторов.
+    PR-22: cascades cleanup — clears department_key from services, deletes
+    DepartmentService/DepartmentQueueSettings/DepartmentRegistrationSettings,
+    and deletes associated QueueProfile.
     """
     department = db.query(Department).filter(Department.id == department_id).first()
 
@@ -373,12 +376,61 @@ def delete_department(
             detail=f"Department with id {department_id} not found",
         )
 
+    # PR-22: cascade cleanup
+    cleaned = {"services": 0, "department_services": 0, "queue_settings": 0,
+               "registration_settings": 0, "queue_profile": False}
+
+    # Clear department_key from services
+    from app.models.service import Service
+    services = db.query(Service).filter(Service.department_key == department.key).all()
+    for svc in services:
+        svc.department_key = None
+        cleaned["services"] += 1
+
+    # Delete DepartmentService links
+    dept_services = db.query(DepartmentService).filter(
+        DepartmentService.department_id == department_id
+    ).all()
+    for ds in dept_services:
+        db.delete(ds)
+        cleaned["department_services"] += 1
+
+    # Delete DepartmentQueueSettings
+    queue_settings = db.query(DepartmentQueueSettings).filter(
+        DepartmentQueueSettings.department_id == department_id
+    ).first()
+    if queue_settings:
+        db.delete(queue_settings)
+        cleaned["queue_settings"] = 1
+
+    # Delete DepartmentRegistrationSettings
+    reg_settings = db.query(DepartmentRegistrationSettings).filter(
+        DepartmentRegistrationSettings.department_id == department_id
+    ).first()
+    if reg_settings:
+        db.delete(reg_settings)
+        cleaned["registration_settings"] = 1
+
+    # Delete associated QueueProfile
+    from app.models.queue_profile import QueueProfile
+    queue_profile = db.query(QueueProfile).filter(
+        QueueProfile.key == department.key
+    ).first()
+    if queue_profile:
+        db.delete(queue_profile)
+        cleaned["queue_profile"] = True
+
     db.delete(department)
     db.commit()
+
+    logger.info(
+        f"Deleted department '{department.name_ru}' (cascade: {cleaned})"
+    )
 
     return {
         "success": True,
         "message": f"Department '{department.name_ru}' deleted successfully",
+        "cascade": cleaned,
     }
 
 
