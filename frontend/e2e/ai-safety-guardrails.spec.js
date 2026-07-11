@@ -49,7 +49,7 @@ async function login(request, username, password, role) {
   if (!password) {
     throw new Error(`Set QA_${role.toUpperCase()}_PASSWORD to run AI safety tests.`);
   }
-  const resp = await request.post(`${BACKEND_URL}/api/v1/auth/login`, {
+  const resp = await request.post(`${BACKEND_URL}/api/v1/authentication/login`, {
     data: { username, password },
     headers: { 'Content-Type': 'application/json' },
   });
@@ -105,7 +105,7 @@ test.describe('AI Safety Guardrails', () => {
   test('EMR smart-template response includes safety_meta', async ({ request }) => {
     const resp = await callAiEndpoint(
       request,
-      '/api/v1/emr-ai-enhanced/generate-smart-template',
+      '/api/v1/emr/ai-enhanced/generate-smart-template',
       {
         specialty: 'cardiology',
         patient_id: 1,
@@ -131,7 +131,7 @@ test.describe('AI Safety Guardrails', () => {
   test('EMR smart-suggestions response includes safety_meta', async ({ request }) => {
     const resp = await callAiEndpoint(
       request,
-      '/api/v1/emr-ai-enhanced/smart-suggestions',
+      '/api/v1/emr/ai-enhanced/smart-suggestions',
       {
         specialty: 'cardiology',
         field: 'complaints',
@@ -153,7 +153,7 @@ test.describe('AI Safety Guardrails', () => {
   test('AI gateway analyze-complaints response is role-gated + safe', async ({ request }) => {
     const resp = await callAiEndpoint(
       request,
-      '/api/v1/ai-gateway/analyze-complaints',
+      '/api/v1/ai/v2/analyze-complaints',
       {
         complaints: 'Боли в груди при физической нагрузке',
         specialty: 'cardiology',
@@ -187,10 +187,10 @@ test.describe('AI Safety Guardrails', () => {
     test.skip(!registrarToken, 'QA_REGISTRAR_PASSWORD not set — skipping role-gate test');
 
     const endpoints = [
-      '/api/v1/emr-ai-enhanced/generate-smart-template',
-      '/api/v1/emr-ai-enhanced/smart-suggestions',
-      '/api/v1/ai-gateway/analyze-complaints',
-      '/api/v1/ai-gateway/suggest-icd10',
+      '/api/v1/emr/ai-enhanced/generate-smart-template',
+      '/api/v1/emr/ai-enhanced/smart-suggestions',
+      '/api/v1/ai/v2/analyze-complaints',
+      '/api/v1/ai/v2/suggest-icd10',
     ];
 
     for (const endpoint of endpoints) {
@@ -204,8 +204,8 @@ test.describe('AI Safety Guardrails', () => {
 
   test('AI endpoints require authentication (401 without token)', async ({ request }) => {
     const endpoints = [
-      '/api/v1/emr-ai-enhanced/generate-smart-template',
-      '/api/v1/ai-gateway/analyze-complaints',
+      '/api/v1/emr/ai-enhanced/generate-smart-template',
+      '/api/v1/ai/v2/analyze-complaints',
     ];
 
     for (const endpoint of endpoints) {
@@ -254,7 +254,7 @@ test.describe('AI Feature Flag Toggle (admin)', () => {
       );
       const aiResp = await callAiEndpoint(
         request,
-        '/api/v1/emr-ai-enhanced/generate-smart-template',
+        '/api/v1/emr/ai-enhanced/generate-smart-template',
         { specialty: 'cardiology' },
         doctorToken,
       );

@@ -62,6 +62,10 @@ jobs:
       DISABLE_2FA_REQUIREMENT: '1'
       # Use mock AI provider (no real API calls)
       AI_PROVIDER_MOCK: '1'
+      # PR-8: disable rate limiting in CI — Playwright spec makes 6+ login
+      # attempts (doctor + admin + registrar across 4 tests) which exceeds
+      # the 5/minute login rate limit.
+      TESTING: '1'
 
     steps:
       - uses: actions/checkout@v7
@@ -100,23 +104,35 @@ jobs:
           python -c "
           import os
           from sqlalchemy import create_engine, text
+          from passlib.context import CryptContext
+
+          # PR-8: generate argon2 hash in runtime instead of hardcoding a
+          # malformed one. The previous hash was truncated/invalid, causing
+          # login to fail with 'malformed argon2 hash' on verify.
+          pwd_context = CryptContext(schemes=['argon2', 'bcrypt'], deprecated='auto')
+          DOCTOR_HASH = pwd_context.hash('QA_PASSWORD_123')
+          ADMIN_HASH = DOCTOR_HASH  # same password for CI
+          REGISTRAR_HASH = DOCTOR_HASH
+
+          # Debug: verify hash works before seeding
+          print('Hash verify check:', pwd_context.verify('QA_PASSWORD_123', DOCTOR_HASH))
+          print('Hash length:', len(DOCTOR_HASH))
+
           e = create_engine(os.environ['DATABASE_URL'])
           with e.begin() as c:
-            # Insert a doctor, registrar, admin user with known passwords.
-            # Passwords are pre-hashed argon2 — 'QA_PASSWORD_123'.
-            DOCTOR_HASH = '\$argon2id\$v=19\$m=65536,t=3,p=4\$ZXhhYW1wbGVzYWx0MTIzNDU2Nzg5MA\$YkEH2I9zS0mKjJ3M2nJKaYqLqYqJqYqJqYqJqYqJqYq'
-            ADMIN_HASH = DOCTOR_HASH  # same password for CI
-            REGISTRAR_HASH = DOCTOR_HASH
-
             for username, email, role, pw_hash in [
               ('qa_doctor@clinic.com',    'qa_doctor@clinic.com',    'Doctor',    DOCTOR_HASH),
               ('qa_admin@clinic.com',     'qa_admin@clinic.com',     'Admin',     ADMIN_HASH),
               ('qa_registrar@clinic.com', 'qa_registrar@clinic.com', 'Registrar', REGISTRAR_HASH),
             ]:
               c.execute(text('''
-                INSERT INTO users (username, email, role, hashed_password, is_active, is_superuser, must_change_password, created_at)
-                VALUES (:u, :e, :r, :p, true, false, false, NOW())
-                ON CONFLICT (username) DO UPDATE SET hashed_password = EXCLUDED.hashed_password
+                INSERT INTO users (username, email, role, hashed_password, is_active, is_superuser, must_change_password, push_notifications_enabled, created_at)
+                VALUES (:u, :e, :r, :p, true, false, false, false, NOW())
+                ON CONFLICT (username) DO UPDATE SET
+                  hashed_password = EXCLUDED.hashed_password,
+                  is_active = true,
+                  role = EXCLUDED.role,
+                  must_change_password = false
               '''), {'u': username, 'e': email, 'r': role, 'p': pw_hash})
             print('Test users seeded.')
           "
