@@ -261,6 +261,7 @@ def create_queue_profile(
             department_key=profile_data.department_key,
             display_order=profile_data.display_order,
             is_active=profile_data.is_active,
+            show_on_qr_page=profile_data.show_on_qr_page,
             icon=profile_data.icon,
             color=profile_data.color,
         )
@@ -282,6 +283,7 @@ def create_queue_profile(
                 "department_key": new_profile.department_key,
                 "order": new_profile.display_order,
                 "is_active": new_profile.is_active,
+                "show_on_qr_page": new_profile.show_on_qr_page,
                 "icon": new_profile.icon,
                 "color": new_profile.color,
             },

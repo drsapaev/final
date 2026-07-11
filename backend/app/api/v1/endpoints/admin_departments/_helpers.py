@@ -22,6 +22,7 @@ from app.models.department import (  # noqa: F401
     DepartmentService,
 )
 from app.models.online_queue import DailyQueue, OnlineQueueEntry  # noqa: F401
+from app.models.queue_profile import QueueProfile  # noqa: F401
 from app.models.service import Service  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.visit import Visit  # noqa: F401
@@ -151,6 +152,7 @@ def _ensure_department_integrations(
         "service_category_created": False,
         "default_service_created": False,
         "default_service_id": None,
+        "queue_profile_created": False,
     }
 
     # Queue settings
@@ -293,6 +295,33 @@ def _ensure_department_integrations(
         )
         integration_result["default_service_created"] = True
         integration_result["default_service_id"] = default_service.id
+
+    # PR-16: Auto-create a QueueProfile so the new department immediately
+    # appears as a registrar tab. Without this, admin creates a department
+    # but no tab appears — they must separately create a QueueProfile via
+    # "Вкладки регистратуры" with the same key, which is non-obvious.
+    existing_profile = (
+        db.query(QueueProfile)
+        .filter(QueueProfile.key == department.key)
+        .first()
+    )
+    if not existing_profile:
+        queue_profile = QueueProfile(
+            key=department.key,
+            title=department.name_ru or department.key,
+            title_ru=department.name_ru or department.key,
+            queue_tags=[department.key],
+            department_key=department.key,
+            display_order=department.display_order,
+            is_active=department.active,
+            show_on_qr_page=True,
+            icon=department.icon or "Layers",
+            color=department.color or "#3b82f6",
+        )
+        db.add(queue_profile)
+        integration_result["queue_profile_created"] = True
+    else:
+        integration_result["queue_profile_created"] = False
 
     return integration_result
 
