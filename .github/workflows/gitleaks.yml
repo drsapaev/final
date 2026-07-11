@@ -39,7 +39,7 @@ jobs:
 
       - name: Upload gitleaks SARIF report
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           # gitleaks-action writes to results.sarif in the workspace root
           sarif_file: results.sarif
