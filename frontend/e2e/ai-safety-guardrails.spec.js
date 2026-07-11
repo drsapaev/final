@@ -153,7 +153,7 @@ test.describe('AI Safety Guardrails', () => {
   test('AI gateway analyze-complaints response is role-gated + safe', async ({ request }) => {
     const resp = await callAiEndpoint(
       request,
-      '/api/v1/ai-gateway/analyze-complaints',
+      '/api/v1/ai/v2/analyze-complaints',
       {
         complaints: 'Боли в груди при физической нагрузке',
         specialty: 'cardiology',
@@ -189,8 +189,8 @@ test.describe('AI Safety Guardrails', () => {
     const endpoints = [
       '/api/v1/emr/ai-enhanced/generate-smart-template',
       '/api/v1/emr/ai-enhanced/smart-suggestions',
-      '/api/v1/ai-gateway/analyze-complaints',
-      '/api/v1/ai-gateway/suggest-icd10',
+      '/api/v1/ai/v2/analyze-complaints',
+      '/api/v1/ai/v2/suggest-icd10',
     ];
 
     for (const endpoint of endpoints) {
@@ -205,7 +205,7 @@ test.describe('AI Safety Guardrails', () => {
   test('AI endpoints require authentication (401 without token)', async ({ request }) => {
     const endpoints = [
       '/api/v1/emr/ai-enhanced/generate-smart-template',
-      '/api/v1/ai-gateway/analyze-complaints',
+      '/api/v1/ai/v2/analyze-complaints',
     ];
 
     for (const endpoint of endpoints) {
