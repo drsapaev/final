@@ -235,7 +235,11 @@ export const resolveInitialPatientId = (initialData) =>
 // DEPARTMENT / CATEGORY MAPPING
 // =====================================================================
 
-export const WIZARD_DEPARTMENT_FILTER_KEYS = {
+// PR-25: Legacy hardcoded filter map — kept as fallback.
+// Primary path is now dynamic: getWizardDepartmentFilterKeys accepts
+// an optional queueProfiles param and builds the filter from
+// profile.queue_tags dynamically.
+const WIZARD_DEPARTMENT_FILTER_KEYS_FALLBACK = {
   cardio: ['cardio'],
   cardiology: ['cardio', 'cardiology'],
   echokg: ['cardio', 'echokg', 'ecg'],
@@ -251,9 +255,41 @@ export const WIZARD_DEPARTMENT_FILTER_KEYS = {
   procedure: ['procedures'],
 };
 
-export const getWizardDepartmentFilterKeys = (value) => {
+// PR-25: backward-compatible export (used by existing code)
+export const WIZARD_DEPARTMENT_FILTER_KEYS = WIZARD_DEPARTMENT_FILTER_KEYS_FALLBACK;
+
+/**
+ * PR-25: Returns filter keys for a given department/tab.
+ *
+ * When queueProfiles is provided (array from /queues/profiles), uses
+ * the profile's queue_tags dynamically — so new departments work
+ * without code changes.
+ *
+ * When queueProfiles is not provided, falls back to the hardcoded map.
+ *
+ * @param {string} value - tab key (e.g. 'cardio', 'cosmetology')
+ * @param {Array} [queueProfiles] - optional array of {key, queue_tags}
+ * @returns {string[]} array of department_key strings to filter by
+ */
+export const getWizardDepartmentFilterKeys = (value, queueProfiles = null) => {
   const normalized = String(value || '').trim().toLowerCase();
-  return WIZARD_DEPARTMENT_FILTER_KEYS[normalized] || [];
+
+  // PR-25: dynamic path — use queue_profiles if available
+  if (queueProfiles && Array.isArray(queueProfiles) && queueProfiles.length > 0) {
+    const profile = queueProfiles.find(
+      (p) => String(p.key || '').trim().toLowerCase() === normalized
+    );
+    if (profile && Array.isArray(profile.queue_tags) && profile.queue_tags.length > 0) {
+      return profile.queue_tags.map((t) => String(t).trim().toLowerCase());
+    }
+    // If profile exists but has no queue_tags, use the key itself
+    if (profile) {
+      return [normalized];
+    }
+  }
+
+  // Fallback to hardcoded map
+  return WIZARD_DEPARTMENT_FILTER_KEYS_FALLBACK[normalized] || [normalized];
 };
 
 export const serviceCodeToWizardCategory = (value) => {

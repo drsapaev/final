@@ -241,8 +241,23 @@ const CartStepV2 = ({
                   style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, margin: 0 }} />
 
                 <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '0px' }}>
-                  <div className="service-name-text" title={service.name}>
-                    {service.name}
+                  <div className="service-name-text" title={service.name} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {/* PR-25: show service code badge for unambiguous identification */}
+                    {service.service_code && (
+                      <span style={{
+                        flexShrink: 0,
+                        padding: '0 4px',
+                        borderRadius: '3px',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        background: 'var(--mac-bg-tertiary)',
+                        color: 'var(--mac-text-secondary)',
+                        lineHeight: '14px'
+                      }}>
+                        {String(service.service_code).toUpperCase()}
+                      </span>
+                    )}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{service.name}</span>
                   </div>
                   <div className="service-price-text">
                     {service.price?.toLocaleString()} сум

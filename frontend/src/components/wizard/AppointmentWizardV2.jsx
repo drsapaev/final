@@ -162,6 +162,8 @@ const AppointmentWizardV2 = ({
   const [doctorsData, setDoctorsData] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
   const [showAllServices, setShowAllServices] = useState(false);
+  // PR-25: queue profiles for dynamic department filtering
+  const [queueProfiles, setQueueProfiles] = useState([]);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
   const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({});
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
@@ -594,6 +596,18 @@ const AppointmentWizardV2 = ({
     try {
       const { data } = await api.get('/registrar/services');
 
+        // PR-25: load queue profiles for dynamic department filtering
+        let profiles = queueProfiles;
+        if (profiles.length === 0) {
+          try {
+            const profilesRes = await api.get('/queues/profiles?active_only=true');
+            profiles = profilesRes.data?.profiles || [];
+            setQueueProfiles(profiles);
+          } catch (e) {
+            logger.error('Failed to load queue profiles for filter:', e);
+          }
+        }
+
         // Извлекаем все услуги из групп
         let allServices = [];
         if (data.services_by_group) {
@@ -605,10 +619,8 @@ const AppointmentWizardV2 = ({
         }
 
         // ✅ ФИЛЬТРАЦИЯ ПО ОТДЕЛЕНИЮ: Если activeTab указан, показываем услуги этого отделения
-        // Также показываем услуги без department_key (общие услуги)
-
-
-        const departmentFilterKeys = editMode ? [] : getWizardDepartmentFilterKeys(activeTab);
+        // PR-25: use dynamic queueProfiles instead of hardcoded map
+        const departmentFilterKeys = editMode ? [] : getWizardDepartmentFilterKeys(activeTab, profiles);
         if (departmentFilterKeys.length > 0) {
           const departmentFilterSet = new Set(departmentFilterKeys);
           allServices = allServices.filter((service) => {
@@ -1340,11 +1352,23 @@ const AppointmentWizardV2 = ({
     const serviceCount = cartItems.length;
     const doctorCount = new Set(cartItems.map((item) => item.doctor_id).filter(Boolean)).size;
 
+    // PR-25: itemized breakdown — show each service + doctor + price
+    const itemizedLines = cartItems.map((item) => {
+      const svcName = item.service_name || item.name || `Услуга #${item.service_id}`;
+      const qty = item.quantity || 1;
+      const price = Number(item.price) || 0;
+      const docName = item.doctor_name || (item.doctor_id ? `Врач #${item.doctor_id}` : '');
+      const priceStr = price > 0 ? `${new Intl.NumberFormat('ru-RU').format(price * qty)} сум` : 'бесплатно';
+      return `• ${svcName}${qty > 1 ? ` ×${qty}` : ''}${docName ? ` — ${docName}` : ''} — ${priceStr}`;
+    });
+
     const summaryLines = [
       `Пациент: ${wizardData.patient.fio || '—'}`,
-      `Услуг в корзине: ${serviceCount}`,
+      '',
+      ...itemizedLines,
+      '',
       doctorCount > 1 ? `Врачей: ${doctorCount}` : null,
-      totalAmount > 0 ? `Сумма: ${new Intl.NumberFormat('ru-RU').format(totalAmount)} сум` : 'Бесплатно',
+      totalAmount > 0 ? `Итого: ${new Intl.NumberFormat('ru-RU').format(totalAmount)} сум` : 'Бесплатно',
     ].filter(Boolean);
 
     // UX Audit Registrar #2: window.confirm() → useConfirm hook.

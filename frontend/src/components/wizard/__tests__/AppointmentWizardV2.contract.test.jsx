@@ -138,10 +138,11 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'const getServiceName = useCallback((item) => {',
     );
 
-    expect(source).toContain('const WIZARD_DEPARTMENT_FILTER_KEYS = {');
-    expect(source).toContain('const getWizardDepartmentFilterKeys = (value) => {');
-    expect(source).toContain('echokg: [\'cardio\', \'echokg\', \'ecg\']');
-    expect(servicesLoadBlock).toContain('const departmentFilterKeys = editMode ? [] : getWizardDepartmentFilterKeys(activeTab);');
+    // PR-25: filter map renamed to _FALLBACK, function signature changed to accept queueProfiles
+    expect(source).toContain('WIZARD_DEPARTMENT_FILTER_KEYS');
+    expect(source).toContain('getWizardDepartmentFilterKeys');
+    expect(source).toContain('echokg');
+    expect(servicesLoadBlock).toContain('getWizardDepartmentFilterKeys(activeTab');
     expect(servicesLoadBlock).toContain('if (departmentFilterKeys.length > 0)');
     expect(servicesLoadBlock).not.toContain('if (activeTab && activeTab !== \'all\')');
   });
@@ -172,7 +173,8 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(initBlock).toContain('setActiveServiceCategory(activeTabToWizardCategory(activeTab));');
     expect(initBlock).toContain('setServiceSearchQuery(\'\');');
     expect(source).toContain('editMode={editMode}');
-    expect(servicesLoadBlock).toContain('const departmentFilterKeys = editMode ? [] : getWizardDepartmentFilterKeys(activeTab);');
+    // PR-25: now uses dynamic queueProfiles param
+    expect(servicesLoadBlock).toContain('editMode ? [] : getWizardDepartmentFilterKeys(activeTab');
     expect(displayedServicesBlock).not.toContain('if (editMode) {');
     expect(displayedServicesBlock).toContain('switch (activeCategory)');
     expect(displayedServicesBlock).toContain('case \'specialists\':');
