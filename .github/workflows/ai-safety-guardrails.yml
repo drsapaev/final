@@ -100,14 +100,18 @@ jobs:
           python -c "
           import os
           from sqlalchemy import create_engine, text
+          from passlib.context import CryptContext
+
+          # PR-8: generate argon2 hash in runtime instead of hardcoding a
+          # malformed one. The previous hash was truncated/invalid, causing
+          # login to fail with 'malformed argon2 hash' on verify.
+          pwd_context = CryptContext(schemes=['argon2', 'bcrypt'], deprecated='auto')
+          DOCTOR_HASH = pwd_context.hash('QA_PASSWORD_123')
+          ADMIN_HASH = DOCTOR_HASH  # same password for CI
+          REGISTRAR_HASH = DOCTOR_HASH
+
           e = create_engine(os.environ['DATABASE_URL'])
           with e.begin() as c:
-            # Insert a doctor, registrar, admin user with known passwords.
-            # Passwords are pre-hashed argon2 — 'QA_PASSWORD_123'.
-            DOCTOR_HASH = '\$argon2id\$v=19\$m=65536,t=3,p=4\$ZXhhYW1wbGVzYWx0MTIzNDU2Nzg5MA\$YkEH2I9zS0mKjJ3M2nJKaYqLqYqJqYqJqYqJqYqJqYq'
-            ADMIN_HASH = DOCTOR_HASH  # same password for CI
-            REGISTRAR_HASH = DOCTOR_HASH
-
             for username, email, role, pw_hash in [
               ('qa_doctor@clinic.com',    'qa_doctor@clinic.com',    'Doctor',    DOCTOR_HASH),
               ('qa_admin@clinic.com',     'qa_admin@clinic.com',     'Admin',     ADMIN_HASH),

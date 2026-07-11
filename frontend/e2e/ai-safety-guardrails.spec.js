@@ -49,7 +49,7 @@ async function login(request, username, password, role) {
   if (!password) {
     throw new Error(`Set QA_${role.toUpperCase()}_PASSWORD to run AI safety tests.`);
   }
-  const resp = await request.post(`${BACKEND_URL}/api/v1/auth/login`, {
+  const resp = await request.post(`${BACKEND_URL}/api/v1/authentication/login`, {
     data: { username, password },
     headers: { 'Content-Type': 'application/json' },
   });
