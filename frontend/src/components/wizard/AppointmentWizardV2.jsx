@@ -1637,6 +1637,10 @@ const AppointmentWizardV2 = ({
 
       const originalServiceIds = new Set();
       const originalQueueIds = new Set(); // ✅ Moved here for availability in handleComplete
+      // PR-14: collect updated_at per queue entry for optimistic locking.
+      // Map<entryId, isoString> — passed to applyRegistrarEditDelta as
+      // expectedEntryUpdatedAt so backend can detect concurrent edits.
+      const entryUpdatedAtMap = {};
 
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
@@ -1739,6 +1743,11 @@ const AppointmentWizardV2 = ({
 
             if (serviceId) originalServiceIds.add(serviceId);
             if (queueId) originalQueueIds.add(queueId);
+            // PR-14: collect updated_at for optimistic locking
+            if (queueId) {
+              const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+              if (ts) entryUpdatedAtMap[queueId] = ts;
+            }
             if (serviceCode) originalServiceCodes.add(String(serviceCode).toUpperCase().trim());
             if (serviceName) originalServiceNames.add(String(serviceName).toLowerCase().trim());
           });
@@ -1838,6 +1847,11 @@ const AppointmentWizardV2 = ({
               originalServiceIds.add(q.service_id);
               const queueId = resolveExplicitQueueEntryId(q);
               if (queueId) originalQueueIds.add(queueId); // ✅ Сохраняем ID записи очереди
+              // PR-14: collect updated_at for optimistic locking
+              if (queueId) {
+                const ts = q.updated_at || q.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+                if (ts) entryUpdatedAtMap[queueId] = ts;
+              }
               // Находим service_code и name по service_id
               const service = servicesData.find((s) => s.id === q.service_id);
               if (service) {
@@ -2031,7 +2045,10 @@ const AppointmentWizardV2 = ({
               discountMode: wizardData.cart.discount_mode,
               allFree: wizardData.cart.all_free,
               services: editDeltaServices,
-              existingQueueEntryIds: Array.from(originalQueueIds)
+              existingQueueEntryIds: Array.from(originalQueueIds),
+              // PR-14: pass optimistic-locking map so backend can detect
+              // concurrent edits (last-write-wins → 409 Conflict).
+              expectedEntryUpdatedAt: Object.keys(entryUpdatedAtMap).length > 0 ? entryUpdatedAtMap : null,
             });
 
             if (!editDeltaResult?.success) {
