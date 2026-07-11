@@ -51,6 +51,7 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { getRegistrarTimestampDisplay } from '../utils/dateUtils';
 
 const hasBackendQueueAction = (entry, action, flagName) => {
   if (!entry) return false;
@@ -1201,6 +1202,7 @@ const DoctorPanel = () => {
                         <th style={thStyle}>№</th>
                         <th style={thStyle}>Пациент</th>
                         <th style={thStyle}>Телефон</th>
+                        <th style={thStyle}>Время</th>
                         <th style={thStyle}>Услуги</th>
                         <th style={thStyle}>Статус</th>
                         <th style={thStyle}>Действия</th>
@@ -1242,6 +1244,31 @@ const DoctorPanel = () => {
                             </div>
                           </td>
                           <td style={tdStyle}>{entry.phone || '—'}</td>
+                          <td style={tdStyle}>
+                            {/* PR-12: show queue_time / created_at + "Изменено" */}
+                            {(() => {
+                              const timeDisplay = getRegistrarTimestampDisplay(entry);
+                              if (!timeDisplay.primaryDate && !timeDisplay.primaryTime) {
+                                return '—';
+                              }
+                              return (
+                                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
+                                  <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: '2px' }}>
+                                    {timeDisplay.primaryLabel}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Clock size={10} />
+                                    {timeDisplay.primaryTime}
+                                  </div>
+                                  {timeDisplay.showChanged &&
+                                    <div style={{ marginTop: '2px', color: 'var(--mac-text-tertiary)' }}>
+                                      {timeDisplay.changedLabel}: {timeDisplay.changedTime}
+                                    </div>
+                                  }
+                                </div>
+                              );
+                            })()}
+                          </td>
                           <td style={tdStyle}>
                             {entry.service_details?.length > 0 ?
                       entry.service_details.slice(0, 2).map((svc, i) =>

@@ -130,7 +130,7 @@ const QueueTable = ({
                                     {entry.patient_phone || entry.phone || '—'}
                                 </td>
                                 <td className="qt-table-cell-secondary">
-                                    {formatTime(entry.created_at || entry.timestamp)}
+                                    {formatTime(entry.queue_time || entry.created_at || entry.timestamp)}
                                 </td>
                                 <td className="qt-table-cell-status">
                                     {getStatusBadge(entry.status)}
