@@ -575,8 +575,8 @@ async def _startup_tasks() -> None:
             lines.append(f"{methods:20s}  {path:40s}  {name}")
         log.info("Mounted routes:\n%s", "\n".join(lines))
         log.info(
-            "Flags: WS_DEV_ALLOW=%s CORS_DISABLE=%s",
-            os.getenv("WS_DEV_ALLOW"),
+            "Flags: TESTING=%s CORS_DISABLE=%s",
+            os.getenv("TESTING"),
             os.getenv("CORS_DISABLE"),
         )
     except Exception:

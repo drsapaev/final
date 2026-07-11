@@ -222,8 +222,14 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
     PR-4: prefer Authorization header over ?token= query param. Query
     param still accepted for backward compat but emits a deprecation
     warning via the caller.
+
+    PR-5: WS_DEV_ALLOW bypass REMOVED — it was a security risk because CI
+    used it and the flag could leak to production. Tests now use TESTING=1
+    (set by pytest conftest) instead.
     """
-    if os.getenv("WS_DEV_ALLOW", "0") == "1":
+    # PR-5: WS_DEV_ALLOW bypass removed. Only TESTING=1 (pytest) skips auth
+    # so unit tests that don't seed users can still connect.
+    if os.getenv("TESTING", "0") == "1":
         return True
     # Extract token from header (preferred) or query param (legacy)
     auth = headers.get("authorization") or headers.get("Authorization")
@@ -269,37 +275,9 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
 
 
 # -----------------------------------------------------------------------------
-# ⚠️ DEPRECATED: DEBUG endpoint - DISABLED in production
-# -----------------------------------------------------------------------------
-@router.websocket("/ws/noauth")
-async def ws_noauth(websocket: WebSocket):
-    """
-    ⚠️ SECURITY WARNING: This endpoint is for development only.
-    Disabled in production for security.
-    """
-    env = os.getenv("ENV", "dev").lower()
-    is_production = env in ("prod", "production")
-
-    if is_production:
-        await websocket.close(
-            code=status.WS_1008_POLICY_VIOLATION,
-            reason="This endpoint is disabled in production for security"
-        )
-        return
-
-    # Only allow in development
-    log.warning("⚠️  DEV mode: /ws/noauth endpoint enabled (NOT for production!)")
-    await websocket.accept()
-    await websocket.send_json({"type": "connected", "room": "noauth", "warning": "DEV ONLY"})
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        pass
-
-
-# -----------------------------------------------------------------------------
-# Основной сокет очереди: СНАЧАЛА accept(), потом проверки
+# PR-5: /ws/noauth endpoint REMOVED — was a literal no-auth WebSocket.
+# Even though it was disabled in production, it's a security risk in
+# dev/staging. Use authenticated /ws/queue instead.
 # -----------------------------------------------------------------------------
 @router.websocket("/ws/queue")
 async def ws_queue(
@@ -320,18 +298,12 @@ async def ws_queue(
     if secure_token and not token:
         token = secure_token
 
-    # ✅ SECURITY: Check environment - only allow DEV bypass in development
+    # ✅ SECURITY: Check environment
     env = os.getenv("ENV", "dev").lower()
     is_production = env in ("prod", "production")
 
-    # ✅ DEV shortcut: только в development режиме
-    if not is_production and os.getenv("WS_DEV_ALLOW", "0") == "1":
-        log.warning("⚠️  DEV mode: WebSocket auth bypass enabled (NOT for production!)")
-        await websocket.accept()
-        await websocket.send_json(
-            {"type": "dev.accepted", "room": f"{department}::{date}"}
-        )
-        return
+    # PR-5: WS_DEV_ALLOW bypass REMOVED — was a security risk. Tests use
+    # TESTING=1 (handled in _auth_ok) instead.
 
     # ✅ SECURITY: In production, require authentication
     if is_production:
