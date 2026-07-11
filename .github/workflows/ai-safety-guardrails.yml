@@ -114,8 +114,8 @@ jobs:
               ('qa_registrar@clinic.com', 'qa_registrar@clinic.com', 'Registrar', REGISTRAR_HASH),
             ]:
               c.execute(text('''
-                INSERT INTO users (username, email, role, hashed_password, is_active, created_at)
-                VALUES (:u, :e, :r, :p, true, NOW())
+                INSERT INTO users (username, email, role, hashed_password, is_active, is_superuser, must_change_password, created_at)
+                VALUES (:u, :e, :r, :p, true, false, false, NOW())
                 ON CONFLICT (username) DO UPDATE SET hashed_password = EXCLUDED.hashed_password
               '''), {'u': username, 'e': email, 'r': role, 'p': pw_hash})
             print('Test users seeded.')
