@@ -600,7 +600,10 @@ const ModernQueueManager = ({
                     }}
                     aria-hidden="true"
                   />
-                  {wsState === 'connected' ? 'Live' : wsState === 'reconnecting' ? 'Reconnect' : wsState === 'connecting' ? 'Connect' : 'Poll'}
+                  {/* PR-24: simplified WebSocket indicator — dot only, no dev jargon */}
+                  <span style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)' }}>
+                    {wsState === 'connected' ? 'Авто-обновление' : wsState === 'reconnecting' || wsState === 'connecting' ? 'Переподключение...' : 'Обновление по таймеру'}
+                  </span>
                 </span>
               )}
             </div>

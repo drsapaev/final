@@ -935,7 +935,7 @@ const QueueJoin = () => {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                    <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Олдингизда</span>
+                    <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Перед вами</span>
                   </div>
                   <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{result.queue_number - 1} к.</span>
                 </div>
@@ -951,7 +951,7 @@ const QueueJoin = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                      <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Кутиш</span>
+                      <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Ожидание</span>
                     </div>
                     <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{formatWaitTime(result.estimated_wait_time)}</span>
                   </div>
@@ -995,7 +995,7 @@ const QueueJoin = () => {
             type="button"
             style={successRecoveryButtonStyle}
           >
-            Тушунарли
+            Понятно
           </button>
         </div>
       </main>
@@ -1244,7 +1244,7 @@ const QueueJoin = () => {
                 }
               }}
             >
-              Давом этиш ({selectedSpecialists.length})
+              Продолжить ({selectedSpecialists.length})
             </button>
 
             {error && (
@@ -1373,7 +1373,7 @@ const QueueJoin = () => {
                 onMouseEnter={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
                 onMouseLeave={(e) => e.target.style.background = 'var(--mac-accent-blue)'}
               >
-                Давом этиш
+                Продолжить
               </button>
             </div>
           </div>
@@ -1606,7 +1606,7 @@ const QueueJoin = () => {
                   onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
                   onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
                 >
-                  Ортга
+                  Назад
                 </button>
                 <button
                   type="submit"
