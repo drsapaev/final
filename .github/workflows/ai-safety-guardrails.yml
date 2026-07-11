@@ -124,7 +124,11 @@ jobs:
               c.execute(text('''
                 INSERT INTO users (username, email, role, hashed_password, is_active, is_superuser, must_change_password, push_notifications_enabled, created_at)
                 VALUES (:u, :e, :r, :p, true, false, false, false, NOW())
-                ON CONFLICT (username) DO UPDATE SET hashed_password = EXCLUDED.hashed_password
+                ON CONFLICT (username) DO UPDATE SET
+                  hashed_password = EXCLUDED.hashed_password,
+                  is_active = true,
+                  role = EXCLUDED.role,
+                  must_change_password = false
               '''), {'u': username, 'e': email, 'r': role, 'p': pw_hash})
             print('Test users seeded.')
           "
@@ -144,6 +148,11 @@ jobs:
               curl -sf -X POST http://127.0.0.1:18000/api/v1/authentication/login \
                 -H "Content-Type: application/json" \
                 -d '{"username":"qa_doctor@clinic.com","password":"QA_PASSWORD_123"}' \
+                -w "\nHTTP status: %{http_code}\n" || true
+              echo "Testing login as qa_admin@clinic.com..."
+              curl -sf -X POST http://127.0.0.1:18000/api/v1/authentication/login \
+                -H "Content-Type: application/json" \
+                -d '{"username":"qa_admin@clinic.com","password":"QA_PASSWORD_123"}' \
                 -w "\nHTTP status: %{http_code}\n" || true
               echo "---server.log tail---"
               tail -30 server.log || true
