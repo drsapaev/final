@@ -98,6 +98,9 @@ def _serialize_doctor(db: Session, doctor) -> DoctorOut:
         "active": doctor.active,
         "created_at": doctor.created_at,
         "updated_at": doctor.updated_at,
+        # PR-21: include department fields
+        "department_id": doctor.department_id,
+        "department": doctor.department.name_ru if doctor.department else None,
         "user": _serialize_doctor_user(doctor.user, linked_doctor_id=doctor.id),
     }
     schedules = crud_clinic.get_doctor_schedules(db, doctor.id)
