@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
+import { getLocalDateString, parseRegistrarTimestamp } from '../utils/dateUtils';
 import {
   Button, Badge, Card,
   Input } from '../components/ui/macos';
@@ -1490,12 +1491,22 @@ const DentistPanelUnified = () => {
 
   // Статистика
   const stats = useMemo(() => {
-    const todayString = new Date().toDateString();
+    // PR-13: use getLocalDateString() instead of new Date().toDateString()
+    // to avoid browser-local timezone issues (off-by-one for early-morning Tashkent)
+    const todayString = getLocalDateString();
     const todayAppointmentsCount = appointmentsTableData.filter((apt) => {
-      if (!apt.appointment_date) {
+      if (!apt.appointment_date && !apt.queue_time && !apt.created_at) {
         return false;
       }
-      return new Date(apt.appointment_date).toDateString() === todayString;
+      // Try to get the date from queue_time/created_at (timezone-aware) first,
+      // then fall back to appointment_date
+      const ts = apt.queue_time || apt.created_at;
+      if (ts) {
+        const aptDate = getLocalDateString(parseRegistrarTimestamp(ts));
+        return aptDate === todayString;
+      }
+      // Fall back to appointment_date (may be YYYY-MM-DD already)
+      return apt.appointment_date === todayString;
     }).length;
 
     const activeTreatmentPlansCount = appointmentsTableData.filter((apt) => apt.status === 'in_progress' || apt.status === 'waiting').length;

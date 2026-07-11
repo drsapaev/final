@@ -13,6 +13,7 @@ import PropTypes from 'prop-types';
 import { User, FileText, RefreshCw, Save, Calendar, Phone } from 'lucide-react';
 import { Button, MacOSCard, MacOSEmptyState } from '../ui/macos';
 import { EMRContainerV2 } from '../emr-v2/EMRContainerV2';
+import { formatRegistrarDate, formatRegistrarDateTime } from '../../utils/dateUtils';
 
 export function VisitTab({
   selectedPatient,
@@ -95,12 +96,12 @@ export function VisitTab({
             {emr.version != null && <span title="Версия EMR">v{emr.version}</span>}
             {emr.updated_at && (
               <span title="Последнее изменение">
-                изм. {new Date(emr.updated_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                изм. {formatRegistrarDateTime(emr.updated_at, 'ru-RU')}
               </span>
             )}
             {emr.signed_at && (
               <span title="Подписана">
-                подписана {new Date(emr.signed_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                подписана {formatRegistrarDate(emr.signed_at, 'ru-RU')}
               </span>
             )}
             {emr.signed_by != null && emr.signed_by > 0 && <span title="Кем подписана">врач #{emr.signed_by}</span>}

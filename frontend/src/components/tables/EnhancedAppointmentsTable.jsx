@@ -40,6 +40,7 @@ import {
   getRegistrarTimestampDisplay,
   formatRegistrarDate,
   formatRegistrarTime,
+  getLocalDateString,
 } from '../../utils/dateUtils';
 
 // ⭐ SSOT: Centralized service code resolver
@@ -973,8 +974,21 @@ const EnhancedAppointmentsTable = ({
         if (row.payment_type) return t[row.payment_type] || row.payment_type;
         return paymentStatus === 'paid' ? t.unknownPayment : t.pendingPayment;
       })(),
-      row.created_at ? formatRegistrarDate(row.created_at) : row.appointment_date || '',
-      row.created_at ? formatRegistrarTime(row.created_at, 'ru-RU', { includeSeconds: true }) : row.appointment_time || '',
+      (() => {
+        // PR-13: use getRegistrarTimestampDisplay for CSV consistency with UI
+        const td = getRegistrarTimestampDisplay(row);
+        return td.primaryDate || formatRegistrarDate(row.created_at) || row.appointment_date || '';
+      })(),
+      (() => {
+        const td = getRegistrarTimestampDisplay(row);
+        return td.primaryTime || formatRegistrarTime(row.created_at, 'ru-RU', { includeSeconds: true }) || row.appointment_time || '';
+      })(),
+      (() => {
+        // PR-13: add "Изменено" column to CSV when present
+        const td = getRegistrarTimestampDisplay(row);
+        if (!td.showChanged) return '';
+        return `${td.changedDate} ${td.changedTime}`;
+      })(),
       t[row.status] || row.status || '',
       (() => {
         if (row.cost_display === 'free') return t.paymentFree;
@@ -987,7 +1001,7 @@ const EnhancedAppointmentsTable = ({
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `appointments_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `appointments_${getLocalDateString()}.csv`;
     link.click();
   }, [filteredData, t, formatPhoneNumber, getDisplayAmount, isDoctorView]);
 
@@ -996,7 +1010,7 @@ const EnhancedAppointmentsTable = ({
   // Функция для отображения номеров очередей
   const renderQueueNumbers = useCallback((row) => {
     // Получаем текущую дату
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
 
     // Helper для форматирования времени
 

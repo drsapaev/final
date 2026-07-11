@@ -14,6 +14,7 @@
 import PropTypes from 'prop-types';
 import { Calendar, Eye, Download, FileText } from 'lucide-react';
 import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
+import { formatRegistrarDate } from '../../utils/dateUtils';
 
 /**
  * @param {Object} props
@@ -185,9 +186,7 @@ export function HistoryTab({
 
                 {/* Timestamp */}
                 <div style={{ flexShrink: 0, fontSize: getFontSize('xs'), color: getColor('textSecondary') }}>
-                  {entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('ru-RU', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                  }) : '—'}
+                  {entry.timestamp ? formatRegistrarDate(entry.timestamp, 'ru-RU') : '—'}
                 </div>
               </div>
             ))}
