@@ -142,7 +142,7 @@ jobs:
       - name: Install frontend deps + Playwright
         run: |
           cd frontend
-          npm ci
+          npm ci --legacy-peer-deps
           npx playwright install --with-deps chromium
 
       - name: Run AI safety guardrails spec
