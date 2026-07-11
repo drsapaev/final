@@ -19,6 +19,7 @@ const DoctorModal = ({
   onSave,
   loading = false,
   availableUsers = [],
+  departments = [],
 }) => {
   const [formData, setFormData] = useState({
     userId: '',
@@ -96,6 +97,9 @@ const DoctorModal = ({
     }
     if (!formData.specialty.trim()) {
       nextErrors.specialty = 'Специальность обязательна';
+    } else if (!/^[a-z][a-z0-9_]*$/.test(formData.specialty.trim())) {
+      // PR-19: validate specialty format — must match queue_tag pattern
+      nextErrors.specialty = 'Только латинские буквы в нижнем регистре, цифры и _ (например: cardiology)';
     }
     if (formData.priceDefault !== '' && Number.isNaN(Number(formData.priceDefault))) {
       nextErrors.priceDefault = 'Цена должна быть числом';
@@ -220,12 +224,27 @@ const DoctorModal = ({
             <Label required className="admin-label-block-mb-8">
               Специальность
             </Label>
-            <Input
-              value={formData.specialty}
-              onChange={(event) => handleChange('specialty', event.target.value)}
-              placeholder="cardiology, dermatology, dentistry..."
-            />
+            {departments.length > 0 ? (
+              <Select
+                value={formData.specialty}
+                onChange={(value) => handleChange('specialty', value)}
+                options={[
+                  { value: '', label: '— Выберите отделение —' },
+                  ...departments.map((d) => ({ value: d.value, label: d.label })),
+                ]}
+                size="large"
+              />
+            ) : (
+              <Input
+                value={formData.specialty}
+                onChange={(event) => handleChange('specialty', event.target.value)}
+                placeholder="cardiology, dermatology, dentistry..."
+              />
+            )}
             {renderFieldError('specialty')}
+            <div className="admin-hint-text-12-secondary-mt-4">
+              Должно совпадать с key отделения (например: cardiology, derma, dental)
+            </div>
           </div>
 
           <div>

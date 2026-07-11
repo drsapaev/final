@@ -147,7 +147,7 @@ const ServiceCatalog = () => {
       api.get('/services'),
       api.get('/services/categories'),
       api.get('/services/admin/doctors'),
-      api.get('/departments'),
+      api.get('/admin/departments'),
       api.get('/queues/profiles?active_only=false') // ⭐ SSOT: Load queue profiles
       ]);
 

@@ -1,10 +1,12 @@
 import { Edit, Plus, RefreshCw, Search, Stethoscope, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
 import DoctorModal from './DoctorModal';
 import useDoctors from '../../hooks/useDoctors';
 import useModal from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
+import { api } from '../../api/client';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() call.
 import { useConfirm } from '../common/ConfirmDialog';
 import {
@@ -19,28 +21,13 @@ import {
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
 
-const departmentOptions = [
-  { value: '', label: 'Все отделения' },
-  { value: 'cardiology', label: 'Кардиология' },
-  { value: 'dermatology', label: 'Дерматология' },
-  { value: 'dentistry', label: 'Стоматология' },
-  { value: 'laboratory', label: 'Лаборатория' },
-  { value: 'cosmetology', label: 'Косметология' },
-  { value: 'procedures', label: 'Процедуры' },
-  { value: 'physiotherapy', label: 'Физиотерапия' },
-  { value: 'functional_diagnostics', label: 'Функциональная диагностика' },
-  { value: 'general', label: 'Общее' },
-];
-
+// PR-19: departmentOptions now loaded dynamically from /admin/departments
+// (was hardcoded — new departments didn't appear in filter dropdown)
 const statusOptions = [
   { value: '', label: 'Все статусы' },
   { value: 'active', label: 'Активен' },
   { value: 'inactive', label: 'Неактивен' },
 ];
-
-const departmentLabels = Object.fromEntries(
-  departmentOptions.filter((item) => item.value).map((item) => [item.value, item.label])
-);
 
 const getDoctorName = (doctor) =>
   doctor.user?.full_name || doctor.name || doctor.user?.username || 'Неизвестно';
@@ -54,7 +41,12 @@ const getDoctorInitials = (doctor) =>
     .toUpperCase()
     .slice(0, 2) || 'Д';
 
-const getDepartmentLabel = (department) => departmentLabels[department] || department || 'Не указано';
+// PR-19: dynamic department label lookup (was hardcoded)
+const getDepartmentLabel = (department, deptList = []) => {
+  if (!department) return 'Не указано';
+  const found = deptList.find((d) => d.key === department);
+  return found ? found.name_ru : department;
+};
 
 const AdminDoctors = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
@@ -79,6 +71,28 @@ const AdminDoctors = () => {
     refreshAvailableUsers,
   } = useDoctors();
   const doctorModal = useModal();
+
+  // PR-19: load departments dynamically (was hardcoded)
+  const [departments, setDepartments] = useState([]);
+
+  const loadDepartments = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/departments');
+      setDepartments(response.data?.data || []);
+    } catch (err) {
+      logger.error('Ошибка загрузки отделений:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDepartments();
+  }, [loadDepartments]);
+
+  // PR-19: build departmentOptions dynamically
+  const departmentOptions = [
+    { value: '', label: 'Все отделения' },
+    ...departments.map((d) => ({ value: d.key, label: d.name_ru || d.key })),
+  ];
 
   const filtersActive = Boolean(searchTerm || filterSpecialization || filterDepartment || filterStatus);
 
@@ -296,7 +310,7 @@ const AdminDoctors = () => {
                     </td>
                     <td className="admin-p-12-16">
                       <Badge variant="success">
-                        {getDepartmentLabel(doctor.specialty || doctor.department)}
+                        {getDepartmentLabel(doctor.specialty || doctor.department, departments)}
                       </Badge>
                     </td>
                     <td className="admin-patients-td">
@@ -341,6 +355,7 @@ const AdminDoctors = () => {
         onSave={handleSaveDoctor}
         availableUsers={availableUsers}
         loading={doctorModal.loading}
+        departments={departmentOptions.filter((d) => d.value)}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
