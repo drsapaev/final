@@ -234,6 +234,36 @@ class CoreMixin(UserManagementServiceMixinBase):
                 db, user.id, "create", "Пользователь создан", created_by
             )
 
+            # PR-17: Auto-create Doctor row for Doctor-role users.
+            # Without this, a new Doctor user is invisible in AdminDoctors,
+            # registrar doctor selector, and schedules until admin manually
+            # links them via AdminDoctors → "Add doctor" → pick user.
+            doctor_created = False
+            if user_data.role in ("Doctor", "Cardiologist", "Dermatologist", "Dentist"):
+                existing_doctor = (
+                    db.query(Doctor)
+                    .filter(Doctor.user_id == user.id)
+                    .first()
+                )
+                if not existing_doctor:
+                    # Derive a sensible default specialty from the role
+                    specialty_map = {
+                        "Doctor": "general",
+                        "Cardiologist": "cardiology",
+                        "Dermatologist": "dermatology",
+                        "Dentist": "dentistry",
+                    }
+                    new_doctor = Doctor(
+                        user_id=user.id,
+                        specialty=specialty_map.get(user_data.role, "general"),
+                        active=user_data.is_active,
+                    )
+                    db.add(new_doctor)
+                    doctor_created = True
+                    logger.info(
+                        f"Auto-created Doctor row for user {user.id} (role={user_data.role})"
+                    )
+
             db.commit()
             # Обновляем объекты, чтобы получить все поля (id, created_at, updated_at)
             db.refresh(user)
