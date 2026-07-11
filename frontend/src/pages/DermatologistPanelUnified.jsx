@@ -22,6 +22,7 @@ import {
   Button, MacOSCard, Badge, Input, Textarea, Select, MacOSEmptyState,
 } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import { adaptTimeFields } from '../utils/registrarAggregation';
 import './dermatology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
@@ -475,9 +476,7 @@ const DermatologistPanelUnified = () => {
                     queue_position: entry.queue_position,
                     doctor: entry.doctor_name || 'Врач',
                     specialty: queue.specialty,
-                    created_at: entry.created_at,
-                    appointment_date: entry.created_at ? entry.created_at.split('T')[0] : today,
-                    appointment_time: entry.visit_time || '',
+                    ...adaptTimeFields(entry, data),
                     status: entry.status ?? null,
                     cost: entry.cost || 0,
                     visit_id: entry.visit_id || null
