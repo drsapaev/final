@@ -138,12 +138,18 @@ async def get_csrf_token(request: Request, response: Response) -> CSRFTokenRespo
     Даже если CSRF middleware отключен, endpoint нужен frontend-клиенту,
     чтобы не шуметь 404 в консоли при state-changing запросах.
     """
+    # PR-30: secure flag must follow production status. Previously secure=False
+    # always — cookie was sent over plain HTTP, allowing MITM interception.
+    import os
+
+    is_prod = os.getenv("ENV", "dev").lower() in ("prod", "production")
+
     token = request.cookies.get("csrf_token") or secrets.token_urlsafe(32)
     response.set_cookie(
         key="csrf_token",
         value=token,
         httponly=False,
-        secure=False,
+        secure=is_prod,
         samesite="lax",
         path="/",
         max_age=60 * 60 * 8,
