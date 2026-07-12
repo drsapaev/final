@@ -40,6 +40,24 @@ if (typeof window !== 'undefined') {
     writable: true,
     configurable: true,
   });
+
+  // PR-39 / P0-2: Mock sessionStorage (tokens migrated from localStorage)
+  const sessionStorageMock = {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  };
+  Object.defineProperty(window, 'sessionStorage', {
+    value: sessionStorageMock,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    value: sessionStorageMock,
+    writable: true,
+    configurable: true,
+  });
 }
 
 // Mock IntersectionObserver

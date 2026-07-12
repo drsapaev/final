@@ -14,7 +14,7 @@ describe('tokenManager', () => {
     beforeEach(() => {
         // Clear all mocks before each test
         vi.clearAllMocks();
-        localStorage.getItem.mockReturnValue(null);
+        sessionStorage.getItem.mockReturnValue(null);
     });
 
     describe('TOKEN_KEYS', () => {
@@ -26,18 +26,18 @@ describe('tokenManager', () => {
     });
 
     describe('getAccessToken', () => {
-        it('should return token from localStorage', () => {
+        it('should return token from sessionStorage', () => {
             const mockToken = 'test-access-token';
-            localStorage.getItem.mockReturnValue(mockToken);
+            sessionStorage.getItem.mockReturnValue(mockToken);
 
             const result = tokenManager.getAccessToken();
 
-            expect(localStorage.getItem).toHaveBeenCalledWith('auth_token');
+            expect(sessionStorage.getItem).toHaveBeenCalledWith('auth_token');
             expect(result).toBe(mockToken);
         });
 
         it('should return null when no token exists', () => {
-            localStorage.getItem.mockReturnValue(null);
+            sessionStorage.getItem.mockReturnValue(null);
 
             const result = tokenManager.getAccessToken();
 
@@ -46,56 +46,56 @@ describe('tokenManager', () => {
     });
 
     describe('setAccessToken', () => {
-        it('should save token to localStorage', () => {
+        it('should save token to sessionStorage', () => {
             const mockToken = 'new-access-token';
 
             tokenManager.setAccessToken(mockToken);
 
-            expect(localStorage.setItem).toHaveBeenCalledWith('auth_token', mockToken);
+            expect(sessionStorage.setItem).toHaveBeenCalledWith('auth_token', mockToken);
         });
 
         it('should remove token when null is passed', () => {
             tokenManager.setAccessToken(null);
 
-            expect(localStorage.removeItem).toHaveBeenCalledWith('auth_token');
+            expect(sessionStorage.removeItem).toHaveBeenCalledWith('auth_token');
         });
     });
 
     describe('getRefreshToken', () => {
-        it('should return refresh token from localStorage', () => {
+        it('should return refresh token from sessionStorage', () => {
             const mockToken = 'test-refresh-token';
-            localStorage.getItem.mockReturnValue(mockToken);
+            sessionStorage.getItem.mockReturnValue(mockToken);
 
             const result = tokenManager.getRefreshToken();
 
-            expect(localStorage.getItem).toHaveBeenCalledWith('refresh_token');
+            expect(sessionStorage.getItem).toHaveBeenCalledWith('refresh_token');
             expect(result).toBe(mockToken);
         });
     });
 
     describe('setRefreshToken', () => {
-        it('should save refresh token to localStorage', () => {
+        it('should save refresh token to sessionStorage', () => {
             const mockToken = 'new-refresh-token';
 
             tokenManager.setRefreshToken(mockToken);
 
-            expect(localStorage.setItem).toHaveBeenCalledWith('refresh_token', mockToken);
+            expect(sessionStorage.setItem).toHaveBeenCalledWith('refresh_token', mockToken);
         });
     });
 
     describe('getUserData', () => {
-        it('should return parsed user object from localStorage', () => {
+        it('should return parsed user object from sessionStorage', () => {
             const mockUser = { id: 1, username: 'testuser', role: 'doctor' };
-            localStorage.getItem.mockReturnValue(JSON.stringify(mockUser));
+            sessionStorage.getItem.mockReturnValue(JSON.stringify(mockUser));
 
             const result = tokenManager.getUserData();
 
-            expect(localStorage.getItem).toHaveBeenCalledWith('user');
+            expect(sessionStorage.getItem).toHaveBeenCalledWith('user');
             expect(result).toEqual(mockUser);
         });
 
         it('should return null when no user data exists', () => {
-            localStorage.getItem.mockReturnValue(null);
+            sessionStorage.getItem.mockReturnValue(null);
 
             const result = tokenManager.getUserData();
 
@@ -103,7 +103,7 @@ describe('tokenManager', () => {
         });
 
         it('should return null on JSON parse error', () => {
-            localStorage.getItem.mockReturnValue('invalid-json');
+            sessionStorage.getItem.mockReturnValue('invalid-json');
 
             const result = tokenManager.getUserData();
 
@@ -112,34 +112,34 @@ describe('tokenManager', () => {
     });
 
     describe('setUserData', () => {
-        it('should save user object as JSON to localStorage', () => {
+        it('should save user object as JSON to sessionStorage', () => {
             const mockUser = { id: 1, username: 'testuser', role: 'doctor' };
 
             tokenManager.setUserData(mockUser);
 
-            expect(localStorage.setItem).toHaveBeenCalledWith('user', JSON.stringify(mockUser));
+            expect(sessionStorage.setItem).toHaveBeenCalledWith('user', JSON.stringify(mockUser));
         });
 
         it('should remove user when null is passed', () => {
             tokenManager.setUserData(null);
 
-            expect(localStorage.removeItem).toHaveBeenCalledWith('user');
+            expect(sessionStorage.removeItem).toHaveBeenCalledWith('user');
         });
     });
 
     describe('clearAll', () => {
-        it('should remove all authentication data from localStorage', () => {
+        it('should remove all authentication data from sessionStorage', () => {
             tokenManager.clearAll();
 
-            expect(localStorage.removeItem).toHaveBeenCalledWith('auth_token');
-            expect(localStorage.removeItem).toHaveBeenCalledWith('refresh_token');
-            expect(localStorage.removeItem).toHaveBeenCalledWith('user');
+            expect(sessionStorage.removeItem).toHaveBeenCalledWith('auth_token');
+            expect(sessionStorage.removeItem).toHaveBeenCalledWith('refresh_token');
+            expect(sessionStorage.removeItem).toHaveBeenCalledWith('user');
         });
     });
 
     describe('hasToken', () => {
         it('should return true when access token exists', () => {
-            localStorage.getItem.mockReturnValue('some-token');
+            sessionStorage.getItem.mockReturnValue('some-token');
 
             const result = tokenManager.hasToken();
 
@@ -147,7 +147,7 @@ describe('tokenManager', () => {
         });
 
         it('should return false when no access token exists', () => {
-            localStorage.getItem.mockReturnValue(null);
+            sessionStorage.getItem.mockReturnValue(null);
 
             const result = tokenManager.hasToken();
 
@@ -155,7 +155,7 @@ describe('tokenManager', () => {
         });
 
         it('should return false for empty string token', () => {
-            localStorage.getItem.mockReturnValue('');
+            sessionStorage.getItem.mockReturnValue('');
 
             const result = tokenManager.hasToken();
 
@@ -165,7 +165,7 @@ describe('tokenManager', () => {
 
     describe('isTokenValid', () => {
         it('should return false when no token exists', () => {
-            localStorage.getItem.mockReturnValue(null);
+            sessionStorage.getItem.mockReturnValue(null);
 
             const result = tokenManager.isTokenValid();
 
@@ -173,7 +173,7 @@ describe('tokenManager', () => {
         });
 
         it('should return false for invalid token format', () => {
-            localStorage.getItem.mockReturnValue('invalid-token');
+            sessionStorage.getItem.mockReturnValue('invalid-token');
 
             const result = tokenManager.isTokenValid();
 
@@ -187,7 +187,7 @@ describe('tokenManager', () => {
             const signature = 'signature';
             const mockJwt = `${header}.${payload}.${signature}`;
 
-            localStorage.getItem.mockReturnValue(mockJwt);
+            sessionStorage.getItem.mockReturnValue(mockJwt);
 
             const result = tokenManager.isTokenValid();
 
@@ -201,7 +201,7 @@ describe('tokenManager', () => {
             const signature = 'signature';
             const mockJwt = `${header}.${payload}.${signature}`;
 
-            localStorage.getItem.mockReturnValue(mockJwt);
+            sessionStorage.getItem.mockReturnValue(mockJwt);
 
             const result = tokenManager.isTokenValid();
 
@@ -215,7 +215,7 @@ describe('tokenManager', () => {
             const signature = 'signature';
             const mockJwt = `${header}.${payload}.${signature}`;
 
-            localStorage.getItem.mockReturnValue(mockJwt);
+            sessionStorage.getItem.mockReturnValue(mockJwt);
 
             const result = tokenManager.isTokenValid();
 

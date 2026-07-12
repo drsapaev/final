@@ -19,7 +19,7 @@ export function RoleGuard({
 
   // Получаем профиль из контекста или пропсов
   const userProfile = profile || (typeof window !== 'undefined' ?
-  JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
+  JSON.parse(sessionStorage.getItem('auth_profile') || 'null') : null);
 
   if (!userProfile) {
     return fallback || <AccessDenied message="Необходима авторизация" theme={theme} />;
@@ -75,7 +75,7 @@ export function withRoleGuard(WrappedComponent, guardProps = {}) {
  */
 export function useRoleAccess(profile = null) {
   const userProfile = profile || (typeof window !== 'undefined' ?
-  JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
+  JSON.parse(sessionStorage.getItem('auth_profile') || 'null') : null);
 
   const hasRole = (roles) => {
   if (!userProfile || !Array.isArray(roles)) return false;
