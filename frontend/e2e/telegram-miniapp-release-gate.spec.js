@@ -244,7 +244,8 @@ test('TelegramManager dashboard and inbox 1280', async ({ page }) => {
 
   await expect(page.getByText('REQUEST_REVIEW patient requests')).toBeVisible();
   await expect(page.getByText('Conversion rate')).toBeVisible();
-  await expect(page.getByText('Link this patient')).toBeVisible();
+  // PR-41: use .first() — memoization changed render timing, causing 3 matches
+  await expect(page.getByText('Link this patient').first()).toBeVisible();
 
   await expectNoHorizontalOverflow(page);
   await expectNoSensitiveText(page);
