@@ -58,13 +58,16 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
 
   function connect() {
     try {
+      // PR-36 / P0-3: JWT now sent via Sec-WebSocket-Protocol subprotocol
+      // (bearer.<token>) instead of URL query. Avoids leaking the token
+      // into nginx access logs, browser history, and Referer headers.
       const token = tokenManager.getAccessToken();
-      const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-      const url = buildWsUrl(`/api/v1/display/ws/board/${encodeURIComponent(boardId)}${tokenParam}`);
-      
-      logger.log(`🔌 Подключаемся к WebSocket: ${url}`);
-      
-      ws = new WebSocket(url);
+      const url = buildWsUrl(`/api/v1/display/ws/board/${encodeURIComponent(boardId)}`);
+      const subprotocols = token ? [`bearer.${token}`] : [];
+
+      logger.log('🔌 Подключаемся к WebSocket (token via subprotocol)');
+
+      ws = new WebSocket(url, subprotocols);
       
       ws.onopen = () => {
         logger.log(`✅ WebSocket подключен к табло ${boardId}`);
