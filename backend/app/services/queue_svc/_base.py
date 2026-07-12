@@ -78,7 +78,9 @@ class QueueBusinessServiceMixinBase:
     DEFAULT_MAX_SLOTS = 15
     QUEUE_QR_TOKEN_MIN_TTL_MINUTES = 5
     QUEUE_QR_TOKEN_MAX_TTL_MINUTES = 15
-    QR_HIDDEN_PROFILE_KEYS = {"ecg", "general"}
+    # PR-28: removed hardcoded QR_HIDDEN_PROFILE_KEYS — admin controls
+    # visibility via show_on_qr_page flag on QueueProfile
+    QR_HIDDEN_PROFILE_KEYS = set()
     QR_SPECIALTY_ALIASES = {
         "cardio": "cardiology",
         "derma": "dermatology",

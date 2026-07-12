@@ -139,14 +139,12 @@ export function routeToRoles(pathname) {
 }
 
 export function getRoleHomeRoute(roleOrProfile) {
-  // PR-27: removed homeForUsernames check (was hardcoded cardio@example.com etc.)
-  // Now uses specialty from profile to route doctors to their specialty panel.
-
+  // PR-27/28: route by Doctor.specialty, not User.role.
+  // Removed homeForUsernames (was hardcoded emails).
+  // Known specialties → dedicated panel; unknown → DoctorPanel (generic).
   if (roleOrProfile && typeof roleOrProfile === 'object') {
-    // PR-27: check specialty for doctor routing
     const specialty = String(roleOrProfile.specialty || '').toLowerCase().trim();
     if (specialty) {
-      // Map specialty to specialty panel route
       const specialtyRouteMap = {
         'cardiology': '/doctor/cardiology',
         'cardio': '/doctor/cardiology',
@@ -157,12 +155,12 @@ export function getRoleHomeRoute(roleOrProfile) {
         'stomatology': '/doctor/dentistry',
       };
       if (specialtyRouteMap[specialty]) {
-        // Verify the user has access to this route
         const route = getEffectiveRouteByPath(specialtyRouteMap[specialty]);
         if (route && isRouteAccessibleToProfile(route, roleOrProfile)) {
           return specialtyRouteMap[specialty];
         }
       }
+      // Unknown specialty (e.g. 'neurology') → fall through to role-based
     }
   }
 

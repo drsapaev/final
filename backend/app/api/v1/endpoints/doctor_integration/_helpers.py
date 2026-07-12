@@ -98,11 +98,19 @@ def _normalize_queue_specialty(value: str) -> str:
 
 
 def _resolve_queue_specialty_variants(specialty: str) -> list[str]:
+    """PR-28: return specialty variants for queue lookup.
+    Uses hardcoded map for known specialties, but falls back to [specialty]
+    for unknown ones (e.g. 'neurology') so new specialties work without code changes.
+    """
     normalized = _normalize_queue_specialty(specialty)
     return DOCTOR_QUEUE_SPECIALTY_VARIANTS.get(normalized, [normalized])
 
 
 def _resolve_queue_allowed_tags(specialty: str) -> list[str]:
+    """PR-28: return allowed queue tags for a specialty.
+    Uses hardcoded map for known specialties, but falls back to [specialty]
+    for unknown ones so new specialties' queues are visible.
+    """
     normalized = _normalize_queue_specialty(specialty)
     return DOCTOR_QUEUE_ALLOWED_TAGS.get(normalized, [normalized])
 
