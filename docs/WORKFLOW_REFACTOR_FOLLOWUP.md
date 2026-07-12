@@ -490,12 +490,46 @@ VITE_ENABLE_WS=1
 - [ ] **Вынести ещё 3-4 shared helpers** — `appointmentSummaryItems`, `loadXxxAppointments` (3 варианта), `handleAppointmentActionClick` switch. Требует более глубокого анализа, т.к. эти функции имеют panel-specific variations.
 - [ ] **Создать ADR-0007** — план generic GET-дедупликации в axios interceptor (P1-5)
 - [ ] **Добавить unit-тесты для новых shared helpers** — `getAllPatientServices`, `makeEnsureCanonicalVisitId` (расширить `doctorPanelShared.test.js`)
+- [ ] **Удалить 19 unused functions в DentistPanelUnified** — `loadTreatmentPlans`, `loadProsthetics`, `handleReports`, `handleTreatmentPlanner`, `filteredPatients`, `stats`, `renderAppointments`, `renderExaminations`, `renderDiagnoses`, `renderTemplates`, `renderReports`, `renderDentalChart` — likely dead code from god-component split (PR-44/45)
+- [ ] **Удалить dead `openQueueWS`** в `api/ws.js:15` — 0 callers (ADR-0005 Phase 0)
+
+---
+
+## Re-audit 2026-07-13
+
+После 448 коммитов в main (PR-26..PR-46, включая полный frontend+backend аудит), статус изменился:
+
+### ✅ Закрыто командой (не нашими PR):
+- **P1-1 (WS disabled)** — ЗАКРЫТ через `useQueueWebSocket` hook (PR-36, #2110). Exponential backoff, JWT subprotocol auth. ADR-0004 отмечен как Implemented.
+- **P0-3 frontend audit (WS JWT in URL)** — частично закрыт: `NotificationWebSocketContext` + `websocketAuth.js` используют subprotocol, но **4 других WS-сайта всё ещё утекают JWT в URL** (новая находка — см. ADR-0005 update).
+- **41 frontend audit finding** — все закрыты (PR-35..PR-44)
+- **50 backend audit findings** — все закрыты (PR-1..PR-34)
+- **Тесты: 517 → 626** (+109 новых)
+
+### ❌ Всё ещё открыто:
+
+| ID | Задача | Статус | Требует локального запуска |
+|---|---|---|---|
+| **P0-1** | DoctorPanel stub | `loadData()` setPatients([]) без API | ✅ Да |
+| **P0-2** | Двойные интерсепторы | `client.js` + `interceptors.js` оба регистрируют | ✅ Да (401 flow) |
+| **P0-3** | Cardio raw fetch | `fetch('/v2/emr/...')` вместо EMRContainerV2 | ✅ Да (smoke test) |
+| **P1-2** | In-memory cache only | cacheService — Map only, нет IndexedDB | ✅ Да |
+| **P1-3** | 7 раздельных WS-систем | ADR-0005 обновлён, 7 phases | ✅ Да |
+| **P1-5** | GET-дедупликация | partial (messages.js only) | ✅ Да |
+| **NEW** | 4 WS-сайта утекают JWT в URL | useQueueWebSocket, useAIChat, useApi, ChatContext | ✅ Да (security P0) |
+
+### Новые находки (2026-07-13):
+- **N1.** 4 из 7 WS-сайтов утекают JWT в URL query (`?token=...`) — regression от PR-36/P0-3
+- **N2.** ChatContext.jsx:357 — WS без auth вообще
+- **N3.** 19 unused functions в DentistPanelUnified (dead code от god-component split)
+- **N4.** Dead `openQueueWS` в api/ws.js — 0 callers
 
 ---
 
 **Дата создания:** 2026-07-04
+**Обновлено:** 2026-07-13 — re-audit после 448 коммитов в main
 **Автор:** dr-sapaev-bot
-**Статус:** Mostly closed — все облачные quick wins выполнены, P0/P1 требуют локальной разработки
+**Статус:** Partially closed — P1-1 закрыт командой, P0-1/P0-2/P0-3/P1-2/P1-3 требуют локальной разработки
 **Связанные merged PR:**
 - #1779 (`c77aa2b`) — основной workflow refactor
 - #1780 (`e2e15a9`) — этот follow-up документ
