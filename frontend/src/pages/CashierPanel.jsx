@@ -1354,7 +1354,9 @@ const CashierPanel = () => {
                                 {row.patient}
                               </td>
                               <td className="cashier-text-sm cashier-text-primary">
-                                {/* TODO: Render services info properly if available in history item */}
+                                {/* PR-43 / Medium-24: services info rendered from row.service
+                                    (single service name). Multi-service breakdown requires
+                                    backend changes to the history endpoint payload. */}
                                  {row.service || '—'}
                               </td>
                               <td className="cashier-text-sm cashier-text-primary">

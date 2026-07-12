@@ -305,7 +305,7 @@ export async function validateFile(file, options = {}) {
   if (allowedCategories.includes('medical')) {
     // Проверка что XML действительно содержит медицинские данные
     if (file.type === 'text/xml' || file.type === 'application/xml') {
-      // TODO: Добавить проверку содержимого XML
+      // PR-43 / Medium-24: XML content validation deferred to backend (XXE risk)
       warnings.push('XML файлы требуют дополнительной валидации на сервере');
     }
   }
