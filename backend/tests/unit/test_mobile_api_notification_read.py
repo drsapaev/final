@@ -76,8 +76,9 @@ async def test_mobile_notification_read_uses_canonical_platform(monkeypatch):
     from app.services.notification_platform_service import NotificationPlatformService
     monkeypatch.setattr(NotificationPlatformService, "mark_read", fake_mark_read)
 
+    # PR-29: notification_id is now str (was int)
     response = await mobile_api.mark_notification_read(
-        notification_id=10,
+        notification_id="10",
         current_user=SimpleNamespace(id=123),
         db=object(),
     )
@@ -103,7 +104,7 @@ async def test_mobile_notification_read_rejects_unknown_notification(monkeypatch
 
     with pytest.raises(HTTPException) as exc_info:
         await mobile_api.mark_notification_read(
-            notification_id=99,
+            notification_id="99",
             current_user=SimpleNamespace(id=77),
             db=object(),
         )

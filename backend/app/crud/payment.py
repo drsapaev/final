@@ -83,24 +83,25 @@ def get_patient_total_spent(db: Session, patient_id: int) -> float:
 
 
 def count_pending_payments(db: Session, patient_id: int) -> int:
-    """Подсчитать количество ожидающих платежей пациента"""
+    """PR-29: Count appointments with unpaid payment_amount.
+
+    Previously returned ALL appointments (placeholder). Now checks
+    payment_amount > 0 AND payment not yet processed
+    (payment_processed_at IS NULL) AND appointment not cancelled.
+
+    Note: Appointment model has no `payment_status` field — the
+    canonical "paid" marker is `payment_processed_at` (set when a
+    Payment row transitions to status='paid' via billing_service).
+    """
     from app.models.appointment import Appointment
 
-    # Получаем все визиты пациента с ожидающими платежами
-    visits = (
+    return (
         db.query(Appointment)
         .filter(
             Appointment.patient_id == patient_id,
-            Appointment.status.in_(["planned", "confirmed", "paid"]),
+            Appointment.status.notin_(["cancelled", "no_show"]),
+            Appointment.payment_amount > 0,
+            Appointment.payment_processed_at.is_(None),
         )
-        .all()
+        .count()
     )
-
-    pending_count = 0
-    for _visit in visits:
-        # Проверяем, есть ли неоплаченные услуги
-        # Здесь должна быть логика проверки неоплаченных услуг
-        # Пока что просто считаем все записи как потенциально требующие оплаты
-        pending_count += 1
-
-    return pending_count

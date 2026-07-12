@@ -10,7 +10,7 @@ from app.models.patient import Patient
 from app.models.user import User
 
 
-MOBILE_LOGIN_PATH = "/api/v1/mobile/mobile/auth/login"
+MOBILE_LOGIN_PATH = "/api/v1/mobile/auth/login"
 
 
 def _create_mobile_user(db_session: Session) -> tuple[User, str, str]:
