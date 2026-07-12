@@ -145,7 +145,7 @@ const FormSelect = ({
         borderRadius: isMobile ? '8px' : '12px',
         fontSize: isMobile ? '16px' : '16px',
         fontFamily: 'inherit',
-        backgroundColor: 'white',
+        backgroundColor: 'var(--mac-bg-primary)',  // PR-42 / Medium-F: was 'white' (broke dark mode)
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
         outline: 'none',
         ...style

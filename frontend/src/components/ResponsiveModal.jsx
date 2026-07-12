@@ -106,7 +106,7 @@ const ResponsiveModal = ({
       
       <div
         style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--mac-bg-primary)',  // PR-42 / Medium-F: was 'white' (broke dark mode)
           borderRadius: isMobile ? '16px 16px 0 0' : '20px',
           boxShadow: 'var(--mac-shadow-xl)',
           maxHeight: isMobile ? '90vh' : '90vh',

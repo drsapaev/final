@@ -342,7 +342,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'white',
+                backgroundColor: 'var(--mac-bg-primary)',  // PR-42 / Medium-F: was 'white' (broke dark mode)
                 boxShadow: 'var(--mac-shadow-md)'
               }}>
               
