@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';  // PR-41 / High-16: added memoization hooks
 import {
   Box,
   Card,
@@ -307,7 +307,8 @@ const TelegramManager = () => {
     }
   };
 
-  const updateOnboardingReviewForm = (requestId, field, value) => {
+  // PR-41 / High-16: wrap handler in useCallback to avoid re-creating on every render
+  const updateOnboardingReviewForm = useCallback((requestId, field, value) => {
     setOnboardingReviewForms((current) => ({
       ...current,
       [requestId]: {
@@ -315,7 +316,7 @@ const TelegramManager = () => {
         [field]: value
       }
     }));
-  };
+  }, []);
 
   const closeOnboardingDialog = () => {
     setOnboardingDialog({
@@ -488,17 +489,14 @@ const TelegramManager = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: '400px' }}>
-        <CircularProgress />
-      </Box>);
-
-  }
-
+  // PR-41 / High-16: memoize filtered/derived arrays BEFORE any early return
+  // (React Hooks must be called in the same order on every render).
   const patientBot = botStatus?.patient_bot || {};
   const patientBotFeatures = Array.isArray(patientBot.features) ? patientBot.features : [];
-  const enabledPatientFeatures = patientBotFeatures.filter((feature) => feature?.enabled);
+  const enabledPatientFeatures = useMemo(
+    () => patientBotFeatures.filter((feature) => feature?.enabled),
+    [patientBotFeatures]
+  );
   const patientPaymentEntryFeature = patientBotFeatures.find(
     (feature) =>
       feature?.key === 'patient_payments_mini_app_entry' ||
@@ -525,7 +523,11 @@ const TelegramManager = () => {
   const patientBotLanguages = Array.isArray(patientBot.supported_languages) ? patientBot.supported_languages : [];
   const staffBot = botStatus?.staff_bot || {};
   const staffBotReadiness = Array.isArray(staffBot.readiness) ? staffBot.readiness : [];
-  const readyStaffControls = staffBotReadiness.filter((item) => item?.ready);
+  // PR-41 / High-16: memoize filtered array
+  const readyStaffControls = useMemo(
+    () => staffBotReadiness.filter((item) => item?.ready),
+    [staffBotReadiness]
+  );
   const staffRoles = Array.isArray(staffBot.supported_roles) ? staffBot.supported_roles : [];
   const staffMenuContractSource = Array.isArray(staffBot.read_only_menu_contract) ? staffBot.read_only_menu_contract : [];
   const staffRoleMenus = staffBot.role_menus || {};
@@ -1056,6 +1058,17 @@ const TelegramManager = () => {
   const dialogReasonOptions = getReasonOptionsForAction(onboardingDialog.action);
   const dialogStatus = dialogRequest?.status || '';
   const dialogReviewable = isReviewableStatus(dialogStatus);
+
+  // PR-41 / High-16: moved loading check AFTER all useMemo/useCallback hooks
+  // (React Hooks rules-of-hooks requires hooks to be called in the same order
+  // on every render — early returns before hooks violate this).
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: '400px' }}>
+        <CircularProgress />
+      </Box>);
+
+  }
 
   return (
     <Box sx={{ p: 3 }}>

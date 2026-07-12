@@ -270,7 +270,12 @@ const AdminPatients = () => {
                 </tr>
               </thead>
               <tbody>
-                {patients.map((patient) => (
+                {/* PR-41 / High-17: cap rendered rows to 200 to avoid rendering
+                    1000+ DOM nodes when the patient list is large. Full
+                    virtualization via @tanstack/react-virtual is installed
+                    but requires table-layout refactoring — this slice cap
+                    is a pragmatic partial fix. */}
+                {patients.slice(0, 200).map((patient) => (
                   <tr
                     key={patient.id}
                     className="admin-patients-tbody-row"
