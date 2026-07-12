@@ -63,10 +63,10 @@ test.describe('Registrar full workflow', () => {
   test.beforeEach(async ({ page }) => {
     // Set auth tokens in localStorage
     await page.addInitScript(({ token, profile }) => {
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('refresh_token', token);
-      localStorage.setItem('auth_profile', JSON.stringify(profile));
-      localStorage.setItem('user', JSON.stringify(profile));
+      sessionStorage.setItem('auth_token', token);
+      sessionStorage.setItem('refresh_token', token);
+      sessionStorage.setItem('auth_profile', JSON.stringify(profile));
+      sessionStorage.setItem('user', JSON.stringify(profile));
     }, { token: accessToken, profile: registrarProfile });
 
     // Mock all API endpoints

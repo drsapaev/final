@@ -110,9 +110,9 @@ async function main() {
           return { ok: false, status: response.status, data };
         }
 
-        localStorage.setItem('auth_token', data.access_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('auth_profile', JSON.stringify(data.user));
+        sessionStorage.setItem('auth_token', data.access_token);
+        sessionStorage.setItem('user', JSON.stringify(data.user));
+        sessionStorage.setItem('auth_profile', JSON.stringify(data.user));
         localStorage.setItem('app_language', 'ru');
         localStorage.setItem('language', 'ru');
         return { ok: true, status: response.status, user: data.user };

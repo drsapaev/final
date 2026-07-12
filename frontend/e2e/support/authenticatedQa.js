@@ -257,9 +257,9 @@ export async function installAuthenticatedQaHarness(page, { role }) {
   });
 
   await page.addInitScript(({ authToken, authProfile }) => {
-    window.localStorage.setItem('auth_token', authToken);
-    window.localStorage.setItem('auth_profile', JSON.stringify(authProfile));
-    window.localStorage.setItem('user', JSON.stringify(authProfile));
+    window.sessionStorage.setItem('auth_token', authToken);
+    window.sessionStorage.setItem('auth_profile', JSON.stringify(authProfile));
+    window.sessionStorage.setItem('user', JSON.stringify(authProfile));
     window.localStorage.setItem('theme', 'light');
     window.localStorage.setItem('language', 'ru');
     window.localStorage.removeItem('clinic_api_rate_limit_until');

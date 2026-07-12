@@ -447,9 +447,9 @@ async function installMiniAppMocks(page, scenario) {
 async function installAdminMocks(page) {
   const token = createJwt(ADMIN_PROFILE);
   await page.addInitScript(({ authToken, profile }) => {
-    window.localStorage.setItem('auth_token', authToken);
-    window.localStorage.setItem('auth_profile', JSON.stringify(profile));
-    window.localStorage.setItem('user', JSON.stringify(profile));
+    window.sessionStorage.setItem('auth_token', authToken);
+    window.sessionStorage.setItem('auth_profile', JSON.stringify(profile));
+    window.sessionStorage.setItem('user', JSON.stringify(profile));
   }, {
     authToken: token,
     profile: ADMIN_PROFILE,

@@ -41,10 +41,11 @@ function jsonResponse(body) {
 test.describe('Registrar queue time rendering', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(({ token, profile }) => {
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('refresh_token', token);
-      localStorage.setItem('auth_profile', JSON.stringify(profile));
-      localStorage.setItem('user', JSON.stringify(profile));
+      // PR-39 / P0-2: tokens migrated from localStorage to sessionStorage
+      sessionStorage.setItem('auth_token', token);
+      sessionStorage.setItem('refresh_token', token);
+      sessionStorage.setItem('auth_profile', JSON.stringify(profile));
+      sessionStorage.setItem('user', JSON.stringify(profile));
     }, { token: accessToken, profile: registrarProfile });
 
     await page.route('**/api/v1/**', async (route) => {
