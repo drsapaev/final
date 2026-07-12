@@ -37,4 +37,17 @@ describe('Input', () => {
 
     expect(screen.queryByRole('button', { name: /clear input/i })).not.toBeInTheDocument();
   });
+
+  it('sets aria-invalid to true when error prop is truthy', () => {
+    render(
+      <Input
+        value=""
+        onChange={() => {}}
+        error="Field is required"
+        placeholder="Error input"
+      />,
+    );
+    const input = screen.getByPlaceholderText('Error input');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+  });
 });

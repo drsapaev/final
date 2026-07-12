@@ -146,6 +146,7 @@ const Input = React.forwardRef(({
         disabled={disabled}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        aria-invalid={!!error}
         {...props}
       />
       {showClearButton && (
