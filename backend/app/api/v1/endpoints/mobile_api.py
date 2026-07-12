@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints._error_logging import log_endpoint_error  # PR-7
@@ -99,7 +100,7 @@ def _get_mobile_notification_rows(
 
 
 @router.post("/auth/login", response_model=MobileLoginResponse)
-async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db)):
+def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db)):
     """
     Мобильная аутентификация
 
@@ -161,7 +162,7 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
 
 
 @router.get("/patients/me", response_model=PatientProfileOut)
-async def get_mobile_patient_profile(
+def get_mobile_patient_profile(
     current_user=Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Профиль пациента для мобильного приложения"""
@@ -202,7 +203,7 @@ async def get_mobile_patient_profile(
 
 
 @router.get("/appointments/upcoming", response_model=list[AppointmentUpcomingOut])
-async def get_upcoming_appointments(
+def get_upcoming_appointments(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
     limit: int = Query(10, ge=1, le=50),
@@ -254,7 +255,7 @@ async def get_upcoming_appointments(
 
 
 @router.get("/appointments/{appointment_id}", response_model=MobileAppointmentDetailOut)
-async def get_appointment_detail(
+def get_appointment_detail(
     appointment_id: int,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -377,7 +378,7 @@ async def book_mobile_appointment(
 
 
 @router.get("/lab/results", response_model=list[LabResultOut])
-async def get_lab_results(
+def get_lab_results(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
     limit: int = Query(20, ge=1, le=100),
@@ -421,32 +422,86 @@ async def get_lab_results(
 
 
 @router.get("/stats", response_model=MobileQuickStats)
-async def get_mobile_quick_stats(
+def get_mobile_quick_stats(
     current_user=Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    """Быстрая статистика для мобильного приложения"""
+    """Быстрая статистика для мобильного приложения.
+
+    PR-32 (High-39): Consolidated 5+ separate queries into 2 aggregate queries:
+    1. Single aggregate over appointments table: COUNT(completed), COUNT(upcoming),
+       MAX(appointment_date) for last_visit — replaces count_patient_visits,
+       count_upcoming_appointments, get_last_visit.
+    2. Single JOIN+SUM over payments+appointments — replaces get_patient_total_spent
+       (which had its own N+1: 1 query for visits + 1 per visit for payments).
+    Only count_pending_payments remains separate (different filter criteria).
+    """
     try:
         patient = get_patient_by_user_id(db, user_id=current_user.id)
 
         if not patient:
             raise HTTPException(status_code=404, detail="Профиль пациента не найден")
 
-        # Получаем статистику
-        from app.crud.appointment import (
-            count_patient_visits,
-            count_upcoming_appointments,
-            get_last_visit,
+        from datetime import datetime
+
+        from sqlalchemy import case, func
+
+        from app.crud.payment import count_pending_payments
+        from app.models.appointment import Appointment
+        from app.models.payment import Payment
+
+        today = datetime.now().date()
+
+        # Single aggregate query: completed count, upcoming count, last visit date.
+        # Replaces count_patient_visits + count_upcoming_appointments + get_last_visit.
+        completed_status_set = ["completed", "in_visit"]
+        upcoming_status_set = ["planned", "confirmed", "paid"]
+
+        stats_row = (
+            db.query(
+                func.count(
+                    case(
+                        (Appointment.status.in_(completed_status_set), Appointment.id),
+                    )
+                ).label("completed_count"),
+                func.count(
+                    case(
+                        (
+                            and_(
+                                Appointment.status.in_(upcoming_status_set),
+                                Appointment.appointment_date >= today,
+                            ),
+                            Appointment.id,
+                        ),
+                    )
+                ).label("upcoming_count"),
+                func.max(
+                    case(
+                        (Appointment.status.in_(completed_status_set), Appointment.appointment_date),
+                    )
+                ).label("last_visit_date"),
+            )
+            .filter(Appointment.patient_id == patient.id)
+            .one()
         )
-        from app.crud.payment import count_pending_payments, get_patient_total_spent
 
-        total_appointments = count_patient_visits(db, patient_id=patient.id)
-        upcoming_appointments = count_upcoming_appointments(db, patient_id=patient.id)
-        completed_appointments = (
-            total_appointments - upcoming_appointments
-        )  # Вычисляем как разность
+        total_appointments = int(stats_row.completed_count or 0)
+        upcoming_appointments = int(stats_row.upcoming_count or 0)
+        completed_appointments = total_appointments - upcoming_appointments
+        last_visit_date = stats_row.last_visit_date
 
-        total_spent = get_patient_total_spent(db, patient_id=patient.id)
-        last_visit = get_last_visit(db, patient_id=patient.id)
+        # Single JOIN+SUM query for total_spent.
+        # Replaces get_patient_total_spent which had N+1 (1 visits query + 1 per visit).
+        total_spent = float(
+            db.query(func.coalesce(func.sum(Payment.amount), 0))
+            .join(Appointment, Payment.visit_id == Appointment.id)
+            .filter(
+                Appointment.patient_id == patient.id,
+                Payment.status == "paid",
+            )
+            .scalar()
+            or 0.0
+        )
+
         favorite_doctor = None  # Пока не реализовано
         pending_payments = count_pending_payments(db, patient_id=patient.id)
 
@@ -455,7 +510,7 @@ async def get_mobile_quick_stats(
             upcoming_appointments=upcoming_appointments,
             completed_appointments=completed_appointments,
             total_spent=total_spent,
-            last_visit=last_visit.appointment_date if last_visit else None,
+            last_visit=last_visit_date,
             favorite_doctor=favorite_doctor.name if favorite_doctor else None,
             pending_payments=pending_payments,
         )
@@ -470,7 +525,7 @@ async def get_mobile_quick_stats(
 
 
 @router.get("/notifications", response_model=list[dict])
-async def get_mobile_notifications(
+def get_mobile_notifications(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
     limit: int = Query(50, ge=1, le=100),
@@ -539,7 +594,7 @@ async def mark_notification_read(
 
 
 @router.get("/health", response_model=dict[str, Any])
-async def mobile_health_check():
+def mobile_health_check():
     """Проверка здоровья мобильного API"""
     return {
         "status": "ok",
@@ -588,7 +643,7 @@ async def test_push_notification(
 
 
 @router.get("/doctors", response_model=list[dict[str, Any]])
-async def list_mobile_doctors(
+def list_mobile_doctors(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
     specialty: str | None = Query(None, description="Filter by specialty"),
@@ -632,7 +687,7 @@ async def list_mobile_doctors(
 
 
 @router.post("/attest", response_model=dict[str, Any])
-async def attest_device(
+def attest_device(
     request: dict[str, Any],
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),

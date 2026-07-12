@@ -3,10 +3,11 @@ from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import and_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.crud.base import CRUDBase
 from app.models.appointment import Appointment
+from app.models.clinic import Doctor
 from app.models.enums import (
     AppointmentStatus,
     can_transition_status,
@@ -369,12 +370,21 @@ def get_last_visit(db: Session, patient_id: int) -> Appointment | None:
 def get_upcoming_appointments(
     db: Session, patient_id: int, limit: int = 10, offset: int = 0
 ) -> list[Appointment]:
-    """Получить предстоящие записи пациента"""
+    """Получить предстоящие записи пациента.
+
+    PR-32 (High-38): Eager-load Appointment.doctor and Doctor.user via
+    selectinload to avoid N+1 queries. Previously, lazy loading caused
+    1 + N + N queries (1 for appointments + 1 per appointment for doctor
+    + 1 per doctor for user). Now: 3 queries total regardless of N.
+    """
     from datetime import datetime
 
     today = datetime.now().date()
     return (
         db.query(Appointment)
+        .options(
+            selectinload(Appointment.doctor).selectinload(Doctor.user)
+        )
         .filter(
             and_(
                 Appointment.patient_id == patient_id,
