@@ -140,12 +140,34 @@ class AIChatService:
             # Формируем контент ответа
             if response.status == "success":
                 ai_content = response.data.get("content", str(response.data))
+                # FA-003: sanitize AI response — strip HTML/JS, dangerous protocols
+                import re
+                try:
+                    import bleach
+                    ai_content = bleach.clean(ai_content, tags=[], strip=True)
+                except ImportError:
+                    import html
+                    ai_content = html.escape(ai_content)
+                # Remove dangerous markdown protocols
+                ai_content = re.sub(
+                    r"\[([^\]]+)\]\((javascript|data|vbscript):[^)]*\)",
+                    r"[\1](#)",
+                    ai_content, flags=re.IGNORECASE,
+                )
             else:
                 ai_content = f"Ошибка: {response.error or 'Unknown error'}"
 
             # Добавляем disclaimer
             if response.status == "success":
                 ai_content += f"\n\n---\n_{response.disclaimer}_"
+
+            # FA-010: Watermarking — sign AI response for accountability
+            import hmac, hashlib
+            from app.core.config import settings as _settings
+            _wm_secret = getattr(_settings, "AI_WATERMARK_SECRET", "") or "default-watermark-key"
+            _wm_msg = f"{ai_content}|{response.provider}|{response.model}"
+            _wm_sig = hmac.new(_wm_secret.encode(), _wm_msg.encode(), hashlib.sha256).hexdigest()[:32]
+            ai_content = f"[AI-generated] {ai_content}"
 
             # Сохраняем AI response
             ai_message = AIChatMessage(

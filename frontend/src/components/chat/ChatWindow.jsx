@@ -1025,9 +1025,19 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                                 </div> :
 
                               <ReactMarkdown
+                                urlTransform={(url) => {
+                                  // F-010: filter dangerous protocols
+                                  const allowed = /^(https?:|mailto:|tel:|\/|#)/i;
+                                  if (!allowed.test(url)) return '#';
+                                  return url;
+                                }}
                                 components={{
-                                  a: ({ ...props }) =>
-                                  <a {...props} target="_blank" rel="noopener noreferrer" />
+                                  a: ({ href, children, ...props }) => {
+                                    if (href && /^(javascript|data|vbscript):/i.test(href)) {
+                                      return <span>{children}</span>;
+                                    }
+                                    return <a {...props} href={href} target="_blank" rel="noopener noreferrer" />;
+                                  }
 
                                 }}>
                                 
