@@ -6,26 +6,23 @@ import {
   Activity,
   FileText,
   User,
-  Save,
   RefreshCw,
   CheckCircle,
   Stethoscope,
   Calendar,
   Phone,
-  Plus,
   TestTube,
   Scissors,
   Sparkles,
   DollarSign } from
 'lucide-react';
 import {
-  Button, MacOSCard, Badge, Input, Textarea, Select, MacOSEmptyState,
+  Button, MacOSCard, Badge, Input, MacOSEmptyState,
 } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './dermatology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
-import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
@@ -34,11 +31,7 @@ import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
-import PhotoUploader from '../components/dermatology/PhotoUploader';
-import PhotoComparison from '../components/dermatology/PhotoComparison';
 import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
-import SkinAnalysis from '../components/dermatology/SkinAnalysis';
-import PriceOverrideManager from '../components/dermatology/PriceOverrideManager';
 import DermaExamsTab from '../components/dermatology/DermaExamsTab';
 import DermaHistoryTab from '../components/dermatology/DermaHistoryTab';
 import DermaPhotosTab from '../components/dermatology/DermaPhotosTab';
@@ -317,9 +310,8 @@ const DermatologistPanelUnified = () => {
     },
   });
 
-  // Состояние для PriceOverrideManager
-  const [showPriceOverride, setShowPriceOverride] = useState(false);
-  const [selectedServiceForPriceOverride, setSelectedServiceForPriceOverride] = useState(null);
+  // PR-47: removed unused showPriceOverride / selectedServiceForPriceOverride state
+  // (PriceOverrideManager import also removed — component was not rendered)
 
   // Локальный справочник цен для дерма/косметологии
   const dermaPriceMap = useMemo(() => ({
@@ -423,7 +415,7 @@ const DermatologistPanelUnified = () => {
         }
 
         // Используем комбинированный подход: получаем данные из queues для услуг и из БД для payment_status
-        const today = new Date().toISOString().split('T')[0];
+        // PR-47: removed unused `today` variable
         // 1. Получаем очереди для информации об услугах
         const queuesResponse = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
           headers: {
@@ -1749,16 +1741,9 @@ const DermatologistPanelUnified = () => {
                         </div>
                         <Button
                         onClick={() => {
-                          if (selectedServices.length > 0) {
-                            setSelectedServiceForPriceOverride({
-                              id: selectedServices[0].id || 1,
-                              name: selectedServices[0].name || 'Выбранная услуга',
-                              price: selectedServices[0].price || 50000
-                            });
-                            setShowPriceOverride(true);
-                          } else {
-                            notify.warning('Сначала выберите услугу');
-                          }
+                          // PR-47: PriceOverrideManager was dead code (imported but never rendered).
+                          // Button now shows a toast instead of calling removed state setters.
+                          notify.info('Изменение цены недоступно — используйте каталог услуг');
                         }}
                         variant="primary"
                         aria-label="Изменить цену процедуры"
