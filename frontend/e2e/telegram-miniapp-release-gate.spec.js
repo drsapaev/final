@@ -399,6 +399,15 @@ async function installMiniAppMocks(page, scenario) {
     });
   });
 
+  // PR-39 / Medium-11: CSRF bootstrap now enabled by default — mock the endpoint
+  await page.route('**/api/v1/auth/csrf-token', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ csrf_token: 'test-csrf-token' }),
+    });
+  });
+
   await page.route('**/api/v1/telemetry', async (route) => {
     await route.fulfill({ status: 204, body: '' });
   });
