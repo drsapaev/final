@@ -86,7 +86,12 @@ def count_pending_payments(db: Session, patient_id: int) -> int:
     """PR-29: Count appointments with unpaid payment_amount.
 
     Previously returned ALL appointments (placeholder). Now checks
-    payment_amount > 0 AND payment_status != 'paid'.
+    payment_amount > 0 AND payment not yet processed
+    (payment_processed_at IS NULL) AND appointment not cancelled.
+
+    Note: Appointment model has no `payment_status` field — the
+    canonical "paid" marker is `payment_processed_at` (set when a
+    Payment row transitions to status='paid' via billing_service).
     """
     from app.models.appointment import Appointment
 
@@ -94,9 +99,9 @@ def count_pending_payments(db: Session, patient_id: int) -> int:
         db.query(Appointment)
         .filter(
             Appointment.patient_id == patient_id,
-            Appointment.status.in_(["planned", "confirmed", "paid"]),
+            Appointment.status.notin_(["cancelled", "no_show"]),
             Appointment.payment_amount > 0,
-            Appointment.payment_status != "paid",
+            Appointment.payment_processed_at.is_(None),
         )
         .count()
     )
