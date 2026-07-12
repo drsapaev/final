@@ -48,6 +48,16 @@ export const TranslationProvider = ({ children }) => {
       error: 'Ошибка',
       success: 'Успешно',
 
+      // PR-44 / P0-19: extracted from PhoneVerification.jsx (demonstrates pattern)
+      verificationTitle: 'Верификация телефона',
+      verificationCode: 'Код подтверждения',
+      sendCode: 'Отправить код',
+      verifyCode: 'Подтвердить',
+      resendCode: 'Отправить снова',
+      codeSent: 'Код отправлен',
+      verificationSuccess: 'Телефон подтвержден',
+      verificationFailed: 'Ошибка верификации',
+
       // Landing page
       title: 'MediClinic Pro',
       subtitle: 'Система управления медицинской клиникой',
@@ -90,6 +100,16 @@ export const TranslationProvider = ({ children }) => {
       error: 'Xatolik',
       success: 'Muvaffaqiyat',
 
+      // PR-44 / P0-19: extracted from PhoneVerification.jsx
+      verificationTitle: 'Telefonni tasdiqlash',
+      verificationCode: 'Tasdiqlash kodi',
+      sendCode: 'Kod yuborish',
+      verifyCode: 'Tasdiqlash',
+      resendCode: 'Qayta yuborish',
+      codeSent: 'Kod yuborildi',
+      verificationSuccess: 'Telefon tasdiqlandi',
+      verificationFailed: 'Tasdiqlash xatoligi',
+
       // Landing page
       title: 'MediClinic Pro',
       subtitle: 'Tibbiy klinikani boshqarish tizimi',
@@ -131,6 +151,16 @@ export const TranslationProvider = ({ children }) => {
       loading: 'Loading...',
       error: 'Error',
       success: 'Success',
+
+      // PR-44 / P0-19: extracted from PhoneVerification.jsx
+      verificationTitle: 'Phone Verification',
+      verificationCode: 'Verification Code',
+      sendCode: 'Send Code',
+      verifyCode: 'Verify',
+      resendCode: 'Resend Code',
+      codeSent: 'Code sent',
+      verificationSuccess: 'Phone verified',
+      verificationFailed: 'Verification failed',
 
       // Landing page
       title: 'MediClinic Pro',

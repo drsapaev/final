@@ -15,6 +15,7 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
+import { useTranslation } from '../../hooks/useTranslation';  // PR-44 / P0-19: i18n extraction
 const PhoneVerification = ({
   phone,
   purpose = 'verification',
@@ -22,8 +23,11 @@ const PhoneVerification = ({
   onCancel,
   customMessage,
   showPhoneInput = false,
-  title = 'Верификация телефона'
+  title  // PR-44 / P0-19: default now comes from useTranslation
 }) => {
+  const { t } = useTranslation();
+  // PR-44 / P0-19: title defaults to translated string instead of hardcoded RU
+  const displayTitle = title || t('verificationTitle');
   const [currentPhone, setCurrentPhone] = useState(phone || '');
   // PR-39 / P0-5: verification code now sanitized via useSafeInput.
   // Previously: raw useState('') with no input sanitization — a malicious
@@ -225,7 +229,7 @@ const PhoneVerification = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-blue-500" />
-          {title}
+          {displayTitle}  {/* PR-44 / P0-19: i18n-aware title */}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
