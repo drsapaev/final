@@ -26,6 +26,7 @@ crud_user = importlib.import_module("app.crud.user")
 # functions like get_patient_by_user_id live on the module itself.
 # Use the instance for method calls, import the module functions directly.
 from app.crud import patient as crud_patient  # CRUDPatient instance (for methods)
+from app.core.config import settings  # PR-29: needed for real expires_in
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
 from app.schemas.mobile import (
@@ -97,7 +98,7 @@ def _get_mobile_notification_rows(
     return items[offset:offset + limit] if items else []
 
 
-@router.post("/mobile/auth/login", response_model=MobileLoginResponse)
+@router.post("/auth/login", response_model=MobileLoginResponse)
 async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db)):
     """
     Мобильная аутентификация
@@ -141,7 +142,7 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
 
         return MobileLoginResponse(
             access_token=access_token,
-            expires_in=3600,  # 1 час
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user={
                 "id": user.id,
                 "username": user.username,
@@ -488,13 +489,13 @@ async def get_mobile_notifications(
 
         return [
             {
-                "id": notif.get("delivery_id"),
-                "title": notif.get("event_title", ""),
-                "message": notif.get("event_message", ""),
-                "type": notif.get("event_type", ""),
-                "data": notif.get("event_payload_snapshot", {}) or {},
-                "sent_at": notif.get("delivery_created_at"),
-                "read": notif.get("delivery_read_at") is not None,
+                "id": notif.get("delivery_id") or notif.get("id"),
+                "title": notif.get("title", ""),
+                "message": notif.get("message", ""),
+                "type": notif.get("event_type", notif.get("notification_type", "")),
+                "data": notif.get("payload_snapshot", {}) or {},
+                "sent_at": notif.get("created_at"),
+                "read": notif.get("is_read", notif.get("read_at") is not None),
             }
             for notif in notifications
         ]
@@ -508,7 +509,7 @@ async def get_mobile_notifications(
 
 @router.post("/notifications/{notification_id}/read", response_model=dict[str, Any])
 async def mark_notification_read(
-    notification_id: int,
+    notification_id: str,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -521,7 +522,7 @@ async def mark_notification_read(
         try:
             await platform.mark_read(
                 current_user=current_user,
-                delivery_id=str(notification_id),
+                delivery_id=notification_id,
             )
         except PermissionError:
             raise HTTPException(status_code=404, detail="Уведомление не найдено")

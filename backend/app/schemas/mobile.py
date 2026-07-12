@@ -2,7 +2,7 @@
 Схемы для мобильного API
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -270,7 +270,7 @@ class BookAppointmentRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     doctor_id: int = Field(..., description="ID врача")
-    appointment_date: datetime = Field(..., description="Дата записи")
+    appointment_date: date = Field(..., description="Дата записи (YYYY-MM-DD)")
     specialty: str = Field(..., description="Специализация")
     patient_id: int | None = Field(None, description="ID пациента")
     patient_fio: str | None = Field(None, description="ФИО пациента")
