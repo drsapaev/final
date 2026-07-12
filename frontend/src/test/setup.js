@@ -42,11 +42,15 @@ if (typeof window !== 'undefined') {
   });
 
   // PR-39 / P0-2: Mock sessionStorage (tokens migrated from localStorage)
+  // Use a store-backed mock so tests that call setItem then getItem work
+  // (the tokenManager tests use vi.fn() expectations, but NotificationPrompt
+  // and other UI tests rely on actual storage behavior).
+  const _sessionStore = {};
   const sessionStorageMock = {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
+    getItem: vi.fn((key) => _sessionStore[key] ?? null),
+    setItem: vi.fn((key, value) => { _sessionStore[key] = String(value); }),
+    removeItem: vi.fn((key) => { delete _sessionStore[key]; }),
+    clear: vi.fn(() => { for (const k of Object.keys(_sessionStore)) delete _sessionStore[k]; }),
   };
   Object.defineProperty(window, 'sessionStorage', {
     value: sessionStorageMock,
