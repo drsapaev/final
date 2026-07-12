@@ -170,11 +170,13 @@ def setup_rate_limiting(app: FastAPI) -> None:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.add_middleware(SlowAPIMiddleware)
     if _STORAGE_URI:
-        logger.info("Rate limiter using Redis storage: %s", _STORAGE_URI)
+        # PR-34: don't log the full Redis URI — it may contain a password.
+        logger.info("Rate limiter using Redis storage (REDIS_URL configured)")
     else:
         logger.info("Rate limiter using in-memory storage (set REDIS_URL for shared limits)")
     if TRUSTED_PROXIES:
-        logger.info("Rate limiter trusting X-Forwarded-For from proxies: %s", TRUSTED_PROXIES)
+        # PR-34: log only the count, not the actual proxy IPs.
+        logger.info("Rate limiter trusting X-Forwarded-For from %d proxy/ies", len(TRUSTED_PROXIES))
 
 
 async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
