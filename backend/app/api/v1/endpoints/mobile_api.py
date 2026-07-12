@@ -161,6 +161,45 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.post("/auth/refresh")
+def mobile_refresh_token(
+    refresh_token: str = Query(..., description="Refresh token issued at login"),
+    db: Session = Depends(get_db),
+):
+    """PR-33: Mobile-friendly refresh endpoint.
+
+    Wraps the same authentication_service.refresh_access_token logic as
+    /authentication/refresh, but lives under /mobile/ for a consistent
+    mobile API surface. Returns BOTH access_token and refresh_token
+    because the service implements refresh-token rotation (RFC 6749 §10.4):
+    each refresh issues a NEW refresh token and revokes the old one.
+    """
+    try:
+        from app.services.authentication_service import get_authentication_service
+
+        service = get_authentication_service()
+        result = service.refresh_access_token(db, refresh_token)
+
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=401,
+                detail=result.get("message", "Invalid refresh token"),
+            )
+
+        return {
+            "access_token": result["access_token"],
+            "refresh_token": result.get("refresh_token") or refresh_token,
+            "token_type": result.get("token_type", "bearer"),
+            "expires_in": result.get("expires_in", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.get("/patients/me", response_model=PatientProfileOut)
 def get_mobile_patient_profile(
     current_user=Depends(get_current_user), db: Session = Depends(get_db)
