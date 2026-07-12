@@ -44,6 +44,7 @@ import {
 import { useModal } from '../hooks/useModal.jsx';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery.js';
 import useDoctorQueue from '../hooks/useDoctorQueue.js';
+import { getProfile } from '../stores/auth';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { getApiOrigin } from '../api/runtime';
@@ -132,6 +133,17 @@ const DoctorPanel = () => {
     }
   }, [activeTab, location.pathname, location.search, navigate]);
 
+  // PR-27: read specialty from profile instead of hardcoding 'general'
+  const [doctorSpecialty, setDoctorSpecialty] = useState('general');
+
+  useEffect(() => {
+    getProfile().then((profile) => {
+      if (profile?.specialty) {
+        setDoctorSpecialty(profile.specialty);
+      }
+    }).catch(() => {});
+  }, []);
+
   // ✅ НОВОЕ: Получаем данные текущего пользователя и очереди
   const {
     queue: queueEntries,
@@ -146,7 +158,7 @@ const DoctorPanel = () => {
     sendToDiagnostics,
     markIncomplete,
     completeVisit
-  } = useDoctorQueue('general');
+  } = useDoctorQueue(doctorSpecialty);
 
   // ✅ Функция отправки push-уведомления "Вернуться с диагностики"
   const callFromDiagnostics = async (entryId) => {
@@ -1405,7 +1417,7 @@ const DoctorPanel = () => {
               </CardHeader>
               <CardContent>
                 <AIAssistant
-                specialty="general"
+                specialty={doctorSpecialty}
                 onSuggestionSelect={(type, suggestion) => {
                   logger.log('AI предложение для общего врача:', type, suggestion);
                 }} />
@@ -1541,7 +1553,7 @@ const DoctorPanel = () => {
       {/* AI Chat Widget */}
       <AIChatWidget
         contextType="general"
-        specialty="general"
+        specialty={doctorSpecialty}
         useWebSocket={false}
         position="bottom-right" />
 

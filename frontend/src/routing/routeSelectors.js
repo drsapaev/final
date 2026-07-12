@@ -139,14 +139,29 @@ export function routeToRoles(pathname) {
 }
 
 export function getRoleHomeRoute(roleOrProfile) {
+  // PR-27: removed homeForUsernames check (was hardcoded cardio@example.com etc.)
+  // Now uses specialty from profile to route doctors to their specialty panel.
+
   if (roleOrProfile && typeof roleOrProfile === 'object') {
-    const identifiers = getProfileIdentifiers(roleOrProfile);
-    if (identifiers.length > 0) {
-      const usernameHomeRoute = ROUTE_REGISTRY.find((route) =>
-        (route.homeForUsernames || []).some((username) => identifiers.includes(String(username).trim().toLowerCase()))
-      );
-      if (usernameHomeRoute) {
-        return usernameHomeRoute.path;
+    // PR-27: check specialty for doctor routing
+    const specialty = String(roleOrProfile.specialty || '').toLowerCase().trim();
+    if (specialty) {
+      // Map specialty to specialty panel route
+      const specialtyRouteMap = {
+        'cardiology': '/doctor/cardiology',
+        'cardio': '/doctor/cardiology',
+        'dermatology': '/doctor/dermatology',
+        'derma': '/doctor/dermatology',
+        'dentistry': '/doctor/dentistry',
+        'dental': '/doctor/dentistry',
+        'stomatology': '/doctor/dentistry',
+      };
+      if (specialtyRouteMap[specialty]) {
+        // Verify the user has access to this route
+        const route = getEffectiveRouteByPath(specialtyRouteMap[specialty]);
+        if (route && isRouteAccessibleToProfile(route, roleOrProfile)) {
+          return specialtyRouteMap[specialty];
+        }
       }
     }
   }
