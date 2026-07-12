@@ -97,18 +97,19 @@ class AIManager:
             AIProviderType.MOCK: MockProvider,
         }
 
-        # Загружаем API ключи из переменных окружения или настроек
+        # FA-011: Load API keys from encrypted secrets manager (falls back to env vars)
+        from app.core.secrets_manager import get_secret
         api_keys = {
-            AIProviderType.OPENAI: os.getenv(
+            AIProviderType.OPENAI: get_secret(
                 "OPENAI_API_KEY", getattr(settings, "OPENAI_API_KEY", None)
             ),
-            AIProviderType.GEMINI: os.getenv(
+            AIProviderType.GEMINI: get_secret(
                 "GEMINI_API_KEY", getattr(settings, "GEMINI_API_KEY", None)
             ),
-            AIProviderType.DEEPSEEK: os.getenv(
+            AIProviderType.DEEPSEEK: get_secret(
                 "DEEPSEEK_API_KEY", getattr(settings, "DEEPSEEK_API_KEY", None)
             ),
-            AIProviderType.GROK: os.getenv(
+            AIProviderType.GROK: get_secret(
                 "XAI_API_KEY", getattr(settings, "XAI_API_KEY", None)
             ),
             AIProviderType.MOCK: "mock-api-key",  # Mock провайдер всегда доступен

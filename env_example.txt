@@ -60,3 +60,19 @@ FCM_PROJECT_ID=your_fcm_project_id_here
 
 # Включить/выключить FCM (по умолчанию false, активируется автоматически при наличии FCM_SERVER_KEY)
 FCM_ENABLED=true
+
+# ==============================================================================
+# F-014 + FA-012: Redis (multi-instance WS coordination, circuit breaker, arq)
+# ==============================================================================
+REDIS_URL=redis://localhost:6379/0
+WS_REDIS_URL=redis://localhost:6379/1
+ARQ_REDIS_URL=redis://localhost:6379/2
+
+# ==============================================================================
+# FA-011: Encrypted secrets (KMS alternative — no AWS/Vault needed)
+# ==============================================================================
+# Generate master key: python -m app.scripts.setup_secrets generate-key
+# Encrypt a secret: python -m app.scripts.setup_secrets encrypt OPENAI_API_KEY "sk-..."
+# If not set, falls back to environment variables (plaintext, less secure).
+MASTER_KEY_FILE=/etc/clinic/master.key
+SECRETS_FILE=/etc/clinic/secrets.json

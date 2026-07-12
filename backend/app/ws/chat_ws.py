@@ -74,10 +74,65 @@ _chat_event_limiter = ChatEventRateLimiter()
 
 
 class ChatConnectionManager:
-    """Менеджер WebSocket соединений для чата"""
+    """Менеджер WebSocket соединений для чата.
+
+    F-014: supports multi-instance deployment via Redis Pub/Sub bridge.
+    Local connections are stored in active_connections; cross-instance
+    delivery is handled by RedisPubSubBridge (graceful degradation if Redis unavailable).
+    """
 
     def __init__(self):
         self.active_connections: dict[int, WebSocket] = {}
+        # F-014: Redis bridge for cross-instance delivery
+        self._redis_bridge = None
+        self._redis_initialized = False
+
+    async def _ensure_redis_bridge(self):
+        """F-014: lazily initialize Redis Pub/Sub bridge."""
+        if self._redis_initialized:
+            return
+        self._redis_initialized = True
+        try:
+            from app.services.ws_redis_pubsub import RedisPubSubBridge
+
+            self._redis_bridge = RedisPubSubBridge(channel_prefix="chat")
+
+            # Subscribe to cross-instance events
+            async def _handle_cross_instance(payload: dict):
+                """Deliver messages from other instances to local connections."""
+                target_user_id = payload.get("target_user_id")
+                event_data = payload.get("event_data")
+                if target_user_id and event_data:
+                    await self._local_deliver(int(target_user_id), event_data)
+
+            await self._redis_bridge.subscribe("cross_instance", _handle_cross_instance)
+            logger.info("F-014: Chat Redis Pub/Sub bridge initialized")
+        except Exception as e:
+            logger.warning(f"F-014: Redis bridge unavailable (single-instance mode): {e}")
+            self._redis_bridge = None
+
+    async def _publish_cross_instance(self, target_user_id: int, event_data: dict):
+        """F-014: publish to other instances via Redis."""
+        await self._ensure_redis_bridge()
+        if self._redis_bridge and self._redis_bridge.enabled:
+            try:
+                await self._redis_bridge.publish("cross_instance", {
+                    "target_user_id": target_user_id,
+                    "event_data": event_data,
+                })
+            except Exception as e:
+                logger.debug(f"F-014: Redis publish failed (local-only delivery): {e}")
+
+    async def _local_deliver(self, user_id: int, data: dict) -> bool:
+        """Deliver message to local WebSocket connection only."""
+        if user_id in self.active_connections:
+            try:
+                await self.active_connections[user_id].send_json(jsonable_encoder(data))
+                return True
+            except Exception as e:
+                logger.error(f"Chat WebSocket send error: {e}")
+                self.disconnect(user_id)
+        return False
 
     async def connect(self, user_id: int, websocket: WebSocket) -> bool:
         try:
@@ -88,6 +143,7 @@ class ChatConnectionManager:
                     pass
             await websocket.accept()
             self.active_connections[user_id] = websocket
+            await self._ensure_redis_bridge()
             logger.info(f"Chat WebSocket connected: user_id={user_id}")
             return True
         except Exception as e:
@@ -100,14 +156,12 @@ class ChatConnectionManager:
             logger.info(f"Chat WebSocket disconnected: user_id={user_id}")
 
     async def send_to_user(self, user_id: int, data: dict) -> bool:
-        if user_id in self.active_connections:
-            try:
-                await self.active_connections[user_id].send_json(jsonable_encoder(data))
-                return True
-            except Exception as e:
-                logger.error(f"Chat WebSocket send error: {e}")
-                self.disconnect(user_id)
-        return False
+        """F-014: deliver locally + publish to other instances via Redis."""
+        # Try local delivery first
+        delivered = await self._local_deliver(user_id, data)
+        # F-014: also publish to other instances (in case user is connected elsewhere)
+        await self._publish_cross_instance(user_id, data)
+        return delivered
 
     def is_online(self, user_id: int) -> bool:
         return user_id in self.active_connections
