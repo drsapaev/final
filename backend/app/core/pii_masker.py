@@ -102,6 +102,45 @@ def mask_name(name: str | None) -> str | None:
     return ".".join(p[0].upper() for p in parts[:3]) + "."
 
 
+def mask_identifier(value: str | None) -> str | None:
+    """Auto-detect phone/email/username format and apply appropriate masking.
+
+    Used for auth_svc logs where the same `username` field can be:
+    - A phone number (mobile login): "+998901234567" → "+998901•••567"
+    - An email (web admin login): "john.doe@example.com" → "j•••@example.com"
+    - A plain username: "admin" → "a•••n"
+
+    Plain usernames are partially masked (first char + dots + last char)
+    so that debug logs remain useful without exposing the full identifier.
+    Single-character values are returned unchanged (too short to mask).
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return value
+    s = value.strip()
+    if not s:
+        return value
+
+    # Phone: starts with + and digits (use existing PHONE_REGEX)
+    if s.startswith("+") and any(c.isdigit() for c in s):
+        return mask_phone(s)
+
+    # Email: contains @
+    if "@" in s:
+        return mask_email(s)
+
+    # Plain username: partial mask preserving first + last char
+    if len(s) == 1:
+        return s
+    if len(s) == 2:
+        return s[0] + "•"
+    if len(s) == 3:
+        return s[0] + "•" + s[-1]
+    # 4+ chars: first + ••• + last
+    return s[0] + "•••" + s[-1]
+
+
 def mask_birth_date(d: Any) -> str | None:
     """date(1985, 6, 15) → '1985-••-••'"""
     if d is None:

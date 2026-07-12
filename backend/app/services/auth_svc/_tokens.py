@@ -4,6 +4,7 @@ Split from authentication_service.py.
 """
 from __future__ import annotations
 
+from app.core.pii_masker import mask_identifier  # PR-31: mask usernames in logs
 from app.services.auth_svc._base import *  # noqa: F401, F403
 from app.services.auth_svc._base import AuthenticationServiceMixinBase
 
@@ -105,7 +106,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
     ) -> tuple[User | None, str]:
         """Аутентифицирует пользователя"""
         try:
-            logger.debug("authenticate_user called with username=%s", username)
+            logger.debug("authenticate_user called with username=%s", mask_identifier(username))
 
             # Ищем пользователя по username или email
             user = (
@@ -115,7 +116,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
             )
 
             if not user:
-                logger.debug("User not found for username=%s", username)
+                logger.debug("User not found for username=%s", mask_identifier(username))
                 self._log_login_attempt(
                     db, None, username, ip_address, user_agent, False, "user_not_found"
                 )
@@ -124,7 +125,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
             logger.debug(
                 "User found: ID=%d, Username=%s, IsActive=%s",
                 user.id,
-                user.username,
+                mask_identifier(user.username),
                 user.is_active,
             )
 
@@ -197,7 +198,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
         remember_me: bool = False,
     ) -> dict[str, Any]:
         """Выполняет вход пользователя"""
-        logger.debug("login_user called with username=%s", username)
+        logger.debug("login_user called with username=%s", mask_identifier(username))
 
         user, message = self.authenticate_user(
             db, username, password, ip_address, user_agent
