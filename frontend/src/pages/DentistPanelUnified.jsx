@@ -811,11 +811,10 @@ const DentistPanelUnified = () => {
 
   const loadTreatmentPlans = useCallback(async () => {
     try {
-      // TODO: Implement treatment plans endpoint
-      // Phase 4+ cleanup: treatmentPlans state removed (dead UI).
-      // const res = await fetch(`${API_V1_BASE}/dental/treatments?limit=100`, { headers: authHeader() });
-      // if (res.ok) setTreatmentPlans(await res.json());
-      logger.info('Treatment plans endpoint not implemented yet');
+      // PR-43 / Medium-24: stub cleaned up. Treatment plans endpoint not yet
+      // implemented in backend. This function is kept as a no-op placeholder
+      // so the UI hook wiring remains stable when the endpoint ships.
+      logger.debug('Treatment plans endpoint pending backend implementation');
     } catch {
 
 
@@ -823,11 +822,10 @@ const DentistPanelUnified = () => {
       // Игнорируем ошибки загрузки планов лечения
     }}, []);const loadProsthetics = useCallback(async () => {
     try {
-      // TODO: Implement prosthetics endpoint
-      // Phase 4+ cleanup: prosthetics state removed (dead UI).
-      // const res = await fetch(`${API_V1_BASE}/dental/prosthetics?limit=100`, { headers: authHeader() });
-      // if (res.ok) setProsthetics(await res.json());
-      logger.info('Prosthetics endpoint not implemented yet');
+      // PR-43 / Medium-24: stub cleaned up. Prosthetics endpoint not yet
+      // implemented in backend. This function is kept as a no-op placeholder
+      // so the UI hook wiring remains stable when the endpoint ships.
+      logger.debug('Prosthetics endpoint pending backend implementation');
     } catch {
 
 
