@@ -31,3 +31,32 @@ cd backend
 alembic upgrade head
 Откат:
 alembic downgrade 20250818_0004
+```
+
+## 2026-07-10 — Audit Remediation Migrations (PR-1 to PR-22)
+
+Three new migrations added during the audit remediation sprint:
+
+### 0037_patient_medical_fields (PR-1)
+- Adds `emergency_contact` (String(64)), `allergies` (Text), `chronic_conditions` (Text) to `patients` table
+- Backs the mobile_api_extended.py profile endpoints
+
+### 0038_user_fcm_fields (PR-2)
+- Adds `device_type` (String(20)), `device_info` (JSON), `push_notifications_enabled` (Boolean default false) to `users` table
+- Backs the FCM token registration endpoints
+
+### 0039_feature_flags (PR-8 fixup)
+- Creates `feature_flags` table (id, key, name, description, enabled, config JSONB, category, environment)
+- Creates `feature_flag_history` table (id, flag_key, action, old_value, new_value, changed_by, changed_at)
+- The `FeatureFlag` and `FeatureFlagHistory` models existed in `app/models/feature_flags.py` but were never registered in `app/models/__init__.py`, so Alembic never created the tables. This blocked the AI safety CI job.
+
+```bash
+cd backend
+alembic upgrade head   # applies 0037, 0038, 0039
+alembic current        # should show 0039_feature_flags
+```
+
+Откат:
+```bash
+alembic downgrade 0036_chat_encryption
+```

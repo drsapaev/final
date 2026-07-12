@@ -6,8 +6,9 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 
 ## Project Anchors
 
-- Product: clinic EMR and operations platform for admin, registrar, doctor, cashier, lab, queue, billing, and rollout workflows.
+- Product: clinic EMR and operations platform for admin, registrar, doctor, cashier, lab, queue, billing, and rollout workflows. Supports multiple doctors per specialty with per-doctor queues, extensible to new specialties without code changes.
 - Backend: Python 3.11, FastAPI, SQLAlchemy, Pydantic v2, PostgreSQL, Alembic, Redis/WebSocket.
+- Architecture: see `docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md` for queue ownership and specialty routing decisions.
 - Frontend: React 18, Vite, React Router, JavaScript/JSX.
 - Runtime defaults: backend `18000`, frontend `5173`, staging Postgres `55432`.
 - Context SSOT: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and the canonical source/test files found for the task.

@@ -1,5 +1,79 @@
 # Changelog
 
+## 2026-07-12 — Architecture & Audit Remediation Sprint (28 PRs)
+
+Comprehensive remediation across 6 audit cycles. All changes merged to `main`
+via PR & merge workflow with CI validation. 0 regressions throughout.
+
+### Backend Audit Remediation (PR-1 to PR-7)
+
+- **PR-1:** Fixed 14 broken endpoints in `mobile_api_extended.py` (500→200)
+- **PR-2:** Fixed 5 broken FCM endpoints + added User device metadata columns
+- **PR-3:** Fixed 4 broken endpoints in `mobile_api.py` + added `Appointment.doctor` relationship
+- **PR-4:** WebSocket JWT moved from URL query param to `Sec-WebSocket-Protocol` subprotocol (5 endpoints)
+- **PR-5:** Removed `WS_DEV_ALLOW` auth bypass + deleted `/ws/noauth` endpoint
+- **PR-6:** Added `/mobile/doctors`, `/mobile/attest`, `Idempotency-Key` middleware
+- **PR-7:** Added error logging to 34 `except Exception` blocks (mobile/FCM endpoints)
+
+### CI/CD Cleanup (PR-8, PR-9)
+
+- **PR-8:** Fixed AI safety Playwright spec (argon2 hash, endpoint paths, rate limiting, 6/6 tests pass)
+- **PR-9:** Removed conflicting CodeQL workflow (default setup enabled)
+
+### Time-Display Audit (PR-10 to PR-14)
+
+- **PR-10:** `add_visit_service` now bumps `visit.updated_at` (doctor-side service additions visible)
+- **PR-11:** Unified `adaptTimeFields()` helper for Cardio/Derma/Dental panels ("Очередь" + "Изменено" indicators)
+- **PR-12:** Added "Время" column to DoctorPanel queue table + fixed QueueTable source preference
+- **PR-13:** Replaced all UTC/browser-local date calls with `Asia/Tashkent` helpers (7 files)
+- **PR-14:** Wired `expectedEntryUpdatedAt` for optimistic locking in wizard
+
+### Admin-Flows Audit (PR-15 to PR-22)
+
+- **PR-15:** Restored `require_roles("Admin")` on all `/services` CRUD endpoints (P0 security)
+- **PR-16:** Auto-create `QueueProfile` on Department create + fixed `show_on_qr_page` drop
+- **PR-17:** Auto-create `Doctor` row when User with `role=Doctor` is created
+- **PR-18:** Implemented 3 missing department bulk endpoints (`/bulk`, `/bulk-delete`, `/bulk-activate`)
+- **PR-19:** DoctorModal: Department dropdown + specialty pattern validation + ServiceCatalog `/departments` fix
+- **PR-20:** Key pattern validation + dedupe service creation + `Registrar` role in `UserCreateRequest`
+- **PR-21:** `DoctorOut` includes department fields + `QueueProfilesManager` `department_key` Select
+- **PR-22:** Cascade-delete for `queue_profile`/`department` + `UserManagement` pagination
+
+### Wizard/QR UX Audit (PR-23 to PR-25)
+
+- **PR-23:** Doctor filter by service in wizard cart + quantity stepper + QueueTable source badge (3 P0)
+- **PR-24:** Edit-mode banner + confirm dialog "Обновить" + WS indicator simplification + QueueJoin i18n (4 P1)
+- **PR-25:** Dynamic department filter from `QueueProfile` + service code badge + itemized confirm (3 P2)
+
+### Architecture Audit (PR-26 to PR-28)
+
+- **PR-26:** Resolved `queue_tag` ↔ `specialist_id` architectural contradiction — each doctor now has their own queue; any same-specialty doctor can call patients; added `cardio`/`derma`/`dentist` roles
+- **PR-27:** Routing by `Doctor.specialty` (not `User.role`) — `/auth/me` returns specialty; `getRoleHomeRoute` uses specialty; removed hardcoded `homeForUsernames`
+- **PR-28:** Removed hardcoded specialty lists — `specialty_mapping` built dynamically from `QueueProfile`; `QR_HIDDEN_PROFILE_KEYS` emptied (admin controls via `show_on_qr_page`)
+
+### Documentation
+
+- **ADR-001:** Queue Ownership & Specialty Architecture (`docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md`)
+- **Developer Guide:** Adding a New Medical Specialty (`docs/developer-guides/adding-a-new-specialty.md`)
+
+### Migration Notes
+
+New Alembic migrations:
+- `0037_patient_medical_fields` — Patient: `emergency_contact`, `allergies`, `chronic_conditions`
+- `0038_user_fcm_fields` — User: `device_type`, `device_info`, `push_notifications_enabled`
+- `0039_feature_flags` — `feature_flags` + `feature_flag_history` tables (were missing from model registry)
+
+### Stats
+
+- **28 PRs** merged to `main`
+- **0 regressions** throughout (CI green on every PR)
+- **+48 new tests** (38 backend + 10 frontend)
+- **96 bugs** fixed across 6 audit cycles
+- **3 Alembic migrations** added
+- **2 architectural documents** (ADR + Developer Guide)
+
+---
+
 ## 2026-07-04 — Admin Sprint 4: P2 polish (fix/admin-sprint4-p2-polish)
 
 Final sprint of 4-sprint admin cleanup roadmap. Reduces duplication, fixes RU/EN mixing, restores codemod-damaged state values.

@@ -28,15 +28,24 @@ exact commands and expected outputs.
 This is a **Medical Clinic Management System** built with FastAPI (Python backend) and React (Vite frontend). The system manages patient appointments, queues, EMR (Electronic Medical Records), payments, and specialized medical panels (cardiology, dermatology, dentistry, laboratory).
 
 **Key Features:**
-- Role-based access control (Admin, Doctor, Registrar, Cashier, Lab, Patient)
-- Real-time queue management via WebSocket
+- Role-based access control (Admin, Doctor, Registrar, Cashier, Lab, Patient, cardio, derma, dentist)
+- Real-time queue management via WebSocket — **per-doctor queues** (each doctor has their own queue with independent numbers)
 - 2FA authentication with blocking flow
 - EMR system with AI integration
-- Multi-specialty medical panels
+- Multi-specialty medical panels (cardiology, dermatology, dentistry) + **generic DoctorPanel for new specialties**
+- **Extensible specialty system** — new specialties (neurology, endocrinology, etc.) added via admin UI without code changes
 - Payment integration (PayMe provider)
 - Telegram and Firebase notifications
 - GraphQL API support
 - PWA capabilities
+- QR self-registration — patients select a specific doctor via QR code
+
+**Architecture decisions:**
+- See [ADR-001: Queue Ownership & Specialty Architecture](docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md)
+- See [Developer Guide: Adding a New Specialty](docs/developer-guides/adding-a-new-specialty.md)
+- Queue ownership: `DailyQueue.specialist_id` → `Doctor.id` (per-doctor, not per-specialty)
+- Specialty source of truth: `Doctor.specialty` (not `User.role`)
+- Specialty display: `QueueProfile` (name, icon, color, QR visibility)
 
 ## Execution Mode Selection (from AGENTS.md)
 
