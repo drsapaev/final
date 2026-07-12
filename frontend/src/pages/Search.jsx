@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getVisit } from '../api/visits';
+import logger from '../utils/logger';  // PR-38 / Medium-23: log instead of silent catch
 import {
   AppEmpty, AppError, Button,
   Input } from '../components/ui/macos';
@@ -52,8 +53,10 @@ export default function Search() {
           if (visitRes?.visit) {
             visitsData = [visitRes.visit];
           }
-        } catch {
-          // Visit not found by ID, try by patient_id
+        } catch (err) {
+          // PR-38 / Medium-23: log the error instead of silently swallowing.
+          // Visit not found by ID — we'll try by patient_id next.
+          logger.warn('Search: getVisit failed, will try by patient_id', err?.message);
         }
 
         // Also get visits for patient with this ID
@@ -68,8 +71,9 @@ export default function Search() {
               }
             });
           }
-        } catch {
-          // No visits for this patient
+        } catch (err) {
+          // PR-38 / Medium-23: log instead of silent catch.
+          logger.warn('Search: patient visits fetch failed', err?.message);
         }
       }
 
@@ -95,7 +99,9 @@ export default function Search() {
       }
 
       setVisits(visitsData);
-    } catch {
+    } catch (err) {
+      // PR-38 / Medium-23: log instead of silent catch.
+      logger.error('Search: query failed', err?.message);
       setError('Ошибка поиска. Попробуйте снова.');
     } finally {
       setLoading(false);
@@ -147,7 +153,9 @@ export default function Search() {
     try {
       const d = new Date(dateStr);
       return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    } catch {
+    } catch (err) {
+      // PR-38 / Medium-23: log instead of silent catch.
+      logger.warn('Search: formatDate failed', err?.message);
       return dateStr;
     }
   };

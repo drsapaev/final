@@ -1,10 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import { getApiOrigin } from '../api/runtime';
+import { api } from '../api/client';  // PR-38 / High-21: centralized axios client
 import { buildPatientDocumentFields } from '../utils/patientDocument';
 import logger from '../utils/logger';
-import tokenManager from '../utils/tokenManager';
-const API_BASE = getApiOrigin();
+
+/**
+ * usePatients hook — patient CRUD operations.
+ *
+ * PR-38 / High-21: Migrated from raw fetch() to the centralized axios client.
+ * Previously: 6 raw fetch() calls with duplicated URL/header/JSON-parse/error
+ * handling. Now: all HTTP goes through `api` from api/client.js, which
+ * handles auth/CSRF/refresh-token interceptors centrally.
+ *
+ * The api/patients.js module provides higher-level wrappers (getPatient,
+ * createPatient, updatePatient, etc.) but this hook needs finer control
+ * over the response transformation (snake_case → camelCase), so it calls
+ * the axios client directly with the same `/patients/*` paths.
+ */
 
 const usePatients = () => {
   const [patients, setPatients] = useState([]);
@@ -15,77 +27,56 @@ const usePatients = () => {
   const [filterAgeRange, setFilterAgeRange] = useState('');
   const [filterBloodType, setFilterBloodType] = useState('');
 
+  // Transform API snake_case → component camelCase
+  const transformPatient = (p) => ({
+    id: p.id,
+    firstName: p.first_name,
+    lastName: p.last_name,
+    middleName: p.middle_name,
+    email: p.email || '',
+    phone: p.phone || '',
+    birthDate: p.birth_date || '',
+    gender: p.sex === 'M' ? 'male' : p.sex === 'F' ? 'female' : '',
+    address: p.address || '',
+    passport: p.doc_number || '',
+    insuranceNumber: '',
+    emergencyContact: '',
+    emergencyPhone: '',
+    bloodType: '',
+    allergies: '',
+    chronicDiseases: '',
+    notes: '',
+    createdAt: p.created_at || new Date().toISOString().split('T')[0],
+    lastVisit: null,
+    visitsCount: 0
+  });
 
-  // Загрузка пациентов - использует реальный API (Single Source of Truth)
+  // Загрузка пациентов
   const loadPatients = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        throw new Error('Токен авторизации не найден');
-      }
-
-      const response = await fetch(`${API_BASE}/api/v1/patients/?limit=1000`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Ошибка загрузки пациентов' }));
-        throw new Error(errorData.detail || `Ошибка ${response.status}`);
-      }
-
-      const data = await response.json();
-      // Преобразуем данные из формата API в формат компонента
-      const transformedPatients = data.map(patient => ({
-        id: patient.id,
-        firstName: patient.first_name,
-        lastName: patient.last_name,
-        middleName: patient.middle_name,
-        email: patient.email || '',
-        phone: patient.phone || '',
-        birthDate: patient.birth_date || '',
-        gender: patient.sex === 'M' ? 'male' : patient.sex === 'F' ? 'female' : '',
-        address: patient.address || '',
-        passport: patient.doc_number || '',
-        insuranceNumber: '', // Поле отсутствует в API
-        emergencyContact: '', // Поле отсутствует в API
-        emergencyPhone: '', // Поле отсутствует в API
-        bloodType: '', // Поле отсутствует в API
-        allergies: '', // Поле отсутствует в API
-        chronicDiseases: '', // Поле отсутствует в API
-        notes: '', // Поле отсутствует в API
-        createdAt: patient.created_at || new Date().toISOString().split('T')[0],
-        lastVisit: null, // Нужно получать отдельно
-        visitsCount: 0 // Нужно получать отдельно
-      }));
-
+      // PR-38 / High-21: axios client handles auth/CSRF/refresh centrally.
+      const response = await api.get('/patients/?limit=1000');
+      const data = response.data;
+      const transformedPatients = data.map(transformPatient);
       setPatients(transformedPatients);
     } catch (err) {
-      setError(err);
+      const message = err?.response?.data?.detail || err?.message || 'Ошибка загрузки пациентов';
+      setError(new Error(message));
       logger.error('Ошибка загрузки пациентов:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Создание пациента - использует реальный API (Single Source of Truth)
+  // Создание пациента
   const createPatient = useCallback(async (patientData) => {
     setLoading(true);
     setError(null);
 
     try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        throw new Error('Токен авторизации не найден');
-      }
-
-      // Преобразуем данные из формата компонента в формат API
-      // Backend принимает полное ФИО или отдельные поля - используем отдельные поля
       const documentFields = buildPatientDocumentFields(
         patientData.passport ?? patientData.doc_number
       );
@@ -102,61 +93,30 @@ const usePatients = () => {
         ...documentFields
       };
 
-      const response = await fetch(`${API_BASE}/api/v1/patients/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(apiData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Ошибка создания пациента' }));
-        throw new Error(errorData.detail || `Ошибка ${response.status}`);
-      }
-
-      const newPatient = await response.json();
-
-      // Преобразуем обратно в формат компонента
-      const transformedPatient = {
-        id: newPatient.id,
-        firstName: newPatient.first_name,
-        lastName: newPatient.last_name,
-        middleName: newPatient.middle_name,
-        email: newPatient.email || '',
-        phone: newPatient.phone || '',
-        birthDate: newPatient.birth_date || '',
-        gender: newPatient.sex === 'M' ? 'male' : newPatient.sex === 'F' ? 'female' : '',
-        address: newPatient.address || '',
-        passport: newPatient.doc_number || '',
-        createdAt: newPatient.created_at || new Date().toISOString().split('T')[0],
-        lastVisit: null,
-        visitsCount: 0
-      };
-
+      // PR-38 / High-21: axios client — no manual fetch/headers/JSON-parse
+      const response = await api.post('/patients/', apiData);
+      const newPatient = response.data;
+      const transformedPatient = transformPatient(newPatient);
       setPatients(prev => [transformedPatient, ...prev]);
       return transformedPatient;
     } catch (err) {
-      setError(err);
-      throw err;
+      const message = err?.response?.data?.detail || err?.message || 'Ошибка создания пациента';
+      const wrapped = new Error(message);
+      wrapped.status = err?.response?.status;
+      wrapped.response = err?.response;
+      setError(wrapped);
+      throw wrapped;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Обновление пациента - использует реальный API (Single Source of Truth)
+  // Обновление пациента
   const updatePatient = useCallback(async (id, patientData) => {
     setLoading(true);
     setError(null);
 
     try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        throw new Error('Токен авторизации не найден');
-      }
-
-      // Преобразуем данные из формата компонента в формат API
       const apiData = {};
       if (patientData.lastName !== undefined) apiData.last_name = patientData.lastName;
       if (patientData.firstName !== undefined) apiData.first_name = patientData.firstName;
@@ -173,79 +133,46 @@ const usePatients = () => {
       }
       if (patientData.address !== undefined) apiData.address = patientData.address;
 
-      const response = await fetch(`${API_BASE}/api/v1/patients/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(apiData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Ошибка обновления пациента' }));
-        throw new Error(errorData.detail || `Ошибка ${response.status}`);
-      }
-
-      const updatedPatient = await response.json();
-
-      // Преобразуем обратно в формат компонента
-      const transformedPatient = {
-        id: updatedPatient.id,
-        firstName: updatedPatient.first_name,
-        lastName: updatedPatient.last_name,
-        middleName: updatedPatient.middle_name,
-        email: updatedPatient.email || '',
-        phone: updatedPatient.phone || '',
-        birthDate: updatedPatient.birth_date || '',
-        gender: updatedPatient.sex === 'M' ? 'male' : updatedPatient.sex === 'F' ? 'female' : '',
-        address: updatedPatient.address || '',
-        passport: updatedPatient.doc_number || ''
-      };
-
+      // PR-38 / High-21: axios client
+      const response = await api.put(`/patients/${id}`, apiData);
+      const updatedPatient = response.data;
+      const transformedPatient = transformPatient(updatedPatient);
+      // Transform returns the basic fields; preserve any extra fields from the
+      // existing patient (e.g., is_deleted flag) via spread.
       setPatients(prev => prev.map(patient =>
         patient.id === id
           ? { ...patient, ...transformedPatient }
           : patient
       ));
-
       return transformedPatient;
     } catch (err) {
-      setError(err);
-      throw err;
+      const message = err?.response?.data?.detail || err?.message || 'Ошибка обновления пациента';
+      const wrapped = new Error(message);
+      wrapped.status = err?.response?.status;
+      wrapped.response = err?.response;
+      setError(wrapped);
+      throw wrapped;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Удаление пациента - использует реальный API (Single Source of Truth)
+  // Удаление пациента
   const deletePatient = useCallback(async (id) => {
     setLoading(true);
     setError(null);
 
     try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        throw new Error('Токен авторизации не найден');
-      }
-
-      const response = await fetch(`${API_BASE}/api/v1/patients/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Ошибка удаления пациента' }));
-        throw new Error(errorData.detail || `Ошибка ${response.status}`);
-      }
-
+      // PR-38 / High-21: axios client
+      await api.delete(`/patients/${id}`);
       setPatients(prev => prev.filter(patient => patient.id !== id));
     } catch (err) {
-      setError(err);
-      throw err;
+      const message = err?.response?.data?.detail || err?.message || 'Ошибка удаления пациента';
+      const wrapped = new Error(message);
+      wrapped.status = err?.response?.status;
+      wrapped.response = err?.response;
+      setError(wrapped);
+      throw wrapped;
     } finally {
       setLoading(false);
     }
@@ -294,77 +221,51 @@ const usePatients = () => {
     return matchesSearch && matchesGender && matchesAgeRange && matchesBloodType;
   });
 
-  // Архивирование пациента (soft-delete) - использует реальный API
+  // Архивирование пациента (soft-delete)
   const archivePatient = useCallback(async (id) => {
     setLoading(true);
     setError(null);
 
     try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        throw new Error('Токен авторизации не найден');
-      }
-
-      const response = await fetch(`${API_BASE}/api/v1/patients/${id}/soft`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Ошибка архивирования пациента' }));
-        throw new Error(errorData.detail || `Ошибка ${response.status}`);
-      }
-
-      // Обновляем пациента в списке как удаленного
+      // PR-38 / High-21: axios client
+      await api.delete(`/patients/${id}/soft`);
       setPatients(prev => prev.map(patient =>
         patient.id === id
           ? { ...patient, is_deleted: true }
           : patient
       ));
     } catch (err) {
-      setError(err);
-      throw err;
+      const message = err?.response?.data?.detail || err?.message || 'Ошибка архивирования пациента';
+      const wrapped = new Error(message);
+      wrapped.status = err?.response?.status;
+      wrapped.response = err?.response;
+      setError(wrapped);
+      throw wrapped;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Восстановление пациента - использует реальный API
+  // Восстановление пациента
   const restorePatient = useCallback(async (id) => {
     setLoading(true);
     setError(null);
 
     try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        throw new Error('Токен авторизации не найден');
-      }
-
-      const response = await fetch(`${API_BASE}/api/v1/patients/${id}/restore`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Ошибка восстановления пациента' }));
-        throw new Error(errorData.detail || `Ошибка ${response.status}`);
-      }
-
-      // Обновляем пациента в списке как активного
+      // PR-38 / High-21: axios client
+      await api.post(`/patients/${id}/restore`);
       setPatients(prev => prev.map(patient =>
         patient.id === id
           ? { ...patient, is_deleted: false }
           : patient
       ));
     } catch (err) {
-      setError(err);
-      throw err;
+      const message = err?.response?.data?.detail || err?.message || 'Ошибка восстановления пациента';
+      const wrapped = new Error(message);
+      wrapped.status = err?.response?.status;
+      wrapped.response = err?.response;
+      setError(wrapped);
+      throw wrapped;
     } finally {
       setLoading(false);
     }
@@ -391,8 +292,8 @@ const usePatients = () => {
     createPatient,
     updatePatient,
     deletePatient,
-    archivePatient,  // Soft-delete
-    restorePatient,  // Restore
+    archivePatient,
+    restorePatient,
     refresh: loadPatients,
     calculateAge
   };
