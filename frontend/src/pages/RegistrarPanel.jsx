@@ -257,7 +257,7 @@ const RegistrarPanel = () => {
     resolveRescheduleVisitId,
     removeRescheduledAppointmentFromView,
   } = useRegistrarReschedule({ setAppointments });
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
+  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('language') || localStorage.getItem('app_language') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   // QW-06 fix: translations moved to ./registrarTranslations.js (was 50+ inline keys).
   // EN translations added (previously missing — EN users saw RU fallback).
   // Full migration to locales/{ru,uz,en}.js deferred until useTranslation.jsx

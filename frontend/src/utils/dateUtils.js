@@ -1,9 +1,36 @@
 /**
  * Date utility functions for the application
  * Provides consistent date formatting across the app
+ *
+ * PR-40 / High-20: Locale is now dynamic via getLocale() — reads the active
+ * language from localStorage (set by useTranslation hook). Previously every
+ * function hardcoded 'ru-RU', ignoring the user's language selection.
  */
 
 export const REGISTRAR_TIME_ZONE = 'Asia/Tashkent';
+
+/**
+ * PR-40 / High-20: Returns the active locale based on the user's language
+ * selection. Reads from the unified 'language' key (set by useTranslation).
+ * Falls back to 'ru-RU' for Russian (default clinic language).
+ *
+ * @returns {string} BCP-47 locale tag (e.g. 'ru-RU', 'uz-UZ', 'en-US')
+ */
+export const getLocale = () => {
+  try {
+    const lang = localStorage.getItem('language')
+      || localStorage.getItem('app_language')
+      || 'ru';
+    switch (lang) {
+      case 'uz': return 'uz-UZ';
+      case 'en': return 'en-US';
+      case 'ru':
+      default: return 'ru-RU';
+    }
+  } catch {
+    return 'ru-RU';
+  }
+};
 
 /**
  * Parses registrar timestamps using the clinic timezone contract.
@@ -35,7 +62,7 @@ export const parseRegistrarTimestamp = (value) => {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-export const formatRegistrarDate = (value, locale = 'ru-RU') => {
+export const formatRegistrarDate = (value, locale = getLocale()) => {
     const parsed = parseRegistrarTimestamp(value);
     if (!parsed) return '';
     return parsed.toLocaleDateString(locale, {
@@ -46,7 +73,7 @@ export const formatRegistrarDate = (value, locale = 'ru-RU') => {
     });
 };
 
-export const formatRegistrarTime = (value, locale = 'ru-RU', options = {}) => {
+export const formatRegistrarTime = (value, locale = getLocale(), options = {}) => {
     const parsed = parseRegistrarTimestamp(value);
     if (!parsed) return '';
     return parsed.toLocaleTimeString(locale, {
@@ -57,7 +84,7 @@ export const formatRegistrarTime = (value, locale = 'ru-RU', options = {}) => {
     });
 };
 
-export const formatRegistrarDateTime = (value, locale = 'ru-RU', options = {}) => {
+export const formatRegistrarDateTime = (value, locale = getLocale(), options = {}) => {
     const date = formatRegistrarDate(value, locale);
     const time = formatRegistrarTime(value, locale, options);
     return [date, time].filter(Boolean).join(' ');
@@ -73,7 +100,7 @@ const timestampsDiffer = (a, b, thresholdMs = REGISTRAR_CHANGED_TIMESTAMP_THRESH
     return Math.abs(first.getTime() - second.getTime()) > thresholdMs;
 };
 
-export const getRegistrarTimestampDisplay = (record = {}, locale = 'ru-RU') => {
+export const getRegistrarTimestampDisplay = (record = {}, locale = getLocale()) => {
     const requestedPrimaryKind = REGISTRAR_PRIMARY_TIME_KINDS.has(record.display_time_kind)
         ? record.display_time_kind
         : null;
@@ -179,7 +206,7 @@ export const getWeekEnd = (date = new Date()) => {
  * @param {string} locale - The locale to use (defaults to 'ru-RU')
  * @returns {string} Formatted date string
  */
-export const formatDate = (date, locale = 'ru-RU') => {
+export const formatDate = (date, locale = getLocale()) => {
     const d = typeof date === 'string' ? new Date(date) : date;
     return d.toLocaleDateString(locale, {
         day: '2-digit',
@@ -194,7 +221,7 @@ export const formatDate = (date, locale = 'ru-RU') => {
  * @param {string} locale - The locale to use (defaults to 'ru-RU')
  * @returns {string} Formatted date-time string
  */
-export const formatDateTime = (date, locale = 'ru-RU') => {
+export const formatDateTime = (date, locale = getLocale()) => {
     const d = typeof date === 'string' ? new Date(date) : date;
     return d.toLocaleString(locale, {
         day: '2-digit',
@@ -238,7 +265,7 @@ export const isFuture = (dateString) => {
  * @param {string} locale - Locale to use (defaults to 'ru-RU')
  * @returns {string} Formatted date string
  */
-export const formatDateDisplay = (date, locale = 'ru-RU') => {
+export const formatDateDisplay = (date, locale = getLocale()) => {
     if (!date) return '';
 
     try {
