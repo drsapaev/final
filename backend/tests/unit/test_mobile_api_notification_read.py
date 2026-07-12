@@ -19,6 +19,9 @@ from app.api.v1.endpoints import mobile_api
 async def test_mobile_notifications_list_uses_canonical_platform(monkeypatch):
     """NOTIF-REAUDIT-28 P0-1: get_mobile_notifications reads 'items' key
     from canonical platform.get_inbox (was 'deliveries' → always empty).
+
+    PR-32: endpoint converted from async def → def (High-37 fix). Test
+    updated to call directly without await.
     """
     delivery = {
         "delivery_id": 10,
@@ -49,7 +52,8 @@ async def test_mobile_notifications_list_uses_canonical_platform(monkeypatch):
     )
     monkeypatch.setattr(mobile_api, "_get_mobile_notification_rows", fake_rows)
 
-    response = await mobile_api.get_mobile_notifications(
+    # PR-32: get_mobile_notifications is now sync def — call directly, no await
+    response = mobile_api.get_mobile_notifications(
         current_user=SimpleNamespace(id=55),
         db=object(),
         limit=7,
