@@ -34,6 +34,7 @@ import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import { sanitizePrintableHtml } from '../../utils/printWindow';  // PR-35 / P0-7
 
 const INVOICE_TYPE_OPTIONS = [
   { value: 'standard', label: 'Обычный' },
@@ -213,9 +214,17 @@ const BillingManager = () => {
   const handleViewInvoiceHTML = async (invoiceId) => {
     try {
       const response = await api.get(`/billing/invoices/${invoiceId}/html`);
-      // Открываем HTML в новом окне
+      // PR-35 / P0-7: Sanitize backend HTML before writing to a new window.
+      // Previously: document.write(response.data.html) wrote raw backend
+      // output to a new window — XSS if backend was compromised or if a
+      // patient name contained <script>. Now: DOMPurify strips scripts,
+      // event handlers, and dangerous tags via sanitizePrintableHtml().
       const newWindow = window.open('', '_blank');
-      newWindow.document.write(response.data.html);
+      if (!newWindow) {
+        toast.error('Popup blocked. Allow popups for this site to view invoices.');
+        return;
+      }
+      newWindow.document.write(sanitizePrintableHtml(response.data.html));
       newWindow.document.close();
     } catch (error) {
       logger.error('Ошибка получения HTML счета:', error);

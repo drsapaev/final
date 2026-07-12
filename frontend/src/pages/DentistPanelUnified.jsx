@@ -836,21 +836,23 @@ const DentistPanelUnified = () => {
     }}, []);const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      // PR-35 / P0-14: Removed duplicate loadPatients() call — was calling
+      // Promise.all([loadPatients(), loadPatients()]) which fetched the
+      // patient list twice on every mount.
       await Promise.all([
-      loadPatients(),
-      loadPatients()]
-      );
+        loadPatients(),
+        loadServices(),
+      ]);
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
     }
-  }, [loadPatients]);
+  }, [loadPatients, loadServices]);
 
   useEffect(() => {
     loadData();
-    loadServices();
-  }, [loadData, loadServices]);
+  }, [loadData]);
 
   useEffect(() => {
     const selectedPatientIdForProtocols =
