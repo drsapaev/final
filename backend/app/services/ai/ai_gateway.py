@@ -32,65 +32,98 @@ logger = logging.getLogger(__name__)
 
 
 class CircuitBreaker:
-    """
-    Circuit breaker для провайдеров.
+    """FA-012: Redis-backed circuit breaker for multi-instance sync.
 
-    States:
-    - CLOSED: нормальная работа
-    - OPEN: провайдер недоступен, пропускаем его
-    - HALF_OPEN: пробуем восстановить
+    Falls back to in-memory when Redis is unavailable (single-instance mode).
+    States: CLOSED → OPEN (after N failures) → HALF_OPEN (after timeout) → CLOSED.
     """
 
     def __init__(self, failure_threshold: int = 3, recovery_timeout: int = 60):
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
-        self._failures: dict[str, int] = {}
-        self._last_failure: dict[str, datetime] = {}
-        self._state: dict[str, str] = {}  # CLOSED, OPEN, HALF_OPEN
+        self._redis = None
+        self._redis_key_prefix = "ai:circuit"
+        # In-memory fallback
+        self._mem_failures: dict[str, int] = {}
+        self._mem_last_failure: dict[str, datetime] = {}
+        self._mem_state: dict[str, str] = {}
 
-    def is_available(self, provider: str) -> bool:
-        """Проверка доступности провайдера"""
-        state = self._state.get(provider, "CLOSED")
+    async def _get_redis(self):
+        if self._redis is not None:
+            return self._redis
+        try:
+            import redis.asyncio as aioredis
+            import os
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            self._redis = aioredis.from_url(redis_url, decode_responses=True)
+            await self._redis.ping()
+            return self._redis
+        except Exception as e:
+            logger.debug(f"FA-012: Redis unavailable, using in-memory: {e}")
+            self._redis = None
+            return None
 
+    async def is_available(self, provider: str) -> bool:
+        redis = await self._get_redis()
+        if redis:
+            try:
+                state = await redis.get(f"{self._redis_key_prefix}:state:{provider}") or "CLOSED"
+                if state == "OPEN":
+                    last_fail = await redis.get(f"{self._redis_key_prefix}:last_fail:{provider}")
+                    if last_fail:
+                        elapsed = datetime.now(UTC) - datetime.fromisoformat(last_fail)
+                        if elapsed > timedelta(seconds=self.recovery_timeout):
+                            await redis.set(f"{self._redis_key_prefix}:state:{provider}", "HALF_OPEN")
+                            return True
+                    return False
+                return True
+            except Exception:
+                pass
+        # Fallback
+        state = self._mem_state.get(provider, "CLOSED")
         if state == "CLOSED":
             return True
-
         if state == "OPEN":
-            # Проверяем таймаут
-            last = self._last_failure.get(provider)
+            last = self._mem_last_failure.get(provider)
             if last and datetime.now(UTC) - last > timedelta(seconds=self.recovery_timeout):
-                self._state[provider] = "HALF_OPEN"
-                logger.info(f"Circuit breaker for {provider}: OPEN -> HALF_OPEN")
+                self._mem_state[provider] = "HALF_OPEN"
                 return True
             return False
-
-        # HALF_OPEN
         return True
 
-    def record_success(self, provider: str):
-        """Успешный запрос"""
-        if self._state.get(provider) == "HALF_OPEN":
-            self._state[provider] = "CLOSED"
-            self._failures[provider] = 0
-            logger.info(f"Circuit breaker for {provider}: HALF_OPEN -> CLOSED")
+    async def record_success(self, provider: str):
+        redis = await self._get_redis()
+        if redis:
+            try:
+                await redis.set(f"{self._redis_key_prefix}:state:{provider}", "CLOSED")
+                await redis.delete(f"{self._redis_key_prefix}:failures:{provider}")
+                return
+            except Exception:
+                pass
+        self._mem_state[provider] = "CLOSED"
+        self._mem_failures[provider] = 0
 
-    def record_failure(self, provider: str):
-        """Неудачный запрос"""
-        self._failures[provider] = self._failures.get(provider, 0) + 1
-        self._last_failure[provider] = datetime.now(UTC)
-
-        if self._failures[provider] >= self.failure_threshold:
-            self._state[provider] = "OPEN"
-            logger.warning(
-                f"Circuit breaker for {provider}: CLOSED -> OPEN "
-                f"(after {self._failures[provider]} failures)"
-            )
+    async def record_failure(self, provider: str):
+        redis = await self._get_redis()
+        if redis:
+            try:
+                failures = await redis.incr(f"{self._redis_key_prefix}:failures:{provider}")
+                await redis.set(f"{self._redis_key_prefix}:last_fail:{provider}", datetime.now(UTC).isoformat())
+                if failures >= self.failure_threshold:
+                    await redis.set(f"{self._redis_key_prefix}:state:{provider}", "OPEN")
+                    logger.warning(f"FA-012: Circuit for {provider}: OPEN ({failures} failures, Redis)")
+                return
+            except Exception:
+                pass
+        self._mem_failures[provider] = self._mem_failures.get(provider, 0) + 1
+        self._mem_last_failure[provider] = datetime.now(UTC)
+        if self._mem_failures[provider] >= self.failure_threshold:
+            self._mem_state[provider] = "OPEN"
 
     def reset(self, provider: str):
-        """Ручной сброс"""
-        self._failures[provider] = 0
-        self._state[provider] = "CLOSED"
-        logger.info(f"Circuit breaker for {provider}: manually reset to CLOSED")
+        self._mem_failures[provider] = 0
+        self._mem_state[provider] = "CLOSED"
+        logger.info(f"FA-012: Circuit for {provider}: manually reset")
 
 
 class AIGateway(IAIGateway):
@@ -301,7 +334,7 @@ class AIGateway(IAIGateway):
 
         for provider_type in self._provider_priority:
             # Check circuit breaker
-            if not self._circuit_breaker.is_available(provider_type.value):
+            if not await self._circuit_breaker.is_available(provider_type.value):
                 logger.debug(f"[{request_id}] Skipping {provider_type.value} (circuit open)")
                 continue
 
@@ -321,7 +354,7 @@ class AIGateway(IAIGateway):
                 result = await self._route_task(provider, provider_type, task_type, payload, specialty)
 
                 # Success!
-                self._circuit_breaker.record_success(provider_type.value)
+                await self._circuit_breaker.record_success(provider_type.value)
 
                 return AIResponse(
                     status="success",
@@ -336,7 +369,7 @@ class AIGateway(IAIGateway):
                 error_msg = f"{provider_type.value}: failed"  # sanitized
                 errors.append(error_msg)
                 logger.warning(f"[{request_id}] Provider {provider_type.value} failed: {e}")
-                self._circuit_breaker.record_failure(provider_type.value)
+                await self._circuit_breaker.record_failure(provider_type.value)
                 continue
 
         # All providers failed
@@ -555,7 +588,7 @@ class AIGateway(IAIGateway):
         """Get list of available (configured) providers"""
         available = []
         for provider_type in self._provider_priority:
-            if self._circuit_breaker.is_available(provider_type.value):
+            if await self._circuit_breaker.is_available(provider_type.value):
                 provider = self._get_provider_instance(provider_type)
                 if provider:
                     available.append(provider_type)
@@ -564,7 +597,7 @@ class AIGateway(IAIGateway):
     async def _get_available_provider(self) -> Any | None:
         """Get first available provider"""
         for provider_type in self._provider_priority:
-            if self._circuit_breaker.is_available(provider_type.value):
+            if await self._circuit_breaker.is_available(provider_type.value):
                 provider = self._get_provider_instance(provider_type)
                 if provider:
                     return provider

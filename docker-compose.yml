@@ -11,8 +11,15 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env.production
+    environment:
+      # F-014: Redis for multi-instance WS coordination + background tasks
+      REDIS_URL: "redis://redis:6379/0"
+      WS_REDIS_URL: "redis://redis:6379/1"
+      ARQ_REDIS_URL: "redis://redis:6379/2"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -54,8 +61,24 @@ services:
     networks:
       - clinic-net
 
+  redis:
+    # F-014, FA-012: Redis for WS Pub/Sub, circuit breaker, arq
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - clinic-net
+
 volumes:
   pgdata:
+  redisdata:
 
 networks:
   clinic-net:
