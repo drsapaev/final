@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
@@ -6,6 +6,10 @@ import Button from './Button';
 /**
  * macOS-style Modal Component
  * Implements Apple's Human Interface Guidelines for modal dialogs
+ *
+ * PR-37 / P0-A: Focus trap — Tab key cycles within modal, Shift+Tab cycles backward.
+ * PR-37 / P0-B: useId() — replaces static id="modal-title" with a unique per-instance id
+ *               so multiple modals on the same page don't collide.
  */
 const Modal = ({
   isOpen,
@@ -25,25 +29,78 @@ const Modal = ({
   void variant;
   const modalRef = useRef(null);
   const backdropRef = useRef(null);
+  // PR-37 / P0-B: unique id for aria-labelledby — avoids collisions when
+  // multiple modals are rendered simultaneously.
+  const titleId = useId();
+  // PR-37 / P0-A: track the previously-focused element to restore focus on close.
+  const previouslyFocusedRef = useRef(null);
 
-  // Handle escape key
+  // PR-37 / P0-A: Focus trap implementation.
+  // On open: save document.activeElement, move focus into the modal.
+  // On Tab: cycle focus within the modal (first ↔ last focusable element).
+  // On close: restore focus to the trigger element.
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (isOpen && closeOnEscape && e.key === 'Escape') {
+    if (!isOpen) return;
+
+    // Save the trigger element so we can restore focus on close.
+    previouslyFocusedRef.current = document.activeElement;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && closeOnEscape) {
         onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      // Focus trap: keep Tab within the modal
+      const modal = modalRef.current;
+      if (!modal) return;
+      const focusableSelectors = [
+        'a[href]',
+        'button:not([disabled])',
+        'input:not([disabled])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(',');
+      const focusables = Array.from(modal.querySelectorAll(focusableSelectors))
+        .filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      // Focus trap for accessibility
+    document.addEventListener('keydown', handleKeyDown);
+    // Move focus into the modal on open
+    requestAnimationFrame(() => {
       if (modalRef.current) {
-        modalRef.current.focus();
+        const focusables = modalRef.current.querySelectorAll(
+          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length > 0) {
+          focusables[0].focus();
+        } else {
+          modalRef.current.focus();
+        }
       }
-    }
+    });
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleKeyDown);
+      // PR-37 / P0-A: restore focus to the trigger element on close.
+      if (previouslyFocusedRef.current && typeof previouslyFocusedRef.current.focus === 'function') {
+        previouslyFocusedRef.current.focus();
+      }
     };
   }, [isOpen, closeOnEscape, onClose]);
 
@@ -120,7 +177,8 @@ const Modal = ({
       style={modalStyles}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="modal-title"
+      aria-labelledby={titleId}
+      tabIndex={-1}
       {...props}>
 
       {/* Backdrop */}
@@ -145,7 +203,7 @@ const Modal = ({
           marginBottom: title ? '16px' : '0'
         }}>
             <h2
-            id="modal-title"
+            id={titleId}
             style={{
               fontSize: '17px',
               fontWeight: '600',
