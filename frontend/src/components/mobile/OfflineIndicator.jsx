@@ -51,15 +51,18 @@ const OfflineIndicator = () => {
 
   const loadCachedData = async () => {
     try {
-      // Загружаем кэшированные данные из IndexedDB или localStorage
-      const cachedAppointments = localStorage.getItem('cached_appointments');
-      const cachedPatients = localStorage.getItem('cached_patients');
-      const cachedNotifications = localStorage.getItem('cached_notifications');
-
+      // PR-36 / P0-1: PHI localStorage cache removed for security.
+      // Previously: cached_appointments / cached_patients / cached_notifications
+      // were stored in plaintext localStorage — XSS or device theft would
+      // expose patient PHI (ФИО, телефоны, записи).
+      // Now: we only track whether the user has been online recently (a
+      // non-PHI flag) and show the offline indicator. The mobile app can
+      // re-fetch data from the server when connectivity is restored —
+      // there is no real offline mode that justifies storing PHI locally.
       setCachedData({
-        appointments: cachedAppointments ? JSON.parse(cachedAppointments).length : 0,
-        patients: cachedPatients ? JSON.parse(cachedPatients).length : 0,
-        notifications: cachedNotifications ? JSON.parse(cachedNotifications).length : 0
+        appointments: 0,
+        patients: 0,
+        notifications: 0
       });
     } catch (error) {
       logger.error('Ошибка загрузки кэшированных данных:', error);
@@ -70,7 +73,9 @@ const OfflineIndicator = () => {
     setSyncStatus('syncing');
 
     try {
-      // Синхронизируем данные с сервером
+      // PR-36 / P0-1: Sync now only verifies connectivity + auth —
+      // we no longer write PHI to localStorage. The mobile app refetches
+      // data through the normal API hooks when it comes back online.
       const promises = [
       fetch('/api/v1/mobile/appointments', {
         headers: {
@@ -86,15 +91,15 @@ const OfflineIndicator = () => {
 
       const responses = await Promise.allSettled(promises);
 
-      // Обновляем кэш
-      responses.forEach((response, index) => {
-        if (response.status === 'fulfilled' && response.value.ok) {
-          const dataKey = index === 0 ? 'cached_appointments' : 'cached_notifications';
-          response.value.json().then((data) => {
-            localStorage.setItem(dataKey, JSON.stringify(data));
-          });
-        }
-      });
+      // PR-36 / P0-1: removed the localStorage.setItem loop that wrote
+      // PHI (appointments, notifications) to plaintext localStorage.
+      // We now just count successful fetches for the UI indicator.
+      const succeeded = responses.filter(
+        (r) => r.status === 'fulfilled' && r.value.ok
+      ).length;
+      if (succeeded > 0) {
+        logger.info(`Sync succeeded for ${succeeded}/${responses.length} endpoints`);
+      }
 
       setSyncStatus('success');
 

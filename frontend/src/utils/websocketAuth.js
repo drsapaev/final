@@ -33,16 +33,20 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
     throw new Error('Authentication required but no token found');
   }
 
-  // Добавляем токен к параметрам, если он есть
+  // PR-36 / P0-3: JWT now sent via Sec-WebSocket-Protocol subprotocol
+  // (bearer.<token>) instead of URL query (?token=...). The previous
+  // approach leaked the JWT into nginx access logs, browser history,
+  // and Referer headers. The backend has supported the subprotocol form
+  // since PR-4 (backend). Query params are kept for non-token data only.
   const urlParams = new URLSearchParams(params);
-  if (token) {
-    urlParams.append('token', token);
-  }
 
   const wsUrl = `${baseUrl}?${urlParams.toString()}`;
-  logger.log(`🔌 Создаем аутентифицированное WebSocket соединение: ${wsUrl}`);
+  // Subprotocols are passed as the second argument to WebSocket().
+  // The backend extracts the token from the bearer.<token> entry.
+  const subprotocols = token ? [`bearer.${token}`] : [];
+  logger.log('🔌 Создаем аутентифицированное WebSocket соединение (token via subprotocol)');
 
-  const ws = new WebSocket(wsUrl);
+  const ws = new WebSocket(wsUrl, subprotocols);
 
   ws.onopen = (event) => {
     logger.log('✅ Аутентифицированное WebSocket подключено');
