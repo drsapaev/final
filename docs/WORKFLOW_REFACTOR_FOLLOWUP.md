@@ -1,11 +1,49 @@
 # Workflow Refactor — Follow-up Audit & Manual Testing Plan
 
+**Последнее обновление:** 2026-07-13 — синхронизация статусов после PR-35 → PR-47
+
 **Связанные документы:**
 - `CHANGELOG.md` — запись 2026-07-04
 - `docs/UNIFIED_PANELS_IMPROVEMENT_PLAN.md` — исходный план унификации панелей
+- `docs/FRONTEND_AUDIT_2026-07-12.md` — полный frontend аудит (41 находок, все закрыты)
+- `docs/BACKEND_AUDIT_STATUS_2026-07-12.md` — полный backend аудит (50 находок, все закрыты)
+- `docs/architecture/ADR-0004-queue-websocket-enablement.md` — ✅ Implemented
+- `docs/architecture/ADR-0005-unified-ws-manager.md` — ⚠️ Partially Implemented
 - PR #1779 (merged, commit `c77aa2b`)
+- PR-35 → PR-47 (frontend audit + cleanup, merged 2026-07-12..13)
 
 **Цель этого документа:** зафиксировать, что осталось после cloud-фазы рефакторинга, какие задачи требуют запуска проекта локально, какие проблемы ещё существуют и в каком направлении делать следующий аудит.
+
+---
+
+## Статус задач (обновлено 2026-07-13)
+
+| ID | Задача | Статус | Кто закрыл | PR |
+|----|--------|--------|------------|-----|
+| P0-1 | DoctorPanel stub | ❌ Open | — | — |
+| P0-2 | Двойные интерсепторы | ❌ Open | — | — |
+| P0-3 | Cardio raw fetch → EMRContainerV2 | ❌ Open | — | — |
+| P1-1 | WS disabled (queue polling 30s) | ✅ Closed | Frontend audit | PR-36 (#2110) |
+| P1-2 | In-memory cache only | ❌ Open | — | — |
+| P1-3 | 3 раздельные WS-системы | ⚠️ Partial | — | auth+reconnect done (PR-36), unified WSManager NOT done |
+| P1-5 | GET-дедупликация | ⚠️ Partial | — | messages.js has conversationPromiseCache, generic dedup NOT done |
+
+### Дополнительно закрытые (не из нашего списка)
+
+Frontend audit (PR-35 → PR-44) закрыл 41 находку, включая:
+- PHI в localStorage → sessionStorage (PR-39)
+- JWT в WS URL → subprotocol (PR-36)
+- CSP unsafe-inline removed (PR-39)
+- Focus trap в модалках (PR-37)
+- N+1 в Search.jsx (PR-37)
+- Dead code 2852 LOC removed (PR-38)
+- i18n унификация (PR-38 + PR-40)
+- God component split plan (PR-44) + AppointmentWizardV2 split (PR-45)
+- Lint cleanup: 41 → 16 panel warnings (PR-47)
+
+Backend audit (PR-1 → PR-34) закрыл 50 находок. См. `docs/BACKEND_AUDIT_STATUS_2026-07-12.md`.
+
+---
 
 ---
 
