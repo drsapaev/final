@@ -584,8 +584,8 @@ class AIGateway(IAIGateway):
             # Don't fail the request if audit fails
             logger.error(f"Failed to audit AI request: {e}")
 
-    def get_available_providers(self) -> list[AIProviderType]:
-        """Get list of available (configured) providers"""
+    async def get_available_providers(self) -> list[AIProviderType]:
+        """FA-012: async — uses Redis-backed circuit breaker."""
         available = []
         for provider_type in self._provider_priority:
             if await self._circuit_breaker.is_available(provider_type.value):
@@ -604,7 +604,7 @@ class AIGateway(IAIGateway):
         return None
 
     async def health_check(self) -> dict[str, Any]:
-        """Check health of all providers"""
+        """FA-012: async health check with Redis-backed circuit breaker."""
         health = {
             "status": "healthy",
             "providers": {},
@@ -617,11 +617,11 @@ class AIGateway(IAIGateway):
         for provider_type in self._provider_priority:
             provider_name = provider_type.value
             provider = self._get_provider_instance(provider_type)
+            is_available = await self._circuit_breaker.is_available(provider_name)
 
             health["providers"][provider_name] = {
-                "available": provider is not None,
-                "circuit_breaker": self._circuit_breaker._state.get(provider_name, "CLOSED"),
-                "failures": self._circuit_breaker._failures.get(provider_name, 0)
+                "available": provider is not None and is_available,
+                "circuit_breaker": "AVAILABLE" if is_available else "OPEN",
             }
 
         # Overall status
