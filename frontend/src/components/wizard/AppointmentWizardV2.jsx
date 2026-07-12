@@ -65,6 +65,9 @@ import './AppointmentWizardV2.css';
 // PatientStepV2 и CartStepV2 вынесены в отдельные файлы для уменьшения размера.
 import PatientStepV2 from './PatientStepV2';
 import CartStepV2 from './CartStepV2';
+// PR-45 / High-15: extracted sub-components to reduce god component size
+import EditModeBanner from './EditModeBanner';
+import StepProgressIndicator from './StepProgressIndicator';
 
 
 // UX Audit Stage 3 (Wizard issue 5.1):
@@ -2613,35 +2616,8 @@ const AppointmentWizardV2 = ({
     boxShadow: 'var(--mac-shadow-sm)'
   };
 
-  // Кастомный заголовок для Шага 1
-  // PR-24: show edit-mode banner when editing
-  const editModeBanner = editMode ? (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '4px 10px',
-      borderRadius: 'var(--mac-radius-sm)',
-      background: 'rgba(59, 130, 246, 0.12)',
-      color: '#2563eb',
-      fontSize: '12px',
-      fontWeight: 600,
-      marginBottom: '4px'
-    }}>
-      ✏️ Редактирование записи
-      {initialData?.source_kind === 'online' || initialData?.source === 'online' ? (
-        <span style={{
-          padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
-          background: 'rgba(139, 92, 246, 0.15)', color: '#7c3aed'
-        }}>QR</span>
-      ) : (
-        <span style={{
-          padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
-          background: 'rgba(100, 116, 139, 0.15)', color: '#475569'
-        }}>Desk</span>
-      )}
-    </div>
-  ) : null;
+  // PR-45 / High-15: editModeBanner extracted to EditModeBanner.jsx component
+  const editModeBanner = <EditModeBanner editMode={editMode} initialData={initialData} />;
 
   const Step1Header =
   <div style={wizardHeaderShellStyle}>
@@ -2894,30 +2870,8 @@ const AppointmentWizardV2 = ({
         }}>
 
         <div className="wizard-container-v2">
-          {/* UX Audit Registrar #22: Progress indicator — визуальный progress bar.
-              Текст «Шаг 1 из 2» уже есть в header, но визуальный bar даёт
-              мгновенное понимание прогресса без чтения. */}
-          <div style={{
-            display: 'flex',
-            gap: 'var(--mac-spacing-2)',
-            marginBottom: 'var(--mac-spacing-3)',
-            padding: '0 4px',
-          }}>
-            {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
-              <div
-                key={step}
-                style={{
-                  flex: 1,
-                  height: '4px',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  backgroundColor: currentStep >= step
-                    ? 'var(--mac-accent-blue, #007aff)'
-                    : 'color-mix(in srgb, var(--mac-text-secondary, #8e8e93), transparent 70%)',
-                  transition: 'background-color 200ms ease',
-                }}
-              />
-            ))}
-          </div>
+          {/* PR-45 / High-15: StepProgressIndicator extracted to its own component */}
+          <StepProgressIndicator currentStep={currentStep} totalSteps={totalSteps} />
 
           {/* Контент шагов */}
           <div className="wizard-content-v2">
