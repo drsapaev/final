@@ -2637,7 +2637,7 @@ const AppointmentWizardV2 = ({
       ) : (
         <span style={{
           padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
-          background: 'rgba(100, 116, 139, 0.15)', color: '#64748b'
+          background: 'rgba(100, 116, 139, 0.15)', color: '#475569'
         }}>Desk</span>
       )}
     </div>

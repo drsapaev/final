@@ -74,21 +74,22 @@ export default function Search() {
       }
 
       // Strategy 2: Find patients matching query and get their visits
+      // PR-37 / P0-13: Replaced sequential for-loop with await api.get()
+      // (up to 10 sequential HTTP round-trips) with Promise.all batched
+      // in parallel. Network latency × 10 → network latency × 1.
       if (patientsData.length > 0 && visitsData.length < 10) {
         const patientIds = patientsData.slice(0, 5).map(p => p.id);
-        for (const patientId of patientIds) {
-          try {
-            const pvRes = await api.get(`/visits/visits?patient_id=${patientId}&limit=5`);
-            if (Array.isArray(pvRes.data)) {
-              const existingIds = new Set(visitsData.map(v => v.id));
-              pvRes.data.forEach(v => {
-                if (!existingIds.has(v.id)) {
-                  visitsData.push(v);
-                }
-              });
-            }
-          } catch {
-            // Skip on error
+        const visitResults = await Promise.allSettled(
+          patientIds.map(pid => api.get(`/visits/visits?patient_id=${pid}&limit=5`))
+        );
+        const existingIds = new Set(visitsData.map(v => v.id));
+        for (const result of visitResults) {
+          if (result.status === 'fulfilled' && Array.isArray(result.value.data)) {
+            result.value.data.forEach(v => {
+              if (!existingIds.has(v.id)) {
+                visitsData.push(v);
+              }
+            });
           }
         }
       }
@@ -156,23 +157,32 @@ export default function Search() {
 
   useEffect(() => {
     // Fetch patient names for visits
+    // PR-37 / P0-13: Replaced sequential for-loop with await api.get()
+    // (up to N sequential HTTP round-trips where N = unique patient count)
+    // with Promise.allSettled batched in parallel.
     const fetchPatientNames = async () => {
       const uniquePatientIds = [...new Set(visits.map(v => v.patient_id).filter(Boolean))];
       const namesMap = { ...patientNames };
-      let hasUpdates = false;
+      // Filter to IDs we haven't fetched yet
+      const idsToFetch = uniquePatientIds.filter(pid => !namesMap[pid]);
+      if (idsToFetch.length === 0) return;
 
-      for (const pid of uniquePatientIds) {
-        if (!namesMap[pid]) {
-          try {
-            const res = await api.get(`/patients/${pid}`);
-            if (res.data) {
-              namesMap[pid] = `${res.data.last_name || ''} ${res.data.first_name || ''} ${res.data.middle_name || ''}`.trim();
-              hasUpdates = true;
-            }
-          } catch {
-            namesMap[pid] = `Пациент #${pid}`;
-            hasUpdates = true;
-          }
+      const results = await Promise.allSettled(
+        idsToFetch.map(pid => api.get(`/patients/${pid}`).then(res => ({ pid, data: res.data })))
+      );
+      let hasUpdates = false;
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.data) {
+          const { pid, data } = result.value;
+          namesMap[pid] = `${data.last_name || ''} ${data.first_name || ''} ${data.middle_name || ''}`.trim();
+          hasUpdates = true;
+        } else if (result.status === 'rejected') {
+          // Extract pid from the rejected promise's input — we know it was
+          // one of idsToFetch. Use index to find which one failed.
+          const idx = results.indexOf(result);
+          const failedPid = idsToFetch[idx];
+          namesMap[failedPid] = `Пациент #${failedPid}`;
+          hasUpdates = true;
         }
       }
 

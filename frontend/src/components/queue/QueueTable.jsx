@@ -146,7 +146,7 @@ const QueueTable = ({
                                             fontSize: '10px',
                                             fontWeight: 500,
                                             background: 'rgba(100, 116, 139, 0.15)',
-                                            color: '#64748b'
+                                            color: '#475569'
                                         }}>Desk</span>
                                     )}
                                 </td>
