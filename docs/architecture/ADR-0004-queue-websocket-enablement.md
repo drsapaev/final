@@ -1,9 +1,31 @@
 # ADR-0004: Enable Queue WebSocket + Add Reconnect
 
-**Status:** Proposed
+**Status:** ✅ Implemented (2026-07-13)
 **Date:** 2026-07-04
+**Implemented in:** PR-36 (#2110) — Frontend Sprint 1 security
 **Owner:** Frontend Platform
 **Related:** `docs/WORKFLOW_REFACTOR_FOLLOWUP.md` P1-1
+
+## Implementation Summary
+
+This ADR was proposed on 2026-07-04 and implemented on 2026-07-12 by
+the frontend audit sprint (PR-36, #2110) — without referencing this
+ADR. The implementation covers all three phases proposed below:
+
+- **Phase 1 (reconnect + auth + heartbeat):** ✅ Done in `frontend/src/hooks/useQueueWebSocket.js` — exponential backoff (3s → 6s → 12s → 24s → 30s, max 5 attempts), JWT via `Sec-WebSocket-Protocol: bearer.<token>` subprotocol (not URL query).
+- **Phase 2 (exponential backoff + infinite retries):** ✅ Done — `RECONNECT_DELAYS = [3000, 6000, 12000, 24000, 30000]` in `useQueueWebSocket.js:33`. Falls back to polling after 5 failed attempts (acceptable — polling is the ultimate fallback).
+- **Phase 3 (wire into useDoctorQueue + enable by default):** ✅ Done via a different path — `useQueueWebSocket` is consumed by `frontend/src/components/queue/ModernQueueManager.jsx:145` (the real queue UI), not `useDoctorQueue` (which is only used by the stub `DoctorPanel.jsx` — see P0-1).
+
+The JWT-in-subprotocol approach (PR-36 / P0-3 from frontend audit) is
+actually **better** than what this ADR proposed (JWT in query param) —
+it avoids leaking the token into nginx access logs and browser history.
+
+The legacy `openQueueWS` function in `frontend/src/api/ws.js:15` is
+now dead code (no callers). It can be removed in a future cleanup PR.
+
+---
+
+## Original Proposal (kept for historical context)
 
 ## Context
 

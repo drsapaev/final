@@ -1,51 +1,66 @@
 # ADR-0005: Unified WebSocket Manager
 
-**Status:** Proposed
+**Status:** Proposed (updated 2026-07-13)
 **Date:** 2026-07-04
 **Owner:** Frontend Platform
-**Related:** `docs/WORKFLOW_REFACTOR_FOLLOWUP.md` P1-3, ADR-0004
+**Related:** `docs/WORKFLOW_REFACTOR_FOLLOWUP.md` P1-3, ADR-0004 (Implemented)
 
 ## Context
 
-The frontend currently has **three independent WebSocket systems** with different APIs, different reconnect strategies, and different authentication patterns:
+> **Update 2026-07-13:** This ADR originally identified 3 WebSocket
+> systems. A re-audit found **7 active WS construction sites** (plus
+> 1 dead). The problem is now larger and more urgent than originally
+> documented. The Decision and Principles below are unchanged; the
+> inventory and migration phases have been updated.
 
-### 1. `openQueueWS` — `frontend/src/api/ws.js:15`
-- **URL**: `/ws/queue?department=&date_str=`
-- **Auth**: none (no token)
-- **Reconnect**: none (`ws.onclose = () => {}`)
-- **Heartbeat**: none
-- **Status**: disabled by default (`VITE_ENABLE_WS=0`), never called by any code
-- **ADR-0004** proposes to enable + add reconnect + auth + heartbeat
+The frontend currently has **seven active WebSocket construction sites**
+(`new WebSocket(...)`) plus one dead function, with inconsistent auth
+patterns, reconnect strategies, and heartbeat implementations:
 
-### 2. `openDisplayBoardWS` — `frontend/src/api/ws.js:51`
-- **URL**: `/api/v1/display/ws/board/{board_id}?token=...`
-- **Auth**: JWT in query param
-- **Reconnect**: 5 attempts × 3s, then dies (no infinite retry)
-- **Heartbeat**: ping every 30s
-- **Status**: active, used by `DisplayBoardUnified.jsx`
-- **Known issue**: after 5 failed reconnects, the display board goes stale silently until manual page reload
+### WS Inventory (as of 2026-07-13)
 
-### 3. `NotificationWebSocketContext` — `frontend/src/contexts/NotificationWebSocketContext.jsx`
-- **URL**: `/api/v1/ws/notifications/connect?token=...`
-- **Auth**: JWT in query param
-- **Reconnect**: infinite 3s retry (via `scheduleReconnect()`)
-- **Heartbeat**: implicit (relies on server-side keepalive)
-- **Status**: active, wraps the entire authenticated app
-- **Known issue**: reconnect delay is fixed 3s — no backoff, so a long backend outage generates 1 request every 3s per client indefinitely
+| # | File | Auth method | Reconnect | Heartbeat | Status |
+|---|------|-------------|-----------|-----------|--------|
+| 1 | `contexts/NotificationWebSocketContext.jsx:214` | ✅ subprotocol `bearer.<token>` | infinite 3s retry | implicit | Active — wraps entire app |
+| 2 | `api/ws.js:70` (`openDisplayBoardWS`) | ✅ subprotocol | 5 attempts × 3s, then dies | ping 30s | Active — DisplayBoard |
+| 3 | `utils/websocketAuth.js:49` (`createAuthenticatedWebSocket`) | ✅ subprotocol | configurable | configurable | Active — utility, callers unknown |
+| 4 | `hooks/useQueueWebSocket.js:90` | ❌ **token in URL query** | exponential 3→30s, 5 attempts | none | Active — ModernQueueManager |
+| 5 | `hooks/useAIChat.js:273` | ❌ **token in URL query** | none | none | Active — AI chat |
+| 6 | `hooks/useApi.js:253` | ❌ **token in URL query** | none | none | Active — generic WS hook |
+| 7 | `contexts/ChatContext.jsx:357` | ❌ **NO AUTH at all** | none | none | Active — chat |
+| 8 | `api/ws.js:15` (`openQueueWS`) | none | none | none | **Dead code** — 0 callers |
+
+### Security Finding (NEW — 2026-07-13)
+
+**4 of 7 active WS sites leak JWT in URL query string** (`?token=...`),
+which is the exact issue that frontend audit PR-36 / P0-3 was supposed to
+fix. PR-36 fixed `NotificationWebSocketContext` and created
+`websocketAuth.js` with the subprotocol pattern, but **4 other WS sites
+were not migrated**:
+
+- `useQueueWebSocket.js:85` — `?token=${encodeURIComponent(token)}`
+- `useAIChat.js:270` — `?token=${token}`
+- `useApi.js:251` — `?token=${encodeURIComponent(token)}`
+- `ChatContext.jsx:357` — no auth at all (separate issue)
+
+This is a **P0 security regression** — the JWT appears in nginx access
+logs, browser history, and Referer headers for these 4 endpoints.
 
 ### The Problem
 
-Three separate implementations means:
+Seven separate implementations means:
 
-1. **Duplicated logic** — each system re-implements URL building, token handling, reconnect, and message parsing. ~150 lines of near-identical code across 3 files.
-2. **Inconsistent resilience** — queue WS gives up instantly, display board gives up after 5 tries, notifications retry forever. No principled reason for the difference.
-3. **No shared backoff** — when the backend recovers from an outage, all 3 systems reconnect simultaneously (thundering herd). With N doctors, that is 3N concurrent WS connections hitting the backend at the same moment.
-4. **No shared connection state** — if the network drops, each system independently detects the failure and reconnects. The user sees 3 separate "reconnecting..." indicators (if any).
-5. **Testing burden** — each system must be tested separately for reconnect, auth, and message handling. No shared test fixtures.
+1. **Duplicated logic** — each system re-implements URL building, token handling, reconnect, and message parsing. ~300 lines of near-identical code across 7 files.
+2. **Inconsistent auth** — 3 sites use subprotocol (secure), 4 sites use URL query (insecure). No principled reason for the difference.
+3. **Inconsistent resilience** — queue WS has exponential backoff, display board gives up after 5 tries, notifications retry forever, AI chat / ChatContext / useApi have no reconnect at all.
+4. **No shared backoff** — when the backend recovers from an outage, all 7 systems reconnect independently (thundering herd). With N doctors, that is up to 7N concurrent WS connections.
+5. **No shared connection state** — the user sees different "reconnecting..." indicators (or none) depending on which WS dropped.
+6. **Testing burden** — each system must be tested separately. No shared test fixtures.
+7. **Security debt** — 4 sites leak JWT in URL. A unified `WSManager` with subprotocol auth would fix all 4 in one migration.
 
 ## Decision
 
-**Create a single `WSManager` class that all three WebSocket use cases build on.**
+**Create a single `WSManager` class that all WebSocket use cases build on.**
 
 ### Principles
 
@@ -53,7 +68,7 @@ Three separate implementations means:
 2. **Configurable retry policy** — each `WSManager` instance accepts a `RetryPolicy` object: `{ strategy: 'fixed' | 'exponential', base: 1000, cap: 30000, maxAttempts: number | Infinity, jitter: 0.2 }`.
 3. **Shared heartbeat** — `WSManager` sends `{type: 'ping'}` every 30s; if no pong within 10s, force reconnect. Configurable via `heartbeatIntervalMs`.
 4. **Connection state observable** — `ws.onStateChange(callback)` emits `'connecting' | 'open' | 'closing' | 'closed' | 'reconnecting'`. UI can show a single "Connection lost, reconnecting..." indicator.
-5. **Auth via query param OR subprotocol** — `WSManager` accepts `auth: { type: 'query', key: 'token', value: () => tokenManager.getAccessToken() }` or `auth: { type: 'subprotocol', value: () => ... }`. Phase 1 uses query param (matches existing pattern); Phase 2 can migrate to subprotocol for log safety.
+5. **Auth via subprotocol (default) OR query param** — `WSManager` accepts `auth: { type: 'subprotocol', value: () => tokenManager.getAccessToken() }` (default, secure — token not in URL/logs) or `auth: { type: 'query', key: 'token', value: () => ... }` (legacy, insecure — only for backend endpoints that don't support subprotocol yet). The 4 sites currently leaking JWT in URL query (useQueueWebSocket, useAIChat, useApi, ChatContext) will be migrated to subprotocol.
 6. **Backpressure** — if the message queue exceeds 100 unprocessed messages, drop the oldest (configurable). Prevents memory blowup if the handler is slow.
 
 ### Proposed API
@@ -79,63 +94,79 @@ class WSManager {
 }
 ```
 
-### Migration Plan (4 phases, each a separate PR)
+### Migration Plan (6 phases, each a separate PR)
+
+> **Updated 2026-07-13:** Original plan had 4 phases for 3 WS sites.
+> Now 7 active sites need migration. Phases 2-4 below are new (for the
+> 4 insecure-auth sites). Phases 5-7 correspond to the original Phases 2-4.
+
+#### Phase 0: Delete dead `openQueueWS` (Trivial, no risk)
+- `frontend/src/api/ws.js:15-45` — `openQueueWS` has 0 callers.
+- Delete the function. Keep `openDisplayBoardWS` and `wsEnabled()`.
+- **Estimated diff**: -30 lines.
 
 #### Phase 1: Create `WSManager` class + unit tests (No production change)
 - New file `frontend/src/core/ws/WSManager.js`.
 - New file `frontend/src/core/ws/__tests__/WSManager.test.js` — unit tests with a mock WebSocket.
-- Tests cover: connect, disconnect, reconnect with fixed backoff, reconnect with exponential backoff, heartbeat, auth via query param, subscribe/unsubscribe, backpressure drop, state transitions.
-- **No existing code changes** — `openQueueWS`, `openDisplayBoardWS`, `NotificationWebSocketContext` continue to work as-is.
+- Tests cover: connect, disconnect, reconnect with fixed backoff, reconnect with exponential backoff, heartbeat, auth via subprotocol, auth via query param, subscribe/unsubscribe, backpressure drop, state transitions.
+- **No existing code changes** — all 7 sites continue to work as-is.
 - **Estimated diff**: ~300 lines new code (class + tests).
 - **Testing**: Unit tests pass.
 
-#### Phase 2: Migrate `openDisplayBoardWS` to `WSManager` (Low risk)
-- Rewrite `openDisplayBoardWS` as a thin wrapper around `WSManager`:
-  ```javascript
-  export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) {
-    const ws = new WSManager({
-      url: () => buildWsUrl(`/api/v1/display/ws/board/${boardId}`),
-      auth: { type: 'query', key: 'token', value: () => tokenManager.getAccessToken() },
-      retry: { strategy: 'exponential', base: 1000, cap: 30000, maxAttempts: Infinity, jitter: 0.2 },
-      heartbeat: { intervalMs: 30000, timeoutMs: 10000 },
-    });
-    ws.subscribe('board_update', onMessage);
-    ws.onStateChange((state) => {
-      if (state === 'open') onConnect && onConnect();
-      if (state === 'closed' || state === 'reconnecting') onDisconnect && onDisconnect();
-    });
-    ws.connect();
-    return () => ws.disconnect(1000, 'bye');
-  }
-  ```
-- **Benefit over current**: infinite reconnect (was: 5 attempts then die). Exponential backoff (was: fixed 3s).
+#### Phase 2: Migrate `useQueueWebSocket` to `WSManager` (Medium risk — security fix)
+- **Priority: HIGH** — this site leaks JWT in URL query (`?token=...`).
+- Rewrite `useQueueWebSocket.js` to use `WSManager` with `auth: { type: 'subprotocol' }`.
+- Preserve the existing exponential backoff (3→6→12→24→30s, 5 attempts).
+- **Benefit**: JWT no longer in URL query. Shared heartbeat. Shared state observable.
+- **Estimated diff**: ~60 lines deleted, ~30 lines added.
+- **Testing**: Manual — verify queue updates still arrive, verify JWT not in Network tab URL.
+
+#### Phase 3: Migrate `useAIChat` to `WSManager` (Medium risk — security fix)
+- **Priority: HIGH** — this site leaks JWT in URL query.
+- Rewrite `useAIChat.js:273` to use `WSManager` with `auth: { type: 'subprotocol' }`.
+- Add reconnect logic (currently none — AI chat dies silently on disconnect).
+- **Benefit**: JWT no longer in URL. Reconnect on disconnect.
+- **Estimated diff**: ~40 lines deleted, ~30 lines added.
+
+#### Phase 4: Migrate `useApi` WS + `ChatContext` to `WSManager` (Medium risk — security fix)
+- **Priority: HIGH** — `useApi` leaks JWT in URL query; `ChatContext` has no auth at all.
+- Rewrite both to use `WSManager` with `auth: { type: 'subprotocol' }`.
+- `ChatContext` needs auth added (currently `new WebSocket(wsUrl)` with no token — this is a separate bug).
+- **Benefit**: JWT no longer in URL. Chat gets auth. Both get reconnect.
+- **Estimated diff**: ~80 lines deleted, ~50 lines added.
+
+#### Phase 5: Migrate `openDisplayBoardWS` to `WSManager` (Low risk)
+- Rewrite `openDisplayBoardWS` as a thin wrapper around `WSManager`.
+- Already uses subprotocol — keep it.
+- **Benefit**: infinite reconnect (was: 5 attempts then die). Shared backoff.
 - **Estimated diff**: ~80 lines deleted, ~30 lines added.
-- **Testing**: Existing `DisplayBoardUnified.contract.test.jsx` passes; manual test — kill backend, verify reconnect.
 
-#### Phase 3: Migrate `NotificationWebSocketContext` to `WSManager` (Medium risk)
+#### Phase 6: Migrate `NotificationWebSocketContext` to `WSManager` (Medium risk)
 - Replace the bespoke WS logic in `NotificationWebSocketContext.jsx` with `WSManager`.
-- The context still owns the message-routing logic (notification_seen_ack, queue_update, etc.) — it just delegates transport to `WSManager`.
-- **Benefit over current**: exponential backoff (was: fixed 3s, no jitter → thundering herd).
+- The context still owns the message-routing logic — it just delegates transport to `WSManager`.
+- Already uses subprotocol — keep it.
+- **Benefit**: exponential backoff (was: fixed 3s, no jitter → thundering herd).
 - **Estimated diff**: ~100 lines deleted, ~40 lines added.
-- **Testing**: Existing `NotificationCenterContext.test.jsx` passes; manual test — verify notifications still arrive, unread count converges after reconnect.
 
-#### Phase 4: Migrate `openQueueWS` to `WSManager` + enable (Medium risk, depends on ADR-0004)
-- Rewrite `openQueueWS` as a `WSManager` wrapper (same pattern as Phase 2).
-- Set `VITE_ENABLE_WS=1` in production env.
-- Wire into `useDoctorQueue` per ADR-0004 Phase 3.
-- **Benefit**: unifies the third system; all WS now goes through `WSManager`.
-- **Estimated diff**: ~50 lines in `ws.js`, ~50 lines in `useDoctorQueue.js`, ~2 lines in env files.
-- **Testing**: ADR-0004 acceptance criteria.
+#### Phase 7: Delete `websocketAuth.js` utility (Trivial, after Phase 5-6)
+- `createAuthenticatedWebSocket` in `utils/websocketAuth.js` is superseded by `WSManager`.
+- Check for remaining callers; if none, delete.
+- **Estimated diff**: -200 lines.
 
 ### Acceptance Criteria
 
 - [ ] `frontend/src/core/ws/WSManager.js` exists with the proposed API
-- [ ] `WSManager.test.js` covers: connect, disconnect, fixed backoff, exponential backoff, heartbeat timeout, auth query param, subscribe/unsubscribe, backpressure, state transitions
-- [ ] `openDisplayBoardWS` uses `WSManager` internally (Phase 2)
-- [ ] `NotificationWebSocketContext` uses `WSManager` internally (Phase 3)
-- [ ] `openQueueWS` uses `WSManager` internally (Phase 4)
+- [ ] `WSManager.test.js` covers: connect, disconnect, fixed backoff, exponential backoff, heartbeat timeout, auth subprotocol, auth query param, subscribe/unsubscribe, backpressure, state transitions
+- [ ] Dead `openQueueWS` deleted (Phase 0)
+- [ ] `useQueueWebSocket` uses `WSManager` with subprotocol auth (Phase 2)
+- [ ] `useAIChat` uses `WSManager` with subprotocol auth (Phase 3)
+- [ ] `useApi` WS + `ChatContext` use `WSManager` with subprotocol auth (Phase 4)
+- [ ] `openDisplayBoardWS` uses `WSManager` internally (Phase 5)
+- [ ] `NotificationWebSocketContext` uses `WSManager` internally (Phase 6)
+- [ ] `websocketAuth.js` deleted (Phase 7)
 - [ ] No file outside `core/ws/` directly constructs `new WebSocket(...)` — CI lint rule
-- [ ] Manual test: kill backend, all 3 systems reconnect with exponential backoff, no thundering herd
+- [ ] **Security**: no WS URL in the codebase contains `?token=` or `&token=` — grep returns 0 results
+- [ ] Manual test: kill backend, all systems reconnect with exponential backoff, no thundering herd
 - [ ] Manual test: display board no longer goes stale after 5 failed reconnects (was: silent death)
 
 ## Consequences

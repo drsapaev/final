@@ -6,26 +6,23 @@ import {
   Activity,
   FileText,
   User,
-  Save,
   RefreshCw,
   CheckCircle,
   Stethoscope,
   Calendar,
   Phone,
-  Plus,
   TestTube,
   Scissors,
   Sparkles,
   DollarSign } from
 'lucide-react';
 import {
-  Button, MacOSCard, Badge, Input, Textarea, Select, MacOSEmptyState,
+  Button, MacOSCard, Badge, Input, MacOSEmptyState,
 } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './dermatology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
-import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
@@ -34,11 +31,7 @@ import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
-import PhotoUploader from '../components/dermatology/PhotoUploader';
-import PhotoComparison from '../components/dermatology/PhotoComparison';
 import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
-import SkinAnalysis from '../components/dermatology/SkinAnalysis';
-import PriceOverrideManager from '../components/dermatology/PriceOverrideManager';
 import DermaExamsTab from '../components/dermatology/DermaExamsTab';
 import DermaHistoryTab from '../components/dermatology/DermaHistoryTab';
 import DermaPhotosTab from '../components/dermatology/DermaPhotosTab';
@@ -317,7 +310,12 @@ const DermatologistPanelUnified = () => {
     },
   });
 
-  // Состояние для PriceOverrideManager
+  // PriceOverrideManager state — the component import was removed (dead code:
+  // PriceOverrideManager was imported but never rendered in JSX). The state
+  // variables are still referenced by a button onClick at line ~1744, so we
+  // keep them to avoid a runtime crash. The button sets state but nothing
+  // opens — this is the existing behaviour. To fully restore, re-import
+  // PriceOverrideManager and render it conditionally on showPriceOverride.
   const [showPriceOverride, setShowPriceOverride] = useState(false);
   const [selectedServiceForPriceOverride, setSelectedServiceForPriceOverride] = useState(null);
 
@@ -422,8 +420,6 @@ const DermatologistPanelUnified = () => {
           return [];
         }
 
-        // Используем комбинированный подход: получаем данные из queues для услуг и из БД для payment_status
-        const today = new Date().toISOString().split('T')[0];
         // 1. Получаем очереди для информации об услугах
         const queuesResponse = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
           headers: {
@@ -1040,7 +1036,7 @@ const DermatologistPanelUnified = () => {
     };
 
     loadPatientFromUrl();
-  }, [location.search, patientIdFromUrl, visitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments, setActiveTab, setSelectedPatient]);
+  }, [location.search, patientIdFromUrl, visitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments, setActiveTab, setSelectedPatient, handleTabChange]);
 
   useEffect(() => {
     const appointmentId = currentAppointment?.appointment_id || null;

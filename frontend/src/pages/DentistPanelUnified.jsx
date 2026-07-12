@@ -40,16 +40,8 @@ import {
   FileText,
   Eye,
   Search,
-  Plus,
-  Edit,
   XCircle,
-  Smile,
-  BarChart3,
-  Users,
-  DollarSign,
-  Scissors,
-  Save,
-  Building } from
+  Save } from
 'lucide-react';
 import '../styles/animations.css';
 import { getApiBaseUrl } from '../api/runtime';
