@@ -66,7 +66,7 @@ export function subscribe(fn) {
 
 export function getToken() {
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    return sessionStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
@@ -74,7 +74,7 @@ export function getToken() {
 
 export function getProfileFromStorage() {
   try {
-    const raw = localStorage.getItem(PROFILE_KEY);
+    const raw = sessionStorage.getItem(PROFILE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -90,7 +90,7 @@ export function getState() {
 
 function clearProfileStorageOnly() {
   try {
-    localStorage.removeItem(PROFILE_KEY);
+    sessionStorage.removeItem(PROFILE_KEY);
   } catch (e) {
     logger.warn('clearProfileStorageOnly failed:', e);
   }
@@ -105,9 +105,9 @@ export function setToken(token) {
 
   try {
     if (token === null || token === undefined) {
-      localStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_KEY);
     } else {
-      localStorage.setItem(TOKEN_KEY, token);
+      sessionStorage.setItem(TOKEN_KEY, token);
     }
   } catch (e) {
     // ignore localStorage failures (e.g. private mode)
@@ -144,7 +144,7 @@ export function clearToken() {
   lastValidatedToken = null;
 
   try {
-    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
   } catch (e) {
     logger.warn('clearToken localStorage failed:', e);
   }
@@ -288,10 +288,10 @@ export async function validateSession(force = false) {
 export function setProfile(profile) {
   try {
     if (profile === null || profile === undefined) {
-      localStorage.removeItem(PROFILE_KEY);
+      sessionStorage.removeItem(PROFILE_KEY);
       tokenManager.setUserData(null);
     } else {
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+      sessionStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
       tokenManager.setUserData(profile);
     }
   } catch (e) {

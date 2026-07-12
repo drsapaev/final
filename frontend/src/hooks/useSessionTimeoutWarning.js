@@ -66,7 +66,8 @@ export function useSessionTimeoutWarning({
 
     const check = () => {
       try {
-        const token = window.localStorage.getItem('auth_token');
+        // PR-39 / P0-2: read token from sessionStorage (tokenManager migration)
+        const token = window.sessionStorage.getItem('auth_token');
         if (!token) {
           // No token at all — the auth guard will handle redirect.
           return;

@@ -19,15 +19,15 @@ function createJwt(expSecondsFromNow) {
 describe('auth store', () => {
   let storage;
 
-  function primeLocalStorage(initial = {}) {
+  function primeSessionStorage(initial = {}) {
     storage = { ...initial };
-    localStorage.getItem.mockImplementation((key) =>
+    sessionStorage.getItem.mockImplementation((key) =>
       Object.prototype.hasOwnProperty.call(storage, key) ? storage[key] : null
     );
-    localStorage.setItem.mockImplementation((key, value) => {
+    sessionStorage.setItem.mockImplementation((key, value) => {
       storage[key] = String(value);
     });
-    localStorage.removeItem.mockImplementation((key) => {
+    sessionStorage.removeItem.mockImplementation((key) => {
       delete storage[key];
     });
   }
@@ -35,11 +35,11 @@ describe('auth store', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    primeLocalStorage();
+    primeSessionStorage();
   });
 
   it('clears auth state when backend returns 401 during profile validation', async () => {
-    primeLocalStorage({
+    primeSessionStorage({
       auth_token: createJwt(3600),
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });
@@ -55,7 +55,7 @@ describe('auth store', () => {
   });
 
   it('clears expired tokens before protected routes hit the API', async () => {
-    primeLocalStorage({
+    primeSessionStorage({
       auth_token: createJwt(-3600),
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });
@@ -70,7 +70,7 @@ describe('auth store', () => {
   });
 
   it('reuses a recent validated session instead of calling /auth/me again', async () => {
-    primeLocalStorage({
+    primeSessionStorage({
       auth_token: createJwt(3600),
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });
@@ -89,7 +89,7 @@ describe('auth store', () => {
   });
 
   it('keeps cached auth state when /auth/me is rate limited', async () => {
-    primeLocalStorage({
+    primeSessionStorage({
       auth_token: createJwt(3600),
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });

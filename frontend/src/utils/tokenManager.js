@@ -3,15 +3,18 @@
  *
  * ВАЖНО: Использовать ТОЛЬКО этот модуль для работы с токенами!
  * Единственный источник истины для ключей токенов.
+ *
+ * PR-39 / P0-2: Tokens migrated from localStorage to sessionStorage.
+ * localStorage persists across browser sessions (until manually cleared) —
+ * a stolen device or shared computer exposes tokens indefinitely.
+ * sessionStorage is cleared when the tab closes, limiting the exposure window.
+ *
+ * Full httpOnly cookie migration requires backend coordination (Set-Cookie
+ * with SameSite=Strict + credentials: 'include' on axios). This is a
+ * partial mitigation until that work is done.
  */
 import logger from './logger';
 
-/**
- * FRONTEND-SECURITY: Tokens stored in localStorage are accessible to XSS.
- * Mitigation: CSP headers (added in backend) prevent inline script injection.
- * Future: migrate to httpOnly cookies (requires backend changes).
- * Current: accept the risk with CSP + strict input validation.
- */
 const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user';
@@ -26,7 +29,8 @@ export const tokenManager = {
    */
   getAccessToken() {
     try {
-      const t = localStorage.getItem(TOKEN_KEY);
+      // PR-39 / P0-2: sessionStorage instead of localStorage
+      const t = sessionStorage.getItem(TOKEN_KEY);
       return t ? t.trim() : null;
     } catch (error) {
       logger.error('Error reading access token:', error);
@@ -42,10 +46,10 @@ export const tokenManager = {
     try {
       if (token) {
         const trimmed = typeof token === 'string' ? token.trim() : token;
-        if (trimmed) localStorage.setItem(TOKEN_KEY, trimmed);else
-        localStorage.removeItem(TOKEN_KEY);
+        if (trimmed) sessionStorage.setItem(TOKEN_KEY, trimmed);else
+        sessionStorage.removeItem(TOKEN_KEY);
       } else {
-        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_KEY);
       }
     } catch (error) {
       logger.error('Error setting access token:', error);
@@ -58,7 +62,8 @@ export const tokenManager = {
    */
   getRefreshToken() {
     try {
-      return localStorage.getItem(REFRESH_TOKEN_KEY);
+      // PR-39 / P0-2: sessionStorage instead of localStorage
+      return sessionStorage.getItem(REFRESH_TOKEN_KEY);
     } catch (error) {
       logger.error('Error reading refresh token:', error);
       return null;
@@ -72,9 +77,10 @@ export const tokenManager = {
   setRefreshToken(token) {
     try {
       if (token) {
-        localStorage.setItem(REFRESH_TOKEN_KEY, token);
+        // PR-39 / P0-2: sessionStorage instead of localStorage
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
       } else {
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        sessionStorage.removeItem(REFRESH_TOKEN_KEY);
       }
     } catch (error) {
       logger.error('Error setting refresh token:', error);
@@ -87,7 +93,8 @@ export const tokenManager = {
    */
   getUserData() {
     try {
-      const data = localStorage.getItem(USER_KEY);
+      // PR-39 / P0-2: sessionStorage instead of localStorage (user data may contain role/permissions)
+      const data = sessionStorage.getItem(USER_KEY);
       return data ? JSON.parse(data) : null;
     } catch (error) {
       logger.error('Error reading user data:', error);
@@ -102,9 +109,10 @@ export const tokenManager = {
   setUserData(userData) {
     try {
       if (userData) {
-        localStorage.setItem(USER_KEY, JSON.stringify(userData));
+        // PR-39 / P0-2: sessionStorage instead of localStorage
+        sessionStorage.setItem(USER_KEY, JSON.stringify(userData));
       } else {
-        localStorage.removeItem(USER_KEY);
+        sessionStorage.removeItem(USER_KEY);
       }
     } catch (error) {
       logger.error('Error setting user data:', error);
@@ -116,9 +124,10 @@ export const tokenManager = {
    */
   clearAll() {
     try {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
+      // PR-39 / P0-2: sessionStorage instead of localStorage
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+      sessionStorage.removeItem(USER_KEY);
     } catch (error) {
       logger.error('Error clearing tokens:', error);
     }

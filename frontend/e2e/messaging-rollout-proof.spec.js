@@ -112,9 +112,9 @@ async function seedAuthContext(context, credentials) {
   const session = createBackendSession(credentials.username);
 
   await context.addInitScript(({ token, profile }) => {
-    localStorage.setItem('auth_token', token);
-    localStorage.setItem('auth_profile', JSON.stringify(profile));
-    localStorage.setItem('user', JSON.stringify(profile));
+    sessionStorage.setItem('auth_token', token);
+    sessionStorage.setItem('auth_profile', JSON.stringify(profile));
+    sessionStorage.setItem('user', JSON.stringify(profile));
     sessionStorage.setItem('auth_token', token);
     sessionStorage.setItem('auth_profile', JSON.stringify(profile));
   }, {
@@ -184,7 +184,7 @@ async function sendVoiceMessage(page, recipientId) {
     formData.append('audio_file', blob, 'voice.wav');
     formData.append('recipient_id', String(recipientIdValue));
 
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+    const token = sessionStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
     const uploadResponse = await fetch('/api/v1/messages/send-voice', {
       method: 'POST',
       headers: {

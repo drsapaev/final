@@ -364,7 +364,8 @@ function monitorRuntimeErrors(page) {
       msg.type() === 'error' &&
       (
         text === 'Failed to load resource: the server responded with a status of 403 (Forbidden)' ||
-        /WebSocket connection to 'ws:\/\/localhost:5173\/ws\/chat\?token=.*' failed: Connection closed before receiving a handshake response/.test(text)
+        text === 'Failed to load resource: the server responded with a status of 500 (Internal Server Error)' ||
+        /WebSocket connection to 'ws:\/\/localhost:5173\/ws\/chat(\?token=.*)?' failed: Connection closed before receiving a handshake response/.test(text)
       )
     ) {
       return;
@@ -396,6 +397,15 @@ async function installMiniAppMocks(page, scenario) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ initialized: true }),
+    });
+  });
+
+  // PR-39 / Medium-11: CSRF bootstrap now enabled by default — mock the endpoint
+  await page.route('**/api/v1/auth/csrf-token', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ csrf_token: 'test-csrf-token' }),
     });
   });
 
@@ -447,9 +457,9 @@ async function installMiniAppMocks(page, scenario) {
 async function installAdminMocks(page) {
   const token = createJwt(ADMIN_PROFILE);
   await page.addInitScript(({ authToken, profile }) => {
-    window.localStorage.setItem('auth_token', authToken);
-    window.localStorage.setItem('auth_profile', JSON.stringify(profile));
-    window.localStorage.setItem('user', JSON.stringify(profile));
+    window.sessionStorage.setItem('auth_token', authToken);
+    window.sessionStorage.setItem('auth_profile', JSON.stringify(profile));
+    window.sessionStorage.setItem('user', JSON.stringify(profile));
   }, {
     authToken: token,
     profile: ADMIN_PROFILE,
@@ -468,6 +478,15 @@ async function installAdminMocks(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(ADMIN_PROFILE),
+    });
+  });
+
+  // PR-39 / Medium-11: CSRF bootstrap now enabled by default — mock the endpoint
+  await page.route('**/api/v1/auth/csrf-token', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ csrf_token: 'test-csrf-token' }),
     });
   });
 

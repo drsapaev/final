@@ -17,7 +17,7 @@ export function clearAuthCache() {
     tokenManager.clearAll();
 
     // Legacy-ключи (auth_profile) — не входят в tokenManager.
-    localStorage.removeItem('auth_profile');
+    sessionStorage.removeItem('auth_profile');
     sessionStorage.removeItem('auth_token');
     sessionStorage.removeItem('auth_profile');
 
@@ -34,7 +34,7 @@ export function clearAuthCache() {
  */
 export function hasStaleAuthCache() {
   try {
-    const profile = localStorage.getItem('auth_profile');
+    const profile = sessionStorage.getItem('auth_profile');
     if (!profile) return false;
 
     const profileData = JSON.parse(profile);

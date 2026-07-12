@@ -253,7 +253,7 @@ function ComponentTestInner() {
         <h2 style={titleStyle}>API интеграция</h2>
         <p>API клиент: {typeof window !== 'undefined' ? 'Доступен' : 'Недоступен'}</p>
         <p>Токен: {tokenManager.getAccessToken() ? 'Есть' : 'Нет'}</p>
-        <p>Профиль: {localStorage.getItem('auth_profile') ? 'Есть' : 'Нет'}</p>
+        <p>Профиль: {sessionStorage.getItem('auth_profile') ? 'Есть' : 'Нет'}</p>
       </div>
     </div>
   );

@@ -14,7 +14,9 @@ import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 
 const API_BASE = getApiBaseUrl();
-const CSRF_BOOTSTRAP_ENABLED = import.meta.env.VITE_CSRF_BOOTSTRAP === '1';
+// PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
+// to explicitly disable (e.g., for local dev without backend CSRF support).
+const CSRF_BOOTSTRAP_ENABLED = import.meta.env.VITE_CSRF_BOOTSTRAP !== '0';
 const GLOBAL_RATE_LIMIT_COOLDOWN_MS = 60_000;
 let globalRateLimitUntil = 0;
 let globalRateLimitLogAt = 0;
@@ -199,12 +201,12 @@ api.interceptors.request.use(async (config) => {
   }
 
   const token = tokenManager.getAccessToken();
-  logger.log('🔍 [api/client.js] Request interceptor:', {
-    url: config.url,
-    hasToken: !!token,
-    tokenPreview: token ? `${token.substring(0, 20)}...` : 'null',
-    headers: config.headers
-  });
+  // PR-39 / Medium-12: Removed tokenPreview logging — was leaking first 20 chars
+  // of the JWT to the browser console (visible in production via devtools).
+  // Now we only log whether a token exists (boolean), not its content.
+  if (import.meta.env.MODE === 'development') {
+    logger.log('[api/client.js] Request:', { url: config.url, hasToken: !!token });
+  }
   if (token) {
     const t = typeof token === 'string' ? token.trim() : token;
     if (t) {
