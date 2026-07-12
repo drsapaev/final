@@ -76,6 +76,23 @@ async def login(
 @router.get("/me", response_model=None)
 async def me(current_user: User = Depends(get_current_user)):
     """Return current authenticated user profile as plain JSON."""
+    # PR-27: include doctor specialty so frontend can route to the correct panel
+    specialty = None
+    doctor_id = None
+    cabinet = None
+    if hasattr(current_user, 'role') and current_user.role in ('Doctor', 'cardio', 'derma', 'dentist'):
+        from app.models.clinic import Doctor
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        try:
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+            if doctor:
+                specialty = doctor.specialty
+                doctor_id = doctor.id
+                cabinet = doctor.cabinet
+        finally:
+            db.close()
+
     return {
         "id": getattr(current_user, "id", None),
         "username": getattr(current_user, "username", None),
@@ -84,6 +101,10 @@ async def me(current_user: User = Depends(get_current_user)):
         "role": getattr(current_user, "role", None),
         "is_active": getattr(current_user, "is_active", True),
         "is_superuser": getattr(current_user, "is_superuser", False),
+        # PR-27: doctor-specific fields for specialty-based routing
+        "specialty": specialty,
+        "doctor_id": doctor_id,
+        "cabinet": cabinet,
     }
 
 
