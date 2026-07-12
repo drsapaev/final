@@ -1,9 +1,30 @@
 # ADR-0004: Enable Queue WebSocket + Add Reconnect
 
-**Status:** Proposed
+**Status:** ✅ Implemented (2026-07-12)
 **Date:** 2026-07-04
+**Implemented:** 2026-07-12 via PR-36 (#2110) + `useQueueWebSocket` hook
 **Owner:** Frontend Platform
 **Related:** `docs/WORKFLOW_REFACTOR_FOLLOWUP.md` P1-1
+
+## Implementation Summary
+
+This ADR was implemented through the frontend security audit (PR-35 → PR-44).
+
+**What was done:**
+1. ✅ **JWT authentication** — `websocketAuth.js` now uses `Sec-WebSocket-Protocol: bearer.<token>` subprotocol (PR-36). More secure than the originally proposed `?token=` query param — prevents token leakage in nginx logs, browser history, and Referer headers.
+2. ✅ **Reconnect with exponential backoff** — `useQueueWebSocket` hook implements exponential backoff (1s → 2s → 4s → ... → 30s cap, reset on successful connect).
+3. ✅ **Heartbeat** — client sends `{type: 'ping'}` every 30s; if no pong within 10s, force reconnect.
+4. ✅ **Wired into production** — `ModernQueueManager.jsx` uses `useQueueWebSocket` (the real queue manager, replacing the stub `DoctorPanel.jsx`).
+5. ✅ **Polling fallback** — `useDoctorQueue` still polls every 30s, but it's only used by `DoctorPanel.jsx` (a stub — see ADR-0003 for DoctorPanel migration).
+
+**What was NOT done (by design):**
+- `openQueueWS` in `api/ws.js` was NOT updated — it remains disabled (`VITE_ENABLE_WS=0`). The new `useQueueWebSocket` hook is the canonical implementation. `openQueueWS` is dead code and will be removed in a future cleanup PR.
+- `VITE_ENABLE_WS` env var is no longer relevant for queue WS — the hook is always enabled.
+
+**Verification:**
+- `frontend/src/hooks/useQueueWebSocket.js` — exponential backoff + JWT subprotocol + heartbeat
+- `frontend/src/utils/websocketAuth.js` — `Sec-WebSocket-Protocol: bearer.<token>` subprotocol
+- `frontend/src/components/queue/ModernQueueManager.jsx` — uses `useQueueWebSocket`
 
 ## Context
 

@@ -1,9 +1,41 @@
 # ADR-0005: Unified WebSocket Manager
 
-**Status:** Proposed
+**Status:** ⚠️ Partially Implemented (2026-07-13) — auth + reconnect + heartbeat done, unified WSManager NOT done
 **Date:** 2026-07-04
+**Updated:** 2026-07-13
 **Owner:** Frontend Platform
 **Related:** `docs/WORKFLOW_REFACTOR_FOLLOWUP.md` P1-3, ADR-0004
+
+## Update (2026-07-13)
+
+ADR-0004 (queue WS enablement) is now ✅ Implemented (see ADR-0004 status).
+However, this ADR (unified WSManager) is only **partially done**:
+
+- ✅ **Auth** — all WS connections now use `Sec-WebSocket-Protocol: bearer.<token>` subprotocol via `websocketAuth.js` (PR-36)
+- ✅ **Reconnect + heartbeat** — `useQueueWebSocket` hook implements exponential backoff + ping/pong
+- ❌ **Unified WSManager** — `frontend/src/core/ws/WSManager.js` was NOT created. The number of WS systems has **increased** from 3 to 7 (see updated inventory below).
+
+### Current WS Systems (7, was 3)
+
+The frontend audit (PR-35 → PR-44) added new WS hooks without consolidating them. Updated inventory:
+
+1. `openQueueWS` (`api/ws.js:15`) — **dead code** (disabled, never called). Candidate for removal.
+2. `openDisplayBoardWS` (`api/ws.js:51`) — active. Display board WS with reconnect.
+3. `NotificationWebSocketContext` (`contexts/`) — active. Notification WS.
+4. `useQueueWebSocket` (new, `hooks/`) — active. Queue WS with exponential backoff + JWT subprotocol. ✅ Implements ADR-0004.
+5. `useAIChat` (new, `hooks/`) — active. AI chat WS.
+6. `useApi` (`hooks/useApi.js:253`) — active. Generic WS hook.
+7. `ChatContext` (`contexts/ChatContext.jsx:357`) — active. Chat WS.
+
+### What remains to be done
+
+The unified `WSManager` class is still needed to:
+1. Centralize connection lifecycle (connect/disconnect/reconnect) for all 7 systems
+2. Provide a single `useWebSocket(channel, options)` hook that all consumers use
+3. Enforce consistent auth (subprotocol), heartbeat, and backoff across all connections
+4. Track connection state globally (for debugging + observability)
+
+**Estimated effort:** 2-3 PRs. The migration is mechanical (replace each hook's internal `new WebSocket(...)` with `wsManager.connect(channel, options)`), but requires testing each consumer.
 
 ## Context
 
