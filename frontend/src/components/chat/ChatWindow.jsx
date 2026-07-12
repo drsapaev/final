@@ -16,7 +16,7 @@ import Avatar from '../common/Avatar';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() call.
 import { useConfirm } from '../common/ConfirmDialog';
 import MessageContextMenu from './MessageContextMenu';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { urlTransform } from 'react-markdown';
 import LinkPreview from './LinkPreview';
 import FileUploader from './FileUploader';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -1025,9 +1025,18 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                                 </div> :
 
                               <ReactMarkdown
+                                urlTransform={(url) => {
+                                  const allowed = /^(https?:|mailto:|tel:|\/|#)/i;
+                                  if (!allowed.test(url)) return '#';
+                                  return urlTransform(url);
+                                }}
                                 components={{
-                                  a: ({ ...props }) =>
-                                  <a {...props} target="_blank" rel="noopener noreferrer" />
+                                  a: ({ href, children, ...props }) => {
+                                    if (href && /^(javascript|data|vbscript):/i.test(href)) {
+                                      return <span>{children}</span>;
+                                    }
+                                    return <a {...props} href={href} target="_blank" rel="noopener noreferrer" />;
+                                  }
 
                                 }}>
                                 

@@ -95,6 +95,25 @@ async def _read_upload_bounded(
     return b"".join(chunks)
 
 
+
+def _fire_and_log(coro, context: str):
+    """F-012: fire-and-forget with structured error logging."""
+    task = asyncio.create_task(coro)
+
+    def _on_done(t: asyncio.Task):
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc:
+            logger.error(
+                "WS_NOTIFY_FAILED context=%s error=%s",
+                context, exc, exc_info=exc,
+            )
+
+    task.add_done_callback(_on_done)
+    return task
+
+
 class MessagesApiService:
     """Handles chat API business logic."""
 
@@ -162,7 +181,7 @@ class MessagesApiService:
             sender_id=msg.sender_id,
             recipient_id=msg.recipient_id,
             message_type=msg.message_type,
-            content=msg.content,
+            content=msg.decrypted_content if hasattr(msg, 'decrypted_content') else msg.content,  # F-009
             is_read=msg.is_read,
             created_at=msg.created_at,
             read_at=msg.read_at,
@@ -178,6 +197,7 @@ class MessagesApiService:
         )
 
     def _audit(self, *, action: str, entity_type: str, entity_id: int, actor_user_id: int, payload: dict[str, Any]) -> None:
+        """F-007: structured audit-log error handling — never silent."""
         try:
             from app.models.audit import AuditLog
 
@@ -190,9 +210,17 @@ class MessagesApiService:
             )
             self.repository.add(audit_entry)
             self.repository.commit()
-        except Exception:
-            # Audit errors should not fail user flow
-            pass
+        except Exception as audit_exc:
+            logger.error(
+                "AUDIT_LOG_FAILED action=%s entity=%s/%s actor=%s error=%s",
+                action, entity_type, entity_id, actor_user_id, audit_exc,
+                exc_info=True,
+            )
+            try:
+                import sentry_sdk
+                sentry_sdk.capture_exception(audit_exc)
+            except ImportError:
+                pass
 
     async def send_message(self, *, request, message_data: MessageCreate, current_user: User) -> MessageOut:
         recipient = self.validate_recipient(
@@ -277,21 +305,20 @@ class MessagesApiService:
             preview=sanitized_content,
             patient_id=message_data.patient_id,
         )
-        try:
-            asyncio.create_task(
-                chat_manager.notify_new_message(
-                    recipient_id=recipient.id,
-                    message_data=enriched_message.model_dump() if hasattr(enriched_message, "model_dump") else enriched_message.dict(),
-                )
-            )
-            asyncio.create_task(
-                chat_manager.notify_new_message(
-                    recipient_id=current_user.id,
-                    message_data=enriched_message.model_dump() if hasattr(enriched_message, "model_dump") else enriched_message.dict(),
-                )
-            )
-        except Exception:
-            pass
+        _fire_and_log(
+            chat_manager.notify_new_message(
+                recipient_id=recipient.id,
+                message_data=enriched_message.model_dump() if hasattr(enriched_message, "model_dump") else enriched_message.dict(),
+            ),
+            context=f"new_message recipient={recipient.id}",
+        )
+        _fire_and_log(
+            chat_manager.notify_new_message(
+                recipient_id=current_user.id,
+                message_data=enriched_message.model_dump() if hasattr(enriched_message, "model_dump") else enriched_message.dict(),
+            ),
+            context=f"new_message echo sender={current_user.id}",
+        )
 
         return enriched_message
 
@@ -335,8 +362,9 @@ class MessagesApiService:
         if unread_ids:
             from app.ws.chat_ws import chat_manager
 
-            asyncio.create_task(
-                chat_manager.notify_messages_read(sender_id=user_id, message_ids=unread_ids)
+            _fire_and_log(
+                chat_manager.notify_messages_read(sender_id=user_id, message_ids=unread_ids),
+                context=f"messages_read sender={user_id}",
             )
 
         self._audit(
@@ -367,17 +395,15 @@ class MessagesApiService:
         message = self.repository.mark_message_as_read(message_id=message_id, user_id=user_id)
 
         if message and should_notify_sender:
-            try:
-                from app.ws.chat_ws import chat_manager
+            from app.ws.chat_ws import chat_manager
 
-                asyncio.create_task(
-                    chat_manager.notify_message_read(
-                        sender_id=message.sender_id,
-                        message_id=message.id,
-                    )
-                )
-            except Exception:
-                pass
+            _fire_and_log(
+                chat_manager.notify_message_read(
+                    sender_id=message.sender_id,
+                    message_id=message.id,
+                ),
+                context=f"message_read sender={message.sender_id}",
+            )
 
         return message
 
@@ -394,18 +420,16 @@ class MessagesApiService:
             payload={"soft_delete": True},
         )
 
-        try:
-            from app.ws.chat_ws import chat_manager
+        from app.ws.chat_ws import chat_manager
 
-            asyncio.create_task(
-                chat_manager.broadcast_event(
-                    user_ids=[user_id],
-                    event_type=MessageEventType.MESSAGE_DELETED,
-                    data={"message_id": message_id},
-                )
-            )
-        except Exception:
-            pass
+        _fire_and_log(
+            chat_manager.broadcast_event(
+                user_ids=[user_id],
+                event_type=MessageEventType.MESSAGE_DELETED,
+                data={"message_id": message_id},
+            ),
+            context=f"message_deleted user={user_id}",
+        )
 
         return {"success": True, "message": "Сообщение удалено"}
 
@@ -431,30 +455,28 @@ class MessagesApiService:
         self.repository.refresh(message)
         enriched = self.enrich_message(message)
 
-        try:
-            from app.ws.chat_ws import chat_manager
+        from app.ws.chat_ws import chat_manager
 
-            other_user_id = (
-                message.sender_id
-                if message.recipient_id == current_user.id
-                else message.recipient_id
-            )
-            payload = {
-                "message_id": message_id,
-                "user_id": current_user.id,
-                "reaction": reaction,
-                "reactions": jsonable_encoder(enriched.reactions),
-                "added": added,
-            }
-            asyncio.create_task(
-                chat_manager.broadcast_event(
-                    user_ids=[current_user.id, other_user_id],
-                    event_type=MessageEventType.REACTION_UPDATE,
-                    data=payload,
-                )
-            )
-        except Exception:
-            pass
+        other_user_id = (
+            message.sender_id
+            if message.recipient_id == current_user.id
+            else message.recipient_id
+        )
+        payload = {
+            "message_id": message_id,
+            "user_id": current_user.id,
+            "reaction": reaction,
+            "reactions": jsonable_encoder(enriched.reactions),
+            "added": added,
+        }
+        _fire_and_log(
+            chat_manager.broadcast_event(
+                user_ids=[current_user.id, other_user_id],
+                event_type=MessageEventType.REACTION_UPDATE,
+                data=payload,
+            ),
+            context=f"reaction_update users={current_user.id},{other_user_id}",
+        )
 
         return enriched
 
@@ -505,7 +527,7 @@ class MessagesApiService:
 
         file_hash = hashlib.sha256(content).hexdigest()
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-        safe_filename = f"voice_{current_user.id}_{timestamp}.{format_name}"
+        safe_filename = f"voice_{uuid.uuid4().hex}.{format_name}"  # F-015: UUID
         upload_dir = "uploads/voice_messages"
         os.makedirs(upload_dir, exist_ok=True)
         file_path = os.path.join(upload_dir, safe_filename)

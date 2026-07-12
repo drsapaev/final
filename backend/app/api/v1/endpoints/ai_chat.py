@@ -419,17 +419,26 @@ async def chat_websocket(
                         include_history=True
                     )
 
-                    # Симулируем streaming (отправляем по частям)
-                    # TODO: Реализовать настоящий streaming когда провайдеры поддержат
+                    # FA-008: streaming rate limit — max response length + chunk count
+                    MAX_RESPONSE_LENGTH = 8000
+                    MAX_CHUNKS = 400
                     chunk_size = 20
-                    full_content = response.content
+                    full_content = response.content[:MAX_RESPONSE_LENGTH]
+                    chunks_sent = 0
 
                     for i in range(0, len(full_content), chunk_size):
+                        if chunks_sent >= MAX_CHUNKS:
+                            await websocket.send_json({
+                                **_build_ai_ws_payload("truncated", session_id,
+                                    reason="max_length_reached")
+                            })
+                            break
                         chunk = full_content[i:i + chunk_size]
                         await websocket.send_json({
                             **_build_ai_ws_payload("chunk", session_id, content=chunk)
                         })
-                        await asyncio.sleep(0.03)  # Небольшая задержка для эффекта typing
+                        await asyncio.sleep(0.03)
+                        chunks_sent += 1
 
                     await websocket.send_json({
                         **_build_ai_ws_payload(

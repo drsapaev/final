@@ -554,6 +554,37 @@ async def _startup_tasks() -> None:
     except Exception as e:
         log.warning(f"Failed to start lab notification scheduler: {e}")
 
+# -----------------------------------------------------------------------------
+# F-017: Retention cleanup scheduler — daily at 03:00
+# -----------------------------------------------------------------------------
+try:
+    import asyncio
+    from datetime import datetime, time as dtime
+
+    async def _retention_cleanup_loop():
+        """F-017: daily cleanup of old/soft-deleted messages."""
+        while True:
+            try:
+                from app.db.session import SessionLocal
+                from app.services.data_retention import DataRetentionService
+                db = SessionLocal()
+                try:
+                    service = DataRetentionService(db)
+                    result = service.cleanup_deleted_messages(batch_size=500)
+                    log.info("F-017 retention cleanup: %s", result)
+                finally:
+                    db.close()
+            except Exception as exc:
+                log.error("F-017 retention cleanup error: %s", exc)
+            # Run every 24 hours
+            await asyncio.sleep(86400)
+
+    asyncio.create_task(_retention_cleanup_loop())
+    log.info("✅ F-017: Retention cleanup scheduler started (daily)")
+except Exception as e:
+    log.warning(f"Failed to start retention scheduler: {e}")
+
+
     # Print routes
     try:
         lines: list[str] = []

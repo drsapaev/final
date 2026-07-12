@@ -46,9 +46,22 @@ def _validate_public_preview_url(raw_url: str) -> str:
 
 
 async def _fetch_public_preview(client: httpx.AsyncClient, url: str) -> httpx.Response:
+    """F-011: IP pinning — resolve DNS once, use IP for fetch with Host header."""
     current_url = _validate_public_preview_url(url)
     for _ in range(MAX_REDIRECTS + 1):
-        response = await client.get(current_url, follow_redirects=False)
+        parsed = urlparse(current_url)
+        # F-011: pin resolved IP to prevent DNS rebinding
+        try:
+            addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443)
+            pinned_ip = addresses[0][4][0]
+        except socket.gaierror as exc:
+            raise HTTPException(status_code=400, detail="URL host cannot be resolved") from exc
+        if _is_blocked_ip(pinned_ip):
+            raise HTTPException(status_code=400, detail="URL host is not allowed")
+        # Build URL with IP, set Host header for virtual hosting
+        fetch_url = current_url.replace(parsed.hostname, pinned_ip)
+        headers = {"Host": parsed.hostname}
+        response = await client.get(fetch_url, headers=headers, follow_redirects=False)
         if response.is_redirect:
             location = response.headers.get("location")
             if not location:

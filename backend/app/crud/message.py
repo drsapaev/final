@@ -12,6 +12,19 @@ from app.models.user import User
 from app.schemas.message import MessageCreate
 
 
+
+def _make_preview(msg) -> str:
+    """F-008: neutral preview without PHI — no message content in conversation list."""
+    if msg.message_type == "voice":
+        return "🎙 Голосовое сообщение"
+    if msg.message_type == "file":
+        return "📎 Файл"
+    if msg.message_type == "image":
+        return "🖼 Изображение"
+    # Для текста — только индикатор длины, без контента
+    return f"Сообщение ({len(msg.content)} символов)"
+
+
 class CRUDMessage:
     """CRUD операции для сообщений"""
 
@@ -26,9 +39,9 @@ class CRUDMessage:
         db_obj = Message(
             sender_id=sender_id,
             recipient_id=obj_in.recipient_id,
-            content=obj_in.content,
             patient_id=getattr(obj_in, "patient_id", None),
         )
+        db_obj.set_content(obj_in.content)  # F-009: encrypt on write
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
@@ -69,56 +82,85 @@ class CRUDMessage:
         self,
         db: Session,
         *,
-        user_id: int
+        user_id: int,
+        skip: int = 0,
+        limit: int = 50
     ) -> list[dict]:
-        """Получить список всех бесед пользователя"""
+        """F-013: SQL-based conversations list — no N+1, with pagination."""
+        from sqlalchemy import func, case, desc as sa_desc
 
-        # Получаем все сообщения пользователя
-        all_messages = db.query(Message).filter(
-            or_(Message.sender_id == user_id, Message.recipient_id == user_id)
-        ).order_by(desc(Message.created_at)).all()
+        partner_expr = case(
+            (Message.sender_id == user_id, Message.recipient_id),
+            else_=Message.sender_id,
+        ).label("partner_id")
 
-        # Группируем по собеседникам
-        conversations = {}
-        for msg in all_messages:
-            other_user_id = msg.recipient_id if msg.sender_id == user_id else msg.sender_id
+        subq = (
+            db.query(
+                Message.id,
+                Message.sender_id,
+                Message.recipient_id,
+                Message.content,
+                Message.message_type,
+                Message.created_at,
+                partner_expr,
+                func.row_number().over(
+                    partition_by=partner_expr,
+                    order_by=sa_desc(Message.created_at),
+                ).label("rn"),
+            )
+            .filter(
+                or_(Message.sender_id == user_id, Message.recipient_id == user_id),
+            )
+            .subquery()
+        )
 
-            if other_user_id not in conversations:
-                # Получаем информацию о пользователе
-                other_user = db.query(User).filter(User.id == other_user_id).first()
-                if not other_user:
-                    continue
+        rows = (
+            db.query(subq, User)
+            .join(User, User.id == subq.c.partner_id)
+            .filter(subq.c.rn == 1)
+            .order_by(sa_desc(subq.c.created_at))
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
-                # Resolve display name: full_name -> username -> email -> ID
-                display_name = other_user.full_name
-                if not display_name:
-                    # Если username похож на email, пробуем найти что-то получше или оставляем как есть
-                    display_name = other_user.username
-                if not display_name:
-                    display_name = other_user.email
-                if not display_name:
-                    display_name = f"User {other_user_id}"
+        if not rows:
+            return []
 
-                # Считаем непрочитанные
-                unread = db.query(Message).filter(
-                    Message.sender_id == other_user_id,
-                    Message.recipient_id == user_id,
-                    Message.is_read == False
-                ).count()
+        partner_ids = [row[0].partner_id for row in rows]
+        unread_map = dict(
+            db.query(Message.sender_id, func.count(Message.id))
+            .filter(
+                Message.recipient_id == user_id,
+                Message.is_read == False,
+                Message.sender_id.in_(partner_ids),
+            )
+            .group_by(Message.sender_id)
+            .all()
+        )
 
-                conversations[other_user_id] = {
-                    'user_id': other_user.id,
-                    'user_name': display_name,
-                    'user_role': other_user.role or "User",
-                    'last_message': msg.content[:100] if len(msg.content) > 100 else msg.content,
-                    'last_message_time': msg.created_at,
-                    'unread_count': unread,
-                    'is_online': False
-                }
+        result = []
+        for row_data, partner in rows:
+            display_name = partner.full_name or partner.username or partner.email or f"User {partner.id}"
+            msg_type = row_data.message_type or "text"
+            if msg_type == "voice":
+                preview = "🎙 Голосовое сообщение"
+            elif msg_type == "file":
+                preview = "📎 Файл"
+            elif msg_type == "image":
+                preview = "🖼 Изображение"
+            else:
+                preview = f"Сообщение ({len(row_data.content or '')} символов)"
 
-        # Сортируем по времени последнего сообщения
-        result = list(conversations.values())
-        result.sort(key=lambda x: x['last_message_time'], reverse=True)
+            result.append({
+                'user_id': partner.id,
+                'user_name': display_name,
+                'user_role': partner.role or "User",
+                'last_message': preview,
+                'last_message_time': row_data.created_at,
+                'unread_count': unread_map.get(partner.id, 0),
+                'is_online': False,
+            })
 
         return result
 
