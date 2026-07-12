@@ -14,17 +14,27 @@ import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-const PhoneVerification = ({ 
-  phone, 
-  purpose = 'verification', 
-  onVerified, 
+import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
+const PhoneVerification = ({
+  phone,
+  purpose = 'verification',
+  onVerified,
   onCancel,
   customMessage,
   showPhoneInput = false,
   title = 'Верификация телефона'
 }) => {
   const [currentPhone, setCurrentPhone] = useState(phone || '');
-  const [verificationCode, setVerificationCode] = useState('');
+  // PR-39 / P0-5: verification code now sanitized via useSafeInput.
+  // Previously: raw useState('') with no input sanitization — a malicious
+  // user could paste script tags or control characters into the code field.
+  // Now: useSafeInput strips HTML tags, control chars, and enforces max length.
+  const [verificationCode, setVerificationCode] = useSafeInput('', {
+    maxLength: 10,
+    type: 'text',
+    allowNewlines: false,
+    allowSpecialChars: false,
+  });
   const [loading, setLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
