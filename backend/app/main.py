@@ -113,9 +113,10 @@ if IS_PROD and (CORS_DISABLE or CORS_ALLOW_ALL):
         "Set BACKEND_CORS_ORIGINS to a strict whitelist."
     )
 
-# Disallow DEV auth fallback knob in production
-if IS_PROD and os.getenv("ENABLE_DEV_AUTH", "false").lower() == "true":
-    raise ValueError("ENABLE_DEV_AUTH must be false in production.")
+# PR-30 / High-10: The previous DEV auth fallback has been removed entirely.
+# Previously: a non-prod env could register dummy /auth/login and /auth/me
+# endpoints returning dev tokens. Now: auth imports must succeed in every
+# environment; failures raise RuntimeError unconditionally (handled below).
 
 
 # -----------------------------------------------------------------------------
@@ -298,21 +299,26 @@ log.info("Idempotency middleware registered")
 # -----------------------------------------------------------------------------
 # CSRF Protection Middleware (optional, enable via CSRF_ENABLED=1)
 # -----------------------------------------------------------------------------
-CSRF_ENABLED = os.getenv("CSRF_ENABLED", "0") == "1"
+# PR-30 / High-12: CSRF protection defaults to ON in production.
+# Set CSRF_ENABLED=0 to explicitly disable (e.g., for local dev).
+CSRF_ENABLED = os.getenv("CSRF_ENABLED", "1" if IS_PROD else "0") == "1"
 if CSRF_ENABLED:
     from app.middleware.csrf_middleware import CSRFMiddleware  # noqa: E402
     app.add_middleware(CSRFMiddleware, enabled=True)
-    log.info("CSRF protection middleware registered")
+    log.info("CSRF protection middleware registered (CSRF_ENABLED=%s, IS_PROD=%s)", CSRF_ENABLED, IS_PROD)
 else:
-    log.info("CSRF protection disabled (set CSRF_ENABLED=1 to enable)")
+    log.info("CSRF protection disabled (CSRF_ENABLED=0)")
 
 # -----------------------------------------------------------------------------
 # CORS
 # -----------------------------------------------------------------------------
 if not CORS_DISABLE:
+    # PR-30: restrict allow_methods to the explicit set the API actually uses.
+    # Wildcard ["*"] would also permit CONNECT/TRACE/PATCH verbs the API never
+    # handles, expanding the attack surface for CORS preflight forgery.
     cfg = {
         "allow_credentials": True,
-        "allow_methods": ["*"],
+        "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         "allow_headers": ["*"],
     }
     if CORS_ALLOW_ALL:
@@ -325,19 +331,20 @@ else:
     log.warning("[FIX:CORS] CORS middleware is disabled via CORS_DISABLE=1")
 
 # -----------------------------------------------------------------------------
-# Попытка импортировать реальную аутентификацию.
-# Если не получилось — включим dev-fallback ниже.
+# PR-30 / High-10: Real auth imports are mandatory in every environment.
+# Previously: a non-prod env could register dummy /auth/login and /auth/me
+# endpoints returning dev tokens. That fallback is now removed — if auth
+# imports fail, the app refuses to start.
 # -----------------------------------------------------------------------------
-_USE_DEV_AUTH_FALLBACK = False
 try:
     from app.api.deps import (  # type: ignore  # noqa: E402
         create_access_token,
     )
 except Exception as e:  # pragma: no cover
-    if IS_PROD:
-        raise RuntimeError("Authentication dependencies unavailable in production") from e
-    log.error("dev-fallback: cannot import deps auth (%s) -> will use dummy token", e)
-    _USE_DEV_AUTH_FALLBACK = True
+    raise RuntimeError(
+        "Authentication dependencies unavailable — fix the import error. "
+        "DEV auth fallback has been removed (PR-30 / High-10)."
+    ) from e
 
 # -----------------------------------------------------------------------------
 # Основные API-роутеры проекта
@@ -351,32 +358,6 @@ log.info("Included api.v1.api router at %s", API_V1_STR)
 # GraphQL API
 app.include_router(graphql_router, prefix="/api")
 log.info("Included GraphQL router at /api/graphql")
-
-# -----------------------------------------------------------------------------
-# DEV fallback для аутентификации — регистрируем ТОЛЬКО если импорты auth упали
-# -----------------------------------------------------------------------------
-if _USE_DEV_AUTH_FALLBACK:
-    enable_dev = os.getenv("ENABLE_DEV_AUTH", "false").lower() == "true"
-
-    if IS_PROD or not enable_dev:
-        log.warning("DEV auth fallback DISABLED (ENV=%s, ENABLE_DEV_AUTH=%s)", ENV, enable_dev)
-    else:
-        log.warning("Using DEV auth fallback endpoints at %s/auth", API_V1_STR)
-
-        def create_access_token(sub: str) -> str:  # type: ignore[no-redef]
-            # простой dev-токен
-            return f"dev.{sub}"
-
-        @app.post(f"{API_V1_STR}/auth/login", tags=["auth"], summary="DEV fallback login")
-        async def _fallback_login(form: OAuth2PasswordRequestForm = Depends()):
-            log.info("Using DEV fallback login for user: %s", form.username)
-            token = create_access_token(form.username)
-            return {"access_token": token, "token_type": "bearer"}
-
-        @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="DEV fallback me")
-        async def _fallback_me():
-            return {"username": "dev", "role": "Admin", "is_active": True}
-
 
 # -----------------------------------------------------------------------------
 # Health
