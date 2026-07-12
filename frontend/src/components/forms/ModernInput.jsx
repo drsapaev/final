@@ -179,7 +179,7 @@ const ModernInput = ({
             type="button"
             className="input-action-btn"
             onClick={() => setShowPassword(!showPassword)}
-            tabIndex={-1}
+            tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
             aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
             title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}>
             
@@ -193,7 +193,7 @@ const ModernInput = ({
             type="button"
             className="input-action-btn"
             onClick={handleClear}
-            tabIndex={-1}
+            tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
             aria-label="Очистить поле"
             title="Очистить поле">
             

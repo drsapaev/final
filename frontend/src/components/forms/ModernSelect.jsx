@@ -249,7 +249,7 @@ const ModernSelect = ({
                   type="button"
                   className="tag-remove"
                   onClick={(e) => handleRemoveOption(e, val)}
-                  tabIndex={-1}
+                  tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
                   aria-label="Удалить"
                   title="Удалить">
                   
@@ -315,8 +315,9 @@ const ModernSelect = ({
       {label &&
       <label
         className={`select-label ${focused || hasValue || isOpen ? 'focused' : ''} ${size}`}
-        style={labelStyles}>
-        
+        style={labelStyles}
+        htmlFor={props.id}>  {/* PR-42 / Medium-E: htmlFor association for screen readers */}
+
           {label}
           {required && <span className="required-mark">*</span>}
         </label>
@@ -351,7 +352,7 @@ const ModernSelect = ({
             type="button"
             className="select-action-btn"
             onClick={handleClear}
-            tabIndex={-1}
+            tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
             aria-label="Очистить выбор"
             title="Очистить выбор">
             
