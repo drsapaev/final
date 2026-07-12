@@ -33,23 +33,10 @@ import SessionWarningModal from '../components/common/SessionWarningModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 
-import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import {
   Calendar,
-  Stethoscope,
-  FileText,
-  Eye,
-  Search,
-  Plus,
-  Edit,
   XCircle,
-  Smile,
-  BarChart3,
-  Users,
-  DollarSign,
-  Scissors,
-  Save,
-  Building } from
+  Save } from
 'lucide-react';
 import '../styles/animations.css';
 import { getApiBaseUrl } from '../api/runtime';

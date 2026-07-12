@@ -216,7 +216,7 @@ const DoctorPanel = () => {
   const primaryColor = getColor('primary', 500);
   const successColor = getColor('success', 500);
   const warningColor = getColor('warning', 500);
-  const dangerColor = getColor('danger', 500);
+  // PR-47: removed unused dangerColor
   const accentColor = getColor('info', 500);
   const interactiveSurface = 'var(--mac-nav-item-bg)';
   const interactiveSurfaceHover = 'var(--mac-card-hover-bg)';
