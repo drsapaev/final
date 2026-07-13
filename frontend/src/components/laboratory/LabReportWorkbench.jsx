@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { toast } from 'react-toastify';  // PR-55: numeric validation toast
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
   Input } from '../ui/macos';
@@ -825,6 +826,20 @@ export default function LabReportWorkbench({
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
                                 disabled={!canEditActiveInstance}
+                                // PR-55: numeric input safety — type=number + inputMode=decimal + validation
+                                type={field.value_type === 'numeric' ? 'number' : 'text'}
+                                inputMode={field.value_type === 'numeric' ? 'decimal' : undefined}
+                                step={field.value_type === 'numeric' ? 'any' : undefined}
+                                onBlur={(event) => {
+                                  if (field.value_type !== 'numeric') return;
+                                  const val = event.target.value;
+                                  if (val === '' || val === null || val === undefined) return;
+                                  const parsed = parseFloat(val);
+                                  if (isNaN(parsed)) {
+                                    toast.error(`Некорректное числовое значение: "${val}"`);
+                                    updateField(field.field_key, '');
+                                  }
+                                }}
                               />
                             )}
                             <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
