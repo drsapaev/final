@@ -10,9 +10,8 @@ import sys
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit, urlunsplit
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
@@ -337,9 +336,7 @@ else:
 # imports fail, the app refuses to start.
 # -----------------------------------------------------------------------------
 try:
-    from app.api.deps import (  # type: ignore  # noqa: E402
-        create_access_token,
-    )
+    pass
 except Exception as e:  # pragma: no cover
     raise RuntimeError(
         "Authentication dependencies unavailable — fix the import error. "
@@ -559,8 +556,6 @@ async def _startup_tasks() -> None:
 # -----------------------------------------------------------------------------
 try:
     import asyncio
-    from datetime import datetime
-    from datetime import time as dtime
 
     async def _retention_cleanup_loop():
         """F-017: daily cleanup of old/soft-deleted messages."""

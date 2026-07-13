@@ -16,7 +16,6 @@ from app.services.notification_platform._base import (
 from app.services.notification_platform._core import CoreMixin
 from app.services.notification_platform._policy import PolicyMixin
 from app.services.notification_platform._rest import RestMixin
-from app.services.notification_websocket import get_notification_ws_manager
 
 __all__ = ["NotificationPlatformService"]
 

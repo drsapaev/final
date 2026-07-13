@@ -33,13 +33,10 @@ from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.notifications import (
-    SendAppointmentReminderEnhancedRequest,
     SendBulkEmailRequest,
     SendBulkSmsRequest,
     SendCustomEmailRequest,
     SendCustomSmsRequest,
-    SendLabResultsEnhancedRequest,
-    SendPaymentConfirmationEnhancedRequest,
 )
 from app.services.email_sms_enhanced import get_email_sms_enhanced_service
 

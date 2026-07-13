@@ -29,7 +29,6 @@ from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 # Use the shared router from _helpers (not a new instance) so that routes
 # registered here are visible when api.py imports telegram_webhook.router.
 from app.api.v1.endpoints.telegram_webhook._helpers import (
-    APIRouter,
     Depends,
     Request,
     Response,

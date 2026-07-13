@@ -674,7 +674,6 @@ def get_today_queues(
     - department: фильтр по отделению (опционально)
     """
     try:
-        from datetime import datetime
 
 
         # R-22 Phase 5: _same_patient_queue_entry_for_visit_id and _same_patient_queue_entry_for_visit
