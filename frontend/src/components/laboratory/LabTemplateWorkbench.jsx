@@ -1201,6 +1201,40 @@ export default function LabTemplateWorkbench({
                                   ))}
                                 </select>
                               </label>
+                              {/* PR-67 / High-10: catalog reference_mode UI — fetch from labReportingApi */}
+                              {field.reference_mode === 'catalog' && field.analyte_code && (
+                                <div style={{ display: 'grid', gap: '4px' }}>
+                                  <Button
+                                    variant="outline"
+                                    size="small"
+                                    onClick={async () => {
+                                      try {
+                                        const ranges = await labReportingApi.listCatalogReferenceRanges(field.analyte_code);
+                                        if (ranges && ranges.length > 0) {
+                                          const range = ranges[0];
+                                          updateField(sectionIndex, fieldIndex, 'reference_text',
+                                            range.text || `${range.low || ''}–${range.high || ''}`);
+                                          if (range.low != null) updateField(sectionIndex, fieldIndex, 'reference_low', range.low);
+                                          if (range.high != null) updateField(sectionIndex, fieldIndex, 'reference_high', range.high);
+                                          notify('success', `Норма загружена из каталога: ${range.text || ''}`);
+                                        } else {
+                                          notify('info', 'В каталоге нет норм для этого аналита.');
+                                        }
+                                      } catch (e) {
+                                        notify('error', `Ошибка загрузки из каталога: ${e.message}`);
+                                      }
+                                    }}
+                                  >
+                                    <Icon name="square.and.arrow.down.on.square" size={14} />
+                                    Загрузить из каталога
+                                  </Button>
+                                </div>
+                              )}
+                              {field.reference_mode === 'catalog' && !field.analyte_code && (
+                                <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-muted)' }}>
+                                  Укажите код аналита для загрузки нормы из каталога
+                                </span>
+                              )}
                               <label style={{ display: 'grid', gap: '6px' }}>
                                 <span>Текст нормы</span>
                                 <input className="macos-input" aria-label="Текст нормы" value={field.reference_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />

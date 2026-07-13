@@ -866,6 +866,28 @@ export default function LabReportWorkbench({
                                 )}
                               </div>
                             </div>
+                            {/* PR-67 / High-9: previous-result trending — show last value from reportHistory */}
+                            {reportHistory.length > 1 && (() => {
+                              const prevReport = reportHistory[1]; // [0] = current, [1] = previous
+                              if (!prevReport?.sections) return null;
+                              let prevValue = null;
+                              for (const sec of prevReport.sections) {
+                                for (const f of (sec.fields || [])) {
+                                  if (f.field_key === field.field_key && f.value_text) {
+                                    prevValue = f.value_text;
+                                    break;
+                                  }
+                                }
+                                if (prevValue) break;
+                              }
+                              if (!prevValue) return null;
+                              const prevDate = prevReport.created_at ? new Date(prevReport.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
+                              return (
+                                <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', whiteSpace: 'nowrap' }}>
+                                  ↗ {prevValue} {prevDate && `(${prevDate})`}
+                                </span>
+                              );
+                            })()}
                             {field.value_type === 'choice' && choiceOptions.length > 0 ? (
                               <select
                                 className="macos-input"
