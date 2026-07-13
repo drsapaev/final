@@ -140,6 +140,8 @@ export default function LabQueueWorkbench({
   // по ФИО + фильтр по статусу (waiting/in_progress/completed).
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  // PR-64 / Medium-14: client-side sorting
+  const [sortBy, setSortBy] = useState('default'); // default | name | time
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredAppointments = appointments.filter((appointment) => {
@@ -161,6 +163,17 @@ export default function LabQueueWorkbench({
       if (!haystack.includes(normalizedSearch)) return false;
     }
     return true;
+  });
+
+  // PR-64 / Medium-14: client-side sorting
+  const sortedAppointments = [...filteredAppointments].sort((a, b) => {
+    if (sortBy === 'name') {
+      return (a.patient_fio || '').localeCompare(b.patient_fio || '', 'ru');
+    }
+    if (sortBy === 'time') {
+      return (a.appointment_time || '').localeCompare(b.appointment_time || '');
+    }
+    return 0; // default = backend order
   });
 
   return (
@@ -294,6 +307,21 @@ export default function LabQueueWorkbench({
               ))}
             </div>
           </div>
+          {/* PR-64 / Medium-14: sort controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+            <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-muted)' }}>Сортировать:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Сортировка очереди"
+              className="macos-input"
+              style={{ fontSize: 'var(--mac-font-size-xs)', padding: '4px 8px', width: 'auto' }}
+            >
+              <option value="default">По умолчанию</option>
+              <option value="name">По имени</option>
+              <option value="time">По времени</option>
+            </select>
+          </div>
           {/* QW-8 fix: индикатор количества отфильтрованных записей. */}
           {(searchQuery || statusFilter !== 'all') && (
             <div
@@ -391,7 +419,7 @@ export default function LabQueueWorkbench({
             </Alert>
           ) : (
             <div style={cardGridStyle}>
-              {filteredAppointments.map((appointment) => {
+              {sortedAppointments.map((appointment) => {
                 const isSelected = selectedAppointment?.id === appointment.id;
                 return (
                   <div
