@@ -662,10 +662,31 @@ export default function LabReportWorkbench({
                     {/* WF-04 fix: показываем supersedes relationship для audit trail.
                         Если этот отчёт — ревизия другого, лаборант видит связь.
                         Backend поле: supersedes_instance_id (см. lab_reporting_service.py:785). */}
+                    {/* PR-60 / Low-31: supersedes link now clickable — navigates to original instance */}
                     {activeInstance.supersedes_instance_id && (
-                      <span style={{ marginLeft: 'var(--mac-spacing-2)', color: 'var(--mac-accent)' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // PR-60 / Low-31: navigate to the superseded instance
+                          if (onInstanceChange && activeInstance.supersedes_instance_id) {
+                            labReportingApi.getInstance(activeInstance.supersedes_instance_id)
+                              .then((instance) => onInstanceChange(instance))
+                              .catch((e) => logger.warn('Failed to load superseded instance:', e));
+                          }
+                        }}
+                        style={{
+                          marginLeft: 'var(--mac-spacing-2)',
+                          color: 'var(--mac-accent)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: 'inherit',
+                          textDecoration: 'underline',
+                          padding: 0,
+                        }}
+                      >
                         ← исправленная версия отчёта #{activeInstance.supersedes_instance_id}
-                      </span>
+                      </button>
                     )}
                   </div>
                   {/* P-20 fix: визуальный stepper жизненного цикла бланка.
@@ -917,7 +938,8 @@ export default function LabReportWorkbench({
                             <Badge variant={flagVariant(field.resolved_flag, field.resolved_flag_severity)}>
                               {formatFlagLabel(field)}
                             </Badge>
-                            {field.required ? <Badge variant="warning">обязательное</Badge> : <span />}
+                            {/* PR-60 / Low-32: was <span /> placeholder, now aria-hidden empty cell */}
+                            {field.required ? <Badge variant="warning">обязательное</Badge> : <span aria-hidden="true" />}
                           </div>
                         );
                       })}
