@@ -7,6 +7,7 @@ from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.audit import extract_model_changes, log_critical_change
+from app.core.i18n import t  # noqa: F401
 from app.crud.patient import (
     normalize_patient_name,
     validate_birthdate,
@@ -19,7 +20,6 @@ from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.services.notifications import notification_sender_service
 from app.services.patient_validation import PatientValidationService
-from app.core.i18n import t  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

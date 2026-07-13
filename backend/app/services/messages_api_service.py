@@ -12,10 +12,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import HTTPException, UploadFile
+from fastapi import (
+    HTTPException,
+    UploadFile,
+    status,  # noqa: F401
+)
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
+from app.core.i18n import t  # noqa: F401
 from app.core.messaging_config import (
     MESSAGING_PERMISSIONS,
     can_send_message_with_branch,
@@ -28,8 +33,6 @@ from app.models.user import User
 from app.repositories.messages_api_repository import MessagesApiRepository
 from app.schemas.message import ConversationOut, MessageCreate, MessageOut
 from app.services.notifications import notification_sender_service
-from fastapi import status  # noqa: F401
-from app.core.i18n import t  # noqa: F401
 
 CHAT_UPLOAD_DIR = Path("uploads/chat")
 CHAT_STORAGE_FILENAME_RE = re.compile(r"^\d{8}_\d{6}_.+$")

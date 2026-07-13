@@ -282,7 +282,7 @@ def get_users_with_fcm_tokens(db: Session) -> list[User]:
 
 # === PR-1: Mobile API wrappers ===
 
-from app.models.user_profile import UserProfile, UserNotificationSettings
+from app.models.user_profile import UserNotificationSettings, UserProfile
 
 # Coarse endpoint keys → list of concrete UserNotificationSettings columns.
 # PR-1 deliberately keeps a small, well-documented mapping; full granularity

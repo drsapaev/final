@@ -16,8 +16,10 @@ from app.api.v1.endpoints.telegram_webhook import (  # noqa: F401
     _routes,
     _staff_commands,
 )
+from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
+    _handle_clinic_bot_update,
+)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
-from app.api.v1.endpoints.telegram_webhook._helpers import router  # noqa: F401
 
 # Re-export underscore-prefixed symbols and constants that tests and
 # other modules access via `telegram_webhook.<name>`.
@@ -28,9 +30,9 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (  # noqa: F401
     TELEGRAM_CONTACT_REJECTED_MESSAGE,
     TELEGRAM_LANGUAGE_MENU,
     TELEGRAM_LOCALIZED_TEXTS,
-    TELEGRAM_STAFF_LINKED_MESSAGE,
     TELEGRAM_STAFF_LINK_REJECTED_MESSAGE,
     TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+    TELEGRAM_STAFF_LINKED_MESSAGE,
     TELEGRAM_TICKET_QR_PREFIX,
     _build_patient_onboarding_entry_token,
     _localized_main_menu,
@@ -42,9 +44,7 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (  # noqa: F401
     _parse_patient_mini_app_entry_token,
     _parse_patient_onboarding_entry_token,
     _telegram_settings_message,
-)
-from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
-    _handle_clinic_bot_update,
+    router,  # noqa: F401
 )
 from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401
     _send_patient_bot_reply,

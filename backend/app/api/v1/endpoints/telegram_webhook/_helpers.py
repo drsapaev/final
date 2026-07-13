@@ -121,7 +121,6 @@ from app.services.visit_confirmation_service import (  # noqa: F401
 )
 from app.utils.validators import normalize_phone_uz  # noqa: F401
 
-
 logger = logging.getLogger(__name__)
 router = APIRouter()
 

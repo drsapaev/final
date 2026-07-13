@@ -3,16 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
-
 from app.api.v1.endpoints.registrar_integration._helpers import (
     _latest_lab_report_summaries_by_visit,
     _normalize_queue_status_for_registrar,
     _registrar_available_actions,
     _resolve_payment_truth,
 )  # noqa: F401
-from app.services.queue_service import queue_service  # noqa: F401
-
-
 from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F401
     _build_queue_payload,
     _detect_ecg_services,
@@ -31,6 +27,8 @@ from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F40
     _same_patient_queue_entry_for_visit,
     _serialize_queue_entry,
 )
+from app.services.queue_service import queue_service  # noqa: F401
+
 
 def _resolve_entry_department(
     db: Session,

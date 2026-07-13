@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import (
-    router,
     _ensure_doctor_can_mutate_queue_entry,
+    router,
 )
-from app.api.v1.endpoints.qr_queue._tokens import RestoreToNextRequest  # noqa: F401
-from app.api.v1.endpoints.qr_queue._tokens import SetIncompleteRequest  # noqa: F401
+from app.api.v1.endpoints.qr_queue._tokens import (
+    RestoreToNextRequest,  # noqa: F401
+    SetIncompleteRequest,  # noqa: F401
+)
 
 
 @router.post("/entry/{entry_id}/restore-next", response_model=dict[str, Any])

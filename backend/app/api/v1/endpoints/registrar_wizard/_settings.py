@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.api.v1.endpoints.registrar_wizard._cart import BenefitSettingsResponse
+from app.api.v1.endpoints.registrar_wizard._cart import (
+    BenefitSettingsRequest,  # noqa: F401
+    BenefitSettingsResponse,
+)
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
-from app.api.v1.endpoints.registrar_wizard._cart import BenefitSettingsRequest  # noqa: F401
 
 
 @router.get("/admin/benefit-settings", summary="Получить настройки льгот", response_model=BenefitSettingsResponse)

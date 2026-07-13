@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import *  # noqa: F401, F403
-from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
+from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
     _build_mini_app_appointment_booking_preview_from_request,
     _build_mini_app_patient_cabinet_summary_from_request,
     _build_mini_app_patient_forms_preview_from_request,
@@ -26,15 +26,18 @@ from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 
 # Specific imports
+# Use the shared router from _helpers (not a new instance) so that routes
+# registered here are visible when api.py imports telegram_webhook.router.
 from app.api.v1.endpoints.telegram_webhook._helpers import (
     APIRouter,
     Depends,
     Request,
     Response,
+    _telegram_update_summary,
     get_db,
     logger,
+    router,  # noqa: F401
     status,
-    _telegram_update_summary,
 )
 from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403
@@ -43,24 +46,6 @@ from app.schemas.notifications import (
     TelegramWebhookUpdateRequest,
 )
 
-# Use the shared router from _helpers (not a new instance) so that routes
-# registered here are visible when api.py imports telegram_webhook.router.
-from app.api.v1.endpoints.telegram_webhook._helpers import router  # noqa: F401
-
-
-from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
-    _build_mini_app_appointment_booking_preview_from_request,
-    _build_mini_app_patient_cabinet_summary_from_request,
-    _build_mini_app_patient_forms_preview_from_request,
-    _build_mini_app_patient_manifest_from_request,
-    _build_mini_app_patient_report_download_response,
-    _handle_clinic_bot_update,
-    _raise_telegram_webhook_internal_error,
-    _save_mini_app_patient_form_submission_from_request,
-    _telegram_bot_info_failure,
-    _telegram_user_from_onboarding_request_auth,
-    _validate_webhook_secret,
-)
 
 def _is_duplicate_update(db, update_id: int | None) -> bool:
     """P1-9: check if this Telegram update was already processed."""

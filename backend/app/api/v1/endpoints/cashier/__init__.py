@@ -9,8 +9,8 @@ to avoid the parameter route shadowing the static export route.
 from __future__ import annotations
 
 from app.api.v1.endpoints.cashier import (
-    _stats,  # noqa: F401  — must be first: registers /payments/export
     _payments,  # noqa: F401  — registers /payments/{payment_id}
+    _stats,  # noqa: F401  — must be first: registers /payments/export
     _visits,  # noqa: F401
 )
 from app.api.v1.endpoints.cashier._helpers import *  # noqa: F401, F403

@@ -5,12 +5,11 @@ from typing import Any
 import requests  # noqa: F401
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
-
 from app.api.v1.endpoints.admin_telegram._helpers import (
     _build_staff_bot_status,
     _build_telegram_ai_approval_status,
 )  # noqa: F401
-from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
+from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401  # noqa: F401
     TelegramWebhookRequest,
     _fetch_telegram_webhook_info,
     _get_configured_bot_token,
@@ -24,16 +23,6 @@ from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
 )
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 
-
-from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
-    _fetch_telegram_webhook_info,
-    _get_configured_bot_token,
-    _get_configured_bot_username,
-    _get_configured_staff_bot_token,
-    _get_staff_bot_token_runtime_status,
-    _sanitize_telegram_webhook_info,
-    _staff_bot_read_only_command_payload,
-)
 
 @router.get("/telegram/settings", response_model=dict[str, Any])
 def get_telegram_settings(

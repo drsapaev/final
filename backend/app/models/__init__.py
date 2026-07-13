@@ -96,6 +96,7 @@ from .emr_v2 import (
 )
 from .emr_version import EMRVersion
 from .family_relation import FamilyRelation, RelationType
+from .feature_flags import FeatureFlag, FeatureFlagHistory
 from .file_system import (
     File,
     FileAccessLog,
@@ -109,7 +110,6 @@ from .file_system import (
     FileVersion,
 )
 from .finance import FinanceTransaction
-from .feature_flags import FeatureFlag, FeatureFlagHistory
 from .global_search_audit import GlobalSearchAudit
 
 # КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!

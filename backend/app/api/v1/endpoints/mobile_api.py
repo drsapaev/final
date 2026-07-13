@@ -3,6 +3,11 @@
 """
 
 import gzip
+
+# PR-3: import the modules directly (not via app.crud.__init__ which
+# re-exports the CRUDAppointment *instance* named `appointment` and shadows
+# the module of the same name). Using importlib avoids the shadowing.
+import importlib
 import json
 from datetime import UTC, datetime
 from typing import Any
@@ -12,12 +17,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints._error_logging import log_endpoint_error  # PR-7
 from app.api.deps import get_current_user
-# PR-3: import the modules directly (not via app.crud.__init__ which
-# re-exports the CRUDAppointment *instance* named `appointment` and shadows
-# the module of the same name). Using importlib avoids the shadowing.
-import importlib
+from app.api.v1.endpoints._error_logging import log_endpoint_error  # PR-7
+
 crud_appointment = importlib.import_module("app.crud.appointment")
 crud_lab = importlib.import_module("app.crud.lab")
 crud_user = importlib.import_module("app.crud.user")
@@ -26,8 +28,8 @@ crud_user = importlib.import_module("app.crud.user")
 # *instance* (which has methods like get_patient_by_phone). Module-level
 # functions like get_patient_by_user_id live on the module itself.
 # Use the instance for method calls, import the module functions directly.
-from app.crud import patient as crud_patient  # CRUDPatient instance (for methods)
 from app.core.config import settings  # PR-29: needed for real expires_in
+from app.crud import patient as crud_patient  # CRUDPatient instance (for methods)
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
 from app.schemas.mobile import (
@@ -234,7 +236,8 @@ def get_mobile_patient_profile(
     except HTTPException:
         raise
     except Exception as e:
-        import logging, traceback
+        import logging
+        import traceback
         logging.getLogger(__name__).error('GET /patients/me failed: %s\n%s', e, traceback.format_exc())
         raise HTTPException(
             status_code=500, detail="Internal server error"
@@ -286,7 +289,8 @@ def get_upcoming_appointments(
     except HTTPException:
         raise
     except Exception as e:
-        import logging, traceback
+        import logging
+        import traceback
         logging.getLogger(__name__).error('GET /appointments/upcoming failed: %s\n%s', e, traceback.format_exc())
         raise HTTPException(
             status_code=500, detail="Internal server error"
@@ -453,7 +457,8 @@ def get_lab_results(
     except HTTPException:
         raise
     except Exception as e:
-        import logging, traceback
+        import logging
+        import traceback
         logging.getLogger(__name__).error('GET /lab/results failed: %s\n%s', e, traceback.format_exc())
         raise HTTPException(
             status_code=500, detail="Internal server error"

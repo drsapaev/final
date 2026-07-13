@@ -7,9 +7,9 @@ from app.api.v1.endpoints.admin_departments import (
 )
 from app.api.v1.endpoints.admin_departments._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.admin_departments._helpers import (  # noqa: F401
-    router,
     _collect_department_overview,
     _ensure_department_integrations,
+    router,
 )
 
 __all__ = ["router", "_collect_department_overview", "_ensure_department_integrations"]

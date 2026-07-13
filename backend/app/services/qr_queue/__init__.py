@@ -4,6 +4,8 @@ Re-exports QRQueueService for backward compatibility.
 """
 from __future__ import annotations
 
+from sqlalchemy.orm import Session  # noqa: F401
+
 from app.services.qr_queue._base import QRQueueServiceMixinBase
 from app.services.qr_queue._patients import PatientsMixin
 from app.services.qr_queue._qr_helpers import QrHelpersMixin
@@ -13,7 +15,6 @@ from app.services.qr_queue._specialists import SpecialistsMixin
 from app.services.qr_queue._tokens import TokensMixin
 from app.services.qr_queue._visits import VisitsMixin
 from app.services.queue_domain_service import QueueDomainService  # noqa: F401
-from sqlalchemy.orm import Session  # noqa: F401
 
 __all__ = ["QRQueueService"]
 

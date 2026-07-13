@@ -567,6 +567,7 @@ print_service: PrintService | None = None
 def get_print_service() -> PrintService:
     """Получить экземпляр сервиса печати"""
     from app.db.session import SessionLocal
+
     # Lazy import to avoid circular dependency: ``app.services.print_svc``
     # imports this mixin module before ``PrintService`` is defined.
     from app.services.print_svc import PrintService

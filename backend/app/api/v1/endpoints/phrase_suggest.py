@@ -7,7 +7,12 @@ Phrase Suggest API - Endpoint для подсказок из истории вр
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,  # noqa: F401
+)
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -15,7 +20,6 @@ from app.api import deps
 from app.services.ai_feature_gating import RequireAiFeature
 from app.services.doctor_phrase_service import get_doctor_phrase_service
 from app.services.phrase_suggest_api_service import PhraseSuggestApiService
-from fastapi import status  # noqa: F401
 
 router = APIRouter()
 

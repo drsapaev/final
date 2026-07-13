@@ -559,7 +559,8 @@ async def _startup_tasks() -> None:
 # -----------------------------------------------------------------------------
 try:
     import asyncio
-    from datetime import datetime, time as dtime
+    from datetime import datetime
+    from datetime import time as dtime
 
     async def _retention_cleanup_loop():
         """F-017: daily cleanup of old/soft-deleted messages."""

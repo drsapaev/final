@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.api.v1.endpoints.admin_telegram import PATIENT_PAYMENT_ENTRY_ROUTE
 from app.core.config import settings
+from app.core.i18n import t  # noqa: F401
 from app.core.rate_limiter import limiter
 from app.crud import (
     appointment as crud_appointment,
@@ -41,7 +42,6 @@ from app.models.visit import Visit
 from app.schemas.notifications import SendPaymentConfirmationRequest
 from app.services.telegram_bot import get_telegram_bot_service
 from app.services.telegram_templates import get_telegram_templates_service
-from app.core.i18n import t  # noqa: F401
 
 router = APIRouter()
 

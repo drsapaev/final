@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.i18n import t  # noqa: F401
 from app.models.cardio_blood_test import CardioBloodTest
 from app.models.cardio_ecg_record import CardioECGRecord
 from app.models.clinic import Doctor
@@ -20,7 +21,6 @@ from app.schemas.cardio import (
     CardioECGRecordCreate,
     CardioECGRecordOut,
 )
-from app.core.i18n import t  # noqa: F401
 
 router = APIRouter(prefix="/cardio", tags=["cardio"])
 logger = logging.getLogger(__name__)

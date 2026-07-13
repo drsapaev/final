@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
-
 from app.api.v1.endpoints.admin_telegram._helpers import (
     _assert_ai_approval_role_allowed,
     _normalize_ai_approval_outcome,

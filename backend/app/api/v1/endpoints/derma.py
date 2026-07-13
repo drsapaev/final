@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.i18n import t  # noqa: F401
 from app.models.clinic import Doctor
 from app.models.derma_examination import DermaExamination
 from app.models.derma_procedure import DermaProcedure
@@ -23,7 +24,6 @@ from app.schemas.derma import (
     DermaProcedureOut,
 )
 from app.services.derma_api_service import DermaApiDomainError, DermaApiService
-from app.core.i18n import t  # noqa: F401
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 logger = logging.getLogger(__name__)

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.services_ep._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.services_ep._helpers import (
-    router,
     _row_to_out,
+    router,
 )  # noqa: F401
 
 

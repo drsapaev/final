@@ -52,8 +52,9 @@ class CircuitBreaker:
         if self._redis is not None:
             return self._redis
         try:
-            import redis.asyncio as aioredis
             import os
+
+            import redis.asyncio as aioredis
             redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
             self._redis = aioredis.from_url(redis_url, decode_responses=True)
             await self._redis.ping()

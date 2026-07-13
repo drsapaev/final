@@ -81,8 +81,8 @@ async def me(current_user: User = Depends(get_current_user)):
     doctor_id = None
     cabinet = None
     if hasattr(current_user, 'role') and current_user.role in ('Doctor', 'cardio', 'derma', 'dentist'):
-        from app.models.clinic import Doctor
         from app.db.session import SessionLocal
+        from app.models.clinic import Doctor
         db = SessionLocal()
         try:
             doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
