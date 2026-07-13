@@ -20,11 +20,12 @@ import {
 'lucide-react';
 
 import logger from '../../utils/logger';
-import { tokenManager } from '../../utils/tokenManager';
 import ModernDialog from '../dialogs/ModernDialog';
-import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
+// UX Audit: inline-стили перенесены в ForceMajeureModal.css.
+// useTheme + tokenManager удалены (auth через axios-interceptor, theme через CSS).
+import './ForceMajeureModal.css';
 
 const ForceMajeureModal = ({
   isOpen,
@@ -33,7 +34,6 @@ const ForceMajeureModal = ({
   specialistName = 'Специалист',
   onSuccess
 }) => {
-  const { theme, getColor } = useTheme();
   const [activeTab, setActiveTab] = useState('transfer'); // 'transfer' | 'cancel'
   const [reason, setReason] = useState('');
   const [refundType, setRefundType] = useState('deposit'); // 'deposit' | 'bank_transfer'
@@ -43,9 +43,7 @@ const ForceMajeureModal = ({
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  const getAuthToken = () => {
-    return tokenManager.getAccessToken();
-  };
+  // UX Audit: getAuthToken + tokenManager удалены — auth через axios-interceptor.
 
   // Load pending entries (dry run)
   const loadPendingEntries = useCallback(async () => {
@@ -156,67 +154,23 @@ const ForceMajeureModal = ({
   };
 
   const header = (
-    <div style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 'var(--mac-spacing-4)',
-      width: '100%'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--mac-spacing-3)', minWidth: 0 }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          background: theme === 'dark'
-            ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.2))'
-            : 'linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.16))',
-          border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.18)'}`,
-          color: 'var(--mac-warning-hover, var(--mac-warning))',
-          boxShadow: '0 10px 24px rgba(245, 158, 11, 0.12)'
-        }}>
+    <div className="fmm-header">
+      <div className="fmm-header-info">
+        <div className="fmm-header-icon">
           <AlertTriangle size={20} />
         </div>
-        <div style={{ minWidth: 0 }}>
-          <h2 style={{
-            margin: 0,
-            fontSize: 'var(--mac-font-size-xl)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: getColor('textPrimary'),
-            lineHeight: 1.2
-          }}>
+        <div className="fmm-header-text">
+          <h2 className="fmm-header-title">
             Форс-мажор
           </h2>
-          <p style={{
-            margin: '4px 0 0',
-            fontSize: 'var(--mac-font-size-sm)',
-            color: getColor('textSecondary'),
-            lineHeight: 1.4
-          }}>
+          <p className="fmm-header-subtitle">
             {specialistName}
           </p>
         </div>
       </div>
       <button
         onClick={onClose}
-        style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '999px',
-          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'var(--mac-border)'}`,
-          background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'var(--mac-bg-secondary)',
-          color: getColor('textSecondary'),
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--mac-shadow-sm)',
-          cursor: 'pointer',
-          flexShrink: 0
-        }}
+        className="fmm-close-btn"
         aria-label="Закрыть диалог">
         <XCircle size={18} />
       </button>
@@ -252,81 +206,32 @@ const ForceMajeureModal = ({
       closeOnEscape={!loading}
       showCloseButton={false}
       dialogStyle={dialogSurfaceStyle}>
-      <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
-        <div style={{
-          display: 'flex',
-          gap: 'var(--mac-spacing-2)',
-          padding: 'var(--mac-spacing-2)',
-          borderRadius: '14px',
-          background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'rgba(148, 163, 184, 0.12)',
-          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(148, 163, 184, 0.16)'}`
-        }}>
+      <div className="fmm-grid-gap">
+        <div className="fmm-tab-container">
           <button
             type="button"
             onClick={() => setActiveTab('transfer')}
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              border: 'none',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 'var(--mac-spacing-2)',
-              fontSize: 'var(--mac-font-size-base)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: activeTab === 'transfer' ? 'var(--mac-accent-blue-hover)' : getColor('textSecondary'),
-              background: activeTab === 'transfer'
-                ? (theme === 'dark' ? 'rgba(59, 130, 246, 0.16)' : 'white')
-                : 'transparent',
-              boxShadow: activeTab === 'transfer' && theme !== 'dark' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-            }}>
+            className={`fmm-tab-btn fmm-tab-btn--transfer ${activeTab === 'transfer' ? 'fmm-tab-btn--active' : ''}`}>
             <Calendar size={18} />
             Перенести на завтра
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('cancel')}
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              border: 'none',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 'var(--mac-spacing-2)',
-              fontSize: 'var(--mac-font-size-base)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: activeTab === 'cancel' ? 'var(--mac-error)' : getColor('textSecondary'),
-              background: activeTab === 'cancel'
-                ? (theme === 'dark' ? 'rgba(239, 68, 68, 0.14)' : 'white')
-                : 'transparent',
-              boxShadow: activeTab === 'cancel' && theme !== 'dark' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-            }}>
+            className={`fmm-tab-btn fmm-tab-btn--cancel ${activeTab === 'cancel' ? 'fmm-tab-btn--active' : ''}`}>
             <DollarSign size={18} />
             Отменить с возвратом
           </button>
         </div>
 
         {dryRunResult &&
-        <div style={{
-          background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'var(--mac-bg-secondary)',
-          border: `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
-          borderRadius: '14px',
-          padding: 'var(--mac-spacing-4)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-4)'
-        }}>
-          <Users size={32} color={theme === 'dark' ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)'} />
-          <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: getColor('textPrimary') }}>
+        <div className="fmm-dry-run-card">
+          <Users size={32} className="fmm-dry-run-icon" />
+          <div className="fmm-dry-run-info">
+            <p className="fmm-dry-run-count">
               {dryRunResult.count} записей
             </p>
-            <p style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: getColor('textSecondary') }}>
+            <p className="fmm-dry-run-subtitle">
               будут {activeTab === 'transfer' ? 'перенесены' : 'отменены'}
               {dryRunResult.totalAmount > 0 && ` • ${dryRunResult.totalAmount.toLocaleString()} сум`}
             </p>
@@ -334,14 +239,7 @@ const ForceMajeureModal = ({
           <button
             type="button"
             onClick={loadPendingEntries}
-            style={{
-              marginLeft: 'auto',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 'var(--mac-spacing-2)',
-              color: getColor('textSecondary')
-            }}
+            className="fmm-refresh-btn"
             aria-label="Обновить список">
             <RefreshCw size={18} />
           </button>
@@ -349,13 +247,7 @@ const ForceMajeureModal = ({
         }
 
         <div>
-          <label style={{
-            display: 'block',
-            marginBottom: 'var(--mac-spacing-2)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: getColor('textPrimary'),
-            fontSize: 'var(--mac-font-size-base)'
-          }}>
+          <label className="fmm-field-label">
             Причина *
           </label>
           <textarea
@@ -363,45 +255,21 @@ const ForceMajeureModal = ({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Опишите причину форс-мажора..."
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              border: `1px solid ${error ? 'var(--mac-error)' : theme === 'dark' ? 'color-mix(in srgb, white, transparent 90%)' : 'var(--mac-border)'}`,
-              borderRadius: 'var(--mac-radius-lg)',
-              fontSize: 'var(--mac-font-size-base)',
-              minHeight: '96px',
-              resize: 'vertical',
-              color: getColor('textPrimary'),
-              backgroundColor: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
-              fontFamily: 'inherit',
-              outline: 'none'
-            }} />
+            className={`fmm-textarea ${error ? 'fmm-textarea--error' : ''}`} />
           {!isReasonValid && reason.length > 0 &&
-          <p style={{ margin: '6px 0 0', fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-error)' }}>
+          <p className="fmm-error-text">
             Минимум 5 символов
           </p>
           }
         </div>
 
         {activeTab === 'cancel' &&
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: 'var(--mac-spacing-1)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: getColor('textPrimary'),
-            fontSize: 'var(--mac-font-size-base)'
-          }}>
+        <div className="fmm-grid-gap-sm">
+          <label className="fmm-field-label fmm-field-label--mb1">
             Тип возврата
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--mac-spacing-3)' }}>
-            <label style={{
-              padding: 'var(--mac-spacing-3)',
-              border: refundType === 'deposit' ? '1px solid var(--mac-accent-blue)' : `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              background: refundType === 'deposit' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white')
-            }}>
+          <div className="fmm-refund-grid">
+            <label className={`fmm-refund-option ${refundType === 'deposit' ? 'fmm-refund-option--selected' : ''}`}>
               <input
                 type="radio"
                 name="refundType"
@@ -410,16 +278,15 @@ const ForceMajeureModal = ({
                 checked={refundType === 'deposit'}
                 onChange={(e) => setRefundType(e.target.value)}
                 style={{ display: 'none' }} />
-              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: getColor('textPrimary'), fontSize: 'var(--mac-font-size-base)' }}>На депозит</div>
-              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: getColor('textSecondary'), marginTop: 'var(--mac-spacing-1)' }}>Мгновенно на баланс</div>
+              <div className={`fmm-refund-radio ${refundType === 'deposit' ? 'fmm-refund-radio--selected' : ''}`}>
+                {refundType === 'deposit' && <div className="fmm-refund-radio-dot" />}
+              </div>
+              <div>
+                <div className="fmm-refund-label">На депозит</div>
+                <div className="fmm-refund-label" style="font-size: var(--mac-font-size-xs); color: var(--mac-text-secondary);">Мгновенно на баланс</div>
+              </div>
             </label>
-            <label style={{
-              padding: 'var(--mac-spacing-3)',
-              border: refundType === 'bank_transfer' ? '1px solid var(--mac-accent-blue)' : `1px solid ${theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-border)'}`,
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              background: refundType === 'bank_transfer' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : 'var(--mac-accent-bg)') : (theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white')
-            }}>
+            <label className={`fmm-refund-option ${refundType === 'bank_transfer' ? 'fmm-refund-option--selected' : ''}`}>
               <input
                 type="radio"
                 name="refundType"
@@ -428,23 +295,23 @@ const ForceMajeureModal = ({
                 checked={refundType === 'bank_transfer'}
                 onChange={(e) => setRefundType(e.target.value)}
                 style={{ display: 'none' }} />
-              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: getColor('textPrimary'), fontSize: 'var(--mac-font-size-base)' }}>На карту</div>
-              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: getColor('textSecondary'), marginTop: 'var(--mac-spacing-1)' }}>Заявка на возврат</div>
+              <div className={`fmm-refund-radio ${refundType === 'bank_transfer' ? 'fmm-refund-radio--selected' : ''}`}>
+                {refundType === 'bank_transfer' && <div className="fmm-refund-radio-dot" />}
+              </div>
+              <div>
+                <div className="fmm-refund-label">На карту</div>
+                <div className="fmm-refund-label" style="font-size: var(--mac-font-size-xs); color: var(--mac-text-secondary);">Заявка на возврат</div>
+              </div>
             </label>
           </div>
         </div>
         }
 
-        <div style={{
-          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
-          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
-          borderRadius: '14px',
-          padding: 'var(--mac-spacing-4)'
-        }}>
-          <p style={{ margin: '0 0 10px', fontSize: 'var(--mac-font-size-base)', color: '#991b1b', fontWeight: 'var(--mac-font-weight-semibold)' }}>
+        <div className="fmm-error-box" style="border-radius: 14px;">
+          <p className="fmm-warning-text">
             ⚠️ Это действие нельзя отменить!
           </p>
-          <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: theme === 'dark' ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-error)' }}>
+          <label className="fmm-field-label" style="font-size: var(--mac-font-size-sm); color: var(--mac-error);">
             Введите <strong>ПОДТВЕРЖДАЮ</strong> для продолжения:
           </label>
           <Input
@@ -453,43 +320,17 @@ const ForceMajeureModal = ({
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
             placeholder="ПОДТВЕРЖДАЮ"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              border: `1px solid ${isConfirmValid ? 'var(--mac-success)' : theme === 'dark' ? 'color-mix(in srgb, white, transparent 90%)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`,
-              borderRadius: 'var(--mac-radius-lg)',
-              fontSize: 'var(--mac-font-size-base)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              textAlign: 'center',
-              letterSpacing: '2px',
-              color: getColor('textPrimary'),
-              backgroundColor: theme === 'dark' ? 'color-mix(in srgb, white, transparent 96%)' : 'white',
-              outline: 'none'
-            }} />
+            className={`fmm-confirm-input ${isConfirmValid ? 'fmm-confirm-input--valid' : ''}`} />
         </div>
 
         {error &&
-        <div style={{
-          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'var(--mac-error-bg)',
-          color: 'var(--mac-error)',
-          padding: '12px 14px',
-          borderRadius: 'var(--mac-radius-lg)',
-          fontSize: 'var(--mac-font-size-base)',
-          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))'}`
-        }}>
+        <div className="fmm-error-box">
           {error}
         </div>
         }
 
         {success &&
-        <div style={{
-          background: theme === 'dark' ? 'rgba(16, 185, 129, 0.10)' : '#f0fdf4',
-          color: 'var(--mac-success)',
-          padding: '12px 14px',
-          borderRadius: 'var(--mac-radius-lg)',
-          fontSize: 'var(--mac-font-size-base)',
-          border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : 'var(--mac-success)'}`
-        }}>
+        <div className="fmm-success-box">
           ✅ {success}
         </div>
         }
