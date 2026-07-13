@@ -61,10 +61,14 @@ export const useLabHotkeys = ({
         return;
       }
 
-      // Escape: clear selection
+      // Escape: clear selection AND switch to queue tab
+      // PR-60 / High-11: was only clearing selection, leaving user on Reports tab with empty state
       if (e.key === 'Escape') {
         if (clearSelection) {
           clearSelection();
+        }
+        if (switchTab) {
+          switchTab('queue');
         }
         return;
       }

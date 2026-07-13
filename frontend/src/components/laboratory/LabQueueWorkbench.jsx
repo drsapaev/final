@@ -436,7 +436,8 @@ export default function LabQueueWorkbench({
                     <div style={metaRowStyle}>
                       <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty)}</Badge>
                       {appointment.payment_status && <Badge variant="info">Оплата: {formatPaymentStatus(appointment.payment_status)}</Badge>}
-                      {appointment.appointment_time && <Badge variant="success">{appointment.appointment_time}</Badge>}
+                      {/* PR-60 / Medium-13: was variant="success" (green implies positive status, but time is not a status) */}
+                      {appointment.appointment_time && <Badge variant="default">{appointment.appointment_time}</Badge>}
                       {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name}</Badge>}
                     </div>
 

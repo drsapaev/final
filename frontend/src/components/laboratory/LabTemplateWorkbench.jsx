@@ -1449,6 +1449,21 @@ export default function LabTemplateWorkbench({
                   <Icon name="doc.on.doc" size={16} />
                   Клонировать
                 </Button>
+                {/* PR-60 / High-7: Cancel changes — reverts draft to server version */}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (activeVersion) {
+                      setDraftVersion(hydrateVersion(activeVersion));
+                      notify('info', 'Изменения отменены. Восстановлена версия с сервера.');
+                    }
+                  }}
+                  disabled={saving || !activeVersion}
+                  title="Отменить изменения и восстановить версию с сервера"
+                >
+                  <Icon name="arrow.counterclockwise" size={16} />
+                  Отменить
+                </Button>
                 <Button variant="outline" onClick={handleSaveTemplate} disabled={saving}>
                   <Icon name="square.and.arrow.down" size={16} />
                   Сохранить черновик
