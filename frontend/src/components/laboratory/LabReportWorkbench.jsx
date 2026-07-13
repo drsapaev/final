@@ -59,6 +59,8 @@ export default function LabReportWorkbench({
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [draftValues, setDraftValues] = useState({});
   const [signerSnapshot, setSignerSnapshot] = useState({});
+  // PR-64 / Medium-16: collapsible sections in report editor
+  const [collapsedSections, setCollapsedSections] = useState(new Set());
   const [saving, setSaving] = useState(false);
   const [busyAction, setBusyAction] = useState('');
   const [printFeedback, setPrintFeedback] = useState(null);
@@ -818,11 +820,30 @@ export default function LabReportWorkbench({
               )}
 
               <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
-                {activeInstance.sections.map((section) => (
+                {activeInstance.sections.map((section) => {
+                  const isCollapsed = collapsedSections.has(section.key);
+                  return (
                   <div key={section.key} style={{ border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-xl)', overflow: 'hidden', background: 'var(--mac-bg-primary)' }}>
-                    <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', background: 'var(--mac-bg-tertiary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
+                    {/* PR-64 / Medium-16: collapsible section header */}
+                    <div
+                      style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', background: 'var(--mac-bg-tertiary)', fontWeight: 'var(--mac-font-weight-semibold)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => {
+                        setCollapsedSections((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(section.key)) next.delete(section.key);
+                          else next.add(section.key);
+                          return next;
+                        });
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
+                      aria-expanded={!isCollapsed}
+                    >
                       {section.title || section.key}
+                      <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>{isCollapsed ? '▶' : '▼'}</span>
                     </div>
+                    {!isCollapsed && (
                     <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', display: 'grid', gap: '10px' }}>
                       {section.fields.map((field) => {
                         const choiceOptions = field.choice_options || [];
@@ -947,8 +968,10 @@ export default function LabReportWorkbench({
                         );
                       })}
                     </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
