@@ -442,11 +442,9 @@ const DentistPanelUnified = () => {
       try {
         const token = tokenManager.getAccessToken();
         if (!token) return null;
-        const response = await fetch(`${API_V1_BASE}/registrar/services`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
+        const response = await apiClient.get(`/registrar/services`);
+        if (response.status < 400) {
+          const data = response.data;
           const servicesData = data.services_by_group || {};
           dentistServicesCache = servicesData;
           setServices(servicesData);
@@ -503,15 +501,10 @@ const DentistPanelUnified = () => {
         }
 
         // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
-        const response = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await apiClient.get(`/registrar/queues/today`);
 
-        if (response.ok) {
-          const data = await response.json();
+        if (response.status < 400) {
+          const data = response.data;
 
           // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
           const allAppointments = [];
@@ -692,15 +685,9 @@ const DentistPanelUnified = () => {
             break;
           }
           const token = tokenManager.getAccessToken();
-          const response = await fetch(`${API_V1_BASE}/doctor/queue/${queueEntryId}/start-visit`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          const response = await apiClient.post(`/doctor/queue/${queueEntryId}/start-visit`);
 
-          if (response.ok) {
+          if (response.status < 400) {
             logger.info('[Dentist] Пациент вызван:', row.patient_fio);
             await loadDentistryAppointments(true);
           }
@@ -1444,12 +1431,8 @@ const DentistPanelUnified = () => {
   const handleExaminationSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_V1_BASE}/dental/examinations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
-        body: JSON.stringify(examinationForm)
-      });
-      if (res.ok) {
+      const res = await apiClient.post(`/dental/examinations`, examinationForm);
+      if (res.status < 400) {
         setShowExaminationForm(false);
         setExaminationForm({
           patient_id: '', examination_date: '', oral_hygiene: '', caries_status: '',
