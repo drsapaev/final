@@ -164,7 +164,7 @@ const ReportsAndAnalytics = ({
       )}
         {renderMetricCard(
         'Выручка',
-        `${(analyticsData.overview.totalRevenue / 1000000).toFixed(1)}М ₽`,
+        `${(analyticsData.overview.totalRevenue / 1000000).toFixed(1)}М сум`,
         15.7,
         <DollarSign className="h-6 w-6" />,
         'purple'
@@ -213,7 +213,7 @@ const ReportsAndAnalytics = ({
         </div>
                 <div className="text-right">
                   <div className="text-sm font-semibold">{item.percentage}%</div>
-                  <div className="text-xs text-gray-600">{item.revenue.toLocaleString()} ₽</div>
+                  <div className="text-xs text-gray-600">{item.revenue.toLocaleString()} сум</div>
             </div>
             </div>
           )}
@@ -362,7 +362,7 @@ const ReportsAndAnalytics = ({
                     <div className="text-sm text-gray-900">{doctor.appointments}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{doctor.revenue.toLocaleString()} ₽</div>
+                    <div className="text-sm text-gray-900">{doctor.revenue.toLocaleString()} сум</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center" aria-label={`Rating ${doctor.rating}`}>
@@ -445,7 +445,7 @@ const ReportsAndAnalytics = ({
                     <div className="text-sm text-gray-900">{procedure.count}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{procedure.revenue.toLocaleString()} ₽</div>
+                    <div className="text-sm text-gray-900">{procedure.revenue.toLocaleString()} сум</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className={`flex items-center ${

@@ -448,7 +448,7 @@ const DynamicPricingManager = () => {
                   <div className="admin-stats-row-info">
                     <span className="admin-flex-center-4">
                       <Percent size={12} />
-                      {normalizePricingEnumValue(rule.discount_type) === 'percentage' ? `${rule.discount_value}%` : `${rule.discount_value} ₽`}
+                      {normalizePricingEnumValue(rule.discount_type) === 'percentage' ? `${rule.discount_value}%` : `${rule.discount_value} сум`}
                     </span>
                     <span className="admin-flex-center-4">
                       <Users size={12} />
@@ -709,11 +709,11 @@ const DynamicPricingManager = () => {
                   <div className="admin-flex-center-16-sm">
                     <span className="admin-price-savings">
                       <DollarSign size={12} />
-                      {pkg.package_price} ₽
+                      {pkg.package_price} сум
                     </span>
                     {pkg.original_price &&
               <span className="admin-price-strike">
-                        {pkg.original_price} ₽
+                        {pkg.original_price} сум
                       </span>
               }
                     {pkg.savings_percentage &&
@@ -885,7 +885,7 @@ const DynamicPricingManager = () => {
               </h4>
             </div>
             <div className="admin-stats-value-success">
-              {analytics.summary?.total_savings?.toLocaleString() || 0} ₽
+              {analytics.summary?.total_savings?.toLocaleString() || 0} сум
             </div>
             <p className="admin-stats-label">
               За период {analytics.period?.start_date && new Date(analytics.period.start_date).toLocaleDateString()} -
@@ -947,7 +947,7 @@ const DynamicPricingManager = () => {
                     Использований: {rule.uses}
                   </span>
                   <span className="text-[var(--mac-success)]">
-                    Экономия: {rule.total_savings?.toLocaleString() || 0} ₽
+                    Экономия: {rule.total_savings?.toLocaleString() || 0} сум
                   </span>
                 </div>
               </div>
@@ -972,7 +972,7 @@ const DynamicPricingManager = () => {
                     Покупок: {pkg.purchases}
                   </span>
                   <span className="text-[var(--mac-success)]">
-                    Экономия: {pkg.total_savings?.toLocaleString() || 0} ₽
+                    Экономия: {pkg.total_savings?.toLocaleString() || 0} сум
                   </span>
                 </div>
               </div>
