@@ -267,10 +267,14 @@ export const useAIChat = (options = {}) => {
             return;
         }
 
-        const wsUrl = `${buildWsUrl('/api/v1/ai/chat/ws')}?token=${token}`;
+        // P0 security fix: JWT sent via Sec-WebSocket-Protocol subprotocol (bearer.<token>)
+        // instead of URL query (?token=...). The URL query form leaked the JWT into nginx
+        // access logs, browser history, and Referer headers. Backend supports subprotocol
+        // auth since PR-4 (backend).
+        const wsUrl = `${buildWsUrl('/api/v1/ai/chat/ws')}`;
 
         try {
-            wsRef.current = new WebSocket(wsUrl);
+            wsRef.current = new WebSocket(wsUrl, [`bearer.${token}`]);
 
             wsRef.current.onopen = () => {
                 logger.info('AI Chat WebSocket connected');
