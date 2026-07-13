@@ -718,26 +718,16 @@ export default function LabReportWorkbench({
                   {/* WF-10 fix: inline-индикатор missing required fields.
                       Показываем сколько обязательных полей ещё не заполнено,
                       чтобы лаборант понимал, почему Finalize disabled. */}
+                  {/* PR-66 / Low-27: replaced plain text spans with Badge components */}
                   {canFinalize && hasMissingRequired && (
-                    <span style={{
-                      fontSize: 'var(--mac-font-size-xs)',
-                      color: 'var(--mac-accent-orange, #c2410c)',
-                      marginLeft: 'var(--mac-spacing-2)',
-                    }}>
-                      Не заполнено обязательных полей: {missingRequiredFields.length}
-                    </span>
+                    <Badge variant="warning" style={{ marginLeft: 'var(--mac-spacing-2)' }}>
+                      ⚠ Не заполнено: {missingRequiredFields.length}
+                    </Badge>
                   )}
-                  {/* Dirty state indicator: показываем, что есть несохранённые
-                      изменения. Предотвращает потерю данных при переключении. */}
                   {isDirty && canEditActiveInstance && (
-                    <span style={{
-                      fontSize: 'var(--mac-font-size-xs)',
-                      color: 'var(--mac-accent-orange, #c2410c)',
-                      marginLeft: 'var(--mac-spacing-2)',
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                    }}>
+                    <Badge variant="warning" style={{ marginLeft: 'var(--mac-spacing-2)' }}>
                       ● несохранённые изменения
-                    </span>
+                    </Badge>
                   )}
                   {/* PR-58: autosave indicator */}
                   {!isDirty && lastAutoSave && (

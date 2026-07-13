@@ -474,6 +474,7 @@ export default function LabQueueWorkbench({
                         {/* P-05 fix: patient_id — внутренний идентификатор, не нужен
                             лаборанту для работы. Скрываем по умолчанию, раскрытие —
                             по клику. Снижает риск утечки PII через скриншоты. */}
+                        {/* PR-66 / Low-30: added custom marker + ::marker CSS reset */}
                         <details style={{ display: 'inline' }}>
                           <summary
                             style={{
@@ -484,6 +485,7 @@ export default function LabQueueWorkbench({
                             }}
                             aria-label="Показать внутренний ID пациента"
                           >
+                            <style>{`summary::-webkit-details-marker { display: none; } summary::marker { content: ''; }`}</style>
                             ID пациента ▸
                           </summary>
                           <span style={{ marginLeft: 6, fontFamily: 'monospace' }}>
