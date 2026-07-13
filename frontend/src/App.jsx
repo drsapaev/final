@@ -207,6 +207,29 @@ function AppShell({ children }) {
 
   return (
     <div className="app-shell" style={macOSWrapStyle} data-route-id={chrome.route?.id || 'unknown'}>
+      {/* PR-49: skip-to-content link for keyboard users — bypasses header + sidebar */}
+      <a
+        href="#main-content"
+        className="skip-to-content-link"
+        style={{
+          position: 'absolute',
+          top: '-100px',
+          left: '8px',
+          zIndex: 9999,
+          padding: '8px 16px',
+          backgroundColor: 'var(--mac-accent-blue, #007aff)',
+          color: '#fff',
+          borderRadius: 'var(--mac-radius-md)',
+          textDecoration: 'none',
+          fontSize: '14px',
+          fontWeight: 600,
+          transition: 'top 200ms ease',
+        }}
+        onFocus={(e) => { e.currentTarget.style.top = '8px'; }}
+        onBlur={(e) => { e.currentTarget.style.top = '-100px'; }}
+      >
+        Перейти к содержимому
+      </a>
       {!chrome.hideHeader && (
         <div style={{ padding: 'var(--mac-spacing-3)', backgroundColor: 'transparent', width: '100%', maxWidth: '100%' }}>
           <HeaderNew />
@@ -293,7 +316,32 @@ function AppShell({ children }) {
           </div>
         )}
 
+        {/* PR-49: mobile sidebar overlay — when sidebar is expanded on mobile,
+            render a semi-transparent backdrop that closes the sidebar on click.
+            Previously the sidebar pushed content right (no overlay), which is
+            non-standard and makes it hard to dismiss on touch devices. */}
+        {compactSidebar && mobileSidebarExpanded && (
+          <div
+            onClick={() => setMobileSidebarExpanded(false)}
+            onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setMobileSidebarExpanded(false); }}
+            aria-label="Закрыть меню"
+            role="button"
+            tabIndex={-1}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              zIndex: 5,
+              cursor: 'pointer',
+            }}
+          />
+        )}
+
         <main
+          id="main-content"
           className={`app-main${chrome.hideSidebar || chrome.fullscreen ? ' app-main--frameless' : ''}`}
           style={{
             ...macOSMainStyle,

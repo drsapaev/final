@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
@@ -30,9 +30,27 @@ const Sidebar = React.forwardRef(({
 }, ref) => {void
   useTheme();
   void variant;
-  const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
+  // PR-49: persist collapse state in localStorage (was reset on every refresh)
+  const STORAGE_KEY = 'mac-sidebar-collapsed';
+  const [internalCollapsed, setInternalCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved === 'true';
+    } catch {
+      return defaultCollapsed;
+    }
+  });
   const isControlled = typeof collapsed === 'boolean';
   const isCollapsed = isControlled ? collapsed : internalCollapsed;
+
+  // PR-49: persist collapse state when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, String(internalCollapsed));
+    } catch {
+      // localStorage may be unavailable (private mode) — ignore
+    }
+  }, [internalCollapsed]);
 
   const setCollapsed = (nextCollapsed) => {
     if (!isControlled) {
@@ -109,7 +127,7 @@ const Sidebar = React.forwardRef(({
         <Button
           variant="ghost"
           size="small"
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={isCollapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
           onClick={toggleCollapsed}
           style={{
             width: '32px',
@@ -135,7 +153,7 @@ const Sidebar = React.forwardRef(({
         <Button
           variant="ghost"
           size="small"
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={isCollapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
           onClick={toggleCollapsed}
           style={{
             width: '32px',
@@ -268,7 +286,8 @@ const Sidebar = React.forwardRef(({
                       borderTop: sectionIdx > 0 ? '1px solid var(--mac-separator, var(--mac-border))' : 'none',
                       marginTop: sectionIdx > 0 ? '8px' : '0',
                     }}
-                    aria-hidden="true"
+                    role="heading"
+                    aria-level="3"
                     className="mac-sidebar-section-header">
                     {section.title}
                   </div>
@@ -305,6 +324,12 @@ const Sidebar = React.forwardRef(({
           border-radius: 3px;
         }
 
+        /* PR-49: Firefox scrollbar styling (was webkit-only) */
+        .mac-sidebar {
+          scrollbar-width: thin;
+          scrollbar-color: var(--mac-border) transparent;
+        }
+
         .mac-sidebar::-webkit-scrollbar-thumb:hover {
           background: var(--mac-text-tertiary);
         }
@@ -320,6 +345,9 @@ const Sidebar = React.forwardRef(({
         .mac-sidebar-item--active:hover {
           background: var(--mac-accent-bg) !important;
         }
+
+        /* PR-49: fixed orphan CSS — was missing selector, browser silently discarded */
+        .mac-sidebar-item--active {
           background: var(--mac-nav-item-active) !important;
           border-color: var(--mac-nav-item-active-border) !important;
         }
