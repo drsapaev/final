@@ -162,7 +162,9 @@ class AIChatService:
                 ai_content += f"\n\n---\n_{response.disclaimer}_"
 
             # FA-010: Watermarking — sign AI response for accountability
-            import hmac, hashlib
+            import hashlib
+            import hmac
+
             from app.core.config import settings as _settings
             _wm_secret = getattr(_settings, "AI_WATERMARK_SECRET", "") or "default-watermark-key"
             _wm_msg = f"{ai_content}|{response.provider}|{response.model}"

@@ -2,6 +2,15 @@
 Расширенные мобильные API endpoints для PWA
 """
 
+# PR-1 NOTE: ``from app.crud import appointment as crud_appointment`` would
+# bind to the ``CRUDAppointment`` *instance* exported by ``app/crud/__init__.py``
+# via ``from .appointment import *`` (which re-exports ``appointment``).
+# That instance has no ``get_appointment`` / ``cancel_appointment`` /
+# ``reschedule_appointment`` / ``count_doctor_patients`` / ``get_doctor_avg_rating``
+# module-level functions. The same problem affects ``patient`` (instance).
+# Use ``importlib.import_module`` to bypass the package-attribute shadowing
+# and bind to the actual modules.
+import importlib as _importlib
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
@@ -9,8 +18,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints._error_logging import log_endpoint_error  # PR-7
 from app.api.deps import get_current_user
+from app.api.v1.endpoints._error_logging import log_endpoint_error  # PR-7
 from app.crud import (
     clinic as crud_doctor,
 )
@@ -26,16 +35,6 @@ from app.crud import (
 from app.db.session import get_db
 from app.models.user import User
 from app.models.user_profile import UserProfile
-
-# PR-1 NOTE: ``from app.crud import appointment as crud_appointment`` would
-# bind to the ``CRUDAppointment`` *instance* exported by ``app/crud/__init__.py``
-# via ``from .appointment import *`` (which re-exports ``appointment``).
-# That instance has no ``get_appointment`` / ``cancel_appointment`` /
-# ``reschedule_appointment`` / ``count_doctor_patients`` / ``get_doctor_avg_rating``
-# module-level functions. The same problem affects ``patient`` (instance).
-# Use ``importlib.import_module`` to bypass the package-attribute shadowing
-# and bind to the actual modules.
-import importlib as _importlib
 
 crud_appointment = _importlib.import_module("app.crud.appointment")
 crud_patient = _importlib.import_module("app.crud.patient")

@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
-
 from app.api.v1.endpoints.registrar_integration._helpers import (
     _normalize_registration_discount_mode,
     _serialize_registrar_datetime,

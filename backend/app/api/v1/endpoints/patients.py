@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.core.audit import log_critical_change
+from app.core.i18n import t  # noqa: F401
 from app.crud.patient import patient as patient_crud
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
@@ -16,7 +17,6 @@ from app.services.patient_portal_service import (
     PatientPortalService,
 )
 from app.services.patient_service import PatientService
-from app.core.i18n import t  # noqa: F401
 
 router = APIRouter()
 

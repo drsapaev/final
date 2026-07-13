@@ -3,7 +3,6 @@
 Split from notifications.py.
 """
 from __future__ import annotations
-from app.services.notifications_pkg._helpers import _normalize_notification_event_type  # noqa: F401
 
 from app.services.notifications_pkg._base import (
     UTC,
@@ -20,6 +19,9 @@ from app.services.notifications_pkg._base import (
     httpx,
     logger,
     smtplib,
+)
+from app.services.notifications_pkg._helpers import (
+    _normalize_notification_event_type,  # noqa: F401
 )
 
 

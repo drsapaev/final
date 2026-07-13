@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.audit import extract_model_changes
+from app.core.i18n import t  # noqa: F401
 from app.models.user import User
 from app.schemas.file_system import (
     FileExportRequest,
@@ -45,7 +46,6 @@ from app.schemas.file_system import (
 from app.services.file_system_api_service import FileSystemApiService
 from app.services.file_system_service import get_file_system_service
 from app.utils.file_validator import validate_upload_file
-from app.core.i18n import t  # noqa: F401
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

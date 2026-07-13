@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
+from app.core.i18n import t  # noqa: F401
 from app.crud import patient as patient_crud
 from app.crud import visit as visit_crud
 from app.crud.notification import crud_notification_template
@@ -40,7 +41,6 @@ from app.schemas.user_management import (
 )
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
-from app.core.i18n import t  # noqa: F401
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

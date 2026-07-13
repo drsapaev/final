@@ -12,10 +12,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.i18n import t  # noqa: F401
 from app.models.appointment import Appointment
 from app.models.user import User
 from app.services.patient_appointments_api_service import PatientAppointmentsApiService
-from app.core.i18n import t  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

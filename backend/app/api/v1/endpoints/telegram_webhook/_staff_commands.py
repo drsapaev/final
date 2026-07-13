@@ -25,7 +25,6 @@ from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
-
 from app.api.v1.endpoints.telegram_webhook._helpers import (
     _extract_staff_link_start_payload,
     _extract_ticket_qr_start_payload,
@@ -41,7 +40,7 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
     _telegram_onboarding_entry_markup,
     _telegram_settings_message,
 )  # noqa: F401
-from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401
+from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401  # noqa: F401
     _create_staff_action_confirmation_request,
     _is_patient_settings_context_template,
     _latest_patient_bot_template_key,
@@ -64,29 +63,6 @@ from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F
     _upsert_ticket_qr_telegram_user,
 )
 
-
-from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401
-    _create_staff_action_confirmation_request,
-    _is_patient_settings_context_template,
-    _latest_patient_bot_template_key,
-    _linked_staff_for_chat,
-    _normalize_staff_button_text,
-    _record_staff_action_denied_audit,
-    _record_staff_command_audit,
-    _record_staff_link_audit,
-    _send_patient_bot_reply,
-    _staff_menu_for_role,
-    _staff_menu_item_for_command,
-    _staff_menu_item_for_text,
-    _staff_menu_keyboard,
-    _staff_menu_message,
-    _staff_read_only_commands,
-    _staff_read_only_domain_data_message,
-    _staff_read_only_item_labels,
-    _staff_state_change_operation_for_command,
-    _upsert_staff_link_telegram_user,
-    _upsert_ticket_qr_telegram_user,
-)
 
 async def _handle_staff_read_only_menu(
     update: dict[str, Any], db: Session, bot_service

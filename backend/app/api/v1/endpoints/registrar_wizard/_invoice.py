@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
-
 from app.api.v1.endpoints.registrar_wizard._helpers import (
     _build_repeat_eligibility_preview_item,
     _load_registration_discount_settings,

@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 import strawberry
 from sqlalchemy import func
 
+from app.core.i18n import t  # noqa: F401
 from app.crud import (
     appointment as crud_appointment,
 )
@@ -50,7 +51,6 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit
-from app.core.i18n import t  # noqa: F401
 
 
 @strawberry.type

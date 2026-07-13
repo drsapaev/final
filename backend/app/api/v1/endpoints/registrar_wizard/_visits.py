@@ -4,7 +4,6 @@ from typing import Any
 
 from app.api.v1.endpoints.registrar_wizard._cart import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
-
 from app.api.v1.endpoints.registrar_wizard._helpers import (
     _ensure_visit_doctor_access,
     _normalize_registration_discount_mode,

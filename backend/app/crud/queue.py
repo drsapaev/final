@@ -166,9 +166,9 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 def get_daily_queues(
     db: Session,
     *,
-    day: "date | None" = None,
+    day: date | None = None,
     active_only: bool = False,
-) -> "list[DailyQueue]":
+) -> list[DailyQueue]:
     """Return DailyQueue ORM rows filtered by ``day`` and/or ``active`` flag.
 
     Switching to the ORM (vs the legacy Table-autoload helpers above) is what
@@ -188,7 +188,7 @@ def get_daily_queue(
     db: Session,
     *,
     queue_id: int,
-) -> "DailyQueue | None":
+) -> DailyQueue | None:
     """Return a single DailyQueue ORM row by id."""
     return db.get(DailyQueue, queue_id)
 
@@ -197,7 +197,7 @@ def get_patient_queue_positions(
     db: Session,
     *,
     patient_id: int,
-) -> "list[OnlineQueueEntry]":
+) -> list[OnlineQueueEntry]:
     """Return all active OnlineQueueEntry rows for a patient (ORM objects).
 
     Ordered by creation time desc so the most recent position comes first.

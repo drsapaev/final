@@ -12,12 +12,12 @@ from app.services.notifications_pkg._base import (
     logger,
 )
 from app.services.notifications_pkg._helpers import (  # noqa: F401
-    _normalize_notification_event_type,
-    _patient_telegram_event_message,
     LAB_NOTIFICATION_EVENT_TYPES,
     PATIENT_TELEGRAM_EVENT_PREFERENCES,
     QUEUE_NOTIFICATION_EVENT_TYPES,
     REGISTRAR_NOTIFICATION_EVENT_TYPES,
+    _normalize_notification_event_type,
+    _patient_telegram_event_message,
 )
 
 

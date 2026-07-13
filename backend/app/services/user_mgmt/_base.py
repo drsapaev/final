@@ -14,8 +14,8 @@ from sqlalchemy.exc import IntegrityError  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.core.security import get_password_hash  # noqa: F401
-from app.models.user import User  # noqa: F401
 from app.models.clinic import Doctor  # noqa: F401
+from app.models.user import User  # noqa: F401
 from app.models.user_profile import (  # noqa: F401
     UserAuditLog,
     UserNotificationSettings,

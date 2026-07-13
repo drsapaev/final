@@ -9,20 +9,20 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.services_ep import router  # noqa: F401
 from app.api.v1.endpoints.services_ep._categories import (  # noqa: F401
-    list_service_categories,
     create_service_category,
-    update_service_category,
     delete_service_category,
+    list_service_categories,
+    update_service_category,
 )
 from app.api.v1.endpoints.services_ep._services import (  # noqa: F401
-    get_queue_groups,
-    get_service_code_mappings,
-    list_services,
-    get_service,
     create_service,
-    update_service,
     delete_service,
+    get_queue_groups,
+    get_service,
+    get_service_code_mappings,
     list_doctors_temp,
+    list_services,
+    update_service,
 )
 
 __all__ = [

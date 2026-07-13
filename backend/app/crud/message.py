@@ -12,7 +12,6 @@ from app.models.user import User
 from app.schemas.message import MessageCreate
 
 
-
 def _make_preview(msg) -> str:
     """F-008: neutral preview without PHI — no message content in conversation list."""
     if msg.message_type == "voice":
@@ -87,7 +86,8 @@ class CRUDMessage:
         limit: int = 50
     ) -> list[dict]:
         """F-013: SQL-based conversations list — no N+1, with pagination."""
-        from sqlalchemy import func, case, desc as sa_desc
+        from sqlalchemy import case, func
+        from sqlalchemy import desc as sa_desc
 
         partner_expr = case(
             (Message.sender_id == user_id, Message.recipient_id),
