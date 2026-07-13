@@ -111,7 +111,9 @@ const WelcomeView = React.memo(({
           </AnimatedTransition>
           <AnimatedTransition type="fade" delay={300}>
             <div className="registrar-date-subtitle">
-              {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', {
+              {new Date().toLocaleDateString(
+                // PR-51: fixed date locale — EN users now get en-US (was uz-UZ)
+                language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-US' : 'uz-UZ', {
               weekday: 'long',
               year: 'numeric',
               month: 'long',
@@ -157,14 +159,14 @@ const WelcomeView = React.memo(({
                 border: '1px solid var(--mac-card-border)',
                 background: 'var(--mac-card-bg)',
               }}>
-                <h3 style={{
+                <h2 style={{
                   margin: '0 0 var(--mac-spacing-3) 0',
                   fontSize: 'var(--mac-font-size-base)',
                   fontWeight: 'var(--mac-font-weight-semibold)',
                   color: textColor,
                 }}>
                   Утренний статус приёма
-                </h3>
+                </h2>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
@@ -432,7 +434,10 @@ const WelcomeView = React.memo(({
               {showCalendar &&
             <Badge variant="secondary" className="registrar-badge-date">
                   <Icon name="magnifyingglass" size="small" />
-                  {new Date(historyDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {new Date(historyDate).toLocaleDateString(
+                    // PR-51: locale-aware date formatting (was hardcoded ru-RU)
+                    language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-US' : 'uz-UZ',
+                    { day: 'numeric', month: 'long', year: 'numeric' })}
                 </Badge>
             }
             </div>
@@ -446,16 +451,13 @@ const WelcomeView = React.memo(({
               const isNoToken = !token;
               const isEmptyQueue = !appointmentsLoading && dataSource === 'api' && filteredAppointments.length === 0;
 
-              logger.info('🎯 Empty state render check:', {
-                appointmentsLoading,
-                dataSource,
-                filteredLength: filteredAppointments.length,
-                appointmentsLength: appointments.length,
-                hasToken: !!token,
-                isNoToken,
-                isEmptyQueue,
-                shouldShow: isEmptyQueue
-              });
+              // PR-51: removed logger.info('Empty state render check') — was
+              // running on EVERY render (even when table is full), logging
+              // PII-adjacent data at info level. Replaced with debug-level
+              // log that only fires when the empty state is actually shown.
+              if (isEmptyQueue && import.meta.env.MODE === 'development') {
+                logger.debug('Empty state shown:', { isNoToken, dataSource, filteredLength: filteredAppointments.length });
+              }
 
               return isEmptyQueue;
             })() &&
@@ -535,6 +537,8 @@ const WelcomeView = React.memo(({
                   setWizardInitialData(null); // ✅ Сброс данных
                   setShowWizard(true);
                 }}
+                // PR-51: disable CTA when session expired (no token)
+                disabled={!tokenManager.hasToken()}
                 className="registrar-btn-cta">
 
                       <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
