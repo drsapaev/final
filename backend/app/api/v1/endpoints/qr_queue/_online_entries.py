@@ -787,8 +787,6 @@ def _full_update_handle_all_free_visit(
 
     Returns the Visit (or None if all_free is False).
     """
-    from datetime import date
-    from decimal import Decimal
 
     from app.models.visit import Visit, VisitService
 
@@ -1369,7 +1367,6 @@ def _full_update_create_single_independent_entry(
     discounts, and creates the OnlineQueueEntry with services/service_codes JSON.
     """
     import json
-    from datetime import datetime
 
     from sqlalchemy import text
 
@@ -1471,10 +1468,8 @@ def _full_update_create_independent_entries(
     Returns (queue_time, new_service_ids) so the orchestrator sees the
     updated list.
     """
-    import json
     from datetime import date, datetime
 
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
     from app.models.service import Service
 
     if is_initial_registration:
@@ -1841,19 +1836,13 @@ def _full_update_process_services(
 ):
     """Section 4: Collect existing services, create new entries, calculate totals."""
     import json
-    from datetime import date, datetime
 
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
-    from app.models.patient import Patient
-    from app.models.service import Service
 
     patient_data = request.patient_data
     # ✅ НОВЫЙ ФОРМАТ: Полные объекты услуг с метаданными
 
     # ⭐ FIX: Определяем существующие услуги из ВСЕХ записей пациента за день (не только текущей entry)
-    from datetime import datetime
 
-    from app.models.online_queue import DailyQueue
 
     existing_service_ids, existing_service_queue_times, final_aggregated_ids = (
         _full_update_collect_existing_services(db=db, entry=entry, request=request)
