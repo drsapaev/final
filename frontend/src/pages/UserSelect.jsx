@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { api } from '../api/client';  // PR-54: replace raw fetch
 import { useNavigate } from 'react-router-dom';
 import tokenManager from '../utils/tokenManager';
 import { roleToRoute } from '../constants/routes';
@@ -18,9 +19,9 @@ export default function UserSelect() {
       setErr('');
       try {
         const token = tokenManager.getAccessToken();
-        const r = await fetch('/api/v1/admin/users', { headers: { Authorization: `Bearer ${token}` } });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = await r.json();
+        const r = await api.get('/admin/users');
+        if (r.status >= 400) throw new Error(`HTTP ${r.status}`);
+        const data = r.data;
         setItems(Array.isArray(data) ? data : []);
       } catch (e) {
         setErr(e.message || 'Ошибка загрузки');

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '../api/client';  // PR-54: replace raw fetch
 import {
   Calendar,
 
@@ -44,26 +45,18 @@ const MobilePatientDashboard = () => {
       setLoading(true);
 
       // Загружаем данные пациента
-      const response = await fetch('/api/v1/mobile/auth/profile', {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
-      });
+      const response = await api.get(`/mobile/auth/profile`);
 
-      if (response.ok) {
-        const data = await response.json();
+      if (response.status < 400) {
+        const data = response.data;
         setPatientData(data);
       }
 
       // Загружаем записи
-      const appointmentsResponse = await fetch('/api/v1/mobile/appointments', {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
-      });
+      const appointmentsResponse = await api.get(`/mobile/appointments`);
 
-      if (appointmentsResponse.ok) {
-        const appointmentsData = await appointmentsResponse.json();
+      if (appointmentsResponse.status < 400) {
+        const appointmentsData = appointmentsResponse.data;
         setAppointments(appointmentsData);
       }
 
