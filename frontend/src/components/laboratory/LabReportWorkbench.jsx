@@ -750,10 +750,13 @@ export default function LabReportWorkbench({
                       с сохранением P-02 fix (блокировка при отсутствии возраста/пола).
                       Использует patient_snapshot из activeInstance — отдельный
                       запрос GET /patients/{id} не нужен. */}
+                  {/* PR-61 / Medium-22: AI button styled as secondary (was visually mixed with operational buttons) */}
+                  <span style={{ opacity: 0.85, borderLeft: '1px solid var(--mac-border)', paddingLeft: 'var(--mac-spacing-2)' }}>
                   <LabReportAIAnalysis
                     activeInstance={activeInstance}
                     notify={notify}
                   />
+                  </span>
                 </div>
               </div>
 

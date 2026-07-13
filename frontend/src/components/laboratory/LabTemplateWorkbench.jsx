@@ -511,12 +511,26 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
               ) : (
                 <label style={{ display: 'grid', gap: '4px' }}>
                   <span style={{ fontSize: '12px' }}>Значение</span>
-                  <input
-                    className="macos-input"
-                    aria-label="Значение условия"
-                    value={caseItem.when?.value ?? ''}
-                    onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
-                  />
+                  {/* PR-61 / Medium-18: sex enum when source is patient.sex */}
+                  {caseItem.when?.source === 'patient.sex' ? (
+                    <select
+                      className="macos-input"
+                      aria-label="Значение условия"
+                      value={caseItem.when?.value ?? ''}
+                      onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
+                    >
+                      <option value="">Выберите...</option>
+                      <option value="M">Мужской (M)</option>
+                      <option value="F">Женский (F)</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="macos-input"
+                      aria-label="Значение условия"
+                      value={caseItem.when?.value ?? ''}
+                      onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
+                    />
+                  )}
                 </label>
               )}
             </div>
@@ -1023,7 +1037,8 @@ export default function LabTemplateWorkbench({
   const renderContentTab = () => (
     <div style={{ display: 'grid', gap: '12px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 600 }}>Секции и показатели ({draftVersion.sections.length})</div>
+        {/* PR-61 / Low-29: count fields not just sections (was misleading) */}
+        <div style={{ fontWeight: 600 }}>Секции и показатели ({draftVersion?.sections?.reduce((acc, s) => acc + (s.fields?.length || 0), 0) || 0} показателей в {draftVersion?.sections?.length || 0} секц.)</div>
         <Button variant="outline" onClick={addSection}>
           <Icon name="plus" size={16} />
           Добавить секцию
