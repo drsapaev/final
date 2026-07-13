@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Sun as LSun, Moon as LMoon, Monitor as LMonitor, Rainbow as LRainbow, Layers as LLayers, Sparkles as LSparkles } from 'lucide-react';
+import { Sun as LSun, Moon as LMoon, Monitor as LMonitor, Rainbow as LRainbow, Layers as LLayers, Sparkles as LSparkles, Bell as BellIcon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
@@ -12,6 +12,7 @@ import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
 import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
 import { getCanonicalRouteById, getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors.js';
+import { useTranslation } from '../../hooks/useTranslation.jsx';  // PR-50: i18n
 
 import logger from '../../utils/logger';
 
@@ -39,15 +40,20 @@ export function isThemeMenuInteraction(event, themeMenuRoot) {
 export default function HeaderNew() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t, language, setLanguage } = useTranslation();  // PR-50: i18n wired
 
   const [state, setState] = useState(auth.getState());
-  const [lang, setLang] = useState(localStorage.getItem('lang') || 'ru');
+  const [lang, setLang] = useState(language || 'ru');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);  // PR-50: profile dropdown
   const themeMenuRef = useRef(null);
   const themeButtonRef = useRef(null);
   const [menuPos, setMenuPos] = useState({ left: 0, top: 0 });
 
   useEffect(() => auth.subscribe(setState), []);
+
+  // PR-50: sync lang with useTranslation
+  useEffect(() => { setLang(language); }, [language]);
 
   const { theme, colorScheme, setColorScheme } = useTheme();
 
@@ -160,9 +166,12 @@ export default function HeaderNew() {
     return items;
   }, [roleNormalized]);
 
+  // PR-50: changeLang now uses useTranslation's setLanguage (which updates
+  // React context + triggers re-render). Previously only wrote to localStorage
+  // — the toggle was decorative.
   const changeLang = (v) => {
     setLang(v);
-    localStorage.setItem('lang', v);
+    setLanguage(v);  // updates useTranslation context → re-renders all consumers
   };
 
   // QW-05 fix: global Back button. Previously navigate(-1) was used only in 2 of ~50
@@ -328,26 +337,30 @@ export default function HeaderNew() {
         background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-separator)'
       }} />
 
-      {/* 1) Язык */}
-      <Button
-      variant="ghost"
-      size="small"
-      onClick={() => changeLang(lang === 'ru' ? 'uz' : lang === 'uz' ? 'en' : 'ru')}
-      title={`Switch to ${lang === 'ru' ? 'UZ' : lang === 'uz' ? 'EN' : 'RU'}`}
-      style={{
-        fontSize: 'var(--mac-font-size-sm)',
-        fontWeight: 'var(--mac-font-weight-semibold)',
-        padding: '6px 10px',
-        flex: '0 0 auto',
-        border: theme === 'dark' ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--mac-border)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mac-spacing-1)'
-      }}>
-
-        <Icon name="globe" size="small" />
-        {lang.toUpperCase()}
-      </Button>
+      {/* 1) Язык — PR-50: replaced cycling button with <select> (H-1, H-2 fix) */}
+      <select
+        value={lang}
+        onChange={(e) => changeLang(e.target.value)}
+        aria-label="Выбрать язык"
+        title="Выбрать язык"
+        style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          padding: '6px 10px',
+          flex: '0 0 auto',
+          border: theme === 'dark' ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-sm)',
+          backgroundColor: 'var(--mac-bg-secondary)',
+          color: 'var(--mac-text-primary)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--mac-spacing-1)'
+        }}>
+        <option value="ru">RU</option>
+        <option value="uz">UZ</option>
+        <option value="en">EN</option>
+      </select>
 
       {/* 2) Сеть */}
       <div style={{ flex: '0 0 auto' }}>
@@ -360,6 +373,31 @@ export default function HeaderNew() {
           <ChatButton />
         </div>
     }
+
+      {/* 2.6) Уведомления — PR-50: global notification bell (H-4 fix) */}
+      {user &&
+        <div style={{ flex: '0 0 auto' }}>
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={() => navigate(getRoleHomeRoute(roleNormalized) || '/')}
+            title="Уведомления"
+            aria-label="Уведомления"
+            style={{
+              width: '36px',
+              height: '36px',
+              padding: 0,
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+            }}>
+            <BellIcon size={16} style={{ color: 'var(--mac-text-primary)' }} />
+          </Button>
+        </div>
+      }
 
       {/* 3) Тема */}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '0 0 auto' }}>
@@ -469,64 +507,118 @@ export default function HeaderNew() {
         </div>
       </div>
 
-      {/* 4) Профиль / Войти */}
-      {user ?
-    <>
+      {/* 4) Профиль / Войти — PR-50: consolidated profile + logout into dropdown (H-6, H-7 fix) */}
+      {user ? (
+        <div style={{ position: 'relative', flex: '0 0 auto' }}>
           <Button
-        variant="outline"
-        size="small"
-        onClick={() => navigate(profileRoute)}
-        title="Профиль пользователя"
-        className="hdr-hide-sm"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)',
-          flex: '0 0 auto'
-        }}>
-
+            variant="outline"
+            size="small"
+            onClick={() => setShowProfileMenu((v) => !v)}
+            title="Профиль пользователя"
+            aria-label="Профиль пользователя"
+            aria-haspopup="menu"
+            aria-expanded={showProfileMenu}
+            className="hdr-hide-sm"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)',
+              flex: '0 0 auto'
+            }}>
             <Icon name="person" size="small" style={{ color: 'var(--mac-text-primary)' }} />
             <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
               {user.full_name || user.username || 'Профиль'}
             </span>
           </Button>
-
-          {/* 5) Выход */}
-          <Button
-        id="logout-header-btn"
-        variant="danger"
-        size="small"
-        onClick={() => {auth.clearToken();setProfile(null);navigate(loginRoute);}}
-        title="Выйти"
-        className="hdr-hide-sm"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)',
-          flex: '0 0 auto'
-        }}>
-
-            <Icon name="person" size="small" style={{ color: 'white' }} />
-            <span>Выйти</span>
-          </Button>
-        </> :
-
-    <Button
-      variant="primary"
-      size="small"
-      onClick={() => navigate(loginRoute)}
-      className="hdr-hide-sm"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mac-spacing-2)',
-        flex: '0 0 auto'
-      }}>
-
+          {showProfileMenu && (
+            <>
+              {/* click-outside overlay — PR-50: added role + keyboard handler */}
+              <div
+                onClick={() => setShowProfileMenu(false)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setShowProfileMenu(false); }}
+                role="button"
+                tabIndex={-1}
+                aria-label="Закрыть меню профиля"
+                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
+              />
+              <div
+                role="menu"
+                aria-label="Меню профиля"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  boxShadow: 'var(--mac-shadow-md)',
+                  zIndex: 100,
+                  minWidth: '180px',
+                  overflow: 'hidden',
+                }}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setShowProfileMenu(false); navigate(profileRoute); }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}>
+                  <Icon name="person" size="small" />
+                  Профиль
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  id="logout-header-btn"
+                  onClick={() => { setShowProfileMenu(false); auth.clearToken(); setProfile(null); navigate(loginRoute); }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    borderTop: '1px solid var(--mac-border)',
+                    cursor: 'pointer',
+                    color: 'var(--mac-danger, #dc2626)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}>
+                  <Icon name="arrow.right.square" size="small" />
+                  Выйти
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <Button
+          variant="primary"
+          size="small"
+          onClick={() => navigate(loginRoute)}
+          className="hdr-hide-sm"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            flex: '0 0 auto'
+          }}>
           <Icon name="person" size="small" style={{ color: 'white' }} />
           <span>Войти</span>
         </Button>
-    }
+      )}
     </div>;
 
 
@@ -538,42 +630,22 @@ export default function HeaderNew() {
       </div>
       <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-4)' }}>
         <GlobalSearchBar />
-        {/* P-027 (UX audit): surface the Cmd+K shortcut so power-users
-            discover the CommandPalette without reading docs. */}
-        <kbd
-          role="button"
-          tabIndex={0}
+        {/* PR-50: ⌘K chip — replaced synthetic KeyboardEvent hack with a real
+            <button> that dispatches a custom event the CommandPalette listens
+            for. Previously dispatched a synthetic keydown event which was
+            brittle and conflicted with GlobalSearchBar's own ⌘K handler. */}
+        <button
+          type="button"
           title="Открыть командную палитру (Cmd+K / Ctrl+K)"
-          aria-label="Открыть командную палитру (Cmd+K или Ctrl+K)"
+          aria-label="Открыть командную палитру"
           onClick={() => {
-            // Dispatch a keyboard event to trigger the CommandPalette's
-            // global listener. This is simpler than importing the component.
-            const isMac = navigator.platform.toUpperCase().includes('MAC');
-            const event = new KeyboardEvent('keydown', {
-              key: 'k',
-              metaKey: isMac,
-              ctrlKey: !isMac,
-              bubbles: true,
-            });
-            document.dispatchEvent(event);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              const isMac = navigator.platform.toUpperCase().includes('MAC');
-              const event = new KeyboardEvent('keydown', {
-                key: 'k',
-                metaKey: isMac,
-                ctrlKey: !isMac,
-                bubbles: true,
-              });
-              document.dispatchEvent(event);
-            }
+            // PR-50: dispatch a custom event instead of a synthetic KeyboardEvent
+            document.dispatchEvent(new CustomEvent('open-command-palette'));
           }}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            padding: '2px 8px',
+            padding: '4px 8px',
             fontSize: 'var(--mac-font-size-xs)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-secondary, #6b7280)',
@@ -594,7 +666,7 @@ export default function HeaderNew() {
           }}
         >
           ⌘K
-        </kbd>
+        </button>
         {roleNav}
       </div>
       <div className="hdr-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{controls}</div>

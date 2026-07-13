@@ -201,8 +201,17 @@ export function CommandPalette({ profile, navigate }) {
       }
     };
 
+    // PR-50: listen for custom 'open-command-palette' event from header ⌘K button.
+    // Previously the header dispatched a synthetic KeyboardEvent which was brittle
+    // and conflicted with GlobalSearchBar's own ⌘K handler.
+    const handleOpenPalette = () => setIsOpen(true);
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('open-command-palette', handleOpenPalette);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('open-command-palette', handleOpenPalette);
+    };
   }, [isOpen]);
 
   // Focus input when opened
