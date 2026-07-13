@@ -735,9 +735,63 @@ export default function LabTemplateWorkbench({
     return version.id;
   }
 
+  // PR-57: validate reference ranges (low < high) before save/publish
+  function validateReferenceRanges() {
+    if (!draftVersion?.sections) return [];
+    const errors = [];
+    draftVersion.sections.forEach((section, sIdx) => {
+      (section.fields || []).forEach((field, fIdx) => {
+        const rule = field.reference_rule;
+        if (!rule) return;
+        // Check default case
+        const def = rule.default;
+        if (def && def.low != null && def.high != null && def.low !== '' && def.high !== '') {
+          if (parseFloat(def.low) >= parseFloat(def.high)) {
+            errors.push(`Секция "${section.title || sIdx + 1}", поле "${field.label || field.field_key}": default low (${def.low}) ≥ high (${def.high})`);
+          }
+        }
+        // Check each case
+        (rule.cases || []).forEach((c, cIdx) => {
+          if (c.low != null && c.high != null && c.low !== '' && c.high !== '') {
+            if (parseFloat(c.low) >= parseFloat(c.high)) {
+              errors.push(`Секция "${section.title || sIdx + 1}", поле "${field.label || field.field_key}", условие ${cIdx + 1}: low (${c.low}) ≥ high (${c.high})`);
+            }
+          }
+        });
+      });
+    });
+    return errors;
+  }
+
+  // PR-57: validate field_key uniqueness before save/publish
+  function validateFieldKeyUniqueness() {
+    if (!draftVersion?.sections) return [];
+    const errors = [];
+    const seenKeys = new Set();
+    draftVersion.sections.forEach((section, sIdx) => {
+      (section.fields || []).forEach((field, fIdx) => {
+        const key = field.field_key;
+        if (!key) return;
+        if (seenKeys.has(key)) {
+          errors.push(`Дубликат field_key "${key}" в секции "${section.title || sIdx + 1}"`);
+        }
+        seenKeys.add(key);
+      });
+    });
+    return errors;
+  }
+
   async function handleSaveTemplate() {
     if (!selectedTemplate) {
       notify('error', 'Выберите шаблон для редактирования.');
+      return;
+    }
+    // PR-57: validate before saving
+    const rangeErrors = validateReferenceRanges();
+    const keyErrors = validateFieldKeyUniqueness();
+    if (rangeErrors.length > 0 || keyErrors.length > 0) {
+      const allErrors = [...rangeErrors, ...keyErrors];
+      notify('error', `Ошибки валидации (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
       return;
     }
     setSaving(true);
@@ -757,6 +811,14 @@ export default function LabTemplateWorkbench({
   async function handlePublishVersion() {
     if (!selectedTemplate) {
       notify('error', 'Выберите шаблон.');
+      return;
+    }
+    // PR-57: validate before publishing
+    const rangeErrors = validateReferenceRanges();
+    const keyErrors = validateFieldKeyUniqueness();
+    if (rangeErrors.length > 0 || keyErrors.length > 0) {
+      const allErrors = [...rangeErrors, ...keyErrors];
+      notify('error', `Ошибки валидации (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
       return;
     }
     setSaving(true);
