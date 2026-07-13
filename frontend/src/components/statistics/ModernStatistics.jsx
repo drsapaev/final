@@ -57,7 +57,7 @@ const ModernStatistics = ({
   useState('today');void
   useState(false);
 
-  // Переводы
+  // Переводы — PR-51: added uz + en translations (was ru-only, caused undefined titles)
   const t = {
     ru: {
       statistics: 'Статистика',
@@ -82,6 +82,54 @@ const ModernStatistics = ({
       sum: 'сум',
       growth: 'рост',
       decline: 'снижение'
+    },
+    uz: {
+      statistics: 'Statistika',
+      totalPatients: 'Jami bemorlar',
+      todayAppointments: 'Bugungi yozuvlar',
+      pendingPayments: 'To\'lovni kutmoqda',
+      completedToday: 'Bugun tugatildi',
+      revenue: 'Daromad',
+      averageWaitTime: 'O\'rtacha kutish vaqti',
+      departmentLoad: 'Bo\'limlar yuklamasi',
+      trends: 'Tendensiyalar',
+      today: 'Bugun',
+      week: 'Hafta',
+      month: 'Oy',
+      year: 'Yil',
+      export: 'Eksport',
+      refresh: 'Yangilash',
+      details: 'Batafsil',
+      minutes: 'daq',
+      patients: 'bemorlar',
+      appointments: 'yozuvlar',
+      sum: 'so\'m',
+      growth: 'o\'sish',
+      decline: 'pasayish'
+    },
+    en: {
+      statistics: 'Statistics',
+      totalPatients: 'Total Patients',
+      todayAppointments: 'Today\'s Appointments',
+      pendingPayments: 'Pending Payments',
+      completedToday: 'Completed Today',
+      revenue: 'Revenue',
+      averageWaitTime: 'Average Wait Time',
+      departmentLoad: 'Department Load',
+      trends: 'Trends',
+      today: 'Today',
+      week: 'Week',
+      month: 'Month',
+      year: 'Year',
+      export: 'Export',
+      refresh: 'Refresh',
+      details: 'Details',
+      minutes: 'min',
+      patients: 'patients',
+      appointments: 'appointments',
+      sum: 'UZS',
+      growth: 'growth',
+      decline: 'decline'
     }
   }[language] || {};
 
