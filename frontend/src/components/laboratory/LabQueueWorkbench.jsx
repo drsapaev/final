@@ -396,10 +396,20 @@ export default function LabQueueWorkbench({
                 return (
                   <div
                     key={appointment.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onOpenAppointment(appointment)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onOpenAppointment(appointment);
+                      }
+                    }}
                     style={{
                       ...queueCardStyle,
                       borderColor: isSelected ? 'var(--mac-accent)' : 'var(--mac-border)',
-                      boxShadow: isSelected ? '0 0 0 2px color-mix(in oklab, var(--mac-accent) 20%, transparent)' : 'none'
+                      boxShadow: isSelected ? '0 0 0 2px color-mix(in oklab, var(--mac-accent) 20%, transparent)' : 'none',
+                      cursor: 'pointer',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)', alignItems: 'flex-start' }}>
