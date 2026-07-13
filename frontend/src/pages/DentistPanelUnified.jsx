@@ -442,7 +442,7 @@ const DentistPanelUnified = () => {
       try {
         const token = tokenManager.getAccessToken();
         if (!token) return null;
-        const response = await apiClient.get(`/registrar/services`);
+        const response = await apiClient.get('/registrar/services');
         if (response.status < 400) {
           const data = response.data;
           const servicesData = data.services_by_group || {};
@@ -501,7 +501,7 @@ const DentistPanelUnified = () => {
         }
 
         // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
-        const response = await apiClient.get(`/registrar/queues/today`);
+        const response = await apiClient.get('/registrar/queues/today');
 
         if (response.status < 400) {
           const data = response.data;
@@ -1431,7 +1431,7 @@ const DentistPanelUnified = () => {
   const handleExaminationSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await apiClient.post(`/dental/examinations`, examinationForm);
+      const res = await apiClient.post('/dental/examinations', examinationForm);
       if (res.status < 400) {
         setShowExaminationForm(false);
         setExaminationForm({

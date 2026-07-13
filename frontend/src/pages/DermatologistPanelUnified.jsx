@@ -353,7 +353,7 @@ const DermatologistPanelUnified = () => {
       try {
         const token = tokenManager.getAccessToken();
         if (!token) return {};
-        const response = await api.get(`/registrar/services`);
+        const response = await api.get('/registrar/services');
         if (response.status < 400) {
           const data = response.data;
           const servicesData = data.services_by_group || {};
@@ -742,7 +742,7 @@ const DermatologistPanelUnified = () => {
     const loadPromise = (async () => {
       dermatologyRequestCache.skinExaminations.lastAttemptAt = Date.now();
       try {
-        const response = await api.get(`/derma/examinations?limit=100`);
+        const response = await api.get('/derma/examinations?limit=100');
         if (response.status < 400) {
           const data = response.data;
           const nextSkinExaminations = Array.isArray(data) ? data : [];
@@ -784,7 +784,7 @@ const DermatologistPanelUnified = () => {
     const loadPromise = (async () => {
       dermatologyRequestCache.cosmeticProcedures.lastAttemptAt = Date.now();
       try {
-        const response = await api.get(`/derma/procedures?limit=100`);
+        const response = await api.get('/derma/procedures?limit=100');
         if (response.status < 400) {
           const data = response.data;
           const nextCosmeticProcedures = Array.isArray(data) ? data : [];
@@ -1259,7 +1259,7 @@ const DermatologistPanelUnified = () => {
       };
       logger.info('[Dermatology] Сохранение осмотра кожи', payload);
 
-      const response = await api.post(`/derma/examinations`, payload);
+      const response = await api.post('/derma/examinations', payload);
 
       if (response.status < 400) {
         setShowSkinForm(false);
@@ -1299,7 +1299,7 @@ const DermatologistPanelUnified = () => {
       };
       logger.info('[Dermatology] Сохранение косметической процедуры', payload);
 
-      const response = await api.post(`/derma/procedures`, payload);
+      const response = await api.post('/derma/procedures', payload);
 
       if (response.status < 400) {
         setShowCosmeticForm(false);

@@ -19,26 +19,27 @@ const MetricCard = ({
 }) => {
   const { isDark } = useTheme();
 
+  // PR-63: replaced hardcoded hex colors with CSS custom properties
   const colorClasses = {
     blue: {
       bg: isDark ? 'var(--mac-accent-blue-active)' : 'var(--mac-accent-bg)',
       text: isDark ? 'var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 60%))' : 'var(--mac-accent-blue-hover)',
-      icon: isDark ? '#60a5fa' : 'var(--mac-accent-blue)'
+      icon: isDark ? 'var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 40%))' : 'var(--mac-accent-blue)'
     },
     green: {
-      bg: isDark ? '#14532d' : 'var(--mac-success-bg)',
-      text: isDark ? '#86efac' : 'var(--mac-success)',
-      icon: isDark ? '#4ade80' : 'var(--mac-success)'
+      bg: isDark ? 'var(--mac-success-bg, color-mix(in srgb, var(--mac-success), transparent 80%))' : 'var(--mac-success-bg)',
+      text: isDark ? 'var(--mac-success-light, color-mix(in srgb, var(--mac-success), white 40%))' : 'var(--mac-success)',
+      icon: isDark ? 'var(--mac-success-light, color-mix(in srgb, var(--mac-success), white 20%))' : 'var(--mac-success)'
     },
     purple: {
-      bg: isDark ? '#581c87' : '#f3e8ff',
-      text: isDark ? '#c084fc' : '#9333ea',
-      icon: isDark ? '#a855f7' : 'var(--mac-accent-purple)'
+      bg: isDark ? 'var(--mac-accent-purple-bg, color-mix(in srgb, var(--mac-accent-purple), transparent 80%))' : 'var(--mac-accent-purple-bg, color-mix(in srgb, var(--mac-accent-purple), transparent 90%))',
+      text: isDark ? 'var(--mac-accent-purple-light, color-mix(in srgb, var(--mac-accent-purple), white 40%))' : 'var(--mac-accent-purple)',
+      icon: isDark ? 'var(--mac-accent-purple-light, color-mix(in srgb, var(--mac-accent-purple), white 20%))' : 'var(--mac-accent-purple)'
     },
     orange: {
-      bg: isDark ? '#9a3412' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-warning), transparent 50%))',
-      text: isDark ? '#fdba74' : 'var(--mac-warning)',
-      icon: isDark ? '#fb923c' : '#f97316'
+      bg: isDark ? 'var(--mac-warning-bg, color-mix(in srgb, var(--mac-warning), transparent 80%))' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-warning), transparent 50%))',
+      text: isDark ? 'var(--mac-warning-light, color-mix(in srgb, var(--mac-warning), white 40%))' : 'var(--mac-warning)',
+      icon: isDark ? 'var(--mac-warning-light, color-mix(in srgb, var(--mac-warning), white 20%))' : 'var(--mac-warning)'
     },
     red: {
       bg: isDark ? 'var(--mac-error)' : 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
