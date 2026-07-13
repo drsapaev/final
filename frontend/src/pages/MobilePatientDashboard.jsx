@@ -265,7 +265,7 @@ const MobilePatientDashboard = () => {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
-                    {patientData?.total_spent || 0}₽
+                    {patientData?.total_spent || 0} сум
                   </div>
                   <div className="text-xs text-gray-600">Потрачено</div>
                 </div>
