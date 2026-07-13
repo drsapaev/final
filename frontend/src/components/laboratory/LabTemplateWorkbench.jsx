@@ -859,6 +859,27 @@ export default function LabTemplateWorkbench({
     }
   }
 
+  // PR-65 / Medium-19: archive template version (soft-delete)
+  async function handleArchiveTemplate() {
+    if (!selectedTemplate || !activeVersion) {
+      notify('error', 'Выберите версию для архивирования.');
+      return;
+    }
+    if (!confirm('Архивировать эту версию шаблона? Она станет недоступна для новых отчётов.')) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await labReportingApi.archiveTemplateVersion(activeVersion.id);
+      notify('success', 'Версия шаблона архивирована.');
+      await onTemplatesChanged(selectedTemplate.id);
+    } catch (error) {
+      notify('error', error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleCloneTemplate() {
     if (!selectedTemplate) {
       notify('error', 'Выберите шаблон для копирования.');
@@ -1486,6 +1507,11 @@ export default function LabTemplateWorkbench({
                 <Button variant="primary" onClick={handlePublishVersion} disabled={saving}>
                   <Icon name="checkmark.seal" size={16} />
                   Опубликовать
+                </Button>
+                {/* PR-65 / Medium-19: archive template version (soft-delete) */}
+                <Button variant="outline" onClick={handleArchiveTemplate} disabled={saving || !activeVersion} title="Архивировать версию">
+                  <Icon name="archivebox" size={16} />
+                  Архивировать
                 </Button>
               </div>
             )}

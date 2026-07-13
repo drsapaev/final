@@ -330,7 +330,8 @@ export default function LabReportWorkbench({
           field_key: field.field_key,
           value_text: currentValue === '' ? null : currentValue,
           value_numeric: field.value_type === 'numeric' && currentValue !== '' ? currentValue : null,
-          comment: field.comment || null
+          // PR-65 / Medium-15: per-field comment from draftValues
+          comment: draftValues[`${field.field_key}__comment`] || null
         });
       });
     });
@@ -848,6 +849,9 @@ export default function LabReportWorkbench({
                       {section.fields.map((field) => {
                         const choiceOptions = field.choice_options || [];
                         const currentValue = draftValues[field.field_key] ?? '';
+                        // PR-65 / Medium-15: per-field comment
+                        const commentKey = `${field.field_key}__comment`;
+                        const currentComment = draftValues[commentKey] ?? '';
 
                         return (
                           <div
@@ -964,6 +968,23 @@ export default function LabReportWorkbench({
                             </Badge>
                             {/* PR-60 / Low-32: was <span /> placeholder, now aria-hidden empty cell */}
                             {field.required ? <Badge variant="warning">обязательное</Badge> : <span aria-hidden="true" />}
+                            {/* PR-65 / Medium-15: per-field comment input */}
+                            <input
+                              type="text"
+                              className="macos-input"
+                              placeholder="💬 комментарий..."
+                              value={currentComment}
+                              onChange={(e) => updateField(commentKey, e.target.value)}
+                              disabled={!canEditActiveInstance}
+                              aria-label={`Комментарий к полю: ${field.label}`}
+                              style={{
+                                fontSize: 'var(--mac-font-size-xs)',
+                                padding: '4px 8px',
+                                minWidth: '100px',
+                                color: 'var(--mac-text-secondary)',
+                                fontStyle: currentComment ? 'normal' : 'italic',
+                              }}
+                            />
                           </div>
                         );
                       })}
