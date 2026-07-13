@@ -1,0 +1,352 @@
+/**
+ * ForceMajeureModal Styles
+ *
+ * UX Audit: 36 inline styles → CSS classes with macos tokens.
+ * Theme-conditional logic (theme === 'dark' ? ... : ...) → [data-theme="dark"] selectors.
+ */
+
+/* Close button (top-right) */
+.fmm-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid var(--mac-border);
+    background: var(--mac-bg-secondary);
+    color: var(--mac-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--mac-shadow-sm);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+[data-theme="dark"] .fmm-close-btn {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* Tab container */
+.fmm-tab-container {
+    display: flex;
+    gap: var(--mac-spacing-2);
+    padding: var(--mac-spacing-2);
+    border-radius: 14px;
+    background: rgba(148, 163, 184, 0.12);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+[data-theme="dark"] .fmm-tab-container {
+    background: color-mix(in srgb, white, transparent 96%);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Tab button base */
+.fmm-tab-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    border-radius: var(--mac-radius-lg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--mac-spacing-2);
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-secondary);
+    background: transparent;
+    box-shadow: none;
+    transition: all 0.2s ease;
+}
+
+.fmm-tab-btn--active {
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .fmm-tab-btn--active {
+    background: rgba(59, 130, 246, 0.16);
+    box-shadow: none;
+}
+
+.fmm-tab-btn--transfer.fmm-tab-btn--active {
+    color: var(--mac-accent-blue-hover);
+}
+
+.fmm-tab-btn--cancel.fmm-tab-btn--active {
+    color: var(--mac-error);
+}
+
+[data-theme="dark"] .fmm-tab-btn--cancel.fmm-tab-btn--active {
+    background: rgba(239, 68, 68, 0.14);
+}
+
+/* Dry run result card */
+.fmm-dry-run-card {
+    background: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: 14px;
+    padding: var(--mac-spacing-4);
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-4);
+}
+
+[data-theme="dark"] .fmm-dry-run-card {
+    background: color-mix(in srgb, white, transparent 96%);
+    border-color: color-mix(in srgb, white, transparent 92%);
+}
+
+.fmm-dry-run-count {
+    margin: 0;
+    font-size: var(--mac-font-size-3xl);
+    font-weight: var(--mac-font-weight-bold);
+    color: var(--mac-text-primary);
+}
+
+.fmm-dry-run-subtitle {
+    margin: 0;
+    font-size: var(--mac-font-size-sm);
+    color: var(--mac-text-secondary);
+}
+
+.fmm-refresh-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--mac-spacing-2);
+    color: var(--mac-text-secondary);
+}
+
+/* Field label */
+.fmm-field-label {
+    display: block;
+    margin-bottom: var(--mac-spacing-2);
+    font-weight: var(--mac-font-weight-medium);
+    color: var(--mac-text-primary);
+    font-size: var(--mac-font-size-base);
+}
+
+.fmm-field-label--mb1 {
+    margin-bottom: var(--mac-spacing-1);
+}
+
+/* Textarea */
+.fmm-textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    font-size: var(--mac-font-size-base);
+    min-height: 96px;
+    resize: vertical;
+    color: var(--mac-text-primary);
+    background-color: white;
+    font-family: inherit;
+    outline: none;
+}
+
+[data-theme="dark"] .fmm-textarea {
+    border-color: color-mix(in srgb, white, transparent 90%);
+    background-color: color-mix(in srgb, white, transparent 96%);
+}
+
+.fmm-textarea--error {
+    border-color: var(--mac-error);
+}
+
+/* Error text */
+.fmm-error-text {
+    margin: 6px 0 0;
+    font-size: var(--mac-font-size-xs);
+    color: var(--mac-error);
+}
+
+/* Refund type grid */
+.fmm-refund-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mac-spacing-3);
+}
+
+/* Refund option (radio-like) */
+.fmm-refund-option {
+    padding: var(--mac-spacing-3);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-2);
+    background: white;
+}
+
+[data-theme="dark"] .fmm-refund-option {
+    border-color: color-mix(in srgb, white, transparent 90%);
+    background: color-mix(in srgb, white, transparent 96%);
+}
+
+.fmm-refund-option--selected {
+    border-color: var(--mac-accent-blue);
+    background: var(--mac-accent-bg);
+}
+
+.fmm-refund-radio {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--mac-text-tertiary);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.fmm-refund-radio--selected {
+    border-color: var(--mac-accent-blue);
+    background: var(--mac-accent-blue);
+}
+
+.fmm-refund-radio-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: white;
+}
+
+.fmm-refund-label {
+    font-size: var(--mac-font-size-sm);
+    font-weight: var(--mac-font-weight-medium);
+    color: var(--mac-text-primary);
+}
+
+/* Confirm input */
+.fmm-confirm-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    font-size: var(--mac-font-size-base);
+    font-family: 'monospace';
+    color: var(--mac-text-primary);
+    background-color: white;
+    outline: none;
+}
+
+[data-theme="dark"] .fmm-confirm-input {
+    border-color: color-mix(in srgb, white, transparent 90%);
+    background-color: color-mix(in srgb, white, transparent 96%);
+}
+
+/* Success message */
+.fmm-success-box {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+    padding: var(--mac-spacing-4);
+    border-radius: var(--mac-radius-lg);
+    background: var(--mac-success-bg);
+    border: 1px solid var(--mac-success);
+    color: var(--mac-success);
+    font-weight: var(--mac-font-weight-medium);
+}
+
+/* Error message */
+.fmm-error-box {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+    padding: var(--mac-spacing-4);
+    border-radius: var(--mac-radius-lg);
+    background: var(--mac-error-bg);
+    border: 1px solid var(--mac-error);
+    color: var(--mac-error);
+    font-weight: var(--mac-font-weight-medium);
+}
+
+/* Grid gap utility */
+.fmm-grid-gap {
+    display: grid;
+    gap: var(--mac-spacing-4);
+}
+
+.fmm-grid-gap-sm {
+    display: grid;
+    gap: 10px;
+}
+
+/* Header */
+.fmm-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--mac-spacing-4);
+    width: 100%;
+}
+
+.fmm-header-info {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--mac-spacing-3);
+    min-width: 0;
+}
+
+.fmm-header-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.16));
+    border: 1px solid rgba(245, 158, 11, 0.18);
+    color: var(--mac-warning-hover, var(--mac-warning));
+    box-shadow: 0 10px 24px rgba(245, 158, 11, 0.12);
+}
+
+[data-theme="dark"] .fmm-header-icon {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.2));
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+.fmm-header-text {
+    min-width: 0;
+}
+
+.fmm-header-title {
+    margin: 0;
+    font-size: var(--mac-font-size-xl);
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+    line-height: 1.2;
+}
+
+.fmm-header-subtitle {
+    margin: 4px 0 0;
+    font-size: var(--mac-font-size-sm);
+    color: var(--mac-text-secondary);
+    line-height: 1.4;
+}
+
+.fmm-dry-run-icon {
+    color: var(--mac-text-secondary);
+}
+
+.fmm-dry-run-info {
+    min-width: 0;
+}
+
+.fmm-warning-text {
+    margin: 0 0 10px;
+    font-size: var(--mac-font-size-base);
+    color: var(--mac-error);
+    font-weight: var(--mac-font-weight-semibold);
+}
+
+.fmm-confirm-input--valid {
+    border-color: var(--mac-success);
+}
