@@ -45,7 +45,7 @@ const MobilePatientDashboard = () => {
       setLoading(true);
 
       // Загружаем данные пациента
-      const response = await api.get(`/mobile/auth/profile`);
+      const response = await api.get('/mobile/auth/profile');
 
       if (response.status < 400) {
         const data = response.data;
@@ -53,7 +53,7 @@ const MobilePatientDashboard = () => {
       }
 
       // Загружаем записи
-      const appointmentsResponse = await api.get(`/mobile/appointments`);
+      const appointmentsResponse = await api.get('/mobile/appointments');
 
       if (appointmentsResponse.status < 400) {
         const appointmentsData = appointmentsResponse.data;
