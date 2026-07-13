@@ -247,10 +247,14 @@ export function useWebSocket(url, options = {}) {
 
     // Добавляем токен аутентификации к URL
     const token = tokenManager.getAccessToken();
-    const separator = url.includes('?') ? '&' : '?';
-    const authenticatedUrl = token ? `${url}${separator}token=${encodeURIComponent(token)}` : url;
+    // P0 security fix: JWT sent via Sec-WebSocket-Protocol subprotocol (bearer.<token>)
+    // instead of URL query (?token=...). The URL query form leaked the JWT into nginx
+    // access logs, browser history, and Referer headers. Backend supports subprotocol
+    // auth since PR-4 (backend).
+    const authenticatedUrl = url;
+    const subprotocols = token ? [`bearer.${token}`] : [];
 
-    const ws = new WebSocket(authenticatedUrl);
+    const ws = new WebSocket(authenticatedUrl, subprotocols);
 
     ws.onopen = () => {
       setConnected(true);

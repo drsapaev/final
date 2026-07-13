@@ -8,7 +8,8 @@
  * который вызывается из queue endpoints при мутациях.
  *
  * Архитектура:
- *   1. Hook подключается к /ws/queue?department=specialist_{id}&date={date}&token={token}
+ *   1. Hook подключается к /ws/queue?department=specialist_{id}&date={date}
+ *      (JWT передаётся через Sec-WebSocket-Protocol subprotocol, не через URL query)
  *   2. При получении сообщения {type: 'queue_update', ...} вызывает onUpdate callback
  *   3. Callback перезагружает snapshot очереди (loadQueueSnapshot)
  *   4. Polling остаётся как fallback (на случай обрыва WS)
@@ -82,12 +83,16 @@ export function useQueueWebSocket({ specialistId, date, enabled = true, onUpdate
     }
 
     const department = `specialist_${specialistId}`;
-    const wsUrl = `${buildWsUrl('/ws/queue')}?department=${encodeURIComponent(department)}&date=${encodeURIComponent(date)}&token=${encodeURIComponent(token)}`;
+    // P0 security fix: JWT sent via Sec-WebSocket-Protocol subprotocol (bearer.<token>)
+    // instead of URL query (?token=...). The URL query form leaked the JWT into nginx
+    // access logs, browser history, and Referer headers. Backend supports subprotocol
+    // auth since PR-4 (backend). Query params kept for non-token data (department, date).
+    const wsUrl = `${buildWsUrl('/ws/queue')}?department=${encodeURIComponent(department)}&date=${encodeURIComponent(date)}`;
 
     setConnectionState(reconnectAttemptRef.current > 0 ? 'reconnecting' : 'connecting');
 
     try {
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(wsUrl, [`bearer.${token}`]);
       wsRef.current = ws;
 
       ws.onopen = () => {
