@@ -6,7 +6,6 @@
  * - Approve/Reject actions for pending requests
  * - Complete action for approved requests
  */
-import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Check,

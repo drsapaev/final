@@ -13,7 +13,7 @@ import logger from '../utils/logger';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useLabHotkeys } from '../hooks/useLabHotkeys';
-import notify from '../services/notify';
+import notifyService from '../services/notify';
 import './lab.css';
 
 // P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
@@ -122,7 +122,7 @@ export default function LabPanel() {
     onWarning: () => setSessionWarning({ active: true }),
     onExpired: () => {
       setSessionWarning(null);
-      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      notifyService.error('Сессия истекла. Пожалуйста, войдите снова.');
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -670,7 +670,7 @@ export default function LabPanel() {
                 <button onClick={() => setSessionWarning(null)} className="lab-session-warning-btn-later">
                   Позже
                 </button>
-                <button onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }} className="lab-session-warning-btn-extend">
+                <button onClick={() => { setSessionWarning(null); notifyService.info('Продлеваем сессию...'); }} className="lab-session-warning-btn-extend">
                   Продлить сессию
                 </button>
               </div>

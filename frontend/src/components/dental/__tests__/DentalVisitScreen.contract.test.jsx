@@ -3,8 +3,11 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-const ROOT = path.resolve(process.cwd(), 'src/components/dental');
-const PANEL_PATH = path.resolve(process.cwd(), 'src/pages/DentistPanelUnified.jsx');
+import { fileURLToPath } from 'node:url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '..');
+const PANEL_PATH = path.resolve(__dirname, '../../../pages/DentistPanelUnified.jsx');
 
 const readSource = (fileName) =>
   fs.readFileSync(path.join(ROOT, fileName), 'utf8').replace(/\r\n/g, '\n');
