@@ -73,7 +73,7 @@ describe('CashierPanel payment action contract', () => {
       'const confirmPayment = async (paymentId) => {',
     );
 
-    expect(groupedContractBlock).toContain('/api/v1/cashier/payments/grouped');
+    expect(groupedContractBlock).toContain('/cashier/payments/grouped');  // PR-53: axios path (was /api/v1/cashier/payments/grouped)
     expect(groupedContractBlock).toContain('appointment?.can_create_grouped_payment !== true');
     expect(groupedContractBlock).toContain('visit_ids: visitIds');
     expect(processPaymentBlock).toContain('const groupedPayment = isBackendGroupedCashierPayment(appointment);');

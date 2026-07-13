@@ -41,6 +41,7 @@ import { printPanelTicket } from '../services/panelPrint';
 import { queueService } from '../services/queue';
 import { printService } from '../services/print';
 import { getApiBaseUrl } from '../api/runtime';
+import { api } from '../api/client';  // PR-53: replace raw fetch with axios
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -352,11 +353,9 @@ const DermatologistPanelUnified = () => {
       try {
         const token = tokenManager.getAccessToken();
         if (!token) return {};
-        const response = await fetch(`${API_V1_BASE}/registrar/services`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
+        const response = await api.get(`/registrar/services`);
+        if (response.status < 400) {
+          const data = response.data;
           const servicesData = data.services_by_group || {};
           setServices(servicesData);
           dermatologyRequestCache.services.data = servicesData;
@@ -417,16 +416,11 @@ const DermatologistPanelUnified = () => {
         // Используем комбинированный подход: получаем данные из queues для услуг и из БД для payment_status
         // PR-47: removed unused `today` variable
         // 1. Получаем очереди для информации об услугах
-        const queuesResponse = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const queuesResponse = await api.get('/registrar/queues/today');
 
         const allAppointments = [];
-        if (queuesResponse.ok) {
-          const queuesData = await queuesResponse.json();
+        if (queuesResponse.status < 400) {
+          const queuesData = queuesResponse.data;
 
           // Собираем записи из очередей
           if (queuesData && queuesData.queues && Array.isArray(queuesData.queues)) {
@@ -632,15 +626,9 @@ const DermatologistPanelUnified = () => {
             break;
           }
           const token = tokenManager.getAccessToken();
-          const response = await fetch(`${API_V1_BASE}/doctor/queue/${queueEntryId}/start-visit`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          const response = await api.post(`/doctor/queue/${queueEntryId}/start-visit`);
 
-          if (response.ok) {
+          if (response.status < 400) {
             logger.info('[Dermatology] Пациент вызван:', row.patient_fio);
             await loadDermatologyAppointments();
           }
@@ -754,11 +742,9 @@ const DermatologistPanelUnified = () => {
     const loadPromise = (async () => {
       dermatologyRequestCache.skinExaminations.lastAttemptAt = Date.now();
       try {
-        const response = await fetch(`${API_V1_BASE}/derma/examinations?limit=100`, {
-          headers: authHeader()
-        });
-        if (response.ok) {
-          const data = await response.json();
+        const response = await api.get(`/derma/examinations?limit=100`);
+        if (response.status < 400) {
+          const data = response.data;
           const nextSkinExaminations = Array.isArray(data) ? data : [];
           setSkinExaminations(nextSkinExaminations);
           dermatologyRequestCache.skinExaminations.data = nextSkinExaminations;
@@ -798,11 +784,9 @@ const DermatologistPanelUnified = () => {
     const loadPromise = (async () => {
       dermatologyRequestCache.cosmeticProcedures.lastAttemptAt = Date.now();
       try {
-        const response = await fetch(`${API_V1_BASE}/derma/procedures?limit=100`, {
-          headers: authHeader()
-        });
-        if (response.ok) {
-          const data = await response.json();
+        const response = await api.get(`/derma/procedures?limit=100`);
+        if (response.status < 400) {
+          const data = response.data;
           const nextCosmeticProcedures = Array.isArray(data) ? data : [];
           setCosmeticProcedures(nextCosmeticProcedures);
           dermatologyRequestCache.cosmeticProcedures.data = nextCosmeticProcedures;
@@ -834,19 +818,15 @@ const DermatologistPanelUnified = () => {
       const token = tokenManager.getAccessToken();
       if (!token) return;
 
-      const skinResponse = await fetch(`${API_V1_BASE}/derma/examinations?patient_id=${patientId}&limit=10`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (skinResponse.ok) {
-        const skinData = await skinResponse.json();
+      const skinResponse = await api.get(`/derma/examinations?patient_id=${patientId}&limit=10`);
+      if (skinResponse.status < 400) {
+        const skinData = skinResponse.data;
         setSkinExaminations(Array.isArray(skinData) ? skinData : []);
       }
 
-      const cosmeticResponse = await fetch(`${API_V1_BASE}/derma/procedures?patient_id=${patientId}&limit=10`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (cosmeticResponse.ok) {
-        const cosmeticData = await cosmeticResponse.json();
+      const cosmeticResponse = await api.get(`/derma/procedures?patient_id=${patientId}&limit=10`);
+      if (cosmeticResponse.status < 400) {
+        const cosmeticData = cosmeticResponse.data;
         setCosmeticProcedures(Array.isArray(cosmeticData) ? cosmeticData : []);
       }
     } catch (error) {
@@ -1048,17 +1028,13 @@ const DermatologistPanelUnified = () => {
 
     const loadCanonicalStatus = async () => {
       try {
-        const response = await fetch(`/api/v1/appointments/${appointmentId}/status`, {
-          headers: {
-            Authorization: `Bearer ${tokenManager.getAccessToken()}`
-          }
-        });
+        const response = await api.get(`/appointments/${appointmentId}/status`);
 
-        if (!response.ok) {
+        if (response.status >= 400) {
           return;
         }
 
-        const statusData = await response.json();
+        const statusData = response.data;
         if (!isMounted) {
           return;
         }
@@ -1097,21 +1073,14 @@ const DermatologistPanelUnified = () => {
         notify.error('Не удалось определить запись для сохранения рецепта');
         return;
       }
-      const response = await fetch(`${API_V1_BASE}/appointments/${appointmentId}/prescription`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify(prescriptionData)
-      });
+      const response = await api.post(`/appointments/${appointmentId}/prescription`, prescriptionData);
 
-      if (response.ok) {
-        const savedPrescription = await response.json();
+      if (response.status < 400) {
+        const savedPrescription = response.data;
         setPrescription(savedPrescription);
         notify.success('Рецепт сохранен успешно!');
       } else {
-        const error = await response.json();
+        const error = response.data;
         notify.error(error.detail || 'Ошибка при сохранении рецепта');
       }
     } catch (error) {
@@ -1214,11 +1183,9 @@ const DermatologistPanelUnified = () => {
       // X-2 (UX audit): fetch latest EMR data for the payload
       let emrPayload = { complaint: '', diagnosis: '', icd10: '', notes: '' };
       try {
-        const emrRes = await fetch(`${API_V1_BASE}/v2/emr/${selectedPatient?.visit_id || currentAppointment?.visit_id}`, {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        });
-        if (emrRes.ok) {
-          const emrData = await emrRes.json();
+        const emrRes = await api.get(`/v2/emr/${selectedPatient?.visit_id || currentAppointment?.visit_id}`);
+        if (emrRes.status < 400) {
+          const emrData = emrRes.data;
           emrPayload = {
             complaint: emrData?.complaints || '',
             diagnosis: emrData?.diagnosis || '',
@@ -1292,16 +1259,9 @@ const DermatologistPanelUnified = () => {
       };
       logger.info('[Dermatology] Сохранение осмотра кожи', payload);
 
-      const response = await fetch(`${API_V1_BASE}/derma/examinations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.post(`/derma/examinations`, payload);
 
-      if (response.ok) {
+      if (response.status < 400) {
         setShowSkinForm(false);
         setSkinExamination({
           patient_id: '',
@@ -1339,16 +1299,9 @@ const DermatologistPanelUnified = () => {
       };
       logger.info('[Dermatology] Сохранение косметической процедуры', payload);
 
-      const response = await fetch(`${API_V1_BASE}/derma/procedures`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.post(`/derma/procedures`, payload);
 
-      if (response.ok) {
+      if (response.status < 400) {
         setShowCosmeticForm(false);
         setCosmeticProcedure({
           patient_id: '',

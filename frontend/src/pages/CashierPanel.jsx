@@ -20,6 +20,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedCallback';
 import { useHotkeys } from '../hooks/useHotkeys';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { getApiOrigin } from '../api/runtime';
+import { api } from '../api/client';  // PR-53: replace raw fetch with axios
 import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -260,6 +261,7 @@ const canCreateCashierPayment = (appointment) =>
   canCreateDirectCashierPayment(appointment) || appointment?.can_create_grouped_payment === true;
 
 const createGroupedCashierPayment = async (appointment, paymentData) => {
+  // PR-53: migrated from raw fetch() to axios client
   const token = tokenManager.getAccessToken();
   if (!token) {
     throw new Error('Missing access token for grouped cashier payment.');
@@ -270,27 +272,15 @@ const createGroupedCashierPayment = async (appointment, paymentData) => {
     throw new Error('Backend did not provide a grouped cashier payment contract for this row.');
   }
 
-  const response = await fetch(`${getApiOrigin()}/api/v1/cashier/payments/grouped`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      patient_id: appointment?.patient_id ?? null,
-      visit_ids: visitIds,
-      amount: paymentData.amount,
-      method: paymentData.method,
-      note: paymentData.note || 'Grouped cashier payment'
-    })
+  const response = await api.post('/cashier/payments/grouped', {
+    patient_id: appointment?.patient_id ?? null,
+    visit_ids: visitIds,
+    amount: paymentData.amount,
+    method: paymentData.method,
+    note: paymentData.note || 'Grouped cashier payment'
   });
 
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload?.detail || 'Grouped cashier payment failed.');
-  }
-
-  return payload;
+  return response.data;
 };
 
 const PAYMENT_ACTION_CAN_FIELD = {
@@ -349,20 +339,15 @@ const CashierPanel = () => {
       // Загружаем данные пациента для поиска
       const loadPatientForSearch = async () => {
         try {
+          // PR-53: migrated from raw fetch() to axios client
           const token = tokenManager.getAccessToken();
           if (!token) return;
 
-          const API_BASE = getApiOrigin();
-          const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-
-          if (response.ok) {
-            const patientData = await response.json();
-            const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
-            setQuery(patientName);
-            logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });
-          }
+          const response = await api.get(`/patients/${patientIdFromUrl}`);
+          const patientData = response.data;
+          const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
+          setQuery(patientName);
+          logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });
         } catch (error) {
           logger.error('[Cashier] Не удалось загрузить пациента:', error);
         }
