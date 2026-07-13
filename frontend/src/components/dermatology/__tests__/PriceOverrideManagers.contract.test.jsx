@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const ROOT = path.resolve(process.cwd(), 'src/components');
+const ROOT = path.resolve(__dirname, '../../..', 'components');
 
 const readComponent = (relativePath) =>
   fs.readFileSync(path.join(ROOT, relativePath), 'utf8').replace(/\r\n/g, '\n');
