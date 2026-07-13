@@ -49,6 +49,7 @@
  *   badge rendered above the history table (parent-defined, closes over dataSource / paginationInfo)
  */
 import React from 'react';
+import PropTypes from 'prop-types';
 import {
   Button, Card, CardHeader, CardContent, Badge, Icon, Input,
 } from '../../../components/ui/macos';
@@ -619,5 +620,43 @@ const WelcomeView = React.memo(({
 });
 
 WelcomeView.displayName = 'WelcomeView';
+
+// UX Audit: PropTypes for all props used in WelcomeView.
+WelcomeView.propTypes = {
+  t: PropTypes.func,
+  language: PropTypes.string,
+  theme: PropTypes.string,
+  textColor: PropTypes.string,
+  appointments: PropTypes.array,
+  departmentStats: PropTypes.object,
+  dataSource: PropTypes.string,
+  appointmentsLoading: PropTypes.bool,
+  filteredAppointments: PropTypes.array,
+  services: PropTypes.object,
+  activeTab: PropTypes.string,
+  historyDate: PropTypes.string,
+  showCalendar: PropTypes.bool,
+  tempDateInput: PropTypes.string,
+  loadAppointments: PropTypes.func,
+  setShowWizard: PropTypes.func,
+  setWizardEditMode: PropTypes.func,
+  setWizardInitialData: PropTypes.func,
+  setShowPaymentManager: PropTypes.func,
+  setHistoryDate: PropTypes.func,
+  setShowCalendar: PropTypes.func,
+  setTempDateInput: PropTypes.func,
+  setSearchParams: PropTypes.func,
+  navigate: PropTypes.func,
+  setPaymentDialog: PropTypes.func,
+  setPrintDialog: PropTypes.func,
+  setContextMenu: PropTypes.func,
+  openRecordPreview: PropTypes.func,
+  openRecordEditor: PropTypes.func,
+  updateAppointmentStatus: PropTypes.func,
+  handleStartVisit: PropTypes.func,
+  generateCSV: PropTypes.func,
+  downloadCSV: PropTypes.func,
+  DataSourceIndicator: PropTypes.elementType,
+};
 
 export default WelcomeView;

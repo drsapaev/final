@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
 import KPIMetrics from '../components/analytics/KPIMetrics';
@@ -140,6 +141,14 @@ function AnalyticsSectionCard({ title, subtitle, children, action, compact = fal
     </section>);
 }
 
+AnalyticsSectionCard.propTypes = {
+  title: PropTypes.string,
+  subtitle: PropTypes.string,
+  children: PropTypes.node,
+  action: PropTypes.node,
+  compact: PropTypes.bool,
+};
+
 function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-accent-blue, #2563eb)', format = 'count', compact = false }) {
   return (
     <article style={{
@@ -206,6 +215,16 @@ function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-acc
     </article>);
 }
 
+AnalyticsStatCard.propTypes = {
+  icon: PropTypes.node,
+  label: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  helper: PropTypes.string,
+  accent: PropTypes.string,
+  format: PropTypes.string,
+  compact: PropTypes.bool,
+};
+
 function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)' }) {
   if (!items.length) {
     return <div style={{ color: analyticsTextSecondary }}>Данных пока недостаточно для сравнения.</div>;
@@ -247,6 +266,12 @@ function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-
       )}
     </div>);
 }
+
+AnalyticsComparisonList.propTypes = {
+  items: PropTypes.array,
+  format: PropTypes.string,
+  accent: PropTypes.string,
+};
 
 function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', compact = false }) {
   if (!items.length) {
@@ -300,6 +325,13 @@ function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accen
     </div>);
 }
 
+AnalyticsLineTrend.propTypes = {
+  items: PropTypes.array,
+  format: PropTypes.string,
+  accent: PropTypes.string,
+  compact: PropTypes.bool,
+};
+
 function AnalyticsEmptyState({ title, description }) {
   return (
     <div style={{
@@ -314,6 +346,11 @@ function AnalyticsEmptyState({ title, description }) {
       <div style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: 1.6 }}>{description}</div>
     </div>);
 }
+
+AnalyticsEmptyState.propTypes = {
+  title: PropTypes.string,
+  description: PropTypes.string,
+};
 
 export default function AnalyticsPage() {
   const { getColor, getSpacing } = useTheme();
