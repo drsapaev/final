@@ -211,7 +211,7 @@ export function NotificationWebSocketProvider({ children }) {
     }
 
     const wsUrl = `${buildWsUrl('/api/v1/ws/notifications/connect')}`;
-    const socket = new WebSocket(wsUrl, [`bearer.${token}`])  // P1-6: token via subprotocol;
+    const socket = new WebSocket(wsUrl, [`bearer.${token}`]);  // P1-6: token via subprotocol;
     ws.current = socket;
 
     socket.onopen = () => {

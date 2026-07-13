@@ -244,7 +244,7 @@ const FileUpload = ({
               justifyContent: 'center',
               padding: 'var(--mac-spacing-2)'
             }}>
-                                        <FileIcon size={24} color='var(--mac-text-tertiary)' />
+                                        <FileIcon size={24} color="var(--mac-text-tertiary)" />
                                     </div>
             }
                             </div>

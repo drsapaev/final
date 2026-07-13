@@ -92,7 +92,7 @@ describe('LabTemplateWorkbench Phase 4+ structure contract', () => {
   it('Phase 2: supports field and section reordering (move up/down)', () => {
     expect(source).toContain('function moveField');
     expect(source).toContain('function moveSection');
-    expect(source).toContain("'up'");
-    expect(source).toContain("'down'");
+    expect(source).toContain('\'up\'');
+    expect(source).toContain('\'down\'');
   });
 });

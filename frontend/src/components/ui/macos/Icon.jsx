@@ -186,7 +186,7 @@ const ICONS = {
   'bell.badge':
   <g>
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <circle cx="18" cy="8" r="2" fill='var(--mac-error)' />
+      <circle cx="18" cy="8" r="2" fill="var(--mac-error)" />
     </g>,
 
   'tv':
