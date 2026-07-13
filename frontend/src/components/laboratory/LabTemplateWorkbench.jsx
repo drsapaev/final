@@ -272,14 +272,24 @@ function NewTemplateDialog({ open, onClose, onCreate, saving }) {
           </div>
           <div>
             <Label htmlFor="new-template-family" style={{ display: 'block', marginBottom: 4 }}>Семейство</Label>
-            <Input
+            {/* PR-59: replaced free-text Input with <select> to prevent typo-induced fragmentation */}
+            <select
               id="new-template-family"
               aria-label="Семейство шаблона"
               value={form.family}
               onChange={(e) => setForm((prev) => ({ ...prev, family: e.target.value }))}
-              placeholder="hematology / biochemistry / ..."
+              className="macos-input"
               style={{ width: '100%', boxSizing: 'border-box' }}
-            />
+            >
+              <option value="hematology">Гематология</option>
+              <option value="biochemistry">Биохимия</option>
+              <option value="coagulation">Коагулология</option>
+              <option value="urinalysis">Общий анализ мочи</option>
+              <option value="immunology">Иммунология</option>
+              <option value="microbiology">Микробиология</option>
+              <option value="endocrinology">Эндокринология</option>
+              <option value="other">Прочее</option>
+            </select>
           </div>
           <div>
             <Label htmlFor="new-template-description" style={{ display: 'block', marginBottom: 4 }}>Описание</Label>
