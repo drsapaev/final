@@ -838,6 +838,41 @@ export default function LabReportWorkbench({
                                   if (isNaN(parsed)) {
                                     toast.error(`Некорректное числовое значение: "${val}"`);
                                     updateField(field.field_key, '');
+                                    return;
+                                  }
+                                  // PR-56: out-of-range confirmation
+                                  // Check if value exceeds matched_threshold (critical value)
+                                  const threshold = field.resolved_flag_meta?.matched_threshold;
+                                  if (threshold && threshold.value) {
+                                    const thresholdVal = parseFloat(threshold.value);
+                                    if (!isNaN(thresholdVal)) {
+                                      const op = threshold.operator;
+                                      let isCritical = false;
+                                      if (op === 'gt' && parsed > thresholdVal) isCritical = true;
+                                      else if (op === 'gte' && parsed >= thresholdVal) isCritical = true;
+                                      else if (op === 'lt' && parsed < thresholdVal) isCritical = true;
+                                      else if (op === 'lte' && parsed <= thresholdVal) isCritical = true;
+                                      if (isCritical) {
+                                        toast.warning(
+                                          `⚠ Критическое значение: ${field.label} = ${parsed} ${field.unit || ''} ` +
+                                          `(порог: ${op} ${thresholdVal}). Проверьте правильность ввода.`,
+                                          { autoClose: 8000 }
+                                        );
+                                      }
+                                    }
+                                  }
+                                  // Check if value is outside reference_text range (e.g., "120-160")
+                                  const refText = field.reference_text || '';
+                                  const rangeMatch = refText.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)/);
+                                  if (rangeMatch) {
+                                    const low = parseFloat(rangeMatch[1]);
+                                    const high = parseFloat(rangeMatch[2]);
+                                    if (!isNaN(low) && !isNaN(high) && (parsed < low || parsed > high)) {
+                                      toast.info(
+                                        `Значение ${parsed} вне референсного диапазона (${low}–${high}) для «${field.label}».`,
+                                        { autoClose: 5000 }
+                                      );
+                                    }
                                   }
                                 }}
                               />
