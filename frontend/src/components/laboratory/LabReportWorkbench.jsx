@@ -258,6 +258,28 @@ export default function LabReportWorkbench({
     return () => window.removeEventListener('keydown', handler);
   }, [canSaveDraft, saving]);
 
+  // PR-58: autosave — 30-second debounce when dirty + canSaveDraft
+  const [lastAutoSave, setLastAutoSave] = useState(null);
+  const autoSaveTimerRef = useRef(null);
+  useEffect(() => {
+    if (!isDirty || !canSaveDraft || saving) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (handleSaveDraftRef.current && !saving) {
+        try {
+          await handleSaveDraftRef.current();
+          setLastAutoSave(new Date());
+        } catch (e) {
+          // Autosave failure is non-fatal — manual save is still available
+          logger.warn('Lab autosave failed:', e);
+        }
+      }
+    }, 30000); // 30 seconds
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [isDirty, canSaveDraft, saving, draftValues]);
+
   useEffect(() => {
     if (activeInstance || !selectedAppointment) {
       return;
@@ -689,6 +711,16 @@ export default function LabReportWorkbench({
                       fontWeight: 'var(--mac-font-weight-medium)',
                     }}>
                       ● несохранённые изменения
+                    </span>
+                  )}
+                  {/* PR-58: autosave indicator */}
+                  {!isDirty && lastAutoSave && (
+                    <span style={{
+                      fontSize: 'var(--mac-font-size-xs)',
+                      color: 'var(--mac-text-tertiary, #6b7280)',
+                      marginLeft: 'var(--mac-spacing-2)',
+                    }}>
+                      ✓ сохранено {lastAutoSave.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
                   )}
                   {/* P-01 fix: AI-анализ бланка. Перенесён из LabResultsManager

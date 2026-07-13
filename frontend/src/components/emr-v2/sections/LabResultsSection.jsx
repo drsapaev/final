@@ -25,7 +25,7 @@ import notify from '../../../services/notify';
 const STATUS_LABELS = {
   DRAFT: 'Черновик',
   IN_PROGRESS: 'В работе',
-  FINALIZED: 'Готов',
+  FINALIZED: 'Утверждён',  // PR-58: unified with labUiLabels.js (was 'Готов')
   PRINTED: 'Напечатан',
   ARCHIVED: 'Архив',
 };
