@@ -44,7 +44,7 @@ describe('hosted payment provider ticket contract', () => {
   it('PaymentClick and PaymentPayMe are thin wrappers around PaymentProviderDialog', () => {
     for (const fileName of ['PaymentClick.jsx', 'PaymentPayMe.jsx']) {
       const source = readProvider(fileName);
-      expect(source).toContain("import PaymentProviderDialog from './PaymentProviderDialog'");
+      expect(source).toContain('import PaymentProviderDialog from \'./PaymentProviderDialog\'');
       // Wrappers must NOT contain api calls directly — that logic lives in the dialog.
       expect(source).not.toContain('api.post');
       expect(source).not.toContain('api.get');

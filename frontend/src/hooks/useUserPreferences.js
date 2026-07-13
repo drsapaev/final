@@ -94,7 +94,7 @@ export const useUserPreferences = (userId = null, autoLoad = true) => {
 
             // Если 401, значит токен протух - чистим его
             if (err.response && err.response.status === 401) {
-                sessionStorage.removeItem('auth_token')  // PR-39 / P0-2: token now in sessionStorage;
+                sessionStorage.removeItem('auth_token');  // PR-39 / P0-2: token now in sessionStorage;
             }
 
             // ВАЖНО: Устанавливаем loadedRef = true чтобы прекратить повторные попытки

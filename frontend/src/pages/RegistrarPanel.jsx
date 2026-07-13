@@ -527,7 +527,7 @@ const RegistrarPanel = () => {
       if (error.response?.status === 401) {
         // Токен недействителен
         logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
-        sessionStorage.removeItem('auth_token')  // PR-39 / P0-2;
+        sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
         // QW-03 fix: show error state instead of demo data.
         startTransition(() => {
           if (!silent) setDataSource('error');
