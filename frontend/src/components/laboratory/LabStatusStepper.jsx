@@ -14,6 +14,7 @@ import { Icon } from '../ui/macos';
 const LAB_REPORT_STEPS = [
   { key: 'DRAFT',       label: 'Черновик' },
   { key: 'IN_PROGRESS', label: 'Заполняется' },
+  { key: 'READY',       label: 'Готов к проверке' },  // PR-59: was missing from stepper
   { key: 'FINALIZED',   label: 'Утверждён' },
   { key: 'PRINTED',     label: 'Напечатан' },
 ];

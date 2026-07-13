@@ -475,6 +475,8 @@ export default function LabReportWorkbench({
           severity: 'success',
           text: `Лабораторный отчёт отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
         });
+        // PR-59: auto-dismiss success feedback after 5 seconds
+        setTimeout(() => setPrintFeedback(null), 5000);
         return;
       }
 
@@ -756,7 +758,7 @@ export default function LabReportWorkbench({
               )}
 
               {activeInstance.critical_findings?.length > 0 && (
-                <Alert severity="error">
+                <Alert severity="error" role="alert">  {/* PR-59: role=alert for screen readers */}
                   <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <strong>Критические результаты</strong>
                     {activeInstance.critical_findings.map((finding) => (
