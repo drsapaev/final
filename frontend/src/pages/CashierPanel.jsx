@@ -941,9 +941,16 @@ const CashierPanel = () => {
         followCursor>
 
         <div className="cashier-badge-wrap">
-          {codes.map((code, idx) =>
+          {/* UX Audit #4.1: показываем только первые 2 бейджа + счётчик «+N».
+              Раньше все бейджи рендерились, что раздувало строку при 5+ услугах. */}
+          {codes.slice(0, 2).map((code, idx) =>
           <span key={idx} className="cashier-badge">
               {typeof code === 'string' ? code : String(code)}
+            </span>
+          )}
+          {codes.length > 2 && (
+            <span className="cashier-badge cashier-badge-more" title={`Ещё ${codes.length - 2} услуг`}>
+              +{codes.length - 2}
             </span>
           )}
         </div>

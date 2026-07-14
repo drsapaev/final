@@ -413,3 +413,12 @@
   font-size: 13px;
   color: var(--mac-text-secondary, #6b7280);
 }
+
+/* ─── Service badge "+N more" (UX Audit #4.1) ─── */
+.cashier-badge-more {
+  background-color: var(--mac-bg-tertiary, #f5f5f7);
+  color: var(--mac-text-secondary, #6b7280);
+  border: 1px dashed var(--mac-border, #d8dde8);
+  font-weight: 500;
+  cursor: help;
+}
