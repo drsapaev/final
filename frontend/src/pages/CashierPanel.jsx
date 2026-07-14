@@ -1250,12 +1250,17 @@ const CashierPanel = () => {
               {
                 id: 'history',
                 label: 'История платежей',
-                icon: CreditCard
+                icon: CreditCard,
+                // UX Audit #3.3: badge с totalItems для консистентности.
+                badge: totalItems > 0 ? totalItems : undefined
               },
               {
                 id: 'refunds',
                 label: 'Возвраты',
                 icon: RefreshCw
+                // UX Audit #3.3: badge для refunds будет добавлен в отдельном PR,
+                // когда RefundRequestsTable будет экспортировать свой count через callback.
+                // Сейчас показ badge без данных вводил бы в заблуждение.
               }]
               }
               activeTab={activeTab}
