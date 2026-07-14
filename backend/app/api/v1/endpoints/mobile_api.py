@@ -37,6 +37,7 @@ from app.schemas.mobile import (
     BookAppointmentRequest,
     LabResultOut,
     MobileAppointmentDetailOut,
+    MobileAttestRequest,
     MobileLoginRequest,
     MobileLoginResponse,
     MobileQuickStats,
@@ -732,7 +733,7 @@ def list_mobile_doctors(
 
 @router.post("/attest", response_model=dict[str, Any])
 def attest_device(
-    request: dict[str, Any],
+    request: MobileAttestRequest,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -746,17 +747,17 @@ def attest_device(
     server-side credentials and is out of scope for this PR. The endpoint
     exists so the mobile app can submit tokens; verification will be
     implemented in a follow-up PR.
+
+    P0-6d FIX: ``request`` is now typed as ``MobileAttestRequest`` so
+    Pydantic validates ``platform`` (must be ``android`` or ``ios``)
+    and caps token sizes at 32KB before the handler runs.
     """
     try:
-        platform = (request.get("platform") or "").lower()
-        if platform not in ("android", "ios"):
-            raise HTTPException(
-                status_code=400,
-                detail="platform must be 'android' or 'ios'",
-            )
+        platform = request.platform
+        # platform is already validated by Pydantic pattern to be 'android' or 'ios'
 
         if platform == "android":
-            token = request.get("integrity_token")
+            token = request.integrity_token
             if not token:
                 raise HTTPException(
                     status_code=400,
@@ -771,7 +772,7 @@ def attest_device(
                 "user_id": current_user.id,
             }
         else:  # ios
-            token = request.get("device_token")
+            token = request.device_token
             if not token:
                 raise HTTPException(
                     status_code=400,

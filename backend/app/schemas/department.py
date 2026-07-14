@@ -179,3 +179,56 @@ class DepartmentFullResponse(DepartmentResponse):
     has_registration_settings: bool = False
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================
+# BULK OPERATIONS (P0-6c FIX)
+# ============================================================
+
+
+class BulkCreateDepartmentsRequest(BaseModel):
+    """Request body for POST /admin/departments/bulk.
+
+    P0-6c FIX: previously this endpoint accepted ``payload: dict`` with
+    no validation, allowing malformed CSV-import payloads to reach the
+    DB layer. Now Pydantic validates each row against ``DepartmentCreate``
+    (which enforces ``key`` pattern, name lengths, etc.) before any DB
+    write. The handler still reports per-row errors via the response so
+    partial success (some rows fail validation) is preserved.
+    """
+
+    departments: list[DepartmentCreate] = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Departments to create (max 500 per request)",
+    )
+
+
+class BulkDeleteDepartmentsRequest(BaseModel):
+    """Request body for DELETE /admin/departments/bulk-delete.
+
+    P0-6c FIX: previously ``payload: dict`` with no validation.
+    """
+
+    ids: list[int] = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Department IDs to delete (max 500 per request)",
+    )
+
+
+class BulkActivateDepartmentsRequest(BaseModel):
+    """Request body for PATCH /admin/departments/bulk-activate.
+
+    P0-6c FIX: previously ``payload: dict`` with no validation.
+    """
+
+    ids: list[int] = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Department IDs to activate/deactivate (max 500)",
+    )
+    active: bool = Field(..., description="New active state")

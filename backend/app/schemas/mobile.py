@@ -353,3 +353,60 @@ class MobileVisitDetailOut(BaseModel):
     total_cost: float | None = None
     created_at: datetime
     updated_at: datetime
+
+
+# === DEVICE ATTESTATION (P0-6d FIX) ===
+
+
+class MobileAttestRequest(BaseModel):
+    """Request body for POST /mobile/attest.
+
+    P0-6d FIX: previously this endpoint accepted ``request: dict[str, Any]``
+    with no validation. Now Pydantic enforces:
+
+    - ``platform`` is one of ``android`` / ``ios`` (required).
+    - ``integrity_token`` is required for Android (max 32KB — Play
+      Integrity tokens are typically ~1-2KB but we leave headroom).
+    - ``device_token`` is required for iOS (max 32KB — Device Check
+      tokens are similarly small).
+    - ``package_name`` / ``bundle_id`` are optional identifier strings
+      capped at 200 chars.
+    - ``nonce`` is an optional replay-protection string capped at 256
+      chars.
+
+    The handler still performs the conditional token-presence checks
+    so the error messages remain identical to the pre-fix behavior.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    platform: str = Field(
+        ...,
+        pattern="^(android|ios)$",
+        description="Attestation platform: 'android' or 'ios'",
+    )
+    integrity_token: str | None = Field(
+        None,
+        max_length=32_000,
+        description="Google Play Integrity token (Android only)",
+    )
+    device_token: str | None = Field(
+        None,
+        max_length=32_000,
+        description="Apple Device Check token (iOS only)",
+    )
+    package_name: str | None = Field(
+        None,
+        max_length=200,
+        description="Android package name (e.g. com.clinic.mobile)",
+    )
+    bundle_id: str | None = Field(
+        None,
+        max_length=200,
+        description="iOS bundle identifier (e.g. com.clinic.mobile)",
+    )
+    nonce: str | None = Field(
+        None,
+        max_length=256,
+        description="Optional replay-protection nonce",
+    )

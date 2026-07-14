@@ -39,6 +39,7 @@ from app.models.lab import LabOrder
 from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
+from app.schemas.notifications import PaymentData
 from app.services.telegram_bot import get_telegram_bot_service
 from app.services.telegram_templates import get_telegram_templates_service
 
@@ -444,18 +445,21 @@ async def send_lab_results(
 @router.post("/send-payment-confirmation", response_model=dict[str, Any])
 async def send_payment_confirmation(
     patient_id: int,
-    payment_data: dict[str, Any],
+    payment_data: PaymentData,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
     """Отправить подтверждение платежа.
 
-    Note: ``payment_data`` is accepted as a plain dict so that callers
-    (both the FastAPI body parser and direct unit-test invocations)
-    can pass through arbitrary payment metadata without going through a
-    Pydantic ``PaymentData`` model that would silently drop unknown
-    keys such as ``transaction_id`` / ``receipt_link``.
+    P0-6b FIX: ``payment_data`` is now typed as ``PaymentData`` (Pydantic
+    model with ``extra='allow'`` so unknown keys like ``transaction_id``
+    and ``receipt_link`` are preserved). The model validates field types
+    and sizes at the framework boundary, preventing mass-assignment of
+    arbitrary keys. Internally the model is converted back to a dict
+    via ``.model_dump()`` so existing helpers (``_safe_payment_template_data``,
+    ``_ensure_payment_confirmation_belongs_to_patient``) continue to work
+    unchanged.
     """
     try:
         # Получаем данные пациента
@@ -465,11 +469,11 @@ async def send_payment_confirmation(
                 status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
             )
 
-        # Ищем Telegram пользователя
+        # Ишем Telegram пользователя
         _ensure_payment_confirmation_belongs_to_patient(
             db,
             patient_id=patient_id,
-            payment_data=payment_data,
+            payment_data=payment_data.model_dump(),
         )
 
         telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient.phone)
@@ -488,7 +492,7 @@ async def send_payment_confirmation(
             await bot_service.initialize(db)
 
         # Формируем данные для шаблона
-        template_data = _safe_payment_template_data(payment_data)
+        template_data = _safe_payment_template_data(payment_data.model_dump())
 
         # Получаем шаблон
         templates_service = get_telegram_templates_service()
@@ -507,7 +511,7 @@ async def send_payment_confirmation(
             return {
                 "success": True,
                 "message": "Подтверждение платежа отправлено",
-                "amount": payment_data.get("amount"),  # already a dict from body.payment_data
+                "amount": payment_data.amount,  # Pydantic model field
             }
         else:
             raise HTTPException(

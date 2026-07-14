@@ -33,10 +33,12 @@ from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.notifications import (
+    PaymentData,
     SendBulkEmailRequest,
     SendBulkSmsRequest,
     SendCustomEmailRequest,
     SendCustomSmsRequest,
+    TemplateDataBase,
 )
 from app.services.email_sms_enhanced import get_email_sms_enhanced_service
 
@@ -126,17 +128,17 @@ def _ensure_payment_confirmation_belongs_to_patient(
 async def send_appointment_reminder_enhanced(
     appointment_id: int,
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: dict[str, Any] | None = None,
+    template_data: TemplateDataBase | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
     """Расширенное напоминание о записи.
 
-    Note: ``template_data`` is accepted as a plain dict (or ``None``) so
-    the endpoint can be invoked both via the FastAPI body parser and
-    directly by unit tests without constructing a Pydantic
-    ``TemplateDataBase`` model.
+    P0-6a FIX: ``template_data`` is now typed as ``TemplateDataBase`` so
+    Pydantic validates field sizes (strings ≤ 100KB) and shape at the
+    framework boundary, preventing template-injection via oversized
+    payloads.
     """
     try:
         # Получаем данные записи
@@ -182,7 +184,7 @@ async def send_appointment_reminder_enhanced(
             patient_data=patient_data,
             appointment_data=appointment_data,
             channels=channels,
-            template_data=template_data,
+            template_data=template_data.model_dump(exclude_none=True) if template_data else None,
         )
 
         return {
@@ -205,15 +207,15 @@ async def send_lab_results_enhanced(
     patient_id: int,
     lab_results_id: int,
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: dict[str, Any] | None = None,
+    template_data: TemplateDataBase | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
     """Расширенная отправка результатов анализов.
 
-    Note: ``template_data`` is accepted as a plain dict (or ``None``) for
-    the same reasons as ``send_appointment_reminder_enhanced``.
+    P0-6a FIX: ``template_data`` is now typed as ``TemplateDataBase``
+    for framework-level validation.
     """
     try:
         # Получаем данные пациента
@@ -249,7 +251,7 @@ async def send_lab_results_enhanced(
             patient_data=patient_data,
             lab_data=lab_data,
             channels=channels,
-            template_data=template_data,
+            template_data=template_data.model_dump(exclude_none=True) if template_data else None,
         )
 
         return {
@@ -270,20 +272,20 @@ async def send_lab_results_enhanced(
 @router.post("/send-payment-confirmation-enhanced", response_model=dict[str, Any])
 async def send_payment_confirmation_enhanced(
     patient_id: int,
-    payment_data: dict[str, Any],
+    payment_data: PaymentData,
     channels: list[str] = Query(["email", "sms"], description="Каналы отправки"),
-    template_data: dict[str, Any] | None = None,
+    template_data: TemplateDataBase | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
     """Расширенное подтверждение платежа.
 
-    Note: ``payment_data`` and ``template_data`` are accepted as plain
-    dicts (or ``None`` for ``template_data``) so the endpoint can be
-    invoked both via the FastAPI body parser and directly by unit tests
-    without constructing Pydantic ``PaymentData`` / ``TemplateDataBase``
-    models that would silently drop unknown keys.
+    P0-6a FIX: ``payment_data`` is now typed as ``PaymentData`` and
+    ``template_data`` as ``TemplateDataBase`` so Pydantic validates
+    field types and sizes at the framework boundary. ``PaymentData``
+    uses ``model_config = {\"extra\": \"allow\"}`` so unknown keys
+    (e.g. ``transaction_id``, ``receipt_link``) are preserved.
     """
     try:
         # Получаем данные пациента
@@ -297,7 +299,7 @@ async def send_payment_confirmation_enhanced(
         _ensure_payment_confirmation_belongs_to_patient(
             db,
             patient_id=patient_id,
-            payment_data=payment_data,
+            payment_data=payment_data.model_dump(),
         )
 
         patient_data = {
@@ -314,9 +316,9 @@ async def send_payment_confirmation_enhanced(
         # Отправляем уведомление
         result = await service.send_payment_confirmation_enhanced(
             patient_data=patient_data,
-            payment_data=payment_data,
+            payment_data=payment_data.model_dump(),
             channels=channels,
-            template_data=template_data,
+            template_data=template_data.model_dump(exclude_none=True) if template_data else None,
         )
 
         return {
