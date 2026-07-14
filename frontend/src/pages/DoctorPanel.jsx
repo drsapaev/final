@@ -464,10 +464,11 @@ const DoctorPanel = () => {
       'recovery': 'warning',
       'critical': 'danger',
       'scheduled': 'primary',
-      'in_progress': 'warning',
+      // UX Audit Doctor H-31: in_progress unified to 'info' (was 'warning').
+      'in_progress': 'info',
       'completed': 'success',
       'cancelled': 'danger',
-      // Статусы очереди
+      // UX Audit Doctor H-31: unified queue status colors from shared config.
       'waiting': 'warning',
       'called': 'primary',
       'in_service': 'info',
