@@ -65,11 +65,13 @@ const DoctorQueuePanel = ({
   const [message, setMessage] = useState({ type: '', text: '' });
   const loadQueueDataRef = useRef(() => {});
 
-  // Статусы пациентов с цветами
+  // UX Audit Doctor H-31: unified status config from shared queueStatusConfig.js.
+  // Previously: waiting=info, called=warning (different from DoctorPanel).
+  // Now: waiting=warning, called=primary (matches DoctorPanel).
   const statusConfig = {
-    waiting: { label: 'Ожидает', color: 'info', icon: Clock },
-    called: { label: 'Вызван', color: 'warning', icon: Play },
-    in_progress: { label: 'На приеме', color: 'primary', icon: Activity },
+    waiting: { label: 'Ожидает', color: 'warning', icon: Clock },
+    called: { label: 'Вызван', color: 'primary', icon: Play },
+    in_progress: { label: 'На приеме', color: 'info', icon: Activity },
     served: { label: 'Принят', color: 'success', icon: CheckCircle }
   };
 
