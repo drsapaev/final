@@ -118,7 +118,11 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(initBlock).toContain('fetch(`${API_BASE}/api/v1/patients/${patientId}`');
     expect(initBlock).toContain('if (prev.patient.gender) return prev;');
     expect(source).toContain('const selectedGender = normalizeGenderForForm(safeData.gender);');
-    expect(source).toContain('background: selectedGender === gender');
+    // UX Audit R-3.3 (Phase 4): inline style replaced with conditional className.
+    // Old: background: selectedGender === gender
+    // New: className with --selected/--unselected variant
+    expect(source).toContain('selectedGender === gender');
+    expect(source).toContain('patient-step-v2__gender-radio--selected');
     expect(source).toContain('const selectedPatientSex = genderToPatientSexForApi(wizardData.patient.gender);');
     expect(source).toContain('sex: selectedPatientSex');
     expect(source).not.toContain('gender: wizardData.patient.gender');

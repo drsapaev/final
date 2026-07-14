@@ -152,19 +152,7 @@ const PatientStepV2 = ({
               aria-checked={selectedGender === gender}
               tabIndex={selectedGender === gender ? 0 : -1}
               onClick={() => onUpdate('gender', gender)}
-              style={{
-                flex: 1,
-                padding: 'var(--mac-spacing-2)',
-                border: 'none',
-                borderRadius: 'var(--mac-radius-sm)',
-                background: selectedGender === gender ? 'var(--mac-bg-primary)' : 'transparent',
-                color: selectedGender === gender ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
-                boxShadow: selectedGender === gender ? 'var(--mac-shadow-sm)' : 'none',
-                cursor: 'pointer',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: selectedGender === gender ? '600' : '400',
-                transition: 'all 0.2s ease'
-              }}>
+              className={`patient-step-v2__gender-radio ${selectedGender === gender ? 'patient-step-v2__gender-radio--selected' : 'patient-step-v2__gender-radio--unselected'}`}>
 
                 {gender === 'male' ? 'Мужской' : 'Женский'}
               </button>
