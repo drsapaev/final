@@ -226,6 +226,15 @@ const ChatWindow = ({ isOpen, onClose }) => {
     if (container.scrollTop === 0 && hasMore && !isLoading) {
       prevScrollHeightRef.current = container.scrollHeight;
       await loadMoreMessages();
+      // PR-68 / P0-5: preserve scroll position after loading older messages
+      // (was: prevScrollHeightRef set but never read — view jumped to top)
+      if (prevScrollHeightRef.current) {
+        requestAnimationFrame(() => {
+          const newScrollHeight = container.scrollHeight;
+          container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
+          prevScrollHeightRef.current = null;
+        });
+      }
     }
   };
 
@@ -326,23 +335,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
       formData.append('audio_file', audioBlob, 'voice.webm');
       formData.append('recipient_id', activeConversation);
 
-      const token = auth.getState().token;
-      const response = await fetch('/messages/send-voice', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
+      // PR-68 / P0-3: replaced raw fetch with axios client
+      // (was: fetch('/messages/send-voice') — no /api/v1 prefix, no CSRF, no token refresh)
+      const response = await api.post('/messages/send-voice', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Ошибка отправки');
-      }void (
-
-      await response.json());
-
-
+      // PR-68: axios response already has .data, no need for .json()
       // Обновляем только список бесед - сообщение придет через WebSocket
       loadConversations();
     } catch (error) {
@@ -1117,7 +1116,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                   className="typing-indicator-modern"
                   style={{
                     position: 'absolute',
-                    bottom: -40,
+                    // PR-68 / P0-4: fixed position — was bottom: -40 (clipped by overflow: hidden)
+                    bottom: 8,
                     left: 12,
                     display: 'flex',
                     alignItems: 'center',

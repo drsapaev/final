@@ -2,7 +2,7 @@
  * Кнопка чата для хедера (macOS стиль)
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import ChatWindow from './ChatWindow';
@@ -12,7 +12,28 @@ import ChatWindow from './ChatWindow';
  */
 const ChatButton = () => {
     const [isOpen, setIsOpen] = useState(false);
-    const { unreadCount, isConnected } = useChat();
+    const { unreadCount, isConnected, loadMessages } = useChat();
+    // PR-68 / P0-1: listen for 'openChat' CustomEvent from desktop notifications
+    const pendingUserIdRef = useRef(null);
+
+    useEffect(() => {
+        const handleOpenChat = (event) => {
+            setIsOpen(true);
+            if (event?.detail?.userId && loadMessages) {
+                pendingUserIdRef.current = event.detail.userId;
+            }
+        };
+        window.addEventListener('openChat', handleOpenChat);
+        return () => window.removeEventListener('openChat', handleOpenChat);
+    }, [loadMessages]);
+
+    // When chat opens with a pending userId, load that conversation
+    useEffect(() => {
+        if (isOpen && pendingUserIdRef.current && loadMessages) {
+            loadMessages(pendingUserIdRef.current);
+            pendingUserIdRef.current = null;
+        }
+    }, [isOpen, loadMessages]);
 
     return (
         <>
