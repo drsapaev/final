@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { CreditCard, DollarSign, Check, Printer } from 'lucide-react';
+import { CreditCard, Check, Printer, Banknote, ArrowLeftRight, Globe } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { toast } from 'react-toastify';
 // UX Audit Registrar #5: все inline-стили перенесены в PaymentDialog.css.
@@ -83,19 +83,22 @@ const PaymentDialog = ({
     onClose();
   };
 
+  // UX Audit R-4.3: уникальные иконки для каждого способа оплаты.
+  // Раньше: 3 из 4 кнопок имели одинаковую иконку CreditCard —
+  // пользователь не различал их визуально (Nielsen #2 + #4).
   const paymentMethods = [
     {
       value: 'Карта',
       label: 'Банковская карта',
       icon: <CreditCard size={16} />,
     },
-    { value: 'Наличные', label: 'Наличные', icon: <DollarSign size={16} /> },
+    { value: 'Наличные', label: 'Наличные', icon: <Banknote size={16} /> },
     {
       value: 'Перевод',
       label: 'Банковский перевод',
-      icon: <CreditCard size={16} />,
+      icon: <ArrowLeftRight size={16} />,
     },
-    { value: 'Онлайн', label: 'Онлайн платеж', icon: <CreditCard size={16} /> },
+    { value: 'Онлайн', label: 'Онлайн платеж', icon: <Globe size={16} /> },
   ];
 
   if (!appointment) return null;
