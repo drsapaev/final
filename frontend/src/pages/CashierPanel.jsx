@@ -599,16 +599,36 @@ const CashierPanel = () => {
   // Deferred #1: session timeout warning — prevents silent JWT expiry while
   // cashier is processing a payment. Mirrors all other clinical panels.
   const [sessionWarning, setSessionWarning] = useState(null);
+  // UX Audit #2.5: счётчик секунд до истечения сессии.
+  const [sessionSecondsLeft, setSessionSecondsLeft] = useState(null);
   useSessionTimeoutWarning({
-    onWarning: () => setSessionWarning({ active: true }),
+    onWarning: (expiresAt) => {
+      // UX Audit #2.5: сохраняем expiresAt для счётчика обратного отсчёта.
+      const ms = expiresAt ? (expiresAt - Date.now()) : 60 * 1000;
+      setSessionWarning({ active: true, expiresAt });
+      setSessionSecondsLeft(Math.max(0, Math.floor(ms / 1000)));
+    },
     onExpired: () => {
       setSessionWarning(null);
+      setSessionSecondsLeft(null);
       notify.error('Сессия истекла. Пожалуйста, войдите снова.');
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
     },
   });
+
+  // UX Audit #2.5: тикаем каждую секунду, пока показано предупреждение.
+  useEffect(() => {
+    if (!sessionWarning?.active || !sessionWarning.expiresAt) return undefined;
+    const tick = () => {
+      const ms = sessionWarning.expiresAt - Date.now();
+      setSessionSecondsLeft(Math.max(0, Math.floor(ms / 1000)));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [sessionWarning]);
 
   // UX Audit #2.3: используем единый formatUZS из utils/formatCurrency.js.
   // Раньше тут было inline-определение new Intl.NumberFormat('ru-RU').format(n) + ' сум',
@@ -1771,33 +1791,31 @@ const CashierPanel = () => {
           </Dialog>
         </div>
       </div>
-      {/* Session timeout warning dialog */}
+      {/* Session timeout warning dialog (UX Audit #2.5: явные последствия + таймер). */}
       {sessionWarning && (
         <div
           role="alertdialog"
           aria-label="Предупреждение об истечении сессии"
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.5)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-          }}
-        >
-          <div style={{
-            background: 'var(--mac-surface, white)', border: '1px solid var(--mac-border, #d8dde8)',
-            borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '90%',
-          }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--mac-text-primary, #1a1d29)' }}>
+          className="cashier-session-warning-overlay">
+          <div className="cashier-session-warning-card">
+            <h3 className="cashier-session-warning-title">
               Сессия скоро истечёт
             </h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--mac-text-secondary, #6b7280)', lineHeight: 1.5 }}>
-              Ваша сессия истекает. Несохранённые данные могут быть потеряны.
-              Сохраните текущий платёж или продлите сессию.
+            <p className="cashier-session-warning-text">
+              Сессия истечёт через <strong>{sessionSecondsLeft ?? '?'}</strong> сек.
+              Несохранённые данные будут потеряны. Сохраните текущий платёж или продлите сессию.
             </p>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setSessionWarning(null)} style={{ padding: '8px 16px', border: '1px solid var(--mac-border, #d8dde8)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontSize: '14px' }}>
-                Позже
+            <div className="cashier-session-warning-actions">
+              <button
+                type="button"
+                onClick={() => setSessionWarning(null)}
+                className="cashier-session-warning-btn cashier-session-warning-btn--secondary">
+                Закрыть и потерять данные
               </button>
-              <button onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', background: 'var(--mac-accent, #dc2626)', color: 'white', cursor: 'pointer', fontSize: '14px' }}>
+              <button
+                type="button"
+                onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }}
+                className="cashier-session-warning-btn cashier-session-warning-btn--primary">
                 Продлить сессию
               </button>
             </div>
