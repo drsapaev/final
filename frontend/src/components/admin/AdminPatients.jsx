@@ -281,6 +281,12 @@ const AdminPatients = () => {
                 </tr>
               </thead>
               <tbody>
+                {/* UX Audit Admin #1.5: indicator for 200-row cap. */}
+                {patients.length > 200 && (
+                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '8px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                    Показано 1–200 из {patients.length}. Уточните поиск, чтобы увидеть остальные.
+                  </td></tr>
+                )}
                 {/* PR-41 / High-17: cap rendered rows to 200 to avoid rendering
                     1000+ DOM nodes when the patient list is large. Full
                     virtualization via @tanstack/react-virtual is installed

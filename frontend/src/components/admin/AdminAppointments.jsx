@@ -498,7 +498,8 @@ const AdminAppointments = () => {
                           <Badge variant="success">Связано</Badge>
                         )}
                       </td>
-                      <td style={textCellStyle}>
+                      <td style={textCellStyle} title={reason || ''}>
+                        {/* UX Audit Admin #1.6: tooltip для обрезанного reason. */}
                         {reason.length > 50 ? `${reason.substring(0, 50)}...` : reason || 'Не указана'}
                       </td>
                       <td aria-label={`Действия для записи ${patientName} - ${doctorName}`} className="admin-p-12-16">
