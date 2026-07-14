@@ -107,7 +107,7 @@ const WelcomeView = React.memo(({
           <AnimatedTransition type="slide" direction="up" delay={200}>
             <h1 className="registrar-hero-title">
               {t('welcome')} в панель регистратора!
-              <Icon name="person" size="default" className="registrar-text-accent" />
+              <Icon name="person" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
             </h1>
           </AnimatedTransition>
           <AnimatedTransition type="fade" delay={300}>
@@ -240,7 +240,7 @@ const WelcomeView = React.memo(({
                     aria-label="Create new appointment"
                     className="registrar-flex" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
 
-                      <Icon name="plus" size="small" className="registrar-text-white" />
+                      <Icon name="plus" size="small" style={{ color: 'white' }} />
                       {t('new_appointment')}
                     </Button>
 
@@ -276,7 +276,7 @@ const WelcomeView = React.memo(({
               {/* Фильтры и навигация */}
                 <div className="registrar-surface-toolbar">
                   <h3 className="registrar-subsection-heading">
-                    <Icon name="line.3.horizontal.decrease" size="default" className="registrar-text-accent" />
+                    <Icon name="line.3.horizontal.decrease" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
                     Фильтры и навигация
                   </h3>
 
@@ -355,7 +355,7 @@ const WelcomeView = React.memo(({
                 <div className="registrar-info-card" style={{ padding: 'var(--mac-spacing-5)', boxShadow: 'var(--mac-shadow-sm)' }}>
                       <div className="registrar-flex-col">
                         <label className="registrar-picker-label">
-                          <Icon name="magnifyingglass" size="small" className="registrar-text-secondary" />
+                          <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
                           Выберите дату для просмотра истории:
                         </label>
                         <Input
@@ -432,7 +432,7 @@ const WelcomeView = React.memo(({
           <div>
             <div className="registrar-flex-between" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
               <h3 className="registrar-history-heading">
-                <Icon name="eye" size="default" className="registrar-text-accent" />
+                <Icon name="eye" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
                 История записей
               </h3>
               {showCalendar &&
@@ -493,7 +493,7 @@ const WelcomeView = React.memo(({
                   }}
                   className="registrar-btn-lg registrar-btn-accent">
 
-                          <Icon name="key" size="small" className="registrar-icon-mr" />Войти снова
+                          <Icon name="key" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Войти снова
                         </button>
 
                         <button
@@ -503,7 +503,7 @@ const WelcomeView = React.memo(({
                   }}
                   className="registrar-btn-lg registrar-btn-success">
 
-                          <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Обновить данные
+                          <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Обновить данные
                         </button>
 
                         {/* UX Audit R-2.2: кнопка «Перезапустить приложение» удалена —
@@ -532,7 +532,7 @@ const WelcomeView = React.memo(({
                 disabled={!tokenManager.hasToken()}
                 className="registrar-btn-cta">
 
-                      <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
+                      <Icon name="plus" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Создать первую запись
                     </Button>
                   </div>
             }
