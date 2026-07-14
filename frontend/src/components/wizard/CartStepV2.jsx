@@ -16,6 +16,8 @@ import { Button, Tooltip,
   Checkbox } from '../ui/macos';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
+// UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
+import './CartStepV2.css';
 
 const CartStepV2 = ({
   cart,
@@ -175,46 +177,21 @@ const CartStepV2 = ({
   }, []);
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 'var(--mac-spacing-4)',
-      height: '100%', // Fill available space
-      padding: '12px 0', // 12px vertical padding
-      overflow: 'hidden',
-      width: '100%'
-    }}>
+    // UX Audit R-3.3: main container inline style → .cart-step-v2 class
+    <div className="cart-step-v2">
       {/* Верхняя панель: Поиск и Категории */}
       {/* Верхняя панель: Поиск и Категории */}
 
 
       {/* Основная область: Сетка услуг (Скролл внутри) */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        paddingRight: 'var(--mac-spacing-2)',
-        minHeight: 0, // Crucial for nested flex scrolling
-        border: '1px solid var(--mac-border)',
-        borderRadius: 'var(--mac-radius-md)',
-        padding: 'var(--mac-spacing-4)', // 16px internal padding
-        background: 'var(--mac-bg-primary)'
-      }}>
+      <div className="cart-step-v2__services-area">
         {searchQuery &&
-        <div style={{
-          marginBottom: 'var(--mac-spacing-3)',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        <div className="cart-step-v2__search-info">
             Результаты поиска: {displayedServices.length}
           </div>
         }
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)', // 3 колонки
-          gap: 'var(--mac-spacing-2)', // Compact gap
-          alignContent: 'start'
-        }}>
+        <div className="cart-step-v2__services-grid">
           {displayedServices.map((service) => {
             // ✅ ИСПРАВЛЕНО: Проверяем также по service_code для edit режима (когда service_id еще null)
             const isInCart = cart?.items?.some((item) => {

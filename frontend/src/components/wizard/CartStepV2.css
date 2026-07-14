@@ -1,0 +1,130 @@
+/**
+ * CartStepV2 Styles
+ *
+ * UX Audit R-3.3: migrated largest inline style blocks to CSS classes.
+ * Smaller one-off styles remain inline (will be migrated incrementally).
+ *
+ * All classes use macOS design system tokens (var(--mac-*)).
+ */
+
+/* Main container — flex column filling available space */
+.cart-step-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-4);
+  height: 100%;
+  padding: 12px 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* Scrollable services area */
+.cart-step-v2__services-area {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: var(--mac-spacing-2);
+  min-height: 0; /* Crucial for nested flex scrolling */
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  padding: var(--mac-spacing-4);
+  background: var(--mac-bg-primary);
+}
+
+/* Search result info text */
+.cart-step-v2__search-info {
+  margin-bottom: var(--mac-spacing-3);
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+}
+
+/* Services grid — 3 columns */
+.cart-step-v2__services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--mac-spacing-2);
+  align-content: start;
+}
+
+/* Service card */
+.cart-step-v2__service-card {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-bg-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cart-step-v2__service-card:hover {
+  border-color: var(--mac-accent-blue);
+  background: var(--mac-bg-secondary);
+}
+
+.cart-step-v2__service-card--in-cart {
+  border-color: var(--mac-success);
+  background: color-mix(in srgb, var(--mac-success, #34c759), transparent 92%);
+}
+
+/* Service checkbox icon */
+.cart-step-v2__service-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* Service info wrapper */
+.cart-step-v2__service-info {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Service name row */
+.cart-step-v2__service-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Service name text (truncated) */
+.cart-step-v2__service-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Cart summary section */
+.cart-step-v2__cart-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-3);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  background: var(--mac-bg-secondary);
+}
+
+/* Cart total amount */
+.cart-step-v2__cart-total {
+  color: var(--mac-success);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+/* Responsive: 2 columns on narrow screens */
+@media (max-width: 768px) {
+  .cart-step-v2__services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .cart-step-v2__services-grid {
+    grid-template-columns: 1fr;
+  }
+}
