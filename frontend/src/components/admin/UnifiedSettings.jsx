@@ -175,7 +175,9 @@ const UnifiedSettings = () => {
                 Цветовая схема задаёт пространство интерфейса: фон, поверхности, header и sidebar. Accent управляет цветом действий и выделений. Theme preference синхронизируется через профиль пользователя, accent остаётся локальной настройкой рабочего места.
               </div>
             </div>
-            <ClinicSettings />
+            {/* UX Audit Admin #2.6: ClinicSettings удалён из default-ветки.
+                Дублировал admin-clinic-settings маршрут. Теперь «Настройки» =
+                только тема/акцент, «Профиль клиники» = ClinicSettings. */}
           </div>);
     }
   };

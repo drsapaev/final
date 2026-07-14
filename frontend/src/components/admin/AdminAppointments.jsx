@@ -11,6 +11,7 @@ import {
   Badge,
   Button,
   MacOSCard,
+  MacOSStatCard,
   MacOSEmptyState,
   Input,
   Skeleton,
@@ -148,32 +149,9 @@ const getDoctorOptionLabel = (doctor) => {
   return flags.length > 0 ? `${name} • ${flags.join(' • ')}` : name;
 };
 
-const StatCard = ({ label, value, icon: Icon, color }) => (
-  <MacOSCard className="p-6">
-    <div className="admin-d-flex-ai-center-jc-between-gap-16">
-      <div>
-        <p
-          className="admin-fs-sm-fw-med-secondary-m-0"
-        >
-          {label}
-        </p>
-        <p
-          className="admin-fs-2xl-fw-bold-primary-m-4px-0-0"
-        >
-          {value}
-        </p>
-      </div>
-      <Icon aria-hidden="true" size={32} className="admin-col-dyn" style={{ '--admin-col0': color }} />
-    </div>
-  </MacOSCard>
-);
+// UX Audit Admin #3.6: локальный StatCard заменён на MacOSStatCard (统一 API).
+// Старый StatCard удалён, используется MacOSStatCard напрямую в render.
 
-StatCard.propTypes = {
-  color: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  label: PropTypes.string.isRequired,
-  value: PropTypes.number.isRequired,
-};
 
 const AdminAppointments = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
@@ -269,10 +247,10 @@ const AdminAppointments = () => {
       <div
         className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16"
       >
-        <StatCard label="Всего записей" value={appointments.length} icon={Calendar} color="var(--mac-accent)" />
-        <StatCard label="На сегодня" value={todayAppointments.length} icon={Clock} color="var(--mac-success)" />
-        <StatCard label="На завтра" value={tomorrowAppointments.length} icon={Calendar} color="var(--mac-text-primary)" />
-        <StatCard label="Ожидают" value={statusStats.pending || 0} icon={Clock} color="var(--mac-warning)" />
+        <MacOSStatCard title="Всего записей" value={appointments.length} icon={Calendar} color="blue" />
+        <MacOSStatCard title="На сегодня" value={todayAppointments.length} icon={Clock} color="green" />
+        <MacOSStatCard title="На завтра" value={tomorrowAppointments.length} icon={Calendar} color="purple" />
+        <MacOSStatCard title="Ожидают" value={statusStats.pending || 0} icon={Clock} color="orange" />
       </div>
 
       <MacOSCard
