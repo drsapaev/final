@@ -663,6 +663,9 @@ const SystemManagement = () => {
       </div>
 
       {/* Табы */}
+      {/* UX Audit Admin #3.7: hand-rolled tabs — DEPRECATED.
+          Future: migrate to <SegmentedControl> for consistency
+          with ClinicManagement. Different API prevents immediate migration. */}
       <div className="admin-tab-bar-simple">
           {[
         { id: 'monitoring', label: 'Мониторинг', icon: Activity },
