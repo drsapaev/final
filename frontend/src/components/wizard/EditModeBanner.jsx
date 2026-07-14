@@ -3,8 +3,13 @@
  *
  * Shows a banner when the wizard is in edit mode, with a QR/Desk source badge.
  * Previously inline in AppointmentWizardV2.jsx (lines 2617-2643).
+ *
+ * UX Audit R-3.3: inline-стили перенесены в EditModeBanner.css.
+ * Раньше: 3 объекта style={{...}} с hardcoded rgba() colors.
+ * Теперь: CSS-классы с var(--mac-*) tokens.
  */
 import PropTypes from 'prop-types';
+import './EditModeBanner.css';
 
 const EditModeBanner = ({ editMode, initialData }) => {
   if (!editMode) return null;
@@ -13,29 +18,12 @@ const EditModeBanner = ({ editMode, initialData }) => {
     initialData?.source_kind === 'online' || initialData?.source === 'online';
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '4px 10px',
-      borderRadius: 'var(--mac-radius-sm)',
-      background: 'rgba(59, 130, 246, 0.12)',
-      color: '#2563eb',
-      fontSize: '12px',
-      fontWeight: 600,
-      marginBottom: '4px'
-    }}>
+    <div className="edit-mode-banner">
       ✏️ Редактирование записи
       {isOnlineSource ? (
-        <span style={{
-          padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
-          background: 'rgba(139, 92, 246, 0.15)', color: '#7c3aed'
-        }}>QR</span>
+        <span className="edit-mode-badge edit-mode-badge--online">QR</span>
       ) : (
-        <span style={{
-          padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
-          background: 'rgba(100, 116, 139, 0.15)', color: '#475569'
-        }}>Desk</span>
+        <span className="edit-mode-badge edit-mode-badge--desk">Desk</span>
       )}
     </div>
   );
