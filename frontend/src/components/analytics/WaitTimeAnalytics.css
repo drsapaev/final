@@ -1,0 +1,410 @@
+/**
+ * WaitTimeAnalytics — Phase 3 CSS migration.
+ * Extracted from WaitTimeAnalytics.jsx (100 inline style blocks → 0 layout blocks).
+ * All styles use var(--mac-*) design tokens.
+ */
+
+/* ─── Layout ─── */
+.wta-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-6);
+}
+
+.wta-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-6);
+}
+
+.wta-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--mac-spacing-4);
+}
+
+.wta-section-header-no-mb {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wta-header {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-4);
+  margin-bottom: var(--mac-spacing-2);
+}
+
+/* ─── Headings ─── */
+.wta-h1 {
+  margin: 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-2xl);
+  font-weight: var(--mac-font-weight-bold);
+}
+
+.wta-h1-subtitle {
+  margin: 4px 0 0 0;
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-base);
+}
+
+.wta-h3 {
+  margin: 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.wta-h3-mb16 {
+  margin: 0 0 16px 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.wta-h3-mb16-no-icon {
+  margin: 0 0 16px 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.wta-h4 {
+  margin: 0 0 8px 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.wta-h4-mb16 {
+  margin: 0 0 16px 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+/* ─── Cards ─── */
+.wta-card-padded {
+  padding: var(--mac-spacing-6);
+}
+
+/* ─── Stat grids ─── */
+.wta-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+
+.wta-stat-grid-sm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+
+.wta-stat-grid-xs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--mac-spacing-2);
+}
+
+.wta-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: var(--mac-spacing-2);
+  margin-bottom: var(--mac-spacing-4);
+}
+
+/* ─── Text styles ─── */
+.wta-text-secondary {
+  color: var(--mac-text-secondary);
+}
+
+.wta-text-tertiary {
+  color: var(--mac-text-tertiary);
+}
+
+.wta-text-primary {
+  color: var(--mac-text-primary);
+}
+
+.wta-text-sm {
+  font-size: var(--mac-font-size-sm);
+}
+
+.wta-text-xs {
+  font-size: var(--mac-font-size-xs);
+}
+
+.wta-text-xs-tertiary {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+}
+
+.wta-text-sm-secondary {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+.wta-text-sm-tertiary {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-tertiary);
+}
+
+.wta-text-sm-primary {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-primary);
+}
+
+.wta-fw-semibold {
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.wta-fw-bold {
+  font-weight: var(--mac-font-weight-bold);
+}
+
+/* ─── Timestamps ─── */
+.wta-timestamp {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+}
+
+/* ─── Queue cards ─── */
+.wta-queue-card {
+  padding: var(--mac-spacing-4);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--mac-bg-secondary);
+}
+
+.wta-queue-name {
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-1);
+}
+
+.wta-queue-stats {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-4);
+}
+
+.wta-queue-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+}
+
+.wta-queue-right {
+  text-align: right;
+}
+
+.wta-queue-wait {
+  font-size: var(--mac-font-size-2xl);
+  font-weight: var(--mac-font-weight-bold);
+}
+
+.wta-queue-wait-error { color: var(--mac-error); }
+.wta-queue-wait-success { color: var(--mac-success); }
+
+/* ─── Department breakdown cards ─── */
+.wta-dept-card {
+  padding: var(--mac-spacing-4);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--mac-bg-secondary);
+}
+
+.wta-dept-name {
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.wta-dept-count {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+.wta-dept-right {
+  text-align: right;
+}
+
+.wta-dept-avg {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-bold);
+  color: var(--mac-info);
+}
+
+.wta-dept-median {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+}
+
+/* ─── Service cards ─── */
+.wta-service-card {
+  padding: var(--mac-spacing-4);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  background-color: var(--mac-bg-secondary);
+}
+
+.wta-service-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--mac-spacing-2);
+}
+
+.wta-service-name {
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.wta-service-code {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Recommendations ─── */
+.wta-recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1);
+}
+
+.wta-recommendations-list-gap2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+}
+
+.wta-recommendation-item {
+  padding: var(--mac-spacing-2);
+  border-radius: var(--mac-radius-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.wta-recommendation-warning {
+  background-color: var(--mac-warning-bg);
+  border: 1px solid var(--mac-warning-border);
+}
+
+.wta-recommendation-info {
+  padding: var(--mac-spacing-4);
+  background-color: var(--mac-info-bg);
+  border: 1px solid var(--mac-info-border);
+  border-radius: var(--mac-radius-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.wta-recommendation-text {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-primary);
+}
+
+.wta-recommendation-text-default {
+  color: var(--mac-text-primary);
+}
+
+/* ─── Summary box ─── */
+.wta-summary-box {
+  margin-top: var(--mac-spacing-4);
+  padding: var(--mac-spacing-4);
+  background-color: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-sm);
+}
+
+.wta-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--mac-font-size-sm);
+}
+
+/* ─── Heatmap ─── */
+.wta-heatmap-cell {
+  padding: var(--mac-spacing-2);
+  border-radius: var(--mac-radius-sm);
+  text-align: center;
+  border: 1px solid var(--mac-border);
+}
+
+.wta-heatmap-hour {
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.wta-heatmap-time {
+  font-size: var(--mac-font-size-xs);
+}
+
+.wta-heatmap-count {
+  font-size: var(--mac-font-size-xs);
+  opacity: 0.8;
+}
+
+.wta-heatmap-summary {
+  padding: var(--mac-spacing-4);
+  background-color: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-sm);
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--mac-font-size-sm);
+}
+
+/* ─── Grid gap ─── */
+.wta-grid-gap {
+  display: grid;
+  gap: var(--mac-spacing-4);
+}
+
+/* ─── Action buttons ─── */
+.wta-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.wta-action-btn-end {
+  display: flex;
+  align-items: end;
+}
+
+/* ─── Filter form ─── */
+.wta-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+
+.wta-filter-label {
+  display: block;
+  margin-bottom: var(--mac-spacing-2);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* ─── Margin utilities ─── */
+.wta-mt-4 { margin-top: var(--mac-spacing-4); }
+.wta-mb-4 { margin-bottom: var(--mac-spacing-4); }
