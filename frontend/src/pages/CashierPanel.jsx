@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import './cashier.css';
 import { useLocation } from 'react-router-dom';
-import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt } from 'lucide-react';
+import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt, MoreVertical } from 'lucide-react';
 import {
   Card, Badge, Button,
 } from '../components/ui/macos';
@@ -1407,12 +1407,12 @@ const CashierPanel = () => {
                                 </Badge>
                               </td>
                               <td className="cashier-cell-actions">
-                                {/* QW-07 fix: differentiated variants by intent.
-                                    Previously all 4 buttons used variant="outline" with emoji icons,
-                                    making destructive (Cancel, Refund) visually identical to constructive
-                                    (Confirm). Now: Confirm=success (green), Cancel=danger (red),
-                                    Refund=warning (orange), Print=ghost (low-emphasis secondary).
-                                    Lucide icons replace emoji for better a11y and visual scanning. */}
+                                {/* UX Audit #2.2: primary action + overflow menu.
+                                    Раньше: 4 равноправные кнопки (success/danger/warning/ghost) —
+                                    слабая визуальная иерархия (Nielsen #4),
+                                    на узких экранах ломалось flex-wrap.
+                                    Теперь: primary «Принять» видна всегда, остальные 3 —
+                                    в overflow menu через нативный <details>. */}
                                 <Button
                                   size="sm"
                                   variant="success"
@@ -1421,34 +1421,40 @@ const CashierPanel = () => {
                                   aria-label="Подтвердить платёж">
                                   <CheckCircle size={14} /> Принять
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="danger"
-                                  onClick={() => openCancelDialog(row)}
-                                  disabled={!hasBackendPaymentAction(row, 'cancel')}
-                                  aria-label="Отменить платёж">
-                                  <XCircle size={14} /> Отмена
-                                </Button>
-                                {/* ✅ v2.0: Кнопка возврата */}
-                                <Button
-                                  size="sm"
-                                  variant="warning"
-                                  onClick={() => openRefundDialog(row)}
-                                  disabled={!hasBackendPaymentAction(row, 'refund')}
-                                  aria-label="Оформить возврат"
-                                  title="Возврат средств">
-                                  <Undo2 size={14} /> Возврат
-                                </Button>
-                                {/* ✅ v2.0: Кнопка печати чека */}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handlePrintReceipt(row)}
-                                  disabled={!hasBackendPaymentAction(row, 'print_receipt')}
-                                  aria-label="Распечатать чек"
-                                  title="Печать чека">
-                                  <Receipt size={14} /> Чек
-                                </Button>
+                                <details className="cashier-overflow-menu">
+                                  <summary className="cashier-overflow-trigger" aria-label="Дополнительные действия с платёжом">
+                                    <MoreVertical size={16} aria-hidden="true" />
+                                  </summary>
+                                  <div className="cashier-overflow-popover" role="menu">
+                                    <button
+                                      type="button"
+                                      className="cashier-overflow-item cashier-overflow-item--danger"
+                                      onClick={() => openCancelDialog(row)}
+                                      disabled={!hasBackendPaymentAction(row, 'cancel')}
+                                      role="menuitem"
+                                      aria-label="Отменить платёж">
+                                      <XCircle size={14} aria-hidden="true" /> Отменить платёж
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="cashier-overflow-item cashier-overflow-item--warning"
+                                      onClick={() => openRefundDialog(row)}
+                                      disabled={!hasBackendPaymentAction(row, 'refund')}
+                                      role="menuitem"
+                                      aria-label="Оформить возврат">
+                                      <Undo2 size={14} aria-hidden="true" /> Оформить возврат
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="cashier-overflow-item"
+                                      onClick={() => handlePrintReceipt(row)}
+                                      disabled={!hasBackendPaymentAction(row, 'print_receipt')}
+                                      role="menuitem"
+                                      aria-label="Распечатать чек">
+                                      <Receipt size={14} aria-hidden="true" /> Печать чека
+                                    </button>
+                                  </div>
+                                </details>
                               </td>
                             </tr>
                     ) :
