@@ -35,6 +35,10 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: 'payme', label: 'PayMe' },
 ];
 
+// UX Audit #1.2: Quick cash denominations (UZS banknotes) + "exact amount" button.
+// Cuts ~10s per cash transaction × 200 tx/shift = ~30 min saved per cashier shift.
+const QUICK_CASH_DENOMINATIONS = [50000, 100000, 200000, 500000];
+
 const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
     // Auto-fill amount from appointment data
     const defaultAmount = appointment?.total_amount ||
@@ -185,6 +189,29 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                 placeholder="Введите полученную сумму"
                                 error={insufficientCash}
                             />
+                            {/* UX Audit #1.2: Quick amount buttons — law of Fitts + Hick.
+                                Reduces 6-7 keystrokes per transaction to a single click. */}
+                            <div className="cpm-quick-amounts" role="group" aria-label="Быстрый ввод полученной суммы">
+                                {QUICK_CASH_DENOMINATIONS.map((nominal) => (
+                                    <Button
+                                        key={nominal}
+                                        type="button"
+                                        size="small"
+                                        variant="outline"
+                                        onClick={() => setPaymentData(prev => ({ ...prev, receivedAmount: String(nominal) }))}
+                                        aria-label={`Ввести ${formatCurrency(nominal)} как полученную сумму`}>
+                                        {formatCurrency(nominal)}
+                                    </Button>
+                                ))}
+                                <Button
+                                    type="button"
+                                    size="small"
+                                    variant="primary"
+                                    onClick={() => setPaymentData(prev => ({ ...prev, receivedAmount: String(numericAmount) }))}
+                                    aria-label="Ввести точную сумму без сдачи">
+                                    Без сдачи
+                                </Button>
+                            </div>
                             {insufficientCash && (
                                 <Typography variant="caption" className="cpm-insufficient-error">
                                     Недостаточно средств. Нужно ещё: {formatCurrency(numericAmount - numericReceived)}
