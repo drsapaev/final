@@ -1274,7 +1274,15 @@ const CashierPanel = () => {
               }]
               }
               activeTab={activeTab}
-              onTabChange={setActiveTab}
+              onTabChange={(newTab) => {
+                // UX Audit #3.6: сброс пагинации при смене таба.
+                // Раньше: пользователь на табе «История», стр. 5 → переключился
+                // на «Ожидающие» → вернулся → оказался на стр. 5 истории,
+                // хотя ожидал стр. 1 (Nielsen #1 — visibility of system status).
+                setActiveTab(newTab);
+                setCurrentPage(1);
+                setPendingPage(1);
+              }}
               size="md"
               variant="default" />
 
