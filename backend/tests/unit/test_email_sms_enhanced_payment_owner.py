@@ -7,6 +7,7 @@ import pytest
 from fastapi import BackgroundTasks, HTTPException
 
 from app.api.v1.endpoints import email_sms_enhanced
+from app.schemas.notifications import PaymentData
 
 
 @pytest.mark.asyncio
@@ -89,7 +90,7 @@ async def test_send_payment_confirmation_enhanced_preserves_no_id_payload(
 
     response = await email_sms_enhanced.send_payment_confirmation_enhanced(
         patient_id=123,
-        payment_data={"amount": 125000},
+        payment_data=PaymentData(amount=125000),
         channels=["email"],
         template_data=None,
         background_tasks=BackgroundTasks(),
@@ -148,7 +149,7 @@ async def test_send_payment_confirmation_enhanced_rejects_other_patient_payment(
     with pytest.raises(HTTPException) as exc_info:
         await email_sms_enhanced.send_payment_confirmation_enhanced(
             patient_id=123,
-            payment_data={"payment_id": 456, "amount": 125000},
+            payment_data=PaymentData(payment_id=456, amount=125000),
             channels=["email", "sms"],
             template_data=None,
             background_tasks=BackgroundTasks(),

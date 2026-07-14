@@ -14,6 +14,7 @@ import pytest
 from app.api.v1.endpoints import admin_telegram, telegram_webhook
 from app.models.appointment import Appointment
 from app.models.audit import AuditLog
+from app.schemas.notifications import SendMessageRequest
 from app.services import telegram_bot
 from app.services.telegram_templates import TelegramTemplatesService
 from app.models.lab import LabReportInstance, LabReportTemplate, LabReportTemplateVersion
@@ -947,7 +948,7 @@ class TestTelegramWebhookSecurity:
             chat_id=123456,
             message="Private follow-up",
             parse_mode="HTML",
-            reply_markup=None,
+            body=SendMessageRequest(),
             db=object(),
             current_user=SimpleNamespace(role="Admin"),
         )

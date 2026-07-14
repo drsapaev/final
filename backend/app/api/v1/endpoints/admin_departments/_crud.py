@@ -144,7 +144,7 @@ def create_department(
 
 @router.post("/bulk", response_model=dict)
 def bulk_create_departments(
-    payload: dict,
+    payload: BulkCreateDepartmentsRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -153,10 +153,12 @@ def bulk_create_departments(
 
     PR-18: Frontend DepartmentManagement.jsx calls this endpoint for CSV
     import. Body: { departments: [{name_ru, name_uz, key, ...}, ...] }
+
+    P0-6c FIX: ``payload`` is now typed as ``BulkCreateDepartmentsRequest``
+    so Pydantic validates each row against ``DepartmentCreate`` (enforcing
+    ``key`` pattern, name lengths, etc.) before any DB write.
     """
-    departments_data = payload.get("departments", [])
-    if not departments_data or not isinstance(departments_data, list):
-        raise HTTPException(status_code=400, detail="departments list is required")
+    departments_data = [d.model_dump(exclude_unset=True) for d in payload.departments]
 
     created = 0
     skipped = 0
@@ -207,7 +209,7 @@ def bulk_create_departments(
 
 @router.delete("/bulk-delete", response_model=dict)
 def bulk_delete_departments(
-    payload: dict,
+    payload: BulkDeleteDepartmentsRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -216,10 +218,10 @@ def bulk_delete_departments(
 
     PR-18: Frontend DepartmentManagement.jsx calls this endpoint for bulk
     delete. Body: { ids: [1, 2, 3] }
+
+    P0-6c FIX: ``payload`` is now typed as ``BulkDeleteDepartmentsRequest``.
     """
-    ids = payload.get("ids", [])
-    if not ids or not isinstance(ids, list):
-        raise HTTPException(status_code=400, detail="ids list is required")
+    ids = payload.ids
 
     deleted = 0
     not_found = 0
@@ -244,7 +246,7 @@ def bulk_delete_departments(
 
 @router.patch("/bulk-activate", response_model=dict)
 def bulk_activate_departments(
-    payload: dict,
+    payload: BulkActivateDepartmentsRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -253,13 +255,13 @@ def bulk_activate_departments(
 
     PR-18: Frontend DepartmentManagement.jsx calls this endpoint for bulk
     activate/deactivate. Body: { ids: [1, 2, 3], active: true/false }
+
+    P0-6c FIX: ``payload`` is now typed as ``BulkActivateDepartmentsRequest``
+    so Pydantic validates that ``ids`` is a non-empty list of ints and
+    ``active`` is a required bool.
     """
-    ids = payload.get("ids", [])
-    active = payload.get("active")
-    if not ids or not isinstance(ids, list):
-        raise HTTPException(status_code=400, detail="ids list is required")
-    if active is None:
-        raise HTTPException(status_code=400, detail="active boolean is required")
+    ids = payload.ids
+    active = payload.active
 
     updated = 0
     not_found = 0

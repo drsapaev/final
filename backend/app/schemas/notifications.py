@@ -19,7 +19,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 # =============================================================================
 # SHARED COMPONENTS
@@ -32,6 +32,11 @@ class TemplateDataBase(BaseModel):
     Template data is intentionally a permissive dict (the email/SMS
     service fills placeholders from it). We cap the size to prevent
     memory abuse and require string keys.
+
+    P0-6a FIX: the original ``field_validator("*")`` only validated
+    declared fields, not ``extra="allow"`` extras. Added a
+    ``model_validator(mode="before")`` that walks the raw input dict
+    so oversized strings in extras are also rejected.
     """
 
     model_config = {"extra": "allow"}  # allow arbitrary template variables
@@ -43,6 +48,21 @@ class TemplateDataBase(BaseModel):
         if isinstance(v, str) and len(v) > 100_000:
             raise ValueError("template_data string values must be ≤ 100KB")
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_large_extras(cls, data: Any) -> Any:
+        # Walk the raw input dict to enforce the same 100KB cap on
+        # extra fields that ``_reject_large_values`` enforces on
+        # declared fields. Without this, callers could pass oversized
+        # values via arbitrary keys (extra="allow") and bypass the cap.
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if isinstance(value, str) and len(value) > 100_000:
+                    raise ValueError(
+                        f"template_data string value for key '{key}' must be ≤ 100KB"
+                    )
+        return data
 
 
 class RecipientData(BaseModel):

@@ -499,7 +499,6 @@ async def send_message_to_user(
     chat_id: int,
     message: str,
     parse_mode: str = "HTML",
-    reply_markup: dict[str, Any] | None = None,
     body: SendMessageRequest = SendMessageRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -507,10 +506,12 @@ async def send_message_to_user(
     """
     Отправка сообщения пользователю через бота.
 
-    ``reply_markup`` can be supplied either as a direct keyword argument
-    (used by direct/unit-test callers) or as part of the ``body`` model
-    (used by FastAPI's JSON body parser). The explicit keyword argument
-    takes precedence when both are provided.
+    P0-6e FIX: removed the redundant ``reply_markup: dict[str, Any] | None``
+    keyword argument. The ``body: SendMessageRequest`` model is now the
+    single source of truth for ``reply_markup`` — Pydantic caps the
+    dict at 50 keys via ``SendMessageRequest._validate_reply_markup_size``.
+    Direct callers (e.g. unit tests) should pass ``body=SendMessageRequest(reply_markup=...)``
+    instead of ``reply_markup=...``.
     """
     try:
         # Resolve ``get_telegram_bot_service`` via the package attribute at
@@ -525,9 +526,7 @@ async def send_message_to_user(
         if not bot_service.active:
             await bot_service.initialize(db)
 
-        effective_reply_markup = (
-            reply_markup if reply_markup is not None else body.reply_markup
-        )
+        effective_reply_markup = body.reply_markup
         success = await bot_service._send_message(
             chat_id=chat_id, text=message, reply_markup=effective_reply_markup
         )

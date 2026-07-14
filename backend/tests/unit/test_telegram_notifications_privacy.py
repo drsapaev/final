@@ -9,6 +9,7 @@ from fastapi import BackgroundTasks
 from fastapi import HTTPException
 
 from app.api.v1.endpoints import telegram_notifications
+from app.schemas.notifications import PaymentData
 
 
 class FakeTelegramTemplatesService:
@@ -649,7 +650,7 @@ async def test_send_payment_confirmation_response_hides_patient_contact_metadata
 
     response = await telegram_notifications.send_payment_confirmation(
         patient_id=123,
-        payment_data={"amount": 125000, "transaction_id": "txn-secret"},
+        payment_data=PaymentData(amount=125000, transaction_id="txn-secret"),
         background_tasks=BackgroundTasks(),
         db=object(),
         current_user=SimpleNamespace(role="Cashier"),
@@ -719,13 +720,13 @@ async def test_send_payment_confirmation_message_omits_raw_payment_identifiers(
 
     response = await telegram_notifications.send_payment_confirmation(
         patient_id=123,
-        payment_data={
-            "amount": 125000,
-            "transaction_id": "txn-secret-internal",
-            "invoice_id": "invoice-secret-internal",
-            "receipt_id": "receipt-secret-internal",
-            "receipt_link": "https://clinic.example.com/receipt/txn-secret-internal",
-        },
+        payment_data=PaymentData(
+            amount=125000,
+            transaction_id="txn-secret-internal",
+            invoice_id="invoice-secret-internal",
+            receipt_id="receipt-secret-internal",
+            receipt_link="https://clinic.example.com/receipt/txn-secret-internal",
+        ),
         background_tasks=BackgroundTasks(),
         db=object(),
         current_user=SimpleNamespace(role="Cashier"),
@@ -792,7 +793,7 @@ async def test_send_payment_confirmation_rejects_payment_for_different_patient(
     with pytest.raises(HTTPException) as exc_info:
         await telegram_notifications.send_payment_confirmation(
             patient_id=123,
-            payment_data={"payment_id": 456, "amount": 125000},
+            payment_data=PaymentData(payment_id=456, amount=125000),
             background_tasks=BackgroundTasks(),
             db=FakeDb(),
             current_user=SimpleNamespace(role="Cashier"),
@@ -826,7 +827,7 @@ async def test_send_payment_confirmation_unregistered_response_hides_patient_pho
 
     response = await telegram_notifications.send_payment_confirmation(
         patient_id=123,
-        payment_data={"amount": 125000},
+        payment_data=PaymentData(amount=125000),
         background_tasks=BackgroundTasks(),
         db=object(),
         current_user=SimpleNamespace(role="Cashier"),
@@ -873,7 +874,7 @@ async def test_send_payment_confirmation_respects_global_notification_preference
 
     response = await telegram_notifications.send_payment_confirmation(
         patient_id=123,
-        payment_data={"amount": 125000, "transaction_id": "txn-secret"},
+        payment_data=PaymentData(amount=125000, transaction_id="txn-secret"),
         background_tasks=BackgroundTasks(),
         db=object(),
         current_user=SimpleNamespace(role="Cashier"),
