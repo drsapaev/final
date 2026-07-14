@@ -221,16 +221,7 @@ const CartStepV2 = ({
                   <div className="service-name-text" title={service.name} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {/* PR-25: show service code badge for unambiguous identification */}
                     {service.service_code && (
-                      <span style={{
-                        flexShrink: 0,
-                        padding: '0 4px',
-                        borderRadius: '3px',
-                        fontSize: '9px',
-                        fontWeight: 700,
-                        background: 'var(--mac-bg-tertiary)',
-                        color: 'var(--mac-text-secondary)',
-                        lineHeight: '14px'
-                      }}>
+                      <span className="cart-step-v2__service-code">
                         {String(service.service_code).toUpperCase()}
                       </span>
                     )}
@@ -245,12 +236,7 @@ const CartStepV2 = ({
           })}
 
           {displayedServices.length === 0 &&
-          <div style={{
-            gridColumn: '1 / -1',
-            textAlign: 'center',
-            padding: 'var(--mac-spacing-8)',
-            color: 'var(--mac-text-tertiary)'
-          }}>
+          <div className="cart-step-v2__empty-services">
               Услуги не найдены
             </div>
           }
@@ -258,21 +244,8 @@ const CartStepV2 = ({
       </div>
 
       {/* Нижняя панель: Корзина */}
-      <div style={{
-        flexShrink: 0,
-        paddingTop: 'var(--mac-spacing-3)',
-        borderTop: '1px solid var(--mac-border)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--mac-spacing-2)'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 'var(--mac-font-size-sm)',
-          color: 'var(--mac-text-secondary)'
-        }}>
+      <div className="cart-step-v2__bottom-panel">
+        <div className="cart-step-v2__summary-row">
           <span>Выбрано: {cart?.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0} шт.</span>
           <span style={{ color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
             Итого: {cartTotal.toLocaleString()} сум
@@ -312,11 +285,7 @@ const CartStepV2 = ({
             </div>
 
             {repeatSuggestionSummary?.hasMixed &&
-          <div style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-warning)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+          <div className="cart-step-v2__mixed-warning">
                 {MIXED_REPEAT_WARNING}
               </div>
           }
@@ -545,7 +514,7 @@ const CartStepV2 = ({
           })}
           </div> :
 
-        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+        <div className="cart-step-v2__footer-hint">
             Корзина пуста
           </div>
         }
