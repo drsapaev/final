@@ -24,7 +24,7 @@ print("🔐 Авторизация...")
 try:
     # FastAPI OAuth2 expects form data, not JSON
     response = requests.post(
-        f"{BASE_URL}/api/v1/auth/login", 
+        f"{BASE_URL}/api/v1/auth/login",
         data=login_data  # Changed from json= to data=
     )
     if response.status_code == 200:
@@ -76,9 +76,9 @@ try:
         json=cart_data,
         headers=headers
     )
-    
+
     print(f"\n📊 Статус ответа: {response.status_code}")
-    
+
     if response.status_code == 200:
         print("✅ Корзина создана успешно!")
         print(json.dumps(response.json(), indent=2, ensure_ascii=False))
@@ -90,7 +90,7 @@ try:
             print(json.dumps(error_detail, indent=2, ensure_ascii=False))
         except:
             print(response.text)
-            
+
 except Exception as e:
     print(f"❌ Исключение: {e}")
     import traceback

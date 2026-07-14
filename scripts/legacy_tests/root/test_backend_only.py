@@ -13,9 +13,9 @@ def test_backend_comprehensive():
     """Комплексный тест backend"""
     print("🚀 Комплексное тестирование BACKEND системы очереди")
     print("=" * 60)
-    
+
     results = []
-    
+
     # Тест 1: Health check
     print("\n🔍 1. Health Check")
     try:
@@ -30,10 +30,10 @@ def test_backend_comprehensive():
     except Exception as e:
         print(f"   ❌ Ошибка подключения: {e}")
         results.append(False)
-    
+
     # Тест 2: Queue endpoints
     print("\n🔍 2. Queue Endpoints")
-    
+
     # Test endpoint
     try:
         response = requests.get(f"{BASE_URL}/queue/test")
@@ -47,7 +47,7 @@ def test_backend_comprehensive():
     except Exception as e:
         print(f"   ❌ Test endpoint ошибка: {e}")
         results.append(False)
-    
+
     # Debug endpoint
     try:
         response = requests.get(f"{BASE_URL}/queue/debug")
@@ -62,10 +62,10 @@ def test_backend_comprehensive():
     except Exception as e:
         print(f"   ❌ Debug endpoint ошибка: {e}")
         results.append(False)
-    
+
     # Тест 3: Join queue functionality
     print("\n🔍 3. Join Queue Functionality")
-    
+
     test_cases = [
         {
             "name": "Полные данные",
@@ -91,7 +91,7 @@ def test_backend_comprehensive():
             }
         }
     ]
-    
+
     for test_case in test_cases:
         try:
             response = requests.post(f"{BASE_URL}/queue/join-fixed", json=test_case["data"])
@@ -111,10 +111,10 @@ def test_backend_comprehensive():
         except Exception as e:
             print(f"   ❌ {test_case['name']} ошибка: {e}")
             results.append(False)
-    
+
     # Тест 4: Error handling
     print("\n🔍 4. Error Handling")
-    
+
     error_cases = [
         {
             "name": "Пустой токен",
@@ -129,7 +129,7 @@ def test_backend_comprehensive():
             "data": {"invalid": "data"}
         }
     ]
-    
+
     for error_case in error_cases:
         try:
             response = requests.post(f"{BASE_URL}/queue/join-fixed", json=error_case["data"])
@@ -147,60 +147,60 @@ def test_backend_comprehensive():
         except Exception as e:
             print(f"   ❌ {error_case['name']} ошибка: {e}")
             results.append(False)
-    
+
     return results
 
 def test_frontend_components():
     """Тест наличия frontend компонентов"""
     print("\n🔍 5. Frontend Components")
-    
+
     components = [
         "frontend/src/pages/QueueJoin.jsx",
         "frontend/src/components/queue/OnlineQueueManager.jsx",
         "frontend/src/components/queue/QRScanner.jsx"
     ]
-    
+
     results = []
-    
+
     for component in components:
         if os.path.exists(component):
             print(f"   ✅ {component}")
-            
+
             # Проверяем содержимое файла
             try:
                 with open(component, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    
+
                 if len(content) > 1000:  # Файл не пустой
                     print(f"      📝 Размер: {len(content)} символов")
                     results.append(True)
                 else:
                     print(f"      ⚠️ Файл слишком мал: {len(content)} символов")
                     results.append(False)
-                    
+
             except Exception as e:
                 print(f"      ❌ Ошибка чтения: {e}")
                 results.append(False)
         else:
             print(f"   ❌ {component} - НЕ НАЙДЕН")
             results.append(False)
-    
+
     return results
 
 def test_app_integration():
     """Тест интеграции в App.jsx"""
     print("\n🔍 6. App.jsx Integration")
-    
+
     try:
         with open("frontend/src/App.jsx", 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         checks = [
             ("QueueJoin импорт", "import QueueJoin" in content),
             ("Маршрут /queue/join", '"/queue/join"' in content),
             ("QueueJoin компонент", "<QueueJoin" in content or "element={<QueueJoin" in content)
         ]
-        
+
         results = []
         for check_name, check_result in checks:
             if check_result:
@@ -209,9 +209,9 @@ def test_app_integration():
             else:
                 print(f"   ❌ {check_name}")
                 results.append(False)
-        
+
         return results
-        
+
     except Exception as e:
         print(f"   ❌ Ошибка чтения App.jsx: {e}")
         return [False]
@@ -220,28 +220,28 @@ def main():
     """Главная функция тестирования"""
     print("🧪 ТЕСТИРОВАНИЕ СИСТЕМЫ ОНЛАЙН-ОЧЕРЕДИ")
     print("=" * 60)
-    
+
     # Запускаем все тесты
     backend_results = test_backend_comprehensive()
     frontend_results = test_frontend_components()
     app_results = test_app_integration()
-    
+
     # Подсчитываем результаты
     all_results = backend_results + frontend_results + app_results
     passed = sum(all_results)
     total = len(all_results)
-    
+
     print("\n" + "=" * 60)
     print("📊 ИТОГОВЫЕ РЕЗУЛЬТАТЫ")
     print("=" * 60)
-    
+
     print(f"Backend тесты: {sum(backend_results)}/{len(backend_results)}")
     print(f"Frontend компоненты: {sum(frontend_results)}/{len(frontend_results)}")
     print(f"App.jsx интеграция: {sum(app_results)}/{len(app_results)}")
-    
+
     print("=" * 60)
     print(f"📈 ОБЩИЙ РЕЗУЛЬТАТ: {passed}/{total} ({passed/total*100:.1f}%)")
-    
+
     if passed >= total * 0.9:
         print("🎉 ОТЛИЧНО! Система практически готова!")
         status = "excellent"
@@ -254,9 +254,9 @@ def main():
     else:
         print("❌ ПЛОХО! Много критических проблем!")
         status = "bad"
-    
+
     print("\n🎯 РЕКОМЕНДАЦИИ:")
-    
+
     if status in ["excellent", "good"]:
         print("1. ✅ Backend API полностью функционален")
         print("2. ✅ Frontend компоненты созданы")
@@ -266,7 +266,7 @@ def main():
         print("1. 🔧 Исправьте ошибки backend API")
         print("2. 📝 Проверьте все компоненты frontend")
         print("3. 🔗 Убедитесь в корректной интеграции")
-    
+
     return status
 
 if __name__ == "__main__":

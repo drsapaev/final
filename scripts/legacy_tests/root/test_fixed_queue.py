@@ -8,7 +8,7 @@ import json
 def test_fixed_endpoints():
     """Тест исправленных endpoints"""
     print("🔍 Тестируем исправленные queue endpoints...")
-    
+
     # Тест 1: Debug endpoint
     print("\n1️⃣ Тестируем /queue/debug:")
     try:
@@ -24,7 +24,7 @@ def test_fixed_endpoints():
             print(f"   ❌ Response: {response.text}")
     except Exception as e:
         print(f"   ❌ Ошибка: {e}")
-    
+
     # Тест 2: Fixed join
     print("\n2️⃣ Тестируем /queue/join-fixed:")
     test_data = {
@@ -32,7 +32,7 @@ def test_fixed_endpoints():
         "patient_name": "Исправленный Тест",
         "phone": "+998901234567"
     }
-    
+
     try:
         response = requests.post(
             "http://localhost:18000/api/v1/queue/join-fixed",

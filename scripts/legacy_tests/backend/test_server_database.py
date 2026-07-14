@@ -9,7 +9,7 @@ def test_server_database():
     """Тест базы данных сервера"""
     print("🔍 ТЕСТ БАЗЫ ДАННЫХ СЕРВЕРА")
     print("=" * 40)
-    
+
     # Тест 1: Health endpoint
     print("1. Тестируем health endpoint...")
     try:
@@ -22,7 +22,7 @@ def test_server_database():
             print(f"   ❌ Health: {response.text}")
     except Exception as e:
         print(f"   ❌ Ошибка health: {e}")
-    
+
     # Тест 2: Попробуем получить информацию о базе данных
     print("\n2. Тестируем database info...")
     try:
@@ -36,7 +36,7 @@ def test_server_database():
             print(f"   ❌ Status: {response.text}")
     except Exception as e:
         print(f"   ❌ Ошибка status: {e}")
-    
+
     # Тест 3: Попробуем простой GET запрос к auth
     print("\n3. Тестируем auth me без токена...")
     try:

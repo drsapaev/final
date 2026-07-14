@@ -7,7 +7,7 @@ def test_frontend_logic_fixed():
     """Тестируем исправленную логику фронтенда"""
     print("🧪 ТЕСТИРОВАНИЕ ИСПРАВЛЕННОЙ ЛОГИКИ ФРОНТЕНДА")
     print("=" * 60)
-    
+
     # Симулируем функцию getServiceCategoryByCode из фронтенда
     def getServiceCategoryByCode(serviceCode):
         if not serviceCode:
@@ -97,7 +97,7 @@ def test_frontend_logic_fixed():
             {'id': 1, 'name': 'Консультация дерматолога-косметолога', 'service_code': 'D01', 'category_code': 'D'},
         ]
     }
-    
+
     # Симулируем функцию преобразования ID в коды
     def convertServiceIdsToCodes(serviceIds, services):
         serviceCodesFromIds = []
@@ -114,7 +114,7 @@ def test_frontend_logic_fixed():
                             serviceCodesFromIds.append(service['service_code'])
                             break
         return serviceCodesFromIds
-    
+
     # Тестируем различные сценарии записей
     test_appointments = [
         {
@@ -153,7 +153,7 @@ def test_frontend_logic_fixed():
             'department': 'cardiology'
         }
     ]
-    
+
     departmentCategoryMapping = {
         'cardio': ['K', 'ECHO'],
         'echokg': ['ECG'],
@@ -162,20 +162,20 @@ def test_frontend_logic_fixed():
         'lab': ['L'],
         'procedures': ['P', 'C', 'D_PROC']
     }
-    
+
     print("🔍 ТЕСТИРОВАНИЕ ЗАПИСЕЙ:")
     print("-" * 40)
-    
+
     for appointment in test_appointments:
-        print(f"\n📋 {appointment['name']}:")
-        print(f"  Услуги (ID): {appointment['services']}")
-        
+        print("\n📋 Запись: ")
+        print("  Услуги (ID) logged")
+
         # Преобразуем ID в коды
         serviceCodesFromIds = convertServiceIdsToCodes(appointment['services'], services_by_group)
         allServiceCodes = appointment['service_codes'] + serviceCodesFromIds
-        
-        print(f"  Коды услуг: {allServiceCodes}")
-        
+
+        print("  Коды услуг logged")
+
         # Проверяем распределение по вкладкам
         for dept, categories in departmentCategoryMapping.items():
             matches = any(getServiceCategoryByCode(code) in categories for code in allServiceCodes)
@@ -183,13 +183,13 @@ def test_frontend_logic_fixed():
                 print(f"  ✅ Попадает в вкладку '{dept}'")
             else:
                 print(f"  ❌ НЕ попадает в вкладку '{dept}'")
-    
+
     print(f"\n🎯 ИТОГОВАЯ ПРОВЕРКА:")
     print("-" * 30)
-    
+
     # Проверяем, что процедуры правильно распределяются
     procedures_codes = ['P01', 'P02', 'P03', 'P04', 'P05', 'C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08', 'D_PROC01', 'D_PROC02', 'D_PROC03']
-    
+
     print("Процедуры должны попадать в вкладку 'procedures':")
     for code in procedures_codes:
         category = getServiceCategoryByCode(code)
@@ -197,7 +197,7 @@ def test_frontend_logic_fixed():
             print(f"  ✅ {code} → {category} → procedures")
         else:
             print(f"  ❌ {code} → {category} → НЕ procedures")
-    
+
     print("\nКонсультации дерматолога должны попадать в вкладку 'derma':")
     derma_codes = ['D01']
     for code in derma_codes:

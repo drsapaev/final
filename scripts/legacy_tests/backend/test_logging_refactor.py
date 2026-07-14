@@ -17,16 +17,16 @@ def test_logging_setup():
     print("=" * 60)
     print("ТЕСТ: Настройка логирования")
     print("=" * 60)
-    
+
     setup_logging(level=logging.INFO)
     logger = get_logger(__name__)
-    
+
     # Тест разных уровней
     logger.debug("DEBUG сообщение (не должно появиться при INFO)")
     logger.info("INFO сообщение")
     logger.warning("WARNING сообщение")
     logger.error("ERROR сообщение")
-    
+
     print("\n✅ Логирование настроено корректно")
     return True
 
@@ -36,16 +36,16 @@ def test_module_loggers():
     print("\n" + "=" * 60)
     print("ТЕСТ: Логгеры для модулей")
     print("=" * 60)
-    
+
     # Тест логгеров для разных модулей
     endpoints_logger = get_logger("app.api.v1.endpoints.registrar_wizard")
     services_logger = get_logger("app.services.qr_queue_service")
     crud_logger = get_logger("app.crud.visit")
-    
+
     endpoints_logger.info("Тест логгера для endpoints")
     services_logger.info("Тест логгера для services")
     crud_logger.info("Тест логгера для crud")
-    
+
     print("\n✅ Логгеры для модулей работают")
     return True
 
@@ -55,14 +55,14 @@ def test_log_format():
     print("\n" + "=" * 60)
     print("ТЕСТ: Формат логов")
     print("=" * 60)
-    
+
     logger = get_logger("test.module")
-    
+
     # Проверяем что формат включает timestamp, name, level, message
     logger.info("Тестовое сообщение с параметрами: %s, %d", "строка", 42)
     logger.warning("Предупреждение с контекстом")
     logger.error("Ошибка с деталями", exc_info=False)
-    
+
     print("\n✅ Формат логов корректен")
     return True
 
@@ -72,14 +72,14 @@ def test_exception_logging():
     print("\n" + "=" * 60)
     print("ТЕСТ: Логирование исключений")
     print("=" * 60)
-    
+
     logger = get_logger("test.exceptions")
-    
+
     try:
         raise ValueError("Тестовая ошибка")
     except Exception:
         logger.exception("Исключение перехвачено и залогировано")
-    
+
     print("\n✅ Логирование исключений работает")
     return True
 
@@ -87,13 +87,13 @@ def test_exception_logging():
 def main():
     """Главная функция"""
     print("\n🧪 ЗАПУСК ТЕСТОВ ЛОГИРОВАНИЯ\n")
-    
+
     try:
         test_logging_setup()
         test_module_loggers()
         test_log_format()
         test_exception_logging()
-        
+
         print("\n" + "=" * 60)
         print("✅ ВСЕ ТЕСТЫ ПРОЙДЕНЫ УСПЕШНО")
         print("=" * 60)
@@ -107,4 +107,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

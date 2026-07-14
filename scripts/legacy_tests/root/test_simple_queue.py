@@ -8,7 +8,7 @@ import json
 def test_simple_endpoints():
     """Тест простых endpoints"""
     print("🔍 Тестируем простые queue endpoints...")
-    
+
     # Тест 1: Test endpoint
     print("\n1️⃣ Тестируем /queue/test:")
     try:
@@ -20,7 +20,7 @@ def test_simple_endpoints():
             print(f"   ❌ Response: {response.text}")
     except Exception as e:
         print(f"   ❌ Ошибка: {e}")
-    
+
     # Тест 2: Simple join
     print("\n2️⃣ Тестируем /queue/join-simple:")
     test_data = {
@@ -28,7 +28,7 @@ def test_simple_endpoints():
         "patient_name": "Тест Тестович",
         "phone": "+998901234567"
     }
-    
+
     try:
         response = requests.post(
             "http://localhost:18000/api/v1/queue/join-simple",
@@ -45,7 +45,7 @@ def test_simple_endpoints():
             print(f"   ❌ Response: {response.text}")
     except Exception as e:
         print(f"   ❌ Ошибка: {e}")
-    
+
     # Тест 3: Оригинальный join (для сравнения)
     print("\n3️⃣ Тестируем оригинальный /queue/join:")
     try:

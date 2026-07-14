@@ -18,22 +18,22 @@ def test_json_login():
             "password": admin_password,
             "remember_me": False
         }
-        
+
         headers = {
             "Content-Type": "application/json"
         }
-        
+
         print("Sending JSON login request with redacted credentials")
-        
+
         response = requests.post(
             "http://localhost:18000/api/v1/auth/json-login",
             json=data,
             headers=headers
         )
-        
+
         print(f"JSON login endpoint: {response.status_code}")
         print(f"Response: {response.text}")
-        
+
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Успешная авторизация!")
@@ -44,17 +44,16 @@ def test_json_login():
         else:
             print(f"Login failed with status: {response.status_code}")
             return False
-            
+
     except Exception as e:
         print(f"JSON login test failed: {e}")
         return False
 
 if __name__ == "__main__":
     print("🧪 Тестирование JSON endpoint авторизации...")
-    
+
     print("\n1. Тест /auth/json-login:")
     login_ok = test_json_login()
-    
+
     print(f"\n📊 Результаты:")
     print(f"JSON Login: {'✅' if login_ok else '❌'}")
-

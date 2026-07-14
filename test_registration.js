@@ -26,4 +26,3 @@ const checkTableUpdate = async () => {
 
 // Проверяем через 1 секунду
 checkTableUpdate();
-

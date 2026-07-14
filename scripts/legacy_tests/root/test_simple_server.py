@@ -18,22 +18,22 @@ def test_simple_server():
             "password": admin_password,
             "remember_me": False
         }
-        
+
         headers = {
             "Content-Type": "application/json"
         }
-        
+
         print("Sending request to simple auth server with redacted credentials")
-        
+
         response = requests.post(
             "http://localhost:8001/api/v1/auth/simple",
             json=data,
             headers=headers
         )
-        
+
         print(f"Simple auth server: {response.status_code}")
         print(f"Response: {response.text}")
-        
+
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Успешная авторизация!")
@@ -45,17 +45,16 @@ def test_simple_server():
         else:
             print(f"Login failed with status: {response.status_code}")
             return False
-            
+
     except Exception as e:
         print(f"Simple server test failed: {e}")
         return False
 
 if __name__ == "__main__":
     print("🧪 Тестирование простого сервера авторизации...")
-    
+
     print("\n1. Тест простого сервера:")
     login_ok = test_simple_server()
-    
+
     print(f"\n📊 Результаты:")
     print(f"Simple Server: {'✅' if login_ok else '❌'}")
-

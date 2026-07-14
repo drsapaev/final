@@ -10,41 +10,41 @@ from pathlib import Path
 def test_docker_build():
     """Тестирует Docker сборку"""
     print("🐳 Тестируем Docker сборку...")
-    
+
     # Проверяем наличие файлов
     required_files = [
         "ops/backend.Dockerfile",
-        "ops/backend.entrypoint.sh", 
+        "ops/backend.entrypoint.sh",
         "backend/requirements.txt",
         "backend/app/main.py"
     ]
-    
+
     for file_path in required_files:
         if not Path(file_path).exists():
             print(f"❌ Файл не найден: {file_path}")
             return False
         else:
             print(f"✅ Файл найден: {file_path}")
-    
+
     # Проверяем права доступа к entrypoint
     entrypoint_path = Path("ops/backend.entrypoint.sh")
     if not os.access(entrypoint_path, os.R_OK):
         print(f"❌ Нет прав на чтение: {entrypoint_path}")
         return False
-    
+
     print("✅ Все файлы найдены и доступны")
-    
+
     # Тестируем Docker build (только проверка синтаксиса)
     try:
         print("🔍 Проверяем синтаксис Dockerfile...")
         result = subprocess.run([
-            "docker", "build", 
+            "docker", "build",
             "--file", "ops/backend.Dockerfile",
             "--target", "base",
             "--no-cache",
             "."
         ], capture_output=True, text=True, timeout=60)
-        
+
         if result.returncode == 0:
             print("✅ Docker сборка прошла успешно!")
             return True
@@ -53,7 +53,7 @@ def test_docker_build():
             print(f"STDOUT: {result.stdout}")
             print(f"STDERR: {result.stderr}")
             return False
-            
+
     except subprocess.TimeoutExpired:
         print("⏰ Таймаут Docker сборки")
         return False

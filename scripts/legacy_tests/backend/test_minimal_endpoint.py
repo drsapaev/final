@@ -24,5 +24,5 @@ if __name__ == "__main__":
     print("- GET  /test")
     print("- POST /queue/join")
     print("- POST /queue/qrcode")
-    
+
     uvicorn.run(app, host="0.0.0.0", port=8001)

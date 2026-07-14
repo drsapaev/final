@@ -7,7 +7,7 @@ def test_frontend_logic():
     """Тестируем логику фронтенда"""
     print("🧪 ТЕСТИРОВАНИЕ ЛОГИКИ ФРОНТЕНДА")
     print("=" * 50)
-    
+
     # Симулируем функцию getServiceCategoryByCode из фронтенда
     def getServiceCategoryByCode(serviceCode):
         if not serviceCode:
@@ -84,18 +84,18 @@ def test_frontend_logic():
         # Старые коды (должны возвращать null или правильную категорию)
         'D10', 'D11', 'D12', 'D13', 'D14', 'D20', 'D21', 'D22'
     ]
-    
+
     print("\n🔍 ТЕСТИРОВАНИЕ КОДОВ УСЛУГ:")
     print("-" * 40)
-    
+
     for code in test_codes:
         category = getServiceCategoryByCode(code)
         print(f"  {code:8} → {category if category else 'null':8}")
-    
+
     # Проверяем распределение по вкладкам
     print(f"\n📋 РАСПРЕДЕЛЕНИЕ ПО ВКЛАДКАМ:")
     print("-" * 40)
-    
+
     departmentCategoryMapping = {
         'cardio': ['K', 'ECHO'],
         'echokg': ['ECG'],
@@ -104,7 +104,7 @@ def test_frontend_logic():
         'lab': ['L'],
         'procedures': ['P', 'C', 'D_PROC']
     }
-    
+
     for dept, categories in departmentCategoryMapping.items():
         print(f"\n🏷️ Вкладка '{dept}':")
         matching_codes = []
@@ -112,20 +112,20 @@ def test_frontend_logic():
             category = getServiceCategoryByCode(code)
             if category in categories:
                 matching_codes.append(code)
-        
+
         if matching_codes:
             for code in matching_codes:
                 print(f"  ✅ {code}")
         else:
             print(f"  (нет услуг)")
-    
+
     print(f"\n🎯 ИТОГО для вкладки 'Процедуры':")
     procedures_codes = []
     for code in test_codes:
         category = getServiceCategoryByCode(code)
         if category in ['P', 'C', 'D_PROC']:
             procedures_codes.append(code)
-    
+
     print(f"  📋 Физиотерапия (P): {len([c for c in procedures_codes if getServiceCategoryByCode(c) == 'P'])} услуг")
     print(f"  💄 Косметология (C): {len([c for c in procedures_codes if getServiceCategoryByCode(c) == 'C'])} услуг")
     print(f"  🔬 Дерматологические процедуры (D_PROC): {len([c for c in procedures_codes if getServiceCategoryByCode(c) == 'D_PROC'])} услуг")

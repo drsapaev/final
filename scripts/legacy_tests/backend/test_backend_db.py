@@ -7,7 +7,6 @@ with engine.connect() as conn:
         print(f'From backend DB: ID={result[0]}, User={result[1]}, Role={result[2]}')
     else:
         print('User not found in backend DB')
-    
+
     # Проверяем путь к БД
     print(f'\nDatabase URL: {engine.url}')
-

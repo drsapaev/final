@@ -32,24 +32,23 @@ print(f"  OPENAI_API_KEY: {'✅ Установлен' if openai_key else '❌ Н
 if deepseek_key:
     print("\n🎉 DeepSeek API ключ успешно загружен!")
     print("   Ключ загружен; значение не выводится.")
-    
+
     # Проверяем инициализацию AI Manager
     print("\n📋 Проверка AI Manager:")
     from backend.app.services.ai.ai_manager import get_ai_manager, AIProviderType
-    
+
     ai_manager = get_ai_manager()
     print(f"  Доступные провайдеры: {ai_manager.get_available_providers()}")
     print(f"  Провайдер по умолчанию: {ai_manager.default_provider}")
-    
+
     if AIProviderType.DEEPSEEK in ai_manager.providers:
         print(f"  ✅ DeepSeek провайдер инициализирован!")
         print(f"  ✅ DeepSeek будет использоваться для AI запросов!")
     else:
         print(f"  ❌ DeepSeek провайдер НЕ инициализирован!")
-        
+
 else:
     print("\n❌ DeepSeek API ключ НЕ загружен!")
     print("   Проверьте backend/.env файл")
 
 print("=" * 60)
-

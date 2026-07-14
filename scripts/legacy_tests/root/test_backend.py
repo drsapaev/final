@@ -29,42 +29,41 @@ def test_login():
             "password": admin_password,
             "remember_me": False
         }
-        
+
         headers = {
             "Content-Type": "application/json"
         }
-        
+
         print("Sending login request with redacted credentials")
-        
+
         response = requests.post(
             "http://localhost:18000/api/v1/auth/login",
             json=data,
             headers=headers
         )
-        
+
         print(f"Login endpoint: {response.status_code}")
         print(f"Response: {response.text}")
-        
+
         if response.status_code == 200:
             return True
         else:
             print(f"Login failed with status: {response.status_code}")
             return False
-            
+
     except Exception as e:
         print(f"Login test failed: {e}")
         return False
 
 if __name__ == "__main__":
     print("🧪 Тестирование backend API...")
-    
+
     print("\n1. Тест health endpoint:")
     health_ok = test_health()
-    
+
     print("\n2. Тест login endpoint:")
     login_ok = test_login()
-    
+
     print(f"\n📊 Результаты:")
     print(f"Health: {'✅' if health_ok else '❌'}")
     print(f"Login: {'✅' if login_ok else '❌'}")
-

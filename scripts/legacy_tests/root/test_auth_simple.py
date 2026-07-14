@@ -8,7 +8,7 @@ import os
 def test_auth():
     """Тест авторизации"""
     print("🔍 Тестирование авторизации...")
-    
+
     try:
         mcp_password = os.getenv("QA_MCP_PASSWORD")
         if not mcp_password:
@@ -22,10 +22,10 @@ def test_auth():
                 "Origin": "http://localhost:8080"
             }
         )
-        
+
         print(f"Status Code: {response.status_code}")
         print(f"Response: {response.text}")
-        
+
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Авторизация успешна!")
@@ -34,7 +34,7 @@ def test_auth():
         else:
             print(f"❌ Ошибка авторизации: {response.status_code}")
             return None
-            
+
     except Exception as e:
         print(f"❌ Ошибка: {e}")
         return None

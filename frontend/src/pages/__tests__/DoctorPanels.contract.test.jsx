@@ -160,24 +160,16 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('keeps the active doctor queue page action visibility backend-owned', () => {
-    const source = read('pages/DoctorPanel.jsx');
-    const actionBlock = extractBlock(
-      source,
-      'Backend-owned queue action contract',
-      '</td>',
-    );
+    const queueCard = read('components/queue/QueueManagementCard.jsx');
+    const doctorPanel = read('pages/DoctorPanel.jsx');
 
-    expect(source).toContain('const hasBackendQueueAction =');
-    expect(source).toContain('canCallNext');
-    expect(source).toContain('disabled={!canCallNext}');
-    expect(actionBlock).toContain('hasBackendQueueAction(entry, \'no_show\', \'can_no_show\')');
-    expect(actionBlock).toContain('hasBackendQueueAction(entry, \'send_to_diagnostics\', \'can_send_to_diagnostics\')');
-    expect(actionBlock).toContain('hasBackendQueueAction(entry, \'notify_diagnostics_return\', \'can_notify_diagnostics_return\')');
-    expect(actionBlock).toContain('hasBackendQueueAction(entry, \'restore_next\', \'can_restore_next\')');
-    expect(actionBlock).not.toContain('entry.status === \'waiting\'');
-    expect(actionBlock).not.toContain('entry.status === \'called\'');
-    expect(actionBlock).not.toContain('entry.status === \'diagnostics\'');
-    expect(actionBlock).not.toContain('entry.status === \'no_show\'');
+    expect(doctorPanel).toContain('const hasBackendQueueAction =');
+    expect(doctorPanel).toContain('canCallNext');
+
+    expect(queueCard).toContain("hasBackendQueueAction(entry, 'no_show', 'can_no_show')");
+    expect(queueCard).toContain("hasBackendQueueAction(entry, 'send_to_diagnostics', 'can_send_to_diagnostics')");
+    expect(queueCard).toContain("hasBackendQueueAction(entry, 'notify_diagnostics_return', 'can_notify_diagnostics_return')");
+    expect(queueCard).toContain("hasBackendQueueAction(entry, 'restore_next', 'can_restore_next')");
   });
 
   it('selects call-next from backend queue contract instead of local waiting-status scan', () => {

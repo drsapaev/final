@@ -11,23 +11,23 @@ from sqlalchemy import text
 def test_db_connection():
     """Тестируем подключение к базе данных"""
     print("🔍 Тестирование подключения к базе данных...")
-    
+
     try:
         # Используем get_db как в сервере
         db_gen = get_db()
         db = next(db_gen)
-        
+
         print("✅ Подключение к базе данных успешно")
-        
+
         # Проверяем пользователя mcp_test
         result = db.execute(text("""
             SELECT id, username, email, full_name, role, is_active, is_superuser, hashed_password
-            FROM users 
+            FROM users
             WHERE username = :username
         """), {"username": "mcp_test"})
-        
+
         user_row = result.fetchone()
-        
+
         if user_row:
             user_id, username, email, full_name, role, is_active, is_superuser, hashed_password = user_row
             print(f"✅ Пользователь mcp_test найден:")
@@ -40,10 +40,10 @@ def test_db_connection():
             print(f"   Password Hash: {hashed_password[:50]}...")
         else:
             print("❌ Пользователь mcp_test НЕ найден!")
-        
+
         # Закрываем соединение
         db.close()
-        
+
     except Exception as e:
         print(f"❌ Ошибка подключения к базе данных: {e}")
         import traceback

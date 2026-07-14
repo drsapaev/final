@@ -39,7 +39,7 @@ def test_cors():
                 'Access-Control-Request-Headers': 'Content-Type'
             }
         )
-        
+
         print(f"OPTIONS запрос: {response.status_code}")
         print(f"CORS заголовки:")
         for header, value in response.headers.items():
@@ -51,10 +51,10 @@ def test_cors():
             preflight_ok = True
         else:
             print(f"❌ CORS preflight ошибка: {response.status_code}")
-            
+
     except Exception as e:
         print(f"❌ Ошибка CORS теста: {e}")
-    
+
     # Тест обычного запроса
     try:
         response = requests.post(
@@ -65,13 +65,13 @@ def test_cors():
                 'Content-Type': 'application/json'
             }
         )
-        
+
         print(f"\nPOST запрос: {response.status_code}")
         print(f"CORS заголовки:")
         for header, value in response.headers.items():
             if 'access-control' in header.lower():
                 print(f"  {header}: {value}")
-        
+
         if response.status_code in [200, 401]:  # 401 - нормально для неверных данных
             print("✅ CORS запрос работает")
             post_ok = True

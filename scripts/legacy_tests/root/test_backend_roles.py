@@ -29,7 +29,7 @@ if login_response.status_code == 200:
     token = data['access_token']
     user = data['user']
     print(f'User ID: {user["id"]}, Role: {user["role"]}')
-    
+
     # 3. Пытаемся получить доступ к эндпоинту
     print("\n=== Тест доступа к /api/v1/registrar/queues/today ===")
     queues_response = requests.get(
@@ -43,4 +43,3 @@ if login_response.status_code == 200:
         print(f'Success! Received data: {queues_response.json()}')
 else:
     print(f'Login failed: {login_response.text}')
-

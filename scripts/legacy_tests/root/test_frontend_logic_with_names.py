@@ -7,7 +7,7 @@ def test_frontend_logic_with_names():
     """Тестируем исправленную логику фронтенда с названиями услуг"""
     print("🧪 ТЕСТИРОВАНИЕ ИСПРАВЛЕННОЙ ЛОГИКИ С НАЗВАНИЯМИ УСЛУГ")
     print("=" * 60)
-    
+
     # Симулируем функцию getServiceCategoryByCode из фронтенда
     def getServiceCategoryByCode(serviceCode):
         if not serviceCode:
@@ -97,16 +97,16 @@ def test_frontend_logic_with_names():
             {'id': 1, 'name': 'Консультация дерматолога-косметолога', 'service_code': 'D01', 'category_code': 'D'},
         ]
     }
-    
+
     # Симулируем функцию преобразования услуг в коды
     def convertServicesToCodes(services, service_codes, services_data):
         # Начинаем с кодов из service_codes
         all_codes = list(service_codes) if service_codes else []
-        
+
         # Преобразуем услуги в коды
         for service in services:
             found_code = None
-            
+
             # Ищем услугу по ID или названию во всех группах
             for groupName in services_data:
                 groupServices = services_data[groupName]
@@ -118,18 +118,18 @@ def test_frontend_logic_with_names():
                         if serviceByID and serviceByID.get('service_code'):
                             found_code = serviceByID['service_code']
                             break
-                    
+
                     # Затем пробуем найти по названию
                     serviceByName = next((s for s in groupServices if s['name'] == service), None)
                     if serviceByName and serviceByName.get('service_code'):
                         found_code = serviceByName['service_code']
                         break
-            
+
             if found_code:
                 all_codes.append(found_code)
-        
+
         return all_codes
-    
+
     # Тестируем реальные данные из API
     test_appointments = [
         {
@@ -168,7 +168,7 @@ def test_frontend_logic_with_names():
             'department': 'dermatology'
         }
     ]
-    
+
     departmentCategoryMapping = {
         'cardio': ['K', 'ECHO'],
         'echokg': ['ECG'],
@@ -177,24 +177,24 @@ def test_frontend_logic_with_names():
         'lab': ['L'],
         'procedures': ['P', 'C', 'D_PROC']
     }
-    
+
     print("🔍 ТЕСТИРОВАНИЕ ЗАПИСЕЙ С НАЗВАНИЯМИ УСЛУГ:")
     print("-" * 50)
-    
+
     for appointment in test_appointments:
-        print(f"\n📋 {appointment['name']}:")
-        print(f"  Услуги (названия): {appointment['services']}")
-        print(f"  Коды услуг (старые): {appointment['service_codes']}")
-        
+        print("\n📋 Запись: ")
+        print("  Услуги (названия) logged")
+        print("  Коды услуг (старые) logged")
+
         # Преобразуем услуги в коды
         allServiceCodes = convertServicesToCodes(
-            appointment['services'], 
-            appointment['service_codes'], 
+            appointment['services'],
+            appointment['service_codes'],
             services_by_group
         )
-        
-        print(f"  Все коды услуг: {allServiceCodes}")
-        
+
+        print("  Все коды услуг logged")
+
         # Проверяем распределение по вкладкам
         for dept, categories in departmentCategoryMapping.items():
             matches = any(getServiceCategoryByCode(code) in categories for code in allServiceCodes)
@@ -202,13 +202,13 @@ def test_frontend_logic_with_names():
                 print(f"  ✅ Попадает в вкладку '{dept}'")
             else:
                 print(f"  ❌ НЕ попадает в вкладку '{dept}'")
-    
+
     print(f"\n🎯 ПРОВЕРКА СТАРЫХ КОДОВ:")
     print("-" * 30)
-    
+
     # Проверяем старые коды из API
     old_codes = ['PHYS_DARSON', 'PHYS_BIOPT', 'PHYS_DIODE', 'PHYS_EXCIM', 'DERM_CRYO_WART', 'DERM_CRYO_PAP', 'DERM_MESO_SCAR', 'COSM_PLASMA_FACE', 'COSM_CLEAN', 'COSM_LASER_TAT', 'CONS_DERM']
-    
+
     for code in old_codes:
         category = getServiceCategoryByCode(code)
         if category in ['P', 'C', 'D_PROC']:

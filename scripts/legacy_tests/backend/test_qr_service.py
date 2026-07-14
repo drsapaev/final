@@ -16,7 +16,7 @@ def test_qr_service():
             return
         else:
             print(f'✅ Найден врач: {doctor.name if hasattr(doctor, "name") else doctor.id}')
-        
+
         # Создаем тестового пользователя если его нет
         user = db.query(User).first()
         if not user:
@@ -24,10 +24,10 @@ def test_qr_service():
             return
         else:
             print(f'✅ Найден пользователь: {user.username}')
-            
+
             # Тестируем создание QR токена
             service = QRQueueService(db)
-            
+
             try:
                 qr_data = service.generate_qr_token(
                     specialist_id=doctor.id,
@@ -35,11 +35,11 @@ def test_qr_service():
                     generated_by_user_id=user.id,
                     expires_hours=24
                 )
-                
+
                 print(f'✅ QR токен создан: {qr_data["token"][:16]}...')
                 print(f'✅ QR URL: {qr_data["qr_url"]}')
                 print(f'✅ Истекает: {qr_data["expires_at"]}')
-                
+
                 # Тестируем получение информации о токене
                 token_info = service.get_qr_token_info(qr_data["token"])
                 if token_info:
@@ -48,10 +48,10 @@ def test_qr_service():
                     print(f'✅ Длина очереди: {token_info["queue_length"]}')
                 else:
                     print('❌ Не удалось получить информацию о токене')
-                    
+
             except Exception as e:
                 print(f'❌ Ошибка тестирования: {e}')
-        
+
     finally:
         db.close()
 
