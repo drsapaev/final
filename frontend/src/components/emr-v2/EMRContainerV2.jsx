@@ -66,7 +66,8 @@ import logger from '../../utils/logger';
 // (consistent with the rest of the app + screen-reader friendly via aria-label).
 import {
     HelpCircle,
-    Ghost,
+    Ghost, // UX Audit Doctor M-19: kept for backward compat, replaced by PanelTopOpen
+    PanelTopOpen,
     History,
     Undo2,
     Redo2,
@@ -488,7 +489,8 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                 {/* Header */}
                 <header className="emr-v2-header">
                     <div className="emr-v2-header__left">
-                        <h2>ЭМК v2</h2>
+                        {/* UX Audit Doctor M-20: «ЭМК v2» → «Электронная медицинская карта». */}
+                        <h2>Электронная медицинская карта</h2>
                         {patientId && <span className="emr-v2-patient-id">Пациент #{patientId}</span>}
                     </div>
 
@@ -516,16 +518,17 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             <HelpCircle size={16} aria-hidden="true" />
                         </Button>
 
+                        {/* UX Audit Doctor M-19: «Ghost Mode» → «Расширенный режим», Ghost icon → PanelTopOpen. */}
                         <Button
                             variant={experimentalGhostMode ? 'primary' : 'ghost'}
                             size="sm"
                             onClick={toggleGhostMode}
                             disabled={isSigned || isAmended}
-                            title={isSigned ? 'Недоступно в подписанной карте' : 'Расширенный режим ввода (экспериментальный)'}
-                            aria-label={isSigned ? 'Ghost Mode недоступен в подписанной карте' : 'Переключить расширенный режим ввода (Ghost Mode)'}
+                            title={isSigned ? 'Недоступно в подписанной карте' : 'Расширенный режим ввода'}
+                            aria-label={isSigned ? 'Расширенный режим недоступен в подписанной карте' : 'Переключить расширенный режим ввода'}
                             aria-pressed={experimentalGhostMode}
                         >
-                            <Ghost size={16} aria-hidden="true" />
+                            <PanelTopOpen size={16} aria-hidden="true" />
                         </Button>
                         <Button
                             variant="ghost"
