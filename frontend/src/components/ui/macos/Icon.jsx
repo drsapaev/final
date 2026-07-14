@@ -16,6 +16,16 @@ const ICONS = {
   'house.fill':
   <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />,
 
+  // UX Audit R-2.1: new icons for better semantic matching
+  'square.grid.2x2':
+  <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
+
+  'line.3.horizontal.decrease':
+  <path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
+
+  'arrow.clockwise':
+  <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8M21 3v5h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
+
   'magnifyingglass':
   <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
 
