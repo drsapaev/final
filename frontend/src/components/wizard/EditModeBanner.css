@@ -1,0 +1,36 @@
+/**
+ * EditModeBanner Styles
+ *
+ * UX Audit R-3.3: migrated from inline style={{}} blocks.
+ * Uses var(--mac-*) tokens instead of hardcoded rgba() colors.
+ */
+
+.edit-mode-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--mac-radius-sm, 4px);
+  background: color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 88%);
+  color: var(--mac-accent-blue, #2563eb);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.edit-mode-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.edit-mode-badge--online {
+  background: color-mix(in srgb, var(--mac-accent-purple, #5856d6), transparent 85%);
+  color: var(--mac-accent-purple, #7c3aed);
+}
+
+.edit-mode-badge--desk {
+  background: color-mix(in srgb, var(--mac-text-secondary, #6b7280), transparent 85%);
+  color: var(--mac-text-secondary, #475569);
+}
