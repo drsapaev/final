@@ -41,6 +41,8 @@ export const ChatProvider = ({ children }) => {
   const readSyncInFlightRef = useRef(new Set());
   const contractVersionMismatchRef = useRef(false);
   const initialConversationLoadUserRef = useRef(null);
+  // PR-68 / P0-2: singleton AudioContext to prevent leak
+  const chatAudioContextRef = useRef(null);
 
   // Храним актуальные функции в ref
   // Это предотвращает разрыв соединения WebSocket при обновлении функций/стейта
@@ -209,7 +211,16 @@ export const ChatProvider = ({ children }) => {
 
       if (shouldPlaySound) {
         try {
-          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          // PR-68 / P0-2: reuse singleton AudioContext to prevent leak
+          // (browsers cap ~6 concurrent contexts; was creating one per message)
+          if (!chatAudioContextRef.current) {
+            chatAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          const audioContext = chatAudioContextRef.current;
+          // Resume if suspended (browsers auto-suspend after inactivity)
+          if (audioContext.state === 'suspended') {
+            audioContext.resume();
+          }
           const oscillator = audioContext.createOscillator();
           const gainNode = audioContext.createGain();
 
