@@ -489,7 +489,7 @@ const ServiceCatalog = () => {
           className="p-6">
 
           <div className="text-center">
-            <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-info)' }}>
+            <div className="admin-stat-num-xl-bold-dynamic-m0 admin-stat-info">
               {services.length}
             </div>
             <div className="admin-stat-label-sm-secondary-mt-4">
@@ -502,7 +502,7 @@ const ServiceCatalog = () => {
           className="p-6">
 
           <div className="text-center">
-            <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-success)' }}>
+            <div className="admin-stat-num-xl-bold-dynamic-m0 admin-stat-success">
               {services.filter((s) => s.active).length}
             </div>
             <div className="admin-stat-label-sm-secondary-mt-4">
@@ -515,7 +515,7 @@ const ServiceCatalog = () => {
           className="p-6">
 
           <div className="text-center">
-            <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>
+            <div className="admin-stat-num-xl-bold-dynamic-m0 admin-stat-warning">
               {categories.length}
             </div>
             <div className="admin-stat-label-sm-secondary-mt-4">
@@ -528,7 +528,7 @@ const ServiceCatalog = () => {
           className="p-6">
 
           <div className="text-center">
-            <div className="admin-stat-num-xl-bold-dynamic-m0" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>
+            <div className="admin-stat-num-xl-bold-dynamic-m0 admin-stat-accent">
               {filteredServices.length}
             </div>
             <div className="admin-stat-label-sm-secondary-mt-4">
