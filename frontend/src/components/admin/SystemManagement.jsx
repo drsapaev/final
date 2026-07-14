@@ -666,8 +666,8 @@ const SystemManagement = () => {
       <div className="admin-tab-bar-simple">
           {[
         { id: 'monitoring', label: 'Мониторинг', icon: Activity },
-        { id: 'backups', label: 'Бэкапы', icon: Database },
-        // UX Audit Admin #1.3+4.2: Settings-tab удалён — все кнопки были нерабочие (dead code).
+        // UX Audit Admin #3.2: backups-tab удалён — дублирует BackupManagement
+        // компонент в ClinicManagement. SystemManagement фокусируется на мониторинге.
         ].map((tab) => {
           const IconComponent = tab.icon;
           const isActive = activeTab === tab.id;
@@ -694,8 +694,7 @@ const SystemManagement = () => {
 
       {/* Контент табов */}
       {activeTab === 'monitoring' && renderMonitoringTab()}
-      {activeTab === 'backups' && renderBackupsTab()}
-      {/* UX Audit Admin #1.3+4.2: Settings-tab удалён. */}
+      {/* UX Audit Admin #3.2: backups-tab удалён — дублирует ClinicManagement. */}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
     </div>);
