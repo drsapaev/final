@@ -720,3 +720,73 @@
   color: var(--mac-success);
   font-weight: 600;
 }
+
+/* ─── StepProgressIndicator with labels (UX Audit R-2.3) ─── */
+.wizard-progress {
+  list-style: none;
+  display: flex;
+  gap: var(--mac-spacing-3);
+  margin: 0 0 var(--mac-spacing-3);
+  padding: 0;
+}
+
+.wizard-progress__item {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  flex: 1;
+  padding-bottom: var(--mac-spacing-2);
+  border-bottom: 2px solid var(--mac-border, #d8dde8);
+}
+
+.wizard-progress__item--active {
+  border-bottom-color: var(--mac-accent-blue, #007aff);
+}
+
+.wizard-progress__item--completed {
+  border-bottom-color: var(--mac-success, #34c759);
+}
+
+.wizard-progress__dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--mac-bg-tertiary, #f5f5f7);
+  color: var(--mac-text-secondary, #6b7280);
+}
+
+.wizard-progress__item--active .wizard-progress__dot {
+  background: var(--mac-accent-blue, #007aff);
+  color: white;
+}
+
+.wizard-progress__item--completed .wizard-progress__dot {
+  background: var(--mac-success, #34c759);
+  color: white;
+}
+
+.wizard-progress__label {
+  font-size: 13px;
+  color: var(--mac-text-secondary, #6b7280);
+}
+
+.wizard-progress__item--active .wizard-progress__label {
+  color: var(--mac-text-primary, #1a1d29);
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .wizard-progress__label {
+    display: none;
+  }
+
+  .wizard-progress__dot {
+    width: 28px;
+    height: 28px;
+  }
+}
