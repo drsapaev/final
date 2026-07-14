@@ -18,7 +18,7 @@ def test_gemini_models():
         print("❌ GEMINI_API_KEY не найден в .env файле")
         return
 
-    print(f"✅ API ключ найден: {api_key[:10]}...")
+    print("✅ API ключ найден: [REDACTED]")
 
     # Настраиваем Gemini
     genai.configure(api_key=api_key)

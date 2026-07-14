@@ -16,7 +16,7 @@ async def test_deepseek_api():
     print("=" * 60)
     print("🔍 ТЕСТ DEEPSEEK API")
     print("=" * 60)
-    print(f"\n🔑 API Key: {api_key[:20]}..." if api_key else "❌ API Key не найден")
+    print("\n🔑 API Key: [REDACTED]" if api_key else "❌ API Key не найден")
 
     if not api_key:
         print("\n❌ DEEPSEEK_API_KEY не установлен!")
