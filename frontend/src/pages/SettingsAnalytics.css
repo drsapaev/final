@@ -1,0 +1,137 @@
+/**
+ * Settings — Phase 3 CSS migration.
+ * Extracted from Settings.jsx (72 inline styles).
+ * All styles use var(--mac-*) design tokens.
+ */
+
+/* ─── Settings page ─── */
+.settings-page {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.settings-h2 {
+  margin: 0;
+}
+
+.settings-tab-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-tab-content {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-card {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-card-title {
+  font-weight: var(--mac-font-weight-bold);
+  margin-bottom: 12px;
+}
+
+.settings-card-title-mb6 {
+  font-weight: var(--mac-font-weight-bold);
+  margin-bottom: 6px;
+}
+
+.settings-card-body {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-card-body-gap8 {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.settings-hint {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.settings-hint-75 {
+  opacity: 0.75;
+}
+
+.settings-info-grid {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-activation-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.settings-input {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.settings-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-btn-primary {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-color);
+  background: var(--accent-color);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-error-box {
+  color: var(--danger-color);
+  background: var(--mac-error-bg);
+  border: 1px solid var(--danger-color);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-label-semibold {
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.settings-role-map-list {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}

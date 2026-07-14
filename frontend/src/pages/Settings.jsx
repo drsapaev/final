@@ -13,6 +13,7 @@ import logger from '../utils/logger';
 import NotificationSystemStatus from '../components/settings/NotificationSystemStatus.jsx';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
+import './SettingsAnalytics.css';
 import { Input,
   Checkbox } from '../components/ui/macos';
 import { notify } from '../services/notify.js';
@@ -36,10 +37,10 @@ function Row({ k, v, onSave }) {
   const [val, setVal] = useState(String(v ?? ''));
   useEffect(() => setVal(String(v ?? '')), [v]);
   return (
-    <div style={row}>
-      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{k}</div>
-      <Input aria-label={`Setting value for ${k}`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
-      <button onClick={() => onSave(k, val)} style={btn}>Сохранить</button>
+    <div className="settings-row">
+      <div className="settings-label-semibold">{k}</div>
+      <Input aria-label={`Setting value for ${k}`} value={val} onChange={(e) => setVal(e.target.value)} className="settings-input" />
+      <button onClick={() => onSave(k, val)} className="settings-btn">Сохранить</button>
     </div>);
 
 }
@@ -219,10 +220,10 @@ export default function Settings() {void
   return (
     <div>
       <RoleGate roles={['Admin']}>
-        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
-          <h2 style={{ margin: 0 }}>Настройки</h2>
+        <div className="settings-page">
+          <h2 className="settings-h2">Настройки</h2>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="settings-tab-bar">
             <TabButton active={tab === 'license'} onClick={() => setTab('license')}>Лицензия</TabButton>
             <TabButton active={tab === 'printer'} onClick={() => setTab('printer')}>Принтер</TabButton>
             <TabButton active={tab === 'online_queue'} onClick={() => setTab('online_queue')}>Онлайн-очередь</TabButton>
@@ -234,25 +235,25 @@ export default function Settings() {void
           </div>
 
           {tab === 'appearance' &&
-          <div style={{ display: 'grid', gap: 12 }}>
+          <div className="settings-tab-content">
               <ColorSchemeSelector />
 
-              <div style={card}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Accent color</div>
-                <div style={{ display: 'grid', gap: 10 }}>
+              <div className="settings-card">
+                <div className="settings-card-title">Accent color</div>
+                <div className="settings-card-body">
                   <AccentPicker />
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>
+                  <div className="settings-hint">
                     Акцентный цвет перекрашивает кнопки, focus states, badges и первичные действия. Он сохраняется локально в браузере, отдельно от theme preference.
                   </div>
                 </div>
               </div>
 
-              <div style={card}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Как использовать вместе</div>
-                <div style={{ display: 'grid', gap: 8, fontSize: 13, color: 'var(--text-primary)' }}>
+              <div className="settings-card">
+                <div className="settings-card-title">Как использовать вместе</div>
+                <div className="settings-card-body-gap8">
                   <div>1. Сначала выберите theme для фона, sidebar и карточек.</div>
                   <div>2. Потом подберите accent для primary actions и focus состояний.</div>
-                  <div style={{ opacity: 0.75 }}>
+                  <div className="settings-hint-75">
                     Theme сохраняется в вашем профиле. Accent хранится только в текущем браузере.
                   </div>
                 </div>
@@ -261,19 +262,19 @@ export default function Settings() {void
           }
 
           {tab === 'notifications' &&
-          <div style={{ display: 'grid', gap: 12 }}>
-              <div style={card}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Статус системы уведомлений</div>
+          <div className="settings-tab-content">
+              <div className="settings-card">
+                <div className="settings-card-title">Статус системы уведомлений</div>
                 <NotificationSystemStatus />
               </div>
             </div>
           }
 
           {tab === 'license' &&
-          <div style={{ display: 'grid', gap: 12 }}>
-              <div style={card}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Статус активации</div>
-                <div style={{ display: 'grid', gap: 4 }}>
+          <div className="settings-tab-content">
+              <div className="settings-card">
+                <div className="settings-card-title-mb6">Статус активации</div>
+                <div className="settings-info-grid">
                   <div>Состояние: {badge}</div>
                   <div>Ключ: <code>{status?.key || '—'}</code></div>
                   <div>Machine hash: <code>{status?.machine_hash || '—'}</code></div>
@@ -281,21 +282,21 @@ export default function Settings() {void
                 </div>
               </div>
 
-              <div style={card}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Активация сервера</div>
-                {errAct && <div style={errBox}>{String(errAct)}</div>}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="settings-card">
+                <div className="settings-card-title-mb6">Активация сервера</div>
+                {errAct && <div className="settings-error-box">{String(errAct)}</div>}
+                <div className="settings-activation-row">
                   <Input
                   placeholder="Вставьте ключ активации"
                   aria-label="Activation key"
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
-                  style={{ ...inp, minWidth: 320 }} />
+                  className="settings-input" />
                 
-                  <button onClick={doActivate} disabled={busyAct || !key.trim()} style={btnPrimary}>
+                  <button onClick={doActivate} disabled={busyAct || !key.trim()} className="settings-btn-primary">
                     {busyAct ? '...' : 'Активировать'}
                   </button>
-                  <button onClick={loadStatus} style={btn}>Обновить статус</button>
+                  <button onClick={loadStatus} className="settings-btn">Обновить статус</button>
                 </div>
                 <div style={{ fontSize: 12, opacity: .7, marginTop: 6 }}>
                   При отсутствии ключа — обратитесь к администратору для выдачи.
@@ -305,14 +306,14 @@ export default function Settings() {void
           }
 
           {(tab === 'printer' || tab === 'online_queue' || tab === 'display_board') &&
-          <div style={{ display: 'grid', gap: 12 }}>
-              <div style={card}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>
+          <div className="settings-tab-content">
+              <div className="settings-card">
+                <div className="settings-card-title-mb6">
                   Категория: <code>{cat}</code>
                 </div>
                 {busyCat && <div style={{ opacity: .7 }}>Загрузка…</div>}
-                {errCat && <div style={errBox}>{String(errCat)}</div>}
-                <div style={{ display: 'grid', gap: 8 }}>
+                {errCat && <div className="settings-error-box">{String(errCat)}</div>}
+                <div className="settings-role-map-list">
                   {items.map((it) =>
                 <Row
                   key={it.key}
@@ -329,9 +330,9 @@ export default function Settings() {void
 
               {tab === 'display_board' &&
             <>
-                  <div style={card}>
-                    <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Табло: бренд и объявления</div>
-                    <div style={{ display: 'grid', gap: 8 }}>
+                  <div className="settings-card">
+                    <div className="settings-card-title-mb6">Табло: бренд и объявления</div>
+                    <div className="settings-role-map-list">
                       <KVField label="Бренд (brand)" defKey="brand" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                       <KVField label="Логотип (logo URL)" defKey="logo" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                       <KVField label="Объявление RU (announcement_ru)" defKey="announcement_ru" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
@@ -346,18 +347,18 @@ export default function Settings() {void
                     </div>
                   </div>
 
-                  <div style={card}>
-                    <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 6 }}>Табло: мэппинг Роль → Отделение</div>
+                  <div className="settings-card">
+                    <div className="settings-card-title-mb6">Табло: мэппинг Роль → Отделение</div>
                     <RoleMapEditor items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                   </div>
                 </>
             }
 
               {tab === 'payment_providers' &&
-            <div style={{ display: 'grid', gap: 12 }}>
-                  <div style={card}>
+            <div className="settings-tab-content">
+                  <div className="settings-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <div style={{ fontWeight: 'var(--mac-font-weight-bold)' }}>Провайдеры оплаты</div>
+                      <div className="settings-label-semibold">Провайдеры оплаты</div>
                       <button
                     onClick={() => setShowAddProvider(true)}
                     style={{
@@ -376,7 +377,7 @@ export default function Settings() {void
                     {loadingProviders ?
                 <div style={{ opacity: 0.7 }}>Загрузка...</div> :
 
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="settings-role-map-list">
                         {providers.map((provider) =>
                   <ProviderCard
                     key={provider.id}
@@ -414,14 +415,14 @@ export default function Settings() {void
           }
 
           {tab === 'security' &&
-          <div style={{ display: 'grid', gap: 12 }}>
-              <div style={card}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Двухфакторная аутентификация (2FA)</div>
+          <div className="settings-tab-content">
+              <div className="settings-card">
+                <div className="settings-card-title">Двухфакторная аутентификация (2FA)</div>
                 <TwoFactorManager />
               </div>
 
-              <div style={card}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 12 }}>Верификация телефона</div>
+              <div className="settings-card">
+                <div className="settings-card-title">Верификация телефона</div>
                 <PhoneVerification
                 showPhoneInput={true}
                 title="Верификация телефона"
@@ -449,7 +450,7 @@ function ProviderCard({ provider, onEdit, onDelete }) {
       gap: 8
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{provider.name}</div>
+        <div className="settings-label-semibold">{provider.name}</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={onEdit}
@@ -535,7 +536,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
         overflow: 'auto'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ margin: 0 }}>{title}</h3>
+          <h3 className="settings-h2">{title}</h3>
           <button
             onClick={onClose}
             style={{
@@ -550,7 +551,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+        <form onSubmit={handleSubmit} className="settings-tab-content">
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Название *</label>
             <Input
@@ -666,7 +667,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Checkbox id="is_active" aria-label="Provider active" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
             
-            <label htmlFor="is_active" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Активен</label>
+            <label htmlFor="is_active" className="settings-label-semibold">Активен</label>
           </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
@@ -758,10 +759,10 @@ function KVField({ label, defKey, items, onSave }) {
   const [val, setVal] = useState(found?.value || '');
   useEffect(() => setVal(found?.value || ''), [found?.value]);
   return (
-    <div style={row}>
-      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{label}</div>
-      <Input aria-label={`${label} setting value`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
-      <button onClick={() => onSave(defKey, val)} style={btn}>Сохранить</button>
+    <div className="settings-row">
+      <div className="settings-label-semibold">{label}</div>
+      <Input aria-label={`${label} setting value`} value={val} onChange={(e) => setVal(e.target.value)} className="settings-input" />
+      <button onClick={() => onSave(defKey, val)} className="settings-btn">Сохранить</button>
     </div>);
 
 }
@@ -773,16 +774,16 @@ function RoleMapItem({ role, items, onSave }) {
   useEffect(() => setVal(found?.value || ''), [found?.value]);
 
   return (
-    <div style={row}>
-      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{role}</div>
+    <div className="settings-row">
+      <div className="settings-label-semibold">{role}</div>
       <Input
         aria-label={`Route target for ${role}`}
         value={val}
         onChange={(e) => setVal(e.target.value)}
-        style={inp}
+        className="settings-input"
         placeholder="Например: Cardio" />
       
-      <button onClick={() => onSave(role, val)} style={btn}>
+      <button onClick={() => onSave(role, val)} className="settings-btn">
         Сохранить
       </button>
     </div>);
@@ -792,7 +793,7 @@ function RoleMapItem({ role, items, onSave }) {
 function RoleMapEditor({ items, onSave }) {
   const roles = ['admin', 'registrar', 'doctor', 'cardio', 'derma', 'dentist', 'lab', 'procedures', 'cashier', 'patient'];
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div className="settings-role-map-list">
       {roles.map((r) =>
       <RoleMapItem
         key={r}
