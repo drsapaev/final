@@ -280,6 +280,10 @@ const WelcomeView = React.memo(({
                     Фильтры и навигация
                   </h3>
 
+                  {/* UX Audit R-1.1: 6 кнопок → 2 primary + overflow dropdown.
+                      Раньше: 6 кнопок одновременно → Hick's Law violation.
+                      Теперь: «Календарь» (toggle) + «Все записи» (default filter) +
+                      «Ещё» dropdown с остальными 4 действиями. */}
                   <div className="registrar-grid-auto">
                     <Button
                     variant={showCalendar ? 'primary' : 'outline'}
@@ -295,26 +299,6 @@ const WelcomeView = React.memo(({
                     </Button>
 
                     <Button
-                    variant="success"
-                    size="default"
-                    onClick={() => setSearchParams({ status: 'queued' })}
-                    className="registrar-flex">
-
-                      <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
-                      Активная очередь
-                    </Button>
-
-                    <Button
-                    variant="primary"
-                    size="default"
-                    onClick={() => setSearchParams({ status: 'paid_pending' })}
-                    className="registrar-flex">
-
-                      <Icon name="creditcard" size="small" className="registrar-text-white" />
-                      Ожидают оплаты
-                    </Button>
-
-                    <Button
                     variant="outline"
                     size="default"
                     onClick={() => setSearchParams({})}
@@ -324,25 +308,46 @@ const WelcomeView = React.memo(({
                       Все записи
                     </Button>
 
-                    <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => navigate('/registrar/queue')}
-                    className="registrar-flex">
-
-                      <Icon name="bell" size="small" />
-                      Онлайн-очередь
-                    </Button>
-
-                    <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
-                    className="registrar-flex">
-
-                      <Icon name="arrow.clockwise" size="small" />
-                      Обновить данные
-                    </Button>
+                    <details className="registrar-overflow-menu">
+                      <summary className="registrar-overflow-trigger" aria-label="Дополнительные фильтры и действия">
+                        <Icon name="plus" size="small" aria-hidden="true" />
+                        Ещё
+                      </summary>
+                      <div className="registrar-overflow-popover" role="menu">
+                        <button
+                          type="button"
+                          className="registrar-overflow-item"
+                          onClick={() => setSearchParams({ status: 'queued' })}
+                          role="menuitem">
+                          <Icon name="checkmark.circle" size="small" aria-hidden="true" />
+                          Активная очередь
+                        </button>
+                        <button
+                          type="button"
+                          className="registrar-overflow-item"
+                          onClick={() => setSearchParams({ status: 'paid_pending' })}
+                          role="menuitem">
+                          <Icon name="creditcard" size="small" aria-hidden="true" />
+                          Ожидают оплаты
+                        </button>
+                        <button
+                          type="button"
+                          className="registrar-overflow-item"
+                          onClick={() => navigate('/registrar/queue')}
+                          role="menuitem">
+                          <Icon name="bell" size="small" aria-hidden="true" />
+                          Онлайн-очередь
+                        </button>
+                        <button
+                          type="button"
+                          className="registrar-overflow-item"
+                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
+                          role="menuitem">
+                          <Icon name="arrow.clockwise" size="small" aria-hidden="true" />
+                          Обновить данные
+                        </button>
+                      </div>
+                    </details>
                   </div>
 
                   {/* Календарный виджет */}
