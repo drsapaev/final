@@ -34,6 +34,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import './AIAnalytics.css';
 const AIAnalytics = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
@@ -199,142 +200,77 @@ const AIAnalytics = () => {
 
 
   const renderOverviewTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+  <div className="ai-analytics-tab-content">
       {/* Сводка */}
       {usageSummary &&
-    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-          <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 'var(--mac-spacing-4)'
-      }}>
-            <h3 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+    <MacOSCard className="ai-analytics-card-padded">
+          <div className="ai-analytics-section-header">
+            <h3 className="ai-analytics-h3">
               <Activity style={{ width: '20px', height: '20px' }} />
               Сводка AI использования за {usageSummary.period_days} дней
             </h3>
-            <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+            <div className="ai-analytics-timestamp">
               Обновлено: {new Date(usageSummary.last_updated).toLocaleString()}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
-            <div style={{
-          padding: 'var(--mac-spacing-4)',
-          backgroundColor: 'var(--mac-info-bg)',
-          borderRadius: 'var(--mac-radius-md)',
-          textAlign: 'center'
-        }}>
-              <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
+          <div className="ai-analytics-stat-grid">
+            <div className="ai-analytics-stat-card ai-analytics-stat-card-info">
+              <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-info">
                 {usageSummary.total_requests}
               </div>
-              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Всего запросов</div>
+              <div className="ai-analytics-stat-label">Всего запросов</div>
             </div>
 
-            <div style={{
-          padding: 'var(--mac-spacing-4)',
-          backgroundColor: 'var(--mac-success-bg)',
-          borderRadius: 'var(--mac-radius-md)',
-          textAlign: 'center'
-        }}>
-              <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
+            <div className="ai-analytics-stat-card ai-analytics-stat-card-success">
+              <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-success">
                 {usageSummary.success_rate.toFixed(1)}%
               </div>
-              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Успешность</div>
+              <div className="ai-analytics-stat-label">Успешность</div>
             </div>
 
-            <div style={{
-          padding: 'var(--mac-spacing-4)',
-          backgroundColor: 'var(--mac-accent-purple-bg)',
-          borderRadius: 'var(--mac-radius-md)',
-          textAlign: 'center'
-        }}>
-              <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-purple)' }}>
+            <div className="ai-analytics-stat-card ai-analytics-stat-card-accent-purple">
+              <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-accent-purple">
                 {formatTime(usageSummary.average_response_time)}
               </div>
-              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Среднее время</div>
+              <div className="ai-analytics-stat-label">Среднее время</div>
             </div>
 
-            <div style={{
-          padding: 'var(--mac-spacing-4)',
-          backgroundColor: 'var(--mac-warning-bg)',
-          borderRadius: 'var(--mac-radius-md)',
-          textAlign: 'center'
-        }}>
-              <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-warning)' }}>
+            <div className="ai-analytics-stat-card ai-analytics-stat-card-warning">
+              <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-warning">
                 {formatCurrency(usageSummary.total_cost_usd)}
               </div>
-              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Общие затраты</div>
+              <div className="ai-analytics-stat-label">Общие затраты</div>
             </div>
 
-            <div style={{
-          padding: 'var(--mac-spacing-4)',
-          backgroundColor: usageSummary.cost_trend === 'increasing' ? 'var(--mac-error-bg)' : 'var(--mac-success-bg)',
-          borderRadius: 'var(--mac-radius-md)',
-          textAlign: 'center'
-        }}>
-              <div style={{
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)',
-            color: usageSummary.cost_trend === 'increasing' ? 'var(--mac-error)' : 'var(--mac-success)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 'var(--mac-spacing-1)'
-          }}>
+            <div className={`ai-analytics-stat-card ${usageSummary.cost_trend === 'increasing' ? 'ai-analytics-stat-card-trend-increasing' : 'ai-analytics-stat-card-trend-decreasing'}`}>
+              <div className={`ai-analytics-trend-value ${usageSummary.cost_trend === 'increasing' ? 'ai-analytics-trend-value-increasing' : 'ai-analytics-trend-value-decreasing'}`}>
                 {usageSummary.cost_trend === 'increasing' ? <TrendingUp style={{ width: '20px', height: '20px' }} /> : <TrendingDown style={{ width: '20px', height: '20px' }} />}
                 {usageSummary.cost_trend}
               </div>
-              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Тренд затрат</div>
+              <div className="ai-analytics-stat-label">Тренд затрат</div>
             </div>
 
-            <div style={{
-          padding: 'var(--mac-spacing-4)',
-          backgroundColor: 'var(--mac-accent-blue-bg)',
-          borderRadius: 'var(--mac-radius-md)',
-          textAlign: 'center'
-        }}>
-              <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-blue)' }}>
+            <div className="ai-analytics-stat-card ai-analytics-stat-card-accent-blue">
+              <div className="ai-analytics-stat-value-2xl ai-analytics-stat-value-accent-blue">
                 {usageSummary.most_used_function || 'N/A'}
               </div>
-              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Популярная функция</div>
+              <div className="ai-analytics-stat-label">Популярная функция</div>
             </div>
           </div>
 
           {usageSummary.recommendations && usageSummary.recommendations.length > 0 &&
-      <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
-              <h4 style={{
-          margin: '0 0 8px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <div className="ai-analytics-mt-4">
+              <h4 className="ai-analytics-h4">
                 Рекомендации
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-1)' }}>
+              <div className="ai-analytics-recommendations-list">
                 {usageSummary.recommendations.map((recommendation, index) =>
           <div
             key={index}
-            style={{
-              padding: 'var(--mac-spacing-2)',
-              backgroundColor: 'var(--mac-info-bg)',
-              border: '1px solid var(--mac-info-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)'
-            }}>
-            
+            className="ai-analytics-recommendation-item ai-analytics-recommendation-item-info">
                     <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
-                    <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
+                    <span className="ai-analytics-recommendation-text">
                       {recommendation}
                     </span>
                   </div>
@@ -346,32 +282,18 @@ const AIAnalytics = () => {
     }
 
       {/* Быстрые действия */}
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-        <h3 style={{
-        margin: '0 0 16px 0',
-        color: 'var(--mac-text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mac-spacing-2)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+      <MacOSCard className="ai-analytics-card-padded">
+        <h3 className="ai-analytics-h3-mb16">
           <Settings style={{ width: '20px', height: '20px' }} />
           Быстрые действия
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
+        <div className="ai-analytics-stat-grid-250">
           <Button
           onClick={optimizeModels}
           disabled={loading}
           variant="primary"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-3)'
-          }}>
-          
+          className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Target style={{ width: '16px', height: '16px' }} />}
             Оптимизировать модели
           </Button>
@@ -380,13 +302,7 @@ const AIAnalytics = () => {
           onClick={() => generateTrainingDataset('diagnostic_patterns')}
           disabled={loading}
           variant="success"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-3)'
-          }}>
-          
+          className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
             Генерировать датасет диагностики
           </Button>
@@ -395,13 +311,7 @@ const AIAnalytics = () => {
           onClick={() => generateTrainingDataset('treatment_outcomes')}
           disabled={loading}
           variant="secondary"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-3)'
-          }}>
-          
+          className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
             Генерировать датасет лечения
           </Button>
@@ -410,13 +320,7 @@ const AIAnalytics = () => {
           onClick={loadModelComparison}
           disabled={loading}
           variant="warning"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-3)'
-          }}>
-          
+          className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
             Сравнить модели
           </Button>
@@ -426,96 +330,74 @@ const AIAnalytics = () => {
 
 
   const renderUsageTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+  <div className="ai-analytics-tab-content">
       {usageAnalytics &&
     <>
           {/* Общая статистика */}
-          <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-            <h3 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+          <MacOSCard className="ai-analytics-card-padded">
+            <h3 className="ai-analytics-h3-mb16">
               <BarChart3 style={{ width: '20px', height: '20px' }} />
               Статистика использования ({usageAnalytics.period.start_date} - {usageAnalytics.period.end_date})
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
+            <div className="ai-analytics-stat-grid-sm">
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-info">
                   {usageAnalytics.usage_statistics.total_requests}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Всего запросов</div>
+                <div className="ai-analytics-stat-label-xs">Всего запросов</div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-success">
                   {usageAnalytics.usage_statistics.success_rate?.toFixed(1)}%
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Успешность</div>
+                <div className="ai-analytics-stat-label-xs">Успешность</div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-purple)' }}>
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-accent-purple">
                   {formatTime(usageAnalytics.usage_statistics.average_execution_time)}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Среднее время</div>
+                <div className="ai-analytics-stat-label-xs">Среднее время</div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-warning)' }}>
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-warning">
                   {usageAnalytics.usage_statistics.total_tokens_used}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Токенов</div>
+                <div className="ai-analytics-stat-label-xs">Токенов</div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-error)' }}>
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-error">
                   {formatCurrency(usageAnalytics.usage_statistics.total_cost_usd)}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Затраты</div>
+                <div className="ai-analytics-stat-label-xs">Затраты</div>
               </div>
             </div>
           </MacOSCard>
 
           {/* Разбивка по функциям */}
           {Object.keys(usageAnalytics.function_breakdown).length > 0 &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h3 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="ai-analytics-card-padded">
+              <h3 className="ai-analytics-h3-mb16">
                 По AI функциям
               </h3>
-              <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+              <div className="ai-analytics-grid-gap">
                 {Object.entries(usageAnalytics.function_breakdown).map(([func, stats]) =>
           <div
             key={func}
-            style={{
-              padding: 'var(--mac-spacing-4)',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-md)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: 'var(--mac-bg-secondary)'
-            }}>
-            
+            className="ai-analytics-function-card">
                     <div>
-                      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+                      <div className="ai-analytics-function-name">
                         {func}
                       </div>
-                      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                      <div className="ai-analytics-function-stats">
                         {stats.requests} запросов • {stats.success_rate?.toFixed(1)}% успешность
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
+                    <div className="ai-analytics-stat-text-right">
+                      <div className="ai-analytics-stat-value-lg ai-analytics-stat-value-info">
                         {formatTime(stats.average_time)}
                       </div>
-                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                      <div className="ai-analytics-timestamp">
                         {formatCurrency(stats.total_cost)}
                       </div>
                     </div>
@@ -527,31 +409,17 @@ const AIAnalytics = () => {
 
           {/* Рекомендации */}
           {usageAnalytics.recommendations && usageAnalytics.recommendations.length > 0 &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h3 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="ai-analytics-card-padded">
+              <h3 className="ai-analytics-h3-mb16">
                 Рекомендации по оптимизации
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
+              <div className="ai-analytics-recommendations-list-gap2">
                 {usageAnalytics.recommendations.map((recommendation, index) =>
           <div
             key={index}
-            style={{
-              padding: 'var(--mac-spacing-4)',
-              backgroundColor: 'var(--mac-warning-bg)',
-              border: '1px solid var(--mac-warning-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)'
-            }}>
-            
+            className="ai-analytics-recommendation-item-lg ai-analytics-recommendation-item-warning">
                     <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--mac-warning)' }} />
-                    <span style={{ color: 'var(--mac-text-primary)' }}>
+                    <span className="ai-analytics-recommendation-text-default">
                       {recommendation}
                     </span>
                   </div>
@@ -565,26 +433,16 @@ const AIAnalytics = () => {
 
 
   const renderLearningTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="ai-analytics-tab-content">
+      <div className="ai-analytics-section-header-no-mb">
+        <h3 className="ai-analytics-h3">
           Инсайты для обучения AI
         </h3>
         <Button
         onClick={loadLearningInsights}
         disabled={loading}
         variant="outline"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)'
-        }}>
-        
+        className="ai-analytics-action-btn-sm">
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Brain style={{ width: '16px', height: '16px' }} />}
           Обновить
         </Button>
@@ -594,35 +452,22 @@ const AIAnalytics = () => {
     <>
           {/* Медицинские паттерны */}
           {learningInsights.medical_patterns &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="ai-analytics-card-padded">
+              <h4 className="ai-analytics-h4">
                 Медицинские паттерны
               </h4>
-              
+
               {learningInsights.medical_patterns.common_symptoms && Array.isArray(learningInsights.medical_patterns.common_symptoms) &&
-        <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-                  <h5 style={{
-            margin: '0 0 8px 0',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+        <div className="ai-analytics-mb-4">
+                  <h5 className="ai-analytics-h5">
                     Частые симптомы
                   </h5>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--mac-spacing-1)' }}>
+                  <div className="ai-analytics-symptoms-wrap">
                     {learningInsights.medical_patterns.common_symptoms.map((symptom, index) =>
             <Badge
               key={index}
               variant="secondary"
-              style={{
-                fontSize: 'var(--mac-font-size-xs)'
-              }}>
-              
+              className="ai-analytics-badge-xs">
                         {symptom}
                       </Badge>
             )}
@@ -632,28 +477,16 @@ const AIAnalytics = () => {
 
               {learningInsights.medical_patterns.diagnosis_frequency &&
         <div>
-                  <h5 style={{
-            margin: '0 0 8px 0',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
+                  <h5 className="ai-analytics-h5">
                     Топ диагнозы
                   </h5>
-                  <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
+                  <div className="ai-analytics-grid-gap-1">
                     {learningInsights.medical_patterns.diagnosis_frequency.top_diagnoses?.map((item, index) =>
             <div
               key={index}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: 'var(--mac-spacing-2)',
-                backgroundColor: 'var(--mac-bg-secondary)',
-                borderRadius: 'var(--mac-radius-sm)'
-              }}>
-              
-                        <span style={{ color: 'var(--mac-text-primary)' }}>{item.diagnosis}</span>
-                        <span style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+              className="ai-analytics-diagnosis-row">
+                        <span className="ai-analytics-diagnosis-name">{item.diagnosis}</span>
+                        <span className="ai-analytics-diagnosis-count">
                           {item.count} ({item.percentage}%)
                         </span>
                       </div>
@@ -666,34 +499,29 @@ const AIAnalytics = () => {
 
           {/* Точность диагностики */}
           {learningInsights.diagnostic_accuracy &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="ai-analytics-card-padded">
+              <h4 className="ai-analytics-h4">
                 Точность диагностики
               </h4>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
+
+              <div className="ai-analytics-stat-grid-sm">
+                <div className="ai-analytics-stat-text-center">
+                  <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-info">
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.ai_accuracy}%
                   </div>
-                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>AI точность</div>
+                  <div className="ai-analytics-stat-label-xs">AI точность</div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
+                <div className="ai-analytics-stat-text-center">
+                  <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-success">
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.doctor_accuracy}%
                   </div>
-                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Врач точность</div>
+                  <div className="ai-analytics-stat-label-xs">Врач точность</div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-purple)' }}>
+                <div className="ai-analytics-stat-text-center">
+                  <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-accent-purple">
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.agreement_rate}%
                   </div>
-                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Согласованность</div>
+                  <div className="ai-analytics-stat-label-xs">Согласованность</div>
                 </div>
               </div>
             </MacOSCard>
@@ -701,31 +529,17 @@ const AIAnalytics = () => {
 
           {/* Рекомендации для обучения */}
           {learningInsights.learning_recommendations &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="ai-analytics-card-padded">
+              <h4 className="ai-analytics-h4">
                 Рекомендации для обучения
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
+              <div className="ai-analytics-recommendations-list-gap2">
                 {learningInsights.learning_recommendations.map((recommendation, index) =>
           <div
             key={index}
-            style={{
-              padding: 'var(--mac-spacing-4)',
-              backgroundColor: 'var(--mac-success-bg)',
-              border: '1px solid var(--mac-success-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)'
-            }}>
-            
+            className="ai-analytics-recommendation-item-lg ai-analytics-recommendation-item-success">
                     <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-success)' }} />
-                    <span style={{ color: 'var(--mac-text-primary)' }}>
+                    <span className="ai-analytics-recommendation-text-default">
                       {recommendation}
                     </span>
                   </div>
@@ -739,26 +553,16 @@ const AIAnalytics = () => {
 
 
   const renderCostTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="ai-analytics-tab-content">
+      <div className="ai-analytics-section-header-no-mb">
+        <h3 className="ai-analytics-h3">
           Анализ затрат на AI
         </h3>
         <Button
         onClick={loadCostAnalysis}
         disabled={loading}
         variant="outline"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)'
-        }}>
-        
+        className="ai-analytics-action-btn-sm">
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <DollarSign style={{ width: '16px', height: '16px' }} />}
           Загрузить
         </Button>
@@ -767,76 +571,57 @@ const AIAnalytics = () => {
       {costAnalysis &&
     <>
           {/* Сводка затрат */}
-          <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-            <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+          <MacOSCard className="ai-analytics-card-padded">
+            <h4 className="ai-analytics-h4">
               Сводка затрат
             </h4>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
+
+            <div className="ai-analytics-stat-grid-sm">
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-2xl ai-analytics-stat-value-success">
                   {formatCurrency(costAnalysis.summary?.total_cost_usd || 0)}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Общие затраты</div>
+                <div className="ai-analytics-stat-label-xs">Общие затраты</div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-2xl ai-analytics-stat-value-info">
                   {formatCurrency(costAnalysis.summary?.average_daily_cost || 0)}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>В день</div>
+                <div className="ai-analytics-stat-label-xs">В день</div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-purple)' }}>
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-2xl ai-analytics-stat-value-accent-purple">
                   {formatCurrency(costAnalysis.forecasts?.monthly_usd || 0)}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Прогноз на месяц</div>
+                <div className="ai-analytics-stat-label-xs">Прогноз на месяц</div>
               </div>
             </div>
           </MacOSCard>
 
           {/* Затраты по функциям */}
           {costAnalysis.function_costs && Object.keys(costAnalysis.function_costs).length > 0 &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="ai-analytics-card-padded">
+              <h4 className="ai-analytics-h4">
                 Затраты по функциям
               </h4>
-              <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+              <div className="ai-analytics-grid-gap">
                 {Object.entries(costAnalysis.function_costs).map(([func, data]) =>
           <div
             key={func}
-            style={{
-              padding: 'var(--mac-spacing-4)',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-md)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: 'var(--mac-bg-secondary)'
-            }}>
-            
+            className="ai-analytics-function-card">
                     <div>
-                      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+                      <div className="ai-analytics-function-name">
                         {func}
                       </div>
-                      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                      <div className="ai-analytics-function-stats">
                         {data.requests} запросов • {data.cost_percentage?.toFixed(1)}% от общих затрат
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-warning)' }}>
+                    <div className="ai-analytics-stat-text-right">
+                      <div className="ai-analytics-stat-value-lg ai-analytics-stat-value-warning">
                         {formatCurrency(data.total_cost)}
                       </div>
-                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                      <div className="ai-analytics-timestamp">
                         {formatCurrency(data.average_cost_per_request)} за запрос
                       </div>
                     </div>
@@ -848,46 +633,27 @@ const AIAnalytics = () => {
 
           {/* Рекомендации по оптимизации затрат */}
           {costAnalysis.cost_optimization?.recommendations &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="ai-analytics-card-padded">
+              <h4 className="ai-analytics-h4">
                 Оптимизация затрат
               </h4>
-              
-              <div style={{
-          padding: 'var(--mac-spacing-4)',
-          backgroundColor: 'var(--mac-success-bg)',
-          borderRadius: 'var(--mac-radius-sm)',
-          marginBottom: 'var(--mac-spacing-4)'
-        }}>
-                <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>
+
+              <div className="ai-analytics-cost-savings">
+                <div className="ai-analytics-cost-savings-amount">
                   Потенциальная экономия: {formatCurrency(costAnalysis.cost_optimization.potential_savings?.amount_usd || 0)}
                 </div>
-                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                <div className="ai-analytics-stat-label">
                   ({costAnalysis.cost_optimization.potential_savings?.percentage || 0}% от текущих затрат)
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
+              <div className="ai-analytics-recommendations-list-gap2">
                 {costAnalysis.cost_optimization.recommendations.map((recommendation, index) =>
           <div
             key={index}
-            style={{
-              padding: 'var(--mac-spacing-2)',
-              backgroundColor: 'var(--mac-info-bg)',
-              border: '1px solid var(--mac-info-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)'
-            }}>
-            
+            className="ai-analytics-recommendation-item ai-analytics-recommendation-item-info">
                     <DollarSign style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
-                    <span style={{ color: 'var(--mac-text-primary)' }}>
+                    <span className="ai-analytics-recommendation-text-default">
                       {recommendation}
                     </span>
                   </div>
@@ -901,26 +667,16 @@ const AIAnalytics = () => {
 
 
   const renderModelsTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="ai-analytics-tab-content">
+      <div className="ai-analytics-section-header-no-mb">
+        <h3 className="ai-analytics-h3">
           Сравнение AI моделей
         </h3>
         <Button
         onClick={loadModelComparison}
         disabled={loading}
         variant="outline"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)'
-        }}>
-        
+        className="ai-analytics-action-btn-sm">
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Cpu style={{ width: '16px', height: '16px' }} />}
           Загрузить
         </Button>
@@ -929,13 +685,8 @@ const AIAnalytics = () => {
       {modelComparison &&
     <>
           {/* Сравнительная таблица */}
-          <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-            <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+          <MacOSCard className="ai-analytics-card-padded">
+            <h4 className="ai-analytics-h4">
               Сравнение моделей для функции: {modelComparison.function}
             </h4>
             
@@ -949,7 +700,7 @@ const AIAnalytics = () => {
           { key: 'reliability', label: 'Надежность', width: '20%', align: 'center' }]
           }
           data={Object.entries(modelComparison.models).map(([model, data]) => ({
-            model: <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{model}</span>,
+            model: <span className="ai-analytics-function-name">{model}</span>,
             accuracy: `${data.accuracy}%`,
             speed: data.speed,
             cost: formatCurrency(data.cost_per_request),
@@ -963,57 +714,37 @@ const AIAnalytics = () => {
             description="Загрузите данные для сравнения AI моделей" />
 
           } />
-        
+
           </MacOSCard>
 
           {/* Рекомендации */}
-          <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-            <h4 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+          <MacOSCard className="ai-analytics-card-padded">
+            <h4 className="ai-analytics-h4">
               Рекомендации
             </h4>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--mac-spacing-4)', marginBottom: 'var(--mac-spacing-4)' }}>
+
+            <div className="ai-analytics-stat-grid ai-analytics-mb-4">
               {Object.entries(modelComparison.recommendations).map(([category, model]) =>
           <div
             key={category}
-            style={{
-              padding: 'var(--mac-spacing-4)',
-              backgroundColor: 'var(--mac-info-bg)',
-              borderRadius: 'var(--mac-radius-sm)',
-              textAlign: 'center'
-            }}>
-            
-                  <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>
+            className="ai-analytics-model-rec-card">
+                  <div className="ai-analytics-model-rec-label">
                     {category.replace('best_for_', '').replace('_', ' ')}
                   </div>
-                  <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-info)' }}>
+                  <div className="ai-analytics-model-rec-value">
                     {model}
                   </div>
                 </div>
           )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
+            <div className="ai-analytics-recommendations-list-gap2">
               {modelComparison.optimization_suggestions?.map((suggestion, index) =>
           <div
             key={index}
-            style={{
-              padding: 'var(--mac-spacing-2)',
-              backgroundColor: 'var(--mac-success-bg)',
-              border: '1px solid var(--mac-success-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)'
-            }}>
-            
+            className="ai-analytics-recommendation-item ai-analytics-recommendation-item-success">
                   <Target style={{ width: '16px', height: '16px', color: 'var(--mac-success)' }} />
-                  <span style={{ color: 'var(--mac-text-primary)' }}>
+                  <span className="ai-analytics-recommendation-text-default">
                     {suggestion}
                   </span>
                 </div>
@@ -1027,76 +758,45 @@ const AIAnalytics = () => {
 
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+    <div className="ai-analytics-root">
       {/* Заголовок */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mac-spacing-4)'
-      }}>
+      <div className="ai-analytics-header">
         <Brain style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
         <div>
-          <h1 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)'
-          }}>
+          <h1 className="ai-analytics-h1">
           Расширенная аналитика AI
           </h1>
-          <p style={{
-            margin: '4px 0 0 0',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-base)'
-          }}>
+          <p className="ai-analytics-h1-subtitle">
             Мониторинг и оптимизация использования искусственного интеллекта
           </p>
         </div>
       </div>
 
       {/* Фильтры */}
-      <MacOSCard style={{ padding: 'var(--mac-spacing-4)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
+      <MacOSCard className="ai-analytics-card-padded-sm">
+        <div className="ai-analytics-filter-grid">
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: 'var(--mac-spacing-1)'
-            }}>
+            <label className="ai-analytics-filter-label">
               Начальная дата
             </label>
             <Input
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })} />
-            
+
           </div>
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: 'var(--mac-spacing-1)'
-            }}>
+            <label className="ai-analytics-filter-label">
               Конечная дата
             </label>
             <Input
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })} />
-            
+
           </div>
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: 'var(--mac-spacing-1)'
-            }}>
+            <label className="ai-analytics-filter-label">
               AI функция
             </label>
             <Select
@@ -1110,20 +810,15 @@ const AIAnalytics = () => {
               { value: 'check_drug_interactions', label: 'Взаимодействия препаратов' },
               { value: 'assess_patient_risk', label: 'Оценка рисков' }]
               } />
-            
+
           </div>
-          <div style={{ display: 'flex', alignItems: 'end' }}>
+          <div className="ai-analytics-action-btn-end">
             <Button
               onClick={loadUsageAnalytics}
               disabled={loading}
               variant="primary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--mac-spacing-2)',
-                width: '100%'
-              }}>
-              
+              className="ai-analytics-action-btn-full">
+
               {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Filter style={{ width: '16px', height: '16px' }} />}
               Применить
             </Button>

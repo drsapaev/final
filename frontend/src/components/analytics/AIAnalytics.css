@@ -1,0 +1,402 @@
+/**
+ * AIAnalytics — Phase 3 CSS migration.
+ * Extracted from AIAnalytics.jsx (179 inline style blocks → 0).
+ * All styles use var(--mac-*) design tokens.
+ */
+
+/* ─── Layout ─── */
+.ai-analytics-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-6);
+}
+
+.ai-analytics-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-6);
+}
+
+.ai-analytics-header {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-4);
+}
+
+.ai-analytics-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--mac-spacing-4);
+}
+
+.ai-analytics-section-header-no-mb {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ─── Headings ─── */
+.ai-analytics-h1 {
+  margin: 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-2xl);
+  font-weight: var(--mac-font-weight-bold);
+}
+
+.ai-analytics-h1-subtitle {
+  margin: 4px 0 0 0;
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-base);
+}
+
+.ai-analytics-h3 {
+  margin: 0;
+  color: var(--mac-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.ai-analytics-h3-mb16 {
+  margin: 0 0 16px 0;
+  color: var(--mac-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.ai-analytics-h4 {
+  margin: 0 0 16px 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.ai-analytics-h4-flex {
+  margin: 0 0 16px 0;
+  color: var(--mac-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.ai-analytics-h5 {
+  margin: 0 0 8px 0;
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* ─── Cards ─── */
+.ai-analytics-card-padded {
+  padding: var(--mac-spacing-6);
+}
+
+.ai-analytics-card-padded-sm {
+  padding: var(--mac-spacing-4);
+}
+
+/* ─── Stat grids ─── */
+.ai-analytics-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+
+.ai-analytics-stat-grid-sm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+
+.ai-analytics-stat-grid-250 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+
+.ai-analytics-stat-grid-200-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+
+/* ─── Stat cards (colored) ─── */
+.ai-analytics-stat-card {
+  padding: var(--mac-spacing-4);
+  border-radius: var(--mac-radius-md);
+  text-align: center;
+}
+
+.ai-analytics-stat-card-info { background-color: var(--mac-info-bg); }
+.ai-analytics-stat-card-success { background-color: var(--mac-success-bg); }
+.ai-analytics-stat-card-warning { background-color: var(--mac-warning-bg); }
+.ai-analytics-stat-card-error { background-color: var(--mac-error-bg); }
+.ai-analytics-stat-card-accent-blue { background-color: var(--mac-accent-blue-bg); }
+.ai-analytics-stat-card-accent-purple { background-color: var(--mac-accent-purple-bg); }
+
+/* ─── Stat values ─── */
+.ai-analytics-stat-value-3xl {
+  font-size: var(--mac-font-size-3xl);
+  font-weight: var(--mac-font-weight-bold);
+}
+
+.ai-analytics-stat-value-2xl {
+  font-size: var(--mac-font-size-2xl);
+  font-weight: var(--mac-font-weight-bold);
+}
+
+.ai-analytics-stat-value-xl {
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-bold);
+}
+
+.ai-analytics-stat-value-lg {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-bold);
+}
+
+.ai-analytics-stat-value-info { color: var(--mac-info); }
+.ai-analytics-stat-value-success { color: var(--mac-success); }
+.ai-analytics-stat-value-warning { color: var(--mac-warning); }
+.ai-analytics-stat-value-error { color: var(--mac-error); }
+.ai-analytics-stat-value-accent-blue { color: var(--mac-accent-blue); }
+.ai-analytics-stat-value-accent-purple { color: var(--mac-accent-purple); }
+
+.ai-analytics-stat-label {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+}
+
+.ai-analytics-stat-label-xs {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-xs);
+}
+
+.ai-analytics-stat-text-center { text-align: center; }
+.ai-analytics-stat-text-right { text-align: right; }
+
+/* ─── Trend display ─── */
+.ai-analytics-trend-value {
+  font-size: var(--mac-font-size-2xl);
+  font-weight: var(--mac-font-weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mac-spacing-1);
+}
+
+.ai-analytics-trend-value-increasing { color: var(--mac-error); }
+.ai-analytics-trend-value-decreasing { color: var(--mac-success); }
+
+/* ─── Timestamps ─── */
+.ai-analytics-timestamp {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+}
+
+/* ─── Recommendations ─── */
+.ai-analytics-recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1);
+}
+
+.ai-analytics-recommendations-list-gap2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+}
+
+.ai-analytics-recommendation-item {
+  padding: var(--mac-spacing-2);
+  border-radius: var(--mac-radius-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.ai-analytics-recommendation-item-info {
+  background-color: var(--mac-info-bg);
+  border: 1px solid var(--mac-info-border);
+}
+
+.ai-analytics-recommendation-item-warning {
+  background-color: var(--mac-warning-bg);
+  border: 1px solid var(--mac-warning-border);
+}
+
+.ai-analytics-recommendation-item-success {
+  background-color: var(--mac-success-bg);
+  border: 1px solid var(--mac-success-border);
+}
+
+.ai-analytics-recommendation-item-lg {
+  padding: var(--mac-spacing-4);
+  border-radius: var(--mac-radius-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.ai-analytics-recommendation-text {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-primary);
+}
+
+.ai-analytics-recommendation-text-default {
+  color: var(--mac-text-primary);
+}
+
+/* ─── Action buttons ─── */
+.ai-analytics-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-3);
+}
+
+.ai-analytics-action-btn-sm {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.ai-analytics-action-btn-full {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  width: 100%;
+}
+
+.ai-analytics-action-btn-end {
+  display: flex;
+  align-items: end;
+}
+
+/* ─── Function breakdown cards ─── */
+.ai-analytics-function-card {
+  padding: var(--mac-spacing-4);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--mac-bg-secondary);
+}
+
+.ai-analytics-function-name {
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.ai-analytics-function-stats {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Filter form ─── */
+.ai-analytics-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--mac-spacing-4);
+}
+
+.ai-analytics-filter-label {
+  display: block;
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-1);
+}
+
+/* ─── Diagnosis list ─── */
+.ai-analytics-diagnosis-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--mac-spacing-2);
+  background-color: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-sm);
+}
+
+.ai-analytics-diagnosis-name {
+  color: var(--mac-text-primary);
+}
+
+.ai-analytics-diagnosis-count {
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Model recommendation cards ─── */
+.ai-analytics-model-rec-card {
+  padding: var(--mac-spacing-4);
+  background-color: var(--mac-info-bg);
+  border-radius: var(--mac-radius-sm);
+  text-align: center;
+}
+
+.ai-analytics-model-rec-label {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+  margin-bottom: var(--mac-spacing-1);
+}
+
+.ai-analytics-model-rec-value {
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-info);
+}
+
+/* ─── Cost savings box ─── */
+.ai-analytics-cost-savings {
+  padding: var(--mac-spacing-4);
+  background-color: var(--mac-success-bg);
+  border-radius: var(--mac-radius-sm);
+  margin-bottom: var(--mac-spacing-4);
+}
+
+.ai-analytics-cost-savings-amount {
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-success);
+}
+
+/* ─── Symptoms tags ─── */
+.ai-analytics-symptoms-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-1);
+}
+
+.ai-analytics-badge-xs {
+  font-size: var(--mac-font-size-xs);
+}
+
+/* ─── Grid gap utility ─── */
+.ai-analytics-grid-gap {
+  display: grid;
+  gap: var(--mac-spacing-4);
+}
+
+.ai-analytics-grid-gap-1 {
+  display: grid;
+  gap: var(--mac-spacing-1);
+}
+
+/* ─── Margin utilities ─── */
+.ai-analytics-mt-4 { margin-top: var(--mac-spacing-4); }
+.ai-analytics-mb-4 { margin-bottom: var(--mac-spacing-4); }
+.ai-analytics-mb-24 { margin-bottom: var(--mac-spacing-4); }
+
+/* ─── Span utilities ─── */
+.ai-analytics-span-primary { color: var(--mac-text-primary); }
+
+/* ─── Dynamic stat card (cost trend) ─── */
+.ai-analytics-stat-card-trend-increasing { background-color: var(--mac-error-bg); }
+.ai-analytics-stat-card-trend-decreasing { background-color: var(--mac-success-bg); }
