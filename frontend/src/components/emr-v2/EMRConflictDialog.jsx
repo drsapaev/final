@@ -161,14 +161,14 @@ export function EMRConflictDialog({
                     ) : (
                         <div className="emr-conflict-dialog__advanced-content">
                             <p className="emr-conflict-dialog__advanced-warning">
-                                ⚠️ Используйте с осторожностью. Это может привести к потере данных других пользователей.
+                                Используйте с осторожностью. Это может привести к потере данных других пользователей.
                             </p>
                             <button
                                 className="emr-conflict-btn emr-conflict-btn--danger"
                                 onClick={onForceOverwrite}
                                 disabled={loading}
                             >
-                                💪 Перезаписать принудительно
+                                Перезаписать принудительно
                                 <span className="emr-conflict-btn__hint">
                                     (данные сервера будут заменены)
                                 </span>
