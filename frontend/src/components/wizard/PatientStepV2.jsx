@@ -230,7 +230,20 @@ const PatientStepV2 = ({
           }}>
             Пол *
           </label>
-          <div style={{
+          <div
+            role="radiogroup"
+            aria-label="Пол пациента"
+            aria-required="true"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              // UX Audit R-2.4: ARIA radiogroup keyboard navigation.
+              // Arrow keys move between options, Tab moves out.
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              e.preventDefault();
+              const next = selectedGender === 'male' ? 'female' : 'male';
+              onUpdate('gender', next);
+            }}
+            style={{
             display: 'flex',
             background: 'var(--mac-bg-secondary)',
             padding: 'var(--mac-spacing-1)',
@@ -242,6 +255,9 @@ const PatientStepV2 = ({
             <button
               key={gender}
               type="button"
+              role="radio"
+              aria-checked={selectedGender === gender}
+              tabIndex={selectedGender === gender ? 0 : -1}
               onClick={() => onUpdate('gender', gender)}
               style={{
                 flex: 1,
