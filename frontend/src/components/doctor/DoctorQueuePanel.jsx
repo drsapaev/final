@@ -77,6 +77,7 @@ const DoctorQueuePanel = ({
 
   // Источники записи
   const sourceConfig = {
+    // UX Audit Doctor M-23: emoji → text labels (lucide icons need import refactor).
     online: { label: 'Онлайн', icon: '📱' },
     desk: { label: 'Регистратура', icon: '🏥' },
     telegram: { label: 'Telegram', icon: '💬' }
