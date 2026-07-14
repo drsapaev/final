@@ -528,11 +528,11 @@ const DoctorServiceSelector = ({
 
 DoctorServiceSelector.propTypes = {
   ...(DoctorServiceSelector.propTypes || {}),
-  canEditPrices: PropTypes.any,
-  className: PropTypes.any,
-  onServicesChange: PropTypes.any,
-  selectedServices: PropTypes.any,
-  specialty: PropTypes.any,
+  canEditPrices: PropTypes.bool,
+  className: PropTypes.string,
+  onServicesChange: PropTypes.func,
+  selectedServices: PropTypes.arrayOf(PropTypes.object),
+  specialty: PropTypes.string,
 };
 
 export default DoctorServiceSelector;
