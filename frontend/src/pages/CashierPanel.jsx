@@ -50,6 +50,22 @@ const getLocalDateString = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+// UX Audit #1.4: Quick date presets for typical financial reporting ranges.
+// Replaces single "Сегодня" button with a 4-option segmented control.
+// Saves cashier clicks when reconciling shifts (typical: «Вчера» / «Неделя»).
+const shiftDay = (days) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return getLocalDateString(d);
+};
+
+const DATE_PRESETS = [
+  { label: 'Сегодня',   getRange: () => ({ from: getLocalDateString(), to: getLocalDateString() }) },
+  { label: 'Вчера',     getRange: () => ({ from: shiftDay(-1), to: shiftDay(-1) }) },
+  { label: 'Неделя',    getRange: () => ({ from: shiftDay(-6), to: getLocalDateString() }) },
+  { label: 'Месяц',     getRange: () => ({ from: shiftDay(-29), to: getLocalDateString() }) },
+];
+
 // Вспомогательная функция для создания прозрачного цвета была удалена (MEDIUM #14 dead code cleanup)
 const PAYMENT_METHOD_LABELS = {
   cash: 'Наличные',
@@ -1013,16 +1029,19 @@ const CashierPanel = () => {
                   onChange={(e) => setSelectedDate(e.target.value)}
                   className="cashier-min-w-160" />
 
-                  <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const today = getLocalDateString();
-                    setSelectedDate(today);
-                  }}>
-
-                    Сегодня
-                  </Button>
+                  {/* UX Audit #1.4: Quick date presets replace single "Сегодня" button.
+                      Reduces 2-3 clicks (open date picker → navigate to yesterday) to 1 click. */}
+                  <SegmentedControl
+                    options={DATE_PRESETS.map((p) => ({ label: p.label, value: p.label }))}
+                    value="__none__"
+                    onChange={(label) => {
+                      const preset = DATE_PRESETS.find((p) => p.label === label);
+                      if (!preset) return;
+                      setSelectedDate(preset.getRange().to);
+                    }}
+                    size="default"
+                    aria-label="Быстрый выбор даты"
+                  />
                 </> :
 
               <>
@@ -1039,17 +1058,19 @@ const CashierPanel = () => {
                   onChange={(e) => setDateTo(e.target.value)}
                   className="cashier-min-w-140" />
 
-                  <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const today = getLocalDateString();
-                    setDateFrom(today);
-                    setDateTo(today);
-                  }}>
-
-                    Сегодня
-                  </Button>
+                  <SegmentedControl
+                    options={DATE_PRESETS.map((p) => ({ label: p.label, value: p.label }))}
+                    value="__none__"
+                    onChange={(label) => {
+                      const preset = DATE_PRESETS.find((p) => p.label === label);
+                      if (!preset) return;
+                      const { from, to } = preset.getRange();
+                      setDateFrom(from);
+                      setDateTo(to);
+                    }}
+                    size="default"
+                    aria-label="Быстрый выбор диапазона дат"
+                  />
                 </>
               }
             </div>
