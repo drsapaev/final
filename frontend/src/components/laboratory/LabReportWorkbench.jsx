@@ -488,7 +488,29 @@ export default function LabReportWorkbench({
         error: printResult.error
       });
 
-      const blob = await labReportingApi.downloadPdf(activeInstance.id);
+      // L-M-9 fix: проверяем что blob-запрос успешен перед window.open.
+      // Раньше если downloadPdf упадёт с 500, переменная blob будет undefined,
+      // URL.createObjectURL(undefined) выбросит, и labourant увидит белый экран.
+      let blob;
+      try {
+        blob = await labReportingApi.downloadPdf(activeInstance.id);
+      } catch (downloadError) {
+        logger.error('[LabReportWorkbench] PDF download failed', downloadError);
+        setPrintFeedback({
+          severity: 'error',
+          text: 'Не удалось сформировать PDF. Проверьте соединение и попробуйте снова.'
+        });
+        notify('error', downloadError.message || 'Не удалось сформировать PDF.');
+        return;
+      }
+      if (!blob || !(blob instanceof Blob)) {
+        // L-M-9 fix: если blob пустой или не Blob — не открываем window.open('undefined')
+        setPrintFeedback({
+          severity: 'error',
+          text: 'PDF сформирован некорректно. Обратитесь к администратору.'
+        });
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
       // WF-05 fix: не помечаем как PRINTED при неудаче popup.
@@ -832,7 +854,9 @@ export default function LabReportWorkbench({
                       aria-expanded={!isCollapsed}
                     >
                       {section.title || section.key}
-                      <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>{isCollapsed ? '▶' : '▼'}</span>
+                      {/* L-M-11 fix: заменены ▶/▼ (CJK punctuation) на lucide chevron icons
+                          для консистентности с LabTemplateWorkbench (там уже chevron.down/right). */}
+                      <Icon name={isCollapsed ? 'chevron.right' : 'chevron.down'} size={14} />
                     </div>
                     {!isCollapsed && (
                     <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', display: 'grid', gap: '10px' }}>
@@ -925,8 +949,22 @@ export default function LabReportWorkbench({
                                   if (val === '' || val === null || val === undefined) return;
                                   const parsed = parseFloat(val);
                                   if (isNaN(parsed)) {
-                                    toast.error(`Некорректное числовое значение: "${val}"`);
-                                    updateField(field.field_key, '');
+                                    // L-M-1 fix: undo вместо безвозвратной потери данных.
+                                    // Раньше при некорректном numeric-вводе (например, "abc")
+                                    // onBlur сбрасывал поле в '' — данные терялись безвозвратно.
+                                    // Теперь показываем toast с кнопкой undo, которая
+                                    // восстанавливает предыдущее валидное значение.
+                                    const previousValue = draftValues[field.field_key] || '';
+                                    toast.error(
+                                      `Некорректное числовое значение: "${val}". Поле возвращено к предыдущему значению.`,
+                                      {
+                                        autoClose: 6000,
+                                        onClick: () => {
+                                          updateField(field.field_key, previousValue);
+                                        },
+                                      }
+                                    );
+                                    updateField(field.field_key, previousValue);
                                     return;
                                   }
                                   // PR-56: out-of-range confirmation
@@ -974,11 +1012,14 @@ export default function LabReportWorkbench({
                             </Badge>
                             {/* PR-60 / Low-32: was <span /> placeholder, now aria-hidden empty cell */}
                             {field.required ? <Badge variant="warning">обязательное</Badge> : <span aria-hidden="true" />}
-                            {/* PR-65 / Medium-15: per-field comment input */}
+                            {/* PR-65 / Medium-15: per-field comment input
+                                L-M-10 fix: убрана emoji 💬 из placeholder.
+                                На macOS emoji рендерится как цветной glyph,
+                                что ломает визуальную иерархию input'а. */}
                             <input
                               type="text"
                               className="macos-input"
-                              placeholder="💬 комментарий..."
+                              placeholder="комментарий…"
                               value={currentComment}
                               onChange={(e) => updateField(commentKey, e.target.value)}
                               disabled={!canEditActiveInstance}

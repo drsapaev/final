@@ -541,3 +541,100 @@
   }
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+ * L-M-7 fix: LabTemplateWorkbench editor tabs — proper tablist pattern.
+ * Раньше 4 кнопки табов использовали aria-pressed (toggle-button pattern),
+ * что не соответствовало tablist-pattern, применённому в LabPanel.
+ * Теперь роль=tab + aria-selected + keyboard-навигация.
+ * ────────────────────────────────────────────────────────────────────── */
+
+.ltw-tablist {
+  display: flex;
+  gap: var(--mac-spacing-1);
+  flex-wrap: wrap;
+}
+
+.ltw-tablist-tab {
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  border: 1px solid var(--mac-border);
+  border-bottom: none;
+  border-radius: var(--mac-radius-md) var(--mac-radius-md) 0 0;
+  background: var(--mac-bg-tertiary);
+  color: var(--mac-text-secondary);
+  cursor: pointer;
+  font-size: var(--mac-font-size-sm);
+  font-weight: 400;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ltw-tablist-tab:hover {
+  color: var(--mac-text-primary);
+  background: var(--mac-bg-secondary);
+}
+
+.ltw-tablist-tab-active {
+  background: var(--mac-bg-primary);
+  color: var(--mac-accent);
+  font-weight: 600;
+  border-bottom: 1px solid var(--mac-bg-primary);
+  /* Визуально «прикрепляем» активный таб к панели ниже */
+  position: relative;
+  z-index: 1;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * L-M-12 fix: LabStatusStepper — replace inline color-mix with CSS classes.
+ * Color-mix(in oklab, ...) не работает в Safari 15.4 и ниже.
+ * Используем rgba() fallback в baseline + @supports для progressive-enhancement.
+ * ────────────────────────────────────────────────────────────────────── */
+
+.lab-status-step {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  padding: 4px 10px;
+  border-radius: var(--mac-radius-lg);
+  font-size: var(--mac-font-size-xs);
+  font-weight: 400;
+}
+
+/* Fallback для старых браузеров без color-mix (rgba на основе #dc2626 — mac-accent) */
+.lab-status-step-completed {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--mac-accent);
+  border: 1px solid rgba(220, 38, 38, 0.30);
+}
+
+.lab-status-step-current {
+  background: var(--mac-accent);
+  color: white;
+  font-weight: 600;
+  border: 1px solid var(--mac-accent);
+}
+
+.lab-status-step-future {
+  background: var(--mac-bg-tertiary);
+  color: var(--mac-text-muted);
+  border: 1px solid var(--mac-border);
+}
+
+/* Progressive enhancement: используем color-mix в современных браузерах */
+@supports (background: color-mix(in oklab, red, blue)) {
+  .lab-status-step-completed {
+    background: color-mix(in oklab, var(--mac-accent) 15%, var(--mac-bg-primary));
+    border: 1px solid color-mix(in oklab, var(--mac-accent) 30%, transparent);
+  }
+}
+
+.lab-status-connector {
+  width: 12px;
+  height: 1px;
+  background: var(--mac-accent);
+  opacity: 0.8;
+}
+
+.lab-status-connector-future {
+  background: var(--mac-border);
+  opacity: 0.5;
+}
+

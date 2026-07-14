@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  Typography,
+  Icon, Typography,
 } from '../ui/macos';
 import { AIButton, AIAssistant } from '../ai';
 
@@ -138,7 +138,9 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
                 aria-label="Закрыть AI-анализ"
                 onClick={() => setShowAIAnalysis(false)}
               >
-                ✕
+                {/* L-M-8 fix: emoji ✕ заменён на lucide-icon X для консистентности
+                    с остальными UI-кнопками (cashier/registrar/admin/doctor panels). */}
+                <Icon name="xmark" size={14} />
               </Button>
             </Box>
           </DialogTitle>

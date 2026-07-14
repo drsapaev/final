@@ -1,81 +1,27 @@
 /**
- * Lab UI labels — PR-73: now locale-aware via useTranslation.
+ * Lab UI labels — static Russian exports.
  *
  * L-H-3 fix: маппинг статусов делегирован в utils/labStatusConfig.js.
- * Этот модуль теперь содержит только i18n-обёртки и payment/specialty
- * labels (которые пока не мигрированы в shared config).
+ * L-M-6 fix: удалена неиспользуемая getLabLabels(t) i18n-обёртка (была
+ * добавлена в PR-73, но ни один компонент в lab-модуле не использует
+ * useTranslation — все рендерят русские строки напрямую). Когда i18n
+ * будет внедряться на уровне всего проекта, миграция будет единой для
+ * всех панелей — не точечно для lab.
  *
  * Usage in components:
- *   const { t } = useTranslation();
- *   const labels = getLabLabels(t);
- *   labels.status('waiting')  // → 'Ожидает' / 'Kutmoqda' / 'Waiting'
+ *   import { formatLabStatus, getLabStatusVariant } from './labUiLabels';
  *
- *   // Для badge-variant и stepper используйте labStatusConfig напрямую:
+ *   // Для stepper / step-index используйте labStatusConfig напрямую:
  *   import { getLabStatusConfig, getLabReportStepIndex } from './utils/labStatusConfig';
  */
 
-import {
-  LAB_REPORT_STATUS_CONFIG,
-  LAB_QUEUE_STATUS_CONFIG,
-  getLabStatusConfig,
-} from './utils/labStatusConfig';
+import { getLabStatusConfig } from './utils/labStatusConfig';
 
-export function getLabLabels(t) {
-  // L-H-3 fix: читаем из единого источника истины.
-  const statusLabels = {
-    ...Object.fromEntries(
-      Object.entries(LAB_QUEUE_STATUS_CONFIG).map(([key, cfg]) => [key, cfg.label])
-    ),
-    ...Object.fromEntries(
-      LAB_REPORT_STATUS_CONFIG.map((cfg) => [cfg.key, cfg.label])
-    ),
-  };
-
-  const paymentStatusLabels = {
-    pending: t('labPaymentPending'),
-    paid: t('labPaymentPaid'),
-    partial: t('labPaymentPartial'),
-    refunded: t('labPaymentRefunded'),
-    cancelled: t('labPaymentCancelled')
-  };
-
-  const specialtyLabels = {
-    lab: t('labSpecialtyLab'),
-    laboratory: t('labSpecialtyLab'),
-    general: t('labSpecialtyGeneral')
-  };
-
-  const severityLabels = {
-    critical: t('labSeverityCritical'),
-    flagged: t('labSeverityFlagged'),
-    warning: t('labSeverityWarning'),
-    clean: t('labSeverityClean')
-  };
-
-  const signerFieldLabels = {
-    lab_technician_label: t('labTechnicianLabel'),
-    lab_technician_name: t('labTechnicianName'),
-    approver_label: t('labApproverLabel'),
-    approver_name: t('labApproverName')
-  };
-
-  return {
-    statusLabels,
-    paymentStatusLabels,
-    specialtyLabels,
-    severityLabels,
-    signerFieldLabels,
-    formatLabStatus: (status) => getLabStatusConfig(status).label,
-    formatPaymentStatus: (status) => paymentStatusLabels[status] || status || t('labUnknown'),
-    formatSpecialtyLabel: (specialty) => specialtyLabels[specialty] || specialty || t('labSpecialtyLab'),
-    formatSeverityLabel: (severity) => severityLabels[severity] || severity || t('labSeverityClean'),
-  };
-}
-
-// Legacy static exports for backward compatibility (hardcoded Russian).
-// L-H-3 fix: label/variant берутся из labStatusConfig.js — единый источник.
-// Оставлены только payment/specialty/severity — они не входят в status-config
-// (относятся к разным доменам: оплата, специализация, severity-флаги).
+// ────────────────────────────────────────────────────────────────────────────
+// Payment / specialty / severity labels (static Russian).
+// Эти домены не входят в labStatusConfig.js — они относятся к разным
+// сущностям (оплата, специализация очереди, severity-флаги).
+// ────────────────────────────────────────────────────────────────────────────
 
 const _paymentStatusLabels = {
   pending: 'Не оплачено',

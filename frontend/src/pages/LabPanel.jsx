@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, Icon,
@@ -118,6 +118,14 @@ export default function LabPanel() {
   // a lab technician is mid-fill on a long report. Mirrors the pattern
   // used in CardiologistPanel/DentistPanel/DermatologistPanel.
   const [sessionWarning, setSessionWarning] = useState(null);
+
+  // L-M-2 fix: ref-guard для дедупликации loadReportHistory.
+  // Раньше loadReportHistory вызывался дважды: один раз из loadInstance
+  // (когда instance.patient_snapshot.patient_id становился известен),
+  // второй — из useEffect [selectedAppointment] ниже. Теперь ref хранит
+  // patient_id для которого история уже загружена, и useEffect пропускает
+  // повторный вызов если patient_id совпадает.
+  const loadedHistoryForPatientRef = useRef(null);
   useSessionTimeoutWarning({
     onWarning: () => setSessionWarning({ active: true }),
     onExpired: () => {
@@ -351,6 +359,11 @@ export default function LabPanel() {
       const instance = await labReportingApi.getInstance(instanceId);
       setActiveInstance(instance);
       if (instance.patient_snapshot?.patient_id) {
+        // L-M-2 fix: дедупликация loadReportHistory.
+        // Сначала помечаем patient_id в loadedHistoryForPatientRef — это
+        // предотвращает повторный вызов из useEffect [selectedAppointment]
+        // ниже, который сработает когда setSelectedAppointment обновит состояние.
+        loadedHistoryForPatientRef.current = instance.patient_snapshot.patient_id;
         await loadReportHistory(instance.patient_snapshot.patient_id);
       }
       switchTab('reports');
@@ -401,7 +414,15 @@ export default function LabPanel() {
 
   useEffect(() => {
     if (selectedAppointment?.patient_id) {
-      loadReportHistory(selectedAppointment.patient_id);
+      // L-M-2 fix: пропускаем повторный вызов если история уже загружена
+      // для этого patient_id (вызвана из loadInstance).
+      if (loadedHistoryForPatientRef.current !== selectedAppointment.patient_id) {
+        loadedHistoryForPatientRef.current = selectedAppointment.patient_id;
+        loadReportHistory(selectedAppointment.patient_id);
+      }
+    } else {
+      // Сброс ref при очистке выбора
+      loadedHistoryForPatientRef.current = null;
     }
     loadTemplateResolution(selectedAppointment);
   }, [selectedAppointment, loadReportHistory, loadTemplateResolution]);

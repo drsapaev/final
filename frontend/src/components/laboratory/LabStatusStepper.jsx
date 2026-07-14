@@ -50,32 +50,7 @@ export default function LabStatusStepper({ status }) {
             style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}
           >
             <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--mac-spacing-2)',
-                padding: '4px 10px',
-                borderRadius: 'var(--mac-radius-lg)',
-                fontSize: 'var(--mac-font-size-xs)',
-                fontWeight: isCurrent ? 600 : 400,
-                background: isCurrent
-                  ? 'var(--mac-accent)'
-                  : isCompleted
-                    ? 'color-mix(in oklab, var(--mac-accent) 15%, var(--mac-bg-primary))'
-                    : 'var(--mac-bg-tertiary)',
-                color: isCurrent
-                  ? 'white'
-                  : isCompleted
-                    ? 'var(--mac-accent)'
-                    : 'var(--mac-text-muted)',
-                border: `1px solid ${
-                  isCurrent
-                    ? 'var(--mac-accent)'
-                    : isCompleted
-                      ? 'color-mix(in oklab, var(--mac-accent) 30%, transparent)'
-                      : 'var(--mac-border)'
-                }`,
-              }}
+              className={`lab-status-step ${isCurrent ? 'lab-status-step-current' : ''} ${isCompleted ? 'lab-status-step-completed' : ''} ${isFuture ? 'lab-status-step-future' : ''}`}
               aria-current={isCurrent ? 'step' : undefined}
               title={
                 isCompleted
@@ -104,12 +79,7 @@ export default function LabStatusStepper({ status }) {
             </div>
             {!isLast && (
               <div
-                style={{
-                  width: '12px',
-                  height: '1px',
-                  background: isFuture ? 'var(--mac-border)' : 'var(--mac-accent)',
-                  opacity: isFuture ? 0.5 : 0.8,
-                }}
+                className={`lab-status-connector ${isFuture ? 'lab-status-connector-future' : ''}`}
                 aria-hidden="true"
               />
             )}
