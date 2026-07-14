@@ -63,3 +63,22 @@
 .cpm-submit-icon {
     margin-right: var(--mac-spacing-2);
 }
+
+/* UX Audit #1.2: Quick amount denominations row */
+.cpm-quick-amounts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mac-spacing-2);
+    margin-top: var(--mac-spacing-2);
+}
+
+/* On narrow viewports (< 480px) buttons should not overflow */
+@media (max-width: 480px) {
+    .cpm-quick-amounts {
+        flex-direction: column;
+    }
+
+    .cpm-quick-amounts > button {
+        width: 100%;
+    }
+}
