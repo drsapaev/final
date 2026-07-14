@@ -12572,3 +12572,47 @@ button[class*="admin-btn"]:active:not(:disabled) {
   background-color: var(--mac-bg-secondary, #f5f5f7);
   transition: background-color 0.12s ease;
 }
+
+/* ─── Phase 3: ActivationSystem stat color modifiers ─── */
+/* Replaces 4 static style={{ '--admin-stat-color': 'var(--mac-*)' }} injections. */
+.admin-stat-blue { --admin-stat-color: var(--mac-accent-blue); }
+.admin-stat-success { --admin-stat-color: var(--mac-success); }
+.admin-stat-warning { --admin-stat-color: var(--mac-warning); }
+.admin-stat-error { --admin-stat-color: var(--mac-error); }
+
+/* ─── Phase 3: ActivationSystem extend dialog ─── */
+/* Replaces 3 static inline style blocks in the extend activation dialog. */
+.admin-extend-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3);
+}
+
+.admin-extend-dialog-label {
+  font-size: var(--mac-font-size-base);
+  color: var(--mac-text-primary);
+}
+
+.admin-extend-dialog-error {
+  color: var(--mac-error);
+  font-size: var(--mac-font-size-sm);
+  margin: 0;
+}
+
+/* ─── Phase 3: SystemManagement static styles ─── */
+/* Replaces 2 static inline style blocks. */
+.admin-sysmgmt-hint {
+  font-size: 13px;
+  color: var(--mac-text-secondary);
+  margin-bottom: 8px;
+}
+
+.admin-sysmgmt-link-btn {
+  margin-left: 8px;
+  background: none;
+  border: none;
+  color: var(--mac-accent-blue);
+  cursor: pointer;
+  font-size: 13px;
+  text-decoration: underline;
+}
