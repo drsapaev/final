@@ -975,40 +975,39 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               placeholder="K01"
               maxLength={3} />
 
-              {formData.code && !isValidServiceCode(formData.code) &&
-            <div className="admin-hint-12-warning-mt-4">
-                  Формат: 1 буква + 2 цифры
-                </div>
-            }
-              {codeWarning &&
-            <div className="admin-hint-12-error-mt-4-flex">
-                  <AlertCircle size={14} />
-                  {codeWarning}
-                </div>
-            }
-              {checkingDuplicates && !codeWarning &&
-            <div className="admin-hint-12-tertiary-mt-4">
-                  Проверка...
-                </div>
-            }
-              {derivedCategoryCode &&
-            <div className="admin-hint-12-secondary-mt-4">
-                  Префикс кода: {derivedCategoryCode}
-                </div>
-            }
-              {selectedGroupLabel && !codePrefixMismatch &&
-            <div className="admin-hint-12-secondary-mt-4">
-                  Ожидаемый префикс для {selectedGroupLabel}: {expectedPrefixLabel}
-                </div>
-            }
-              {codePrefixMismatch &&
-            <div className="admin-hint-12-warning-mt-4-flex">
-                  <AlertCircle size={14} />
-                  {selectedGroupLabel
-                    ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}".`
-                    : `Код ${normalizedCode} не подходит для выбранной группы.`}
-                </div>
-            }
+              {/* UX Audit Admin #2.3: unified status block — 6 подсказок → 1 с приоритетом. */}
+              {(() => {
+                const codeHint = codePrefixMismatch
+                  ? { type: 'error', text: selectedGroupLabel
+                      ? `Код ${normalizedCode} не подходит для группы «${selectedGroupLabel}». Допустимо: ${expectedPrefixLabel}`
+                      : `Код ${normalizedCode} не подходит для выбранной группы.` }
+                  : codeWarning
+                  ? { type: 'error', text: codeWarning }
+                  : checkingDuplicates
+                  ? { type: 'info', text: 'Проверка...' }
+                  : (formData.code && !isValidServiceCode(formData.code))
+                  ? { type: 'warning', text: 'Формат: 1 буква + 2 цифры' }
+                  : (derivedCategoryCode && selectedGroupLabel)
+                  ? { type: 'info', text: `Префикс: ${derivedCategoryCode} (ожидается ${expectedPrefixLabel} для «${selectedGroupLabel}»)` }
+                  : derivedCategoryCode
+                  ? { type: 'info', text: `Префикс кода: ${derivedCategoryCode}` }
+                  : null;
+
+                if (!codeHint) return null;
+
+                const hintClass = codeHint.type === 'error'
+                  ? 'admin-hint-12-error-mt-4-flex'
+                  : codeHint.type === 'warning'
+                  ? 'admin-hint-12-warning-mt-4'
+                  : 'admin-hint-12-tertiary-mt-4';
+
+                return (
+                  <div className={hintClass}>
+                    {codeHint.type === 'error' && <AlertCircle size={14} />}
+                    {codeHint.text}
+                  </div>
+                );
+              })()}
             </div>
 
             <div>
