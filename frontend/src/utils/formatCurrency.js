@@ -36,3 +36,28 @@ function formatCurrency(amount) {
 }
 
 export default formatCurrency;
+
+/**
+ * formatUZS — UX Audit #2.3 — единый форматтер для cashier-панели.
+ *
+ * Проблема: в CashierPanel и его дочерних компонентах было 3 разных
+ * представления одной валюты:
+ *   - new Intl.NumberFormat('ru-RU').format(n) + ' сум'   (CashierPanel.format)
+ *   - amount.toLocaleString() + ' сум'                    (RefundRequestsTable)
+ *   - amount.toLocaleString() + ' UZS'                    (refund dialog)
+ *   - formatCurrency(n)                                    (CashPaymentModal, → «UZS»)
+ *
+ * Это нарушение консистентности (Nielsen #4) — пользователь мог подумать,
+ * что «сум» и «UZS» — разные валюты.
+ *
+ * Решение: formatUZS — единый форматтер с суффиксом «сум» для cashier-панели.
+ * Не трогает formatCurrency (используется в admin-панелях с другим форматом).
+ */
+function formatUZS(amount) {
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) {
+    return '0 сум';
+  }
+  return new Intl.NumberFormat('ru-RU').format(Number(amount)) + ' сум';
+}
+
+export { formatUZS };

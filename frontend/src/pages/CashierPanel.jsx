@@ -27,6 +27,7 @@ import tokenManager from '../utils/tokenManager';
 import { getErrorMessage } from '../utils/errorHandler';
 import { formatRegistrarDate, formatRegistrarTime, parseRegistrarTimestamp } from '../utils/dateUtils';
 import notify from '../services/notify';
+import { formatUZS } from '../utils/formatCurrency';
 import {
   Dialog,
   DialogTitle,
@@ -606,7 +607,11 @@ const CashierPanel = () => {
     },
   });
 
-  const format = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' сум';
+  // UX Audit #2.3: используем единый formatUZS из utils/formatCurrency.js.
+  // Раньше тут было inline-определение new Intl.NumberFormat('ru-RU').format(n) + ' сум',
+  // что приводило к расхождениям с CashPaymentModal (formatCurrency → «UZS»)
+  // и RefundRequestsTable (toLocaleString + «сум»).
+  const format = formatUZS;
 
   // ✅ УЛУЧШЕНИЕ: Обработчики с универсальными хуками
   const handlePaymentSuccess = (paymentData) => {
@@ -881,7 +886,7 @@ const CashierPanel = () => {
       names = serviceCodes.map((s) => {
         const parts = [];
         if (s.name) parts.push(s.name);
-        if (s.price) parts.push(`${new Intl.NumberFormat('ru-RU').format(s.price)} сум`);
+        if (s.price) parts.push(formatUZS(s.price));
         if (s.quantity && s.quantity > 1) parts.push(`x${s.quantity}`);
         return parts.length > 0 ? parts.join(' — ') : `Услуга #${s.id || '?'}`;
       });
@@ -1672,7 +1677,7 @@ const CashierPanel = () => {
             <DialogContent>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Исходная сумма платежа: {refundPaymentAmount?.toLocaleString()} UZS
+                  Исходная сумма платежа: {formatUZS(refundPaymentAmount)}
                 </Typography>
                 <Box>
                   <Typography variant="body2" gutterBottom>Сумма возврата:</Typography>
@@ -1735,7 +1740,7 @@ const CashierPanel = () => {
                     }} />
                       </Box>
                       <Typography sx={{ width: 80, textAlign: 'right' }}>
-                        {h.count} / {Number(h.amount).toLocaleString()}
+                        {h.count} / {formatUZS(h.amount)}
                       </Typography>
                     </Box>
                 ) :

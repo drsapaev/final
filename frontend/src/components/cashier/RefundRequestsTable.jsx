@@ -23,6 +23,7 @@ import {
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import { formatUZS } from '../../utils/formatCurrency';
 import PropTypes from 'prop-types';
 
 const REFUND_FILTER_OPTIONS = [
@@ -239,9 +240,8 @@ const RefundRequestsTable = ({ onRefresh }) => {
     });
   };
 
-  const formatAmount = (amount) => {
-    return amount ? `${amount.toLocaleString()} сум` : '—';
-  };
+  // UX Audit #2.3: используем единый formatUZS из utils/formatCurrency.js.
+  const formatAmount = (amount) => amount ? formatUZS(amount) : '—';
 
   const renderActions = (request) => {
     if (processingId === request.id) {
