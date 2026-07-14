@@ -27,22 +27,54 @@ function maskPhoneForCSV(phone) {
 /**
  * Generate CSV string from appointment rows.
  * @param {Array} data - appointment rows
+ * @param {Object} options - export options
+ * @param {boolean} options.maskPhone - mask phone numbers for PHI protection (default: true)
+ * @param {boolean} options.includeAddress - include address column (default: false)
+ * @param {boolean} options.includeTimestamps - include date/time/changed columns (default: false)
  * @returns {string} CSV content with BOM-safe headers
  */
-export function generateCSV(data) {
-  const headers = ['№', 'ФИО', 'Год рождения', 'Телефон', 'Услуги', 'Тип обращения', 'Вид оплаты', 'Стоимость', 'Статус'];
-  const rows = data.map((row, index) => [
-    index + 1,
-    row.patient_fio || '',
-    row.patient_birth_year || '',
-    // R-05 fix: маскируем телефон в CSV-экспорте
-    maskPhoneForCSV(row.patient_phone || ''),
-    Array.isArray(row.services) ? row.services.join('; ') : row.services || '',
-    row.visit_type || '',
-    row.payment_type || '',
-    row.cost || '',
-    row.status || '',
-  ]);
+export function generateCSV(data, options = {}) {
+  const {
+    maskPhone = true,
+    includeAddress = false,
+    includeTimestamps = false,
+  } = options;
+
+  // UX Audit R-3.1: unified CSV generation with PHI masking.
+  // Раньше: handleExport в EnhancedAppointmentsTable использовал formatPhoneNumber
+  // (БЕЗ маски) — PHI leak. Теперь: единая функция с maskPhone=true по умолчанию.
+  const phoneFormatter = maskPhone ? maskPhoneForCSV : (p) => p || '';
+
+  const headers = ['№', 'ФИО', 'Год рождения', 'Телефон'];
+  if (includeAddress) headers.push('Адрес');
+  headers.push('Услуги', 'Тип обращения', 'Вид оплаты');
+  if (includeTimestamps) headers.push('Дата', 'Время', 'Изменено');
+  headers.push('Статус', 'Стоимость');
+
+  const rows = data.map((row, index) => {
+    const baseRow = [
+      index + 1,
+      row.patient_fio || '',
+      row.patient_birth_year || '',
+      // R-05 fix: маскируем телефон в CSV-экспорте
+      phoneFormatter(row.patient_phone || ''),
+    ];
+    if (includeAddress) baseRow.push(row.address || '');
+    baseRow.push(
+      Array.isArray(row.services) ? row.services.join('; ') : row.services || '',
+      row.visit_type || '',
+      row.payment_type || '',
+    );
+    if (includeTimestamps) {
+      baseRow.push(
+        row.appointment_date || row.created_at?.split('T')[0] || '',
+        row.appointment_time || '',
+        row.updated_at ? row.updated_at.split('T')[0] : '',
+      );
+    }
+    baseRow.push(row.status || '', row.cost || row.total_amount || '');
+    return baseRow;
+  });
 
   // R-23 fix: CSV injection protection (CWE-1236).
   const escapeCSVCell = (value) => {

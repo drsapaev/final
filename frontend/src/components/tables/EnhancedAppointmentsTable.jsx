@@ -47,6 +47,8 @@ import {
 import { LEGACY_CODE_TO_NAME, ID_TO_NAME, getServiceDisplayName } from '../../utils/serviceCodeResolver';
 import PropTypes from 'prop-types';
 import AppointmentPagination from './AppointmentPagination';  // PR-75
+// UX Audit R-3.1: единая CSV-функция с PHI masking.
+import { generateCSV, downloadCSV } from '../../pages/registrar/registrarCsv';
 
 const SESSION_COLORS = [
   'var(--mac-accent-blue)', // blue
@@ -897,114 +899,18 @@ const EnhancedAppointmentsTable = ({
   }, []);
 
   // Экспорт данных
+  // UX Audit R-3.1: используем единую generateCSV из registrarCsv.js с PHI masking.
+  // Раньше: inline handleExport с formatPhoneNumber (БЕЗ маски) — PHI leak.
+  // Теперь: единая функция с maskPhone=true по умолчанию + опции для extra columns.
   const handleExport = useCallback(() => {
-    // Функция для преобразования услуг в строку для CSV
-    const formatServicesForCsv = (services) => {
-      if (!services) return '';
-
-      let servicesList = [];
-      if (Array.isArray(services)) {
-        servicesList = services.map((service) => {
-          if (typeof service === 'string') return service;
-          if (typeof service === 'object' && service.name) return service.name;
-          if (typeof service === 'object' && service.code) {
-            // ⭐ SSOT: Используем централизованный маппинг из serviceCodeResolver
-            return LEGACY_CODE_TO_NAME[service.code] || ID_TO_NAME[service.code] || ID_TO_NAME[service] || service.code || service;
-          }
-          return String(service);
-        });
-      } else if (typeof services === 'string') {
-        servicesList = [services];
-      } else {
-        return String(services);
-      }
-
-      return servicesList.join('; ');
-    };
-
-    const csvContent = [
-    // Заголовки - для doctor view убираем телефон и адрес
-    isDoctorView ?
-    [t.number, t.patient, t.birthYear, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(',') :
-    [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
-    // Данные
-    ...filteredData.map((row, index) => {
-      const baseData = [
-      // Номера очередей для CSV
-      row.queue_numbers && row.queue_numbers.length > 0 ?
-      row.queue_numbers.map((q) => `${q.queue_name}: №${q.number}`).join('; ') :
-      index + 1,
-      row.patient_fio || ''];
-
-
-      // Для doctor view не включаем телефон и адрес
-      if (!isDoctorView) {
-        baseData.push(
-          formatPhoneNumber(row.patient_phone),
-          row.patient_birth_year || '',
-          row.address || ''
-        );
-      } else {
-        baseData.push(row.patient_birth_year || '');
-      }
-
-      return baseData.concat([
-      (() => {
-        const discountMode = row.discount_mode;
-        if (discountMode === 'mixed') return t.mixed;
-        if (discountMode === 'benefit') return t.free;
-        if (discountMode === 'repeat') return t.repeat;
-        if (discountMode === 'all_free') return t.allfree;
-        return t.paid;
-      })(),
-      formatServicesForCsv(row.services),
-      (() => {
-        if (row.payment_type === 'mixed_payment') return t.mixedPayment;
-        if (row.payment_type === 'approval_pending') return t.approvalPending;
-        if (row.payment_type === 'free') return t.paymentFree;
-        if (row.cost_display === 'free') return t.paymentFree;
-        const discountMode = row.discount_mode;
-        const paymentStatus = (row.payment_status || '').toLowerCase();
-        const amount = getDisplayAmount(row);
-        const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
-        const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';
-        const isZeroCostDiscount = ['repeat', 'benefit'].includes(discountMode) && amount <= 0 && paymentStatus !== 'paid';
-
-        if (isPendingAllFree) return t.approvalPending;
-        if (isApprovedAllFree || isZeroCostDiscount) return t.paymentFree;
-        if (row.payment_type) return t[row.payment_type] || row.payment_type;
-        return paymentStatus === 'paid' ? t.unknownPayment : t.pendingPayment;
-      })(),
-      (() => {
-        // PR-13: use getRegistrarTimestampDisplay for CSV consistency with UI
-        const td = getRegistrarTimestampDisplay(row);
-        return td.primaryDate || formatRegistrarDate(row.created_at) || row.appointment_date || '';
-      })(),
-      (() => {
-        const td = getRegistrarTimestampDisplay(row);
-        return td.primaryTime || formatRegistrarTime(row.created_at, 'ru-RU', { includeSeconds: true }) || row.appointment_time || '';
-      })(),
-      (() => {
-        // PR-13: add "Изменено" column to CSV when present
-        const td = getRegistrarTimestampDisplay(row);
-        if (!td.showChanged) return '';
-        return `${td.changedDate} ${td.changedTime}`;
-      })(),
-      t[row.status] || row.status || '',
-      (() => {
-        if (row.cost_display === 'free') return t.paymentFree;
-        return row.total_amount || row.cost || row.payment_amount || '';
-      })()]
-      ).join(',');
-    })].
-    join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `appointments_${getLocalDateString()}.csv`;
-    link.click();
-  }, [filteredData, t, formatPhoneNumber, getDisplayAmount, isDoctorView]);
+    const csvContent = generateCSV(filteredData, {
+      maskPhone: true, // R-05 fix: всегда маскируем телефон в CSV-экспорте
+      includeAddress: !isDoctorView, // адрес только для registrar view
+      includeTimestamps: true, // дата/время/изменено
+    });
+    const filename = `appointments_${getLocalDateString()}.csv`;
+    downloadCSV(csvContent, filename);
+  }, [filteredData, isDoctorView]);
 
   // Преждевременный возврат перенесён ниже, чтобы не нарушать порядок хуков
 
