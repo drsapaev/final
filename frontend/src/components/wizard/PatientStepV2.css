@@ -263,3 +263,186 @@
   color: var(--mac-accent-blue, #007aff);
   font-weight: var(--mac-font-weight-semibold);
 }
+
+/* ─── Phase 4: remaining inline styles migrated ─── */
+
+/* Standard field wrapper (flex column) */
+.patient-step-v2__field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+}
+
+/* Field wrapper that spans full grid width */
+.patient-step-v2__field-group--full {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+  grid-column: 1 / -1;
+}
+
+/* Standard field label */
+.patient-step-v2__field-label {
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+  color: var(--mac-text-primary);
+}
+
+/* Phone hint text */
+.patient-step-v2__phone-hint {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+  font-style: italic;
+}
+
+/* Phone error block */
+.patient-step-v2__phone-error-block {
+  margin-top: var(--mac-spacing-1);
+  padding: var(--mac-spacing-2);
+  background: color-mix(in srgb, var(--mac-error), transparent 82%);
+  border: 1px solid color-mix(in srgb, var(--mac-error), transparent 70%);
+  border-radius: var(--mac-radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1);
+}
+
+.patient-step-v2__phone-error-text {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-error);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+.patient-step-v2__phone-error-btn {
+  background: var(--mac-accent-blue, #007aff);
+  color: var(--mac-text-on-accent, white);
+  border: none;
+  border-radius: var(--mac-radius-sm);
+  padding: var(--mac-spacing-1) var(--mac-spacing-2);
+  font-size: var(--mac-font-size-xs);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* Gender radiogroup container */
+.patient-step-v2__gender-radiogroup {
+  display: flex;
+  background: var(--mac-bg-secondary);
+  padding: var(--mac-spacing-1);
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+  height: 36px;
+}
+
+/* Gender radio button */
+.patient-step-v2__gender-radio {
+  flex: 1;
+  padding: var(--mac-spacing-2);
+  border: none;
+  border-radius: var(--mac-radius-sm);
+  cursor: pointer;
+  font-size: var(--mac-font-size-sm);
+  transition: all 0.2s ease;
+}
+
+.patient-step-v2__gender-radio--selected {
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  box-shadow: var(--mac-shadow-sm);
+  font-weight: 600;
+}
+
+.patient-step-v2__gender-radio--unselected {
+  background: transparent;
+  color: var(--mac-text-secondary);
+  font-weight: 400;
+}
+
+/* Suggestions dropdown */
+.patient-step-v2__suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin-top: var(--mac-spacing-1);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  box-shadow: var(--mac-shadow-lg);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.patient-step-v2__suggestion-btn {
+  padding: var(--mac-spacing-3);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid var(--mac-border);
+  transition: background-color 0.2s;
+}
+
+.patient-step-v2__suggestion-btn:hover {
+  background: var(--mac-bg-secondary);
+}
+
+/* Discount mode radio card */
+.patient-step-v2__discount-card {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-3);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  cursor: pointer;
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+  background: var(--mac-bg-primary);
+}
+
+.patient-step-v2__discount-card:hover {
+  background: var(--mac-bg-secondary);
+}
+
+.patient-step-v2__discount-card-text {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-primary);
+}
+
+.patient-step-v2__discount-radio-input {
+  margin: 0;
+}
+
+/* All-free warning banner */
+.patient-step-v2__all-free-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  background: var(--mac-warning);
+  border: 1px solid var(--mac-warning-hover, #ff9500);
+  border-radius: var(--mac-radius-sm);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-xs);
+  margin-top: var(--mac-spacing-2);
+}
+
+/* Discount mode section */
+.patient-step-v2__discount-section-wrapper {
+  margin-top: var(--mac-spacing-2);
+}
+
+/* Spinner animation for search */
+.patient-step-v2__search-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

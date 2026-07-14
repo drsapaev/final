@@ -90,7 +90,7 @@ const PatientStepV2 = ({
           {/* UX Audit Registrar #11: loading indicator во время поиска пациентов. */}
           {isSearching &&
           <div className="patient-step-v2__search-loading">
-            <RefreshCw size={14} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+            <RefreshCw size={14} className="patient-step-v2__search-spinner" />
             Поиск пациентов...
           </div>
           }
@@ -104,37 +104,13 @@ const PatientStepV2 = ({
 
           {/* Саджесты */}
           {showSuggestions && suggestions.length > 0 &&
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 100,
-            marginTop: 'var(--mac-spacing-1)',
-            background: 'var(--mac-bg-primary)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            boxShadow: 'var(--mac-shadow-lg)',
-            maxHeight: '200px',
-            overflowY: 'auto'
-          }}>
+          <div className="patient-step-v2__suggestions-dropdown">
               {suggestions.map((patient) =>
             <button
               type="button"
               key={patient.id}
               onClick={() => onSelectPatient(patient)}
-              style={{
-                padding: 'var(--mac-spacing-3)',
-                cursor: 'pointer',
-                width: '100%',
-                textAlign: 'left',
-                border: 'none',
-                background: 'transparent',
-                borderBottom: '1px solid var(--mac-border)',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+              className="patient-step-v2__suggestion-btn">
 
                   <div className="patient-step-v2__suggestion-name">
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
@@ -150,16 +126,8 @@ const PatientStepV2 = ({
         </div>
 
         {/* Пол (рядом с ФИО) */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--mac-spacing-2)'
-        }}>
-          <label style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="patient-step-v2__field-group">
+          <label className="patient-step-v2__field-label">
             Пол *
           </label>
           <div
@@ -175,14 +143,7 @@ const PatientStepV2 = ({
               const next = selectedGender === 'male' ? 'female' : 'male';
               onUpdate('gender', next);
             }}
-            style={{
-            display: 'flex',
-            background: 'var(--mac-bg-secondary)',
-            padding: 'var(--mac-spacing-1)',
-            borderRadius: 'var(--mac-radius-md)',
-            border: '1px solid var(--mac-border)',
-            height: '36px'
-          }}>
+            className="patient-step-v2__gender-radiogroup">
             {['male', 'female'].map((gender) =>
             <button
               key={gender}
@@ -218,16 +179,8 @@ const PatientStepV2 = ({
         </div>
 
         {/* Телефон */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--mac-spacing-2)'
-        }}>
-          <label style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="patient-step-v2__field-group">
+          <label className="patient-step-v2__field-label">
             Телефон <span className="patient-step-v2__field-hint">(необязательно)</span>
           </label>
           <Input
@@ -242,11 +195,7 @@ const PatientStepV2 = ({
             size="md" />
 
           {!data.phone && !errors.phone &&
-          <span style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-text-tertiary)',
-            fontStyle: 'italic'
-          }}>
+          <span className="patient-step-v2__phone-hint">
               Для детей и пожилых можно не указывать. Номер можно вводить без +998 — мы приведём его к формату +998XXXXXXXXX.
             </span>
           }
@@ -257,40 +206,15 @@ const PatientStepV2 = ({
             </span>
           }
           {phoneError &&
-          <div style={{
-            marginTop: 'var(--mac-spacing-1)',
-            padding: 'var(--mac-spacing-2)',
-            background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
-            border: '1px solid color-mix(in srgb, var(--mac-error), transparent 70%)',
-            borderRadius: 'var(--mac-radius-sm)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--mac-spacing-1)'
-          }}>
-              <span style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-error)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-1)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}>
+          <div className="patient-step-v2__phone-error-block">
+              <span className="patient-step-v2__phone-error-text">
                 <AlertCircle size={14} />
                 {phoneError.message}
               </span>
               <button
               type="button"
               onClick={() => onSelectPatient(phoneError.patient)}
-              style={{
-                background: 'var(--mac-accent-blue, #007aff)',
-                color: 'var(--mac-text-on-accent)',
-                border: 'none',
-                borderRadius: 'var(--mac-radius-sm)',
-                padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
-                fontSize: 'var(--mac-font-size-xs)',
-                cursor: 'pointer',
-                alignSelf: 'flex-start'
-              }}>
+              className="patient-step-v2__phone-error-btn">
 
                 Выбрать {phoneError?.patient?.fio || 'этого пациента'}
               </button>
@@ -299,16 +223,8 @@ const PatientStepV2 = ({
         </div>
 
         {/* Дата рождения */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--mac-spacing-2)'
-        }}>
-          <label style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="patient-step-v2__field-group">
+          <label className="patient-step-v2__field-label">
             Дата рождения <span className="patient-step-v2__field-hint">(необязательно)</span>
           </label>
           <Input
@@ -332,17 +248,8 @@ const PatientStepV2 = ({
         </div>
 
         {/* Адрес */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--mac-spacing-2)',
-          gridColumn: '1 / -1'
-        }}>
-          <label style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="patient-step-v2__field-group--full">
+          <label className="patient-step-v2__field-label">
             Адрес
           </label>
           <Input
@@ -357,37 +264,12 @@ const PatientStepV2 = ({
       </div>
 
       {/* Тип визита - перенесено из PaymentStepV2 */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--mac-spacing-2)',
-        gridColumn: '1 / -1'
-      }}>
-        <label style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: 'var(--mac-text-primary)'
-        }}>
+      <div className="patient-step-v2__field-group--full">
+        <label className="patient-step-v2__field-label">
           Тип визита
         </label>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--mac-spacing-2)'
-        }}>
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-3)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            cursor: 'pointer',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            background: 'var(--mac-bg-primary)'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
+        <div className="patient-step-v2__field-group">
+          <label className="patient-step-v2__discount-card">
 
             <input
               type="radio"
@@ -396,29 +278,14 @@ const PatientStepV2 = ({
               aria-label="Select paid visit discount mode"
               checked={cart?.discount_mode === 'none'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
-              style={{ margin: 0 }} />
+              className="patient-step-v2__discount-radio-input" />
 
-            <span style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <span className="patient-step-v2__discount-card-text">
               Платный
             </span>
           </label>
 
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-3)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            cursor: 'pointer',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            background: 'var(--mac-bg-primary)'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
+          <label className="patient-step-v2__discount-card">
 
             <input
               type="radio"
@@ -427,29 +294,14 @@ const PatientStepV2 = ({
               aria-label="Select repeat visit discount mode"
               checked={cart?.discount_mode === 'repeat'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
-              style={{ margin: 0 }} />
+              className="patient-step-v2__discount-radio-input" />
 
-            <span style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <span className="patient-step-v2__discount-card-text">
               Повторный (бесплатная консультация)
             </span>
           </label>
 
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-3)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            cursor: 'pointer',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            background: 'var(--mac-bg-primary)'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
+          <label className="patient-step-v2__discount-card">
 
             <input
               type="radio"
@@ -458,55 +310,26 @@ const PatientStepV2 = ({
               aria-label="Select benefit discount mode"
               checked={cart?.discount_mode === 'benefit'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
-              style={{ margin: 0 }} />
+              className="patient-step-v2__discount-radio-input" />
 
-            <span style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <span className="patient-step-v2__discount-card-text">
               Льготный (бесплатная консультация)
             </span>
           </label>
         </div>
 
-        <div style={{ marginTop: 'var(--mac-spacing-2)' }}>
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-3)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            cursor: 'pointer',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            background: 'var(--mac-bg-primary)'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
+        <div className="patient-step-v2__discount-section-wrapper">
+          <label className="patient-step-v2__discount-card">
 
             <Checkbox aria-label="Request all services free approval" checked={cart?.all_free} onChange={(e) => onUpdateCart('all_free', e.target.checked)}
-              style={{ margin: 0 }} />
+              className="patient-step-v2__discount-radio-input" />
 
-            <span style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            <span className="patient-step-v2__discount-card-text">
               All Free (требует одобрения администратора)
             </span>
           </label>
           {cart?.all_free &&
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-            background: 'var(--mac-warning)',
-            border: '1px solid var(--mac-warning-hover)',
-            borderRadius: 'var(--mac-radius-sm)',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-xs)',
-            marginTop: 'var(--mac-spacing-2)'
-          }}>
+          <div className="patient-step-v2__all-free-warning">
               <AlertCircle size={16} />
               Заявка будет отправлена на одобрение администратору
             </div>
