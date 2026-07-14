@@ -32,6 +32,7 @@ from app.core.config import settings  # PR-29: needed for real expires_in
 from app.crud import patient as crud_patient  # CRUDPatient instance (for methods)
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
+from app.schemas.authentication import RefreshTokenResponse
 from app.schemas.mobile import (
     AppointmentUpcomingOut,
     BookAppointmentRequest,
@@ -164,7 +165,7 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/auth/refresh")
+@router.post("/auth/refresh", response_model=RefreshTokenResponse)
 def mobile_refresh_token(
     refresh_token: str = Query(..., description="Refresh token issued at login"),
     db: Session = Depends(get_db),
