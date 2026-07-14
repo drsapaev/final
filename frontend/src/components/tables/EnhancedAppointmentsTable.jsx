@@ -2059,7 +2059,7 @@ const EnhancedAppointmentsTable = ({
                         {/* В режиме панели врача кнопки оплаты не показываем */}
                         {canPay &&
                       <button
-                        className="action-button"
+                        className="action-button action-button--success"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -2068,16 +2068,6 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('payment', row, e);
-                        }}
-                        style={{
-                          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'var(--mac-success, #34c759)',
-                          color: 'var(--mac-text-primary)',
-                          cursor: 'pointer',
-                          fontSize: 'var(--mac-font-size-xs)',
-                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}
                         title="Оплата">
 
@@ -2088,7 +2078,7 @@ const EnhancedAppointmentsTable = ({
                         {/* Вызвать */}
                         {canCall &&
                       <button
-                        className="action-button"
+                        className="action-button action-button--primary"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -2097,16 +2087,6 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('call', row, e);
-                        }}
-                        style={{
-                          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'var(--mac-accent-blue, #007aff)',
-                          color: 'var(--mac-text-primary)',
-                          cursor: 'pointer',
-                          fontSize: 'var(--mac-font-size-xs)',
-                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}
                         title="Вызвать">
 
@@ -2127,15 +2107,6 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('print', row, e);
                         }}
-                        style={{
-                          padding: 'var(--mac-spacing-1)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-accent-blue)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto'
-                        }}
                         title="Печать"
                         aria-label="Печать">
 
@@ -2155,16 +2126,6 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('complete', row, e);
-                        }}
-                        style={{
-                          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'var(--mac-warning, #f59e0b)',
-                          color: 'var(--mac-text-primary)',
-                          cursor: 'pointer',
-                          fontSize: 'var(--mac-font-size-xs)',
-                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}
                         title="Завершить">
 
@@ -2209,17 +2170,6 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('view', row, e);
                         }}
-                        style={{
-                          padding: 'var(--mac-spacing-1)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-text-secondary)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto',
-                          position: 'relative',
-                          zIndex: 101
-                        }}
                         title="Просмотр"
                         aria-label="Просмотр">
 
@@ -2239,17 +2189,6 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('edit', row, e);
                         }}
-                        style={{
-                          padding: 'var(--mac-spacing-1)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-text-secondary)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto',
-                          position: 'relative',
-                          zIndex: 101
-                        }}
                         title="Редактировать"
                         aria-label="Редактировать">
 
@@ -2259,7 +2198,7 @@ const EnhancedAppointmentsTable = ({
                         {/* Просмотр EMR (только для завершённых записей) */}
                         {canViewEmr &&
                         <button
-                        className="action-button"
+                        className="action-button action-button--primary"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -2268,15 +2207,6 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('view_emr', row, e);
-                        }}
-                        style={{
-                          padding: 'var(--mac-spacing-1)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-accent-blue, #007aff)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto'
                         }}
                         title="Просмотр EMR"
                         aria-label="Просмотр EMR">
@@ -2299,15 +2229,6 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('reschedule', row, e);
                         }}
-                        style={{
-                          padding: 'var(--mac-spacing-1)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-warning, #f59e0b)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto'
-                        }}
                         title="Перенос"
                         aria-label="Перенос записи">
                           <CalendarClock size={14} />
@@ -2325,15 +2246,6 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('cancel', row, e);
-                        }}
-                        style={{
-                          padding: 'var(--mac-spacing-1)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-error, #ef4444)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto'
                         }}
                         title="Отмена"
                         aria-label="Отмена записи">
@@ -2353,15 +2265,6 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('more', row, e);
                         }}
-                        style={{
-                          padding: 'var(--mac-spacing-1)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-text-secondary)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto'
-                        }}
                         title="Еще"
                         aria-label="Еще">
 
@@ -2371,7 +2274,7 @@ const EnhancedAppointmentsTable = ({
                         {/* Назначить следующий визит */}
                         {canScheduleNext &&
                       <button
-                        className="action-button"
+                        className="action-button action-button--primary"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -2380,16 +2283,6 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('schedule_next', row, e);
-                        }}
-                        style={{
-                          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
-                          border: 'none',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'var(--mac-accent-blue, #007aff)',
-                          color: 'var(--mac-text-primary)',
-                          cursor: 'pointer',
-                          fontSize: 'var(--mac-font-size-xs)',
-                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}
                         title="Назначить следующий визит">
 
