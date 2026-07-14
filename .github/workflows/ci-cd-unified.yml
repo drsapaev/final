@@ -17,6 +17,15 @@ on:
   schedule:
     - cron: '0 2 * * *'  # Ежедневно в 2:00
   workflow_dispatch:  # Ручной запуск
+    inputs:
+      update_snapshots:
+        description: 'Update visual regression baseline snapshots'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: read
@@ -757,6 +766,22 @@ jobs:
         cd frontend
         npx playwright test e2e/registrar-ux-audit.spec.js e2e/cashier-ux-audit.spec.js e2e/visual-regression.spec.js --project=chromium
       continue-on-error: true  # Visual regression — non-blocking, informational only
+
+    - name: 📸 Update visual regression baseline snapshots (manual only)
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_snapshots == 'true'
+      run: |
+        cd frontend
+        npx playwright test e2e/visual-regression.spec.js --project=chromium --update-snapshots
+      continue-on-error: true
+
+    - name: 📤 Upload visual regression artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: visual-regression-screenshots
+        path: frontend/e2e/__screenshots__/
+        retention-days: 14
+        if-no-files-found: ignore
 
   # --- Backend тесты ---
   backend-tests:
