@@ -14,6 +14,7 @@
 
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { FileText, Pencil, CheckCircle2, FilePenLine, RefreshCw, GitBranch } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
 import './EMRHistoryPanel.css';
@@ -51,16 +52,17 @@ function getActionLabel(changeType) {
 /**
  * Get action icon
  */
+// UX Audit Doctor M-22: emoji → lucide-react icons.
 function getActionIcon(changeType) {
     const icons = {
-        created: '📄',
-        updated: '✏️',
-        signed: '✅',
-        amended: '📝',
-        restored: '🔄',
-        migrated: '🔀',
+        created: FileText,
+        updated: Pencil,
+        signed: CheckCircle2,
+        amended: FilePenLine,
+        restored: RefreshCw,
+        migrated: GitBranch,
     };
-    return icons[changeType] || '•';
+    return icons[changeType] || null;
 }
 
 /**
