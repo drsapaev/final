@@ -108,9 +108,13 @@ const DoctorPanel = () => {
     }
 
     setActiveTab(tabId);
+    // UX Audit Doctor QW#2: сброс фильтров при смене вкладки.
+    setFilterStatus('all');
+    setSearchQuery('');
     const params = new URLSearchParams(location.search);
     params.set('tab', tabId);
-    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+    // UX Audit Doctor QW#1: replace: false — Back-кнопка браузера работает между вкладками (P-029 fix).
+    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: false });
   }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
@@ -125,7 +129,7 @@ const DoctorPanel = () => {
 
     if (!requestedTab && patientId) {
       params.set('tab', nextTab);
-      navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+      navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: false });
     }
 
     if (activeTab !== nextTab) {
@@ -631,7 +635,7 @@ const DoctorPanel = () => {
         {/* Вкладки */}
         <div style={tabsStyle}>
           <button
-            aria-label="Open doctor dashboard tab"
+            aria-label="Открыть вкладку «Обзор»"
             style={activeTab === 'dashboard' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('dashboard')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', true)}
@@ -864,7 +868,7 @@ const DoctorPanel = () => {
                     <div className="doctor-search-wrap">
                       <Search size={20} className="doctor-search-icon" />
                       <Input
-                      aria-label="Search patients"
+                      aria-label="Поиск пациентов"
                       type="text"
                       placeholder="Поиск пациентов..."
                       value={searchQuery}
@@ -886,7 +890,7 @@ const DoctorPanel = () => {
                       type="button"
                       variant="primary"
                       title="Add patient"
-                      aria-label="Add patient">
+                      aria-label="Добавить пациента">
                       <Plus aria-hidden="true" size={16} />
                       {!isMobile && <span>Добавить</span>}
                     </Button>
@@ -1011,7 +1015,7 @@ const DoctorPanel = () => {
                     <div className="doctor-search-wrap">
                       <Search size={20} className="doctor-search-icon" />
                       <Input
-                      aria-label="Search appointments"
+                      aria-label="Поиск записей"
                       type="text"
                       placeholder="Поиск записей..."
                       value={searchQuery}
