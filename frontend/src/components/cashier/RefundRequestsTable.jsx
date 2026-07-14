@@ -13,7 +13,6 @@ import {
   DollarSign,
   Clock,
   CheckCircle,
-  RefreshCw,
   Loader2,
   User,
   CreditCard
@@ -380,16 +379,13 @@ const RefundRequestsTable = ({ onRefresh }) => {
             size="small"
             aria-label="Фильтр заявок на возврат"
           />
-
-          <Button
-            variant="secondary"
-            size="small"
-            onClick={loadRequests}
-            disabled={loading}
-            aria-label="Обновить список заявок на возврат"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
-          </Button>
+          {/* UX Audit #1.3: дублирующая кнопка «Обновить» убрана.
+              Глобальная кнопка «Обновить» в stats-card CashierPanel
+              вызывает onRefresh → loadRequests. Лишний триггер (Nielsen #8 —
+              эстетический и минималистичный дизайн) создавал когнитивную
+              неоднозначность: «обновляет ли кнопка весь экран или только
+              эту таблицу?». При смене фильтра список всё равно
+              авто-обновляется через useEffect → loadRequests. */}
         </div>
       </div>
 
