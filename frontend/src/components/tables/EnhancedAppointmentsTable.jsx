@@ -524,7 +524,7 @@ const EnhancedAppointmentsTable = ({
           cursor: 'help',
           border: `1px solid ${withOpacity(config.color, 0.2)}`
         }}>
-        <span style={{ fontSize: 'var(--mac-font-size-base)' }}>{config.emoji}</span>
+        <span className="eat-status-emoji">{config.emoji}</span>
         <span>{config.text}</span>
       </div>);
 
@@ -1303,7 +1303,7 @@ const EnhancedAppointmentsTable = ({
                   userSelect: 'none'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
+                <div className="eat-th-content">
                   {t.number}
                   {sortConfig.key === 'queue_number' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1326,7 +1326,7 @@ const EnhancedAppointmentsTable = ({
                   width: isDoctorView ? '15%' : 'auto'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
+                <div className="eat-th-content">
                   {t.patient}
                   {sortConfig.key === 'patient_fio' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1364,7 +1364,7 @@ const EnhancedAppointmentsTable = ({
                   minWidth: isDoctorView ? '5%' : '60px'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
+                <div className="eat-th-content">
                   {t.birthYear}
                   {sortConfig.key === 'patient_birth_year' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1446,7 +1446,7 @@ const EnhancedAppointmentsTable = ({
                   width: isDoctorView ? '9%' : 'auto'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
+                <div className="eat-th-content">
                   {t.date}
                   {sortConfig.key === 'appointment_date' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1469,7 +1469,7 @@ const EnhancedAppointmentsTable = ({
                   width: isDoctorView ? '7%' : 'auto'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
+                <div className="eat-th-content">
                   {t.status}
                   {sortConfig.key === 'status' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1493,7 +1493,7 @@ const EnhancedAppointmentsTable = ({
                   width: isDoctorView ? '8%' : 'auto'
                 }}>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'flex-end' }}>
+                <div className="eat-th-content--end">
                   {t.cost}
                   {sortConfig.key === 'cost' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
@@ -1632,7 +1632,7 @@ const EnhancedAppointmentsTable = ({
                   title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}>
 
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
+                        <div className="eat-td-flex">
                           <span>{row.patient_fio || '—'}</span>
                           {/* Ярлыки источника/приоритета */}
                           {/* ✅ SSOT: Только source='online' показывает QR badge */}
@@ -1901,8 +1901,8 @@ const EnhancedAppointmentsTable = ({
                               }}>
                                   {timeDisplay.primaryLabel}
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
-                                  <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
+                                <div className="eat-th-content">
+                                  <Calendar size={12} className="eat-calendar-icon" />
                                   {timeDisplay.primaryDate}
                                 </div>
                                 <div style={{
@@ -1935,8 +1935,8 @@ const EnhancedAppointmentsTable = ({
                         if (row.appointment_date || row.appointment_time) {
                           return (
                             <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', justifyContent: 'center' }}>
-                                  <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
+                                <div className="eat-th-content">
+                                  <Calendar size={12} className="eat-calendar-icon" />
                                   {row.appointment_date || '—'}
                                 </div>
                                 {row.appointment_time &&
