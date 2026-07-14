@@ -667,8 +667,8 @@ const SystemManagement = () => {
           {[
         { id: 'monitoring', label: 'Мониторинг', icon: Activity },
         { id: 'backups', label: 'Бэкапы', icon: Database },
-        { id: 'settings', label: 'Настройки', icon: Settings }].
-        map((tab) => {
+        // UX Audit Admin #1.3+4.2: Settings-tab удалён — все кнопки были нерабочие (dead code).
+        ].map((tab) => {
           const IconComponent = tab.icon;
           const isActive = activeTab === tab.id;
 
@@ -695,7 +695,7 @@ const SystemManagement = () => {
       {/* Контент табов */}
       {activeTab === 'monitoring' && renderMonitoringTab()}
       {activeTab === 'backups' && renderBackupsTab()}
-      {activeTab === 'settings' && renderSettingsTab()}
+      {/* UX Audit Admin #1.3+4.2: Settings-tab удалён. */}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
     </div>);
