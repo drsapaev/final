@@ -181,7 +181,8 @@ const RegistrarPanel = () => {
           return newParams;
         });
 
-        logger.info('[Registrar] Загружен пациент из URL:', patientName);
+        // UX Audit R-3.6: убрано логирование patientName (PII leak).
+        logger.info('[Registrar] Загружен пациент из URL (patientId matched)');
       } catch (error) {
         // 404 — пациент не найден, не логируем как error.
         const status = error?.response?.status;
@@ -1166,7 +1167,8 @@ const RegistrarPanel = () => {
 
       // ⭐ FIX 16: Подробный лог queue_time для каждой entry
       sorted.forEach((entry, idx) => {
-        logger.info(`  📌 Entry[${idx}]: id=${entry.id}, queue_tag=${entry.queue_tag}, queue_time=${entry.queue_time}, patient=${entry.patient_fio}`);
+        // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
+        logger.info(`  📌 Entry[${idx}]: id=${entry.id}, queue_tag=${entry.queue_tag}, queue_time=${entry.queue_time}`);
       });
 
       // Каждая entry уже содержит свой queue_time — никакого переопределения не нужно
@@ -1198,7 +1200,8 @@ const RegistrarPanel = () => {
       const qrInFiltered = filtered.filter((a) => a.source === 'online');
       logger.info(`🔍 QR-записей в фильтре: ${qrInFiltered.length}`);
       qrInFiltered.forEach((a) => {
-        logger.info(`  - ${a.patient_fio}: ${a.queue_numbers?.length || 0} queue_numbers`, a.queue_numbers);
+        // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
+        logger.info(`  - appointment_id=${a.id}: ${a.queue_numbers?.length || 0} queue_numbers`);
       });
 
       const aggregatedPatients = aggregatePatientsForAllDepartments(filtered);
@@ -1268,7 +1271,8 @@ const RegistrarPanel = () => {
       });
     }
 
-    logger.info('[RegistrarPanel] Opening edit wizard for:', row?.patient_fio || row?.patient_name);
+    // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
+    logger.info('[RegistrarPanel] Opening edit wizard for appointment:', row?.id);
     setWizardEditMode(true);
     setWizardInitialData(row);
     setShowWizard(true);
@@ -1612,7 +1616,8 @@ const RegistrarPanel = () => {
                     openRecordPreview(row);
                     break;
                   case 'edit':
-                    logger.info('[RegistrarPanel] Открытие мастера редактирования для:', row.patient_fio || row.patient_name);
+                    // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
+                    logger.info('[RegistrarPanel] Открытие мастера редактирования для appointment:', row.id);
                     openRecordEditor(row);
                     break;
                   case 'payment':
