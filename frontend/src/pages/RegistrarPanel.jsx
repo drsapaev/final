@@ -1604,7 +1604,9 @@ const RegistrarPanel = () => {
               language={language}
               outerBorder={false}
               services={services}
-              showCheckboxes={true} // UX Audit Registrar #13: включаем чекбоксы для bulk print
+              showCheckboxes={false} // UX Audit R-4.7: bulk-action UI удалён (QW-01 fix),
+                                    // поэтому чекбоксы отключены — они были dead UI
+                                    // (видны, но ничего не делают). Nielsen #2 + #4.
               onRowClick={(row) => {
                 logger.info('Открыть детали записи:', row);
                 // Здесь можно открыть модальное окно с деталями записи
