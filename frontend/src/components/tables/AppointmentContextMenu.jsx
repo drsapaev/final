@@ -166,6 +166,9 @@ const AppointmentContextMenu = ({
   {
     id: 'force_majeure',
     label: 'Форс-мажор',
+    // UX Audit R-2.7: tooltip объясняет, что произойдёт при клике.
+    // Без tooltip «Форс-мажор» — внутренний термин, неинтуитивный для регистратора.
+    title: 'Экстренные действия со всеми записями врача: перенос на другой день или отмена с возвратом',
     icon: AlertTriangle,
     color: colors.warning,
     visible: !isDoctorView
@@ -284,7 +287,8 @@ const AppointmentContextMenu = ({
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
-              }}>
+              }}
+              title={item.title}>
               
               <Icon size={16} />
               <span>{item.label}</span>
