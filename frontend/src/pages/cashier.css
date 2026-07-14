@@ -350,3 +350,18 @@
 .cashier-session-warning-btn--primary:hover {
   filter: brightness(0.95);
 }
+
+/* ─── Grouped payment badge (UX Audit #2.6) ─── */
+.cashier-badge-grouped {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--mac-accent-orange, #ff9500), transparent 88%);
+  color: var(--mac-accent-orange, #ff9500);
+  border: 1px solid color-mix(in srgb, var(--mac-accent-orange, #ff9500), transparent 60%);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
