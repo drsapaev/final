@@ -50,6 +50,8 @@ const SystemManagement = () => {
   const [systemHealth, setSystemHealth] = useState(null);
   const [systemMetrics, setSystemMetrics] = useState(null);
   const [alerts, setAlerts] = useState([]);
+  // UX Audit Admin #4.8: alerts display limit for pagination.
+  const [alertsLimit, setAlertsLimit] = useState(10);
   const [thresholds, setThresholds] = useState({});
 
   // Состояние бэкапов
@@ -362,10 +364,23 @@ const SystemManagement = () => {
         title="Нет активных алертов"
         description="Система работает стабильно"
         iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-success)' }} /> :
-
-
+      <>
+      {/* UX Audit Admin #4.8: alerts counter + show all button. */}
+      {alerts.length > 0 && (
+        <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', marginBottom: '8px' }}>
+          Показано {Math.min(alertsLimit, alerts.length)} из {alerts.length}
+          {alerts.length > alertsLimit && (
+            <button
+              type="button"
+              onClick={() => setAlertsLimit(50)}
+              style={{ marginLeft: '8px', background: 'none', border: 'none', color: 'var(--mac-accent-blue)', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}>
+              Показать все
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex flex-col gap-3">
-            {alerts.slice(0, 10).map((alert, index) =>
+            {alerts.slice(0, alertsLimit).map((alert, index) =>
         <div key={index} className="admin-alert-row">
                 <div className="admin-flex-center-12">
                   <Badge variant={getSeverityColor(alert.severity)}>
@@ -381,6 +396,7 @@ const SystemManagement = () => {
               </div>
         )}
           </div>
+      </>
       }
       </MacOSCard>
     </div>;
