@@ -767,3 +767,70 @@
   display: inline-flex;
   align-items: center;
 }
+
+/* ─── Overflow menu (UX Audit R-1.1) ─── */
+.registrar-overflow-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.registrar-overflow-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--mac-radius-sm, 6px);
+  border: 1px solid var(--mac-border, #d8dde8);
+  background: var(--mac-bg-primary, white);
+  color: var(--mac-text-secondary, #6b7280);
+  cursor: pointer;
+  font-size: var(--mac-font-size-sm, 13px);
+  list-style: none;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.registrar-overflow-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.registrar-overflow-trigger:hover {
+  background: var(--mac-bg-tertiary, #f5f5f7);
+  color: var(--mac-text-primary, #1a1d29);
+}
+
+.registrar-overflow-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  background: var(--mac-bg-primary, white);
+  border: 1px solid var(--mac-border, #d8dde8);
+  border-radius: var(--mac-radius-md, 8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 4px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.registrar-overflow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--mac-text-primary, #1a1d29);
+  font-size: 13px;
+  text-align: left;
+  border-radius: var(--mac-radius-sm, 6px);
+  cursor: pointer;
+  transition: background 120ms ease;
+  font-family: inherit;
+}
+
+.registrar-overflow-item:hover {
+  background: var(--mac-bg-tertiary, #f5f5f7);
+}
