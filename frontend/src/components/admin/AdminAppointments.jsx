@@ -334,6 +334,17 @@ const AdminAppointments = () => {
           />
         </div>
 
+        {/* UX Audit Admin #1.1: кнопка «Сбросить» для быстрой очистки фильтров. */}
+        {filtersActive && (
+          <div style={{ marginBottom: '12px' }}>
+            <Button variant="ghost" size="sm" onClick={() => {
+              setSearchTerm(''); setFilterStatus(''); setFilterDate(''); setFilterDoctor('');
+            }} aria-label="Сбросить все фильтры">
+              ✕ Сбросить фильтры
+            </Button>
+          </div>
+        )}
+
         <div className="admin-ovx-auto">
           {loading ? (
             <Skeleton type="table" count={5} />

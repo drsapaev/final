@@ -223,6 +223,17 @@ const AdminPatients = () => {
           />
         </div>
 
+        {/* UX Audit Admin #1.1: кнопка «Сбросить» для быстрой очистки фильтров. */}
+        {filtersActive && (
+          <div style={{ marginBottom: '12px' }}>
+            <Button variant="ghost" size="sm" onClick={() => {
+              setSearchTerm(''); setFilterGender(''); setFilterAgeRange(''); setFilterBloodType('');
+            }} aria-label="Сбросить все фильтры">
+              ✕ Сбросить фильтры
+            </Button>
+          </div>
+        )}
+
         <div className="admin-overflow-x-auto">
           {loading ? (
             <Skeleton type="table" count={5} />
