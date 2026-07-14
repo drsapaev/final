@@ -1572,7 +1572,7 @@ const RegistrarPanel = () => {
                   }}
                   aria-label="Создать новую запись из рабочего списка регистратора"
                   className="registrar-inline-flex registrar-inline-flex-shrink">
-                    <Icon name="plus" size="small" className="registrar-text-white" />
+                    <Icon name="plus" size="small" style={{ color: 'white' }} />
                     {t('new_appointment')}
                   </Button>
                 </div>
@@ -1602,7 +1602,7 @@ const RegistrarPanel = () => {
                 onClick={() => setShowWizard(true)}
                 className="registrar-btn-cta">
 
-                    <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
+                    <Icon name="plus" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Создать первую запись
                   </Button>
                 </div> :
             filteredAppointments.length === 0 ?
@@ -1724,7 +1724,7 @@ const RegistrarPanel = () => {
                 onClick={loadMoreAppointments}
                 disabled={paginationInfo.loadingMore}
                 aria-label={paginationInfo.loadingMore ? 'Loading more appointments' : 'Load more appointments'}
-                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'} registrar-flex registrar-load-more-btn`}
+                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'} registrar-load-more-btn`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
                 aria-disabled={paginationInfo.loadingMore}>
 
                     {paginationInfo.loadingMore ?
@@ -1734,7 +1734,7 @@ const RegistrarPanel = () => {
                       </> :
 
                 <>
-                        <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Загрузить еще
+                        <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Загрузить еще
                       </>
                 }
                   </button>
@@ -1775,7 +1775,7 @@ const RegistrarPanel = () => {
           }
         ]}>
         {recordPreviewDialog.row && (
-          <div className="registrar-text-primary registrar-grid-gap-md">
+          <div className="registrar-grid-gap-md" style={{ color: 'var(--mac-text-primary)' }}>
             {[
               ['Пациент', recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
               ['Телефон', recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
@@ -1791,7 +1791,7 @@ const RegistrarPanel = () => {
               <div
                 key={label}
                 className="registrar-surface registrar-preview-row">
-                <span className="registrar-text-secondary registrar-preview-label">{label}</span>
+                <span className="registrar-preview-label" style={{ color: 'var(--mac-text-secondary)' }}>{label}</span>
                 <span className="registrar-preview-value">
                   {String(value)}
                 </span>
@@ -2101,8 +2101,8 @@ const RegistrarPanel = () => {
         ]}>
         <div className="registrar-grid-gap-lg">
           <div className="registrar-reschedule-card registrar-reschedule-card-accent">
-            <div className="registrar-flex-start">
-              <div className="registrar-reschedule-icon registrar-text-accent registrar-reschedule-icon-bg">
+            <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+              <div className="registrar-reschedule-icon registrar-reschedule-icon-bg" style={{ color: 'var(--mac-accent-blue)' }}>
                 📅
               </div>
               <div>
