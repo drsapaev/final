@@ -464,7 +464,10 @@ export const ChatProvider = ({ children }) => {
         }
         // Если не нормальное закрытие (1000) - пробуем переподключиться
         if (e.code !== 1000) {
-          const delay = Math.min(1000 * 2 ** retryCountRef.current, 30000);
+          // PR-70 / M-1: added jitter to prevent thundering herd on server restart
+          const baseDelay = Math.min(1000 * 2 ** retryCountRef.current, 30000);
+          const jitter = Math.random() * 500; // 0-500ms random jitter
+          const delay = baseDelay + jitter;
           retryCountRef.current += 1;
           logger.info('[FIX:WS] Chat WebSocket closed, scheduling reconnect', {
             code: e.code,
