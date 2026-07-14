@@ -464,11 +464,12 @@ const AdminAppointments = () => {
                         <p
                           className="admin-fs-xs-secondary-m-4px-0-0"
                         >
+                          {/* UX Audit Admin #2.8: унифицированный формат кабинета. */}
                           {appointment.queueCabinet
-                            ? `Очередь: ${appointment.queueCabinet}`
+                            ? `Источник: очередь (${appointment.queueCabinet})`
                             : appointment.doctorCabinet
-                              ? `Врач: ${appointment.doctorCabinet}`
-                              : 'Нет связанного кабинета'}
+                              ? `Источник: врач (${appointment.doctorCabinet})`
+                              : 'Кабинет не указан'}
                         </p>
                       </td>
                       <td style={textCellStyle}>

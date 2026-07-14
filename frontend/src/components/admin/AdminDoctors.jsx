@@ -183,11 +183,15 @@ const AdminDoctors = () => {
             iconPosition="left"
             aria-label="Поиск врачей"
           />
-          <Input
-            type="text"
-            placeholder="Специализация..."
+          {/* UX Audit Admin #4.7: фильтр специализации — Select вместо текстового инпута. */}
+          <Select
             value={filterSpecialization}
-            onChange={(event) => setFilterSpecialization(event.target.value)}
+            onChange={setFilterSpecialization}
+            options={[
+              { value: '', label: 'Все специализации' },
+              ...[...new Set(doctors.map((d) => d.specialty).filter(Boolean))].map((s) => ({ value: s, label: s })),
+            ]}
+            size="large"
             aria-label="Фильтр по специализации"
           />
           <Select

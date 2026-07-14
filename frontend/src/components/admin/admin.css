@@ -12616,3 +12616,39 @@ button[class*="admin-btn"]:active:not(:disabled) {
   font-size: 13px;
   text-decoration: underline;
 }
+
+/* ─── UX Audit Admin #4.5: responsive table columns ─── */
+@media (max-width: 1024px) {
+  .admin-service-col-duration,
+  .admin-service-col-doctor {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-service-col-legacy-code {
+    display: none !important;
+  }
+}
+
+/* ─── UX Audit Admin #3.4: unified page title ─── */
+.admin-page-title {
+  font-size: var(--mac-font-size-xl, 20px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-text-primary, #1a1d29);
+  margin: 0 0 4px 0;
+}
+
+.admin-page-subtitle {
+  font-size: var(--mac-font-size-sm, 13px);
+  color: var(--mac-text-secondary, #6b7280);
+  margin: 0;
+}
+
+/* ─── UX Audit Admin #3.5: unified filter grid ─── */
+.admin-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
