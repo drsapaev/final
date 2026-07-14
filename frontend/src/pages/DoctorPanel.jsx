@@ -604,7 +604,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
-            aria-label="Open patients tab"
+            aria-label="Открыть вкладку «Пациенты»"
             style={activeTab === 'patients' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('patients')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'patients', true)}
@@ -615,7 +615,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
-            aria-label="Open appointments tab"
+            aria-label="Открыть вкладку «Записи»"
             style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('appointments')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'appointments', true)}
@@ -627,7 +627,7 @@ const DoctorPanel = () => {
 
           {/* ✅ НОВОЕ: Таб очереди */}
           <button
-            aria-label="Open queue tab"
+            aria-label="Открыть вкладку «Очередь»"
             style={activeTab === 'queue' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('queue')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'queue', true)}
@@ -643,7 +643,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
-            aria-label="Open AI assistant tab"
+            aria-label="Открыть вкладку «AI-помощник»"
             style={activeTab === 'ai' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('ai')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'ai', true)}
@@ -654,7 +654,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
-            aria-label="Open reports tab"
+            aria-label="Открыть вкладку «Отчёты»"
             style={activeTab === 'reports' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('reports')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'reports', true)}
@@ -1429,7 +1429,7 @@ const DoctorPanel = () => {
                 Информация о пациенте
               </h3>
               <button
-              aria-label="Close patient information dialog"
+              aria-label="Закрыть окно информации о пациенте"
               onClick={patientModal.closeModal}
               className="doctor-modal-close">
 

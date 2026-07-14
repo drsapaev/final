@@ -238,7 +238,7 @@ const DoctorServiceSelector = ({
               <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-purple)'
+              color: 'var(--mac-success)'
             }}>
                 {getTotalCost().toLocaleString()} UZS
               </div>
