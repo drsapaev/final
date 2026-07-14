@@ -5,6 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea,
 } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
+import './LabTemplateWorkbench.css';
 
 const blankField = () => ({
   analyte_code: '',
@@ -245,41 +246,40 @@ function NewTemplateDialog({ open, onClose, onCreate, saving }) {
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Новый шаблон</DialogTitle>
       <DialogContent>
-        <form onSubmit={handleSubmit} id="new-template-form" style={{ display: 'grid', gap: '12px', paddingTop: '8px' }}>
+        <form onSubmit={handleSubmit} id="new-template-form" className="ltw-form-grid">
           <div>
-            <Label htmlFor="new-template-code" style={{ display: 'block', marginBottom: 4 }}>Код шаблона</Label>
+            <Label htmlFor="new-template-code" className="ltw-label">Код шаблона</Label>
             <Input
               id="new-template-code"
               aria-label="Код шаблона"
               value={form.code}
               onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
               placeholder="Напр. hematology_basic"
-              style={{ width: '100%', boxSizing: 'border-box' }}
+              className="ltw-input-full"
               required
             />
           </div>
           <div>
-            <Label htmlFor="new-template-name" style={{ display: 'block', marginBottom: 4 }}>Название</Label>
+            <Label htmlFor="new-template-name" className="ltw-label">Название</Label>
             <Input
               id="new-template-name"
               aria-label="Название шаблона"
               value={form.name}
               onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder="Напр. Общий анализ крови"
-              style={{ width: '100%', boxSizing: 'border-box' }}
+              className="ltw-input-full"
               required
             />
           </div>
           <div>
-            <Label htmlFor="new-template-family" style={{ display: 'block', marginBottom: 4 }}>Семейство</Label>
+            <Label htmlFor="new-template-family" className="ltw-label">Семейство</Label>
             {/* PR-59: replaced free-text Input with <select> to prevent typo-induced fragmentation */}
             <select
               id="new-template-family"
               aria-label="Семейство шаблона"
               value={form.family}
               onChange={(e) => setForm((prev) => ({ ...prev, family: e.target.value }))}
-              className="macos-input"
-              style={{ width: '100%', boxSizing: 'border-box' }}
+              className="macos-input ltw-input-full"
             >
               <option value="hematology">Гематология</option>
               <option value="biochemistry">Биохимия</option>
@@ -292,7 +292,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving }) {
             </select>
           </div>
           <div>
-            <Label htmlFor="new-template-description" style={{ display: 'block', marginBottom: 4 }}>Описание</Label>
+            <Label htmlFor="new-template-description" className="ltw-label">Описание</Label>
             <Textarea
               id="new-template-description"
               aria-label="Описание шаблона"
@@ -300,7 +300,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving }) {
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               placeholder="Краткое описание шаблона"
               minRows={3}
-              style={{ width: '100%', boxSizing: 'border-box' }}
+              className="ltw-input-full"
             />
           </div>
         </form>
@@ -381,7 +381,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
   // If the rule doesn't match our expected format, show raw JSON fallback.
   if (!isStructured) {
     return (
-      <div style={{ display: 'grid', gap: '6px' }}>
+      <div className="ltw-grid-6">
         <span>Правила нормы (raw JSON)</span>
         <textarea
           className="macos-input"
@@ -390,7 +390,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
           value={field.reference_rule_text || ''}
           onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
         />
-        <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+        <span className="ltw-text-12 ltw-text-secondary">
           Структурированный редактор недоступен — формат не распознан.
         </span>
       </div>
@@ -436,9 +436,9 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
   };
 
   return (
-    <div style={{ border: '1px solid var(--mac-border)', borderRadius: '10px', padding: '12px', display: 'grid', gap: '10px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontWeight: 600, fontSize: '14px' }}>Правила нормы</span>
+    <div className="ltw-rule-editor">
+      <div className="ltw-flex-between">
+        <span className="ltw-fw-600 ltw-text-14">Правила нормы</span>
         <Button variant="outline" size="small" onClick={addCase}>
           <Icon name="plus" size={12} />
           Добавить условие
@@ -446,7 +446,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
       </div>
 
       {cases.length === 0 && (
-        <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+        <span className="ltw-text-13 ltw-text-secondary">
           Нет условий. Будет использоваться значение по умолчанию.
         </span>
       )}
@@ -454,17 +454,17 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
       {cases.map((caseItem, caseIndex) => {
         const isBetween = caseItem.when?.op === 'between';
         return (
-          <div key={caseIndex} style={{ border: '1px solid color-mix(in oklab, var(--mac-border) 70%, transparent)', borderRadius: '8px', padding: '10px', display: 'grid', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', fontWeight: 500 }}>Условие {caseIndex + 1}</span>
+          <div key={caseIndex} className="ltw-case-card">
+            <div className="ltw-flex-between">
+              <span className="ltw-text-13 ltw-fw-500">Условие {caseIndex + 1}</span>
               <Button variant="ghost" size="small" onClick={() => removeCase(caseIndex)} aria-label="Удалить условие">
                 <Icon name="trash" size={12} />
               </Button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.5fr 1fr', gap: '8px', alignItems: 'end' }}>
-              <label style={{ display: 'grid', gap: '4px' }}>
-                <span style={{ fontSize: '12px' }}>Источник</span>
+            <div className="ltw-grid-3">
+              <label className="ltw-label-grid">
+                <span className="ltw-text-12">Источник</span>
                 <select
                   className="macos-input"
                   aria-label="Источник условия"
@@ -474,8 +474,8 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   {RULE_SOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </label>
-              <label style={{ display: 'grid', gap: '4px' }}>
-                <span style={{ fontSize: '12px' }}>Оператор</span>
+              <label className="ltw-label-grid">
+                <span className="ltw-text-12">Оператор</span>
                 <select
                   className="macos-input"
                   aria-label="Оператор условия"
@@ -486,9 +486,9 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                 </select>
               </label>
               {isBetween ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  <label style={{ display: 'grid', gap: '4px' }}>
-                    <span style={{ fontSize: '12px' }}>Минимум</span>
+                <div className="ltw-grid-2-50-50">
+                  <label className="ltw-label-grid">
+                    <span className="ltw-text-12">Минимум</span>
                     <input
                       className="macos-input"
                       aria-label="Минимум условия"
@@ -497,8 +497,8 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                       onChange={(e) => updateCaseWhen(caseIndex, 'min', parseFloat(e.target.value) || 0)}
                     />
                   </label>
-                  <label style={{ display: 'grid', gap: '4px' }}>
-                    <span style={{ fontSize: '12px' }}>Максимум</span>
+                  <label className="ltw-label-grid">
+                    <span className="ltw-text-12">Максимум</span>
                     <input
                       className="macos-input"
                       aria-label="Максимум условия"
@@ -509,8 +509,8 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   </label>
                 </div>
               ) : (
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  <span style={{ fontSize: '12px' }}>Значение</span>
+                <label className="ltw-label-grid">
+                  <span className="ltw-text-12">Значение</span>
                   {/* PR-61 / Medium-18: sex enum when source is patient.sex */}
                   {caseItem.when?.source === 'patient.sex' ? (
                     <select
@@ -535,9 +535,9 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.5fr 0.5fr', gap: '8px', alignItems: 'end' }}>
-              <label style={{ display: 'grid', gap: '4px' }}>
-                <span style={{ fontSize: '12px' }}>Текст нормы</span>
+            <div className="ltw-grid-3-ranges">
+              <label className="ltw-label-grid">
+                <span className="ltw-text-12">Текст нормы</span>
                 <input
                   className="macos-input"
                   aria-label="Текст нормы для условия"
@@ -546,8 +546,8 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   placeholder="3.5-5.0"
                 />
               </label>
-              <label style={{ display: 'grid', gap: '4px' }}>
-                <span style={{ fontSize: '12px' }}>Нижняя граница</span>
+              <label className="ltw-label-grid">
+                <span className="ltw-text-12">Нижняя граница</span>
                 <input
                   className="macos-input"
                   aria-label="Нижняя граница нормы"
@@ -556,8 +556,8 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   onChange={(e) => updateCase(caseIndex, 'low', parseFloat(e.target.value) || null)}
                 />
               </label>
-              <label style={{ display: 'grid', gap: '4px' }}>
-                <span style={{ fontSize: '12px' }}>Верхняя граница</span>
+              <label className="ltw-label-grid">
+                <span className="ltw-text-12">Верхняя граница</span>
                 <input
                   className="macos-input"
                   aria-label="Верхняя граница нормы"
@@ -572,11 +572,11 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
       })}
 
       {/* Default case */}
-      <div style={{ border: '1px dashed var(--mac-border)', borderRadius: '8px', padding: '10px', display: 'grid', gap: '8px' }}>
-        <span style={{ fontSize: '13px', fontWeight: 500 }}>По умолчанию (если ни одно условие не сработало)</span>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.5fr 0.5fr', gap: '8px', alignItems: 'end' }}>
-          <label style={{ display: 'grid', gap: '4px' }}>
-            <span style={{ fontSize: '12px' }}>Текст нормы</span>
+      <div className="ltw-default-card">
+        <span className="ltw-text-13 ltw-fw-500">По умолчанию (если ни одно условие не сработало)</span>
+        <div className="ltw-grid-3-ranges">
+          <label className="ltw-label-grid">
+            <span className="ltw-text-12">Текст нормы</span>
             <input
               className="macos-input"
               aria-label="Текст нормы по умолчанию"
@@ -585,8 +585,8 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
               placeholder="3.5-5.0"
             />
           </label>
-          <label style={{ display: 'grid', gap: '4px' }}>
-            <span style={{ fontSize: '12px' }}>Нижняя граница</span>
+          <label className="ltw-label-grid">
+            <span className="ltw-text-12">Нижняя граница</span>
             <input
               className="macos-input"
               aria-label="Нижняя граница по умолчанию"
@@ -595,8 +595,8 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
               onChange={(e) => updateDefault('low', parseFloat(e.target.value) || null)}
             />
           </label>
-          <label style={{ display: 'grid', gap: '4px' }}>
-            <span style={{ fontSize: '12px' }}>Верхняя граница</span>
+          <label className="ltw-label-grid">
+            <span className="ltw-text-12">Верхняя граница</span>
             <input
               className="macos-input"
               aria-label="Верхняя граница по умолчанию"
@@ -610,16 +610,15 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
 
       {/* Raw JSON toggle for advanced users */}
       <details>
-        <summary style={{ cursor: 'pointer', fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+        <summary className="ltw-summary-12">
           Raw JSON (для продвинутых)
         </summary>
         <textarea
-          className="macos-input"
+          className="macos-input ltw-raw-json-textarea"
           aria-label="Raw JSON правил нормы"
           rows={6}
           value={field.reference_rule_text || ''}
           onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
-          style={{ marginTop: '6px' }}
         />
       </details>
     </div>
@@ -1056,10 +1055,10 @@ export default function LabTemplateWorkbench({
   // Editor tab renderers
   // ============================================================
   const renderContentTab = () => (
-    <div style={{ display: 'grid', gap: '12px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="ltw-grid">
+      <div className="ltw-flex-between">
         {/* PR-61 / Low-29: count fields not just sections (was misleading) */}
-        <div style={{ fontWeight: 600 }}>Секции и показатели ({draftVersion?.sections?.reduce((acc, s) => acc + (s.fields?.length || 0), 0) || 0} показателей в {draftVersion?.sections?.length || 0} секц.)</div>
+        <div className="ltw-fw-600">Секции и показатели ({draftVersion?.sections?.reduce((acc, s) => acc + (s.fields?.length || 0), 0) || 0} показателей в {draftVersion?.sections?.length || 0} секц.)</div>
         <Button variant="outline" onClick={addSection}>
           <Icon name="plus" size={16} />
           Добавить секцию
@@ -1069,20 +1068,20 @@ export default function LabTemplateWorkbench({
       {draftVersion.sections.map((section, sectionIndex) => {
         const isSectionExpanded = expandedSections.has(sectionIndex);
         return (
-          <div key={`${section.key}-${sectionIndex}`} style={{ border: '1px solid var(--mac-border)', borderRadius: '16px', background: 'var(--mac-bg-primary)', overflow: 'hidden' }}>
+          <div key={`${section.key}-${sectionIndex}`} className="ltw-section-card">
             {/* Section header — collapsible */}
             <button
               type="button"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '12px 14px', cursor: 'pointer', borderBottom: isSectionExpanded ? '1px solid var(--mac-border)' : 'none', background: 'transparent', border: 'none', width: '100%', textAlign: 'left' }}
+              className={`ltw-section-header ${isSectionExpanded ? 'ltw-section-header-expanded' : ''}`}
               onClick={() => toggleSection(sectionIndex)}
               aria-expanded={isSectionExpanded}
               aria-label={`Секция: ${section.title || section.key}`}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+              <div className="ltw-flex-center">
                 <Icon name={isSectionExpanded ? 'chevron.down' : 'chevron.right'} size={16} />
-                <span style={{ fontWeight: 600, fontSize: '15px' }}>{section.title || section.key}</span>
+                <span className="ltw-section-title">{section.title || section.key}</span>
                 <Badge variant="default">{section.fields.length} полей</Badge>
               </div>
-              <span style={{ display: 'flex', gap: '4px' }}>
+              <span className="ltw-flex-gap-4">
                 <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); moveSection(sectionIndex, 'up'); }} disabled={sectionIndex === 0} aria-label="Переместить секцию вверх">
                   <Icon name="arrow.up" size={14} />
                 </Button>
@@ -1097,40 +1096,40 @@ export default function LabTemplateWorkbench({
 
             {/* Section content — only when expanded */}
             {isSectionExpanded && (
-              <div style={{ padding: '14px', display: 'grid', gap: '12px' }}>
+              <div className="ltw-section-content">
                 {/* Section key + title editors */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', alignItems: 'end' }}>
-                  <label style={{ display: 'grid', gap: '6px' }}>
+                <div className="ltw-grid-2">
+                  <label className="ltw-grid-6">
                     <span>Ключ секции</span>
                     <input className="macos-input" aria-label="Ключ секции" value={section.key} onChange={(event) => updateSection(sectionIndex, 'key', event.target.value)} />
                   </label>
-                  <label style={{ display: 'grid', gap: '6px' }}>
+                  <label className="ltw-grid-6">
                     <span>Заголовок секции</span>
                     <input className="macos-input" aria-label="Заголовок секции" value={section.title || ''} onChange={(event) => updateSection(sectionIndex, 'title', event.target.value)} />
                   </label>
                 </div>
 
                 {/* Fields */}
-                <div style={{ display: 'grid', gap: '8px' }}>
+                <div className="ltw-grid-8">
                   {section.fields.map((field, fieldIndex) => {
                     const fieldKey = `${sectionIndex}-${fieldIndex}`;
                     const isFieldExpanded = expandedFields.has(fieldKey);
                     return (
-                      <div key={`${field.field_key}-${fieldIndex}`} style={{ border: '1px solid color-mix(in oklab, var(--mac-border) 80%, transparent)', borderRadius: '12px', overflow: 'hidden' }}>
+                      <div key={`${field.field_key}-${fieldIndex}`} className="ltw-field-card">
                         {/* Field header — collapsible */}
                         <button
                           type="button"
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '10px 12px', cursor: 'pointer', background: isFieldExpanded ? 'var(--mac-bg-secondary)' : 'transparent', border: 'none', width: '100%', textAlign: 'left' }}
+                          className={`ltw-field-header ${isFieldExpanded ? 'ltw-field-header-expanded' : ''}`}
                           onClick={() => toggleField(sectionIndex, fieldIndex)}
                           aria-expanded={isFieldExpanded}
                           aria-label={`Поле: ${field.label || field.field_key}`}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                          <div className="ltw-flex-center">
                             <Icon name={isFieldExpanded ? 'chevron.down' : 'chevron.right'} size={14} />
-                            <span style={{ fontWeight: 500, fontSize: '14px' }}>{field.label || field.field_key || '(без названия)'}</span>
+                            <span className="ltw-field-title">{field.label || field.field_key || '(без названия)'}</span>
                             <Badge variant="info">{fieldTypeOptions.find((o) => o.value === field.value_type)?.label || field.value_type}</Badge>
                             {field.required && <Badge variant="warning">обязательное</Badge>}
                           </div>
-                          <span style={{ display: 'flex', gap: '4px' }}>
+                          <span className="ltw-flex-gap-4">
                             <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); moveField(sectionIndex, fieldIndex, 'up'); }} disabled={fieldIndex === 0} aria-label="Переместить поле вверх">
                               <Icon name="arrow.up" size={12} />
                             </Button>
@@ -1148,17 +1147,17 @@ export default function LabTemplateWorkbench({
 
                         {/* Field content — only when expanded */}
                         {isFieldExpanded && (
-                          <div style={{ padding: '12px', display: 'grid', gap: '10px' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 0.8fr 0.8fr', gap: '8px', alignItems: 'end' }}>
-                              <label style={{ display: 'grid', gap: '6px' }}>
+                          <div className="ltw-field-content">
+                            <div className="ltw-grid-4">
+                              <label className="ltw-grid-6">
                                 <span>Ключ поля</span>
                                 <input className="macos-input" aria-label="Ключ поля" value={field.field_key} onChange={(event) => updateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
                               </label>
-                              <label style={{ display: 'grid', gap: '6px' }}>
+                              <label className="ltw-grid-6">
                                 <span>Название поля</span>
                                 <input className="macos-input" aria-label="Название поля" value={field.label} onChange={(event) => updateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
                               </label>
-                              <label style={{ display: 'grid', gap: '6px' }}>
+                              <label className="ltw-grid-6">
                                 <span>Тип значения</span>
                                 <select className="macos-input" aria-label="Тип значения" value={field.value_type} onChange={(event) => updateField(sectionIndex, fieldIndex, 'value_type', event.target.value)}>
                                   {fieldTypeOptions.map((option) => (
@@ -1166,14 +1165,14 @@ export default function LabTemplateWorkbench({
                                   ))}
                                 </select>
                               </label>
-                              <label style={{ display: 'grid', gap: '6px' }}>
+                              <label className="ltw-grid-6">
                                 <span>Единица измерения</span>
                                 <input className="macos-input" aria-label="Единица измерения" value={field.unit || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
                               </label>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.8fr 1.2fr auto', gap: '8px', alignItems: 'end' }}>
-                              <label style={{ display: 'grid', gap: '6px' }}>
+                            <div className="ltw-grid-5">
+                              <label className="ltw-grid-6">
                                 <span>Код анализируемого показателя</span>
                                 <input
                                   className="macos-input"
@@ -1183,7 +1182,7 @@ export default function LabTemplateWorkbench({
                                   onChange={(event) => updateFieldCatalog(sectionIndex, fieldIndex, 'analyte_code', event.target.value)}
                                 />
                               </label>
-                              <label style={{ display: 'grid', gap: '6px' }}>
+                              <label className="ltw-grid-6">
                                 <span>Код единицы измерения</span>
                                 <input
                                   className="macos-input"
@@ -1193,7 +1192,7 @@ export default function LabTemplateWorkbench({
                                   onChange={(event) => updateField(sectionIndex, fieldIndex, 'unit_code', event.target.value)}
                                 />
                               </label>
-                              <label style={{ display: 'grid', gap: '6px' }}>
+                              <label className="ltw-grid-6">
                                 <span>Источник нормы</span>
                                 <select className="macos-input" aria-label="Источник нормы" value={field.reference_mode} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_mode', event.target.value)}>
                                   {referenceModeOptions.map((option) => (
@@ -1203,7 +1202,7 @@ export default function LabTemplateWorkbench({
                               </label>
                               {/* PR-67 / High-10: catalog reference_mode UI — fetch from labReportingApi */}
                               {field.reference_mode === 'catalog' && field.analyte_code && (
-                                <div style={{ display: 'grid', gap: '4px' }}>
+                                <div className="ltw-label-grid">
                                   <Button
                                     variant="outline"
                                     size="small"
@@ -1231,15 +1230,15 @@ export default function LabTemplateWorkbench({
                                 </div>
                               )}
                               {field.reference_mode === 'catalog' && !field.analyte_code && (
-                                <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-muted)' }}>
+                                <span className="ltw-catalog-hint">
                                   Укажите код аналита для загрузки нормы из каталога
                                 </span>
                               )}
-                              <label style={{ display: 'grid', gap: '6px' }}>
+                              <label className="ltw-grid-6">
                                 <span>Текст нормы</span>
                                 <input className="macos-input" aria-label="Текст нормы" value={field.reference_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
                               </label>
-                              <label style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingBottom: '8px' }}>
+                              <label className="ltw-checkbox-label">
                                 <input type="checkbox" aria-label="Обязательное поле" checked={Boolean(field.required)} onChange={(event) => updateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
                                 Обязательное
                               </label>
@@ -1264,16 +1263,16 @@ export default function LabTemplateWorkbench({
                               updateField={updateField}
                             />
 
-                            <details style={{ marginTop: '8px' }}>
-                              <summary style={{ cursor: 'pointer', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                            <details className="ltw-details">
+                              <summary className="ltw-summary">
                                 Расширенные правила (видимость / подсветка) — raw JSON
                               </summary>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
-                                <label style={{ display: 'grid', gap: '6px' }}>
+                              <div className="ltw-raw-json-grid">
+                                <label className="ltw-grid-6">
                                   <span>JSON правил видимости</span>
                                   <textarea className="macos-input" aria-label="JSON правил видимости" rows={3} value={field.visibility_rule_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'visibility_rule_text', event.target.value)} />
                                 </label>
-                                <label style={{ display: 'grid', gap: '6px' }}>
+                                <label className="ltw-grid-6">
                                   <span>JSON правил подсветки</span>
                                   <textarea className="macos-input" aria-label="JSON правил подсветки" rows={3} value={field.highlight_rule_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'highlight_rule_text', event.target.value)} />
                                 </label>
@@ -1298,9 +1297,9 @@ export default function LabTemplateWorkbench({
   );
 
   const renderDesignTab = () => (
-    <div style={{ display: 'grid', gap: '18px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
-        <label style={{ display: 'grid', gap: '6px' }}>
+    <div className="ltw-grid-18">
+      <div className="ltw-grid-2-minmax">
+        <label className="ltw-grid-6">
           <span>Макет печати</span>
           <select className="macos-input" aria-label="Макет печати" value={draftVersion.layout_preset} onChange={(event) => setDraftVersion((prev) => ({ ...prev, layout_preset: event.target.value }))}>
             {layoutOptions.map((option) => (
@@ -1308,17 +1307,17 @@ export default function LabTemplateWorkbench({
             ))}
           </select>
         </label>
-        <label style={{ display: 'grid', gap: '6px' }}>
+        <label className="ltw-grid-6">
           <span>Подвал</span>
           <textarea className="macos-input" aria-label="Подвал шаблона" rows={3} value={draftVersion.footer_notes} onChange={(event) => setDraftVersion((prev) => ({ ...prev, footer_notes: event.target.value }))} />
         </label>
       </div>
 
       <div>
-        <div style={{ fontWeight: 600, marginBottom: '10px' }}>Брендирование документа</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
+        <div className="ltw-branding-title">Брендирование документа</div>
+        <div className="ltw-grid-3-minmax">
           {['document_title', 'document_subtitle', 'clinic_name', 'address', 'phone', 'logo_url'].map((key) => (
-            <label key={key} style={{ display: 'grid', gap: '6px' }}>
+            <label key={key} className="ltw-grid-6">
               <span>{brandingFieldLabels[key] || key}</span>
               <input className="macos-input" aria-label={brandingFieldLabels[key] || key} value={draftVersion.branding_overrides?.[key] || ''} onChange={(event) => updateBranding(key, event.target.value)} />
             </label>
@@ -1330,10 +1329,10 @@ export default function LabTemplateWorkbench({
 
   const renderSignersTab = () => (
     <div>
-      <div style={{ fontWeight: 600, marginBottom: '10px' }}>Подписи по умолчанию</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px' }}>
+      <div className="ltw-branding-title">Подписи по умолчанию</div>
+      <div className="ltw-grid-4-minmax">
         {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
-          <label key={key} style={{ display: 'grid', gap: '6px' }}>
+          <label key={key} className="ltw-grid-6">
             <span>{signerFieldLabels[key] || key}</span>
             <input className="macos-input" aria-label={signerFieldLabels[key] || key} value={draftVersion.signer_defaults?.[key] || ''} onChange={(event) => updateSigner(key, event.target.value)} />
           </label>
@@ -1349,44 +1348,44 @@ export default function LabTemplateWorkbench({
     const signers = draftVersion.signer_defaults || {};
 
     return (
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="ltw-grid-16">
         <Alert severity="info">
           Предпросмотр показывает структуру бланка. Финальный PDF рендерится на backend.
         </Alert>
 
         <Card variant="filled" padding="default">
-          <div style={{ textAlign: 'center', marginBottom: '16px', borderBottom: '1px solid var(--mac-border)', paddingBottom: '12px' }}>
-            {branding.clinic_name && <div style={{ fontWeight: 600, fontSize: '15px' }}>{branding.clinic_name}</div>}
-            {branding.document_title && <div style={{ fontSize: '18px', fontWeight: 700, marginTop: '4px' }}>{branding.document_title}</div>}
-            {branding.document_subtitle && <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', marginTop: '2px' }}>{branding.document_subtitle}</div>}
-            {branding.address && <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>{branding.address}</div>}
-            {branding.phone && <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{branding.phone}</div>}
+          <div className="ltw-preview-header">
+            {branding.clinic_name && <div className="ltw-section-title">{branding.clinic_name}</div>}
+            {branding.document_title && <div className="ltw-text-18 ltw-fw-700">{branding.document_title}</div>}
+            {branding.document_subtitle && <div className="ltw-text-13 ltw-text-secondary">{branding.document_subtitle}</div>}
+            {branding.address && <div className="ltw-text-12 ltw-text-secondary">{branding.address}</div>}
+            {branding.phone && <div className="ltw-text-12 ltw-text-secondary">{branding.phone}</div>}
           </div>
 
           {draftVersion.sections.map((section, sectionIndex) => (
-            <div key={sectionIndex} style={{ marginBottom: '16px' }}>
-              <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '8px', borderBottom: '1px solid var(--mac-border)', paddingBottom: '4px' }}>
+            <div key={sectionIndex} className="ltw-preview-section">
+              <div className="ltw-preview-section-title">
                 {section.title || section.key}
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <table className="ltw-preview-table">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--mac-border)' }}>
-                    <th style={{ textAlign: 'left', padding: '4px 8px' }}>Показатель</th>
-                    <th style={{ textAlign: 'left', padding: '4px 8px' }}>Значение</th>
-                    <th style={{ textAlign: 'left', padding: '4px 8px' }}>Единица</th>
-                    <th style={{ textAlign: 'left', padding: '4px 8px' }}>Норма</th>
+                  <tr className="ltw-preview-row">
+                    <th className="ltw-preview-th">Показатель</th>
+                    <th className="ltw-preview-th">Значение</th>
+                    <th className="ltw-preview-th">Единица</th>
+                    <th className="ltw-preview-th">Норма</th>
                   </tr>
                 </thead>
                 <tbody>
                   {section.fields.map((field, fieldIndex) => (
-                    <tr key={fieldIndex} style={{ borderBottom: '1px solid var(--mac-border)' }}>
-                      <td style={{ padding: '4px 8px' }}>
+                    <tr key={fieldIndex} className="ltw-preview-row">
+                      <td className="ltw-preview-td">
                         {field.label || field.field_key}
-                        {field.required && <span style={{ color: 'var(--mac-error)', marginLeft: '2px' }}>*</span>}
+                        {field.required && <span className="ltw-text-error">*</span>}
                       </td>
-                      <td style={{ padding: '4px 8px', color: 'var(--mac-text-secondary)' }}>—</td>
-                      <td style={{ padding: '4px 8px', color: 'var(--mac-text-secondary)' }}>{field.unit || ''}</td>
-                      <td style={{ padding: '4px 8px', color: 'var(--mac-text-secondary)' }}>{field.reference_text || (field.reference_mode === 'rule_based' ? '(по правилам)' : '')}</td>
+                      <td className="ltw-preview-td-secondary">—</td>
+                      <td className="ltw-preview-td-secondary">{field.unit || ''}</td>
+                      <td className="ltw-preview-td-secondary">{field.reference_text || (field.reference_mode === 'rule_based' ? '(по правилам)' : '')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1395,21 +1394,21 @@ export default function LabTemplateWorkbench({
           ))}
 
           {draftVersion.footer_notes && (
-            <div style={{ borderTop: '1px solid var(--mac-border)', paddingTop: '8px', fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+            <div className="ltw-preview-footer">
               {draftVersion.footer_notes}
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px', fontSize: '12px' }}>
+          <div className="ltw-preview-signers">
             <div>
-              <div style={{ color: 'var(--mac-text-secondary)' }}>{signers.lab_technician_label || 'Лаборант'}:</div>
-              <div style={{ marginTop: '16px', borderTop: '1px solid var(--mac-border)', paddingTop: '2px' }}>
+              <div className="ltw-text-secondary">{signers.lab_technician_label || 'Лаборант'}:</div>
+              <div className="ltw-preview-signer-line">
                 {signers.lab_technician_name || '_______________'}
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--mac-text-secondary)' }}>{signers.approver_label || 'Подпись'}:</div>
-              <div style={{ marginTop: '16px', borderTop: '1px solid var(--mac-border)', paddingTop: '2px' }}>
+              <div className="ltw-text-secondary">{signers.approver_label || 'Подпись'}:</div>
+              <div className="ltw-preview-signer-line">
                 {signers.approver_name || '_______________'}
               </div>
             </div>
@@ -1420,11 +1419,11 @@ export default function LabTemplateWorkbench({
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '16px', alignItems: 'start' }}>
+    <div className="ltw-root">
       <Card variant="filled" padding="none">
-        <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
-          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <CardHeader className="ltw-card-header">
+          <CardTitle className="ltw-card-title">
+            <span className="ltw-flex-center">
               <Icon name="rectangle.stack.badge.plus" size={20} />
               Шаблоны
             </span>
@@ -1434,44 +1433,30 @@ export default function LabTemplateWorkbench({
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '16px' }}>
+        <CardContent className="ltw-card-content">
           {/* WF-21 fix: search для консистентности с LabQueueWorkbench */}
-          <div style={{ position: 'relative', marginBottom: '8px' }}>
+          <div className="ltw-search-wrapper">
             <input
               type="search"
               value={templateSearch}
               onChange={(e) => setTemplateSearch(e.target.value)}
               placeholder="Поиск по названию, коду, семейству…"
               aria-label="Поиск шаблонов"
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '10px',
-                border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                fontSize: '14px',
-                outline: 'none',
-              }}
+              className="ltw-search-input"
             />
             {templateSearch && (
               <button
                 type="button"
                 onClick={() => setTemplateSearch('')}
                 aria-label="Очистить поиск"
-                style={{
-                  position: 'absolute', right: '8px', top: '50%',
-                  transform: 'translateY(-50%)', background: 'none',
-                  border: 'none', cursor: 'pointer',
-                  color: 'var(--mac-text-muted)', fontSize: '16px',
-                }}
+                className="ltw-search-clear"
               >
                 ×
               </button>
             )}
           </div>
 
-          <div style={{ display: 'grid', gap: '8px' }}>
+          <div className="ltw-grid-8">
             {templates
               .filter((t) => {
                 if (!templateSearch.trim()) return true;
@@ -1483,20 +1468,11 @@ export default function LabTemplateWorkbench({
                 key={template.id}
                 type="button"
                 onClick={() => onSelectTemplate(template.id)}
-                style={{
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: '14px',
-                  padding: '12px',
-                  textAlign: 'left',
-                  background: selectedTemplate?.id === template.id ? 'color-mix(in oklab, var(--mac-accent) 10%, var(--mac-bg-primary))' : 'var(--mac-bg-primary)',
-                  cursor: 'pointer',
-                  display: 'grid',
-                  gap: '6px'
-                }}
+                className={`ltw-template-btn ${selectedTemplate?.id === template.id ? 'ltw-template-btn-selected' : ''}`}
               >
-                <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>{template.name}</div>
-                <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>{template.code} • {template.family}</div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div className="ltw-fw-600">{template.name}</div>
+                <div className="ltw-text-13 ltw-text-secondary">{template.code} • {template.family}</div>
+                <div className="ltw-flex-gap-6">
                   {template.published_version_id && <Badge variant="success">Опубликован</Badge>}
                   {template.draft_version_id && <Badge variant="warning">Черновик</Badge>}
                 </div>
@@ -1507,14 +1483,14 @@ export default function LabTemplateWorkbench({
       </Card>
 
       <Card variant="filled" padding="none">
-        <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
-          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <CardHeader className="ltw-card-header">
+          <CardTitle className="ltw-card-title-gap-12">
+            <span className="ltw-flex-center">
               <Icon name="slider.horizontal.3" size={20} />
               Редактор бланка
             </span>
             {selectedTemplate && (
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div className="ltw-flex-gap-8">
                 <Button variant="outline" onClick={handleCloneTemplate} disabled={saving}>
                   <Icon name="doc.on.doc" size={16} />
                   Клонировать
@@ -1551,36 +1527,27 @@ export default function LabTemplateWorkbench({
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}>
+        <CardContent className="ltw-card-content-flat">
           {!selectedTemplate ? (
             <Alert severity="info">Выберите шаблон слева, чтобы редактировать оформление, секции и строки анализов.</Alert>
           ) : (
-            <div style={{ display: 'grid', gap: '16px' }}>
+            <div className="ltw-grid-16">
               {/* Template metadata badges */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="ltw-badges-row">
                 <Badge variant="info">{selectedTemplate.code}</Badge>
                 <Badge variant="primary">{selectedTemplate.family}</Badge>
                 {activeVersion?.status && <Badge variant={activeVersion.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus(activeVersion.status)}</Badge>}
               </div>
 
               {/* Phase 4+: editor tabs — Content / Design / Signers / Preview */}
-              <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--mac-border)', paddingBottom: '8px' }}>
+              <div className="ltw-tab-bar">
                 {EDITOR_TABS.map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setEditorTab(tab.id)}
                     aria-pressed={editorTab === tab.id}
-                    style={{
-                      padding: '8px 16px',
-                      border: 'none',
-                      background: editorTab === tab.id ? 'var(--mac-accent)' : 'transparent',
-                      color: editorTab === tab.id ? 'white' : 'var(--mac-text-primary)',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: editorTab === tab.id ? 600 : 400,
-                    }}>
+                    className={`ltw-tab-btn ${editorTab === tab.id ? 'ltw-tab-btn-active' : ''}`}>
                     {tab.label}
                   </button>
                 ))}
