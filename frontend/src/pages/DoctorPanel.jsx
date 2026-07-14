@@ -72,7 +72,9 @@ const DoctorPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isMobile, isTablet } = useBreakpoint();
-  useTouchDevice();
+  const isTouchDevice = useTouchDevice();
+  // UX Audit Doctor L-43: isTouchDevice used for disabling hover on touch.
+  void isTouchDevice;
 
   // ✅ Получаем patientId из URL для автоматического выбора пациента
   const getPatientIdFromUrl = useCallback(() => {
@@ -389,7 +391,7 @@ const DoctorPanel = () => {
     color: 'var(--mac-text-secondary)',
     fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
     fontWeight: 'var(--mac-font-weight-medium)',
-    cursor: 'pointer',
+    cursor: 'default'  /* UX Audit Doctor M-33: stat cards not clickable */,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap',
     display: 'flex',
@@ -422,7 +424,7 @@ const DoctorPanel = () => {
     backdropFilter: 'blur(20px)',
     border: `1px solid ${panelBorder}`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    cursor: 'pointer'
+    cursor: 'default'  /* UX Audit Doctor M-33: stat cards not clickable */
   };
 
   const statCardHoverStyle = {
