@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-02-25T07:03:34.692579+00:00",
+  "generated_at": "2026-07-14T07:05:33.838297+00:00",
   "summary": {
     "modules_total": 4,
     "avg_correctness": 5.0,
-    "avg_usability": 4.38
+    "avg_usability": 5.0
   },
   "modules": [
     {
@@ -44,19 +44,17 @@
         "error_handling": true,
         "empty_state": true,
         "validation_feedback": true,
-        "a11y_keyboard": false,
+        "a11y_keyboard": true,
         "recovery_actions": true
       },
       "critical_flow_status": "pass",
       "correctness_score": 5.0,
-      "usability_score": 3.75,
+      "usability_score": 5.0,
       "grade": {
         "correctness": "excellent",
-        "usability": "fair"
+        "usability": "excellent"
       },
-      "gaps": [
-        "a11y_keyboard"
-      ]
+      "gaps": []
     },
     {
       "id": "cashier_payment",
@@ -71,25 +69,22 @@
         "error_handling": true,
         "empty_state": true,
         "validation_feedback": true,
-        "a11y_keyboard": false,
+        "a11y_keyboard": true,
         "recovery_actions": true
       },
       "critical_flow_status": "pass",
       "correctness_score": 5.0,
-      "usability_score": 3.75,
+      "usability_score": 5.0,
       "grade": {
         "correctness": "excellent",
-        "usability": "fair"
+        "usability": "excellent"
       },
-      "gaps": [
-        "a11y_keyboard"
-      ]
+      "gaps": []
     },
     {
       "id": "admin_settings",
       "name": "Admin Settings",
       "files_scanned": [
-        "frontend/src/pages/AdminPanel.jsx",
         "frontend/src/pages/Settings.jsx",
         "frontend/src/hooks/useSettings.js"
       ],

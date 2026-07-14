@@ -317,7 +317,7 @@ function createLocalRateLimitError(config) {
 
 /**
  * Generic request wrapper that normalizes server error detail.
- * Usage: await apiRequest('get', '/visits', { params: { limit: 10 } })
+ * Usage: await apiRequest('get', '/visits/visits', { params: { limit: 10 } })
  */
 async function apiRequest(method, url, { params = {}, data = {} } = {}) {
   try {
