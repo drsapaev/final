@@ -569,6 +569,8 @@ const RegistrarPanel = () => {
   const loadAppointmentsInFlightRef = useRef(false);
   const autoRefreshCooldownUntilRef = useRef(0);
   const autoRefreshCooldownLoggedRef = useRef(false);
+  // UX Audit R-4.1: track last WebSocket update timestamp to skip redundant interval refresh.
+  const lastQueueUpdatedRef = useRef(0);
   useEffect(() => {
     if (initialLoadRef.current) return;
     initialLoadRef.current = true;
@@ -581,6 +583,8 @@ const RegistrarPanel = () => {
   useEffect(() => {
     const handleQueueUpdate = (event) => {
       const { action, specialty } = event.detail || {};
+      // UX Audit R-4.1: record WebSocket update timestamp to skip redundant interval refresh.
+      lastQueueUpdatedRef.current = Date.now();
       logger.info('[RegistrarPanel] Получено событие обновления очереди:', { action, specialty, detail: event.detail });
 
       // Для критических действий обновляем немедленно без silent режима
@@ -751,10 +755,19 @@ const RegistrarPanel = () => {
       if (Date.now() < autoRefreshCooldownUntilRef.current || loadAppointmentsInFlightRef.current) {
         return;
       }
+      // UX Audit R-4.1: skip interval refresh if WebSocket updated recently.
+      // Раньше: setInterval(15000) работал ВСЕГДА, даже когда WebSocket уже
+      // обновил данные. Это создавало race conditions и дублирующие network-запросы.
+      // Теперь: если queueUpdated event был < 30s назад, пропускаем interval refresh.
+      const lastWsUpdate = lastQueueUpdatedRef.current;
+      if (lastWsUpdate && (Date.now() - lastWsUpdate) < 30000) {
+        logger.info('⏰ Автообновление: пропускаем (WebSocket обновил недавно)');
+        return;
+      }
       // Загружаем только записи тихо, без смены индикаторов
       logger.info('⏰ Автообновление: вызов loadAppointments (dialog-open resilient)');
       loadAppointments({ silent: true, source: 'auto_refresh' });
-    }, 15000);
+    }, 30000); // UX Audit R-4.1: 15s → 30s (WebSocket покрывает real-time)
 
     return () => clearInterval(id);
   }, [autoRefresh, showWizard, loadAppointments]);
