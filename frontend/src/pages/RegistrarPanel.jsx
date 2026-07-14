@@ -1283,17 +1283,42 @@ const RegistrarPanel = () => {
         openRecordEditor(row);
         logger.info('Редактирование записи:', row);
         break;
-      case 'in_cabinet':
+      case 'in_cabinet': {
+        // UX Audit R-1.2: добавлен confirm для критичных действий в context menu.
+        // Раньше: handleContextMenuAction вызывал updateAppointmentStatus напрямую,
+        // без подтверждения. В то же время inline onActionClick в таблице требовал
+        // confirm. Это нарушение Nielsen #4 (consistency) + #5 (error prevention).
+        const inCabinetName = row.patient_fio || row.patient_name || '';
+        const inCabinetOk = await confirm({
+          title: 'Отправить в кабинет',
+          message: `Отправить пациента «${inCabinetName}» в кабинет?`,
+          confirmLabel: 'Отправить',
+          cancelLabel: 'Отмена',
+          intent: 'primary',
+        });
+        if (!inCabinetOk) break;
         await updateAppointmentStatus(row.id, 'in_cabinet', '', row);
         notify.success('Пациент отправлен в кабинет');
         break;
+      }
       case 'call':
         await handleStartVisit(row);
         break;
-      case 'complete':
+      case 'complete': {
+        // UX Audit R-1.2: confirm для завершения приёма в context menu.
+        const completeName = row.patient_fio || row.patient_name || '';
+        const completeOk = await confirm({
+          title: 'Завершение приёма',
+          message: `Завершить приём пациента «${completeName}»?`,
+          confirmLabel: 'Завершить',
+          cancelLabel: 'Отмена',
+          intent: 'primary',
+        });
+        if (!completeOk) break;
         await updateAppointmentStatus(row.id, 'done', '', row);
         notify.success('Приём завершён');
         break;
+      }
       case 'payment':
         setPaymentDialog({ open: true, row, paid: false, source: 'context' });
         break;
@@ -1336,7 +1361,7 @@ const RegistrarPanel = () => {
         logger.info('Неизвестное действие:', action);
         break;
     }
-  }, [updateAppointmentStatus, handleStartVisit, openRecordPreview, openRecordEditor]);
+  }, [updateAppointmentStatus, handleStartVisit, openRecordPreview, openRecordEditor, confirm, setPaymentDialog, setPrintDialog, setCancelDialog, setForceMajeureModal]);
 
   return (
     <div
