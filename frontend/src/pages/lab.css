@@ -184,3 +184,360 @@
   cursor: pointer;
   font-size: 14px;
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+ * L-H-4 fix: LabQueueWorkbench — миграция inline-стилей в CSS.
+ * Аналогичная миграция уже выполнена для Cashier/Registrar/Admin/Doctor.
+ * Классы используют macOS design system tokens (var(--mac-*)).
+ * ────────────────────────────────────────────────────────────────────── */
+
+.lqw-root {
+  display: grid;
+  gap: var(--mac-spacing-4);
+}
+
+.lqw-card-header {
+  background: var(--mac-bg-tertiary);
+  border-bottom: 1px solid var(--mac-border);
+  padding: var(--mac-spacing-4);
+}
+
+.lqw-card-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.lqw-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-2);
+  align-items: center;
+}
+
+.lqw-card-content {
+  padding: var(--mac-spacing-4);
+  background: var(--mac-bg-secondary);
+}
+
+.lqw-card-grid {
+  display: grid;
+  gap: var(--mac-spacing-4);
+}
+
+.lqw-queue-card {
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-xl);
+  background: var(--mac-bg-primary);
+  padding: var(--mac-spacing-4);
+  display: grid;
+  gap: var(--mac-spacing-3);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lqw-queue-card:hover {
+  border-color: color-mix(in oklab, var(--mac-accent) 40%, var(--mac-border));
+}
+
+.lqw-queue-card-selected {
+  border-color: var(--mac-accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--mac-accent) 20%, transparent);
+}
+
+.lqw-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--mac-spacing-3);
+  align-items: flex-start;
+}
+
+.lqw-card-info {
+  display: grid;
+  gap: var(--mac-spacing-2);
+}
+
+.lqw-card-name {
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.lqw-card-meta {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-base);
+}
+
+.lqw-card-services {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-base);
+  line-height: 1.5;
+}
+
+.lqw-card-services strong {
+  color: var(--mac-text-primary);
+}
+
+.lqw-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--mac-spacing-3);
+  align-items: center;
+}
+
+.lqw-card-id {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+}
+
+/* Search & filter bar (L-H-4) */
+.lqw-search-filter-row {
+  display: flex;
+  gap: var(--mac-spacing-3);
+  flex-wrap: wrap;
+  margin-top: var(--mac-spacing-3);
+  align-items: center;
+}
+
+.lqw-search-wrapper {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.lqw-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mac-text-muted);
+  pointer-events: none;
+}
+
+.lqw-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  border-radius: var(--mac-radius-lg);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  outline: none;
+}
+
+.lqw-search-input:focus {
+  border-color: var(--mac-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--mac-accent) 20%, transparent);
+}
+
+.lqw-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mac-text-muted);
+  padding: var(--mac-spacing-1);
+  font-size: var(--mac-font-size-lg);
+  line-height: 1;
+}
+
+.lqw-status-filter-group {
+  display: flex;
+  gap: var(--mac-spacing-1);
+}
+
+.lqw-status-filter-btn {
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  cursor: pointer;
+  font-size: var(--mac-font-size-sm);
+  font-weight: 400;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.lqw-status-filter-btn:hover {
+  border-color: var(--mac-accent);
+}
+
+.lqw-status-filter-btn-active {
+  border-color: var(--mac-accent);
+  background: var(--mac-accent);
+  color: white;
+  font-weight: 600;
+}
+
+.lqw-sort-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.lqw-sort-label {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-muted);
+}
+
+.lqw-sort-select {
+  font-size: var(--mac-font-size-xs);
+  padding: 4px 8px;
+  width: auto;
+}
+
+.lqw-filter-count {
+  margin-top: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-muted);
+}
+
+/* Skeleton loading (L-H-4 + L-M-4 fix: prefers-reduced-motion) */
+.lqw-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--mac-border) 25%,
+    var(--mac-bg-secondary) 50%,
+    var(--mac-border) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--mac-radius-sm);
+  animation: lqw-skeleton-shimmer 1.5s infinite;
+}
+
+@keyframes lqw-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lqw-skeleton {
+    animation: none;
+    background: var(--mac-bg-tertiary);
+  }
+}
+
+/* History card (L-H-4) */
+.lqw-history-card {
+  border: 1px solid var(--mac-border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--mac-bg-primary);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--mac-spacing-3);
+  align-items: center;
+}
+
+.lqw-history-info {
+  display: grid;
+  gap: var(--mac-spacing-1);
+}
+
+.lqw-history-title {
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.lqw-history-meta {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+}
+
+.lqw-history-badges {
+  display: flex;
+  gap: var(--mac-spacing-2);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* MaskedPhone button (L-H-4 + L-M-5 fix) */
+.lqw-masked-phone {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.lqw-masked-phone-empty {
+  color: var(--mac-text-secondary);
+}
+
+/* PII details summary (L-H-4 + L-M-5 fix) */
+.lqw-pii-details {
+  display: inline;
+}
+
+.lqw-pii-summary {
+  display: inline-block;
+  cursor: pointer;
+  color: var(--mac-text-muted);
+  list-style: none;
+}
+
+.lqw-pii-value {
+  margin-left: 6px;
+  font-family: monospace;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * L-H-5 fix: LabReportWorkbench — responsive field grid.
+ * На tablet/mobile 5-колоночная grid сжимается в нечитаемое.
+ * На узких экранах поле + результат переходят в 2-колоночный stack.
+ * ────────────────────────────────────────────────────────────────────── */
+
+.lrw-field-row {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1.2fr)
+    minmax(140px, 0.9fr)
+    minmax(80px, 0.5fr)
+    minmax(90px, 0.7fr)
+    minmax(70px, 0.4fr);
+  gap: var(--mac-spacing-2);
+  align-items: center;
+}
+
+.lrw-field-label {
+  display: grid;
+  gap: var(--mac-spacing-1);
+}
+
+.lrw-field-label-name {
+  color: var(--mac-text-primary);
+}
+
+.lrw-field-meta {
+  display: grid;
+  gap: var(--mac-spacing-1);
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-xs);
+}
+
+@media (max-width: 1024px) {
+  /* Tablet: 3 колонки — label/value/unit, флаг + обязательное в новую строку */
+  .lrw-field-row {
+    grid-template-columns:
+      minmax(180px, 1.5fr)
+      minmax(120px, 1fr)
+      minmax(60px, 0.4fr);
+  }
+}
+
+@media (max-width: 720px) {
+  /* Mobile: вертикальный stack, каждое поле на своей строке */
+  .lrw-field-row {
+    grid-template-columns: 1fr;
+    gap: var(--mac-spacing-1);
+  }
+}
+

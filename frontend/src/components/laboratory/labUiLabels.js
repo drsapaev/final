@@ -1,26 +1,34 @@
 /**
  * Lab UI labels — PR-73: now locale-aware via useTranslation.
  *
+ * L-H-3 fix: маппинг статусов делегирован в utils/labStatusConfig.js.
+ * Этот модуль теперь содержит только i18n-обёртки и payment/specialty
+ * labels (которые пока не мигрированы в shared config).
+ *
  * Usage in components:
  *   const { t } = useTranslation();
  *   const labels = getLabLabels(t);
  *   labels.status('waiting')  // → 'Ожидает' / 'Kutmoqda' / 'Waiting'
+ *
+ *   // Для badge-variant и stepper используйте labStatusConfig напрямую:
+ *   import { getLabStatusConfig, getLabReportStepIndex } from './utils/labStatusConfig';
  */
 
+import {
+  LAB_REPORT_STATUS_CONFIG,
+  LAB_QUEUE_STATUS_CONFIG,
+  getLabStatusConfig,
+} from './utils/labStatusConfig';
+
 export function getLabLabels(t) {
+  // L-H-3 fix: читаем из единого источника истины.
   const statusLabels = {
-    waiting: t('labWaiting'),
-    confirmed: t('labConfirmed'),
-    pending: t('labWaiting'),
-    called: t('labCalled'),
-    in_progress: t('labInProgress'),
-    completed: t('labCompleted'),
-    done: t('labCompleted'),
-    DRAFT: t('labDraft'),
-    IN_PROGRESS: t('labFilling'),
-    READY: t('labReady'),
-    FINALIZED: t('labFinalized'),
-    PRINTED: t('labPrinted')
+    ...Object.fromEntries(
+      Object.entries(LAB_QUEUE_STATUS_CONFIG).map(([key, cfg]) => [key, cfg.label])
+    ),
+    ...Object.fromEntries(
+      LAB_REPORT_STATUS_CONFIG.map((cfg) => [cfg.key, cfg.label])
+    ),
   };
 
   const paymentStatusLabels = {
@@ -57,28 +65,17 @@ export function getLabLabels(t) {
     specialtyLabels,
     severityLabels,
     signerFieldLabels,
-    formatLabStatus: (status) => statusLabels[status] || status || t('labUnknown'),
+    formatLabStatus: (status) => getLabStatusConfig(status).label,
     formatPaymentStatus: (status) => paymentStatusLabels[status] || status || t('labUnknown'),
     formatSpecialtyLabel: (specialty) => specialtyLabels[specialty] || specialty || t('labSpecialtyLab'),
     formatSeverityLabel: (severity) => severityLabels[severity] || severity || t('labSeverityClean'),
   };
 }
 
-// Legacy static exports for backward compatibility (hardcoded Russian)
-const _statusLabels = {
-  waiting: 'Ожидает',
-  confirmed: 'Подтверждён',
-  pending: 'Ожидает',
-  called: 'Вызван',
-  in_progress: 'В работе',
-  completed: 'Завершён',
-  done: 'Завершён',
-  DRAFT: 'Черновик',
-  IN_PROGRESS: 'Заполняется',
-  READY: 'Готов к проверке',
-  FINALIZED: 'Утверждён',
-  PRINTED: 'Напечатан'
-};
+// Legacy static exports for backward compatibility (hardcoded Russian).
+// L-H-3 fix: label/variant берутся из labStatusConfig.js — единый источник.
+// Оставлены только payment/specialty/severity — они не входят в status-config
+// (относятся к разным доменам: оплата, специализация, severity-флаги).
 
 const _paymentStatusLabels = {
   pending: 'Не оплачено',
@@ -108,18 +105,13 @@ export const signerFieldLabels = {
   approver_name: 'ФИО утверждающего'
 };
 
+// L-H-3 fix: formatLabStatus и getLabStatusVariant делегируют в labStatusConfig.
 export function formatLabStatus(status) {
-  return _statusLabels[status] || status || 'Неизвестно';
+  return getLabStatusConfig(status).label;
 }
 
 export function getLabStatusVariant(status) {
-  if (status === 'FINALIZED' || status === 'PRINTED' || status === 'completed' || status === 'done') {
-    return 'success';
-  }
-  if (status === 'READY' || status === 'called' || status === 'in_progress' || status === 'IN_PROGRESS') {
-    return 'primary';
-  }
-  return 'warning';
+  return getLabStatusConfig(status).variant;
 }
 
 export function formatPaymentStatus(status) {

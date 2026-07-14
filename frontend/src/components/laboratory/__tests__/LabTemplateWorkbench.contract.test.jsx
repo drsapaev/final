@@ -7,26 +7,37 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
+
+// L-H-6 fix: helper-функции вынесены в templateEditor/utils.js.
+// Контракт-тест обновлён, чтобы читать оба файла.
 const source = fs.readFileSync(
   path.join(ROOT, 'components/laboratory/LabTemplateWorkbench.jsx'),
   'utf8'
 );
 
-function sourceBlock(startMarker, endMarker) {
-  const start = source.indexOf(startMarker);
+const utilsSource = fs.readFileSync(
+  path.join(ROOT, 'components/laboratory/templateEditor/utils.js'),
+  'utf8'
+);
+
+function blockFromFile(fileContent, startMarker, endMarker) {
+  const start = fileContent.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
-  const end = source.indexOf(endMarker, start);
+  const end = fileContent.indexOf(endMarker, start);
   expect(end).toBeGreaterThan(start);
-  return source.slice(start, end);
+  return fileContent.slice(start, end);
 }
 
 describe('LabTemplateWorkbench template version command contract', () => {
   it('uses backend-owned template version actions instead of status for draft creation', () => {
-    const helperBlock = sourceBlock(
+    // helper теперь в utils.js
+    const helperBlock = blockFromFile(
+      utilsSource,
       'function hasTemplateVersionAction(version, action) {',
       'function parseJsonInput(value) {'
     );
-    const ensureDraftBlock = sourceBlock(
+    const ensureDraftBlock = blockFromFile(
+      source,
       'async function ensureDraftVersion() {',
       'async function handleSaveTemplate() {'
     );

@@ -1,5 +1,9 @@
 import PropTypes from 'prop-types';
 import { Icon } from '../ui/macos';
+import {
+  LAB_REPORT_STATUS_CONFIG,
+  getLabReportStepIndex,
+} from './utils/labStatusConfig';
 
 /**
  * P-04 fix: LabStatusStepper выделен в отдельный файл.
@@ -10,21 +14,11 @@ import { Icon } from '../ui/macos';
  *
  * Раньше статус отображался одним Badge без контекста «куда двигаться
  * дальше». Stepper показывает пройденные шаги, текущий и будущие.
+ *
+ * L-H-3 fix: вместо локального LAB_REPORT_STEPS используется единый
+ * источник истины — utils/labStatusConfig.js. Маппинг статусов больше
+ * не дублируется между этим файлом и labUiLabels.js.
  */
-const LAB_REPORT_STEPS = [
-  { key: 'DRAFT',       label: 'Черновик' },
-  { key: 'IN_PROGRESS', label: 'Заполняется' },
-  { key: 'READY',       label: 'Готов к проверке' },  // PR-59: was missing from stepper
-  { key: 'FINALIZED',   label: 'Утверждён' },
-  { key: 'PRINTED',     label: 'Напечатан' },
-];
-
-function getLabReportStepIndex(status) {
-  if (!status) return -1;
-  const idx = LAB_REPORT_STEPS.findIndex((s) => s.key === status);
-  return idx;
-}
-
 export default function LabStatusStepper({ status }) {
   const currentIndex = getLabReportStepIndex(status);
   if (currentIndex < 0) {
@@ -44,11 +38,11 @@ export default function LabStatusStepper({ status }) {
         marginTop: 'var(--mac-spacing-2)',
       }}
     >
-      {LAB_REPORT_STEPS.map((step, index) => {
+      {LAB_REPORT_STATUS_CONFIG.map((step, index) => {
         const isCompleted = index < currentIndex;
         const isCurrent = index === currentIndex;
         const isFuture = index > currentIndex;
-        const isLast = index === LAB_REPORT_STEPS.length - 1;
+        const isLast = index === LAB_REPORT_STATUS_CONFIG.length - 1;
 
         return (
           <div

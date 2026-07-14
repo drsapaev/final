@@ -14,7 +14,9 @@
 export const LAB_REPORT_ACTION_CAN_FIELD = {
   edit: 'can_edit',
   save_draft: 'can_save_draft',
-  mark_ready: 'can_mark_ready',
+  // L-H-2 fix: mark_ready удалён — UI-кнопка убрана в WF-round5.
+  // Если backend вернёт can_mark_ready в available_actions, фронт его
+  // проигнорирует (нет UI-действия). Чтобы вернуть — добавить UI + тесты.
   finalize: 'can_finalize',
   revise: 'can_revise',
   print: 'can_print'

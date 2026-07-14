@@ -846,17 +846,11 @@ export default function LabReportWorkbench({
                         return (
                           <div
                             key={field.field_key}
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns:
-                                'minmax(220px, 1.2fr) minmax(140px, 0.9fr) minmax(80px, 0.5fr) minmax(90px, 0.7fr) minmax(70px, 0.4fr)',
-                              gap: 'var(--mac-spacing-2)',
-                              alignItems: 'center'
-                            }}
+                            className="lrw-field-row"
                           >
-                            <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
-                              <strong style={{ color: 'var(--mac-text-primary)' }}>{field.label}</strong>
-                              <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
+                            <div className="lrw-field-label">
+                              <strong className="lrw-field-label-name">{field.label}</strong>
+                              <div className="lrw-field-meta">
                                 <span>Норма: {field.reference_text || 'не задана'}</span>
                                 {field.resolved_flag_meta?.matched_threshold && (
                                   <span>
