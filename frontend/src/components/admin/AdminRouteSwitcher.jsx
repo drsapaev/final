@@ -122,7 +122,8 @@ export default function AdminRouteSwitcher() {
     >
       <div style={switcherLabelStyle}>
         <ArrowLeftRight size={14} aria-hidden="true" />
-        Быстрый переход между экранами
+        {/* UX Audit Admin #2.1: переименовано для соответствия фактическому функционалу (только 2 маршрута). */}
+        Сводка и аналитика
       </div>
       <div style={routeGridStyle}>
         {switcherRoutes.map((route) => {
