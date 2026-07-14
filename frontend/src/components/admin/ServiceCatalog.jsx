@@ -18,6 +18,7 @@ import {
   X,
   RefreshCw,
   AlertCircle,
+  Activity,
   Heart,
   Scissors,
   Stethoscope,
@@ -118,12 +119,16 @@ const ServiceCatalog = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Иконки специальностей
+  // UX Audit Admin #3.9: унифицированы ключи с SERVICE_GROUP_LABELS.
   const specialtyIcons = {
     cardiology: Heart,
+    ecg: Activity,
     dermatology: Stethoscope,
-    stomatology: Scissors,
+    dental: Scissors,
+    stomatology: Scissors, // alias для обратной совместимости
     laboratory: TestTube,
-    physiotherapy: Package // Можно заменить на более подходящую иконку
+    procedures: Package,
+    physiotherapy: Package, // alias для обратной совместимости
   };
 
   const specialtyColors = {
