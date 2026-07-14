@@ -38,6 +38,16 @@ import {
   Alert,
   Skeleton,
 } from '../components/ui/macos';
+// UX Audit #4.6: Recharts для почасовой статистики (вместо inline-баров на Box sx).
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+} from 'recharts';
 
 // ✅ Компоненты для возвратов
 import RefundRequestsTable from '../components/cashier/RefundRequestsTable';
@@ -1916,39 +1926,51 @@ const CashierPanel = () => {
           </Dialog>
 
           {/* ✅ v2.0: Диалог почасовой статистики */}
+          {/* UX Audit #4.6: Recharts вместо inline-баров на Box sx={{...}}.
+              Раньше: примитивный bar chart без осей, без интерактива, без tooltip.
+              Теперь: полноценный BarChart с XAxis/YAxis/Tooltip/CartesianGrid. */}
           <Dialog open={showHourlyChart} onClose={() => setShowHourlyChart(false)}>
             <DialogTitle>
               Почасовая статистика за {selectedDate}
             </DialogTitle>
             <DialogContent>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {hourlyStats.filter((h) => h.count > 0).length > 0 ?
-                hourlyStats.filter((h) => h.count > 0).map((h) =>
-                <Box key={h.hour} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Typography sx={{ width: 60, fontWeight: 600 }}>{h.hour}:00</Typography>
-                      <Box sx={{
-                    flex: 1,
-                    height: 24,
-                    backgroundColor: 'rgba(52, 199, 89, 0.2)',
-                    borderRadius: 4,
-                    position: 'relative'
-                  }}>
-                        <Box sx={{
-                      width: `${Math.min(100, h.count / Math.max(...hourlyStats.map((s) => s.count)) * 100)}%`,
-                      height: '100%',
-                      backgroundColor: 'var(--mac-success)',
-                      borderRadius: 4
-                    }} />
-                      </Box>
-                      <Typography sx={{ width: 80, textAlign: 'right' }}>
-                        {h.count} / {formatUZS(h.amount)}
-                      </Typography>
-                    </Box>
-                ) :
-
+              {hourlyStats.filter((h) => h.count > 0).length > 0 ? (
+                <div className="cashier-hourly-chart">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={hourlyStats.filter((h) => h.count > 0)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--mac-border, #d8dde8)" />
+                      <XAxis
+                        dataKey="hour"
+                        tickFormatter={(h) => `${h}:00`}
+                        stroke="var(--mac-text-secondary, #6b7280)"
+                        fontSize={12}
+                      />
+                      <YAxis
+                        stroke="var(--mac-text-secondary, #6b7280)"
+                        fontSize={12}
+                        allowDecimals={false}
+                      />
+                      <RechartsTooltip
+                        contentStyle={{
+                          background: 'var(--mac-surface, white)',
+                          border: '1px solid var(--mac-border, #d8dde8)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                        }}
+                        labelFormatter={(h) => `${h}:00`}
+                        formatter={(value, name) => {
+                          if (name === 'count') return [value, 'Платежей'];
+                          if (name === 'amount') return [formatUZS(value), 'Сумма'];
+                          return [value, name];
+                        }}
+                      />
+                      <Bar dataKey="count" fill="var(--mac-success, #34c759)" radius={[4, 4, 0, 0]} name="count" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
                 <Typography color="textSecondary">Нет платежей за этот день</Typography>
-                }
-              </Box>
+              )}
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setShowHourlyChart(false)}>Закрыть</Button>

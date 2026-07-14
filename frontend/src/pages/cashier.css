@@ -469,3 +469,16 @@
 .cashier-empty-cell {
   padding: 24px 16px;
 }
+
+/* ─── Hourly chart (UX Audit #4.6) ─── */
+.cashier-hourly-chart {
+  width: 100%;
+  min-width: 400px;
+  padding: 8px 0;
+}
+
+@media (max-width: 640px) {
+  .cashier-hourly-chart {
+    min-width: 280px;
+  }
+}
