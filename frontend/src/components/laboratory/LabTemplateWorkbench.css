@@ -1,0 +1,537 @@
+/**
+ * LabTemplateWorkbench — Phase 3 CSS migration.
+ * Extracted from LabTemplateWorkbench.jsx (144 inline style blocks → 0 layout blocks).
+ * All styles use var(--mac-*) design tokens.
+ */
+
+/* ─── Layout ─── */
+.ltw-root {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.ltw-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.ltw-grid-6 {
+  display: grid;
+  gap: 6px;
+}
+
+.ltw-grid-8 {
+  display: grid;
+  gap: 8px;
+}
+
+.ltw-grid-10 {
+  display: grid;
+  gap: 10px;
+}
+
+.ltw-grid-16 {
+  display: grid;
+  gap: 16px;
+}
+
+.ltw-grid-18 {
+  display: grid;
+  gap: 18px;
+}
+
+.ltw-flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ltw-flex-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ltw-flex-gap-4 {
+  display: flex;
+  gap: 4px;
+}
+
+.ltw-flex-gap-6 {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ltw-flex-gap-8 {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ─── Form elements ─── */
+.ltw-form-grid {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.ltw-label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ltw-label-grid {
+  display: grid;
+  gap: 4px;
+}
+
+.ltw-label-grid-6 {
+  display: grid;
+  gap: 6px;
+}
+
+.ltw-input-full {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ltw-checkbox-label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-bottom: 8px;
+}
+
+/* ─── Section / field cards ─── */
+.ltw-section-card {
+  border: 1px solid var(--mac-border);
+  border-radius: 16px;
+  background: var(--mac-bg-primary);
+  overflow: hidden;
+}
+
+.ltw-field-card {
+  border: 1px solid color-mix(in oklab, var(--mac-border) 80%, transparent);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ltw-case-card {
+  border: 1px solid color-mix(in oklab, var(--mac-border) 70%, transparent);
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.ltw-default-card {
+  border: 1px dashed var(--mac-border);
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.ltw-rule-editor {
+  border: 1px solid var(--mac-border);
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+/* ─── Collapsible headers ─── */
+.ltw-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.ltw-section-header-expanded {
+  border-bottom: 1px solid var(--mac-border);
+}
+
+.ltw-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.ltw-field-header-expanded {
+  background: var(--mac-bg-secondary);
+}
+
+.ltw-section-content {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.ltw-field-content {
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+/* ─── Text styles ─── */
+.ltw-text-12 {
+  font-size: 12px;
+}
+
+.ltw-text-13 {
+  font-size: 13px;
+}
+
+.ltw-text-14 {
+  font-size: 14px;
+}
+
+.ltw-text-15 {
+  font-size: 15px;
+}
+
+.ltw-text-18 {
+  font-size: 18px;
+}
+
+.ltw-text-secondary {
+  color: var(--mac-text-secondary);
+}
+
+.ltw-text-muted {
+  color: var(--mac-text-muted);
+}
+
+.ltw-text-error {
+  color: var(--mac-error);
+}
+
+.ltw-fw-500 {
+  font-weight: 500;
+}
+
+.ltw-fw-600 {
+  font-weight: 600;
+}
+
+.ltw-fw-700 {
+  font-weight: 700;
+}
+
+/* ─── Grid templates ─── */
+.ltw-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: end;
+}
+
+.ltw-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 0.5fr 1fr;
+  gap: 8px;
+  align-items: end;
+}
+
+.ltw-grid-3-ranges {
+  display: grid;
+  grid-template-columns: 1fr 0.5fr 0.5fr;
+  gap: 8px;
+  align-items: end;
+}
+
+.ltw-grid-4 {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 0.8fr 0.8fr;
+  gap: 8px;
+  align-items: end;
+}
+
+.ltw-grid-5 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.8fr 1.2fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.ltw-grid-2-minmax {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ltw-grid-3-minmax {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ltw-grid-4-minmax {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ltw-grid-2-50-50 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* ─── Search ─── */
+.ltw-search-wrapper {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.ltw-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.ltw-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mac-text-muted);
+  font-size: 16px;
+}
+
+/* ─── Template list button ─── */
+.ltw-template-btn {
+  border: 1px solid var(--mac-border);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: left;
+  background: var(--mac-bg-primary);
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+}
+
+.ltw-template-btn-selected {
+  background: color-mix(in oklab, var(--mac-accent) 10%, var(--mac-bg-primary));
+}
+
+/* ─── Card headers ─── */
+.ltw-card-header {
+  background: var(--mac-bg-tertiary);
+  border-bottom: 1px solid var(--mac-border);
+  padding: 16px;
+}
+
+.ltw-card-content {
+  padding: 16px;
+  background: var(--mac-bg-secondary);
+  display: grid;
+  gap: 16px;
+}
+
+.ltw-card-content-flat {
+  padding: 16px;
+  background: var(--mac-bg-secondary);
+}
+
+.ltw-card-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ltw-card-title-gap-12 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ─── Tabs ─── */
+.ltw-tab-bar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--mac-border);
+  padding-bottom: 8px;
+}
+
+.ltw-tab-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--mac-text-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.ltw-tab-btn-active {
+  background: var(--mac-accent);
+  color: white;
+  font-weight: 600;
+}
+
+/* ─── Preview ─── */
+.ltw-preview-header {
+  text-align: center;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--mac-border);
+  padding-bottom: 12px;
+}
+
+.ltw-preview-section {
+  margin-bottom: 16px;
+}
+
+.ltw-preview-section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--mac-border);
+  padding-bottom: 4px;
+}
+
+.ltw-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ltw-preview-th {
+  text-align: left;
+  padding: 4px 8px;
+}
+
+.ltw-preview-td {
+  padding: 4px 8px;
+}
+
+.ltw-preview-td-secondary {
+  padding: 4px 8px;
+  color: var(--mac-text-secondary);
+}
+
+.ltw-preview-row {
+  border-bottom: 1px solid var(--mac-border);
+}
+
+.ltw-preview-footer {
+  border-top: 1px solid var(--mac-border);
+  padding-top: 8px;
+  font-size: 12px;
+  color: var(--mac-text-secondary);
+}
+
+.ltw-preview-signers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+  font-size: 12px;
+}
+
+.ltw-preview-signer-line {
+  margin-top: 16px;
+  border-top: 1px solid var(--mac-border);
+  padding-top: 2px;
+}
+
+/* ─── Details / summary ─── */
+.ltw-details {
+  margin-top: 8px;
+}
+
+.ltw-summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--mac-text-secondary);
+}
+
+.ltw-summary-12 {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--mac-text-secondary);
+}
+
+.ltw-raw-json-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ltw-raw-json-textarea {
+  margin-top: 6px;
+}
+
+/* ─── Badges row ─── */
+.ltw-badges-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ─── Hint text ─── */
+.ltw-hint {
+  font-size: 12px;
+  color: var(--mac-text-secondary);
+}
+
+.ltw-hint-13 {
+  font-size: 13px;
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Catalog hint ─── */
+.ltw-catalog-hint {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-muted);
+}
+
+/* ─── Section title ─── */
+.ltw-section-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.ltw-field-title {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* ─── Branding title ─── */
+.ltw-branding-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
