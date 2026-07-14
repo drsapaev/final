@@ -581,7 +581,7 @@ const DoctorPanel = () => {
     }
 
     event.currentTarget.style.background = hovered ? interactiveSurfaceHover : interactiveSurface;
-    event.currentTarget.style.transform = hovered ? 'translateY(-2px)' : 'translateY(0)';
+    event.currentTarget.style.transform = hovered ? 'translateY(-1px)' : 'translateY(0)';
   };
 
   // Рендер
