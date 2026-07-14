@@ -195,11 +195,10 @@ export const labReportingApi = {
     });
   },
 
-  markReady(instanceId) {
-    return request(`/lab/report-instances/${instanceId}/mark-ready`, {
-      method: 'POST'
-    });
-  },
+  // L-H-2 fix: markReady endpoint удалён как мёртвый код.
+  // WF-round5 убрал UI-кнопку (действие было функционально пустой операцией —
+  // backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
+  // Если backend endpoint потребуется снова — добавлять вместе с UI-кнопкой.
 
   finalize(instanceId) {
     return request(`/lab/report-instances/${instanceId}/finalize`, {

@@ -2,635 +2,30 @@ import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-  Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea,
 } from '../ui/macos';
+import { useConfirm } from '../common/ConfirmDialog';
 import { labReportingApi } from '../../api/labReporting';
 import './LabTemplateWorkbench.css';
 
-const blankField = () => ({
-  analyte_code: '',
-  unit_code: '',
-  field_key: '',
-  label: '',
-  value_type: 'numeric',
-  unit: '',
-  reference_mode: 'static_text',
-  reference_text: '',
-  reference_rule: null,
-  visibility_rule: null,
-  highlight_rule: null,
-  choice_options: null,
-  sort_order: 0,
-  required: false
-});
-
-const blankSection = (index) => ({
-  key: `section_${index}`,
-  title: `Раздел ${index}`,
-  sort_order: index * 10,
-  section_style: {},
-  fields: [blankField()]
-});
-
-const blankVersion = {
-  layout_preset: 'lab_table_classic_v1',
-  page_settings: { paper_size: 'A4', orientation: 'portrait' },
-  branding_overrides: {
-    document_title: '',
-    document_subtitle: '',
-    clinic_name: '',
-    address: '',
-    phone: '',
-    logo_url: ''
-  },
-  signer_defaults: {
-    lab_technician_label: 'Лаборант',
-    lab_technician_name: '',
-    approver_label: 'Подпись',
-    approver_name: ''
-  },
-  footer_notes: '',
-  sections: [blankSection(1)]
-};
-
-const layoutOptions = [
-  { value: 'lab_table_classic_v1', label: 'Классический' },
-  { value: 'lab_table_compact_v1', label: 'Компактный' }
-];
-
-const versionStatusLabels = {
-  PUBLISHED: 'Опубликован',
-  DRAFT: 'Черновик',
-  ARCHIVED: 'Архив'
-};
-
-const brandingFieldLabels = {
-  document_title: 'Заголовок документа',
-  document_subtitle: 'Подзоловок документа',
-  clinic_name: 'Название клиники',
-  address: 'Адрес',
-  phone: 'Телефон',
-  logo_url: 'Логотип (URL)'
-};
-
-const signerFieldLabels = {
-  lab_technician_label: 'Подпись лаборанта',
-  lab_technician_name: 'ФИО лаборанта',
-  approver_label: 'Подпись утверждающего',
-  approver_name: 'ФИО утверждающего'
-};
-
-const fieldTypeOptions = [
-  { value: 'numeric', label: 'Число' },
-  { value: 'text', label: 'Текст' },
-  { value: 'choice', label: 'Выбор из списка' },
-  { value: 'multiline', label: 'Многострочный текст' }
-];
-
-const referenceModeOptions = [
-  { value: 'static_text', label: 'Текстовая норма' },
-  { value: 'rule_based', label: 'Норма по правилам' },
-  { value: 'catalog', label: 'Из каталога' }
-];
-
-// Phase 4+ refactor: editor tabs — Content / Design / Signers / Preview.
-const EDITOR_TABS = [
-  { id: 'content',  label: 'Содержимое' },
-  { id: 'design',   label: 'Оформление' },
-  { id: 'signers',  label: 'Подписи' },
-  { id: 'preview',  label: 'Предпросмотр' },
-];
-
-function formatVersionStatus(status) {
-  return versionStatusLabels[status] || status;
-}
-
-const TEMPLATE_VERSION_ACTION_CAN_FIELD = {
-  update: 'can_update',
-  publish: 'can_publish',
-  create_draft: 'can_create_draft'
-};
-
-function hasTemplateVersionAction(version, action) {
-  const normalizedAction = String(action || '').trim().toLowerCase();
-  if (!normalizedAction) {
-    return false;
-  }
-
-  if (Array.isArray(version?.available_actions)) {
-    return version.available_actions.some(
-      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
-    );
-  }
-
-  const flagName = TEMPLATE_VERSION_ACTION_CAN_FIELD[normalizedAction];
-  if (flagName && Object.prototype.hasOwnProperty.call(version || {}, flagName)) {
-    return Boolean(version[flagName]);
-  }
-
-  return false;
-}
-
-function parseJsonInput(value) {
-  if (!value?.trim()) {
-    return null;
-  }
-  try {
-    return JSON.parse(value);
-  } catch {
-    return Symbol.for('invalid-json');
-  }
-}
-
-function stringifyJson(value) {
-  if (!value) {
-    return '';
-  }
-  return JSON.stringify(value, null, 2);
-}
-
-function buildVersionPayload(draftVersion) {
-  const sections = draftVersion.sections.map((section, sectionIndex) => ({
-    ...section,
-    sort_order: section.sort_order ?? (sectionIndex + 1) * 10,
-    section_style: section.section_style || {},
-    fields: section.fields.map((field, fieldIndex) => {
-      const referenceRule = parseJsonInput(field.reference_rule_text || '');
-      const visibilityRule = parseJsonInput(field.visibility_rule_text || '');
-      const highlightRule = parseJsonInput(field.highlight_rule_text || '');
-      if ([referenceRule, visibilityRule, highlightRule].includes(Symbol.for('invalid-json'))) {
-        throw new Error('Один из JSON-блоков правил заполнен некорректно');
-      }
-      return {
-        ...field,
-        sort_order: field.sort_order ?? (fieldIndex + 1) * 10,
-        reference_rule: referenceRule,
-        visibility_rule: visibilityRule,
-        highlight_rule: highlightRule,
-        reference_rule_text: undefined,
-        visibility_rule_text: undefined,
-        highlight_rule_text: undefined
-      };
-    })
-  }));
-
-  return {
-    layout_preset: draftVersion.layout_preset,
-    page_settings: draftVersion.page_settings || { paper_size: 'A4', orientation: 'portrait' },
-    branding_overrides: draftVersion.branding_overrides || {},
-    signer_defaults: draftVersion.signer_defaults || {},
-    footer_notes: draftVersion.footer_notes || '',
-    sections
-  };
-}
-
-function hydrateVersion(version) {
-  if (!version) {
-    return { ...blankVersion, sections: [blankSection(1)] };
-  }
-  return {
-    layout_preset: version.layout_preset,
-    page_settings: version.page_settings || { paper_size: 'A4', orientation: 'portrait' },
-    branding_overrides: {
-      clinic_name: '',
-      address: '',
-      phone: '',
-      logo_url: '',
-      document_title: '',
-      document_subtitle: '',
-      ...(version.branding_overrides || {})
-    },
-    signer_defaults: {
-      lab_technician_label: 'Лаборант',
-      lab_technician_name: '',
-      approver_label: 'Подпись',
-      approver_name: '',
-      ...(version.signer_defaults || {})
-    },
-    footer_notes: version.footer_notes || '',
-    sections: (version.sections || []).map((section) => ({
-      ...section,
-      fields: (section.fields || []).map((field) => ({
-        ...field,
-        reference_rule_text: stringifyJson(field.reference_rule),
-        visibility_rule_text: stringifyJson(field.visibility_rule),
-        highlight_rule_text: stringifyJson(field.highlight_rule)
-      }))
-    }))
-  };
-}
-
-// ============================================================
-// Phase 4+: New Template Dialog (was always-visible form)
-// ============================================================
-function NewTemplateDialog({ open, onClose, onCreate, saving }) {
-  const [form, setForm] = useState({
-    code: '',
-    name: '',
-    family: 'hematology',
-    description: ''
-  });
-
-  useEffect(() => {
-    if (open) {
-      setForm({ code: '', name: '', family: 'hematology', description: '' });
-    }
-  }, [open]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onCreate(form);
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Новый шаблон</DialogTitle>
-      <DialogContent>
-        <form onSubmit={handleSubmit} id="new-template-form" className="ltw-form-grid">
-          <div>
-            <Label htmlFor="new-template-code" className="ltw-label">Код шаблона</Label>
-            <Input
-              id="new-template-code"
-              aria-label="Код шаблона"
-              value={form.code}
-              onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
-              placeholder="Напр. hematology_basic"
-              className="ltw-input-full"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="new-template-name" className="ltw-label">Название</Label>
-            <Input
-              id="new-template-name"
-              aria-label="Название шаблона"
-              value={form.name}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="Напр. Общий анализ крови"
-              className="ltw-input-full"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="new-template-family" className="ltw-label">Семейство</Label>
-            {/* PR-59: replaced free-text Input with <select> to prevent typo-induced fragmentation */}
-            <select
-              id="new-template-family"
-              aria-label="Семейство шаблона"
-              value={form.family}
-              onChange={(e) => setForm((prev) => ({ ...prev, family: e.target.value }))}
-              className="macos-input ltw-input-full"
-            >
-              <option value="hematology">Гематология</option>
-              <option value="biochemistry">Биохимия</option>
-              <option value="coagulation">Коагулология</option>
-              <option value="urinalysis">Общий анализ мочи</option>
-              <option value="immunology">Иммунология</option>
-              <option value="microbiology">Микробиология</option>
-              <option value="endocrinology">Эндокринология</option>
-              <option value="other">Прочее</option>
-            </select>
-          </div>
-          <div>
-            <Label htmlFor="new-template-description" className="ltw-label">Описание</Label>
-            <Textarea
-              id="new-template-description"
-              aria-label="Описание шаблона"
-              value={form.description}
-              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-              placeholder="Краткое описание шаблона"
-              minRows={3}
-              className="ltw-input-full"
-            />
-          </div>
-        </form>
-      </DialogContent>
-      <DialogActions>
-        <Button variant="outline" onClick={onClose}>Отмена</Button>
-        <Button variant="primary" type="submit" form="new-template-form" disabled={saving}>
-          <Icon name="plus" size={16} />
-          Создать
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-NewTemplateDialog.propTypes = {
-  open: PropTypes.bool,
-  onClose: PropTypes.func.isRequired,
-  onCreate: PropTypes.func.isRequired,
-  saving: PropTypes.bool,
-};
-
-// ============================================================
-// Phase 3: ReferenceRuleEditor — structured editor for reference_rule JSON.
-// Replaces raw JSON textarea with a visual cases editor.
-//
-// Rule format (from backend _sex_reference_rule / _ige_reference_rule):
-// {
-//   "cases": [
-//     { "when": {"source":"patient.sex","op":"eq","value":"M"},
-//       "text":"3.5-5.0", "low":3.5, "high":5.0 }
-//   ],
-//   "default": { "text":"3.5-5.0", "low":3.5, "high":5.0 }
-// }
-//
-// Supports:
-//   - source: patient.sex | patient.age | patient.age_months
-//   - op: eq | ne | lt | gt | le | ge | between
-//   - value: string or number (for eq/ne/lt/gt/le/ge)
-//   - min/max: numbers (for between)
-//   - text/low/high: reference range for this case
-// ============================================================
-
-const RULE_SOURCE_OPTIONS = [
-  { value: 'patient.sex', label: 'Пол пациента' },
-  { value: 'patient.age', label: 'Возраст (лет)' },
-  { value: 'patient.age_months', label: 'Возраст (мес.)' },
-];
-
-const RULE_OP_OPTIONS = [
-  { value: 'eq', label: '=' },
-  { value: 'ne', label: '≠' },
-  { value: 'lt', label: '<' },
-  { value: 'gt', label: '>' },
-  { value: 'le', label: '≤' },
-  { value: 'ge', label: '≥' },
-  { value: 'between', label: 'между' },
-];
-
-function parseRuleText(text) {
-  if (!text?.trim()) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function serializeRule(rule) {
-  if (!rule) return '';
-  return JSON.stringify(rule, null, 2);
-}
-
-function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
-  const rule = parseRuleText(field.reference_rule_text);
-  const isStructured = rule === null || (rule && Array.isArray(rule.cases));
-
-  // If the rule doesn't match our expected format, show raw JSON fallback.
-  if (!isStructured) {
-    return (
-      <div className="ltw-grid-6">
-        <span>Правила нормы (raw JSON)</span>
-        <textarea
-          className="macos-input"
-          aria-label="JSON правил нормы"
-          rows={6}
-          value={field.reference_rule_text || ''}
-          onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
-        />
-        <span className="ltw-text-12 ltw-text-secondary">
-          Структурированный редактор недоступен — формат не распознан.
-        </span>
-      </div>
-    );
-  }
-
-  const cases = rule?.cases || [];
-  const defaultRule = rule?.default || { text: '', low: '', high: '' };
-
-  const updateRule = (nextRule) => {
-    updateField(sectionIndex, fieldIndex, 'reference_rule_text', serializeRule(nextRule));
-  };
-
-  const addCase = () => {
-    const newCase = {
-      when: { source: 'patient.sex', op: 'eq', value: 'M' },
-      text: '',
-      low: '',
-      high: '',
-    };
-    updateRule({ ...rule, cases: [...cases, newCase] });
-  };
-
-  const updateCase = (caseIndex, key, value) => {
-    const nextCases = cases.map((c, i) => i === caseIndex ? { ...c, [key]: value } : c);
-    updateRule({ ...rule, cases: nextCases });
-  };
-
-  const updateCaseWhen = (caseIndex, whenKey, value) => {
-    const nextCases = cases.map((c, i) => {
-      if (i !== caseIndex) return c;
-      return { ...c, when: { ...c.when, [whenKey]: value } };
-    });
-    updateRule({ ...rule, cases: nextCases });
-  };
-
-  const removeCase = (caseIndex) => {
-    updateRule({ ...rule, cases: cases.filter((_, i) => i !== caseIndex) });
-  };
-
-  const updateDefault = (key, value) => {
-    updateRule({ ...rule, default: { ...defaultRule, [key]: value } });
-  };
-
-  return (
-    <div className="ltw-rule-editor">
-      <div className="ltw-flex-between">
-        <span className="ltw-fw-600 ltw-text-14">Правила нормы</span>
-        <Button variant="outline" size="small" onClick={addCase}>
-          <Icon name="plus" size={12} />
-          Добавить условие
-        </Button>
-      </div>
-
-      {cases.length === 0 && (
-        <span className="ltw-text-13 ltw-text-secondary">
-          Нет условий. Будет использоваться значение по умолчанию.
-        </span>
-      )}
-
-      {cases.map((caseItem, caseIndex) => {
-        const isBetween = caseItem.when?.op === 'between';
-        return (
-          <div key={caseIndex} className="ltw-case-card">
-            <div className="ltw-flex-between">
-              <span className="ltw-text-13 ltw-fw-500">Условие {caseIndex + 1}</span>
-              <Button variant="ghost" size="small" onClick={() => removeCase(caseIndex)} aria-label="Удалить условие">
-                <Icon name="trash" size={12} />
-              </Button>
-            </div>
-
-            <div className="ltw-grid-3">
-              <label className="ltw-label-grid">
-                <span className="ltw-text-12">Источник</span>
-                <select
-                  className="macos-input"
-                  aria-label="Источник условия"
-                  value={caseItem.when?.source || 'patient.sex'}
-                  onChange={(e) => updateCaseWhen(caseIndex, 'source', e.target.value)}
-                >
-                  {RULE_SOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </label>
-              <label className="ltw-label-grid">
-                <span className="ltw-text-12">Оператор</span>
-                <select
-                  className="macos-input"
-                  aria-label="Оператор условия"
-                  value={caseItem.when?.op || 'eq'}
-                  onChange={(e) => updateCaseWhen(caseIndex, 'op', e.target.value)}
-                >
-                  {RULE_OP_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </label>
-              {isBetween ? (
-                <div className="ltw-grid-2-50-50">
-                  <label className="ltw-label-grid">
-                    <span className="ltw-text-12">Минимум</span>
-                    <input
-                      className="macos-input"
-                      aria-label="Минимум условия"
-                      type="number"
-                      value={caseItem.when?.min ?? ''}
-                      onChange={(e) => updateCaseWhen(caseIndex, 'min', parseFloat(e.target.value) || 0)}
-                    />
-                  </label>
-                  <label className="ltw-label-grid">
-                    <span className="ltw-text-12">Максимум</span>
-                    <input
-                      className="macos-input"
-                      aria-label="Максимум условия"
-                      type="number"
-                      value={caseItem.when?.max ?? ''}
-                      onChange={(e) => updateCaseWhen(caseIndex, 'max', parseFloat(e.target.value) || 0)}
-                    />
-                  </label>
-                </div>
-              ) : (
-                <label className="ltw-label-grid">
-                  <span className="ltw-text-12">Значение</span>
-                  {/* PR-61 / Medium-18: sex enum when source is patient.sex */}
-                  {caseItem.when?.source === 'patient.sex' ? (
-                    <select
-                      className="macos-input"
-                      aria-label="Значение условия"
-                      value={caseItem.when?.value ?? ''}
-                      onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
-                    >
-                      <option value="">Выберите...</option>
-                      <option value="M">Мужской (M)</option>
-                      <option value="F">Женский (F)</option>
-                    </select>
-                  ) : (
-                    <input
-                      className="macos-input"
-                      aria-label="Значение условия"
-                      value={caseItem.when?.value ?? ''}
-                      onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
-                    />
-                  )}
-                </label>
-              )}
-            </div>
-
-            <div className="ltw-grid-3-ranges">
-              <label className="ltw-label-grid">
-                <span className="ltw-text-12">Текст нормы</span>
-                <input
-                  className="macos-input"
-                  aria-label="Текст нормы для условия"
-                  value={caseItem.text || ''}
-                  onChange={(e) => updateCase(caseIndex, 'text', e.target.value)}
-                  placeholder="3.5-5.0"
-                />
-              </label>
-              <label className="ltw-label-grid">
-                <span className="ltw-text-12">Нижняя граница</span>
-                <input
-                  className="macos-input"
-                  aria-label="Нижняя граница нормы"
-                  type="number"
-                  value={caseItem.low ?? ''}
-                  onChange={(e) => updateCase(caseIndex, 'low', parseFloat(e.target.value) || null)}
-                />
-              </label>
-              <label className="ltw-label-grid">
-                <span className="ltw-text-12">Верхняя граница</span>
-                <input
-                  className="macos-input"
-                  aria-label="Верхняя граница нормы"
-                  type="number"
-                  value={caseItem.high ?? ''}
-                  onChange={(e) => updateCase(caseIndex, 'high', parseFloat(e.target.value) || null)}
-                />
-              </label>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Default case */}
-      <div className="ltw-default-card">
-        <span className="ltw-text-13 ltw-fw-500">По умолчанию (если ни одно условие не сработало)</span>
-        <div className="ltw-grid-3-ranges">
-          <label className="ltw-label-grid">
-            <span className="ltw-text-12">Текст нормы</span>
-            <input
-              className="macos-input"
-              aria-label="Текст нормы по умолчанию"
-              value={defaultRule.text || ''}
-              onChange={(e) => updateDefault('text', e.target.value)}
-              placeholder="3.5-5.0"
-            />
-          </label>
-          <label className="ltw-label-grid">
-            <span className="ltw-text-12">Нижняя граница</span>
-            <input
-              className="macos-input"
-              aria-label="Нижняя граница по умолчанию"
-              type="number"
-              value={defaultRule.low ?? ''}
-              onChange={(e) => updateDefault('low', parseFloat(e.target.value) || null)}
-            />
-          </label>
-          <label className="ltw-label-grid">
-            <span className="ltw-text-12">Верхняя граница</span>
-            <input
-              className="macos-input"
-              aria-label="Верхняя граница по умолчанию"
-              type="number"
-              value={defaultRule.high ?? ''}
-              onChange={(e) => updateDefault('high', parseFloat(e.target.value) || null)}
-            />
-          </label>
-        </div>
-      </div>
-
-      {/* Raw JSON toggle for advanced users */}
-      <details>
-        <summary className="ltw-summary-12">
-          Raw JSON (для продвинутых)
-        </summary>
-        <textarea
-          className="macos-input ltw-raw-json-textarea"
-          aria-label="Raw JSON правил нормы"
-          rows={6}
-          value={field.reference_rule_text || ''}
-          onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
-        />
-      </details>
-    </div>
-  );
-}
-
-ReferenceRuleEditor.propTypes = {
-  sectionIndex: PropTypes.number.isRequired,
-  fieldIndex: PropTypes.number.isRequired,
-  field: PropTypes.object.isRequired,
-  updateField: PropTypes.func.isRequired,
-};
+// L-H-6 fix: декомпозиция монолита (1598 → ~600 строк).
+// Helper-функции и подкомпоненты вынесены в отдельные модули:
+import {
+  blankField,
+  blankSection,
+  blankVersion,
+  hydrateVersion,
+  buildVersionPayload,
+  hasTemplateVersionAction,
+} from './templateEditor/utils';
+import {
+  EDITOR_TABS,
+  formatVersionStatus,
+} from './templateEditor/config';
+import NewTemplateDialog from './templateEditor/NewTemplateDialog';
+import ContentTab from './templateEditor/ContentTab';
+import DesignTab from './templateEditor/DesignTab';
+import SignersTab from './templateEditor/SignersTab';
+import PreviewTab from './templateEditor/PreviewTab';
 
 export default function LabTemplateWorkbench({
   templates,
@@ -639,6 +34,11 @@ export default function LabTemplateWorkbench({
   onTemplatesChanged,
   notify
 }) {
+  // L-H-1 fix: useConfirm() для всех destructive actions (вместо native confirm()).
+  // Согласованность с LabReportWorkbench — единый стилизованный portal-dialog
+  // с focus-trap, Esc-to-cancel, явным описанием последствий.
+  const [confirm, confirmDialog] = useConfirm();
+
   // Phase 4+: New Template dialog state (was always-visible form).
   const [showNewTemplateDialog, setShowNewTemplateDialog] = useState(false);
 
@@ -653,8 +53,8 @@ export default function LabTemplateWorkbench({
   const [catalogAnalytes, setCatalogAnalytes] = useState([]);
 
   // Phase 4+ Phase 2: collapsible sections + field cards + duplicate + reorder.
-  const [expandedSections, setExpandedSections] = useState(new Set([0])); // first section open
-  const [expandedFields, setExpandedFields] = useState(new Set()); // all fields collapsed by default
+  const [expandedSections, setExpandedSections] = useState(new Set([0]));
+  const [expandedFields, setExpandedFields] = useState(new Set());
 
   const toggleSection = (sectionIndex) => {
     setExpandedSections((prev) => {
@@ -763,17 +163,15 @@ export default function LabTemplateWorkbench({
     if (!draftVersion?.sections) return [];
     const errors = [];
     draftVersion.sections.forEach((section, sIdx) => {
-      (section.fields || []).forEach((field, fIdx) => {
+      (section.fields || []).forEach((field) => {
         const rule = field.reference_rule;
         if (!rule) return;
-        // Check default case
         const def = rule.default;
         if (def && def.low != null && def.high != null && def.low !== '' && def.high !== '') {
           if (parseFloat(def.low) >= parseFloat(def.high)) {
             errors.push(`Секция "${section.title || sIdx + 1}", поле "${field.label || field.field_key}": default low (${def.low}) ≥ high (${def.high})`);
           }
         }
-        // Check each case
         (rule.cases || []).forEach((c, cIdx) => {
           if (c.low != null && c.high != null && c.low !== '' && c.high !== '') {
             if (parseFloat(c.low) >= parseFloat(c.high)) {
@@ -792,7 +190,7 @@ export default function LabTemplateWorkbench({
     const errors = [];
     const seenKeys = new Set();
     draftVersion.sections.forEach((section, sIdx) => {
-      (section.fields || []).forEach((field, fIdx) => {
+      (section.fields || []).forEach((field) => {
         const key = field.field_key;
         if (!key) return;
         if (seenKeys.has(key)) {
@@ -809,7 +207,6 @@ export default function LabTemplateWorkbench({
       notify('error', 'Выберите шаблон для редактирования.');
       return;
     }
-    // PR-57: validate before saving
     const rangeErrors = validateReferenceRanges();
     const keyErrors = validateFieldKeyUniqueness();
     if (rangeErrors.length > 0 || keyErrors.length > 0) {
@@ -836,7 +233,6 @@ export default function LabTemplateWorkbench({
       notify('error', 'Выберите шаблон.');
       return;
     }
-    // PR-57: validate before publishing
     const rangeErrors = validateReferenceRanges();
     const keyErrors = validateFieldKeyUniqueness();
     if (rangeErrors.length > 0 || keyErrors.length > 0) {
@@ -859,14 +255,24 @@ export default function LabTemplateWorkbench({
   }
 
   // PR-65 / Medium-19: archive template version (soft-delete)
+  // L-H-1 fix: native confirm() заменён на useConfirm() — стилизованный
+  // portal-dialog с focus-trap, Esc-to-cancel, явным описанием последствий.
   async function handleArchiveTemplate() {
     if (!selectedTemplate || !activeVersion) {
       notify('error', 'Выберите версию для архивирования.');
       return;
     }
-    if (!confirm('Архивировать эту версию шаблона? Она станет недоступна для новых отчётов.')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Архивирование версии шаблона',
+      message: 'Версия станет недоступна для создания новых отчётов.',
+      description: 'Существующие отчёты, созданные по этой версии, ' +
+        'сохранят доступ к данным. Восстановить архивированную версию нельзя — ' +
+        'потребуется создать новый черновик на основе существующей.',
+      confirmLabel: 'Архивировать',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await labReportingApi.archiveTemplateVersion(activeVersion.id);
@@ -896,23 +302,19 @@ export default function LabTemplateWorkbench({
     }
   }
 
+  // ─── Field/Section mutation helpers (used by ContentTab) ───
+
   function updateBranding(key, value) {
     setDraftVersion((prev) => ({
       ...prev,
-      branding_overrides: {
-        ...prev.branding_overrides,
-        [key]: value
-      }
+      branding_overrides: { ...prev.branding_overrides, [key]: value }
     }));
   }
 
   function updateSigner(key, value) {
     setDraftVersion((prev) => ({
       ...prev,
-      signer_defaults: {
-        ...prev.signer_defaults,
-        [key]: value
-      }
+      signer_defaults: { ...prev.signer_defaults, [key]: value }
     }));
   }
 
@@ -929,9 +331,7 @@ export default function LabTemplateWorkbench({
     setDraftVersion((prev) => ({
       ...prev,
       sections: prev.sections.map((section, index) => {
-        if (index !== sectionIndex) {
-          return section;
-        }
+        if (index !== sectionIndex) return section;
         return {
           ...section,
           fields: section.fields.map((field, nestedIndex) => (
@@ -951,15 +351,11 @@ export default function LabTemplateWorkbench({
     setDraftVersion((prev) => ({
       ...prev,
       sections: prev.sections.map((section, index) => {
-        if (index !== sectionIndex) {
-          return section;
-        }
+        if (index !== sectionIndex) return section;
         return {
           ...section,
           fields: section.fields.map((field, nestedIndex) => {
-            if (nestedIndex !== fieldIndex) {
-              return field;
-            }
+            if (nestedIndex !== fieldIndex) return field;
             return {
               ...field,
               analyte_code: value,
@@ -969,6 +365,24 @@ export default function LabTemplateWorkbench({
         };
       })
     }));
+  }
+
+  async function loadCatalogReferenceRange(sectionIndex, fieldIndex, analyteCode) {
+    try {
+      const ranges = await labReportingApi.listCatalogReferenceRanges(analyteCode);
+      if (ranges && ranges.length > 0) {
+        const range = ranges[0];
+        updateField(sectionIndex, fieldIndex, 'reference_text',
+          range.text || `${range.low || ''}–${range.high || ''}`);
+        if (range.low != null) updateField(sectionIndex, fieldIndex, 'reference_low', range.low);
+        if (range.high != null) updateField(sectionIndex, fieldIndex, 'reference_high', range.high);
+        notify('success', `Норма загружена из каталога: ${range.text || ''}`);
+      } else {
+        notify('info', 'В каталоге нет норм для этого аналита.');
+      }
+    } catch (e) {
+      notify('error', `Ошибка загрузки из каталога: ${e.message}`);
+    }
   }
 
   function addSection() {
@@ -1007,7 +421,6 @@ export default function LabTemplateWorkbench({
     }));
   }
 
-  // Phase 4+ Phase 2: duplicate + reorder helpers.
   function duplicateField(sectionIndex, fieldIndex) {
     setDraftVersion((prev) => ({
       ...prev,
@@ -1051,372 +464,9 @@ export default function LabTemplateWorkbench({
     });
   }
 
-  // ============================================================
-  // Editor tab renderers
-  // ============================================================
-  const renderContentTab = () => (
-    <div className="ltw-grid">
-      <div className="ltw-flex-between">
-        {/* PR-61 / Low-29: count fields not just sections (was misleading) */}
-        <div className="ltw-fw-600">Секции и показатели ({draftVersion?.sections?.reduce((acc, s) => acc + (s.fields?.length || 0), 0) || 0} показателей в {draftVersion?.sections?.length || 0} секц.)</div>
-        <Button variant="outline" onClick={addSection}>
-          <Icon name="plus" size={16} />
-          Добавить секцию
-        </Button>
-      </div>
-
-      {draftVersion.sections.map((section, sectionIndex) => {
-        const isSectionExpanded = expandedSections.has(sectionIndex);
-        return (
-          <div key={`${section.key}-${sectionIndex}`} className="ltw-section-card">
-            {/* Section header — collapsible */}
-            <button
-              type="button"
-              className={`ltw-section-header ${isSectionExpanded ? 'ltw-section-header-expanded' : ''}`}
-              onClick={() => toggleSection(sectionIndex)}
-              aria-expanded={isSectionExpanded}
-              aria-label={`Секция: ${section.title || section.key}`}>
-              <div className="ltw-flex-center">
-                <Icon name={isSectionExpanded ? 'chevron.down' : 'chevron.right'} size={16} />
-                <span className="ltw-section-title">{section.title || section.key}</span>
-                <Badge variant="default">{section.fields.length} полей</Badge>
-              </div>
-              <span className="ltw-flex-gap-4">
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); moveSection(sectionIndex, 'up'); }} disabled={sectionIndex === 0} aria-label="Переместить секцию вверх">
-                  <Icon name="arrow.up" size={14} />
-                </Button>
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); moveSection(sectionIndex, 'down'); }} disabled={sectionIndex === draftVersion.sections.length - 1} aria-label="Переместить секцию вниз">
-                  <Icon name="arrow.down" size={14} />
-                </Button>
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); removeSection(sectionIndex); }} aria-label="Удалить секцию">
-                  <Icon name="trash" size={14} />
-                </Button>
-              </span>
-            </button>
-
-            {/* Section content — only when expanded */}
-            {isSectionExpanded && (
-              <div className="ltw-section-content">
-                {/* Section key + title editors */}
-                <div className="ltw-grid-2">
-                  <label className="ltw-grid-6">
-                    <span>Ключ секции</span>
-                    <input className="macos-input" aria-label="Ключ секции" value={section.key} onChange={(event) => updateSection(sectionIndex, 'key', event.target.value)} />
-                  </label>
-                  <label className="ltw-grid-6">
-                    <span>Заголовок секции</span>
-                    <input className="macos-input" aria-label="Заголовок секции" value={section.title || ''} onChange={(event) => updateSection(sectionIndex, 'title', event.target.value)} />
-                  </label>
-                </div>
-
-                {/* Fields */}
-                <div className="ltw-grid-8">
-                  {section.fields.map((field, fieldIndex) => {
-                    const fieldKey = `${sectionIndex}-${fieldIndex}`;
-                    const isFieldExpanded = expandedFields.has(fieldKey);
-                    return (
-                      <div key={`${field.field_key}-${fieldIndex}`} className="ltw-field-card">
-                        {/* Field header — collapsible */}
-                        <button
-                          type="button"
-                          className={`ltw-field-header ${isFieldExpanded ? 'ltw-field-header-expanded' : ''}`}
-                          onClick={() => toggleField(sectionIndex, fieldIndex)}
-                          aria-expanded={isFieldExpanded}
-                          aria-label={`Поле: ${field.label || field.field_key}`}>
-                          <div className="ltw-flex-center">
-                            <Icon name={isFieldExpanded ? 'chevron.down' : 'chevron.right'} size={14} />
-                            <span className="ltw-field-title">{field.label || field.field_key || '(без названия)'}</span>
-                            <Badge variant="info">{fieldTypeOptions.find((o) => o.value === field.value_type)?.label || field.value_type}</Badge>
-                            {field.required && <Badge variant="warning">обязательное</Badge>}
-                          </div>
-                          <span className="ltw-flex-gap-4">
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); moveField(sectionIndex, fieldIndex, 'up'); }} disabled={fieldIndex === 0} aria-label="Переместить поле вверх">
-                              <Icon name="arrow.up" size={12} />
-                            </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); moveField(sectionIndex, fieldIndex, 'down'); }} disabled={fieldIndex === section.fields.length - 1} aria-label="Переместить поле вниз">
-                              <Icon name="arrow.down" size={12} />
-                            </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); duplicateField(sectionIndex, fieldIndex); }} aria-label="Дублировать поле">
-                              <Icon name="doc.on.doc" size={12} />
-                            </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); removeField(sectionIndex, fieldIndex); }} aria-label="Удалить поле">
-                              <Icon name="trash" size={12} />
-                            </Button>
-                          </span>
-                        </button>
-
-                        {/* Field content — only when expanded */}
-                        {isFieldExpanded && (
-                          <div className="ltw-field-content">
-                            <div className="ltw-grid-4">
-                              <label className="ltw-grid-6">
-                                <span>Ключ поля</span>
-                                <input className="macos-input" aria-label="Ключ поля" value={field.field_key} onChange={(event) => updateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
-                              </label>
-                              <label className="ltw-grid-6">
-                                <span>Название поля</span>
-                                <input className="macos-input" aria-label="Название поля" value={field.label} onChange={(event) => updateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
-                              </label>
-                              <label className="ltw-grid-6">
-                                <span>Тип значения</span>
-                                <select className="macos-input" aria-label="Тип значения" value={field.value_type} onChange={(event) => updateField(sectionIndex, fieldIndex, 'value_type', event.target.value)}>
-                                  {fieldTypeOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                  ))}
-                                </select>
-                              </label>
-                              <label className="ltw-grid-6">
-                                <span>Единица измерения</span>
-                                <input className="macos-input" aria-label="Единица измерения" value={field.unit || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
-                              </label>
-                            </div>
-
-                            <div className="ltw-grid-5">
-                              <label className="ltw-grid-6">
-                                <span>Код анализируемого показателя</span>
-                                <input
-                                  className="macos-input"
-                                  aria-label="Код анализируемого показателя"
-                                  list="lab-analyte-catalog"
-                                  value={field.analyte_code || ''}
-                                  onChange={(event) => updateFieldCatalog(sectionIndex, fieldIndex, 'analyte_code', event.target.value)}
-                                />
-                              </label>
-                              <label className="ltw-grid-6">
-                                <span>Код единицы измерения</span>
-                                <input
-                                  className="macos-input"
-                                  aria-label="Код единицы измерения"
-                                  list="lab-unit-catalog"
-                                  value={field.unit_code || ''}
-                                  onChange={(event) => updateField(sectionIndex, fieldIndex, 'unit_code', event.target.value)}
-                                />
-                              </label>
-                              <label className="ltw-grid-6">
-                                <span>Источник нормы</span>
-                                <select className="macos-input" aria-label="Источник нормы" value={field.reference_mode} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_mode', event.target.value)}>
-                                  {referenceModeOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                  ))}
-                                </select>
-                              </label>
-                              {/* PR-67 / High-10: catalog reference_mode UI — fetch from labReportingApi */}
-                              {field.reference_mode === 'catalog' && field.analyte_code && (
-                                <div className="ltw-label-grid">
-                                  <Button
-                                    variant="outline"
-                                    size="small"
-                                    onClick={async () => {
-                                      try {
-                                        const ranges = await labReportingApi.listCatalogReferenceRanges(field.analyte_code);
-                                        if (ranges && ranges.length > 0) {
-                                          const range = ranges[0];
-                                          updateField(sectionIndex, fieldIndex, 'reference_text',
-                                            range.text || `${range.low || ''}–${range.high || ''}`);
-                                          if (range.low != null) updateField(sectionIndex, fieldIndex, 'reference_low', range.low);
-                                          if (range.high != null) updateField(sectionIndex, fieldIndex, 'reference_high', range.high);
-                                          notify('success', `Норма загружена из каталога: ${range.text || ''}`);
-                                        } else {
-                                          notify('info', 'В каталоге нет норм для этого аналита.');
-                                        }
-                                      } catch (e) {
-                                        notify('error', `Ошибка загрузки из каталога: ${e.message}`);
-                                      }
-                                    }}
-                                  >
-                                    <Icon name="square.and.arrow.down.on.square" size={14} />
-                                    Загрузить из каталога
-                                  </Button>
-                                </div>
-                              )}
-                              {field.reference_mode === 'catalog' && !field.analyte_code && (
-                                <span className="ltw-catalog-hint">
-                                  Укажите код аналита для загрузки нормы из каталога
-                                </span>
-                              )}
-                              <label className="ltw-grid-6">
-                                <span>Текст нормы</span>
-                                <input className="macos-input" aria-label="Текст нормы" value={field.reference_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
-                              </label>
-                              <label className="ltw-checkbox-label">
-                                <input type="checkbox" aria-label="Обязательное поле" checked={Boolean(field.required)} onChange={(event) => updateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
-                                Обязательное
-                              </label>
-                            </div>
-
-                            {/* Phase 3: structured editor for reference rules.
-                                Replaces raw JSON textarea with a visual cases editor.
-                                Rule format (from backend _sex_reference_rule):
-                                {
-                                  "cases": [
-                                    { "when": {"source":"patient.sex","op":"eq","value":"M"},
-                                      "text":"3.5-5.0", "low":3.5, "high":5.0 }
-                                  ],
-                                  "default": { "text":"3.5-5.0", "low":3.5, "high":5.0 }
-                                }
-                                Visibility + highlight rules stay as raw JSON (rarely used,
-                                advanced-only) — they're collapsed by default. */}
-                            <ReferenceRuleEditor
-                              sectionIndex={sectionIndex}
-                              fieldIndex={fieldIndex}
-                              field={field}
-                              updateField={updateField}
-                            />
-
-                            <details className="ltw-details">
-                              <summary className="ltw-summary">
-                                Расширенные правила (видимость / подсветка) — raw JSON
-                              </summary>
-                              <div className="ltw-raw-json-grid">
-                                <label className="ltw-grid-6">
-                                  <span>JSON правил видимости</span>
-                                  <textarea className="macos-input" aria-label="JSON правил видимости" rows={3} value={field.visibility_rule_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'visibility_rule_text', event.target.value)} />
-                                </label>
-                                <label className="ltw-grid-6">
-                                  <span>JSON правил подсветки</span>
-                                  <textarea className="macos-input" aria-label="JSON правил подсветки" rows={3} value={field.highlight_rule_text || ''} onChange={(event) => updateField(sectionIndex, fieldIndex, 'highlight_rule_text', event.target.value)} />
-                                </label>
-                              </div>
-                            </details>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <Button variant="outline" onClick={() => addField(sectionIndex)}>
-                    <Icon name="plus" size={16} />
-                    Добавить показатель
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-
-  const renderDesignTab = () => (
-    <div className="ltw-grid-18">
-      <div className="ltw-grid-2-minmax">
-        <label className="ltw-grid-6">
-          <span>Макет печати</span>
-          <select className="macos-input" aria-label="Макет печати" value={draftVersion.layout_preset} onChange={(event) => setDraftVersion((prev) => ({ ...prev, layout_preset: event.target.value }))}>
-            {layoutOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="ltw-grid-6">
-          <span>Подвал</span>
-          <textarea className="macos-input" aria-label="Подвал шаблона" rows={3} value={draftVersion.footer_notes} onChange={(event) => setDraftVersion((prev) => ({ ...prev, footer_notes: event.target.value }))} />
-        </label>
-      </div>
-
-      <div>
-        <div className="ltw-branding-title">Брендирование документа</div>
-        <div className="ltw-grid-3-minmax">
-          {['document_title', 'document_subtitle', 'clinic_name', 'address', 'phone', 'logo_url'].map((key) => (
-            <label key={key} className="ltw-grid-6">
-              <span>{brandingFieldLabels[key] || key}</span>
-              <input className="macos-input" aria-label={brandingFieldLabels[key] || key} value={draftVersion.branding_overrides?.[key] || ''} onChange={(event) => updateBranding(key, event.target.value)} />
-            </label>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderSignersTab = () => (
-    <div>
-      <div className="ltw-branding-title">Подписи по умолчанию</div>
-      <div className="ltw-grid-4-minmax">
-        {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
-          <label key={key} className="ltw-grid-6">
-            <span>{signerFieldLabels[key] || key}</span>
-            <input className="macos-input" aria-label={signerFieldLabels[key] || key} value={draftVersion.signer_defaults?.[key] || ''} onChange={(event) => updateSigner(key, event.target.value)} />
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderPreviewTab = () => {
-    // Phase 4+ tab 4: read-only sample render of the template.
-    // Shows branding + sections + fields as they'll appear in the PDF.
-    const branding = draftVersion.branding_overrides || {};
-    const signers = draftVersion.signer_defaults || {};
-
-    return (
-      <div className="ltw-grid-16">
-        <Alert severity="info">
-          Предпросмотр показывает структуру бланка. Финальный PDF рендерится на backend.
-        </Alert>
-
-        <Card variant="filled" padding="default">
-          <div className="ltw-preview-header">
-            {branding.clinic_name && <div className="ltw-section-title">{branding.clinic_name}</div>}
-            {branding.document_title && <div className="ltw-text-18 ltw-fw-700">{branding.document_title}</div>}
-            {branding.document_subtitle && <div className="ltw-text-13 ltw-text-secondary">{branding.document_subtitle}</div>}
-            {branding.address && <div className="ltw-text-12 ltw-text-secondary">{branding.address}</div>}
-            {branding.phone && <div className="ltw-text-12 ltw-text-secondary">{branding.phone}</div>}
-          </div>
-
-          {draftVersion.sections.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="ltw-preview-section">
-              <div className="ltw-preview-section-title">
-                {section.title || section.key}
-              </div>
-              <table className="ltw-preview-table">
-                <thead>
-                  <tr className="ltw-preview-row">
-                    <th className="ltw-preview-th">Показатель</th>
-                    <th className="ltw-preview-th">Значение</th>
-                    <th className="ltw-preview-th">Единица</th>
-                    <th className="ltw-preview-th">Норма</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {section.fields.map((field, fieldIndex) => (
-                    <tr key={fieldIndex} className="ltw-preview-row">
-                      <td className="ltw-preview-td">
-                        {field.label || field.field_key}
-                        {field.required && <span className="ltw-text-error">*</span>}
-                      </td>
-                      <td className="ltw-preview-td-secondary">—</td>
-                      <td className="ltw-preview-td-secondary">{field.unit || ''}</td>
-                      <td className="ltw-preview-td-secondary">{field.reference_text || (field.reference_mode === 'rule_based' ? '(по правилам)' : '')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-
-          {draftVersion.footer_notes && (
-            <div className="ltw-preview-footer">
-              {draftVersion.footer_notes}
-            </div>
-          )}
-
-          <div className="ltw-preview-signers">
-            <div>
-              <div className="ltw-text-secondary">{signers.lab_technician_label || 'Лаборант'}:</div>
-              <div className="ltw-preview-signer-line">
-                {signers.lab_technician_name || '_______________'}
-              </div>
-            </div>
-            <div>
-              <div className="ltw-text-secondary">{signers.approver_label || 'Подпись'}:</div>
-              <div className="ltw-preview-signer-line">
-                {signers.approver_name || '_______________'}
-              </div>
-            </div>
-          </div>
-        </Card>
-      </div>
-    );
-  };
+  // L-H-6 fix: render-tab функции заменены на подкомпоненты ContentTab /
+  // DesignTab / SignersTab / PreviewTab. Это убирает ~700 строк из этого файла
+  // и позволяет независимо тестировать каждый tab.
 
   return (
     <div className="ltw-root">
@@ -1495,7 +545,6 @@ export default function LabTemplateWorkbench({
                   <Icon name="doc.on.doc" size={16} />
                   Клонировать
                 </Button>
-                {/* PR-60 / High-7: Cancel changes — reverts draft to server version */}
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -1518,7 +567,6 @@ export default function LabTemplateWorkbench({
                   <Icon name="checkmark.seal" size={16} />
                   Опубликовать
                 </Button>
-                {/* PR-65 / Medium-19: archive template version (soft-delete) */}
                 <Button variant="outline" onClick={handleArchiveTemplate} disabled={saving || !activeVersion} title="Архивировать версию">
                   <Icon name="archivebox" size={16} />
                   Архивировать
@@ -1532,14 +580,12 @@ export default function LabTemplateWorkbench({
             <Alert severity="info">Выберите шаблон слева, чтобы редактировать оформление, секции и строки анализов.</Alert>
           ) : (
             <div className="ltw-grid-16">
-              {/* Template metadata badges */}
               <div className="ltw-badges-row">
                 <Badge variant="info">{selectedTemplate.code}</Badge>
                 <Badge variant="primary">{selectedTemplate.family}</Badge>
                 {activeVersion?.status && <Badge variant={activeVersion.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus(activeVersion.status)}</Badge>}
               </div>
 
-              {/* Phase 4+: editor tabs — Content / Design / Signers / Preview */}
               <div className="ltw-tab-bar">
                 {EDITOR_TABS.map((tab) => (
                   <button
@@ -1553,17 +599,48 @@ export default function LabTemplateWorkbench({
                 ))}
               </div>
 
-              {/* Tab content */}
-              {editorTab === 'content' && renderContentTab()}
-              {editorTab === 'design' && renderDesignTab()}
-              {editorTab === 'signers' && renderSignersTab()}
-              {editorTab === 'preview' && renderPreviewTab()}
+              {editorTab === 'content' && (
+                <ContentTab
+                  draftVersion={draftVersion}
+                  expandedSections={expandedSections}
+                  expandedFields={expandedFields}
+                  onToggleSection={toggleSection}
+                  onToggleField={toggleField}
+                  onAddSection={addSection}
+                  onAddField={addField}
+                  onRemoveSection={removeSection}
+                  onRemoveField={removeField}
+                  onDuplicateField={duplicateField}
+                  onMoveField={moveField}
+                  onMoveSection={moveSection}
+                  onUpdateSection={updateSection}
+                  onUpdateField={updateField}
+                  onUpdateFieldCatalog={updateFieldCatalog}
+                  onLoadCatalogReferenceRange={loadCatalogReferenceRange}
+                />
+              )}
+              {editorTab === 'design' && (
+                <DesignTab
+                  draftVersion={draftVersion}
+                  onUpdateLayout={(value) => setDraftVersion((prev) => ({ ...prev, layout_preset: value }))}
+                  onUpdateFooter={(value) => setDraftVersion((prev) => ({ ...prev, footer_notes: value }))}
+                  onUpdateBranding={updateBranding}
+                />
+              )}
+              {editorTab === 'signers' && (
+                <SignersTab
+                  draftVersion={draftVersion}
+                  onUpdateSigner={updateSigner}
+                />
+              )}
+              {editorTab === 'preview' && (
+                <PreviewTab draftVersion={draftVersion} />
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Phase 4+: New Template dialog (was always-visible form) */}
       <NewTemplateDialog
         open={showNewTemplateDialog}
         onClose={() => setShowNewTemplateDialog(false)}
@@ -1585,6 +662,9 @@ export default function LabTemplateWorkbench({
           </option>
         ))}
       </datalist>
+
+      {/* L-H-1 fix: portal-mounted ConfirmDialog для destructive actions */}
+      {confirmDialog}
     </div>
   );
 }

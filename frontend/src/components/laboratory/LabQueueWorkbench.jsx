@@ -30,10 +30,11 @@ function maskPhone(phone) {
 }
 
 // P-05 fix: компонент-обёртка для переключения маска/открыто.
+// L-H-4 fix: миграция inline-стилей в CSS (.lqw-masked-phone*).
 // Раскрытие может быть ограничено ролью через prop canReveal.
 function MaskedPhone({ phone, canReveal = true }) {
   const [revealed, setRevealed] = useState(false);
-  if (!phone) return <span style={{ color: 'var(--mac-text-secondary)' }}>не указан</span>;
+  if (!phone) return <span className="lqw-masked-phone-empty">не указан</span>;
   if (!canReveal) {
     return <span>{maskPhone(phone)}</span>;
   }
@@ -46,16 +47,7 @@ function MaskedPhone({ phone, canReveal = true }) {
       }}
       title={revealed ? 'Скрыть номер' : 'Показать номер (доступ ограничен)'}
       aria-label={revealed ? 'Скрыть номер телефона' : 'Показать номер телефона'}
-      style={{
-        background: 'none',
-        border: 'none',
-        padding: 0,
-        cursor: 'pointer',
-        color: 'inherit',
-        font: 'inherit',
-        textDecoration: 'underline dotted',
-        textUnderlineOffset: '2px',
-      }}
+      className="lqw-masked-phone"
     >
       {revealed ? phone : maskPhone(phone)}
     </button>
@@ -65,27 +57,6 @@ function MaskedPhone({ phone, canReveal = true }) {
 MaskedPhone.propTypes = {
   phone: PropTypes.string,
   canReveal: PropTypes.bool,
-};
-
-const cardGridStyle = {
-  display: 'grid',
-  gap: 'var(--mac-spacing-4)'
-};
-
-const queueCardStyle = {
-  border: '1px solid var(--mac-border)',
-  borderRadius: 'var(--mac-radius-xl)',
-  background: 'var(--mac-bg-primary)',
-  padding: 'var(--mac-spacing-4)',
-  display: 'grid',
-  gap: 'var(--mac-spacing-3)'
-};
-
-const metaRowStyle = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--mac-spacing-2)',
-  alignItems: 'center'
 };
 
 const activeQueueStatuses = new Set([
@@ -135,9 +106,6 @@ export default function LabQueueWorkbench({
   reportHistory = []
 }) {
   // QW-8 fix: локальный state поиска и фильтра статусов.
-  // Раньше при 30+ записях в очереди лаборант вынужден был скроллить
-  // и визуально искать нужного пациента. Теперь — мгновенный поиск
-  // по ФИО + фильтр по статусу (waiting/in_progress/completed).
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   // PR-64 / Medium-14: client-side sorting
@@ -177,27 +145,14 @@ export default function LabQueueWorkbench({
   });
 
   return (
-    <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+    <div className="lqw-root">
       <Card variant="filled" padding="none">
-        <CardHeader
-          style={{
-            background: 'var(--mac-bg-tertiary)',
-            borderBottom: '1px solid var(--mac-border)',
-            padding: 'var(--mac-spacing-4)'
-          }}
-        >
-          <CardTitle
-            style={{
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)'
-            }}
-          >
+        <CardHeader className="lqw-card-header">
+          <CardTitle className="lqw-card-title">
             <Icon name="testtube.2" size={20} />
             Очередь лаборатории
           </CardTitle>
-          <div style={metaRowStyle}>
+          <div className="lqw-meta-row">
             <Badge variant="info">Всего: {appointments.length}</Badge>
             <Badge variant="warning">
               В работе: {appointments.filter((item) => activeQueueStatuses.has(item.status)).length}
@@ -207,34 +162,13 @@ export default function LabQueueWorkbench({
               Обновить
             </Button>
           </div>
-          {/* QW-8 fix: панель поиска и фильтра статусов. */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 'var(--mac-spacing-3)',
-              flexWrap: 'wrap',
-              marginTop: 'var(--mac-spacing-3)',
-              alignItems: 'center',
-            }}
-          >
-            <div
-              style={{
-                position: 'relative',
-                flex: '1 1 240px',
-                minWidth: '200px',
-              }}
-            >
+          {/* QW-8 fix: панель поиска и фильтра статусов. L-H-4: CSS-классы. */}
+          <div className="lqw-search-filter-row">
+            <div className="lqw-search-wrapper">
               <Icon
                 name="magnifyingglass"
                 size={14}
-                styleAttr={{
-                  position: 'absolute',
-                  left: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--mac-text-muted)',
-                  pointerEvents: 'none',
-                }}
+                className="lqw-search-icon"
               />
               <Input
                 type="search"
@@ -242,35 +176,14 @@ export default function LabQueueWorkbench({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск по ФИО, телефону, ID…"
                 aria-label="Поиск по очереди лаборатории"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px 8px 32px',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  border: '1px solid var(--mac-border)',
-                  background: 'var(--mac-bg-primary)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  outline: 'none',
-                }}
+                className="lqw-search-input"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
                   aria-label="Очистить поиск"
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--mac-text-muted)',
-                    padding: 'var(--mac-spacing-1)',
-                    fontSize: 'var(--mac-font-size-lg)',
-                    lineHeight: 1,
-                  }}
+                  className="lqw-search-clear"
                 >
                   ×
                 </button>
@@ -279,7 +192,7 @@ export default function LabQueueWorkbench({
             <div
               role="group"
               aria-label="Фильтр по статусу"
-              style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}
+              className="lqw-status-filter-group"
             >
               {[
                 { key: 'all',        label: 'Все' },
@@ -291,16 +204,7 @@ export default function LabQueueWorkbench({
                   type="button"
                   onClick={() => setStatusFilter(opt.key)}
                   aria-pressed={statusFilter === opt.key}
-                  style={{
-                    padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-                    borderRadius: 'var(--mac-radius-md)',
-                    border: `1px solid ${statusFilter === opt.key ? 'var(--mac-accent)' : 'var(--mac-border)'}`,
-                    background: statusFilter === opt.key ? 'var(--mac-accent)' : 'var(--mac-bg-primary)',
-                    color: statusFilter === opt.key ? 'white' : 'var(--mac-text-primary)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: statusFilter === opt.key ? 600 : 400,
-                  }}
+                  className={`lqw-status-filter-btn ${statusFilter === opt.key ? 'lqw-status-filter-btn-active' : ''}`}
                 >
                   {opt.label}
                 </button>
@@ -308,14 +212,13 @@ export default function LabQueueWorkbench({
             </div>
           </div>
           {/* PR-64 / Medium-14: sort controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-            <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-muted)' }}>Сортировать:</span>
+          <div className="lqw-sort-row">
+            <span className="lqw-sort-label">Сортировать:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               aria-label="Сортировка очереди"
-              className="macos-input"
-              style={{ fontSize: 'var(--mac-font-size-xs)', padding: '4px 8px', width: 'auto' }}
+              className="macos-input lqw-sort-select"
             >
               <option value="default">По умолчанию</option>
               <option value="name">По имени</option>
@@ -324,13 +227,7 @@ export default function LabQueueWorkbench({
           </div>
           {/* QW-8 fix: индикатор количества отфильтрованных записей. */}
           {(searchQuery || statusFilter !== 'all') && (
-            <div
-              style={{
-                marginTop: 'var(--mac-spacing-2)',
-                fontSize: 'var(--mac-font-size-xs)',
-                color: 'var(--mac-text-muted)',
-              }}
-            >
+            <div className="lqw-filter-count">
               Показано: {filteredAppointments.length} из {appointments.length}
               {searchQuery && ` · поиск: «${searchQuery}»`}
               {statusFilter !== 'all' && ` · фильтр: ${
@@ -339,77 +236,29 @@ export default function LabQueueWorkbench({
             </div>
           )}
         </CardHeader>
-        <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)' }}>
+        <CardContent className="lqw-card-content">
           {loading ? (
             // QW-3 fix: skeleton-загрузка вместо текста «Загрузка…».
-            // Skeleton показывает структуру будущих карточек и снижает
-            // ощущение медлительности. 3 карточки-заглушки с shimmer-анимацией.
-            <div style={cardGridStyle} aria-busy="true" aria-live="polite">
+            // L-H-4: используется CSS-класс .lqw-skeleton с @media (prefers-reduced-motion).
+            // L-M-4 fix: при prefers-reduced-motion skeleton остаётся статичным
+            // (без мигания), но структура всё ещё видна — лучше, чем белый экран.
+            <div className="lqw-card-grid" aria-busy="true" aria-live="polite">
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  style={{
-                    ...queueCardStyle,
-                    background: 'var(--mac-bg-tertiary)',
-                  }}
+                  className="lqw-queue-card"
+                  style={{ background: 'var(--mac-bg-tertiary)' }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
-                    <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)', flex: 1 }}>
-                      <div
-                        style={{
-                          height: '18px',
-                          width: '60%',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
-                          backgroundSize: '200% 100%',
-                          animation: 'lab-skeleton-shimmer 1.5s infinite',
-                        }}
-                      />
-                      <div
-                        style={{
-                          height: '14px',
-                          width: '80%',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
-                          backgroundSize: '200% 100%',
-                          animation: 'lab-skeleton-shimmer 1.5s infinite',
-                        }}
-                      />
-                      <div
-                        style={{
-                          height: '14px',
-                          width: '50%',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
-                          backgroundSize: '200% 100%',
-                          animation: 'lab-skeleton-shimmer 1.5s infinite',
-                        }}
-                      />
+                  <div className="lqw-card-top">
+                    <div className="lqw-card-info" style={{ flex: 1 }}>
+                      <div className="lqw-skeleton" style={{ height: '18px', width: '60%' }} />
+                      <div className="lqw-skeleton" style={{ height: '14px', width: '80%' }} />
+                      <div className="lqw-skeleton" style={{ height: '14px', width: '50%' }} />
                     </div>
-                    <div
-                      style={{
-                        height: '22px',
-                        width: '80px',
-                        borderRadius: '11px',
-                        background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
-                        backgroundSize: '200% 100%',
-                        animation: 'lab-skeleton-shimmer 1.5s infinite',
-                      }}
-                    />
+                    <div className="lqw-skeleton" style={{ height: '22px', width: '80px', borderRadius: '11px' }} />
                   </div>
                 </div>
               ))}
-              <style>{`
-                @keyframes lab-skeleton-shimmer {
-                  0% { background-position: 200% 0; }
-                  100% { background-position: -200% 0; }
-                }
-                @media (prefers-reduced-motion: reduce) {
-                  [style*="lab-skeleton-shimmer"] {
-                    animation: none !important;
-                  }
-                }
-              `}</style>
             </div>
           ) : filteredAppointments.length === 0 ? (
             <Alert severity="info">
@@ -418,7 +267,7 @@ export default function LabQueueWorkbench({
                 : 'Ничего не найдено. Измените поисковый запрос или фильтр.'}
             </Alert>
           ) : (
-            <div style={cardGridStyle}>
+            <div className="lqw-card-grid">
               {sortedAppointments.map((appointment) => {
                 const isSelected = selectedAppointment?.id === appointment.id;
                 return (
@@ -433,35 +282,30 @@ export default function LabQueueWorkbench({
                         onOpenAppointment(appointment);
                       }
                     }}
-                    style={{
-                      ...queueCardStyle,
-                      borderColor: isSelected ? 'var(--mac-accent)' : 'var(--mac-border)',
-                      boxShadow: isSelected ? '0 0 0 2px color-mix(in oklab, var(--mac-accent) 20%, transparent)' : 'none',
-                      cursor: 'pointer',
-                    }}
+                    className={`lqw-queue-card ${isSelected ? 'lqw-queue-card-selected' : ''}`}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)', alignItems: 'flex-start' }}>
-                      <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
-                        <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+                    <div className="lqw-card-top">
+                      <div className="lqw-card-info">
+                        <div className="lqw-card-name">
                           {appointment.patient_fio || 'Пациент без имени'}
                         </div>
-                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
-                        Визит: {appointment.visit_id || 'не привязан'} | Телефон:{' '}
-                        {/* P-05 fix: маскирование номера телефона в публичном
-                            пространстве лаборатории. Раскрытие — по клику. */}
-                        <MaskedPhone phone={appointment.patient_phone} />
+                        <div className="lqw-card-meta">
+                          Визит: {appointment.visit_id || 'не привязан'} | Телефон:{' '}
+                          {/* P-05 fix: маскирование номера телефона в публичном
+                              пространстве лаборатории. Раскрытие — по клику. */}
+                          <MaskedPhone phone={appointment.patient_phone} />
+                        </div>
                       </div>
-                    </div>
                       <Badge variant={getLabStatusVariant(appointment.status)}>
                         {formatLabStatus(appointment.status)}
                       </Badge>
                     </div>
 
-                    <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)', lineHeight: 1.5 }}>
-                      <strong style={{ color: 'var(--mac-text-primary)' }}>Услуги:</strong> {formatServices(appointment)}
+                    <div className="lqw-card-services">
+                      <strong>Услуги:</strong> {formatServices(appointment)}
                     </div>
 
-                    <div style={metaRowStyle}>
+                    <div className="lqw-meta-row">
                       <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty)}</Badge>
                       {appointment.payment_status && <Badge variant="info">Оплата: {formatPaymentStatus(appointment.payment_status)}</Badge>}
                       {/* PR-60 / Medium-13: was variant="success" (green implies positive status, but time is not a status) */}
@@ -469,34 +313,32 @@ export default function LabQueueWorkbench({
                       {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name}</Badge>}
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)', alignItems: 'center' }}>
-                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+                    <div className="lqw-card-bottom">
+                      <div className="lqw-card-id">
                         {/* P-05 fix: patient_id — внутренний идентификатор, не нужен
                             лаборанту для работы. Скрываем по умолчанию, раскрытие —
-                            по клику. Снижает риск утечки PII через скриншоты. */}
-                        {/* PR-66 / Low-30: added custom marker + ::marker CSS reset */}
-                        <details style={{ display: 'inline' }}>
+                            по клику. Снижает риск утечки PII через скриншоты.
+                            L-M-5 fix: используем CSS-класс .lqw-pii-* вместо inline
+                            style-hack с ::-webkit-details-marker. */}
+                        <details className="lqw-pii-details">
                           <summary
-                            style={{
-                              display: 'inline-block',
-                              cursor: 'pointer',
-                              color: 'var(--mac-text-muted)',
-                              listStyle: 'none',
-                            }}
+                            className="lqw-pii-summary"
                             aria-label="Показать внутренний ID пациента"
                           >
-                            <style>{`summary::-webkit-details-marker { display: none; } summary::marker { content: ''; }`}</style>
                             ID пациента ▸
                           </summary>
-                          <span style={{ marginLeft: 6, fontFamily: 'monospace' }}>
+                          <span className="lqw-pii-value">
                             {appointment.patient_id}
                           </span>
                         </details>
                       </div>
-                      <Button variant="primary" onClick={() => onOpenAppointment(appointment)}>
-                        <Icon name="doc.text" size={16} />
-                        {appointment.report_instance_id ? 'Открыть отчёт' : 'Открыть в редакторе'}
-                      </Button>
+                      {/* L-M-3 fix: убрана вложенная Button внутри role="button".
+                          Карточка целиком кликабельна, отдельная кнопка избыточна
+                          и создавала a11y anti-pattern (click bubbles to parent). */}
+                      <Badge variant={appointment.report_instance_id ? 'success' : 'info'}>
+                        <Icon name="doc.text" size={12} />
+                        {appointment.report_instance_id ? 'Отчёт существует' : 'Новый отчёт'}
+                      </Badge>
                     </div>
                   </div>
                 );
@@ -508,46 +350,28 @@ export default function LabQueueWorkbench({
 
       {selectedAppointment && (
         <Card variant="filled" padding="none">
-          <CardHeader
-            style={{
-              background: 'var(--mac-bg-tertiary)',
-              borderBottom: '1px solid var(--mac-border)',
-              padding: 'var(--mac-spacing-4)'
-            }}
-          >
-            <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+          <CardHeader className="lqw-card-header">
+            <CardTitle className="lqw-card-title">
               <Icon name="clock.arrow.circlepath" size={20} />
               История отчётов пациента
             </CardTitle>
           </CardHeader>
-          <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)' }}>
+          <CardContent className="lqw-card-content">
             {reportHistory.length === 0 ? (
               <Alert severity="info">Для выбранного пациента ещё нет лабораторных отчётов.</Alert>
             ) : (
-              <div style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
+              <div className="lqw-card-grid">
                 {reportHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: '14px',
-                      padding: '12px 14px',
-                      background: 'var(--mac-bg-primary)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 'var(--mac-spacing-3)',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
-                      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+                  <div key={item.id} className="lqw-history-card">
+                    <div className="lqw-history-info">
+                      <div className="lqw-history-title">
                         {item.template?.name || `Отчёт #${item.id}`}
                       </div>
-                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+                      <div className="lqw-history-meta">
                         Создан: {new Date(item.created_at).toLocaleString()} | Статус: {formatLabStatus(item.status)}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div className="lqw-history-badges">
                       <Badge variant={getLabStatusVariant(item.status)}>
                         {formatLabStatus(item.status)}
                       </Badge>
