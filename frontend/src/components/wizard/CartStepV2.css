@@ -128,3 +128,196 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ─── UX Audit R-3.3 (Phase 2): remaining inline styles migrated ─── */
+
+/* Service code badge (e.g. "C001") */
+.cart-step-v2__service-code {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--mac-bg-tertiary);
+  color: var(--mac-text-secondary);
+  line-height: 14px;
+}
+
+/* Empty services state */
+.cart-step-v2__empty-services {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--mac-spacing-8);
+  color: var(--mac-text-tertiary);
+}
+
+/* Bottom cart panel */
+.cart-step-v2__bottom-panel {
+  flex-shrink: 0;
+  padding-top: var(--mac-spacing-3);
+  border-top: 1px solid var(--mac-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+}
+
+/* Cart summary row (selected count + total) */
+.cart-step-v2__summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* Consultation discount section */
+.cart-step-v2__consultation-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-bg-secondary);
+}
+
+/* Consultation row */
+.cart-step-v2__consultation-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* Service name in consultation (truncated) */
+.cart-step-v2__consultation-service-name {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-primary);
+  font-weight: var(--mac-font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Doctor name in consultation */
+.cart-step-v2__consultation-doctor {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary);
+}
+
+/* Repeat eligibility badge */
+.cart-step-v2__eligibility-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.cart-step-v2__eligibility-badge--eligible {
+  color: var(--mac-success);
+  background: color-mix(in srgb, var(--mac-success), transparent 90%);
+  border: 1px solid color-mix(in srgb, var(--mac-success), transparent 75%);
+}
+
+.cart-step-v2__eligibility-badge--not-eligible {
+  color: var(--mac-warning);
+  background: color-mix(in srgb, var(--mac-warning), transparent 88%);
+  border: 1px solid color-mix(in srgb, var(--mac-warning), transparent 70%);
+}
+
+/* Mixed repeat warning */
+.cart-step-v2__mixed-warning {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-warning);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+/* Doctor group info banner */
+.cart-step-v2__doctor-group-banner {
+  margin-bottom: var(--mac-spacing-2);
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 88%);
+  border: 1px solid color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 75%);
+  border-radius: var(--mac-radius-sm);
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-accent-blue, #007aff);
+}
+
+/* Cart items list */
+.cart-step-v2__cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: var(--mac-spacing-1);
+}
+
+/* Cart item row */
+.cart-step-v2__cart-item {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-bg-primary);
+}
+
+/* Cart item name (truncated) */
+.cart-step-v2__cart-item-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Quantity controls */
+.cart-step-v2__qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cart-step-v2__qty-btn {
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  cursor: pointer;
+  border-radius: 3px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.cart-step-v2__qty-btn:hover {
+  background: var(--mac-bg-secondary);
+}
+
+.cart-step-v2__qty-value {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Discount mode selector */
+.cart-step-v2__discount-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1);
+}
+
+.cart-step-v2__discount-hint {
+  font-size: 10px;
+  color: var(--mac-text-tertiary);
+}
+
+/* Footer hint */
+.cart-step-v2__footer-hint {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+}
