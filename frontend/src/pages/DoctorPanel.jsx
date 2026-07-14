@@ -225,18 +225,14 @@ const DoctorPanel = () => {
   // Используем централизованные функции темизации вместо прямых designTokens
 
   // Загрузка данных
+  // UX Audit Doctor H-08: убрана эмуляция загрузки (setPatients([]) + Skeleton).
+  // Теперь честно показываем empty-state без имитации skeleton-загрузки.
   const loadData = useCallback(async () => {
-    setLoading(true);
+    setLoading(false);
     setLoadError(null);
-    try {
-      setPatients([]);
-      setAppointments([]);
-    } catch (error) {
-      logger.error('Ошибка загрузки данных врача:', error);
-      setLoadError('Не удалось загрузить пациентов и записи врача. Повторите попытку или откройте очередь.');
-    } finally {
-      setLoading(false);
-    }
+    // Данные загружаются через useDoctorQueue (очередь) и useDoctorHistory (история).
+    // Пациенты и записи на сегодня загружаются из реального API, когда он будет готов.
+    // Пока — честный empty-state без имитации.
   }, []);
 
   useEffect(() => {
@@ -910,7 +906,7 @@ const DoctorPanel = () => {
                 title: 'Пациенты не найдены',
                 description: searchQuery || filterStatus !== 'all'
                   ? 'По текущему поиску или фильтру нет пациентов.'
-                  : 'Пациенты не подставляются тестовыми данными. Используйте очередь или регистрацию, чтобы открыть реальную карту пациента.'
+                  : 'Нет пациентов для отображения. Откройте пациента через вкладку «Очередь» или найдите по ID/телефону в форме поиска выше.'
               }) :
 
               <div className="admin-table-wrapper">
