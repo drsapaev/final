@@ -30,6 +30,7 @@ import {
   Eye,
   Trash2,
   XCircle,
+  X,
   Download,
   Pill,
   Heart,
@@ -928,12 +929,15 @@ const DoctorPanel = () => {
 
                               <Edit size={16} />
                             </button>
+                            {/* UX Audit Doctor H-02: View/Delete были заглушки (logger.log only).
+                                View → открывает модалку (дублирует клик по строке — оставляем).
+                                Delete → disabled (нет backend API + нужен ConfirmDialog). */}
                             <button
                         aria-label={`View ${getPatientA11yContext(patient)}`}
                         className="doctor-action-btn doctor-action-btn-success"
                         onClick={(e) => {
                           e.stopPropagation();
-                          logger.log('View patient', patient.id);
+                          handlePatientClick(patient);
                         }}>
 
                               <Eye size={16} />
@@ -941,10 +945,9 @@ const DoctorPanel = () => {
                             <button
                         aria-label={`Delete ${getPatientA11yContext(patient)}`}
                         className="doctor-action-btn doctor-action-btn-danger"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          logger.log('Delete patient', patient.id);
-                        }}>
+                        disabled
+                        title="Функция в разработке"
+                        onClick={(e) => e.stopPropagation()}>
 
                               <Trash2 size={16} />
                             </button>
@@ -1066,23 +1069,23 @@ const DoctorPanel = () => {
 
                               <Edit size={16} />
                             </button>
+                            {/* UX Audit Doctor H-03: Complete/Cancel были заглушки (logger.log only).
+                                Disabled до реализации backend API + ConfirmDialog. */}
                             <button
                         aria-label={`Complete ${getAppointmentA11yContext(appointment)}`}
                         className="doctor-action-btn doctor-action-btn-success"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          logger.log('Complete appointment', appointment.id);
-                        }}>
+                        disabled
+                        title="Функция в разработке"
+                        onClick={(e) => e.stopPropagation()}>
 
                               <CheckCircle size={16} />
                             </button>
                             <button
                         aria-label={`Cancel ${getAppointmentA11yContext(appointment)}`}
                         className="doctor-action-btn doctor-action-btn-danger"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          logger.log('Cancel appointment', appointment.id);
-                        }}>
+                        disabled
+                        title="Функция в разработке"
+                        onClick={(e) => e.stopPropagation()}>
 
                               <XCircle size={16} />
                             </button>
@@ -1430,7 +1433,8 @@ const DoctorPanel = () => {
               onClick={patientModal.closeModal}
               className="doctor-modal-close">
 
-                <XCircle size={24} />
+                {/* UX Audit Doctor L-26: X → X (не XCircle, который выглядит как error). */}
+                <X size={24} />
               </button>
             </div>
 
