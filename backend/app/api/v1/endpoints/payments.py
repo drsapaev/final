@@ -202,6 +202,32 @@ class ProvidersResponse(BaseModel):
 # API Endpoints
 
 
+# UX Audit R-4.3 (Phase 3): Backend-driven payment methods endpoint.
+# Returns list of available payment methods for the registrar/cashier panels.
+# Frontend usePaymentMethods() hook fetches this endpoint when enableBackendFetch=true.
+@router.get("/payment-methods")
+def get_payment_methods(
+    current_user=Depends(deps.get_current_user),
+) -> dict[str, Any]:
+    """
+    Get available payment methods for the clinic.
+
+    Returns a list of payment methods with value, label, and icon_name.
+    Frontend maps icon_name to a lucide-react icon component.
+
+    Currently returns hardcoded defaults — future: configurable per clinic
+    via clinic_settings table.
+    """
+    return {
+        "methods": [
+            {"value": "Карта", "label": "Банковская карта", "icon_name": "card"},
+            {"value": "Наличные", "label": "Наличные", "icon_name": "cash"},
+            {"value": "Перевод", "label": "Банковский перевод", "icon_name": "transfer"},
+            {"value": "Онлайн", "label": "Онлайн платеж", "icon_name": "online"},
+        ]
+    }
+
+
 @router.get("/providers", response_model=ProvidersResponse)
 def get_available_providers(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
     offset: int = Query(default=0, ge=0, description="Смещение"),
