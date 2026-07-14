@@ -22,6 +22,7 @@ import { Card, CardHeader, CardContent } from '../../../components/ui/macos';
 import { AnimatedTransition } from '../../../components/ui';
 import ModernQueueManager from '../../../components/queue/ModernQueueManager';
 import { getLocalDateString } from '../../../utils/dateUtils';
+import { getRegistrarTranslator } from '../../registrarTranslations';
 import logger from '../../../utils/logger';
 
 const QueueView = React.memo(({
@@ -35,6 +36,9 @@ const QueueView = React.memo(({
   theme,
   doctors,
 }) => {
+  // UX Audit R-3.8: используем t() для локализации заголовка и подзаголовка.
+  // Раньше: хардкод русского «Онлайн-очередь» / «Управление онлайн-записью...».
+  const t = getRegistrarTranslator(language);
   return (
     <AnimatedTransition type="fade" delay={100}>
       <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
@@ -50,7 +54,7 @@ const QueueView = React.memo(({
               gap: getSpacing('sm'),
               color: getColor('textPrimary'),
             }}>
-              Онлайн-очередь
+              {t('tabs_queue')}
             </h1>
           </AnimatedTransition>
           <AnimatedTransition type="fade" delay={400}>
@@ -60,7 +64,8 @@ const QueueView = React.memo(({
               lineHeight: '1.5',
               color: getColor('textSecondary'),
             }}>
-              Управление онлайн-записью и QR кодами для очереди
+              {/* UX Audit R-3.8: subtitle локализован через t() */}
+              {t('queue_subtitle')}
             </div>
           </AnimatedTransition>
         </CardHeader>
