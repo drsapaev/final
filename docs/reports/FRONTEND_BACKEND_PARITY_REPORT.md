@@ -1,16 +1,16 @@
 # Frontend-Backend Parity Report
 
-Generated at: 2026-06-30T08:11:18.515835+00:00
+Generated at: 2026-07-14T07:44:26.746325+00:00
 
 ## Summary
 
-- Backend operations total: **1111**
-- Frontend calls total: **222**
-- Implemented matches: **130**
-- Partial (unresolved frontend calls): **9**
-- Missing in frontend: **987**
-- Frontend orphan calls: **83**
-- Coverage: **11.7%**
+- Backend operations total: **1142**
+- Frontend calls total: **167**
+- Implemented matches: **154**
+- Partial (unresolved frontend calls): **13**
+- Missing in frontend: **996**
+- Frontend orphan calls: **0**
+- Coverage: **13.49%**
 
 ## Critical Missing (auth/queue/billing/emr)
 
@@ -37,55 +37,19 @@ Generated at: 2026-06-30T08:11:18.515835+00:00
 
 ## Partial Preview (first 40)
 
-- `GET` ``${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`` (frontend/src/api/services.js:600) reason=`unresolved_constant_ref`
-- `GET` `API_ENDPOINTS.NOTIFICATIONS.GET(id)` (frontend/src/api/services.js:607) reason=`unresolved_constant_ref`
-- `GET` `API_ENDPOINTS.NOTIFICATIONS.TYPES` (frontend/src/api/services.js:637) reason=`unresolved_constant_ref`
+- `GET` `url` (frontend/src/api/mcpClient.js:45) reason=`unresolved_expression`
+- `POST` `url` (frontend/src/api/mcpClient.js:48) reason=`unresolved_expression`
+- `PUT` `url` (frontend/src/api/mcpClient.js:51) reason=`unresolved_expression`
+- `PATCH` `url` (frontend/src/api/mcpClient.js:54) reason=`unresolved_expression`
+- `DELETE` `url` (frontend/src/api/mcpClient.js:57) reason=`unresolved_expression`
+- `GET` `cacheKey` (frontend/src/api/messages.js:81) reason=`unresolved_expression`
+- `GET` `cacheKey` (frontend/src/api/messages.js:125) reason=`unresolved_expression`
+- `GET` `cacheKey` (frontend/src/api/services.js:75) reason=`unresolved_expression`
 - `GET` `cleanUrl` (frontend/src/hooks/useAdminData.js:45) reason=`unresolved_expression`
 - `GET` `endpoint` (frontend/src/hooks/useApi.js:79) reason=`unresolved_expression`
 - `POST` `endpoint` (frontend/src/hooks/useApi.js:217) reason=`unresolved_expression`
-- `POST` `userCreateUrl` (frontend/src/hooks/useDoctors.js:55) reason=`unresolved_expression`
-- `GET` `endpoint` (frontend/src/hooks/useUserPreferences.js:76) reason=`unresolved_expression`
-- `PUT` `endpoint` (frontend/src/hooks/useUserPreferences.js:125) reason=`unresolved_expression`
+- `GET` `endpoint` (frontend/src/hooks/useUserPreferences.js:77) reason=`unresolved_expression`
+- `PUT` `endpoint` (frontend/src/hooks/useUserPreferences.js:128) reason=`unresolved_expression`
 
 ## Frontend Orphan Preview (first 40)
 
-- `GET` `/api/v1/visits` (frontend/src/api/client.js:214)
-- `GET` `/api/v1/users` (frontend/src/api/services.js:51)
-- `GET` `/api/v1/users/{id}` (frontend/src/api/services.js:58)
-- `POST` `/api/v1/users` (frontend/src/api/services.js:65)
-- `PUT` `/api/v1/users/{id}` (frontend/src/api/services.js:74)
-- `DELETE` `/api/v1/users/{id}` (frontend/src/api/services.js:83)
-- `GET` `/api/v1/users/roles` (frontend/src/api/services.js:90)
-- `GET` `/api/v1/users/permissions` (frontend/src/api/services.js:97)
-- `GET` `/api/v1/patients/stats` (frontend/src/api/services.js:159)
-- `GET` `/api/v1/doctors` (frontend/src/api/services.js:172)
-- `GET` `/api/v1/doctors/{id}` (frontend/src/api/services.js:179)
-- `POST` `/api/v1/doctors` (frontend/src/api/services.js:186)
-- `PUT` `/api/v1/doctors/{id}` (frontend/src/api/services.js:195)
-- `DELETE` `/api/v1/doctors/{id}` (frontend/src/api/services.js:204)
-- `GET` `/api/v1/doctors/specializations` (frontend/src/api/services.js:211)
-- `GET` `/api/v1/doctors/departments` (frontend/src/api/services.js:218)
-- `GET` `/api/v1/doctors/{id}/schedule` (frontend/src/api/services.js:226)
-- `GET` `/api/v1/doctors/{id}/availability` (frontend/src/api/services.js:234)
-- `GET` `/api/v1/appointments/patient/{patientId}` (frontend/src/api/services.js:295)
-- `GET` `/api/v1/appointments/doctor/{doctorId}` (frontend/src/api/services.js:303)
-- `GET` `/api/v1/appointments/by-date` (frontend/src/api/services.js:312)
-- `POST` `/api/v1/appointments/{id}/cancel` (frontend/src/api/services.js:319)
-- `POST` `/api/v1/appointments/{id}/confirm` (frontend/src/api/services.js:326)
-- `GET` `/api/v1/queue` (frontend/src/api/services.js:339)
-- `GET` `/api/v1/queue/{id}` (frontend/src/api/services.js:346)
-- `POST` `/api/v1/queue` (frontend/src/api/services.js:353)
-- `PUT` `/api/v1/queue/{id}` (frontend/src/api/services.js:362)
-- `DELETE` `/api/v1/queue/{id}` (frontend/src/api/services.js:371)
-- `GET` `/api/v1/queue/stats` (frontend/src/api/services.js:379)
-- `GET` `/api/v1/queue/by-department` (frontend/src/api/services.js:388)
-- `POST` `/api/v1/queue/call-next` (frontend/src/api/services.js:395)
-- `POST` `/api/v1/queue/{id}/skip` (frontend/src/api/services.js:404)
-- `POST` `/api/v1/queue/{id}/complete` (frontend/src/api/services.js:411)
-- `GET` `/api/v1/services/by-department` (frontend/src/api/services.js:465)
-- `GET` `/api/v1/services/pricing` (frontend/src/api/services.js:473)
-- `GET` `/api/v1/analytics/revenue` (frontend/src/api/services.js:502)
-- `GET` `/api/v1/analytics/patients` (frontend/src/api/services.js:510)
-- `GET` `/api/v1/analytics/appointments` (frontend/src/api/services.js:518)
-- `GET` `/api/v1/analytics/doctors` (frontend/src/api/services.js:526)
-- `GET` `/api/v1/analytics/departments` (frontend/src/api/services.js:534)

@@ -82,8 +82,11 @@ export async function openReceptionSlot({ day, specialistId }) {
 }
 
 // UX Audit Registrar #7: closeReceptionSlot — закрытие приёма.
+// P2 ARCHITECTURE AUDIT: backend mounts this at /queue/legacy/close
+// (queue.py is mounted with prefix="/queue/legacy" in api.py:389).
+// The previous /queue/close path was a frontend orphan — no backend match.
 export async function closeReceptionSlot({ day, specialistId }) {
-  const response = await api.post('/queue/close', null, {
+  const response = await api.post('/queue/legacy/close', null, {
     params: {
       day,
       specialist_id: specialistId,
