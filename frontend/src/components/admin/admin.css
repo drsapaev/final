@@ -12564,3 +12564,11 @@ button[class*="admin-btn"]:active:not(:disabled) {
   transition: background-color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease),
               color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease) !important;
 }
+
+/* ─── UX Audit Admin #1.2: table row hover via CSS instead of inline JS ─── */
+.admin-table-wrapper tbody tr:hover,
+.admin-patients-tbody-row:hover,
+.admin-doctors-tbody-row:hover {
+  background-color: var(--mac-bg-secondary, #f5f5f7);
+  transition: background-color 0.12s ease;
+}
