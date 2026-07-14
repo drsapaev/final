@@ -760,3 +760,10 @@
   gap: var(--mac-spacing-2);
   flex-wrap: wrap;
 }
+
+/* ─── Breadcrumb separator (UX Audit R-3.9) ─── */
+.registrar-breadcrumb-separator {
+  color: var(--mac-text-tertiary, #8e8e93);
+  display: inline-flex;
+  align-items: center;
+}
