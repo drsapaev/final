@@ -1593,8 +1593,17 @@ const RegistrarPanel = () => {
                   </Button>
                 </div> :
             filteredAppointments.length === 0 ?
-            <div className="registrar-empty-table">
-                  {t('empty_table')}
+            <div className="registrar-empty-state">
+                  {/* UX Audit R-4.2: unified empty state pattern — иконка + заголовок + описание + кнопка. */}
+                  <div className="registrar-empty-icon-lg">
+                    <Icon name="magnifyingglass" size="large" />
+                  </div>
+                  <h3 className="registrar-empty-heading registrar-empty-heading-text">
+                    {t('empty_table')}
+                  </h3>
+                  <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
+                    Попробуйте изменить фильтры или выбрать другую дату.
+                  </p>
                 </div> :
 
             <EnhancedAppointmentsTable
