@@ -1,0 +1,397 @@
+/**
+ * MacOSDemo — Phase 3 CSS migration.
+ * Extracted from MacOSDemo.jsx (92 inline style blocks → 0 layout blocks).
+ * All styles use var(--mac-*) design tokens.
+ */
+
+/* ─── Root ─── */
+.demo-root {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  background: var(--mac-gradient-window);
+  min-height: 100vh;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  color: var(--mac-text-primary);
+  transition: background var(--mac-duration-normal) var(--mac-ease);
+}
+
+/* ─── Header ─── */
+.demo-header-wrapper {
+  padding: 12px 0 0 0;
+  background-color: transparent;
+}
+
+.demo-header {
+  background-color: var(--mac-bg-toolbar);
+  border-bottom: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-md);
+  box-shadow: var(--mac-shadow-sm);
+  backdrop-filter: var(--mac-blur-light);
+  -webkit-backdrop-filter: var(--mac-blur-light);
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  position: sticky;
+  top: 12px;
+  margin: 0 12px;
+  z-index: 100;
+}
+
+.demo-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  flex: 1;
+}
+
+.demo-header-title {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin: 0;
+}
+
+.demo-header-center {
+  display: flex;
+  gap: var(--mac-spacing-2);
+  align-items: center;
+}
+
+.demo-header-right {
+  display: flex;
+  gap: var(--mac-spacing-2);
+  align-items: center;
+  margin-left: var(--mac-spacing-3);
+}
+
+.demo-theme-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--mac-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── Main layout ─── */
+.demo-main-layout {
+  display: flex;
+  gap: var(--mac-spacing-5);
+  margin-top: 0px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 0 16px 0;
+}
+
+.demo-sidebar-wrapper {
+  margin-top: var(--mac-spacing-5);
+  flex-shrink: 0;
+}
+
+.demo-sidebar {
+  background: var(--mac-gradient-sidebar);
+  border-right: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-md);
+  backdrop-filter: var(--mac-blur-light);
+  -webkit-backdrop-filter: var(--mac-blur-light);
+}
+
+.demo-content {
+  flex: 1;
+  overflow: auto;
+  padding-right: 10px;
+  margin-top: var(--mac-spacing-5);
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mac-border) transparent;
+}
+
+/* ─── Demo card grid ─── */
+.demo-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--mac-spacing-5);
+  margin-bottom: var(--mac-spacing-5);
+  padding-bottom: 40px;
+}
+
+/* ─── Flex utilities ─── */
+.demo-flex-col-3 { display: flex; flex-direction: column; gap: var(--mac-spacing-3); }
+.demo-flex-col-4 { display: flex; flex-direction: column; gap: var(--mac-spacing-4); }
+.demo-flex-wrap-2 { display: flex; gap: var(--mac-spacing-2); flex-wrap: wrap; }
+.demo-flex-center-2 { display: flex; align-items: center; gap: var(--mac-spacing-2); }
+.demo-flex-center-4 { display: flex; gap: var(--mac-spacing-2); align-items: center; }
+
+/* ─── Button icon helper ─── */
+.demo-btn-icon {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.demo-btn-icon-semibold {
+  font-weight: var(--mac-font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+/* ─── Progress label ─── */
+.demo-progress-label {
+  margin-bottom: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+.demo-progress-percent {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Form section heading ─── */
+.demo-section-heading {
+  margin: 0;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.demo-section-heading-mb16 {
+  margin: 0 0 16px 0;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+/* ─── Form grid ─── */
+.demo-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--mac-spacing-6);
+}
+
+.demo-form-subsection {
+  display: grid;
+  gap: var(--mac-spacing-4);
+}
+
+.demo-form-extra {
+  margin-top: 32px;
+  display: grid;
+  gap: var(--mac-spacing-5);
+}
+
+/* ─── Tab variants ─── */
+.demo-tab-variant-1 {
+  display: flex;
+  margin-bottom: var(--mac-spacing-6);
+  border-bottom: 1px solid var(--mac-border);
+}
+
+.demo-tab-variant-2 {
+  display: flex;
+  margin-bottom: var(--mac-spacing-6);
+}
+
+.demo-tab-variant-3 {
+  display: flex;
+  gap: var(--mac-spacing-2);
+  margin-bottom: var(--mac-spacing-6);
+  background-color: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-md);
+  padding: var(--mac-spacing-1);
+}
+
+/* ─── Tab buttons ─── */
+.demo-tab-btn-1 {
+  padding: var(--mac-spacing-3) var(--mac-spacing-5);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-sm);
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+  position: relative;
+  margin-bottom: -1px;
+}
+
+.demo-tab-btn-1-active {
+  color: var(--mac-accent-blue);
+  font-weight: var(--mac-font-weight-semibold);
+  border-bottom: 2px solid var(--mac-accent-blue);
+}
+
+.demo-tab-btn-1-inactive {
+  color: var(--mac-text-secondary);
+  font-weight: var(--mac-font-weight-normal);
+  border-bottom: 2px solid transparent;
+}
+
+.demo-tab-btn-1-inactive:hover {
+  color: var(--mac-text-primary);
+}
+
+.demo-tab-btn-2 {
+  padding: var(--mac-spacing-3) var(--mac-spacing-5);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-sm);
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+  position: relative;
+  margin-bottom: -1px;
+}
+
+.demo-tab-btn-2-active {
+  color: var(--mac-accent-blue);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.demo-tab-btn-2-inactive {
+  color: var(--mac-text-secondary);
+  font-weight: var(--mac-font-weight-normal);
+}
+
+.demo-tab-btn-2-inactive:hover {
+  color: var(--mac-text-primary);
+}
+
+.demo-tab-btn-2-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--mac-accent-blue);
+  border-radius: 2px 2px 0 0;
+}
+
+.demo-tab-btn-3 {
+  padding: var(--mac-spacing-2) var(--mac-spacing-4);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-sm);
+  border-radius: var(--mac-radius-sm);
+  transition: all var(--mac-duration-normal) var(--mac-ease);
+}
+
+.demo-tab-btn-3-active {
+  background: var(--mac-accent-blue);
+  color: white;
+  font-weight: var(--mac-font-weight-semibold);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+.demo-tab-btn-3-inactive {
+  background: transparent;
+  color: var(--mac-text-secondary);
+  font-weight: var(--mac-font-weight-normal);
+}
+
+.demo-tab-btn-3-inactive:hover {
+  background-color: var(--mac-bg-tertiary);
+  color: var(--mac-text-primary);
+}
+
+/* ─── Tab indicator box ─── */
+.demo-tab-indicator {
+  padding: var(--mac-spacing-3);
+  background-color: var(--mac-bg-tertiary);
+  border-radius: var(--mac-radius-sm);
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary);
+  font-family: SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+}
+
+.demo-tab-indicator-strong {
+  color: var(--mac-accent-blue);
+}
+
+.demo-tab-border {
+  border-bottom: 1px solid var(--mac-border);
+  margin-bottom: var(--mac-spacing-6);
+}
+
+/* ─── Usage guidelines ─── */
+.demo-guidelines {
+  padding: var(--mac-spacing-4);
+  background-color: var(--mac-bg-tertiary);
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+}
+
+.demo-guidelines-title {
+  margin: 0 0 12px 0;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-primary);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.demo-guidelines-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary);
+  line-height: 1.5;
+}
+
+/* ─── Icon grid ─── */
+.demo-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: var(--mac-spacing-5);
+}
+
+.demo-icon-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: var(--mac-spacing-4);
+  border-radius: var(--mac-radius-lg);
+  background-color: var(--mac-bg-tertiary);
+  transition: all 0.2s ease;
+}
+
+.demo-icon-label {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary);
+  text-align: center;
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* ─── Modal ─── */
+.demo-modal-text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.demo-modal-input {
+  margin-top: var(--mac-spacing-4);
+}
+
+/* ─── Floating button ─── */
+.demo-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+}
+
+/* ─── Card margins ─── */
+.demo-card-mb-6 { margin-bottom: var(--mac-spacing-6); }
+.demo-card-mb-40 { margin-bottom: 40px; }
