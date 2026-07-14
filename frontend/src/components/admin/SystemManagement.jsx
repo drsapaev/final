@@ -219,6 +219,10 @@ const SystemManagement = () => {
     }
   };
 
+  // UX Audit Admin #2.4: русские лейблы для severity (consistency с AdminDashboard).
+  const SEVERITY_LABELS = { critical: 'Критический', warning: 'Предупреждение', info: 'Информация' };
+  const getSeverityLabel = (s) => SEVERITY_LABELS[s] || 'Информация';
+
   // ===================== РЕНДЕРИНГ =====================
 
   const renderMonitoringTab = () =>
@@ -365,7 +369,7 @@ const SystemManagement = () => {
         <div key={index} className="admin-alert-row">
                 <div className="admin-flex-center-12">
                   <Badge variant={getSeverityColor(alert.severity)}>
-                    {alert.severity}
+                    {getSeverityLabel(alert.severity)}
                   </Badge>
                   <span className="admin-text-sm-primary">
                     {alert.message}
