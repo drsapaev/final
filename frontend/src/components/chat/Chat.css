@@ -1285,3 +1285,23 @@
 .file-link:hover {
   text-decoration: underline;
 }
+
+/* PR-70 / M-3: reduced-motion support */
+@media (prefers-reduced-motion: reduce) {
+  .typing-bubble, .typing-indicator-modern, .chat-status-indicator,
+  .message-appear, .shimmer, .record-pulse, .pulse {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* PR-70 / M-2: focus-visible styles for keyboard users */
+.chat-window button:focus-visible,
+.chat-window .conv-item:focus-visible,
+.chat-window input:focus-visible,
+.chat-window textarea:focus-visible,
+.chat-window select:focus-visible {
+  outline: 2px solid var(--mac-accent-blue, #007aff);
+  outline-offset: 2px;
+}
+

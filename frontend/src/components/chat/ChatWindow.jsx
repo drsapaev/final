@@ -151,6 +151,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const prevScrollHeightRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const typingThrottleRef = useRef(null); // PR-70 / M-8: throttle typing events
 
   // Scroll to bottom button state
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -321,7 +322,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   // Отправка голосового сообщения
-  const handleSendVoice = async (audioBlob) => {
+  // PR-70 / L-10: accept duration argument (was dropped by parent)
+  const handleSendVoice = async (audioBlob, duration) => {
 
 
     if (!activeConversation || isSending) {
@@ -336,6 +338,10 @@ const ChatWindow = ({ isOpen, onClose }) => {
       const formData = new FormData();
       formData.append('audio_file', audioBlob, 'voice.webm');
       formData.append('recipient_id', activeConversation);
+      // PR-70 / L-10: send voice_duration (was silently dropped)
+      if (duration) {
+        formData.append('voice_duration', String(duration));
+      }
 
       // PR-68 / P0-3: replaced raw fetch with axios client
       // (was: fetch('/messages/send-voice') — no /api/v1 prefix, no CSRF, no token refresh)
@@ -368,7 +374,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
     if (activeConversation) {
-      sendTyping(activeConversation, true);
+      // PR-70 / M-8: throttle sendTyping to max once per 500ms (was every keystroke)
+      if (!typingThrottleRef.current) {
+        sendTyping(activeConversation, true);
+        typingThrottleRef.current = setTimeout(() => {
+          typingThrottleRef.current = null;
+        }, 500);
+      }
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
         sendTyping(activeConversation, false);
