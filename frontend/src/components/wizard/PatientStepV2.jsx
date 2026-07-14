@@ -89,24 +89,7 @@ const PatientStepV2 = ({
 
           {/* UX Audit Registrar #11: loading indicator во время поиска пациентов. */}
           {isSearching &&
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 100,
-            marginTop: 'var(--mac-spacing-1)',
-            padding: 'var(--mac-spacing-3)',
-            background: 'var(--mac-bg-primary)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            boxShadow: 'var(--mac-shadow-lg)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)',
-          }}>
+          <div className="patient-step-v2__search-loading">
             <RefreshCw size={14} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
             Поиск пациентов...
           </div>
@@ -114,22 +97,7 @@ const PatientStepV2 = ({
 
           {/* UX Audit #9: Empty state — patients not found. */}
           {showSuggestions && !isSearching && suggestions.length === 0 && safeData.fio && safeData.fio.trim().length >= 2 &&
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 100,
-            marginTop: 'var(--mac-spacing-1)',
-            padding: 'var(--mac-spacing-3)',
-            background: 'var(--mac-bg-primary)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            boxShadow: 'var(--mac-shadow-lg)',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            textAlign: 'center',
-          }}>
+          <div className="patient-step-v2__search-empty">
             Пациенты не найдены. Будет создан новый пациент.
           </div>
           }
@@ -168,12 +136,12 @@ const PatientStepV2 = ({
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
 
-                  <div style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+                  <div className="patient-step-v2__suggestion-name">
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
                   </div>
-                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', display: 'flex', gap: 'var(--mac-spacing-2)' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}><Phone size={12} aria-hidden="true" />{patient.phone}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}><Calendar size={12} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
+                  <div className="patient-step-v2__suggestion-details">
+                    <span className="patient-step-v2__suggestion-detail"><Phone size={12} aria-hidden="true" />{patient.phone}</span>
+                    <span className="patient-step-v2__suggestion-detail"><Calendar size={12} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
                   </div>
                 </button>
             )}
