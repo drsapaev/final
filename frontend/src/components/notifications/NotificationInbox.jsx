@@ -33,13 +33,13 @@ function getSeverityStyle(severity = 'info') {
   switch (String(severity).toLowerCase()) {
     case 'critical':
     case 'error':
-      return { color: 'var(--mac-error)', background: 'rgba(185, 28, 28, 0.12)' };
+      return { color: 'var(--mac-error)', background: 'color-mix(in srgb, var(--mac-error), transparent 88%)' };
     case 'warning':
-      return { color: 'var(--mac-warning-active, var(--mac-warning))', background: 'rgba(180, 83, 9, 0.12)' };
+      return { color: 'var(--mac-warning-active, var(--mac-warning))', background: 'color-mix(in srgb, var(--mac-warning), transparent 88%)' };
     case 'success':
-      return { color: '#15803d', background: 'rgba(21, 128, 61, 0.12)' };
+      return { color: 'var(--mac-success, var(--mac-success, var(--mac-success, #15803d)))', background: 'color-mix(in srgb, var(--mac-success), transparent 88%)' };
     default:
-      return { color: 'var(--mac-accent-blue-hover)', background: 'rgba(29, 78, 216, 0.10)' };
+      return { color: 'var(--mac-accent-blue-hover)', background: 'color-mix(in srgb, var(--mac-accent-blue), transparent 90%)' };
   }
 }
 

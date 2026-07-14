@@ -175,7 +175,7 @@ const DoctorCalendar = ({
       backgroundColor: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
       borderRadius: 'var(--mac-radius-lg)',
       boxShadow: isDark ?
-      '0 4px 20px rgba(0, 0, 0, 0.3)' :
+      '0 4px 20px color-mix(in srgb, var(--mac-text-primary), transparent 70%)' :
       '0 4px 20px rgba(0, 0, 0, 0.08)',
       overflow: 'hidden'
     },
