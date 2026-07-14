@@ -15,7 +15,7 @@ import {
   Box,
 } from '../ui/macos';
 import notify from '../../services/notify';
-import formatCurrency from '../../utils/formatCurrency';
+import { formatUZS } from '../../utils/formatCurrency';
 // UX Audit #4 regression fix: inline-стили → CSS-классы (после PR #1910 regression).
 import './CashPaymentModal.css';
 
@@ -140,7 +140,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             gap={1}
                             className="cpm-amount-hint-box">
                             <Info size={14} aria-hidden="true" />
-                            Сумма к оплате: {formatCurrency(defaultAmount)}
+                            Сумма к оплате: {formatUZS(defaultAmount)}
                         </Box>
                     )}
                 </Box>
@@ -199,8 +199,8 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                         size="small"
                                         variant="outline"
                                         onClick={() => setPaymentData(prev => ({ ...prev, receivedAmount: String(nominal) }))}
-                                        aria-label={`Ввести ${formatCurrency(nominal)} как полученную сумму`}>
-                                        {formatCurrency(nominal)}
+                                        aria-label={`Ввести ${formatUZS(nominal)} как полученную сумму`}>
+                                        {formatUZS(nominal)}
                                     </Button>
                                 ))}
                                 <Button
@@ -214,7 +214,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             </div>
                             {insufficientCash && (
                                 <Typography variant="caption" className="cpm-insufficient-error">
-                                    Недостаточно средств. Нужно ещё: {formatCurrency(numericAmount - numericReceived)}
+                                    Недостаточно средств. Нужно ещё: {formatUZS(numericAmount - numericReceived)}
                                 </Typography>
                             )}
                             {changeDue > 0 && (
@@ -223,7 +223,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                     px={1.5}
                                     py={1}
                                     className="cpm-change-due-box">
-                                    Сдача: {formatCurrency(changeDue)}
+                                    Сдача: {formatUZS(changeDue)}
                                 </Box>
                             )}
                         </Box>
