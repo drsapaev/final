@@ -1315,6 +1315,13 @@ const CashierPanel = () => {
                         `${appointment.patient_last_name} ${appointment.patient_first_name}` :
                         appointment.patient_name || `Пациент #${appointment.patient_id}`
                         }
+                              {/* UX Audit #2.6: badge «Групповой» для grouped-платежей,
+                                  чтобы было видно, почему кнопка «Онлайн» дизейблится. */}
+                              {isBackendGroupedCashierPayment(appointment) && (
+                                <span className="cashier-badge cashier-badge-grouped" title="Несколько визитов в одном платеже">
+                                  Групповой
+                                </span>
+                              )}
                             </td>
                             <td className="cashier-text-sm cashier-text-primary">
                               {renderServiceBadges(appointment.services, appointment.services_names)}
@@ -1338,7 +1345,9 @@ const CashierPanel = () => {
                             onClick={() => openPaymentWidget(appointment)}
                             disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}
                             aria-label="Начать онлайн-оплату"
-                            title={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment) ? 'Онлайн-оплата недоступна для этой записи' : 'Оплата онлайн'}>
+                            title={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)
+                              ? 'Онлайн-оплата недоступна для групповых платежей (несколько визитов). Используйте кнопку «Касса».'
+                              : 'Оплата онлайн через Click/PayMe/Kaspi'}>
 
                                   Онлайн
                                 </Button>
