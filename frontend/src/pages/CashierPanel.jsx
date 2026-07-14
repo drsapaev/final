@@ -1016,6 +1016,16 @@ const CashierPanel = () => {
       <div className="cashier-root-inner">
         <div className="max-w-7xl mx-auto space-y-6">
 
+          {/* UX Audit #3.5: page header для ориентира (Nielsen #1 —
+              visibility of system status). hideSidebar:true убирает боковую
+              навигацию, поэтому без заголовка кассир теряет контекст страницы. */}
+          <header className="cashier-page-header">
+            <h1 className="cashier-page-title">Касса</h1>
+            <p className="cashier-page-subtitle">
+              Медицинская клиника · {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </header>
+
           {/* Filters */}
           <Card
             variant="default"
