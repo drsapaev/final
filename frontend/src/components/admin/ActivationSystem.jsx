@@ -287,7 +287,7 @@ const ActivationSystem = () => {
       {/* Статистика */}
       <div className="admin-grid-auto-200">
         <MacOSCard className="admin-card-p-24-center">
-          <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-accent-blue)' }}>
+          <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-blue">
             {stats.total_activations || 0}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
@@ -295,7 +295,7 @@ const ActivationSystem = () => {
           </div>
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
-          <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-success)' }}>
+          <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-success">
             {stats.active_activations || 0}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
@@ -303,7 +303,7 @@ const ActivationSystem = () => {
           </div>
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
-          <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>
+          <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-warning">
             {stats.trial_activations || 0}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
@@ -311,7 +311,7 @@ const ActivationSystem = () => {
           </div>
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
-          <div className="admin-stat-num-2xl-bold-dynamic-mb-8" style={{ '--admin-stat-color': 'var(--mac-error)' }}>
+          <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-error">
             {stats.expired_activations || 0}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
@@ -524,8 +524,8 @@ const ActivationSystem = () => {
           { label: 'Отмена', variant: 'secondary', onClick: () => setExtendDialog(null) },
           { label: 'Продлить', variant: 'primary', onClick: submitExtendActivation },
         ]}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
-          <label htmlFor="extend-days-input" style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-primary)' }}>
+        <div className="admin-extend-dialog-body">
+          <label htmlFor="extend-days-input" className="admin-extend-dialog-label">
             На сколько дней продлить ключ?
           </label>
           <Input
@@ -538,7 +538,7 @@ const ActivationSystem = () => {
             autoFocus
           />
           {extendDialog?.error && (
-            <p style={{ color: 'var(--mac-error)', fontSize: 'var(--mac-font-size-sm)', margin: 0 }}>
+            <p className="admin-extend-dialog-error">
               {extendDialog.error}
             </p>
           )}
