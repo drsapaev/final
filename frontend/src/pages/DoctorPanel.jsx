@@ -70,7 +70,7 @@ const DOCTOR_PANEL_TABS = new Set(['dashboard', 'patients', 'appointments', 'que
 const DoctorPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isMobile, isTablet } = useBreakpoint();void
+  const { isMobile, isTablet } = useBreakpoint();
   useTouchDevice();
 
   // ✅ Получаем patientId из URL для автоматического выбора пациента
@@ -343,11 +343,7 @@ const DoctorPanel = () => {
   }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Измерение высоты заголовка
-  useEffect(() => {
-    if (headerRef.current) {
-      setHeaderHeight(headerRef.current.offsetHeight);
-    }
-  }, [isMobile, isTablet]);
+  // UX Audit Doctor H-09: headerHeight useEffect removed — headerRef was never attached.
 
   // Стили
   const pageStyle = {
@@ -358,50 +354,15 @@ const DoctorPanel = () => {
     lineHeight: '1.5',
     color: 'var(--mac-text-primary)',
     transition: 'background var(--mac-duration-normal) var(--mac-ease)'
-  };void
-
-  {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
-    backdropFilter: 'blur(20px)',
-    borderBottom: `1px solid ${getColor('primary', 200)}`,
-    boxShadow: getShadow('lg')
-  };void
-
-  {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: isMobile ? getSpacing('md') : getSpacing('lg'),
-    maxWidth: '1400px',
-    margin: '0 auto'
-  };void
-
-  {
-    display: 'flex',
-    alignItems: 'center',
-    gap: getSpacing('sm'),
-    color: 'var(--mac-text-on-accent)',
-    fontSize: isMobile ? getFontSize('lg') : getFontSize('xl'),
-    fontWeight: 'var(--mac-font-weight-bold)',
-    textDecoration: 'none'
-  };void
-
-  {
-    display: 'flex',
-    alignItems: 'center',
-    gap: isMobile ? getSpacing('sm') : getSpacing('md')
   };
+  // UX Audit Doctor H-09: 5 мёртвых стилевых блоков удалены (header/inner/title/actions).
+  // Они были labelled statements без присваивания — never used.
 
   const contentStyle = {
-    marginTop: `${headerHeight + 20}px`,
+    marginTop: '20px',
     padding: isMobile ? getSpacing('md') : getSpacing('lg'),
     maxWidth: '1400px',
-    margin: `${headerHeight + 20}px auto 0 auto`
+    margin: '20px auto 0 auto'
   };
 
   const tabsStyle = {
@@ -638,7 +599,7 @@ const DoctorPanel = () => {
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', false)}>
 
             <Activity size={isMobile ? 16 : 20} />
-            {!isMobile && <span>Панель</span>}
+            {!isMobile && <span>Обзор</span>}
           </button>
 
           <button
