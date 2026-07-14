@@ -27,6 +27,7 @@ import {
 'lucide-react';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
+import './WaitTimeAnalytics.css';
 
 import logger from '../../utils/logger';
 const WaitTimeAnalytics = () => {
@@ -183,25 +184,12 @@ const WaitTimeAnalytics = () => {
   };
 
   const renderOverviewTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+  <div className="wta-tab-content">
       {/* Сводка */}
       {summary &&
-    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-          <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 'var(--mac-spacing-4)'
-      }}>
-            <h3 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)'
-        }}>
+    <MacOSCard className="wta-card-padded">
+          <div className="wta-section-header">
+            <h3 className="wta-h3">
               <Activity style={{ width: '20px', height: '20px' }} />
               Сводка за последние {summary.period_days} дней
             </h3>
@@ -216,7 +204,7 @@ const WaitTimeAnalytics = () => {
             </Badge>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
+          <div className="wta-stat-grid">
             <MacOSStatCard
           title="Среднее время ожидания"
           value={formatTime(summary.average_wait_time_minutes)}
@@ -247,31 +235,18 @@ const WaitTimeAnalytics = () => {
           </div>
 
           {summary.top_recommendations && summary.top_recommendations.length > 0 &&
-      <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
-              <h4 style={{
-          margin: '0 0 8px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <div className="wta-mt-4">
+              <h4 className="wta-h4">
                 Рекомендации
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-1)' }}>
+              <div className="wta-recommendations-list">
                 {summary.top_recommendations.map((recommendation, index) =>
           <div
             key={index}
-            style={{
-              padding: 'var(--mac-spacing-2)',
-              backgroundColor: 'var(--mac-warning-bg)',
-              border: '1px solid var(--mac-warning-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)'
-            }}>
+            className="wta-recommendation-item wta-recommendation-warning">
             
                     <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--mac-warning)' }} />
-                    <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
+                    <span className="wta-recommendation-text">
                       {recommendation}
                     </span>
                   </div>
@@ -284,26 +259,13 @@ const WaitTimeAnalytics = () => {
 
       {/* Real-time оценки */}
       {realTimeEstimates &&
-    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-          <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 'var(--mac-spacing-4)'
-      }}>
-            <h3 style={{
-          margin: 0,
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)'
-        }}>
+    <MacOSCard className="wta-card-padded">
+          <div className="wta-section-header">
+            <h3 className="wta-h3">
               <Zap style={{ width: '20px', height: '20px' }} />
               Текущие оценки времени ожидания
             </h3>
-            <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+            <div className="wta-dept-median">
               Обновлено: {new Date(realTimeEstimates.timestamp).toLocaleTimeString()}
             </div>
           </div>
@@ -315,46 +277,28 @@ const WaitTimeAnalytics = () => {
         description="В данный момент нет активных очередей для отображения" /> :
 
 
-      <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+      <div className="wta-grid-gap">
               {Object.values(realTimeEstimates.queues).map((queue) =>
         <div
           key={queue.queue_id}
-          style={{
-            padding: 'var(--mac-spacing-4)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: 'var(--mac-bg-secondary)'
-          }}>
+          className="wta-queue-card">
           
                   <div>
-                    <div style={{
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: 'var(--mac-spacing-1)'
-            }}>
+                    <div className="wta-queue-name">
                       {queue.department} - {queue.doctor_name}
                     </div>
-                    <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-4)'
-            }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
+                    <div className="wta-queue-stats">
+                      <span className="wta-queue-stat">
                         <Users style={{ width: '14px', height: '14px' }} />
                         {queue.current_queue_length} в очереди
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
+                      <span className="wta-queue-stat">
                         <Clock style={{ width: '14px', height: '14px' }} />
                         ~{formatTime(queue.average_service_time)} на пациента
                       </span>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div className="wta-queue-right">
                     <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
@@ -375,16 +319,11 @@ const WaitTimeAnalytics = () => {
       }
 
           {realTimeEstimates.summary && Object.keys(realTimeEstimates.queues).length > 0 &&
-      <div style={{
-        marginTop: 'var(--mac-spacing-4)',
-        padding: 'var(--mac-spacing-4)',
-        backgroundColor: 'var(--mac-bg-secondary)',
-        borderRadius: 'var(--mac-radius-sm)'
-      }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--mac-font-size-sm)' }}>
-                <span style={{ color: 'var(--mac-text-primary)' }}>Минимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.shortest_wait)}</strong></span>
-                <span style={{ color: 'var(--mac-text-primary)' }}>Среднее ожидание: <strong>{formatTime(realTimeEstimates.summary.average_wait)}</strong></span>
-                <span style={{ color: 'var(--mac-text-primary)' }}>Максимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.longest_wait)}</strong></span>
+      <div className="wta-summary-box">
+              <div className="wta-summary-row">
+                <span className="wta-recommendation-text-default">Минимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.shortest_wait)}</strong></span>
+                <span className="wta-recommendation-text-default">Среднее ожидание: <strong>{formatTime(realTimeEstimates.summary.average_wait)}</strong></span>
+                <span className="wta-recommendation-text-default">Максимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.longest_wait)}</strong></span>
               </div>
             </div>
       }
@@ -394,29 +333,21 @@ const WaitTimeAnalytics = () => {
 
 
   const renderDetailedTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+  <div className="wta-tab-content">
       {loading ?
-    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+    <MacOSCard className="wta-card-padded">
           <Skeleton height="200px" />
         </MacOSCard> :
     analytics ?
     <>
           {/* Общая статистика */}
-          <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-            <h3 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)'
-        }}>
+          <MacOSCard className="wta-card-padded">
+            <h3 className="wta-h3-mb16">
               <BarChart3 style={{ width: '20px', height: '20px' }} />
               Детальная статистика ({analytics.period.start_date} - {analytics.period.end_date})
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
+            <div className="wta-stat-grid-sm">
               <MacOSStatCard
             title="Среднее"
             value={formatTime(analytics.overall_stats.average_minutes)}
@@ -456,42 +387,29 @@ const WaitTimeAnalytics = () => {
 
           {/* Разбивка по отделениям */}
           {Object.keys(analytics.department_breakdown).length > 0 &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h3 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="wta-card-padded">
+              <h3 className="wta-h3-mb16-no-icon">
                 По отделениям
               </h3>
-              <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+              <div className="wta-grid-gap">
                 {Object.entries(analytics.department_breakdown).map(([dept, stats]) =>
           <div
             key={dept}
-            style={{
-              padding: 'var(--mac-spacing-4)',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: 'var(--mac-bg-secondary)'
-            }}>
+            className="wta-dept-card">
             
                     <div>
-                      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+                      <div className="wta-dept-name">
                         {dept}
                       </div>
-                      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                      <div className="wta-dept-count">
                         {stats.count} записей
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
+                    <div className="wta-queue-right">
+                      <div className="wta-dept-avg">
                         {formatTime(stats.average_minutes)}
                       </div>
-                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                      <div className="wta-dept-median">
                         медиана: {formatTime(stats.median_minutes)}
                       </div>
                     </div>
@@ -503,31 +421,18 @@ const WaitTimeAnalytics = () => {
 
           {/* Рекомендации */}
           {analytics.recommendations && analytics.recommendations.length > 0 &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-              <h3 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+      <MacOSCard className="wta-card-padded">
+              <h3 className="wta-h3-mb16-no-icon">
                 Рекомендации по улучшению
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
+              <div className="wta-recommendations-list-gap2">
                 {analytics.recommendations.map((recommendation, index) =>
           <div
             key={index}
-            style={{
-              padding: 'var(--mac-spacing-4)',
-              backgroundColor: 'var(--mac-info-bg)',
-              border: '1px solid var(--mac-info-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)'
-            }}>
+            className="wta-recommendation-info">
             
                     <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
-                    <span style={{ color: 'var(--mac-text-primary)' }}>
+                    <span className="wta-recommendation-text-default">
                       {recommendation}
                     </span>
                   </div>
@@ -547,25 +452,16 @@ const WaitTimeAnalytics = () => {
 
 
   const renderServicesTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="wta-tab-content">
+      <div className="wta-section-header-no-mb">
+        <h3 className="wta-h3-mb16-no-icon">
           Аналитика по услугам
         </h3>
         <Button
         onClick={loadServiceAnalytics}
         disabled={loading}
         variant="outline"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)'
-        }}>
+        className="wta-action-btn">
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
           Загрузить
@@ -573,33 +469,23 @@ const WaitTimeAnalytics = () => {
       </div>
 
       {loading ?
-    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+    <MacOSCard className="wta-card-padded">
           <Skeleton height="300px" />
         </MacOSCard> :
     serviceAnalytics && Object.keys(serviceAnalytics.service_analytics).length > 0 ?
-    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-          <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+    <MacOSCard className="wta-card-padded">
+          <div className="wta-grid-gap">
             {Object.entries(serviceAnalytics.service_analytics).map(([serviceCode, data]) =>
         <div
           key={serviceCode}
-          style={{
-            padding: 'var(--mac-spacing-4)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            backgroundColor: 'var(--mac-bg-secondary)'
-          }}>
+          className="wta-service-card">
           
-                <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 'var(--mac-spacing-2)'
-          }}>
+                <div className="wta-service-header">
                   <div>
-                    <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+                    <div className="wta-dept-name">
                       {data.service_name}
                     </div>
-                    <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                    <div className="wta-dept-count">
                       Код: {serviceCode} • {data.total_visits} визитов
                     </div>
                   </div>
@@ -613,7 +499,7 @@ const WaitTimeAnalytics = () => {
                 </div>
                 
                 {data.wait_time_stats &&
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 'var(--mac-spacing-2)' }}>
+          <div className="wta-stat-grid-xs">
                     <MacOSStatCard
               title="Среднее"
               value={formatTime(data.wait_time_stats.average_minutes)}
@@ -654,25 +540,16 @@ const WaitTimeAnalytics = () => {
 
 
   const renderHeatmapTab = () =>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{
-        margin: 0,
-        color: 'var(--mac-text-primary)',
-        fontSize: 'var(--mac-font-size-lg)',
-        fontWeight: 'var(--mac-font-weight-semibold)'
-      }}>
+  <div className="wta-tab-content">
+      <div className="wta-section-header-no-mb">
+        <h3 className="wta-h3-mb16-no-icon">
           Тепловая карта времени ожидания
         </h3>
         <Button
         onClick={loadHeatmap}
         disabled={loading}
         variant="outline"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)'
-        }}>
+        className="wta-action-btn">
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
           Загрузить
@@ -680,31 +557,21 @@ const WaitTimeAnalytics = () => {
       </div>
 
       {loading ?
-    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+    <MacOSCard className="wta-card-padded">
           <Skeleton height="400px" />
         </MacOSCard> :
     heatmapData ?
-    <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-          <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-            <h4 style={{
-          margin: '0 0 8px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+    <MacOSCard className="wta-card-padded">
+          <div className="wta-mb-4">
+            <h4 className="wta-h4">
               Время ожидания по часам дня
             </h4>
-            <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+            <div className="wta-dept-count">
               Период: {heatmapData.period.start_date} - {heatmapData.period.end_date}
             </div>
           </div>
 
-          <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
-        gap: 'var(--mac-spacing-2)',
-        marginBottom: 'var(--mac-spacing-4)'
-      }}>
+          <div className="wta-heatmap-grid">
             {heatmapData.heatmap_data.map((hourData) =>
         <div
           key={hourData.hour}
@@ -739,9 +606,9 @@ const WaitTimeAnalytics = () => {
         justifyContent: 'space-between',
         fontSize: 'var(--mac-font-size-sm)'
       }}>
-              <span style={{ color: 'var(--mac-text-primary)' }}>Пиковый час: <strong>{heatmapData.summary.peak_hour}:00</strong></span>
-              <span style={{ color: 'var(--mac-text-primary)' }}>Лучший час: <strong>{heatmapData.summary.best_hour}:00</strong></span>
-              <span style={{ color: 'var(--mac-text-primary)' }}>Самый загруженный: <strong>{heatmapData.summary.busiest_hour}:00</strong></span>
+              <span className="wta-recommendation-text-default">Пиковый час: <strong>{heatmapData.summary.peak_hour}:00</strong></span>
+              <span className="wta-recommendation-text-default">Лучший час: <strong>{heatmapData.summary.best_hour}:00</strong></span>
+              <span className="wta-recommendation-text-default">Самый загруженный: <strong>{heatmapData.summary.busiest_hour}:00</strong></span>
             </div>
       }
         </MacOSCard> :
@@ -763,45 +630,25 @@ const WaitTimeAnalytics = () => {
 
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+    <div className="wta-tab-content">
       {/* Заголовок */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mac-spacing-4)',
-        marginBottom: 'var(--mac-spacing-2)'
-      }}>
+      <div className="wta-header">
         <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
         <div>
-          <h1 style={{
-            margin: 0,
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-2xl)',
-            fontWeight: 'var(--mac-font-weight-bold)'
-          }}>
+          <h1 className="wta-h1">
             Аналитика времени ожидания
           </h1>
-          <p style={{
-            margin: '4px 0 0 0',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-base)'
-          }}>
+          <p className="wta-h1-subtitle">
             Анализ времени ожидания пациентов и оптимизация очередей
           </p>
         </div>
       </div>
 
       {/* Фильтры */}
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--mac-spacing-4)' }}>
+      <MacOSCard className="wta-card-padded">
+        <div className="wta-stat-grid">
           <div>
-            <label style={{
-              display: 'block',
-              marginBottom: 'var(--mac-spacing-2)',
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}>
+            <label className="wta-filter-label">
               Начальная дата
             </label>
             <Input
@@ -811,13 +658,7 @@ const WaitTimeAnalytics = () => {
             
           </div>
           <div>
-            <label style={{
-              display: 'block',
-              marginBottom: 'var(--mac-spacing-2)',
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}>
+            <label className="wta-filter-label">
               Конечная дата
             </label>
             <Input
@@ -827,13 +668,7 @@ const WaitTimeAnalytics = () => {
             
           </div>
           <div>
-            <label style={{
-              display: 'block',
-              marginBottom: 'var(--mac-spacing-2)',
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}>
+            <label className="wta-filter-label">
               Отделение
             </label>
             <Input
@@ -842,7 +677,7 @@ const WaitTimeAnalytics = () => {
               onChange={(e) => setFilters({ ...filters, department: e.target.value })} />
             
           </div>
-          <div style={{ display: 'flex', alignItems: 'end' }}>
+          <div className="wta-action-btn-end">
             <Button
               onClick={loadAnalytics}
               disabled={loading}
