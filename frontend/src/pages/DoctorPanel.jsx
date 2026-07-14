@@ -1421,8 +1421,16 @@ const DoctorPanel = () => {
       </main>
 
       {/* ✅ УЛУЧШЕНИЕ: Модальное окно пациента с универсальным хуком */}
+      {/* UX Audit Doctor H-07: a11y — role=dialog, aria-modal, Esc, overlay click. */}
       {patientModal.isOpen && patientModal.selectedItem &&
-      <div className="doctor-modal-overlay">
+      <div
+        className="doctor-modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Информация о пациенте"
+        onClick={(e) => { if (e.target === e.currentTarget) patientModal.closeModal(); }}
+        onKeyDown={(e) => { if (e.key === 'Escape') patientModal.closeModal(); }}
+        tabIndex={-1}>
           <div className="doctor-modal-card">
             <div className="doctor-modal-header">
               <h3 className="doctor-modal-title">
