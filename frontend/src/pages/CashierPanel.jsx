@@ -972,16 +972,23 @@ const CashierPanel = () => {
 
               </div>
 
-              {/* Статус */}
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="cashier-text-sm cashier-text-primary">
-
-                <option value="all">Все статусы</option>
-                <option value="paid">Оплачено</option>
-                <option value="pending">Ожидает</option>
-              </select>
+              {/* Статус — показывается только на табе истории платежей.
+                  На табе «Ожидающие оплаты» статус заведомо = pending,
+                  поэтому фильтр избыточен (закон Хика — убираем лишний выбор). */}
+              {activeTab === 'history' && (
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  aria-label="Фильтр по статусу платежа"
+                  className="cashier-text-sm cashier-text-primary">
+                  <option value="all">Все статусы</option>
+                  <option value="paid">Оплачено</option>
+                  <option value="partial">Частично</option>
+                  <option value="pending">Ожидает</option>
+                  <option value="cancelled">Отменён</option>
+                  <option value="refunded">Возвращён</option>
+                </select>
+              )}
 
               {/* Переключатель режима даты */}
               <div className="cashier-date-mode">
