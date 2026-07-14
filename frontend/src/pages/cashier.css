@@ -433,3 +433,39 @@
 .cashier-th-sortable:hover {
   color: var(--mac-accent-blue, #007aff);
 }
+
+/* ─── Empty states (UX Audit #4.3) ─── */
+.cashier-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.cashier-empty-state--inline {
+  padding: 24px 16px;
+}
+
+.cashier-empty-state-icon {
+  color: var(--mac-success, #34c759);
+  margin-bottom: 4px;
+}
+
+.cashier-empty-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--mac-text-primary, #1a1d29);
+}
+
+.cashier-empty-state-text {
+  font-size: 13px;
+  color: var(--mac-text-secondary, #6b7280);
+  margin-bottom: 8px;
+}
+
+.cashier-empty-cell {
+  padding: 24px 16px;
+}
