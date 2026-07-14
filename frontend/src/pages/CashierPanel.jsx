@@ -347,6 +347,9 @@ const CashierPanel = () => {
     const patientId = new URLSearchParams(window.location.search).get('patientId');
     return patientId ? `patient:${patientId}` : '';
   });
+  // UX Audit #2.4: показывать подсказку с примерами синтаксиса поиска,
+  // пока input в фокусе и запрос пустой.
+  const [searchFocused, setSearchFocused] = useState(false);
   const debouncedQuery = useDebouncedValue(query, 500); // 500ms debounce
 
   // ✅ Эффект для загрузки пациента из URL
@@ -1001,6 +1004,9 @@ const CashierPanel = () => {
 
             <div className="cashier-filter-row">
               {/* Поиск */}
+              {/* UX Audit #2.4: улучшенный placeholder + раскрывающаяся подсказка
+                  с примерами синтаксиса (patient:ID). Раньше placeholder был обрезан
+                  и не раскрывал скрытые возможности поиска. */}
               <div className="cashier-search-wrap">
                 <Search className="cashier-search-icon" />
                 <input
@@ -1008,9 +1014,19 @@ const CashierPanel = () => {
                   aria-label="Поиск платежей кассира"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
                   className="cashier-text-sm cashier-text-primary"
-                  placeholder="Поиск по пациенту " />
-
+                  placeholder="Поиск: имя пациента, ID или телефон..."
+                  title="Можно искать по имени, ID (patient:123) или телефону" />
+                {searchFocused && !query && (
+                  <div className="cashier-search-hint" role="status" aria-live="polite">
+                    <span className="cashier-search-hint-label">Примеры:</span>
+                    <code className="cashier-search-hint-code">Иванов</code>
+                    <code className="cashier-search-hint-code">patient:123</code>
+                    <code className="cashier-search-hint-code">+99890...</code>
+                  </div>
+                )}
               </div>
 
               {/* Статус — показывается только на табе истории платежей.
