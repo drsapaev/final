@@ -13,10 +13,6 @@ import {
   Button,
   Alert,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Select,
 } from '../ui/macos';
 
@@ -72,7 +68,6 @@ const PaymentWidget = ({
   const [error, setError] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // HIGH #7 fix: auto-polling for online payment status.
   // Previously the cashier had to click "Проверить статус" manually.
@@ -345,10 +340,8 @@ const PaymentWidget = ({
     }
   };
 
-  // Подтверждение платежа
-  const confirmPayment = () => {
-    setShowConfirmDialog(true);
-  };
+  // UX Audit #1.5: confirmPayment() и showConfirmDialog state удалены —
+  // двойное подтверждение убрано. initializePayment() вызывается напрямую.
 
   // Форматирование суммы
   const formatAmount = (amountValue, currencyCode) => {
@@ -544,15 +537,19 @@ const PaymentWidget = ({
         }
 
         {/* Кнопки действий */}
+        {/* UX Audit #1.5: убран двойной confirm-dialog (Nielsen #7 — flexibility & efficiency).
+            Раньше: click «Оплатить» → модалка подтверждения → click «Продолжить» → реальная инициализация.
+            Теперь: click «Оплатить» сразу инициализирует платёж. Защита от случайного клика —
+            через `loading` state (кнопка дизейблится на время инициализации). */}
         <Box display="flex" className="pw-actions-row">
           <Button
             variant="contained"
             color="primary"
             size="large"
             fullWidth
-            onClick={confirmPayment}
+            onClick={initializePayment}
             disabled={loading || !selectedProvider || paymentStatus === 'paid'}>
-            
+
             {loading ?
             <>
                 <CircularProgress size={20} className="pw-submit-spinner" />
@@ -570,47 +567,11 @@ const PaymentWidget = ({
             size="large"
             onClick={cancelPayment}
             disabled={loading}>
-            
+
               Отмена
             </Button>
           }
         </Box>
-
-        {/* Диалог подтверждения */}
-        <Dialog open={showConfirmDialog} onClose={() => setShowConfirmDialog(false)}>
-          <DialogTitle>Подтверждение оплаты</DialogTitle>
-          <DialogContent>
-            <Typography variant="body1" gutterBottom>
-              Вы собираетесь оплатить:
-            </Typography>
-            <Box className="pw-confirm-amount-box">
-              <Typography variant="h6" color="primary">
-                {formatAmount(amount, currency)}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                через {providers.find((p) => p.code === selectedProvider)?.name}
-              </Typography>
-            </Box>
-            <Typography variant="body2" color="textSecondary">
-              После нажатия «Продолжить» вы будете перенаправлены на страницу оплаты.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShowConfirmDialog(false)}>
-              Отмена
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => {
-                setShowConfirmDialog(false);
-                initializePayment();
-              }}
-              disabled={loading}>
-              
-              Продолжить
-            </Button>
-          </DialogActions>
-        </Dialog>
       </CardContent>
     </Card>);
 
