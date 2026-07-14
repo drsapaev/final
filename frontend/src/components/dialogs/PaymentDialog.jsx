@@ -3,8 +3,8 @@ import PropTypes from 'prop-types';
 import { CreditCard, Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { toast } from 'react-toastify';
-// UX Audit R-4.3: centralized payment methods config (future: backend-driven).
-import { DEFAULT_PAYMENT_METHODS } from '../../config/paymentMethods';
+// UX Audit R-4.3 (Phase 2): usePaymentMethods hook (future: backend-driven).
+import { usePaymentMethods } from '../../hooks/usePaymentMethods';
 // UX Audit Registrar #5: все inline-стили перенесены в PaymentDialog.css.
 // useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
 // Также: emoji в заголовке (✅/💳) заменены на text-only (иконки и так есть в actions).
@@ -85,11 +85,10 @@ const PaymentDialog = ({
     onClose();
   };
 
-  // UX Audit R-4.3: payment methods загружаются из централизованного конфига.
-  // Раньше: hardcoded array в PaymentDialog.
-  // Теперь: DEFAULT_PAYMENT_METHODS из config/paymentMethods.js.
-  // Future: usePaymentMethods() hook will fetch from backend API.
-  const paymentMethods = DEFAULT_PAYMENT_METHODS;
+  // UX Audit R-4.3 (Phase 2): payment methods через usePaymentMethods hook.
+  // enableBackendFetch=false — использует DEFAULT_PAYMENT_METHODS.
+  // Когда backend endpoint будет готов, переключить на true.
+  const { paymentMethods } = usePaymentMethods({ enableBackendFetch: false });
 
   if (!appointment) return null;
 
