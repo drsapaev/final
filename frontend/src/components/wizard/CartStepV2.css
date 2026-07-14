@@ -321,3 +321,14 @@
   font-size: var(--mac-font-size-xs);
   color: var(--mac-text-tertiary);
 }
+
+/* ─── Phase 3: additional classes ─── */
+.cart-step-v2__consultation-title {
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.cart-step-v2__consultation-info {
+  min-width: 0;
+}
