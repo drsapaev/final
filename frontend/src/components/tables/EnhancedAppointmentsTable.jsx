@@ -46,6 +46,7 @@ import {
 // ⭐ SSOT: Centralized service code resolver
 import { LEGACY_CODE_TO_NAME, ID_TO_NAME, getServiceDisplayName } from '../../utils/serviceCodeResolver';
 import PropTypes from 'prop-types';
+import AppointmentPagination from './AppointmentPagination';  // PR-75
 
 const SESSION_COLORS = [
   'var(--mac-accent-blue)', // blue
