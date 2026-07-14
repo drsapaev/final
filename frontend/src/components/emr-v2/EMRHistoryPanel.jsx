@@ -225,7 +225,7 @@ export function EMRHistoryPanel({
 
             {/* Footer: hint */}
             <div className="emr-history-panel__hint">
-                💡 Нажмите на версию для сравнения
+                Нажмите на версию для сравнения
             </div>
         </div>
     );

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -102,6 +102,13 @@ const DoctorPanel = () => {
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+
+  // UX Audit Doctor M-46: useMemo for stat calculations (was 3 filter calls per render).
+  const appointmentStats = useMemo(() => ({
+    scheduled: appointments.filter((a) => a.status === 'scheduled').length,
+    inProgress: appointments.filter((a) => a.status === 'in_progress').length,
+    completed: appointments.filter((a) => a.status === 'completed').length,
+  }), [appointments]);
 
   const setDoctorTab = useCallback((tabId) => {
     if (!DOCTOR_PANEL_TABS.has(tabId)) {
@@ -715,7 +722,7 @@ const DoctorPanel = () => {
                       </div>
                       <div>
                         <div className="doctor-stat-num">
-                          {appointments.filter((a) => a.status === 'scheduled').length}
+{appointmentStats.scheduled}
                         </div>
                         <div className="doctor-stat-label">
                           Записей на сегодня
@@ -742,7 +749,7 @@ const DoctorPanel = () => {
                       </div>
                       <div>
                         <div className="doctor-stat-num">
-                          {appointments.filter((a) => a.status === 'in_progress').length}
+                          {appointmentStats.inProgress}
                         </div>
                         <div className="doctor-stat-label">
                           В процессе
@@ -769,7 +776,7 @@ const DoctorPanel = () => {
                       </div>
                       <div>
                         <div className="doctor-stat-num">
-                          {appointments.filter((a) => a.status === 'completed').length}
+                          {appointmentStats.completed}
                         </div>
                         <div className="doctor-stat-label">
                           Завершено сегодня
