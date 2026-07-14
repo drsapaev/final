@@ -228,72 +228,10 @@ const ClinicManagement = () => {
 
     }
 
-      {/* Быстрые действия */}
-      <MacOSCard className="p-4">
-          <h3 className="admin-fs-lg-fw-semi-primary-mb-16-1">
-            Быстрые действия
-          </h3>
-        <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-fw-wrap-1">
-          <Button
-          onClick={() => setActiveTab('branches')}
-          className="admin-d-flex-ai-center-gap-8-h-64-bgc-blue-bd-none-p-16-tr-all-0-2s-ease-tf-scale-1"
-          onMouseEnter={(e) => {
-            e.target.style.transform = 'scale(1.02)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'scale(1)';
-          }}>
-          
-            <Building2 className="w-5 h-5" />
-            <span>Управление филиалами</span>
-          </Button>
-          
-          <Button
-          onClick={() => setActiveTab('equipment')}
-          variant="outline"
-          className="admin-d-flex-ai-center-gap-8-h-64-p-16-tr-all-0-2s-ease-tf-scale-1-2"
-          onMouseEnter={(e) => {
-            e.target.style.transform = 'scale(1.02)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'scale(1)';
-          }}>
-          
-            <Wrench className="w-5 h-5" />
-            <span>Управление оборудованием</span>
-          </Button>
-          
-          <Button
-          onClick={() => setActiveTab('licenses')}
-          variant="outline"
-          className="admin-d-flex-ai-center-gap-8-h-64-p-16-tr-all-0-2s-ease-tf-scale-1-1"
-          onMouseEnter={(e) => {
-            e.target.style.transform = 'scale(1.02)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'scale(1)';
-          }}>
-          
-            <Key className="w-5 h-5" />
-            <span>Управление лицензиями</span>
-          </Button>
-          
-          <Button
-          onClick={() => setActiveTab('backups')}
-          variant="outline"
-          className="admin-d-flex-ai-center-gap-8-h-64-p-16-tr-all-0-2s-ease-tf-scale-1"
-          onMouseEnter={(e) => {
-            e.target.style.transform = 'scale(1.02)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'scale(1)';
-          }}>
-          
-            <HardDrive className="w-5 h-5" />
-            <span>Резервное копирование</span>
-          </Button>
-        </div>
-      </MacOSCard>
+      {/* UX Audit Admin #1.8+4.4: блок «Быстрые действия» удалён.
+          4 кнопки дублировали SegmentedControl табы (branches/equipment/licenses/backups).
+          64 строки JSX + 8 inline onMouseEnter/onMouseLeave → 0.
+          SegmentedControl выше (строка ~400) обеспечивает навигацию. */}
 
       {/* Системная информация */}
       {/* UX Audit Admin #2.5: динамические данные из systemHealth вместо hardcoded. */}
