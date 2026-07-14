@@ -11,6 +11,7 @@ import {
   Calendar,
   Timer
 } from 'lucide-react';
+import './QueueJoin.css';
 import {
   fetchQrTokenInfo,
   startQueueJoinSession,
@@ -586,13 +587,11 @@ const QueueJoin = () => {
   // Компонент загрузки - macOS стиль
   if (step === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
-        <div className="max-w-md w-full text-center" style={glassCardStyle}>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" style={{
-            borderColor: 'var(--mac-accent-blue)'
-          }}></div>
-          <h2 style={titleStyle}>Загрузка...</h2>
-          <p style={bodyTextStyle}>Информация об очереди</p>
+      <div className="min-h-screen flex items-center justify-center p-4 qj-page-base">
+        <div className="max-w-md w-full text-center qj-glass-card">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4 qj-spinner"></div>
+          <h2 className="qj-title">Загрузка...</h2>
+          <p className="qj-body-text">Информация об очереди</p>
         </div>
       </div>
     );
@@ -601,37 +600,31 @@ const QueueJoin = () => {
   // Компонент ошибки - macOS стиль
   if (step === 'error') {
     return (
-      <main className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle} aria-labelledby="queue-join-error-title">
-        <div className="max-w-md w-full text-center" style={glassCardStyle} aria-describedby="queue-join-error-message">
+      <main className="min-h-screen flex items-center justify-center p-4 qj-page-base" aria-labelledby="queue-join-error-title">
+        <div className="max-w-md w-full text-center qj-glass-card" aria-describedby="queue-join-error-message">
           <AlertCircle style={{
             width: '64px',
             height: '64px',
             color: 'var(--mac-error)',
             margin: '0 auto 16px'
           }} aria-hidden="true" />
-          <h2 id="queue-join-error-title" style={{
-            ...titleStyle,
-            marginBottom: 'var(--mac-spacing-3)',
-          }}>Ошибка</h2>
-          <p style={{
-            ...bodyTextStyle,
-            marginBottom: 'var(--mac-spacing-6)',
-          }} id="queue-join-error-message" role="alert" aria-live="assertive">{error}</p>
-          <div style={statusActionStackStyle}>
+          <h2 id="queue-join-error-title" className="qj-title">Ошибка</h2>
+          <p className="qj-body-text-mb6" id="queue-join-error-message" role="alert" aria-live="assertive">{error}</p>
+          <div className="qj-action-stack">
             <button
               type="button"
               onClick={() => {
                 setError(null);
                 loadTokenInfo();
               }}
-              style={primaryRecoveryButtonStyle}
+              className="qj-recovery-btn qj-recovery-btn-primary"
             >
               Попробовать снова
             </button>
             <button
               type="button"
               onClick={() => navigate('/')}
-              style={dangerRecoveryButtonStyle}
+              className="qj-recovery-btn qj-recovery-btn-danger"
             >
               Главная страница
             </button>
@@ -644,8 +637,8 @@ const QueueJoin = () => {
   // Компонент ожидания открытия очереди - macOS стиль
   if (step === 'waiting') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
-        <div className="max-w-md w-full text-center" style={glassCardStyle}>
+      <div className="min-h-screen flex items-center justify-center p-4 qj-page-base">
+        <div className="max-w-md w-full text-center qj-glass-card">
           <Clock style={{
             width: '64px',
             height: '64px',
@@ -660,21 +653,12 @@ const QueueJoin = () => {
             marginBottom: 'var(--mac-spacing-3)',
             letterSpacing: '-0.02em'
           }}>Очередь скоро откроется</h2>
-          <p style={{
-            ...bodyTextStyle,
-            marginBottom: 'var(--mac-spacing-6)',
-          }}>
+          <p className="qj-body-text-mb6">
             Запись в очередь откроется в {queueInfo?.start_time}
           </p>
 
           {/* Обратный отсчет - macOS стиль */}
-          <div style={{
-            background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-warning), transparent 88%) 0%, color-mix(in srgb, var(--mac-warning), transparent 93%) 100%)',
-            borderRadius: 'var(--mac-radius-xl)',
-            padding: 'var(--mac-spacing-6)',
-            marginBottom: 'var(--mac-spacing-6)',
-            border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 76%)'
-          }}>
+          <div className="qj-countdown-box">
             <div style={{
               fontSize: '44px',
               fontWeight: 'var(--mac-font-weight-semibold)',
@@ -685,53 +669,31 @@ const QueueJoin = () => {
             }}>
               {formatCountdown(countdown)}
             </div>
-            <p style={mutedCaptionStyle}>до открытия записи</p>
+            <p className="qj-muted-caption">до открытия записи</p>
           </div>
 
           {/* Информация о враче и кабинете - macOS стиль */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-6)' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
-              background: 'var(--mac-bg-secondary)',
-              borderRadius: 'var(--mac-radius-lg)'
-            }}>
+          <div className="qj-info-list">
+            <div className="qj-info-row">
               <div className="flex items-center">
                 <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Специалист</span>
+                <span className="qj-info-label">Специалист</span>
               </div>
-              <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{queueInfo?.specialist_name}</span>
+              <span className="qj-info-value">{queueInfo?.specialist_name}</span>
             </div>
 
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
-              background: 'var(--mac-bg-secondary)',
-              borderRadius: 'var(--mac-radius-lg)'
-            }}>
+            <div className="qj-info-row">
               <div className="flex items-center">
                 <MapPin style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Бўлим</span>
+                <span className="qj-info-label">Бўлим</span>
               </div>
-              <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{queueInfo?.department_name}</span>
+              <span className="qj-info-value">{queueInfo?.department_name}</span>
             </div>
 
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
-              background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-accent), transparent 88%) 0%, color-mix(in srgb, var(--mac-accent), transparent 93%) 100%)',
-              borderRadius: 'var(--mac-radius-lg)',
-              border: '1px solid color-mix(in srgb, var(--mac-accent), transparent 76%)'
-            }}>
+            <div className="qj-info-row-accent">
               <div className="flex items-center">
                 <Calendar style={{ width: '18px', height: '18px', color: 'var(--mac-accent-blue)', marginRight: 'var(--mac-spacing-2)' }} />
-                <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>День приёма</span>
+                <span className="qj-info-label-accent">День приёма</span>
               </div>
               <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-accent-blue)' }}>
                 {queueInfo?.target_date ? new Date(queueInfo.target_date).toLocaleDateString('ru-RU', {
@@ -743,32 +705,15 @@ const QueueJoin = () => {
             </div>
           </div>
 
-          <div style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            color: 'var(--mac-text-tertiary)',
-            marginBottom: 'var(--mac-spacing-6)',
-            textAlign: 'center',
-            lineHeight: '1.5'
-          }}>
-            <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>Не закрывайте эту страницу</p>
+          <div className="qj-hint">
+            <p >Не закрывайте эту страницу</p>
             <p>Когда запись откроется, вы будете автоматически перенаправлены</p>
           </div>
 
           <div className="flex gap-3">
             <button
               onClick={() => navigate('/')}
-              style={{
-                flex: 1,
-                background: 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)',
-                color: 'var(--mac-accent-blue)',
-                padding: '14px 20px',
-                borderRadius: 'var(--mac-radius-lg)',
-                border: 'none',
-                fontSize: 'var(--mac-font-size-xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
+              className="qj-btn-secondary"
               onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
               onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
             >
@@ -776,19 +721,7 @@ const QueueJoin = () => {
             </button>
             <button
               onClick={loadTokenInfo}
-              style={{
-                flex: 1,
-                background: 'var(--mac-accent-blue)',
-                color: 'var(--mac-text-on-accent)',
-                padding: '14px 20px',
-                borderRadius: 'var(--mac-radius-lg)',
-                border: 'none',
-                fontSize: 'var(--mac-font-size-xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
-              }}
+              className="qj-btn-primary"
               onMouseEnter={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
               onMouseLeave={(e) => e.target.style.background = 'var(--mac-accent-blue)'}
             >
@@ -818,44 +751,26 @@ const QueueJoin = () => {
     const departmentName = getDepartmentName(result.entries?.[0]?.department || result.entries?.[0]?.specialty);
 
     return (
-      <main className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle} aria-labelledby="queue-join-success-title">
-        <div className="max-w-md w-full text-center" style={glassCardStyle} role="status" aria-live="polite">
+      <main className="min-h-screen flex items-center justify-center p-4 qj-page-base" aria-labelledby="queue-join-success-title">
+        <div className="max-w-md w-full text-center qj-glass-card" role="status" aria-live="polite">
           <CheckCircle style={{
             width: '64px',
             height: '64px',
             color: 'var(--mac-success)',
             margin: '0 auto 20px'
           }} aria-hidden="true" />
-          <h2 id="queue-join-success-title" style={{
-            fontSize: 'var(--mac-font-size-3xl)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: 'var(--mac-spacing-6)',
-            letterSpacing: '-0.02em'
-          }}>
+          <h2 id="queue-join-success-title" className="qj-title-success">
             {isMultiple ? 'Вы зарегистрированы в очередях!' : 'Вы в очереди!'}
           </h2>
 
           {isMultiple ? (
             // Множественная регистрация
             <>
-              <div style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
-                borderRadius: 'var(--mac-radius-xl)',
-                padding: 'var(--mac-spacing-6)',
-                marginBottom: 'var(--mac-spacing-6)',
-                border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)'
-              }}>
-                <p style={{
-                  fontSize: 'var(--mac-font-size-lg)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: 'var(--mac-spacing-4)',
-                  textAlign: 'center'
-                }}>
+              <div className="qj-success-box">
+                <p className="qj-success-entries-title">
                   Вы зарегистрированы в {result.entries.length} очередях:
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
+                <div className="qj-success-entries-list">
                   {result.entries.map((entry, idx) => (
                     <div
                       key={idx}
@@ -905,26 +820,14 @@ const QueueJoin = () => {
           ) : (
             // Одиночная регистрация
             <>
-              <div style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
-                borderRadius: 'var(--mac-radius-xl)',
-                padding: 'var(--mac-spacing-8) var(--mac-spacing-6)',
-                marginBottom: 'var(--mac-spacing-6)',
-                border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)'
-              }}>
-                <div style={{
-                  fontSize: '48px',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-success)',
-                  marginBottom: 'var(--mac-spacing-2)',
-                  letterSpacing: '-0.02em'
-                }}>
+              <div className="qj-success-box-lg">
+                <div className="qj-success-number">
                   №{result.queue_number}
                 </div>
-                <p style={{ fontSize: 'var(--mac-font-size-lg)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Ваш номер в очереди</p>
+                <p className="qj-success-label">Ваш номер в очереди</p>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-6)' }}>
+              <div className="qj-info-list">
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -935,9 +838,9 @@ const QueueJoin = () => {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                    <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Перед вами</span>
+                    <span className="qj-info-label">Перед вами</span>
                   </div>
-                  <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{result.queue_number - 1} к.</span>
+                  <span className="qj-info-value">{result.queue_number - 1} к.</span>
                 </div>
 
                 {result.estimated_wait_time && (
@@ -951,9 +854,9 @@ const QueueJoin = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                      <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Ожидание</span>
+                      <span className="qj-info-label">Ожидание</span>
                     </div>
-                    <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{formatWaitTime(result.estimated_wait_time)}</span>
+                    <span className="qj-info-value">{formatWaitTime(result.estimated_wait_time)}</span>
                   </div>
                 )}
 
@@ -968,9 +871,9 @@ const QueueJoin = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                      <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Специалист</span>
+                      <span className="qj-info-label">Специалист</span>
                     </div>
-                    <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{result.specialist_name}</span>
+                    <span className="qj-info-value">{result.specialist_name}</span>
                   </div>
                 )}
               </div>
@@ -993,7 +896,7 @@ const QueueJoin = () => {
           <button
             onClick={() => navigate('/')}
             type="button"
-            style={successRecoveryButtonStyle}
+            className="qj-recovery-btn qj-recovery-btn-success"
           >
             Понятно
           </button>
@@ -1004,39 +907,20 @@ const QueueJoin = () => {
 
   // Основной интерфейс (info + form) - macOS стиль
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
+    <div className="min-h-screen flex items-center justify-center p-4 qj-page-base">
       <div
         aria-live="polite"
-        style={{
-          position: 'absolute',
-          width: 1,
-          height: 1,
-          margin: -1,
-          padding: 0,
-          overflow: 'hidden',
-          clip: 'rect(0, 0, 0, 0)',
-          border: 0
-        }}
+        className="qj-sr-only"
       >
         {step === 'select-specialists' && 'Выберите специалистов и продолжайте регистрацию.'}
         {step === 'form' && 'Заполните обязательные поля: ФИО и телефон.'}
         {step === 'info' && 'Проверьте информацию по очереди и перейдите к форме.'}
       </div>
-      <div className="max-w-md w-full overflow-hidden" style={glassCardStyle}>
+      <div className="max-w-md w-full overflow-hidden qj-glass-card">
 
         {/* Заголовок с информацией об очереди - macOS стиль с правильным spacing */}
-        <div className="text-white" style={{
-          background: 'linear-gradient(135deg, var(--mac-accent) 0%, var(--mac-accent-purple) 100%)',
-          borderRadius: '20px 20px 0 0',
-          padding: 'var(--mac-spacing-6)'
-        }}>
-          <h1 style={{
-            fontSize: '26px',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            marginBottom: 'var(--mac-spacing-4)',
-            letterSpacing: '-0.02em',
-            lineHeight: '1.2'
-          }}>Присоединиться к очереди</h1>
+        <div className="text-white qj-main-header">
+          <h1 className="qj-main-title">Присоединиться к очереди</h1>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div className="flex items-center" style={{ opacity: 0.95 }}>
@@ -1074,7 +958,7 @@ const QueueJoin = () => {
         </div>
 
         {step === 'select-specialists' && (
-          <div style={{ padding: 'var(--mac-spacing-6)' }}>
+          <div className="qj-select-section">
             <div style={{
               marginBottom: 'var(--mac-spacing-6)',
               textAlign: 'center'
@@ -1248,16 +1132,7 @@ const QueueJoin = () => {
             </button>
 
             {error && (
-              <div style={{
-                marginTop: 'var(--mac-spacing-4)',
-                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
-                borderRadius: 'var(--mac-radius-md)',
-                background: 'var(--mac-error-bg)',
-                border: '1px solid var(--mac-error-border)',
-                color: 'var(--mac-error)',
-                fontSize: 'var(--mac-font-size-base)',
-                textAlign: 'center'
-              }} role="alert" aria-live="assertive">
+              <div className="qj-error-banner" role="alert" aria-live="assertive">
                 {error}
               </div>
             )}
@@ -1265,7 +1140,7 @@ const QueueJoin = () => {
         )}
 
         {step === 'info' && (
-          <div style={{ padding: 'var(--mac-spacing-6)' }}>
+          <div className="qj-select-section">
             {/* Статус очереди - macOS стиль с правильным spacing */}
             <div style={{
               display: 'grid',
@@ -1380,19 +1255,13 @@ const QueueJoin = () => {
         )}
 
         {step === 'form' && (
-          <div style={{ padding: 'var(--mac-spacing-6)' }}>
-            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
+          <div className="qj-select-section">
+            <form onSubmit={handleFormSubmit} className="qj-form">
               {/* ФИО - macOS стиль */}
               <div>
                 <label
                   htmlFor="queue-patient-name"
-                  style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: 'var(--mac-spacing-2)'
-                }}
+                  className="qj-form-label"
                 >
                   ФИО *
                 </label>
@@ -1443,13 +1312,7 @@ const QueueJoin = () => {
               <div>
                 <label
                   htmlFor="queue-phone"
-                  style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: 'var(--mac-spacing-2)'
-                }}
+                  className="qj-form-label"
                 >
                   Номер телефона *
                 </label>
@@ -1528,13 +1391,7 @@ const QueueJoin = () => {
               <div>
                 <label
                   htmlFor="queue-telegram-id"
-                  style={{
-                  display: 'block',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  marginBottom: 'var(--mac-spacing-2)'
-                }}
+                  className="qj-form-label"
                 >
                   Telegram ID (ихтиёрий)
                 </label>
