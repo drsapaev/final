@@ -56,9 +56,7 @@ const DoctorQueuePanel = ({
   className = ''
 }) => {
   // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)
-  const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
-  window.location.hostname === 'localhost' &&
-  window.location.port === '5173';
+  const isDemoMode = import.meta.env.MODE === 'development' && window.location.hostname === 'localhost';
 
   const [loading, setLoading] = useState(true);
   const [queueData, setQueueData] = useState(null);

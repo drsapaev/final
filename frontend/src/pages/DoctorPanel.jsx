@@ -204,7 +204,7 @@ const DoctorPanel = () => {
     const now = new Date();
     const diffMs = now - start;
     const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return '<1m';
+    if (diffMins < 1) return 'только что';
     if (diffMins < 60) return `${diffMins}m`;
     const hours = Math.floor(diffMins / 60);
     const mins = diffMins % 60;
