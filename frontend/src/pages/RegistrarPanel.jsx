@@ -622,20 +622,11 @@ const RegistrarPanel = () => {
     }
   }, [showCalendar, historyDate]);
 
-  // Debounce для ввода даты с клавиатуры
-  useEffect(() => {
-    if (!showCalendar) return;
-
-    const timer = setTimeout(() => {
-      // Проверяем, что введённая дата валидна и отличается от текущей
-      if (tempDateInput && tempDateInput !== historyDate) {
-        logger.info('📅 Debounced date input:', tempDateInput);
-        setHistoryDate(tempDateInput);
-      }
-    }, 1000); // Задержка 1 секунда
-
-    return () => clearTimeout(timer);
-  }, [tempDateInput, showCalendar, historyDate]);
+  // UX Audit R-1.3: debounce 1000ms удалён.
+  // Раньше: setTimeout 1s + onBlur дублировали применение даты, создавая
+  // «мёртвую» секунду без визуального отклика (Nielsen #2).
+  // Теперь: дата применяется только через onBlur в WelcomeView (стандартный
+  // паттерн для date-picker'ов) или через нативный onChange календаря.
 
   // Перезагружаем данные при изменении даты в календаре
   useEffect(() => {
