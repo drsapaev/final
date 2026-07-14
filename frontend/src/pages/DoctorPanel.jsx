@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useDebouncedValue } from '../hooks/useDebouncedCallback';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -103,7 +104,12 @@ const DoctorPanel = () => {
   const patientModal = useModal();
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [searchQuery, setSearchQuery] = useState('');
+  // UX Audit Doctor M-12: debounce search to avoid lag on large lists.
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const [filterStatus, setFilterStatus] = useState('all');
+  // UX Audit Doctor M-16: simple pagination for patient table.
+  const [patientPage, setPatientPage] = useState(0);
+  const PATIENTS_PER_PAGE = 25;
 
   // UX Audit Doctor M-46: useMemo for stat calculations (was 3 filter calls per render).
   const appointmentStats = useMemo(() => ({
@@ -569,6 +575,8 @@ const DoctorPanel = () => {
   };
 
   const filteredPatients = patients.filter((patient) => {
+    // UX Audit Doctor M-12: use debounced search query.
+    const _searchQuery = debouncedSearchQuery;
     const patientName = String(patient.name || '');
     const patientPhone = String(patient.phone || '');
     const matchesSearch = patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -866,7 +874,7 @@ const DoctorPanel = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredPatients.map((patient) =>
+                      {filteredPatients.slice(patientPage * PATIENTS_PER_PAGE, (patientPage + 1) * PATIENTS_PER_PAGE).map((patient) =>
                   <tr
                     key={patient.id}
                     className="doctor-table-row-hover"
