@@ -224,7 +224,7 @@ const WelcomeView = React.memo(({
           {/* QW-08 fix: unwrapped nested AnimatedTransition (was delays 800-1500). */}
             <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
                 <h2 className="registrar-section-heading">
-                  <Icon name="gear" size="default" className="registrar-text-accent" />
+                  <Icon name="square.grid.2x2" size="default" className="registrar-text-accent" />
                   Панель управления
                 </h2>
 
@@ -278,13 +278,13 @@ const WelcomeView = React.memo(({
               {/* Фильтры и навигация */}
                 <div className="registrar-surface-toolbar">
                   <h3 className="registrar-subsection-heading">
-                    <Icon name="magnifyingglass" size="default" className="registrar-text-accent" />
+                    <Icon name="line.3.horizontal.decrease" size="default" className="registrar-text-accent" />
                     Фильтры и навигация
                   </h3>
 
                   <div className="registrar-grid-auto">
                     <Button
-                    variant={showCalendar ? 'warning' : 'outline'}
+                    variant={showCalendar ? 'primary' : 'outline'}
                     size="default"
                     onClick={() => {
                       logger.info('Кнопка "Календарь" нажата');
@@ -292,7 +292,7 @@ const WelcomeView = React.memo(({
                     }}
                     className="registrar-flex">
 
-                      <Icon name="magnifyingglass" size="small" style={{ color: showCalendar ? 'white' : 'var(--mac-text-primary)' }} />
+                      <Icon name="calendar" size="small" className={showCalendar ? 'registrar-text-white' : 'registrar-text-primary'} />
                       Календарь
                     </Button>
 
@@ -342,7 +342,7 @@ const WelcomeView = React.memo(({
                     onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
                     className="registrar-flex">
 
-                      <Icon name="gear" size="small" />
+                      <Icon name="arrow.clockwise" size="small" />
                       Обновить данные
                     </Button>
                   </div>
