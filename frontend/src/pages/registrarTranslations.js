@@ -35,6 +35,8 @@ const translations = {
     tabs_lab: 'Лаборатория',
     tabs_procedures: 'Процедуры',
     tabs_queue: 'Онлайн-очередь',
+    // UX Audit R-3.8: subtitle для QueueView
+    queue_subtitle: 'Управление онлайн-записью и QR кодами для очереди',
     // Действия
     new_appointment: 'Новая запись',
     export_csv: 'Экспорт CSV',
@@ -115,6 +117,8 @@ const translations = {
     tabs_lab: 'Laboratoriya',
     tabs_procedures: 'Muolajalar',
     tabs_queue: 'Navbat',
+    // UX Audit R-3.8: subtitle для QueueView
+    queue_subtitle: 'Onlayn yozilish va navbat uchun QR kodlarni boshqarish',
     // Amallar
     new_appointment: 'Yangi yozuv',
     export_csv: 'CSV eksport',
@@ -195,6 +199,8 @@ const translations = {
     tabs_lab: 'Laboratory',
     tabs_procedures: 'Procedures',
     tabs_queue: 'Online queue',
+    // UX Audit R-3.8: subtitle для QueueView
+    queue_subtitle: 'Manage online booking and QR codes for the queue',
     // Actions
     new_appointment: 'New appointment',
     export_csv: 'Export CSV',
