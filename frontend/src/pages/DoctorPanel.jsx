@@ -779,37 +779,6 @@ const DoctorPanel = () => {
                   </Card>
                 </AnimatedTransition>
               </div>
-
-              {/* Быстрые действия */}
-              <AnimatedTransition type="fade" delay={600}>
-                <Card className="doctor-card-mb-xl">
-                  <CardHeader>
-                    <h2 className="doctor-section-title">
-                      Быстрые действия
-                    </h2>
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`doctor-actions-grid doctor-actions-grid-${isMobile ? '1' : isTablet ? '2' : '4'}`}>
-                      <Button variant="primary" fullWidth disabled title="Функция в разработке">
-                        <Plus size={20} />
-                        Новый пациент
-                      </Button>
-                      <Button variant="secondary" fullWidth disabled title="Функция в разработке">
-                        <Calendar size={20} />
-                        Записать на прием
-                      </Button>
-                      <Button variant="success" fullWidth disabled title="Функция в разработке">
-                        <FileText size={20} />
-                        Создать отчет
-                      </Button>
-                      <Button variant="info" fullWidth disabled title="Функция в разработке">
-                        <Download size={20} />
-                        Экспорт данных
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </AnimatedTransition>
             </div>
           </AnimatedTransition>
         }
