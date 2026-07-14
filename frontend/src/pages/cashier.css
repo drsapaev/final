@@ -278,3 +278,75 @@
   font-size: 11px;
   color: var(--mac-accent-blue, #007aff);
 }
+
+/* ─── Session timeout warning (UX Audit #2.5) ─── */
+.cashier-session-warning-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--mac-text-primary, #1a1d29), transparent 50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.cashier-session-warning-card {
+  background: var(--mac-surface, white);
+  border: 1px solid var(--mac-border, #d8dde8);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.cashier-session-warning-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: var(--mac-text-primary, #1a1d29);
+}
+
+.cashier-session-warning-text {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--mac-text-secondary, #6b7280);
+  line-height: 1.5;
+}
+
+.cashier-session-warning-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cashier-session-warning-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  transition: background 120ms ease;
+}
+
+.cashier-session-warning-btn--secondary {
+  border: 1px solid var(--mac-border, #d8dde8);
+  background: transparent;
+  color: var(--mac-text-secondary, #6b7280);
+}
+
+.cashier-session-warning-btn--secondary:hover {
+  background: var(--mac-bg-tertiary, #f5f5f7);
+}
+
+.cashier-session-warning-btn--primary {
+  border: none;
+  background: var(--mac-accent, var(--mac-accent-blue, #007aff));
+  color: white;
+}
+
+.cashier-session-warning-btn--primary:hover {
+  filter: brightness(0.95);
+}
