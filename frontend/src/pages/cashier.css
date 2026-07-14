@@ -422,3 +422,14 @@
   font-weight: 500;
   cursor: help;
 }
+
+/* ─── Sortable table headers (UX Audit #4.2) ─── */
+.cashier-th-sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 120ms ease;
+}
+
+.cashier-th-sortable:hover {
+  color: var(--mac-accent-blue, #007aff);
+}

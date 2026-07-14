@@ -398,6 +398,12 @@ const CashierPanel = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
+  // UX Audit #4.2: client-side sort state для таба «История платежей».
+  // Сортировка применяется к уже загруженным filteredPayments (после groupPaymentsByPatientAndTime).
+  // Поддерживаемые поля: 'date' | 'patient' | 'amount'.
+  const [sortField, setSortField] = useState('date');
+  const [sortDir, setSortDir] = useState('desc'); // 'asc' | 'desc'
+
   // ✅ УЛУЧШЕНИЕ: Пагинация для истории платежей (Server-side)
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1014,7 +1020,35 @@ const CashierPanel = () => {
   };
 
   // Group payments for display (already filtered by server)
-  const filteredPayments = groupPaymentsByPatientAndTime(payments);
+  // UX Audit #4.2: client-side sort по sortField/sortDir.
+  const toggleSort = (field) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const groupedPayments = groupPaymentsByPatientAndTime(payments);
+  const sortedPayments = [...groupedPayments].sort((a, b) => {
+    let aVal, bVal;
+    if (sortField === 'amount') {
+      aVal = Number(a.total_amount || a.amount || 0);
+      bVal = Number(b.total_amount || b.amount || 0);
+    } else if (sortField === 'patient') {
+      aVal = String(a.patient || '').toLowerCase();
+      bVal = String(b.patient || '').toLowerCase();
+    } else {
+      // 'date' — sortBy date+time string
+      aVal = `${a.date || ''} ${a.time || ''}`;
+      bVal = `${b.date || ''} ${b.time || ''}`;
+    }
+    const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const filteredPayments = sortedPayments;
 
 
   return (
@@ -1436,11 +1470,18 @@ const CashierPanel = () => {
                     <table className="cashier-table">
                       <thead>
                         <tr className="cashier-table-row">
-                          <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
-                          <th className="cashier-text-sm cashier-text-primary">Пациент</th>
+                          {/* UX Audit #4.2: кликабельные заголовки с сортировкой. */}
+                          <th className="cashier-text-sm cashier-text-primary cashier-th-sortable" onClick={() => toggleSort('date')}>
+                            Дата/Время {sortField === 'date' && (sortDir === 'asc' ? '↑' : '↓')}
+                          </th>
+                          <th className="cashier-text-sm cashier-text-primary cashier-th-sortable" onClick={() => toggleSort('patient')}>
+                            Пациент {sortField === 'patient' && (sortDir === 'asc' ? '↑' : '↓')}
+                          </th>
                           <th className="cashier-text-sm cashier-text-primary">Услуга</th>
                           <th className="cashier-text-sm cashier-text-primary">Способ</th>
-                          <th className="cashier-text-sm cashier-text-primary">Сумма</th>
+                          <th className="cashier-text-sm cashier-text-primary cashier-th-sortable" onClick={() => toggleSort('amount')}>
+                            Сумма {sortField === 'amount' && (sortDir === 'asc' ? '↑' : '↓')}
+                          </th>
                           <th className="cashier-text-sm cashier-text-primary">Статус</th>
                           <th className="cashier-text-sm cashier-text-primary">Действия</th>
                         </tr>
