@@ -208,7 +208,7 @@ def test_user_management_system():
         # Получение настроек уведомлений через CRUD
         notifications = user_notification_settings.get_by_user_id(db, user_id)
         if notifications:
-            print(f"✅ Настройки уведомлений получены через CRUD: email напоминания {notifications.email_appointment_reminder}")
+            print("✅ Настройки уведомлений получены через CRUD")
         else:
             print("❌ Ошибка получения настроек уведомлений через CRUD")
             return False

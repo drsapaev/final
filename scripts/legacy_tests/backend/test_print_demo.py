@@ -113,9 +113,9 @@ async def demo_prescription_printing():
         }
 
         print("📋 Данные рецепта:")
-        print(f"   Номер: {prescription_data['prescription']['number']}")
-        print(f"   Пациент: {prescription_data['patient']['full_name']}")
-        print(f"   Врач: {prescription_data['doctor']['full_name']}")
+        print("   Номер: [REDACTED]")
+        print("   Пациент: [REDACTED]")
+        print("   Врач: [REDACTED]")
         print(f"   Медикаментов: {len(prescription_data['prescription']['medications'])}")
 
         print("\n🖨️ Попытка печати рецепта...")

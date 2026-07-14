@@ -147,7 +147,7 @@ def test_patient_validation():
         if is_valid:
             print("✅ PASS: Valid patient data accepted")
         else:
-            print(f"❌ FAIL: Valid data rejected: {errors}")
+            print("❌ FAIL: Valid data rejected")
             return False
 
         # Test invalid data
@@ -185,7 +185,7 @@ def test_medical_validation():
         if valid:
             print("✅ PASS: Valid ICD-10 code accepted")
         else:
-            print(f"❌ FAIL: Valid ICD-10 rejected: {error}")
+            print("❌ FAIL: Valid ICD-10 rejected")
             return False
 
         # Test invalid ICD-10 code
@@ -201,7 +201,7 @@ def test_medical_validation():
         if valid:
             print("✅ PASS: Valid blood pressure accepted")
         else:
-            print(f"❌ FAIL: Valid BP rejected: {error}")
+            print("❌ FAIL: Valid BP rejected")
             return False
 
         # Test invalid blood pressure
