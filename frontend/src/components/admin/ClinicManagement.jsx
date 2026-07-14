@@ -42,8 +42,9 @@ const ClinicManagement = () => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [error] = useState(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null);
+  // UX Audit Admin #3.1: showConfirmModal + pendingAction removed — dead code.
+  // setShowConfirmModal(true) was never called anywhere in the file.
+  // Other admin components use useConfirm() hook (P-013 fix).
 
   const tabs = [
   { id: 'overview', label: 'Обзор', icon: BarChart3 },
@@ -115,13 +116,9 @@ const ClinicManagement = () => {
     }
   };
 
-  const handleConfirmAction = () => {
-    if (pendingAction) {
-      pendingAction();
-      setPendingAction(null);
-    }
-    setShowConfirmModal(false);
-  };
+  // UX Audit Admin #3.1: handleConfirmAction removed — dead code.
+
+
 
 
 
@@ -459,37 +456,7 @@ const ClinicManagement = () => {
         </div>
       </MacOSCard>
 
-      {/* Модальное окно подтверждения */}
-      <Modal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        title="Подтверждение действия"
-        size="sm"
-        className="admin-z-9999">
-        
-        <div className="p-6">
-          <p className="admin-fs-base-primary-mb-24-lh-1p5">
-            Вы уверены, что хотите выполнить это действие? 
-            Это может повлиять на работу системы.
-          </p>
-          
-          <div className="admin-d-flex-jc-end-gap-12-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmModal(false)}>
-              
-              Отмена
-            </Button>
-            <Button
-              onClick={handleConfirmAction}
-              className="admin-bgc-blue-bd-none">
-              
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Подтвердить
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* UX Audit Admin #3.1: dead Modal removed — was never opened. */}
     </div>);
 
 };
