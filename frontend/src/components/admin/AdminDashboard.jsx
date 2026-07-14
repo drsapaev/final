@@ -193,6 +193,30 @@ const AdminDashboard = () => {
   }, []);
 
   const dashboardKpis = React.useMemo(() => [
+    // UX Audit Admin #4.3: KPI разделены на операционные (сегодня) и кумулятивные (всего).
+    // Операционные — показывают текущую нагрузку.
+    {
+      key: 'appointments-today',
+      title: 'Записи сегодня',
+      value: stats.appointmentsToday || 0,
+      icon: Calendar,
+      color: 'orange',
+    },
+    {
+      key: 'pending-approvals',
+      title: 'Ожидают подтверждения',
+      value: stats.pendingApprovals || 0,
+      icon: Clock,
+      color: 'red',
+    },
+    {
+      key: 'revenue',
+      title: 'Доход (за месяц)',
+      value: formatCurrency(stats.totalRevenue || 0),
+      icon: TrendingUp,
+      color: 'green',
+    },
+    // Кумулятивные — общее количество.
     {
       key: 'users',
       title: 'Всего пользователей',
@@ -213,27 +237,6 @@ const AdminDashboard = () => {
       value: stats.totalPatients || 0,
       icon: Users,
       color: 'purple',
-    },
-    {
-      key: 'revenue',
-      title: 'Доход',
-      value: formatCurrency(stats.totalRevenue || 0),
-      icon: TrendingUp,
-      color: 'green',
-    },
-    {
-      key: 'appointments-today',
-      title: 'Записи сегодня',
-      value: stats.appointmentsToday || 0,
-      icon: Calendar,
-      color: 'orange',
-    },
-    {
-      key: 'pending-approvals',
-      title: 'Ожидают подтверждения',
-      value: stats.pendingApprovals || 0,
-      icon: Clock,
-      color: 'red',
     },
   ], [stats]);
 
