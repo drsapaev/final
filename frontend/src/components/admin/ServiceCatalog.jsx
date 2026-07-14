@@ -681,8 +681,10 @@ const ServiceCatalog = () => {
 
       </MacOSCard>
 
-      {/* Форма добавления/редактирования */}
+      {/* UX Audit Admin #1.4: форма в modal overlay вместо inline внизу страницы. */}
       {(showAddForm || editingService) &&
+      <div className="admin-modal-overlay">
+        <div className="admin-modal-body-catalog-700">
       <ServiceForm
         service={editingService}
         categories={categories}
@@ -695,6 +697,8 @@ const ServiceCatalog = () => {
           setShowAddForm(false);
           setEditingService(null);
         }} />
+        </div>
+      </div>
 
       }
 
@@ -1160,11 +1164,9 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
         {/* Кнопки */}
         <div className="admin-form-actions-catalog">
-          <div className="admin-progress-indicator-catalog">
-            {activeTab === 'basic' && '1 / 3'}
-            {activeTab === 'queue' && '2 / 3'}
-            {activeTab === 'options' && '3 / 3'}
-          </div>
+          {/* UX Audit Admin #2.2: fake progress indicator «1/3, 2/3, 3/3» удалён.
+              Табы свободные (можно кликнуть любую), индикатор вводил в заблуждение,
+              имитируя wizard с последовательным продвижением. */}
           <div className="admin-form-row-gap-12">
             <Button type="button" variant="outline" onClick={onCancel}>
               <X size={16} className="mr-2" />
