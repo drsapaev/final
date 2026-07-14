@@ -391,13 +391,7 @@ const AdminAppointments = () => {
                     <tr
                       key={appointment.id}
                       className="admin-bd-b-1px-solid-var-mac-bo-tr-background-color-var"
-                      onMouseEnter={(event) => {
-                        event.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
-                      }}
-                      onMouseLeave={(event) => {
-                        event.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
+                      >
                       <td aria-label={`Пациент ${patientName}`} className="admin-p-12-16">
                         <div className="admin-flex-center-12">
                           <div

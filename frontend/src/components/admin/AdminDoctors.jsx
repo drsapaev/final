@@ -256,13 +256,7 @@ const AdminDoctors = () => {
                   <tr
                     key={doctor.id}
                     className="admin-patients-tbody-row"
-                    onMouseEnter={(event) => {
-                      event.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
-                    }}
-                    onMouseLeave={(event) => {
-                      event.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
+                    >
                     <td
                       aria-label={`Врач ${getDoctorName(doctor)}`}
                       className="admin-p-12-16"
