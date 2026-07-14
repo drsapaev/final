@@ -67,7 +67,8 @@ const hasBackendQueueAction = (entry, action, flagName) => {
   return false;
 };
 
-const DOCTOR_PANEL_TABS = new Set(['dashboard', 'patients', 'appointments', 'queue', 'ai', 'reports']);
+// UX Audit Doctor H-10: added 'visit' tab for EMR-v2 integration.
+const DOCTOR_PANEL_TABS = new Set(['dashboard', 'patients', 'appointments', 'queue', 'visit', 'ai', 'reports']);
 
 const DoctorPanel = () => {
   const location = useLocation();
@@ -658,6 +659,18 @@ const DoctorPanel = () => {
                 {queueStats.waiting}
               </Badge>
             }
+          </button>
+
+          {/* UX Audit Doctor H-10: visit tab for EMR-v2 integration. */}
+          <button
+            aria-label="Открыть вкладку «Приём»"
+            style={activeTab === 'visit' ? activeTabStyle : tabStyle}
+            onClick={() => setDoctorTab('visit')}
+            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'visit', true)}
+            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'visit', false)}>
+
+            <FileText size={isMobile ? 16 : 20} />
+            {!isMobile && <span>Приём</span>}
           </button>
 
           <button
@@ -1344,6 +1357,30 @@ const DoctorPanel = () => {
               </CardContent>
             </Card>
           </AnimatedTransition>
+        }
+
+        {activeTab === 'visit' &&
+        <AnimatedTransition type="fade">
+          <Card className="doctor-card-mb-xl">
+            <CardHeader>
+              <h2 className="doctor-section-title">
+                Электронная медицинская карта
+              </h2>
+            </CardHeader>
+            <CardContent>
+              {/* UX Audit Doctor H-10: EMR-v2 integration for general doctor. */}
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mac-text-secondary)' }}>
+                <FileText size={48} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                <p style={{ fontSize: '15px', marginBottom: '8px' }}>
+                  Выберите пациента из очереди, чтобы открыть электронную медицинскую карту.
+                </p>
+                <Button variant="primary" onClick={() => setDoctorTab('queue')}>
+                  Открыть очередь
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </AnimatedTransition>
         }
 
         {activeTab === 'ai' &&
