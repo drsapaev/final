@@ -20,6 +20,7 @@ import {
   SegmentedControl,
   Textarea,
 } from '../ui/macos';
+import './MacOSDemo.css';
 import { AccentPicker } from '../ui/macos';
 import { notify } from '../../services/notify.js';
 
@@ -114,69 +115,25 @@ const MacOSDemo = () => {
 
 
   return (
-    <div style={{
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-      background: 'var(--mac-gradient-window)',
-      minHeight: '100vh',
-      padding: '0',
-      overflowX: 'hidden',
-      overflowY: 'auto',
-      display: 'flex',
-      flexDirection: 'column',
-      color: 'var(--mac-text-primary)',
-      transition: 'background var(--mac-duration-normal) var(--mac-ease)'
-    }}>
+    <div className="demo-root">
           {/* Custom Header с иконками */}
-          <div style={{
-        padding: '12px 0 0 0',
-        backgroundColor: 'transparent'
-      }}>
-            <header style={{
-          backgroundColor: 'var(--mac-bg-toolbar)',
-          borderBottom: '1px solid var(--mac-separator)',
-          borderRadius: 'var(--mac-radius-md)',
-          boxShadow: 'var(--mac-shadow-sm)',
-          backdropFilter: 'var(--mac-blur-light)',
-          WebkitBackdropFilter: 'var(--mac-blur-light)',
-          height: '54px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 12px',
-          position: 'sticky',
-          top: '12px',
-          margin: '0 12px',
-          zIndex: 100
-        }}>
+          <div className="demo-header-wrapper">
+            <header className="demo-header">
               {/* Left section - Title */}
-              <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            flex: 1
-          }}>
-                <h1 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>
+              <div className="demo-header-left">
+                <h1 className="demo-header-title">
                   macOS Medical Dashboard
                 </h1>
                 <Badge variant="secondary">Demo</Badge>
               </div>
 
               {/* Center section - Actions */}
-              <div style={{
-            display: 'flex',
-            gap: 'var(--mac-spacing-2)',
-            alignItems: 'center'
-          }}>
+              <div className="demo-header-center">
                 <Button
               variant="primary"
               size="small"
               onClick={() => notify.success('Patient created!')}
-              style={{ fontWeight: 'var(--mac-font-weight-semibold)', display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+              className="demo-btn-icon-semibold">
 
                   <Icon name="plus" size="small" style={{ color: 'white' }} />
                   New Patient
@@ -186,9 +143,9 @@ const MacOSDemo = () => {
               variant="outline"
               size="small"
               onClick={() => notify.info('Search initiated')}
-              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+              className="demo-btn-icon">
 
-                  <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-accent-blue)' }} />
+                  <Icon name="magnifyingglass" size="small" className="demo-tab-indicator-strong" />
                   Search
                 </Button>
                 
@@ -196,7 +153,7 @@ const MacOSDemo = () => {
               variant="secondary"
               size="small"
               onClick={() => notify.warning('Settings opened')}
-              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+              className="demo-btn-icon">
 
                   <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
                   Settings
@@ -204,26 +161,13 @@ const MacOSDemo = () => {
               </div>
 
               {/* Right section - Accent & Theme */}
-              <div style={{
-            display: 'flex',
-            gap: 'var(--mac-spacing-2)',
-            alignItems: 'center',
-            marginLeft: 'var(--mac-spacing-3)'
-          }}>
+              <div className="demo-header-right">
                 <AccentPicker />
                 <Button
               variant="ghost"
               size="small"
               onClick={toggleDarkMode}
-              style={{
-                width: '32px',
-                height: '32px',
-                padding: 0,
-                borderRadius: 'var(--mac-radius-sm)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="demo-theme-btn"
               aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
               title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
 
@@ -233,45 +177,20 @@ const MacOSDemo = () => {
             </header>
           </div>
 
-      <div style={{
-        display: 'flex',
-        gap: 'var(--mac-spacing-5)',
-        marginTop: '0px', // Убираем marginTop, так как отступ уже есть в хедере
-        flex: 1,
-        minHeight: 0,
-        overflow: 'hidden',
-        padding: '0 0 16px 0' // Убираем боковые отступы
-      }}>
+      <div className="demo-main-layout">
             {/* Sidebar с отступом */}
-            <div style={{
-          marginTop: 'var(--mac-spacing-5)', // Увеличиваем отступ сверху для сайдбара от хедера
-          flexShrink: 0
-        }}>
+            <div className="demo-sidebar-wrapper">
               <Sidebar
             items={sidebarItems}
             activeItem={activeSidebarItem}
             onItemClick={(item) => setActiveSidebarItem(item.id)}
             header="Medical System"
-            style={{
-              background: 'var(--mac-gradient-sidebar)',
-              borderRight: '1px solid var(--mac-separator)',
-              borderRadius: 'var(--mac-radius-md)',
-              backdropFilter: 'var(--mac-blur-light)',
-              WebkitBackdropFilter: 'var(--mac-blur-light)'
-            }} />
+            className="demo-sidebar" />
 
             </div>
 
         {/* Main Content */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          paddingRight: '10px',
-          marginTop: 'var(--mac-spacing-5)', // Добавляем отступ сверху для контента, чтобы он был на том же уровне, что и сайдбар
-          minHeight: 0,
-          scrollbarWidth: 'thin',
-          scrollbarColor: 'var(--mac-border) transparent'
-        }}>
+        <div className="demo-content">
           <style>{`
             div::-webkit-scrollbar {
               width: 8px;
@@ -288,13 +207,7 @@ const MacOSDemo = () => {
             }
           `}</style>
           {/* Demo Cards */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: 'var(--mac-spacing-5)',
-            marginBottom: 'var(--mac-spacing-5)',
-            paddingBottom: '40px'
-          }}>
+          <div className="demo-card-grid">
             {/* Button Demo */}
             <Card>
               <CardHeader>
@@ -302,35 +215,35 @@ const MacOSDemo = () => {
                 <CardDescription>Various button styles and states</CardDescription>
               </CardHeader>
               <CardContent>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
-                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
-                  <Button variant="primary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                <div className="demo-flex-col-3">
+                <div className="demo-flex-wrap-2">
+                  <Button variant="primary" className="demo-btn-icon">
                     <Icon name="plus" size="small" style={{ color: 'white' }} />
                     Primary
                   </Button>
-                  <Button variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                  <Button variant="secondary" className="demo-btn-icon">
                     <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
                     Secondary
                   </Button>
-                  <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-                    <Icon name="square.and.arrow.up" size="small" style={{ color: 'var(--mac-accent-blue)' }} />
+                  <Button variant="outline" className="demo-btn-icon">
+                    <Icon name="square.and.arrow.up" size="small" className="demo-tab-indicator-strong" />
                     Outline
                   </Button>
-                  <Button variant="ghost" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                  <Button variant="ghost" className="demo-btn-icon">
                     <Icon name="eye" size="small" style={{ color: 'var(--mac-success)' }} />
                     Ghost
                   </Button>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
-                  <Button variant="success" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                <div className="demo-flex-wrap-2">
+                  <Button variant="success" className="demo-btn-icon">
                     <Icon name="checkmark.circle" size="small" style={{ color: 'var(--mac-success)' }} />
                     Success
                   </Button>
-                  <Button variant="warning" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                  <Button variant="warning" className="demo-btn-icon">
                     <Icon name="exclamationmark.triangle" size="small" style={{ color: 'var(--mac-warning)' }} />
                     Warning
                   </Button>
-                  <Button variant="danger" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                  <Button variant="danger" className="demo-btn-icon">
                     <Icon name="trash" size="small" style={{ color: 'var(--mac-error)' }} />
                     Danger
                   </Button>
@@ -346,7 +259,7 @@ const MacOSDemo = () => {
                 <CardDescription>Text inputs with validation</CardDescription>
               </CardHeader>
               <CardContent>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
+                <div className="demo-flex-col-4">
                   <Input
                     label="Patient Name"
                     placeholder="Enter patient name"
@@ -375,22 +288,22 @@ const MacOSDemo = () => {
                 <CardDescription>Loading states and progress bars</CardDescription>
               </CardHeader>
               <CardContent>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
+                <div className="demo-flex-col-4">
                   <div>
-                    <div style={{ marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                    <div className="demo-progress-label">
                       Treatment Progress
                     </div>
                     <Progress value={75} max={100} showValue />
                   </div>
                   <div>
-                    <div style={{ marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                    <div className="demo-progress-label">
                       Data Sync
                     </div>
                     <Progress value={45} max={100} variant="primary" />
                   </div>
-                  <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
+                  <div className="demo-flex-center-2">
                     <CircularProgress value={85} size="small" />
-                    <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>85%</span>
+                    <span className="demo-progress-percent">85%</span>
                   </div>
                 </div>
               </CardContent>
@@ -398,36 +311,36 @@ const MacOSDemo = () => {
           </div>
 
           {/* Form Controls Demo */}
-          <Card style={{ marginBottom: 'var(--mac-spacing-6)' }}>
+          <Card className="demo-card-mb-6">
             <CardHeader>
               <CardTitle>Form Controls</CardTitle>
               <CardDescription>Complete set of macOS form components</CardDescription>
             </CardHeader>
             <CardContent>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--mac-spacing-6)' }}>
-                <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
-                  <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Checkboxes</h4>
+              <div className="demo-form-grid">
+                <div className="demo-form-subsection">
+                  <h4 className="demo-section-heading">Checkboxes</h4>
                   <Checkbox label="Receive notifications" description="Email and push" defaultChecked />
                   <Checkbox label="Enable auto-backup" />
                   <Checkbox label="Sync with cloud" disabled />
                 </div>
                 
-                <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
-                  <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Radio Buttons</h4>
+                <div className="demo-form-subsection">
+                  <h4 className="demo-section-heading">Radio Buttons</h4>
                   <Radio name="priority" value="normal" label="Normal Priority" defaultChecked />
                   <Radio name="priority" value="urgent" label="Urgent Priority" />
                   <Radio name="priority" value="low" label="Low Priority" />
                 </div>
                 
-                <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
-                  <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Switches</h4>
+                <div className="demo-form-subsection">
+                  <h4 className="demo-section-heading">Switches</h4>
                   <Switch label="Dark Mode" />
                   <Switch label="Push Notifications" defaultChecked />
                   <Switch label="Auto-save" />
                 </div>
                 
-                <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
-                  <h4 style={{ margin: 0, fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Select Dropdown</h4>
+                <div className="demo-form-subsection">
+                  <h4 className="demo-section-heading">Select Dropdown</h4>
                   <Select
                     label="Department"
                     options={[
@@ -441,9 +354,9 @@ const MacOSDemo = () => {
                 </div>
               </div>
               
-              <div style={{ marginTop: '32px', display: 'grid', gap: 'var(--mac-spacing-5)' }}>
+              <div className="demo-form-extra">
                 <div>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Segmented Control</h4>
+                  <h4 className="demo-section-heading-mb16">Segmented Control</h4>
                   <SegmentedControl
                     options={[
                     { value: 'all', label: 'All Patients' },
@@ -457,7 +370,7 @@ const MacOSDemo = () => {
                 </div>
                 
                 <div>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', fontWeight: 'var(--mac-font-weight-semibold)' }}>Textarea</h4>
+                  <h4 className="demo-section-heading-mb16">Textarea</h4>
                   <Textarea
                     label="Patient Notes"
                     placeholder="Enter detailed patient notes..."
@@ -475,7 +388,7 @@ const MacOSDemo = () => {
           </Card>
 
           {/* Tab System Demo */}
-          <Card style={{ marginBottom: '40px' }}>
+          <Card className="demo-card-mb-40">
             <CardHeader>
               <CardTitle>Tab System Variants</CardTitle>
               <CardDescription>Three different macOS tab styles for visual comparison</CardDescription>
@@ -493,11 +406,7 @@ const MacOSDemo = () => {
                   }}>
                     Variant 1: Underline Style (Safari-like)
                   </h4>
-                  <div style={{
-                    display: 'flex',
-                    marginBottom: 'var(--mac-spacing-6)',
-                    borderBottom: '1px solid var(--mac-border)'
-                  }}>
+                  <div className="demo-tab-variant-1">
                     {[
                     { id: 'tab1-1', label: 'Overview', icon: 'house' },
                     { id: 'tab1-2', label: 'Patients', icon: 'person' },
@@ -547,15 +456,8 @@ const MacOSDemo = () => {
                   </div>
                   
                   {/* Active tab indicator */}
-                  <div style={{
-                    padding: 'var(--mac-spacing-3)',
-                    backgroundColor: 'var(--mac-bg-tertiary)',
-                    borderRadius: 'var(--mac-radius-sm)',
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-secondary)',
-                    fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
-                  }}>
-                    Active: <strong style={{ color: 'var(--mac-accent-blue)' }}>
+                  <div className="demo-tab-indicator">
+                    Active: <strong className="demo-tab-indicator-strong">
                       {[
                       { id: 'tab1-1', label: 'Overview' },
                       { id: 'tab1-2', label: 'Patients' },
@@ -576,10 +478,7 @@ const MacOSDemo = () => {
                   }}>
                     Variant 2: Colored Bar Style (Finder-like)
                   </h4>
-                  <div style={{
-                    display: 'flex',
-                    marginBottom: 'var(--mac-spacing-6)'
-                  }}>
+                  <div className="demo-tab-variant-2">
                     {[
                     { id: 'tab2-1', label: 'Dashboard', icon: 'house' },
                     { id: 'tab2-2', label: 'Analytics', icon: 'chart.bar' },
@@ -637,21 +536,11 @@ const MacOSDemo = () => {
 
                     })}
                   </div>
-                  <div style={{
-                    borderBottom: '1px solid var(--mac-border)',
-                    marginBottom: 'var(--mac-spacing-6)'
-                  }} />
+                  <div className="demo-tab-border" />
                   
                   {/* Active tab indicator */}
-                  <div style={{
-                    padding: 'var(--mac-spacing-3)',
-                    backgroundColor: 'var(--mac-bg-tertiary)',
-                    borderRadius: 'var(--mac-radius-sm)',
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-secondary)',
-                    fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
-                  }}>
-                    Active: <strong style={{ color: 'var(--mac-accent-blue)' }}>
+                  <div className="demo-tab-indicator">
+                    Active: <strong className="demo-tab-indicator-strong">
                       {[
                       { id: 'tab2-1', label: 'Dashboard' },
                       { id: 'tab2-2', label: 'Analytics' },
@@ -672,14 +561,7 @@ const MacOSDemo = () => {
                   }}>
                     Variant 3: Rounded Style (Xcode-like)
                   </h4>
-                  <div style={{
-                    display: 'flex',
-                    gap: 'var(--mac-spacing-2)',
-                    marginBottom: 'var(--mac-spacing-6)',
-                    backgroundColor: 'var(--mac-bg-secondary)',
-                    borderRadius: 'var(--mac-radius-md)',
-                    padding: 'var(--mac-spacing-1)'
-                  }}>
+                  <div className="demo-tab-variant-3">
                     {[
                     { id: 'tab3-1', label: 'Files', icon: 'folder' },
                     { id: 'tab3-2', label: 'Search', icon: 'magnifyingglass' },
@@ -730,15 +612,8 @@ const MacOSDemo = () => {
                   </div>
                   
                   {/* Active tab indicator */}
-                  <div style={{
-                    padding: 'var(--mac-spacing-3)',
-                    backgroundColor: 'var(--mac-bg-tertiary)',
-                    borderRadius: 'var(--mac-radius-sm)',
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-secondary)',
-                    fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
-                  }}>
-                    Active: <strong style={{ color: 'var(--mac-accent-blue)' }}>
+                  <div className="demo-tab-indicator">
+                    Active: <strong className="demo-tab-indicator-strong">
                       {[
                       { id: 'tab3-1', label: 'Files' },
                       { id: 'tab3-2', label: 'Search' },
@@ -750,27 +625,11 @@ const MacOSDemo = () => {
                 </div>
 
                 {/* Usage Guidelines */}
-                <div style={{
-                  padding: 'var(--mac-spacing-4)',
-                  backgroundColor: 'var(--mac-bg-tertiary)',
-                  borderRadius: 'var(--mac-radius-md)',
-                  border: '1px solid var(--mac-border)'
-                }}>
-                  <h5 style={{
-                    margin: '0 0 12px 0',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-primary)',
-                    fontWeight: 'var(--mac-font-weight-semibold)'
-                  }}>
+                <div className="demo-guidelines">
+                  <h5 className="demo-guidelines-title">
                     Usage Guidelines:
                   </h5>
-                  <ul style={{
-                    margin: 0,
-                    paddingLeft: '20px',
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-secondary)',
-                    lineHeight: '1.5'
-                  }}>
+                  <ul className="demo-guidelines-list">
                     <li><strong>Variant 1 (Underline):</strong> Best for content-heavy interfaces like Safari, perfect for medical dashboards</li>
                     <li><strong>Variant 2 (Colored Bar):</strong> Great for file management and hierarchical navigation</li>
                     <li><strong>Variant 3 (Rounded):</strong> Ideal for development tools and compact interfaces</li>
@@ -781,38 +640,20 @@ const MacOSDemo = () => {
           </Card>
 
           {/* Icon Demo */}
-          <Card style={{ marginBottom: '40px' }}>
+          <Card className="demo-card-mb-40">
             <CardHeader>
               <CardTitle>Icon System</CardTitle>
               <CardDescription>SF Symbols-like icon collection</CardDescription>
             </CardHeader>
             <CardContent>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))',
-                gap: 'var(--mac-spacing-5)'
-              }}>
+              <div className="demo-icon-grid">
                 {[
                 'house', 'person', 'heart', 'gear', 'bell', 'chart.bar',
                 'magnifyingglass', 'plus', 'trash', 'eye', 'phone', 'envelope'].
                 map((iconName) =>
-                <div key={iconName} style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: 'var(--mac-spacing-4)',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  backgroundColor: 'var(--mac-bg-tertiary)',
-                  transition: 'all 0.2s ease'
-                }}>
+                <div key={iconName} className="demo-icon-cell">
                     <Icon name={iconName} size="large" />
-                    <span style={{
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-secondary)',
-                    textAlign: 'center',
-                    fontWeight: 'var(--mac-font-weight-medium)'
-                  }}>
+                    <span className="demo-icon-label">
                       {iconName}
                     </span>
                   </div>
@@ -833,7 +674,7 @@ const MacOSDemo = () => {
             <Button
             variant="outline"
             onClick={() => setIsModalOpen(false)}
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+            className="demo-btn-icon">
 
               <Icon name="xmark" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
               Cancel
@@ -841,7 +682,7 @@ const MacOSDemo = () => {
             <Button
             variant="primary"
             onClick={() => setIsModalOpen(false)}
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+            className="demo-btn-icon">
 
               <Icon name="checkmark" size="small" style={{ color: 'white' }} />
               Confirm
@@ -849,12 +690,12 @@ const MacOSDemo = () => {
           </>
         }>
 
-        <p style={{ margin: 0, lineHeight: '1.5' }}>
+        <p className="demo-modal-text">
           This is a demonstration of the macOS-style modal component.
           It features backdrop blur, smooth animations, and proper accessibility.
         </p>
 
-        <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
+        <div className="demo-modal-input">
           <Input
             label="Demo Input"
             placeholder="Type something..." />
@@ -865,7 +706,7 @@ const MacOSDemo = () => {
       {/* Toast Notifications — removed in PR #1928. showToast() now uses notify service. */}
 
       {/* Demo Button */}
-      <div style={{ position: 'fixed', bottom: '20px', right: '20px' }}>
+      <div className="demo-fab">
         <Button
           variant="primary"
           size="large"
