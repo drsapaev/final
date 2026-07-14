@@ -94,7 +94,12 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
           ? 'Оплата проведена: ' + successCount + ' (уже оплачено: ' + skippedCount
           : 'Оплата проведена: ' + successCount;
         notify.success(failedCount > 0 ? message + '. Failed: ' + failedCount : message);
-        setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
+        // UX Audit R-1.4: убран setTimeout(800ms) silent reload.
+        // Раньше: 800ms «мёртвого» времени, в течение которого строка
+        // оставалась в статусе «Ожидает оплаты» — регистратор мог
+        // повторно нажать «Оплатить» (двойной запрос на бэкенд).
+        // Теперь: silent reload вызывается сразу, без задержки.
+        loadAppointments({ silent: true, source: 'payment_success' });
         return result.results || [];
       }
 
