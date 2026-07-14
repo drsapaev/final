@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
+import { useTranslation } from '../../hooks/useTranslation';  // PR-72
 import ChatWindow from './ChatWindow';
 
 /**
@@ -13,6 +14,7 @@ import ChatWindow from './ChatWindow';
 const ChatButton = () => {
     const [isOpen, setIsOpen] = useState(false);
     const { unreadCount, isConnected, loadMessages } = useChat();
+    const { t } = useTranslation();  // PR-72
     // PR-68 / P0-1: listen for 'openChat' CustomEvent from desktop notifications
     const pendingUserIdRef = useRef(null);
 
@@ -39,8 +41,8 @@ const ChatButton = () => {
         <>
             <button
                 onClick={() => setIsOpen(true)}
-                title={isConnected ? 'Сообщения' : 'Сообщения (офлайн)'}
-                aria-label={isConnected ? 'Открыть сообщения' : 'Открыть сообщения, офлайн'}
+                title={isConnected ? t('chatMessages') : t('chatMessagesOffline')}
+                aria-label={isConnected ? t('chatOpen') : t('chatOpenOffline')}
                 style={{
                     position: 'relative',
                     width: '36px',
