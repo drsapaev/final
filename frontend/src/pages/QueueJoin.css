@@ -1,0 +1,671 @@
+/**
+ * QueueJoin — Phase 3 CSS migration.
+ * Extracted from QueueJoin.jsx (120 inline style blocks → 0 layout blocks).
+ * All styles use var(--mac-*) design tokens.
+ */
+
+/* ─── Base layout ─── */
+.qj-page-base {
+  background: var(--mac-gradient-window);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+}
+
+.qj-glass-card {
+  background: var(--mac-card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--mac-radius-xl);
+  box-shadow: var(--mac-main-shell-shadow);
+  border: 1px solid var(--mac-card-border);
+  padding: var(--mac-spacing-8) var(--mac-spacing-6);
+}
+
+/* ─── Text styles ─── */
+.qj-title {
+  font-size: var(--mac-font-size-2xl);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-2);
+  letter-spacing: -0.02em;
+}
+
+.qj-title-3xl {
+  font-size: var(--mac-font-size-3xl);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-3);
+  letter-spacing: -0.02em;
+}
+
+.qj-title-success {
+  font-size: var(--mac-font-size-3xl);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-6);
+  letter-spacing: -0.02em;
+}
+
+.qj-body-text {
+  font-size: var(--mac-font-size-lg);
+  color: var(--mac-text-secondary);
+  line-height: 1.5;
+}
+
+.qj-body-text-mb6 {
+  font-size: var(--mac-font-size-lg);
+  color: var(--mac-text-secondary);
+  line-height: 1.5;
+  margin-bottom: var(--mac-spacing-6);
+}
+
+.qj-muted-caption {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-tertiary);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* ─── Action stack ─── */
+.qj-action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3);
+}
+
+/* ─── Recovery buttons ─── */
+.qj-recovery-btn {
+  width: 100%;
+  padding: var(--mac-spacing-4) var(--mac-spacing-6);
+  border-radius: var(--mac-radius-lg);
+  border: none;
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qj-recovery-btn-primary {
+  background: var(--mac-accent-blue);
+  color: var(--mac-text-on-accent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%);
+}
+
+.qj-recovery-btn-danger {
+  background: var(--mac-error);
+  color: var(--mac-text-on-accent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-error), transparent 70%);
+}
+
+.qj-recovery-btn-success {
+  background: var(--mac-success);
+  color: var(--mac-text-on-accent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-success), transparent 70%);
+}
+
+/* ─── Loading spinner ─── */
+.qj-spinner {
+  border-color: var(--mac-accent-blue);
+}
+
+/* ─── Waiting screen ─── */
+.qj-countdown-box {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mac-warning), transparent 88%) 0%, color-mix(in srgb, var(--mac-warning), transparent 93%) 100%);
+  border-radius: var(--mac-radius-xl);
+  padding: var(--mac-spacing-6);
+  margin-bottom: var(--mac-spacing-6);
+  border: 1px solid color-mix(in srgb, var(--mac-warning), transparent 76%);
+}
+
+.qj-countdown-number {
+  font-size: 44px;
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-warning);
+  margin-bottom: var(--mac-spacing-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Info rows ─── */
+.qj-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3);
+  margin-bottom: var(--mac-spacing-6);
+}
+
+.qj-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
+  background: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-lg);
+}
+
+.qj-info-row-accent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mac-accent), transparent 88%) 0%, color-mix(in srgb, var(--mac-accent), transparent 93%) 100%);
+  border-radius: var(--mac-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--mac-accent), transparent 76%);
+}
+
+.qj-info-label {
+  font-size: var(--mac-font-size-base);
+  color: var(--mac-text-secondary);
+}
+
+.qj-info-label-accent {
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-medium);
+  color: var(--mac-accent-blue);
+}
+
+.qj-info-value {
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.qj-info-value-accent {
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-accent-blue);
+}
+
+/* ─── Hint text ─── */
+.qj-hint {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-tertiary);
+  margin-bottom: var(--mac-spacing-6);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.qj-hint-no-mb {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-tertiary);
+  line-height: 1.5;
+}
+
+/* ─── Waiting buttons ─── */
+.qj-btn-secondary {
+  flex: 1;
+  background: color-mix(in srgb, var(--mac-text-tertiary), transparent 88%);
+  color: var(--mac-accent-blue);
+  padding: 14px 20px;
+  border-radius: var(--mac-radius-lg);
+  border: none;
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.qj-btn-secondary:hover {
+  background: color-mix(in srgb, var(--mac-text-tertiary), transparent 82%);
+}
+
+.qj-btn-primary {
+  flex: 1;
+  background: var(--mac-accent-blue);
+  color: var(--mac-text-on-accent);
+  padding: 14px 20px;
+  border-radius: var(--mac-radius-lg);
+  border: none;
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%);
+}
+
+.qj-btn-primary:hover {
+  background: var(--mac-accent-blue-hover);
+}
+
+/* ─── Success screen ─── */
+.qj-success-box {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%);
+  border-radius: var(--mac-radius-xl);
+  padding: var(--mac-spacing-6);
+  margin-bottom: var(--mac-spacing-6);
+  border: 1px solid color-mix(in srgb, var(--mac-success), transparent 76%);
+}
+
+.qj-success-box-lg {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%);
+  border-radius: var(--mac-radius-xl);
+  padding: var(--mac-spacing-8) var(--mac-spacing-6);
+  margin-bottom: var(--mac-spacing-6);
+  border: 1px solid color-mix(in srgb, var(--mac-success), transparent 76%);
+}
+
+.qj-success-number {
+  font-size: 48px;
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-success);
+  margin-bottom: var(--mac-spacing-2);
+  letter-spacing: -0.02em;
+}
+
+.qj-success-label {
+  font-size: var(--mac-font-size-lg);
+  color: var(--mac-text-secondary);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+.qj-success-entries-title {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-4);
+  text-align: center;
+}
+
+.qj-success-entries-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3);
+}
+
+.qj-success-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--mac-spacing-4);
+  background: color-mix(in srgb, var(--mac-card-bg), transparent 16%);
+  border-radius: var(--mac-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--mac-success), transparent 72%);
+}
+
+.qj-success-entry-left {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3);
+}
+
+.qj-success-entry-name {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.qj-success-entry-time {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+  margin-top: var(--mac-spacing-1);
+}
+
+.qj-success-entry-right {
+  text-align: right;
+}
+
+.qj-success-entry-number {
+  font-size: var(--mac-font-size-3xl);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-success);
+}
+
+.qj-success-entry-label {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+}
+
+.qj-success-hint {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-tertiary);
+  margin-bottom: var(--mac-spacing-6);
+  line-height: 1.5;
+}
+
+.qj-success-hint-accent {
+  margin-top: var(--mac-spacing-3);
+  font-weight: var(--mac-font-weight-medium);
+  color: var(--mac-accent-blue);
+}
+
+/* ─── Main interface header ─── */
+.qj-main-header {
+  background: linear-gradient(135deg, var(--mac-accent) 0%, var(--mac-accent-purple) 100%);
+  border-radius: 20px 20px 0 0;
+  padding: var(--mac-spacing-6);
+}
+
+.qj-main-title {
+  font-size: 26px;
+  font-weight: var(--mac-font-weight-semibold);
+  margin-bottom: var(--mac-spacing-4);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.qj-main-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qj-main-info-row {
+  display: flex;
+  align-items: center;
+  opacity: 0.95;
+}
+
+.qj-main-info-row-muted {
+  display: flex;
+  align-items: center;
+  opacity: 0.9;
+}
+
+.qj-main-info-row-date {
+  display: flex;
+  align-items: center;
+  margin-top: var(--mac-spacing-2);
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--mac-text-on-accent), transparent 80%);
+  opacity: 0.95;
+}
+
+/* ─── Select specialists ─── */
+.qj-select-section {
+  padding: var(--mac-spacing-6);
+}
+
+.qj-select-header {
+  margin-bottom: var(--mac-spacing-6);
+  text-align: center;
+}
+
+.qj-select-title {
+  font-size: var(--mac-font-size-2xl);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-2);
+  letter-spacing: -0.02em;
+}
+
+.qj-select-subtitle {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-lg);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.qj-specialists-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3);
+  margin-bottom: var(--mac-spacing-6);
+}
+
+.qj-loading-text {
+  padding: var(--mac-spacing-4);
+  text-align: center;
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-lg);
+}
+
+.qj-empty-state {
+  padding: 18px 16px;
+  text-align: center;
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-base);
+  border-radius: var(--mac-radius-lg);
+  border: 1px dashed color-mix(in srgb, var(--mac-text-secondary), transparent 72%);
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 10%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qj-refresh-btn {
+  align-self: center;
+  background: var(--mac-accent-blue);
+  color: var(--mac-text-on-accent);
+  border: none;
+  border-radius: var(--mac-radius-md);
+  padding: 8px 14px;
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-semibold);
+  cursor: pointer;
+}
+
+.qj-refresh-btn:hover {
+  background: var(--mac-accent-blue-hover);
+}
+
+/* ─── Continue button ─── */
+.qj-continue-btn {
+  width: 100%;
+  background: var(--mac-accent-blue);
+  color: var(--mac-text-on-accent);
+  padding: var(--mac-spacing-4) var(--mac-spacing-6);
+  border-radius: var(--mac-radius-lg);
+  border: none;
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%);
+}
+
+.qj-continue-btn:disabled {
+  background: var(--mac-border);
+  color: var(--mac-text-tertiary);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.qj-continue-btn:not(:disabled):hover {
+  background: var(--mac-accent-blue-hover);
+}
+
+/* ─── Error banner ─── */
+.qj-error-banner {
+  margin-top: var(--mac-spacing-4);
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
+  border-radius: var(--mac-radius-md);
+  background: var(--mac-error-bg);
+  border: 1px solid var(--mac-error-border);
+  color: var(--mac-error);
+  font-size: var(--mac-font-size-base);
+  text-align: center;
+}
+
+.qj-error-box {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mac-error), transparent 88%) 0%, color-mix(in srgb, var(--mac-error), transparent 93%) 100%);
+  border: 1px solid color-mix(in srgb, var(--mac-error), transparent 72%);
+  border-radius: var(--mac-radius-lg);
+  padding: var(--mac-spacing-3);
+}
+
+/* ─── Info stats grid ─── */
+.qj-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mac-spacing-4);
+  margin-bottom: var(--mac-spacing-6);
+}
+
+.qj-stat-box-accent {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mac-accent), transparent 88%) 0%, color-mix(in srgb, var(--mac-accent), transparent 93%) 100%);
+  border-radius: var(--mac-radius-xl);
+  padding: 24px 20px;
+  border: 1px solid color-mix(in srgb, var(--mac-accent), transparent 76%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+}
+
+.qj-stat-box-success {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%);
+  border-radius: var(--mac-radius-xl);
+  padding: 24px 20px;
+  border: 1px solid color-mix(in srgb, var(--mac-success), transparent 76%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+}
+
+.qj-stat-number {
+  font-size: 36px;
+  font-weight: var(--mac-font-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: var(--mac-spacing-2);
+}
+
+.qj-stat-label {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-tertiary);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* ─── Info CTA ─── */
+.qj-info-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--mac-spacing-5);
+}
+
+.qj-info-cta-text {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-lg);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 320px;
+}
+
+/* ─── Form ─── */
+.qj-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-6);
+}
+
+.qj-form-label {
+  display: block;
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+  color: var(--mac-text-primary);
+  margin-bottom: var(--mac-spacing-2);
+}
+
+.qj-form-input {
+  width: 100%;
+  padding-left: 40px;
+  padding-right: 16px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border: 1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%);
+  border-radius: var(--mac-radius-lg);
+  font-size: var(--mac-font-size-xl);
+  font-family: inherit;
+  background: var(--mac-bg-secondary);
+  transition: all 0.2s ease;
+  outline: none;
+  color: var(--mac-text-primary);
+}
+
+.qj-form-input:focus {
+  border: 1px solid var(--mac-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%);
+}
+
+.qj-form-input-padded {
+  width: 100%;
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
+  border: 1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%);
+  border-radius: var(--mac-radius-lg);
+  font-size: var(--mac-font-size-xl);
+  font-family: inherit;
+  background: var(--mac-bg-secondary);
+  transition: all 0.2s ease;
+  outline: none;
+  color: var(--mac-text-primary);
+}
+
+.qj-form-input-padded:focus {
+  border: 1px solid var(--mac-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%);
+}
+
+.qj-phone-hint {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+  margin-top: var(--mac-spacing-1);
+}
+
+.qj-telegram-hint {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-tertiary);
+  margin-bottom: var(--mac-spacing-2);
+}
+
+/* ─── Form buttons ─── */
+.qj-form-buttons {
+  display: flex;
+  gap: var(--mac-spacing-3);
+  padding-top: 16px;
+}
+
+.qj-back-btn {
+  flex: 1;
+  background: color-mix(in srgb, var(--mac-text-tertiary), transparent 88%);
+  color: var(--mac-accent-blue);
+  padding: 14px 20px;
+  border-radius: var(--mac-radius-lg);
+  border: none;
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.qj-back-btn:hover {
+  background: color-mix(in srgb, var(--mac-text-tertiary), transparent 82%);
+}
+
+.qj-submit-btn {
+  flex: 1;
+  background: var(--mac-accent-blue);
+  color: var(--mac-text-on-accent);
+  padding: 14px 20px;
+  border-radius: var(--mac-radius-lg);
+  border: none;
+  font-size: var(--mac-font-size-xl);
+  font-weight: var(--mac-font-weight-semibold);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%);
+}
+
+.qj-submit-btn:disabled {
+  background: var(--mac-text-tertiary);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.qj-submit-btn:not(:disabled):hover {
+  background: var(--mac-accent-blue-hover);
+}
+
+/* ─── SR-only ─── */
+.qj-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
