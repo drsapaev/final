@@ -1406,19 +1406,19 @@ const RegistrarPanel = () => {
         </button>
         {activeTab && (
           <>
-            <span>›</span>
+            <Icon name="chevron.right" size="small" className="registrar-breadcrumb-separator" aria-hidden="true" />
             <span>{queueProfiles.find(p => p.key === activeTab)?.title || activeTab}</span>
           </>
         )}
         {searchQuery && (
           <>
-            <span>›</span>
+            <Icon name="chevron.right" size="small" className="registrar-breadcrumb-separator" aria-hidden="true" />
             <span>Поиск: «{searchQuery}»</span>
           </>
         )}
         {showWizard && (
           <>
-            <span>›</span>
+            <Icon name="chevron.right" size="small" className="registrar-breadcrumb-separator" aria-hidden="true" />
             <span>{wizardEditMode ? 'Редактирование' : 'Новая запись'}</span>
           </>
         )}
