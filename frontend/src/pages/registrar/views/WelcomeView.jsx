@@ -488,9 +488,7 @@ const WelcomeView = React.memo(({
                     // Перенаправляем на страницу входа
                     window.location.href = '/login';
                   }}
-                  className="registrar-btn-lg registrar-btn-accent"
-                  onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
-                  onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue)'}>
+                  className="registrar-btn-lg registrar-btn-accent">
 
                           <Icon name="key" size="small" className="registrar-icon-mr" />Войти снова
                         </button>
@@ -500,25 +498,14 @@ const WelcomeView = React.memo(({
                     // Обновляем данные
                     loadAppointments({ source: 'manual_refresh_button' });
                   }}
-                  className="registrar-btn-lg registrar-btn-success"
-                  onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-green-hover)'}
-                  onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-green)'}>
+                  className="registrar-btn-lg registrar-btn-success">
 
                           <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Обновить данные
                         </button>
 
-                        <button
-                  onClick={() => {
-                    // Перезапускаем приложение
-                    window.location.reload();
-                  }}
-                  className="registrar-btn-lg registrar-btn-neutral"
-                  onMouseOver={(e) => e.target.style.background = 'var(--mac-text-secondary)'}
-                  onMouseOut={(e) => e.target.style.background = 'var(--mac-text-tertiary)'}>
-
-                          <Icon name="arrow.up.arrow.down" size="small" className="registrar-icon-mr" />Перезапустить приложение
-                        </button>
-                      </div>
+                        {/* UX Audit R-2.2: кнопка «Перезапустить приложение» удалена —
+                            это dev-tool, не должен быть в продакшене. */}
+              </div>
               }
                     <p style={{
                 fontSize: 'var(--mac-font-size-base)',
