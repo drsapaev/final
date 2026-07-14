@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { CreditCard, Check, Printer, Banknote, ArrowLeftRight, Globe } from 'lucide-react';
+import { CreditCard, Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { toast } from 'react-toastify';
+// UX Audit R-4.3: centralized payment methods config (future: backend-driven).
+import { DEFAULT_PAYMENT_METHODS } from '../../config/paymentMethods';
 // UX Audit Registrar #5: все inline-стили перенесены в PaymentDialog.css.
 // useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
 // Также: emoji в заголовке (✅/💳) заменены на text-only (иконки и так есть в actions).
@@ -83,23 +85,11 @@ const PaymentDialog = ({
     onClose();
   };
 
-  // UX Audit R-4.3: уникальные иконки для каждого способа оплаты.
-  // Раньше: 3 из 4 кнопок имели одинаковую иконку CreditCard —
-  // пользователь не различал их визуально (Nielsen #2 + #4).
-  const paymentMethods = [
-    {
-      value: 'Карта',
-      label: 'Банковская карта',
-      icon: <CreditCard size={16} />,
-    },
-    { value: 'Наличные', label: 'Наличные', icon: <Banknote size={16} /> },
-    {
-      value: 'Перевод',
-      label: 'Банковский перевод',
-      icon: <ArrowLeftRight size={16} />,
-    },
-    { value: 'Онлайн', label: 'Онлайн платеж', icon: <Globe size={16} /> },
-  ];
+  // UX Audit R-4.3: payment methods загружаются из централизованного конфига.
+  // Раньше: hardcoded array в PaymentDialog.
+  // Теперь: DEFAULT_PAYMENT_METHODS из config/paymentMethods.js.
+  // Future: usePaymentMethods() hook will fetch from backend API.
+  const paymentMethods = DEFAULT_PAYMENT_METHODS;
 
   if (!appointment) return null;
 
