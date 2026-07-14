@@ -586,20 +586,53 @@ export default function LabTemplateWorkbench({
                 {activeVersion?.status && <Badge variant={activeVersion.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus(activeVersion.status)}</Badge>}
               </div>
 
-              <div className="ltw-tab-bar">
-                {EDITOR_TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setEditorTab(tab.id)}
-                    aria-pressed={editorTab === tab.id}
-                    className={`ltw-tab-btn ${editorTab === tab.id ? 'ltw-tab-btn-active' : ''}`}>
-                    {tab.label}
-                  </button>
-                ))}
+              {/* L-M-7 fix: заменён aria-pressed на role=tablist + role=tab + aria-selected.
+                  Согласованность с LabPanel.jsx (там тоже role=tablist).
+                  Keyboard-навигация: стрелки вправо/лево, Home, End. */}
+              <div className="ltw-tab-bar ltw-tablist" role="tablist" aria-label="Редактор шаблона">
+                {EDITOR_TABS.map((tab) => {
+                  const isActive = editorTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      id={`ltw-tab-${tab.id}`}
+                      aria-selected={isActive}
+                      aria-controls={`ltw-tabpanel-${tab.id}`}
+                      tabIndex={isActive ? 0 : -1}
+                      onClick={() => setEditorTab(tab.id)}
+                      onKeyDown={(e) => {
+                        const idx = EDITOR_TABS.findIndex((t) => t.id === tab.id);
+                        let nextIdx = null;
+                        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIdx = (idx + 1) % EDITOR_TABS.length;
+                        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nextIdx = (idx - 1 + EDITOR_TABS.length) % EDITOR_TABS.length;
+                        else if (e.key === 'Home') nextIdx = 0;
+                        else if (e.key === 'End') nextIdx = EDITOR_TABS.length - 1;
+                        if (nextIdx !== null) {
+                          e.preventDefault();
+                          setEditorTab(EDITOR_TABS[nextIdx].id);
+                          window.requestAnimationFrame(() => {
+                            document.getElementById(`ltw-tab-${EDITOR_TABS[nextIdx].id}`)?.focus();
+                          });
+                        }
+                      }}
+                      className={`ltw-tablist-tab ${isActive ? 'ltw-tablist-tab-active' : ''}`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
 
-              {editorTab === 'content' && (
+              {/* L-M-7 fix: добавлены role=tabpanel для согласованности с tablist-pattern. */}
+              <div
+                id={`ltw-tabpanel-${editorTab}`}
+                role="tabpanel"
+                aria-labelledby={`ltw-tab-${editorTab}`}
+                tabIndex={0}
+              >
+                {editorTab === 'content' && (
                 <ContentTab
                   draftVersion={draftVersion}
                   expandedSections={expandedSections}
@@ -636,6 +669,7 @@ export default function LabTemplateWorkbench({
               {editorTab === 'preview' && (
                 <PreviewTab draftVersion={draftVersion} />
               )}
+              </div>
             </div>
           )}
         </CardContent>
