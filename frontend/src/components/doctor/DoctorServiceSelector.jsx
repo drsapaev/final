@@ -37,6 +37,7 @@ const DoctorServiceSelector = ({
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
+  const [serviceSearch, setServiceSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState({});
   const [error, setError] = useState('');
