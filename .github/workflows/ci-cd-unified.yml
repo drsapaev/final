@@ -752,6 +752,12 @@ jobs:
         npx playwright install --with-deps chromium
         npx playwright test e2e/registrar-time.spec.js --project=chromium
 
+    - name: 📸 UX Audit e2e + Visual regression (Chromium)
+      run: |
+        cd frontend
+        npx playwright test e2e/registrar-ux-audit.spec.js e2e/cashier-ux-audit.spec.js e2e/visual-regression.spec.js --project=chromium
+      continue-on-error: true  # Visual regression — non-blocking, informational only
+
   # --- Backend тесты ---
   backend-tests:
     name: 🐍 Backend тесты
