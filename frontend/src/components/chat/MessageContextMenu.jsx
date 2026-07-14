@@ -1,6 +1,6 @@
 
 import { useEffect, useRef } from 'react';
-import { Copy, Reply, Trash, Forward } from 'lucide-react';
+import { Copy, Reply, Trash } from 'lucide-react';
 import './MessageContextMenu.css';
 import PropTypes from 'prop-types';
 
@@ -27,22 +27,22 @@ const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }) => {
         <div
             className="message-context-menu"
             ref={menuRef}
+            role="menu"
+            aria-label="Меню сообщения"
             style={{
                 left: x,
                 top: y
             }}
         >
-            <button onClick={() => handleAction('copy')}>
+            <button role="menuitem" onClick={() => handleAction('copy')}>
                 <Copy size={14} /> <span>Копировать</span>
             </button>
-            <button onClick={() => handleAction('reply')}>
+            <button role="menuitem" onClick={() => handleAction('reply')}>
                 <Reply size={14} /> <span>Ответить</span>
             </button>
-            <button onClick={() => handleAction('forward')}>
-                <Forward size={14} /> <span>Переслать</span>
-            </button>
+            {/* PR-69 / H-4: removed forward stub */}
             {isOwn && (
-                <button className="delete" onClick={() => handleAction('delete')}>
+                <button role="menuitem" className="delete" onClick={() => handleAction('delete')}>
                     <Trash size={14} /> <span>Удалить</span>
                 </button>
             )}
