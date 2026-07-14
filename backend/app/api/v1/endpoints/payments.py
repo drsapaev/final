@@ -202,11 +202,17 @@ class ProvidersResponse(BaseModel):
 # API Endpoints
 
 
-# UX Audit R-4.3 (Phase 3): Backend-driven payment methods endpoint.
+# UX Audit R-4.3 (Phase 3+4): Backend-driven payment methods endpoint.
 # Returns list of available payment methods for the registrar/cashier panels.
 # Frontend usePaymentMethods() hook fetches this endpoint when enableBackendFetch=true.
+#
+# Phase 4: Per-clinic configuration via clinic_settings table.
+# Admin can set key="payment_methods" in clinic_settings to override defaults.
+# Example clinic_settings value:
+#   [{"value": "Карта", "label": "Банковская карта", "icon_name": "card"}, ...]
 @router.get("/payment-methods")
 def get_payment_methods(
+    db: Session = Depends(get_db),
     current_user=Depends(deps.get_current_user),
 ) -> dict[str, Any]:
     """
@@ -215,9 +221,25 @@ def get_payment_methods(
     Returns a list of payment methods with value, label, and icon_name.
     Frontend maps icon_name to a lucide-react icon component.
 
-    Currently returns hardcoded defaults — future: configurable per clinic
-    via clinic_settings table.
+    Per-clinic configuration: if clinic_settings has key="payment_methods",
+    returns that value. Otherwise returns hardcoded defaults.
     """
+    # UX Audit R-4.3 (Phase 4): check clinic_settings for per-clinic override.
+    from app.models.clinic import ClinicSettings
+
+    custom_methods = (
+        db.query(ClinicSettings)
+        .filter(ClinicSettings.key == "payment_methods")
+        .filter(ClinicSettings.category == "payment")
+        .first()
+    )
+
+    if custom_methods and custom_methods.value:
+        methods = custom_methods.value
+        if isinstance(methods, list) and len(methods) > 0:
+            return {"methods": methods}
+
+    # Default payment methods (hardcoded fallback)
     return {
         "methods": [
             {"value": "Карта", "label": "Банковская карта", "icon_name": "card"},
