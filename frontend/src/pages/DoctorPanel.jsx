@@ -789,19 +789,19 @@ const DoctorPanel = () => {
                   </CardHeader>
                   <CardContent>
                     <div className={`doctor-actions-grid doctor-actions-grid-${isMobile ? '1' : isTablet ? '2' : '4'}`}>
-                      <Button variant="primary" fullWidth>
+                      <Button variant="primary" fullWidth disabled title="Функция в разработке">
                         <Plus size={20} />
                         Новый пациент
                       </Button>
-                      <Button variant="secondary" fullWidth>
+                      <Button variant="secondary" fullWidth disabled title="Функция в разработке">
                         <Calendar size={20} />
                         Записать на прием
                       </Button>
-                      <Button variant="success" fullWidth>
+                      <Button variant="success" fullWidth disabled title="Функция в разработке">
                         <FileText size={20} />
                         Создать отчет
                       </Button>
-                      <Button variant="info" fullWidth>
+                      <Button variant="info" fullWidth disabled title="Функция в разработке">
                         <Download size={20} />
                         Экспорт данных
                       </Button>
@@ -1386,27 +1386,27 @@ const DoctorPanel = () => {
               </CardHeader>
               <CardContent>
                 <div className={`doctor-reports-grid doctor-reports-grid-${isMobile ? '1' : isTablet ? '2' : '3'}`}>
-                  <Button variant="primary" fullWidth>
+                  <Button variant="primary" fullWidth disabled title="Функция в разработке">
                     <FileText size={20} />
                     Отчет по пациентам
                   </Button>
-                  <Button variant="secondary" fullWidth>
+                  <Button variant="secondary" fullWidth disabled title="Функция в разработке">
                     <Calendar size={20} />
                     Отчет по записям
                   </Button>
-                  <Button variant="success" fullWidth>
+                  <Button variant="success" fullWidth disabled title="Функция в разработке">
                     <Activity size={20} />
                     Статистика работы
                   </Button>
-                  <Button variant="warning" fullWidth>
+                  <Button variant="warning" fullWidth disabled title="Функция в разработке">
                     <Pill size={20} />
                     Отчет по лекарствам
                   </Button>
-                  <Button variant="info" fullWidth>
+                  <Button variant="info" fullWidth disabled title="Функция в разработке">
                     <Heart size={20} />
                     Медицинская статистика
                   </Button>
-                  <Button variant="ghost" fullWidth>
+                  <Button variant="ghost" fullWidth disabled title="Функция в разработке">
                     <Download size={20} />
                     Экспорт всех данных
                   </Button>
@@ -1479,7 +1479,9 @@ const DoctorPanel = () => {
                 Закрыть
               </button>
               <button
-              className="doctor-text-sm doctor-modal-btn-accent">
+              className="doctor-text-sm doctor-modal-btn-accent"
+              disabled
+              title="Функция в разработке">
 
                 Редактировать
               </button>
