@@ -299,6 +299,7 @@ const ClinicManagement = () => {
       </MacOSCard>
 
       {/* Системная информация */}
+      {/* UX Audit Admin #2.5: динамические данные из systemHealth вместо hardcoded. */}
       <MacOSCard className="p-4">
           <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
             Системная информация
@@ -306,20 +307,14 @@ const ClinicManagement = () => {
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-fw-wrap">
           <div className="flex flex-col gap-2">
             <div className="admin-d-flex-jc-between-fs-sm-5">
-              <span className="text-[var(--mac-text-secondary)]">Версия системы:</span>
-              <span className="admin-fw-med-primary-3">
-                1.0.0
-              </span>
-            </div>
-            <div className="admin-d-flex-jc-between-fs-sm-4">
-              <span className="text-[var(--mac-text-secondary)]">База данных:</span>
-              <span className="admin-fw-med-primary-2">
-                SQLite
-              </span>
+              <span className="text-[var(--mac-text-secondary)]">Статус системы:</span>
+              <Badge variant={systemHealth?.overall_status === 'healthy' ? 'success' : 'error'}
+                text={systemHealth?.overall_status === 'healthy' ? 'Работает' : 'Ошибка'} />
             </div>
             <div className="admin-d-flex-jc-between-fs-sm-3">
               <span className="text-[var(--mac-text-secondary)]">Статус БД:</span>
-              <Badge variant="success" text="Подключена" />
+              <Badge variant={systemHealth?.db === 'healthy' ? 'success' : 'error'}
+                text={systemHealth?.db === 'healthy' ? 'Подключена' : 'Недоступна'} />
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -329,15 +324,10 @@ const ClinicManagement = () => {
                 {new Date().toLocaleDateString()}
               </span>
             </div>
-            <div className="admin-d-flex-jc-between-fs-sm-1">
-              <span className="text-[var(--mac-text-secondary)]">Время работы:</span>
-              <span className="admin-fw-med-primary">
-                24/7
-              </span>
-            </div>
             <div className="admin-d-flex-jc-between-fs-sm">
               <span className="text-[var(--mac-text-secondary)]">Безопасность:</span>
-              <Badge variant="success" text="Активна" />
+              <Badge variant={systemHealth?.security === 'active' ? 'success' : 'warning'}
+                text={systemHealth?.security === 'active' ? 'Активна' : 'Проверьте настройки'} />
             </div>
           </div>
         </div>
