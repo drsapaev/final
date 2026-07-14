@@ -85,10 +85,10 @@ const PaymentDialog = ({
     onClose();
   };
 
-  // UX Audit R-4.3 (Phase 2): payment methods через usePaymentMethods hook.
-  // enableBackendFetch=false — использует DEFAULT_PAYMENT_METHODS.
-  // Когда backend endpoint будет готов, переключить на true.
-  const { paymentMethods } = usePaymentMethods({ enableBackendFetch: false });
+  // UX Audit R-4.3 (Phase 3): payment methods через usePaymentMethods hook.
+  // enableBackendFetch=true — fetches from GET /api/v1/payments/payment-methods.
+  // Fallback на DEFAULT_PAYMENT_METHODS при ошибке API.
+  const { paymentMethods } = usePaymentMethods({ enableBackendFetch: true });
 
   if (!appointment) return null;
 
