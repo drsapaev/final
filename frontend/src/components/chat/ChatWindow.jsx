@@ -8,6 +8,7 @@ import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';
 import { X, Send, MessageCircle, ChevronLeft, ChevronDown, Plus, Search, Check, CheckCheck, Mic, Filter, Smile, Paperclip, Zap, AlertCircle, VolumeX, Volume2 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
+import { useTranslation } from '../../hooks/useTranslation';  // PR-72
 import auth from '../../stores/auth';
 import VoiceRecorder from './VoiceRecorder';
 import VoiceMessage from './VoiceMessage';
@@ -87,6 +88,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const [authState, setAuthState] = useState(auth.getState());
   const user = authState.profile;
   const { addToast } = useToast();
+  const { t } = useTranslation();  // PR-72
   const {
     conversations,
     messages,
@@ -334,13 +336,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
     try {
       // PR-71: prepend urgent marker if flagged
-      const messageContent = wasUrgent ? `🚨 СРОЧНО: ${content}` : content;
+      const messageContent = wasUrgent ? `${t('chatUrgentPrefix')}${content}` : content;
       await sendMessage(activeConversation, messageContent);
       sendTyping(activeConversation, false);
     } catch {
       setInputValue(content);
       if (wasUrgent) setIsUrgent(true);
-      addToast({ type: 'error', message: 'Ошибка отправки сообщения' });
+      addToast({ type: 'error', message: t('chatSendError') });
     } finally {
       setIsSending(false);
     }
@@ -426,26 +428,26 @@ const ChatWindow = ({ isOpen, onClose }) => {
     if (action === 'copy') {
       try {
         await navigator.clipboard.writeText(msg.content);
-        addToast({ type: 'success', message: 'Текст скопирован' });
+        addToast({ type: 'success', message: t('chatCopied') });
       } catch (err) {
         logger.error('Failed to copy text:', err);
       }
     } else if (action === 'delete') {
       // P-013 fix: replaced window.confirm() with shared useConfirm hook.
       const ok = await confirm({
-        title: 'Удаление сообщения',
-        message: 'Удалить это сообщение у себя?',
+        title: t('chatDeleteTitle'),
+        message: t('chatDeleteConfirm'),
         description: 'Сообщение будет удалено только из вашего просмотра. Другие участники чата по-прежнему будут его видеть.',
-        confirmLabel: 'Удалить',
-        cancelLabel: 'Отмена',
+        confirmLabel: t('chatDelete'),
+        cancelLabel: t('chatCancel'),
         intent: 'danger',
       });
       if (ok) {
         try {
           await deleteMessage(msg.id);
-          addToast({ type: 'success', message: 'Сообщение удалено' });
+          addToast({ type: 'success', message: t('chatDeleted') });
         } catch {
-          addToast({ type: 'error', message: 'Не удалось удалить сообщение' });
+          addToast({ type: 'error', message: t('chatDeleteError') });
         }
       }
     } else if (action === 'reply') {
@@ -462,9 +464,9 @@ const ChatWindow = ({ isOpen, onClose }) => {
     setIsSending(true);
     try {
       await uploadFile(activeConversation, file);
-      addToast({ type: 'success', message: 'Файл отправлен' });
+      addToast({ type: 'success', message: t('chatFileSent') });
     } catch {
-      addToast({ type: 'error', message: 'Ошибка при загрузке файла' });
+      addToast({ type: 'error', message: t('chatFileError') });
     } finally {
       setIsSending(false);
     }
@@ -585,7 +587,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
       return date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
     }
     if (diff < 172800000) {
-      return 'Вчера';
+      return t('chatYesterday');
     }
     return date.toLocaleDateString('ru', { day: 'numeric', month: 'short' });
   };
@@ -693,7 +695,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
         // PR-69 / H-8: added role="dialog" + aria-modal + Esc-to-close
         role="dialog"
         aria-modal="true"
-        aria-label="Чат"
+        aria-label={t('chatTitle')}
         className={`chat-window ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''} ${isCompactViewport ? 'compact' : ''}`}
         onPointerDown={isCompactViewport ? undefined : handleMouseDown}
         onKeyDown={(e) => { if (e.key === 'Escape' && isOpen) { onClose(); } }}
@@ -703,10 +705,10 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 <div className="chat-header">
                     <div className="chat-title-group">
                         <div className={`chat-status-indicator ${isConnected ? 'online' : 'connecting'}`}
-            title={isConnected ? 'Онлайн' : 'Подключение...'} />
+            title={isConnected ? t('chatOnline') : t('chatConnecting')} />
 
                         {(activeConversation || showNewChat) &&
-            <button onClick={handleBack} className="chat-btn-icon" title="Назад" aria-label="Назад к списку чатов">
+            <button onClick={handleBack} className="chat-btn-icon" title={t('chatBack')} aria-label={t('chatBack')}>
                                 <ChevronLeft size={20} />
                             </button>
             }
@@ -736,8 +738,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 if (showMsgSearch) setMsgSearchQuery('');
               }}
               className={`chat-btn-icon ${showMsgSearch ? 'active' : ''}`}
-              title="Поиск в переписке"
-              aria-label={showMsgSearch ? 'Скрыть поиск в переписке' : 'Открыть поиск в переписке'}>
+              title={t('chatSearch')}
+              aria-label={showMsgSearch ? t('chatSearch') : t('chatSearch')}>
 
                                 <Search size={18} />
                             </button>
@@ -754,8 +756,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                   });
                 }}
                 className="chat-btn-icon"
-                title={mutedConversations.has(activeConversation) ? 'Включить уведомления' : 'Отключить уведомления'}
-                aria-label={mutedConversations.has(activeConversation) ? 'Включить уведомления' : 'Отключить уведомления'}
+                title={mutedConversations.has(activeConversation) ? t('chatUnmute') : t('chatMute')}
+                aria-label={mutedConversations.has(activeConversation) ? t('chatUnmute') : t('chatMute')}
                 style={{ color: mutedConversations.has(activeConversation) ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}>
                 {mutedConversations.has(activeConversation) ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
@@ -763,14 +765,14 @@ const ChatWindow = ({ isOpen, onClose }) => {
                         <button
               onClick={() => setShowNewChat(true)}
               className="chat-btn-icon"
-              title="Новый чат"
-              aria-label="Создать новый чат"
+              title={t('chatNewChat')}
+              aria-label={t('chatNewChat')}
               style={{ opacity: activeConversation || showNewChat ? 0.5 : 1 }}
               disabled={activeConversation || showNewChat}>
               
                             <Plus size={18} />
                         </button>
-                        <button onClick={onClose} className="chat-btn-icon" title="Закрыть" aria-label="Закрыть чат">
+                        <button onClick={onClose} className="chat-btn-icon" title={t('chatClose')} aria-label={t('chatClose')}>
                             <X size={18} />
                         </button>
                     </div>
@@ -916,9 +918,9 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                             <div className="conv-top-row">
                                                 {/* PR-69 / H-2: conversation preview with message-type indicators */}
                                                 <div className="conv-preview">
-                                                  {conv.last_message?.startsWith('data:image/') || conv.last_message?.match(/\.(jpg|jpeg|png|gif|webp)/i) ? '📷 Фото'
-                                                  : conv.last_message?.startsWith('data:audio/') || conv.last_message?.includes('voice') ? '🎤 Голосовое сообщение'
-                                                  : conv.last_message?.startsWith('/api/') || conv.last_message?.includes('file') ? '📎 Файл'
+                                                  {conv.last_message?.startsWith('data:image/') || conv.last_message?.match(/\.(jpg|jpeg|png|gif|webp)/i) ? t('chatPhoto')
+                                                  : conv.last_message?.startsWith('data:audio/') || conv.last_message?.includes('voice') ? t('chatVoice')
+                                                  : conv.last_message?.startsWith('/api/') || conv.last_message?.includes('file') ? t('chatFile')
                                                   : conv.last_message || ''}
                                                 </div>
                                                 {conv.unread_count > 0 &&
@@ -1314,8 +1316,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                         <button
                   onClick={() => setShowQuickReplies((v) => !v)}
                   className="voice-btn"
-                  title="Быстрые ответы"
-                  aria-label="Быстрые ответы"
+                  title={t('chatQuickReplies')}
+                  aria-label={t('chatQuickReplies')}
                   disabled={isSending}>
                   <Zap size={16} />
                 </button>
@@ -1331,8 +1333,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                         <button
                   onClick={() => setIsUrgent((v) => !v)}
                   className="voice-btn"
-                  title={isUrgent ? 'Снять срочность' : 'Пометить как срочное'}
-                  aria-label={isUrgent ? 'Снять срочность' : 'Пометить как срочное'}
+                  title={isUrgent ? t('chatUrgentRemove') : t('chatUrgent')}
+                  aria-label={isUrgent ? t('chatUrgentRemove') : t('chatUrgent')}
                   style={{ color: isUrgent ? 'var(--mac-error, #dc2626)' : 'var(--mac-text-secondary)' }}
                   disabled={isSending}>
                   <AlertCircle size={16} />
@@ -1341,8 +1343,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                         <button
                   onClick={() => setShowVoiceRecorder(true)}
                   className="voice-btn"
-                  title="Голосовое сообщение"
-                  aria-label="Записать голосовое сообщение"
+                  title={t('chatVoiceMessage')}
+                  aria-label={t('chatVoiceMessage')}
                   disabled={isSending}>
 
                                             <Mic size={18} />
@@ -1351,8 +1353,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                   onClick={handleSend}
                   disabled={!inputValue.trim() || isSending}
                   className="send-btn"
-                  title="Отправить"
-                  aria-label="Отправить сообщение">
+                  title={t('chatSend')}
+                  aria-label={t('chatSend')}>
                   
                                             <Send size={16} />
                                         </button>
