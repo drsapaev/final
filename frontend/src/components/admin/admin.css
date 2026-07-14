@@ -12581,6 +12581,7 @@ button[class*="admin-btn"]:active:not(:disabled) {
 .admin-stat-error { --admin-stat-color: var(--mac-error); }
 .admin-stat-info { --admin-stat-color: var(--mac-info); }
 .admin-stat-accent { --admin-stat-color: var(--mac-accent); }
+.admin-stat-destructive { --admin-stat-color: var(--mac-destructive); }
 
 /* ─── Phase 3: ActivationSystem extend dialog ─── */
 /* Replaces 3 static inline style blocks in the extend activation dialog. */

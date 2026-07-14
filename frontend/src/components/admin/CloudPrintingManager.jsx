@@ -327,23 +327,23 @@ const CloudPrintingManager = () => {
         {statistics &&
     <div className="admin-grid-auto-200-mb-24-printing">
           <MacOSCard className="p-6">
-            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>{statistics.total_printers}</div>
+            <div className="admin-stat-num-2xl-bold-dynamic admin-stat-accent">{statistics.total_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">Всего принтеров</div>
           </MacOSCard>
           <MacOSCard className="p-6">
-            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-success)' }}>{statistics.online_printers}</div>
+            <div className="admin-stat-num-2xl-bold-dynamic admin-stat-success">{statistics.online_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">В сети</div>
           </MacOSCard>
           <MacOSCard className="p-6">
-            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-destructive)' }}>{statistics.offline_printers}</div>
+            <div className="admin-stat-num-2xl-bold-dynamic admin-stat-destructive">{statistics.offline_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">Не в сети</div>
           </MacOSCard>
           <MacOSCard className="p-6">
-            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-warning)' }}>{statistics.providers_count}</div>
+            <div className="admin-stat-num-2xl-bold-dynamic admin-stat-warning">{statistics.providers_count}</div>
             <div className="admin-stat-label-sm-secondary-block">Провайдеров</div>
           </MacOSCard>
           <MacOSCard className="p-6">
-            <div className="admin-stat-num-2xl-bold-dynamic" style={{ '--admin-stat-color': 'var(--mac-accent)' }}>{localPrinters.length}</div>
+            <div className="admin-stat-num-2xl-bold-dynamic admin-stat-accent">{localPrinters.length}</div>
             <div className="admin-stat-label-sm-secondary-block">Локальных ОС-принтеров</div>
           </MacOSCard>
         </div>
