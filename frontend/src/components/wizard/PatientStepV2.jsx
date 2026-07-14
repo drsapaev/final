@@ -15,6 +15,8 @@ import { Input,
   Checkbox } from '../ui/macos';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
+// UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
+import './PatientStepV2.css';
 
 const PatientStepV2 = ({
   data = {}, // ✅ Default empty object to prevent crash
@@ -38,37 +40,15 @@ const PatientStepV2 = ({
   const selectedGender = normalizeGenderForForm(safeData.gender);
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 'var(--mac-spacing-6)',
-      animation: 'slideIn 0.3s ease-out',
-      height: '100%',
-      overflowY: 'auto',
-      paddingRight: '4px',
-      padding: '12px 0' // 12px vertical padding
-    }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 'var(--mac-spacing-5)',
-        alignItems: 'start'
-      }}>
+    // UX Audit R-3.3: main container inline style → .patient-step-v2 class
+    <div className="patient-step-v2">
+      <div className="patient-step-v2__form-grid">
         {/* ФИО с поиском */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--mac-spacing-2)',
-          position: 'relative'
-        }}>
-          <label style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)'
-          }}>
+        <div className="patient-step-v2__field">
+          <label className="patient-step-v2__label">
             ФИО пациента *
           </label>
-          <div style={{ position: 'relative' }}>
+          <div className="patient-step-v2__field-relative">
             <Input
               ref={fioRef}
               type="text"

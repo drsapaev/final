@@ -1,0 +1,92 @@
+/**
+ * PatientStepV2 Styles
+ *
+ * UX Audit R-3.3: migrated largest inline style blocks to CSS classes.
+ * Smaller one-off styles remain inline (will be migrated incrementally).
+ *
+ * All classes use macOS design system tokens (var(--mac-*)).
+ */
+
+/* Main container — flex column with scroll */
+.patient-step-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-6);
+  animation: slideIn 0.3s ease-out;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 4px;
+  padding: 12px 0;
+}
+
+/* Top grid — 2 columns for form fields */
+.patient-step-v2__form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mac-spacing-5);
+  align-items: start;
+}
+
+/* Form field wrapper */
+.patient-step-v2__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+  position: relative;
+}
+
+/* Field label */
+.patient-step-v2__label {
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+  color: var(--mac-text-primary);
+}
+
+/* Field with relative positioning (for dropdowns) */
+.patient-step-v2__field-relative {
+  position: relative;
+}
+
+/* Search status indicator dot — existing patient */
+.patient-step-v2__status-dot--existing {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mac-primary, var(--mac-accent-blue, #007aff));
+}
+
+/* Search status indicator dot — new patient */
+.patient-step-v2__status-dot--new {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mac-success, #34c759);
+}
+
+/* Search status text — existing */
+.patient-step-v2__status-text--existing {
+  color: var(--mac-primary, var(--mac-accent-blue, #007aff));
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* Search status text — new */
+.patient-step-v2__status-text--new {
+  color: var(--mac-success, #34c759);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* Error message */
+.patient-step-v2__error {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-danger, #ff453a);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+}
+
+/* Responsive: single column on narrow screens */
+@media (max-width: 768px) {
+  .patient-step-v2__form-grid {
+    grid-template-columns: 1fr;
+  }
+}
