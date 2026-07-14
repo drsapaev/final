@@ -1971,7 +1971,26 @@ const EnhancedAppointmentsTable = ({
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
                   }}>
+                      {/* UX Audit R-4.4: показываем visit status + payment status.
+                          Раньше: 15 статусов в одной колонке, включая paid_pending/payment_paid.
+                          Теперь: visit status (основной) + payment badge (если есть). */}
                       {renderStatus(row.status)}
+                      {row.payment_status && row.payment_status !== 'paid' && (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          marginTop: '2px',
+                          padding: '1px 4px',
+                          borderRadius: 'var(--mac-radius-sm)',
+                          backgroundColor: 'var(--mac-accent-orange-soft, rgba(255, 149, 0, 0.12))',
+                          color: 'var(--mac-accent-orange, #ff9500)',
+                          fontSize: '9px',
+                          fontWeight: 'var(--mac-font-weight-medium)',
+                        }}>
+                          💰 {row.payment_status === 'paid_pending' ? 'Ожидает оплаты' : row.payment_status}
+                        </div>
+                      )}
                     </td>
 
 
