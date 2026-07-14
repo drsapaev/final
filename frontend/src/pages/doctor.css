@@ -345,3 +345,42 @@
   background: color-mix(in srgb, var(--mac-accent-orange), transparent 94%);
   border-left: 3px solid var(--mac-accent-orange);
 }
+
+/* ─── Phase 3: table cell styles (replaces thStyle/tdStyle constants) ─── */
+.doctor-th {
+  padding: var(--mac-spacing-md);
+  text-align: left;
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+  border-bottom: 1px solid var(--mac-separator);
+}
+
+.doctor-td {
+  padding: var(--mac-spacing-md);
+  border-bottom: 1px solid color-mix(in srgb, var(--mac-separator), transparent 30%);
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Phase 3: queue timestamp display (replaces 4 inline style blocks) ─── */
+.doctor-queue-time {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary);
+}
+
+.doctor-queue-time-label {
+  font-weight: var(--mac-font-weight-semibold);
+  margin-bottom: 2px;
+}
+
+.doctor-queue-time-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.doctor-queue-time-changed {
+  margin-top: 2px;
+  color: var(--mac-text-tertiary);
+}
