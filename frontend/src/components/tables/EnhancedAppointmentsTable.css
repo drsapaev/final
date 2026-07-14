@@ -225,3 +225,100 @@
 .dark-theme .action-button:hover {
   background-color: color-mix(in oklab, var(--mac-accent-blue), transparent 70%);
 }
+
+/* ─── UX Audit R-3.3: action button + table cell patterns ─── */
+
+/* Standard table cell padding (used 5+ times in JSX) */
+.table-cell-padded {
+  padding: 12px 8px;
+}
+
+/* Status badge (used in renderStatus) */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+  padding: var(--mac-spacing-1) var(--mac-spacing-2);
+  border-radius: var(--mac-radius-sm);
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-medium);
+  cursor: help;
+}
+
+/* Action button base (10+ usages in JSX with className="action-button") */
+.action-button {
+  padding: var(--mac-spacing-1) var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-medium);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+  transition: all 0.15s ease;
+}
+
+.action-button:hover:not(:disabled) {
+  background: var(--mac-bg-secondary);
+  border-color: var(--mac-accent-blue);
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Action button variants */
+.action-button--success {
+  background: var(--mac-success);
+  color: white;
+  border-color: var(--mac-success);
+}
+
+.action-button--success:hover:not(:disabled) {
+  filter: brightness(0.95);
+  background: var(--mac-success);
+}
+
+.action-button--danger {
+  background: var(--mac-danger);
+  color: white;
+  border-color: var(--mac-danger);
+}
+
+.action-button--danger:hover:not(:disabled) {
+  filter: brightness(0.95);
+  background: var(--mac-danger);
+}
+
+.action-button--warning {
+  background: var(--mac-accent-orange, #ff9500);
+  color: white;
+  border-color: var(--mac-accent-orange, #ff9500);
+}
+
+.action-button--warning:hover:not(:disabled) {
+  filter: brightness(0.95);
+  background: var(--mac-accent-orange, #ff9500);
+}
+
+.action-button--ghost {
+  background: transparent;
+  color: var(--mac-accent-blue);
+  border-color: transparent;
+}
+
+.action-button--ghost:hover:not(:disabled) {
+  background: var(--mac-bg-tertiary);
+}
+
+/* Row actions container */
+.row-actions {
+  display: flex;
+  gap: var(--mac-spacing-1);
+  flex-wrap: wrap;
+  align-items: center;
+}
