@@ -345,6 +345,32 @@ const AdminAppointments = () => {
           </div>
         )}
 
+        {/* UX Audit Admin #2.7: quick filter chips для частых статусов. */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+          {[
+            { value: 'completed', label: 'Завершённые' },
+            { value: 'cancelled', label: 'Отменённые' },
+            { value: 'pending', label: 'Ожидают оплаты' },
+          ].map((chip) => (
+            <button
+              key={chip.value}
+              type="button"
+              onClick={() => setFilterStatus(filterStatus === chip.value ? '' : chip.value)}
+              style={{
+                padding: '4px 12px',
+                borderRadius: '16px',
+                border: `1px solid ${filterStatus === chip.value ? 'var(--mac-accent-blue, #007aff)' : 'var(--mac-border, #d8dde8)'}`,
+                background: filterStatus === chip.value ? 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 88%)' : 'transparent',
+                color: filterStatus === chip.value ? 'var(--mac-accent-blue, #007aff)' : 'var(--mac-text-secondary, #6b7280)',
+                fontSize: '13px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}>
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
         <div className="admin-ovx-auto">
           {loading ? (
             <Skeleton type="table" count={5} />
