@@ -11,6 +11,13 @@
  * 2. (future PR) Add usePaymentMethods() hook that fetches from API
  * 3. (future PR) Backend endpoint returns { value, label_key, icon_name }
  *    and frontend maps icon_name to lucide component
+ *
+ * FIX (paymentMethods-jsx): ранее этот .js-файл содержал JSX-элементы
+ * (<CreditCard size={16} />), что ломало Vite production-build (rollup
+ * не парсит JSX в .js-файлах). Теперь config хранит сам lucide-компонент
+ * (CreditCard), а не React-элемент. Потребитель рендерит его как
+ * <Icon size={16} /> — это идиоматичный React-паттерн и устраняет JSX
+ * из .js-файла.
  */
 
 import { CreditCard, Banknote, ArrowLeftRight, Globe } from 'lucide-react';
@@ -27,25 +34,27 @@ export const DEFAULT_PAYMENT_METHODS = [
     value: 'Карта',
     label: 'Банковская карта',
     iconKey: 'card',
-    icon: <CreditCard size={16} />,
+    // FIX: храним компонент (CreditCard), а не React-элемент (<CreditCard />).
+    // Потребитель рендерит: <method.Icon size={16} />.
+    Icon: CreditCard,
   },
   {
     value: 'Наличные',
     label: 'Наличные',
     iconKey: 'cash',
-    icon: <Banknote size={16} />,
+    Icon: Banknote,
   },
   {
     value: 'Перевод',
     label: 'Банковский перевод',
     iconKey: 'transfer',
-    icon: <ArrowLeftRight size={16} />,
+    Icon: ArrowLeftRight,
   },
   {
     value: 'Онлайн',
     label: 'Онлайн платеж',
     iconKey: 'online',
-    icon: <Globe size={16} />,
+    Icon: Globe,
   },
 ];
 
@@ -62,7 +71,7 @@ export function getPaymentMethodIcon(iconKey) {
 /**
  * Map backend payment method response to frontend format.
  * @param {Array} backendMethods - [{ value, label_key, icon_name }]
- * @returns {Array} [{ value, label, icon, iconKey }]
+ * @returns {Array} [{ value, label, Icon, iconKey }]
  */
 export function mapBackendPaymentMethods(backendMethods) {
   if (!Array.isArray(backendMethods)) return DEFAULT_PAYMENT_METHODS;
@@ -72,7 +81,8 @@ export function mapBackendPaymentMethods(backendMethods) {
       value: method.value,
       label: method.label || method.label_key,
       iconKey: method.icon_name || method.iconKey,
-      icon: <IconComponent size={16} />,
+      // FIX: храним компонент, не React-элемент.
+      Icon: IconComponent,
     };
   });
 }
