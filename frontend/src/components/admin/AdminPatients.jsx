@@ -214,13 +214,22 @@ const AdminPatients = () => {
             size="large"
             aria-label="Фильтр по возрасту"
           />
-          <Select
-            value={filterBloodType}
-            onChange={setFilterBloodType}
-            options={bloodTypeOptions}
-            size="large"
-            aria-label="Фильтр по группе крови"
-          />
+          {/* UX Audit Admin #2.9: blood type filter перемещён в раскрытие.
+              Редкий фильтр не должен занимать 25% фильтр-грида. */}
+          <details style={{ marginTop: '4px' }}>
+            <summary style={{ cursor: 'pointer', fontSize: '13px', color: 'var(--mac-accent-blue, #007aff)', userSelect: 'none' }}>
+              Расширенные фильтры {filterBloodType ? `(${filterBloodType})` : ''}
+            </summary>
+            <div style={{ marginTop: '8px' }}>
+              <Select
+                value={filterBloodType}
+                onChange={setFilterBloodType}
+                options={bloodTypeOptions}
+                size="large"
+                aria-label="Фильтр по группе крови"
+              />
+            </div>
+          </details>
         </div>
 
         {/* UX Audit Admin #1.1: кнопка «Сбросить» для быстрой очистки фильтров. */}
