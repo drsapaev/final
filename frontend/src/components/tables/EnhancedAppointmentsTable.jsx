@@ -1153,7 +1153,7 @@ const EnhancedAppointmentsTable = ({
     padding: '60px',
     color: 'var(--mac-text-secondary)'
   }}>
-      <div style={{ textAlign: 'center' }}>
+      <div className="eat-td">
         <div
         className="loading-spinner"
         style={{
@@ -1193,14 +1193,14 @@ const EnhancedAppointmentsTable = ({
           minWidth: 0
         }}>
           {/* Поиск */}
-          <div style={{ position: 'relative', minWidth: '200px', maxWidth: '300px', flex: '1 1 auto' }}>
+          <div className="eat-search-input-wrap">
             <Input
               type="text"
               placeholder={t.search}
               value={filterConfig.search}
               onChange={(e) => setFilterConfig((prev) => ({ ...prev, search: e.target.value }))}
               icon={Search}
-              style={{ width: '100%' }} />
+              className="eat-search-input" />
 
           </div>
 
@@ -1219,7 +1219,7 @@ const EnhancedAppointmentsTable = ({
             { value: 'paid_pending', label: t.paid_pending },
             { value: 'paid', label: t.paid }]
             }
-            style={{ minWidth: '120px', maxWidth: '150px', flex: '0 0 auto' }} />
+            className="eat-filter-select" />
 
 
           {/* Экспорт */}
@@ -1240,7 +1240,7 @@ const EnhancedAppointmentsTable = ({
 
           {/* Информация о выбранных */}
           {showCheckboxes && selectedRows.size > 0 &&
-          <Badge variant="info" style={{ flex: '0 0 auto' }}>
+          <Badge variant="info">
               {t.selected}: {selectedRows.size}
             </Badge>
           }
@@ -1259,7 +1259,7 @@ const EnhancedAppointmentsTable = ({
         zIndex: 1
       }}>
         <div className="admin-table-wrapper">
-<table style={{
+<table className="eat-table-container" style={{
           width: '100%',
           borderCollapse: 'collapse',
           tableLayout: 'auto',
@@ -1273,7 +1273,7 @@ const EnhancedAppointmentsTable = ({
             <tr>
               {/* Чекбокс для выбора всех */}
               {showCheckboxes &&
-              <th style={{
+              <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'left',
                 borderBottom: '1px solid var(--mac-border)',
@@ -1283,7 +1283,7 @@ const EnhancedAppointmentsTable = ({
               aria-label={t.selectAll}>
                   <Checkbox aria-label={t.selectAll} checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
                   onChange={(e) => handleSelectAll(e.target.checked)}
-                  style={{ cursor: 'pointer' }} />
+                  />
 
                 </th>
               }
@@ -1336,7 +1336,7 @@ const EnhancedAppointmentsTable = ({
 
               {/* Телефон - скрыт для doctor view */}
               {!isDoctorView &&
-              <th style={{
+              <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'left',
                 borderBottom: '1px solid var(--mac-border)',
@@ -1374,7 +1374,7 @@ const EnhancedAppointmentsTable = ({
 
               {/* Адрес - скрыт для doctor view */}
               {!isDoctorView &&
-              <th style={{
+              <th className="eat-th hide-on-mobile" style={{
                 padding: '12px 8px',
                 textAlign: 'left',
                 borderBottom: '1px solid var(--mac-border)',
@@ -1382,15 +1382,14 @@ const EnhancedAppointmentsTable = ({
                 fontWeight: 'var(--mac-font-weight-semibold)',
                 fontSize: 'var(--mac-font-size-base)',
                 minWidth: '140px'
-              }}
-              className="hide-on-mobile">
+              }}>
 
                   {t.address}
                 </th>
               }
 
               {/* Тип обращения */}
-              <th style={{
+              <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'center',
                 borderBottom: '1px solid var(--mac-border)',
@@ -1404,7 +1403,7 @@ const EnhancedAppointmentsTable = ({
               </th>
 
               {/* Услуги */}
-              <th style={{
+              <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'left',
                 borderBottom: '1px solid var(--mac-border)',
@@ -1418,7 +1417,7 @@ const EnhancedAppointmentsTable = ({
               </th>
 
               {/* Вид оплаты */}
-              <th style={{
+              <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'center',
                 borderBottom: '1px solid var(--mac-border)',
@@ -1502,7 +1501,7 @@ const EnhancedAppointmentsTable = ({
               </th>
 
               {/* Действия */}
-              <th style={{
+              <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'center',
                 borderBottom: '1px solid var(--mac-border)',
@@ -1602,13 +1601,13 @@ const EnhancedAppointmentsTable = ({
                         e.stopPropagation();
                         handleRowSelect(row.id, e.target.checked);
                       }}
-                      style={{ cursor: 'pointer' }} />
+                      />
 
                       </td>
                   }
 
                     {/* Номер */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
                     color: 'var(--mac-text-secondary)',
@@ -1618,7 +1617,7 @@ const EnhancedAppointmentsTable = ({
                     </td>
 
                     {/* Пациент */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     color: 'var(--mac-text-primary)',
                     fontSize: 'var(--mac-font-size-base)',
@@ -1682,7 +1681,7 @@ const EnhancedAppointmentsTable = ({
 
                     {/* Телефон - скрыт для doctor view */}
                     {!isDoctorView &&
-                  <td style={{
+                  <td className="eat-td" style={{
                     padding: '12px 8px',
                     color: 'var(--mac-text-primary)',
                     fontSize: 'var(--mac-font-size-base)',
@@ -1696,14 +1695,14 @@ const EnhancedAppointmentsTable = ({
                       alignItems: 'center',
                       gap: 'var(--mac-spacing-2)'
                     }}>
-                          <Phone size={18} style={{ color: 'var(--mac-accent-blue)', fontWeight: 'var(--mac-font-weight-bold)', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
+                          <Phone size={18} className="eat-phone-icon" />
                           {formatPhoneNumber(row.patient_phone)}
                         </div>
                       </td>
                   }
 
                     {/* Год рождения */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
                     color: 'var(--mac-text-primary)',
@@ -1717,7 +1716,7 @@ const EnhancedAppointmentsTable = ({
 
                     {/* Адрес - скрыт для doctor view */}
                     {!isDoctorView &&
-                  <td style={{
+                  <td className="eat-td hide-on-mobile" style={{
                     padding: '12px 8px',
                     color: 'var(--mac-text-primary)',
                     fontSize: 'var(--mac-font-size-base)',
@@ -1727,7 +1726,6 @@ const EnhancedAppointmentsTable = ({
                     whiteSpace: 'normal',
                     lineHeight: '1.4'
                   }}
-                  className="hide-on-mobile"
                   title={row.address}>
 
                         {row.address ?
@@ -1757,7 +1755,7 @@ const EnhancedAppointmentsTable = ({
                   }
 
                     {/* Тип обращения */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
                     minWidth: '80px'
@@ -1777,7 +1775,7 @@ const EnhancedAppointmentsTable = ({
                     </td>
 
                     {/* Услуги */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     minWidth: '180px'
                   }}>
@@ -1807,7 +1805,7 @@ const EnhancedAppointmentsTable = ({
                     </td>
 
                     {/* Вид оплаты */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
                     minWidth: '100px'
@@ -1844,7 +1842,7 @@ const EnhancedAppointmentsTable = ({
 
                     {/* P1 fix: Lab results badge — shows if lab results are ready */}
                     {row.latest_lab_report && (
-                      <td style={{
+                      <td className="eat-td" style={{
                         padding: '12px 8px',
                         textAlign: 'center',
                         fontSize: '12px',
@@ -1876,7 +1874,7 @@ const EnhancedAppointmentsTable = ({
                     )}
 
                     {/* Дата и время регистрации */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
                     color: 'var(--mac-text-primary)',
@@ -1963,7 +1961,7 @@ const EnhancedAppointmentsTable = ({
                     </td>
 
                     {/* Статус */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
                     minWidth: '80px',
@@ -1995,7 +1993,7 @@ const EnhancedAppointmentsTable = ({
 
 
                     {/* Стоимость */}
-                    <td style={{
+                    <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'right',
                     color: (() => {
