@@ -32,6 +32,8 @@ export const ChatProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
   const [isChatOpen, setIsChatOpen] = useState(false); // Track if chat window is open
+  // PR-71: muted conversations (client-side, no sound/notification for these)
+  const [mutedConversations, setMutedConversations] = useState(new Set());
   const [onlineUsers, setOnlineUsers] = useState({}); // Track online status of users
 
   const wsRef = useRef(null);
@@ -207,7 +209,9 @@ export const ChatProvider = ({ children }) => {
       // 1. Tab is not focused (user is in another tab/window)
       // 2. OR the chat window is closed
       // 3. Never play sound if actively viewing that conversation
-      const shouldPlaySound = !document.hasFocus() || !isChatOpen;
+      // PR-71: skip sound if conversation is muted
+      const isMuted = mutedConversations.has(message.sender_id);
+      const shouldPlaySound = (!document.hasFocus() || !isChatOpen) && !isMuted;
 
       if (shouldPlaySound) {
         try {
@@ -637,6 +641,9 @@ export const ChatProvider = ({ children }) => {
     typingUsers,
     isChatOpen,
     setIsChatOpen,
+    // PR-71: muted conversations
+    mutedConversations,
+    setMutedConversations,
     onlineUsers,
     requestOnlineStatus,
     loadConversations,
