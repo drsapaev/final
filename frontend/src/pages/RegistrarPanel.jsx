@@ -1348,7 +1348,16 @@ const RegistrarPanel = () => {
           // R-24 fix: санитизация tel: URL — оставляем только digits и +.
           // Предотвращает injection через специальные символы в phone field.
           const sanitizedPhone = String(row.patient_phone).replace(/[^\d+]/g, '');
-          window.open(`tel:${sanitizedPhone}`);
+          // UX Audit R-2.5: используем нативный <a> anchor вместо window.open().
+          // window.open() может блокироваться браузером как pop-up, т.к. этот
+          // handler вызывается не из прямого user-gesture (через context menu).
+          // Нативный anchor — стандартный паттерн для tel: ссылок.
+          const link = document.createElement('a');
+          link.href = `tel:${sanitizedPhone}`;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         }
         break;
       case 'force_majeure':
