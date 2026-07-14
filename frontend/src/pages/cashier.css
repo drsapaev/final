@@ -393,3 +393,23 @@
     flex: 1 1 auto;
   }
 }
+
+/* ─── Page header (UX Audit #3.5) ─── */
+.cashier-page-header {
+  padding: 16px 4px 8px;
+  border-bottom: 1px solid var(--mac-separator, #e5e7eb);
+}
+
+.cashier-page-title {
+  margin: 0 0 4px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--mac-text-primary, #1a1d29);
+  letter-spacing: -0.01em;
+}
+
+.cashier-page-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mac-text-secondary, #6b7280);
+}
