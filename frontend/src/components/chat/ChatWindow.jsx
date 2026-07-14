@@ -134,6 +134,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
+  // PR-69 / H-3: reply state for quote block
+  const [replyTo, setReplyTo] = useState(null); // { id, content, sender_name }
 
   // Search & Filter State
   const [convSearchQuery, setConvSearchQuery] = useState('');
@@ -410,11 +412,12 @@ const ChatWindow = ({ isOpen, onClose }) => {
         }
       }
     } else if (action === 'reply') {
-      setInputValue(`@${msg.sender_name || 'Сотрудник'}, `);
+      // PR-69 / H-3: real reply — set replyTo state for quote block display
+      setReplyTo({ id: msg.id, content: msg.content, sender_name: msg.sender_name });
+      setInputValue('');
       inputRef.current?.focus();
-    } else if (action === 'forward') {
-      addToast({ type: 'info', message: 'Функция пересылки в разработке' });
     }
+    // PR-69 / H-4: removed 'forward' stub (was showing 'в разработке' toast)
   };
 
   const handleFileUpload = async (file) => {
@@ -635,8 +638,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const chatWindowElement = ReactDOM.createPortal(
     <div className="chat-window-overlay" style={{ pointerEvents: 'none', background: 'transparent' }}>
             <div
+        // PR-69 / H-8: added role="dialog" + aria-modal + Esc-to-close
+        role="dialog"
+        aria-modal="true"
+        aria-label="Чат"
         className={`chat-window ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''} ${isCompactViewport ? 'compact' : ''}`}
         onPointerDown={isCompactViewport ? undefined : handleMouseDown}
+        onKeyDown={(e) => { if (e.key === 'Escape' && isOpen) { onClose(); } }}
         style={chatWindowStyle}>
         
                 {/* Header */}
@@ -836,7 +844,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                 </span>
                                             </div>
                                             <div className="conv-top-row">
-                                                <div className="conv-preview">{conv.last_message}</div>
+                                                {/* PR-69 / H-2: conversation preview with message-type indicators */}
+                                                <div className="conv-preview">
+                                                  {conv.last_message?.startsWith('data:image/') || conv.last_message?.match(/\.(jpg|jpeg|png|gif|webp)/i) ? '📷 Фото'
+                                                  : conv.last_message?.startsWith('data:audio/') || conv.last_message?.includes('voice') ? '🎤 Голосовое сообщение'
+                                                  : conv.last_message?.startsWith('/api/') || conv.last_message?.includes('file') ? '📎 Файл'
+                                                  : conv.last_message || ''}
+                                                </div>
                                                 {conv.unread_count > 0 &&
                   <span className="unread-badge">
                                                         {conv.unread_count > 99 ? '99+' : conv.unread_count}
