@@ -6,7 +6,7 @@ import { api } from '../../api/client';
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';
-import { X, Send, MessageCircle, ChevronLeft, ChevronDown, Plus, Search, Check, CheckCheck, Mic, Filter, Smile, Paperclip } from 'lucide-react';
+import { X, Send, MessageCircle, ChevronLeft, ChevronDown, Plus, Search, Check, CheckCheck, Mic, Filter, Smile, Paperclip, Zap, AlertCircle, VolumeX, Volume2 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import auth from '../../stores/auth';
 import VoiceRecorder from './VoiceRecorder';
@@ -106,6 +106,9 @@ const ChatWindow = ({ isOpen, onClose }) => {
     sendTyping,
     searchUsers,
     closeConversation,
+    // PR-71: muted conversations from context
+    mutedConversations,
+    setMutedConversations,
 
     toggleReaction,
     deleteMessage,
@@ -142,6 +145,21 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const [convFilter, setConvFilter] = useState('all'); // 'all' | 'unread'
   const [showMsgSearch, setShowMsgSearch] = useState(false);
   const [msgSearchQuery, setMsgSearchQuery] = useState('');
+  // PR-71: new features — draft persistence, urgent flag
+  const [drafts, setDrafts] = useState({}); // { [conversationId]: text }
+  // mutedConversations comes from ChatContext now (for sound suppression)
+  const [isUrgent, setIsUrgent] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+
+  // PR-71: quick-reply templates for clinic workflow
+  const quickReplies = [
+    'Пациент готов',
+    'Подойдите в регистратуру',
+    'Подойдите в кабинет 3',
+    'Вызовите следующего пациента',
+    'Перерыв на обед',
+    'Телефонный звонок от МЗ',
+  ];
 
   // Список всех пользователей для отображения по дефолту
   const [allUsers, setAllUsers] = useState([]);
@@ -308,13 +326,20 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
     const content = inputValue.trim();
     setInputValue('');
+    // PR-71: clear draft on send
+    setDrafts((prev) => { const next = { ...prev }; delete next[activeConversation]; return next; });
     setIsSending(true);
+    const wasUrgent = isUrgent;
+    setIsUrgent(false);
 
     try {
-      await sendMessage(activeConversation, content);
+      // PR-71: prepend urgent marker if flagged
+      const messageContent = wasUrgent ? `🚨 СРОЧНО: ${content}` : content;
+      await sendMessage(activeConversation, messageContent);
       sendTyping(activeConversation, false);
     } catch {
       setInputValue(content);
+      if (wasUrgent) setIsUrgent(true);
       addToast({ type: 'error', message: 'Ошибка отправки сообщения' });
     } finally {
       setIsSending(false);
@@ -541,7 +566,12 @@ const ChatWindow = ({ isOpen, onClose }) => {
       setSearchQuery('');
       setSearchResults([]);
     } else {
+      // PR-71: save draft before closing conversation
+      if (activeConversation && inputValue) {
+        setDrafts((prev) => ({ ...prev, [activeConversation]: inputValue }));
+      }
       closeConversation();
+      setInputValue('');
     }
   };
 
@@ -577,6 +607,16 @@ const ChatWindow = ({ isOpen, onClose }) => {
   });
 
   const isCompactViewport = viewport.width <= COMPACT_CHAT_BREAKPOINT;
+
+  // PR-71: restore draft when switching to a conversation
+  useEffect(() => {
+    if (activeConversation && drafts[activeConversation]) {
+      setInputValue(drafts[activeConversation]);
+    } else if (activeConversation) {
+      setInputValue('');
+    }
+    setIsUrgent(false); // reset urgent flag on conversation switch
+  }, [activeConversation]);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -698,10 +738,28 @@ const ChatWindow = ({ isOpen, onClose }) => {
               className={`chat-btn-icon ${showMsgSearch ? 'active' : ''}`}
               title="Поиск в переписке"
               aria-label={showMsgSearch ? 'Скрыть поиск в переписке' : 'Открыть поиск в переписке'}>
-              
+
                                 <Search size={18} />
                             </button>
             }
+            {/* PR-71: Mute conversation toggle */}
+            {activeConversation && (
+              <button
+                onClick={() => {
+                  setMutedConversations((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(activeConversation)) next.delete(activeConversation);
+                    else next.add(activeConversation);
+                    return next;
+                  });
+                }}
+                className="chat-btn-icon"
+                title={mutedConversations.has(activeConversation) ? 'Включить уведомления' : 'Отключить уведомления'}
+                aria-label={mutedConversations.has(activeConversation) ? 'Включить уведомления' : 'Отключить уведомления'}
+                style={{ color: mutedConversations.has(activeConversation) ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}>
+                {mutedConversations.has(activeConversation) ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
+            )}
                         <button
               onClick={() => setShowNewChat(true)}
               className="chat-btn-icon"
@@ -1182,6 +1240,47 @@ const ChatWindow = ({ isOpen, onClose }) => {
                             </div>
 
                             <div className="message-input-container">
+                                {/* PR-71: Quick-reply templates popover */}
+                                {showQuickReplies && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    bottom: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    background: 'var(--mac-bg-primary)',
+                                    border: '1px solid var(--mac-border)',
+                                    borderRadius: 'var(--mac-radius-md)',
+                                    padding: '8px',
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '4px',
+                                    zIndex: 10,
+                                    boxShadow: 'var(--mac-shadow-md)',
+                                  }}>
+                                    {quickReplies.map((reply) => (
+                                      <button
+                                        key={reply}
+                                        onClick={() => {
+                                          setInputValue(reply);
+                                          setShowQuickReplies(false);
+                                          inputRef.current?.focus();
+                                        }}
+                                        style={{
+                                          padding: '6px 10px',
+                                          textAlign: 'left',
+                                          background: 'var(--mac-bg-secondary)',
+                                          border: 'none',
+                                          borderRadius: 'var(--mac-radius-sm)',
+                                          cursor: 'pointer',
+                                          fontSize: 'var(--mac-font-size-sm)',
+                                          color: 'var(--mac-text-primary)',
+                                        }}
+                                      >
+                                        {reply}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                                 {showVoiceRecorder ?
               <VoiceRecorder
                 onSend={handleSendVoice}
@@ -1210,21 +1309,42 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                         <FileUploader
                   onUpload={handleFileUpload}
                   disabled={isSending} />
-                
+
+                                        {/* PR-71: Quick-reply templates */}
+                                        <button
+                  onClick={() => setShowQuickReplies((v) => !v)}
+                  className="voice-btn"
+                  title="Быстрые ответы"
+                  aria-label="Быстрые ответы"
+                  disabled={isSending}>
+                  <Zap size={16} />
+                </button>
+
                                         <EmojiPicker
                   onEmojiSelect={(emoji) => {
                     setInputValue((prev) => prev + emoji);
                     inputRef.current?.focus();
                   }}
                   disabled={isSending} />
-                
+
+                                        {/* PR-71: Urgent flag toggle */}
+                                        <button
+                  onClick={() => setIsUrgent((v) => !v)}
+                  className="voice-btn"
+                  title={isUrgent ? 'Снять срочность' : 'Пометить как срочное'}
+                  aria-label={isUrgent ? 'Снять срочность' : 'Пометить как срочное'}
+                  style={{ color: isUrgent ? 'var(--mac-error, #dc2626)' : 'var(--mac-text-secondary)' }}
+                  disabled={isSending}>
+                  <AlertCircle size={16} />
+                </button>
+
                                         <button
                   onClick={() => setShowVoiceRecorder(true)}
                   className="voice-btn"
                   title="Голосовое сообщение"
                   aria-label="Записать голосовое сообщение"
                   disabled={isSending}>
-                  
+
                                             <Mic size={18} />
                                         </button>
                                         <button
