@@ -25,6 +25,8 @@ import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import { formatUZS } from '../../utils/formatCurrency';
 import PropTypes from 'prop-types';
+// UX Audit #3.4: inline-стили перенесены в CSS-классы.
+import './RefundRequestsTable.css';
 
 const REFUND_FILTER_OPTIONS = [
   { value: 'all', label: 'Все' },
@@ -34,55 +36,9 @@ const REFUND_FILTER_OPTIONS = [
   { value: 'rejected', label: 'Отклонённые' }
 ];
 
-const textCellStyle = {
-  color: 'var(--mac-text-primary)'
-};
-
-const mutedCellStyle = {
-  color: 'var(--mac-text-secondary)',
-  fontSize: 'var(--mac-font-size-xs)'
-};
-
-const amountCellStyle = {
-  color: 'var(--mac-success)',
-  fontWeight: 'var(--mac-font-weight-semibold)'
-};
-
-const reasonCellStyle = {
-  display: 'block',
-  maxWidth: '220px',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap'
-};
-
-const inlineClusterStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 'var(--mac-spacing-2)'
-};
-
-const actionClusterStyle = {
-  display: 'flex',
-  justifyContent: 'center',
-  gap: 'var(--mac-spacing-1)',
-  flexWrap: 'wrap'
-};
-
-const headerStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 'var(--mac-spacing-3)',
-  marginBottom: 'var(--mac-spacing-4)',
-  flexWrap: 'wrap'
-};
-
-const statusIconStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 'var(--mac-spacing-1)'
-};
+// UX Audit #3.4: inline-стили перенесены в RefundRequestsTable.css.
+// Раньше было 8 объектов style={...}, что не консистентно с остальным UI
+// и усложняло поддержку тёмной темы.
 
 const REFUND_ACTION_CAN_FIELD = {
   approve: 'can_approve',
@@ -214,7 +170,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     const IconComponent = config.icon;
 
     return (
-      <Badge variant={config.variant} style={statusIconStyle}>
+      <Badge variant={config.variant} className="refund-status-icon">
         <IconComponent size={12} aria-hidden="true" />
         {config.label}
       </Badge>
@@ -246,9 +202,9 @@ const RefundRequestsTable = ({ onRefresh }) => {
   const renderActions = (request) => {
     if (processingId === request.id) {
       return (
-        <span role="status" aria-live="polite" style={inlineClusterStyle}>
+        <span role="status" aria-live="polite" className="refund-inline-cluster">
           <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-          <span style={mutedCellStyle}>Обработка</span>
+          <span className="refund-cell-muted">Обработка</span>
         </span>
       );
     }
@@ -259,7 +215,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
 
     if (canApprove || canReject || canComplete) {
       return (
-        <div style={actionClusterStyle}>
+        <div className="refund-action-cluster">
           {canApprove && (
             <Button
               variant="success"
@@ -297,20 +253,20 @@ const RefundRequestsTable = ({ onRefresh }) => {
       );
     }
 
-    return <span style={mutedCellStyle}>—</span>;
+    return <span className="refund-cell-muted">—</span>;
   };
 
   const columns = [
     {
       key: 'id',
       title: 'ID',
-      render: (id) => <span style={textCellStyle}>#{id}</span>
+      render: (id) => <span className="refund-cell-text">#{id}</span>
     },
     {
       key: 'patient_name',
       title: 'Пациент',
       render: (_value, request) => (
-        <span style={inlineClusterStyle}>
+        <span className="refund-inline-cluster">
           <User size={16} color="var(--mac-text-secondary)" aria-hidden="true" />
           <span>{request.patient_name || `Пациент #${request.patient_id}`}</span>
         </span>
@@ -319,7 +275,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     {
       key: 'amount',
       title: 'Сумма',
-      render: (amount) => <span style={amountCellStyle}>{formatAmount(amount)}</span>
+      render: (amount) => <span className="refund-cell-amount">{formatAmount(amount)}</span>
     },
     {
       key: 'refund_type',
@@ -330,7 +286,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       key: 'reason',
       title: 'Причина',
       render: (reason) => (
-        <span style={reasonCellStyle} title={reason}>
+        <span className="refund-cell-reason" title={reason}>
           {reason || '—'}
         </span>
       )
@@ -343,7 +299,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     {
       key: 'created_at',
       title: 'Дата',
-      render: (createdAt) => <span style={mutedCellStyle}>{formatDate(createdAt)}</span>
+      render: (createdAt) => <span className="refund-cell-muted">{formatDate(createdAt)}</span>
     },
     {
       key: 'actions',
@@ -354,8 +310,8 @@ const RefundRequestsTable = ({ onRefresh }) => {
 
   return (
     <section aria-labelledby="refund-requests-title">
-      <div style={headerStyle}>
-        <div style={inlineClusterStyle}>
+      <div className="refund-header">
+        <div className="refund-inline-cluster">
           <DollarSign size={20} color="var(--mac-success)" aria-hidden="true" />
           <h3
             id="refund-requests-title"
@@ -370,7 +326,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
           <Badge variant="default">{requests.length}</Badge>
         </div>
 
-        <div style={inlineClusterStyle}>
+        <div className="refund-inline-cluster">
           <Select
             id="refund-request-filter"
             value={filter}

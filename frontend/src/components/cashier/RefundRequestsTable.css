@@ -1,0 +1,56 @@
+/**
+ * RefundRequestsTable Styles
+ *
+ * UX Audit #3.4: migration of inline style objects → CSS classes.
+ * 8 inline style constants removed from JSX, replaced with semantic classes.
+ */
+
+.refund-cell-text {
+  color: var(--mac-text-primary);
+}
+
+.refund-cell-muted {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-xs);
+}
+
+.refund-cell-amount {
+  color: var(--mac-success);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.refund-cell-reason {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refund-inline-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.refund-action-cluster {
+  display: flex;
+  justify-content: center;
+  gap: var(--mac-spacing-1);
+  flex-wrap: wrap;
+}
+
+.refund-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mac-spacing-3);
+  margin-bottom: var(--mac-spacing-4);
+  flex-wrap: wrap;
+}
+
+.refund-status-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+}
