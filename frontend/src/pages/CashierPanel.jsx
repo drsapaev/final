@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import './cashier.css';
 import { useLocation } from 'react-router-dom';
-import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt, MoreVertical } from 'lucide-react';
+import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt, MoreVertical, Loader2 } from 'lucide-react';
 import {
   Card, Badge, Button,
 } from '../components/ui/macos';
@@ -398,6 +398,10 @@ const CashierPanel = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
+  // UX Audit #4.5: anti-double-click state для action-кнопок.
+  // Хранит {type, id} текущего action; пока не null — все action-кнопки disabled.
+  const [processingAction, setProcessingAction] = useState(null);
+
   // UX Audit #4.2: client-side sort state для таба «История платежей».
   // Сортировка применяется к уже загруженным filteredPayments (после groupPaymentsByPatientAndTime).
   // Поддерживаемые поля: 'date' | 'patient' | 'amount'.
@@ -729,11 +733,15 @@ const CashierPanel = () => {
     }
 
     try {
+      // UX Audit #4.5: anti-double-click protection.
+      setProcessingAction({ type: 'confirm', id: paymentId });
       await paymentsHook.confirmPayment(paymentId);
       setRefreshKey((prev) => prev + 1); // Обновляем данные
     } catch (err) {
       logger.error('Error confirming payment:', err);
       notify.error(getErrorMessage(err, 'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.'));
+    } finally {
+      setProcessingAction(null);
     }
   };
 
@@ -764,6 +772,8 @@ const CashierPanel = () => {
     }
 
     try {
+      // UX Audit #4.5: anti-double-click protection.
+      setProcessingAction({ type: 'cancel', id: cancelPaymentContext.id });
       const result = await paymentsHook.cancelPayment(cancelPaymentContext.id, cancelReason.trim());
       if (result.success) {
         setCancelDialogOpen(false);
@@ -776,6 +786,8 @@ const CashierPanel = () => {
       }
     } catch (error) {
       notify.error(getErrorMessage(error, 'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.'));
+    } finally {
+      setProcessingAction(null);
     }
   };
 
@@ -829,6 +841,8 @@ const CashierPanel = () => {
       return;
     }
     try {
+      // UX Audit #4.5: anti-double-click protection.
+      setProcessingAction({ type: 'refund', id: refundPaymentId });
       const result = await paymentsHook.refundPayment(refundPaymentId, {
         amount: parseFloat(refundAmount),
         reason: refundReason
@@ -845,6 +859,8 @@ const CashierPanel = () => {
       }
     } catch (error) {
       notify.error(getErrorMessage(error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
+    } finally {
+      setProcessingAction(null);
     }
   };
 
@@ -857,29 +873,35 @@ const CashierPanel = () => {
       return;
     }
 
-    if (paymentRowOrId && typeof paymentRowOrId === 'object') {
-      try {
-        const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId));
-        if (opened) {
-          notify.success('Открыт диалог печати этого компьютера.');
-          return;
+    // UX Audit #4.5: anti-double-click protection.
+    setProcessingAction({ type: 'print_receipt', id: paymentId });
+    try {
+      if (paymentRowOrId && typeof paymentRowOrId === 'object') {
+        try {
+          const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId));
+          if (opened) {
+            notify.success('Открыт диалог печати этого компьютера.');
+            return;
+          }
+
+          logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
+            paymentId
+          });
+        } catch (error) {
+          logger.error('[Cashier] Unexpected browser receipt print error:', error);
         }
-
-        logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
-          paymentId
-        });
-      } catch (error) {
-        logger.error('[Cashier] Unexpected browser receipt print error:', error);
       }
-    }
 
-    const result = await paymentsHook.getReceipt(paymentId);
-    if (!result.success) {
-      notify.error(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
-      return;
-    }
+      const result = await paymentsHook.getReceipt(paymentId);
+      if (!result.success) {
+        notify.error(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
+        return;
+      }
 
-    notify.warning('Диалог печати не открылся, поэтому был загружен PDF-чек.');
+      notify.warning('Диалог печати не открылся, поэтому был загружен PDF-чек.');
+    } finally {
+      setProcessingAction(null);
+    }
   };
 
   // ✅ v2.0: Состояние для почасовой статистики
@@ -1590,9 +1612,12 @@ const CashierPanel = () => {
                                   size="sm"
                                   variant="success"
                                   onClick={() => confirmPayment(row.id)}
-                                  disabled={!hasBackendPaymentAction(row, 'confirm')}
+                                  disabled={!hasBackendPaymentAction(row, 'confirm') || processingAction?.id === row.id}
                                   aria-label="Подтвердить платёж">
-                                  <CheckCircle size={14} /> Принять
+                                  {processingAction?.id === row.id && processingAction?.type === 'confirm' ?
+                                    <Loader2 size={14} className="animate-spin" aria-hidden="true" /> :
+                                    <CheckCircle size={14} />}
+                                  Принять
                                 </Button>
                                 <details className="cashier-overflow-menu">
                                   <summary className="cashier-overflow-trigger" aria-label="Дополнительные действия с платёжом">
@@ -1603,7 +1628,7 @@ const CashierPanel = () => {
                                       type="button"
                                       className="cashier-overflow-item cashier-overflow-item--danger"
                                       onClick={() => openCancelDialog(row)}
-                                      disabled={!hasBackendPaymentAction(row, 'cancel')}
+                                      disabled={!hasBackendPaymentAction(row, 'cancel') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label="Отменить платёж">
                                       <XCircle size={14} aria-hidden="true" /> Отменить платёж
@@ -1612,7 +1637,7 @@ const CashierPanel = () => {
                                       type="button"
                                       className="cashier-overflow-item cashier-overflow-item--warning"
                                       onClick={() => openRefundDialog(row)}
-                                      disabled={!hasBackendPaymentAction(row, 'refund')}
+                                      disabled={!hasBackendPaymentAction(row, 'refund') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label="Оформить возврат">
                                       <Undo2 size={14} aria-hidden="true" /> Оформить возврат
@@ -1621,7 +1646,7 @@ const CashierPanel = () => {
                                       type="button"
                                       className="cashier-overflow-item"
                                       onClick={() => handlePrintReceipt(row)}
-                                      disabled={!hasBackendPaymentAction(row, 'print_receipt')}
+                                      disabled={!hasBackendPaymentAction(row, 'print_receipt') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label="Распечатать чек">
                                       <Receipt size={14} aria-hidden="true" /> Печать чека
@@ -1734,7 +1759,8 @@ const CashierPanel = () => {
               <Button
                 variant="danger"
                 onClick={handleCancelPayment}
-                disabled={cancelReason.trim().length < 10}>
+                disabled={processingAction?.type === 'cancel' || cancelReason.trim().length < 10}>
+                {processingAction?.type === 'cancel' ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
                 Отменить платёж
               </Button>
             </DialogActions>
@@ -1882,7 +1908,8 @@ const CashierPanel = () => {
               <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
                 Отмена
               </Button>
-              <Button variant="danger" onClick={handleRefund}>
+              <Button variant="danger" onClick={handleRefund} disabled={processingAction?.type === 'refund'}>
+                {processingAction?.type === 'refund' ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
                 Выполнить возврат
               </Button>
             </DialogActions>

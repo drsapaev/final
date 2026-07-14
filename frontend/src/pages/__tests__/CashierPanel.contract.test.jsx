@@ -40,10 +40,12 @@ describe('CashierPanel payment action contract', () => {
       '<td colSpan="7"',
     );
 
-    expect(actionCellBlock).toContain('disabled={!hasBackendPaymentAction(row, \'confirm\')}');
-    expect(actionCellBlock).toContain('disabled={!hasBackendPaymentAction(row, \'cancel\')}');
-    expect(actionCellBlock).toContain('disabled={!hasBackendPaymentAction(row, \'refund\')}');
-    expect(actionCellBlock).toContain('disabled={!hasBackendPaymentAction(row, \'print_receipt\')}');
+    // UX Audit #4.5: disabled теперь также учитывает processingAction (anti-double-click),
+    // но hasBackendPaymentAction(row, '<action>') остаётся обязательной частью условия.
+    expect(actionCellBlock).toContain('hasBackendPaymentAction(row, \'confirm\')');
+    expect(actionCellBlock).toContain('hasBackendPaymentAction(row, \'cancel\')');
+    expect(actionCellBlock).toContain('hasBackendPaymentAction(row, \'refund\')');
+    expect(actionCellBlock).toContain('hasBackendPaymentAction(row, \'print_receipt\')');
     expect(actionCellBlock).not.toContain('row.status ===');
     expect(actionCellBlock).not.toContain('payment_status');
   });
