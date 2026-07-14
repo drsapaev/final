@@ -90,3 +90,176 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ─── UX Audit R-3.3 (Phase 2): remaining inline styles migrated ─── */
+
+/* Search status indicator (absolute positioned) */
+.patient-step-v2__search-status {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  font-size: var(--mac-font-size-xs);
+  pointer-events: none;
+}
+
+/* Status dot inline */
+.patient-step-v2__status-dot-inline {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.patient-step-v2__status-dot-inline--existing {
+  background: var(--mac-primary, var(--mac-accent-blue, #007aff));
+}
+
+.patient-step-v2__status-dot-inline--new {
+  background: var(--mac-success, #34c759);
+}
+
+/* Status text inline */
+.patient-step-v2__status-text-inline--existing {
+  color: var(--mac-primary, var(--mac-accent-blue, #007aff));
+  font-weight: var(--mac-font-weight-medium);
+}
+
+.patient-step-v2__status-text-inline--new {
+  color: var(--mac-success, #34c759);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+/* Error message inline */
+.patient-step-v2__error-inline {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-danger);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+}
+
+/* Search loading dropdown */
+.patient-step-v2__search-loading {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin-top: var(--mac-spacing-1);
+  padding: var(--mac-spacing-3);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  box-shadow: var(--mac-shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+}
+
+/* Empty state dropdown */
+.patient-step-v2__search-empty {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin-top: var(--mac-spacing-1);
+  padding: var(--mac-spacing-3);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  box-shadow: var(--mac-shadow-lg);
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+  text-align: center;
+}
+
+/* Suggestions dropdown */
+.patient-step-v2__suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin-top: var(--mac-spacing-1);
+  padding: var(--mac-spacing-2);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  box-shadow: var(--mac-shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* Suggestion item */
+.patient-step-v2__suggestion-item {
+  padding: var(--mac-spacing-2);
+  border-radius: var(--mac-radius-sm);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.patient-step-v2__suggestion-item:hover {
+  background: var(--mac-bg-secondary);
+}
+
+.patient-step-v2__suggestion-item--selected {
+  background: var(--mac-bg-tertiary);
+}
+
+/* Suggestion name */
+.patient-step-v2__suggestion-name {
+  font-weight: var(--mac-font-weight-medium);
+  color: var(--mac-text-primary);
+}
+
+/* Suggestion details (phone + birth date) */
+.patient-step-v2__suggestion-details {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary);
+  display: flex;
+  gap: var(--mac-spacing-2);
+}
+
+.patient-step-v2__suggestion-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+}
+
+/* Field hint (optional text) */
+.patient-step-v2__field-hint {
+  color: var(--mac-text-tertiary);
+  font-weight: var(--mac-font-weight-normal);
+}
+
+/* Discount mode selector */
+.patient-step-v2__discount-mode {
+  display: flex;
+  gap: var(--mac-spacing-2);
+  margin-top: var(--mac-spacing-2);
+}
+
+.patient-step-v2__discount-option {
+  flex: 1;
+  padding: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  cursor: pointer;
+  text-align: center;
+  font-size: var(--mac-font-size-xs);
+  transition: all 0.15s ease;
+}
+
+.patient-step-v2__discount-option--selected {
+  border-color: var(--mac-accent-blue, #007aff);
+  background: color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 92%);
+  color: var(--mac-accent-blue, #007aff);
+  font-weight: var(--mac-font-weight-semibold);
+}

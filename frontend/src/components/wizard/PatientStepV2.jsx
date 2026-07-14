@@ -63,27 +63,17 @@ const PatientStepV2 = ({
 
 
             {/* Индикатор Новый/Существующий */}
-            <div style={{
-              position: 'absolute',
-              right: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)',
-              fontSize: 'var(--mac-font-size-xs)',
-              pointerEvents: 'none'
-            }}>
+            <div className="patient-step-v2__search-status">
               {safeData.id ?
               <>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--mac-primary)' }} />
-                  <span style={{ color: 'var(--mac-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>Существующий</span>
+                  <div className="patient-step-v2__status-dot-inline patient-step-v2__status-dot-inline--existing" />
+                  <span className="patient-step-v2__status-text-inline--existing">Существующий</span>
                 </> :
 
               (safeData.fio || '').length > 0 &&
               <>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--mac-success)' }} />
-                    <span style={{ color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-medium)' }}>Новый</span>
+                    <div className="patient-step-v2__status-dot-inline patient-step-v2__status-dot-inline--new" />
+                    <span className="patient-step-v2__status-text-inline--new">Новый</span>
                   </>
 
               }
@@ -91,13 +81,7 @@ const PatientStepV2 = ({
           </div>
 
           {errors.fio &&
-          <span style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-danger)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-1)'
-          }}>
+          <span className="patient-step-v2__error-inline">
               <AlertCircle size={14} />
               {errors.fio}
             </span>
@@ -258,13 +242,7 @@ const PatientStepV2 = ({
             )}
           </div>
           {errors.gender &&
-          <span style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-danger)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-1)'
-          }}>
+          <span className="patient-step-v2__error-inline">
               <AlertCircle size={14} />
               {errors.gender}
             </span>
@@ -282,7 +260,7 @@ const PatientStepV2 = ({
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
-            Телефон <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'var(--mac-font-weight-normal)' }}>(необязательно)</span>
+            Телефон <span className="patient-step-v2__field-hint">(необязательно)</span>
           </label>
           <Input
             ref={phoneRef}
@@ -305,13 +283,7 @@ const PatientStepV2 = ({
             </span>
           }
           {errors.phone &&
-          <span style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-danger)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-1)'
-          }}>
+          <span className="patient-step-v2__error-inline">
               <AlertCircle size={14} />
               {errors.phone}
             </span>
@@ -369,7 +341,7 @@ const PatientStepV2 = ({
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
-            Дата рождения <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'var(--mac-font-weight-normal)' }}>(необязательно)</span>
+            Дата рождения <span className="patient-step-v2__field-hint">(необязательно)</span>
           </label>
           <Input
             type="text"
@@ -384,13 +356,7 @@ const PatientStepV2 = ({
             aria-label="Дата рождения" />
 
           {errors.birth_date &&
-          <span style={{
-            fontSize: 'var(--mac-font-size-xs)',
-            color: 'var(--mac-danger)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-1)'
-          }}>
+          <span className="patient-step-v2__error-inline">
               <AlertCircle size={14} />
               {errors.birth_date}
             </span>
