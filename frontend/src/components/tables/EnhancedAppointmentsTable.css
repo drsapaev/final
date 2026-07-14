@@ -322,3 +322,15 @@
   flex-wrap: wrap;
   align-items: center;
 }
+
+/* Action button — primary variant (blue, for "Вызвать") */
+.action-button--primary {
+  background: var(--mac-accent-blue, #007aff);
+  color: white;
+  border-color: var(--mac-accent-blue, #007aff);
+}
+
+.action-button--primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+  background: var(--mac-accent-blue, #007aff);
+}
