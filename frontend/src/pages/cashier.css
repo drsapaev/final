@@ -146,3 +146,15 @@
   font-size: 14px;
   resize: vertical;
 }
+
+/* ─── Cancel dialog context block (UX Audit #2.1) ─── */
+.cashier-cancel-context {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: color-mix(in srgb, var(--mac-danger, #ff453a), transparent 92%);
+  border-left: 3px solid var(--mac-danger, #ff453a);
+  border-radius: 6px;
+}

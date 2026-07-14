@@ -388,7 +388,9 @@ const CashierPanel = () => {
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
 
   // ✅ УЛУЧШЕНИЕ: Новые состояния для отмены платежа
-  const [confirmingPaymentId, setConfirmingPaymentId] = useState(null);
+  // UX Audit #2.1: контекст отменяемого платежа (id + patient + amount) —
+  // показывается в диалоге, чтобы кассир видел, ЧТО именно он отменяет.
+  const [cancelPaymentContext, setCancelPaymentContext] = useState(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
@@ -701,20 +703,38 @@ const CashierPanel = () => {
     }
   };
 
-  const openCancelDialog = (paymentId) => {
-    setConfirmingPaymentId(paymentId);
+  const openCancelDialog = (payment) => {
+    // UX Audit #2.1: принимаем объект payment целиком, чтобы показать контекст.
+    // Раньше принимали только paymentId, и в диалоге было видно только #{id}.
+    const paymentId = typeof payment === 'object' && payment !== null
+      ? (payment.id || payment.payment_id)
+      : payment;
+    const patient = typeof payment === 'object' && payment !== null
+      ? (payment.patient || payment.patient_name || `Пациент #${payment.patient_id}`)
+      : null;
+    const amount = typeof payment === 'object' && payment !== null
+      ? Number(payment.total_amount || payment.amount || 0)
+      : 0;
+    setCancelPaymentContext({ id: paymentId, patient, amount });
     setCancelDialogOpen(true);
     setCancelReason('');
   };
 
   const handleCancelPayment = async () => {
-    if (!confirmingPaymentId) return;
+    if (!cancelPaymentContext?.id) return;
+    // UX Audit #2.1: обязательная причина отмены (минимум 10 символов).
+    // Раньше textarea была помечена «необязательно» — аудит-лог пустовал.
+    if (!cancelReason || cancelReason.trim().length < 10) {
+      notify.warning('Укажите причину отмены (минимум 10 символов)');
+      return;
+    }
 
     try {
-      const result = await paymentsHook.cancelPayment(confirmingPaymentId, cancelReason);
+      const result = await paymentsHook.cancelPayment(cancelPaymentContext.id, cancelReason.trim());
       if (result.success) {
         setCancelDialogOpen(false);
-        setConfirmingPaymentId(null);
+        setCancelPaymentContext(null);
+        setCancelReason('');
         notify.info('Платёж отменён');
         triggerDataReload();
       } else {
@@ -1404,7 +1424,7 @@ const CashierPanel = () => {
                                 <Button
                                   size="sm"
                                   variant="danger"
-                                  onClick={() => openCancelDialog(row.id)}
+                                  onClick={() => openCancelDialog(row)}
                                   disabled={!hasBackendPaymentAction(row, 'cancel')}
                                   aria-label="Отменить платёж">
                                   <XCircle size={14} /> Отмена
@@ -1481,6 +1501,7 @@ const CashierPanel = () => {
           </Card>
 
           {/* ✅ УЛУЧШЕНИЕ: Диалог подтверждения отмены платежа */}
+          {/* UX Audit #2.1: показываем контекст платежа + обязательная причина (min 10 chars). */}
           <Dialog
             open={cancelDialogOpen}
             onClose={() => setCancelDialogOpen(false)}
@@ -1489,22 +1510,46 @@ const CashierPanel = () => {
 
             <DialogTitle>Отмена платежа</DialogTitle>
             <DialogContent>
+              {cancelPaymentContext && (
+                <div className="cashier-cancel-context" role="group" aria-label="Контекст отменяемого платежа">
+                  <Typography variant="body2" color="textSecondary">
+                    Платёж #{cancelPaymentContext.id}
+                  </Typography>
+                  {cancelPaymentContext.patient && (
+                    <Typography variant="body1">
+                      Пациент: <strong>{cancelPaymentContext.patient}</strong>
+                    </Typography>
+                  )}
+                  {cancelPaymentContext.amount > 0 && (
+                    <Typography variant="body1">
+                      Сумма: <strong>{format(cancelPaymentContext.amount)}</strong>
+                    </Typography>
+                  )}
+                </div>
+              )}
               <Typography variant="body2" className="cashier-mb-4">
-                Вы уверены, что хотите отменить платёж #{confirmingPaymentId}?
+                Это действие нельзя отменить. Укажите причину для аудита.
               </Typography>
               <textarea
-                aria-label="Причина отмены платежа"
+                aria-label="Причина отмены платежа (обязательно, минимум 10 символов)"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Причина отмены (необязательно)"
-                className="cashier-text-sm cashier-text-primary" />
-
+                placeholder="Причина отмены (обязательно, минимум 10 символов)"
+                required
+                minLength={10}
+                className="cashier-text-sm cashier-text-primary cashier-refund-textarea" />
+              <Typography variant="caption" color="textSecondary">
+                {cancelReason.trim().length}/10 символов
+              </Typography>
             </DialogContent>
             <DialogActions>
               <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
-                Отмена
+                Закрыть
               </Button>
-              <Button variant="danger" onClick={handleCancelPayment}>
+              <Button
+                variant="danger"
+                onClick={handleCancelPayment}
+                disabled={cancelReason.trim().length < 10}>
                 Отменить платёж
               </Button>
             </DialogActions>
