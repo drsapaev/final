@@ -261,7 +261,10 @@ export default function LabReportWorkbench({
   }, [canSaveDraft, saving]);
 
   // PR-58: autosave — 30-second debounce when dirty + canSaveDraft
+  // L-L-6 fix: добавлен autoSaving state — отображается в индикаторе
+  // во время сохранения (а не только после успешного завершения).
   const [lastAutoSave, setLastAutoSave] = useState(null);
+  const [autoSaving, setAutoSaving] = useState(false);
   const autoSaveTimerRef = useRef(null);
   useEffect(() => {
     if (!isDirty || !canSaveDraft || saving) return;
@@ -269,11 +272,14 @@ export default function LabReportWorkbench({
     autoSaveTimerRef.current = setTimeout(async () => {
       if (handleSaveDraftRef.current && !saving) {
         try {
+          setAutoSaving(true);
           await handleSaveDraftRef.current();
           setLastAutoSave(new Date());
         } catch (e) {
           // Autosave failure is non-fatal — manual save is still available
           logger.warn('Lab autosave failed:', e);
+        } finally {
+          setAutoSaving(false);
         }
       }
     }, 30000); // 30 seconds
@@ -381,7 +387,12 @@ export default function LabReportWorkbench({
     }
   }
   // WF-22 fix: обновляем ref для keyboard shortcut.
-  handleSaveDraftRef.current = handleSaveDraft;
+  // L-L-4 fix: присваивание перенесено в useEffect (было при каждом render,
+  // что может вызывать stale-closure проблемы в race conditions).
+  // Намеренно без deps array — обновляем ref на каждом render (дешёвая операция).
+  useEffect(() => {
+    handleSaveDraftRef.current = handleSaveDraft;
+  });
 
   // WF-round5: handleMarkReady убран — Mark Ready был функционально пустой
   // операцией (backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
@@ -751,8 +762,24 @@ export default function LabReportWorkbench({
                       ● несохранённые изменения
                     </Badge>
                   )}
-                  {/* PR-58: autosave indicator */}
-                  {!isDirty && lastAutoSave && (
+                  {/* PR-58: autosave indicator
+                      L-L-6 fix: показываем «сохраняется…» во время autosave.
+                      Раньше индикатор пропадал когда labourant начинал печатать,
+                      потому что !isDirty скрывало его. Теперь индикатор виден
+                      во время активного autosave — feedback не прерывается. */}
+                  {autoSaving && (
+                    <span
+                      style={{
+                        fontSize: 'var(--mac-font-size-xs)',
+                        color: 'var(--mac-text-tertiary, #6b7280)',
+                        marginLeft: 'var(--mac-spacing-2)',
+                      }}
+                      aria-live="polite"
+                    >
+                      ◌ сохраняется…
+                    </span>
+                  )}
+                  {!isDirty && !autoSaving && lastAutoSave && (
                     <span style={{
                       fontSize: 'var(--mac-font-size-xs)',
                       color: 'var(--mac-text-tertiary, #6b7280)',

@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { useCallback, useRef } from 'react';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
 } from '../ui/macos';
@@ -59,6 +60,27 @@ export default function LabReportHistoryPanel({
     ? 'В лаборатории пока нет сохранённых отчётов для повторного открытия.'
     : 'Для выбранного фильтра нет лабораторных отчётов.';
 
+  // L-L-5 fix: keyboard-навигация между карточками (ArrowUp/Down).
+  // Список карточек хранится в ref — при ArrowDown/Up перемещаем фокус.
+  const cardRefsRef = useRef([]);
+  const handleCardKeyDown = useCallback((event, index) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      const next = Math.min(index + 1, filteredItems.length - 1);
+      cardRefsRef.current[next]?.focus();
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      const prev = Math.max(index - 1, 0);
+      cardRefsRef.current[prev]?.focus();
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      cardRefsRef.current[0]?.focus();
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      cardRefsRef.current[filteredItems.length - 1]?.focus();
+    }
+  }, [filteredItems.length]);
+
   return (
     <Card variant="filled" padding="none">
       <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
@@ -84,14 +106,18 @@ export default function LabReportHistoryPanel({
         {filteredItems.length === 0 ? (
           <Alert severity="info">{emptyText}</Alert>
         ) : (
-          filteredItems.map((item) => {
+          filteredItems.map((item, index) => {
             const severity = historySeverityState(item);
             const patientLabel = item.patient_snapshot?.full_name || `Пациент #${item.patient_id}`;
             return (
               <button
                 key={item.id}
                 type="button"
+                ref={(el) => { cardRefsRef.current[index] = el; }}
                 onClick={() => onOpenInstance(item.id)}
+                // L-L-5 fix: ArrowUp/Down/Home/End для навигации между карточками.
+                onKeyDown={(e) => handleCardKeyDown(e, index)}
+                aria-label={`Отчёт ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status)}`}
                 style={{
                   border: '1px solid var(--mac-border)',
                   borderRadius: '14px',

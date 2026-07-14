@@ -2,7 +2,14 @@
  * L-H-6 fix: shared constants для templateEditor.
  * Раньше жили в LabTemplateWorkbench.jsx как module-level consts.
  * Теперь переиспользуются всеми tab-renderer'ами.
+ *
+ * L-L-8 fix: signerFieldLabels берётся из labUiLabels.js (единый источник
+ * истины), а не дублируется здесь. Раньше было 2 независимые копии с
+ * одинаковыми значениями — рассинхрон был неизбежен при любом изменении.
  */
+
+// L-L-8 fix: re-export из labUiLabels.js — единый источник истины.
+export { signerFieldLabels } from '../labUiLabels';
 
 export const layoutOptions = [
   { value: 'lab_table_classic_v1', label: 'Классический' },
@@ -24,12 +31,7 @@ export const brandingFieldLabels = {
   logo_url: 'Логотип (URL)'
 };
 
-export const signerFieldLabels = {
-  lab_technician_label: 'Подпись лаборанта',
-  lab_technician_name: 'ФИО лаборанта',
-  approver_label: 'Подпись утверждающего',
-  approver_name: 'ФИО утверждающего'
-};
+// L-L-8 fix: signerFieldLabels удалён — re-export выше.
 
 export const fieldTypeOptions = [
   { value: 'numeric', label: 'Число' },

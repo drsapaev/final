@@ -680,6 +680,7 @@ export default function LabTemplateWorkbench({
         onClose={() => setShowNewTemplateDialog(false)}
         onCreate={handleCreateTemplate}
         saving={saving}
+        existingTemplates={templates}
       />
 
       <datalist id="lab-analyte-catalog">
