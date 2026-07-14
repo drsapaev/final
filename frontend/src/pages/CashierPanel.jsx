@@ -1454,10 +1454,18 @@ const CashierPanel = () => {
                 }
                   </div> :
 
-              <div className="cashier-text-sm cashier-text-secondary">
-                    Нет записей, ожидающих оплаты
-                  </div>
-              }
+              (/* UX Audit #4.3: actionable empty state вместо голого текста. */
+              <div className="cashier-empty-state" role="status">
+                <CheckCircle size={32} className="cashier-empty-state-icon" aria-hidden="true" />
+                <div className="cashier-empty-state-title">Все платежи обработаны</div>
+                <div className="cashier-empty-state-text">
+                  Новых записей, ожидающих оплаты, нет.
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setActiveTab('history')}>
+                  Открыть историю платежей
+                </Button>
+              </div>
+              )}
               </div>
             }
 
@@ -1576,8 +1584,14 @@ const CashierPanel = () => {
                     ) :
 
                     <tr className="cashier-empty-row">
-                            <td colSpan="7" className="cashier-text-sm cashier-text-secondary">
-                              Нет данных для отображения
+                            <td colSpan="7" className="cashier-empty-cell">
+                              {/* UX Audit #4.3: actionable empty state для истории. */}
+                              <div className="cashier-empty-state cashier-empty-state--inline" role="status">
+                                <div className="cashier-empty-state-title">Нет платежей за выбранный период</div>
+                                <div className="cashier-empty-state-text">
+                                  Попробуйте изменить фильтры или выбрать другую дату.
+                                </div>
+                              </div>
                             </td>
                           </tr>
                     }
