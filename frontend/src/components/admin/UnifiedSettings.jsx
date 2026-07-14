@@ -125,8 +125,8 @@ const UnifiedSettings = () => {
         return <PaymentProviderSettings />;
       case 'queue-settings':
         return <QueueSettings />;
-      case 'ai-settings':
-        return <AISettings />;
+      // UX Audit Admin #4.9: case 'ai-settings' удалён — мёртвый код.
+      // Маршрут admin-ai-settings рендерится отдельным маршрутом, минуя UnifiedSettings.
       case 'display-settings':
         return <DisplayBoardSettings />;
       case 'clinic-settings':
