@@ -731,7 +731,7 @@ const EnhancedAppointmentsTable = ({
 
     return (
       <div
-        style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--mac-spacing-1)', cursor: 'help' }}
+        className="eat-service-code-wrap"
         title={tooltipText}>
 
         {compactCodes.map((code, idx) =>
@@ -840,12 +840,7 @@ const EnhancedAppointmentsTable = ({
 
     // ✅ Упрощённый вид: вид оплаты + иконка статуса
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mac-spacing-2)',
-        justifyContent: 'center'
-      }}>
+      <div className="eat-payment-type-wrap">
         <span style={{
           display: 'flex',
           alignItems: 'center',
@@ -862,10 +857,7 @@ const EnhancedAppointmentsTable = ({
           <span>{typeText}</span>
         </span>
         {paymentStatus &&
-        <span style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          lineHeight: 1
-        }}>
+        <span className="eat-payment-status-icon">
             {paymentStatus === 'paid' ? '✅' :
           paymentStatus === 'pending' ? '⏳' :
           paymentStatus === 'failed' ? '❌' : ''}
@@ -1146,24 +1138,10 @@ const EnhancedAppointmentsTable = ({
 
   // Инлайновый лоадер без раннего возврата
   const loaderNode =
-  <div style={{
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '60px',
-    color: 'var(--mac-text-secondary)'
-  }}>
+  <div className="eat-loader">
       <div className="eat-td">
         <div
-        className="loading-spinner"
-        style={{
-          width: '40px',
-          height: '40px',
-          border: '3px solid var(--mac-border)',
-          borderTop: '3px solid var(--mac-accent-blue)',
-          borderRadius: '50%',
-          margin: '0 auto 16px'
-        }} />
+        className="loading-spinner eat-loader-spinner" />
         {t.loading}
       </div>
     </div>;
@@ -1179,19 +1157,8 @@ const EnhancedAppointmentsTable = ({
         borderRadius: outerBorder ? 'var(--mac-radius-lg)' : '0'
       }}>
       {/* Панель инструментов */}
-      <div style={{
-        padding: 'var(--mac-spacing-4)',
-        borderBottom: '1px solid var(--mac-border)',
-        overflowX: 'auto',
-        minWidth: '600px'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-3)',
-          flexWrap: 'nowrap',
-          minWidth: 0
-        }}>
+      <div className="eat-toolbar">
+        <div className="eat-toolbar-inner">
           {/* Поиск */}
           <div className="eat-search-input-wrap">
             <Input
@@ -1226,13 +1193,7 @@ const EnhancedAppointmentsTable = ({
           <Button
             variant="outline"
             onClick={handleExport}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)',
-              flex: '0 0 auto',
-              minWidth: '100px'
-            }}>
+            className="eat-export-btn">
 
             <Download size={16} />
             {t.export}
@@ -1249,15 +1210,7 @@ const EnhancedAppointmentsTable = ({
 
       {/* Таблица */}
       {loading ? loaderNode : null}
-      <div style={{
-        width: '100%',
-        maxWidth: '100%',
-        overflowX: 'auto',
-        overflowY: 'visible',
-        boxSizing: 'border-box',
-        position: 'relative',
-        zIndex: 1
-      }}>
+      <div className="eat-table-scroll">
         <div className="admin-table-wrapper">
 <table className="eat-table-container" style={{
           width: '100%',
@@ -1520,12 +1473,7 @@ const EnhancedAppointmentsTable = ({
             <tr>
                 <td
                 colSpan="10"
-                style={{
-                  padding: '40px',
-                  textAlign: 'center',
-                  color: 'var(--mac-text-secondary)',
-                  fontSize: 'var(--mac-font-size-lg)'
-                }}>
+                className="eat-empty-row">
 
                   {t.noData}
                 </td>
@@ -1595,7 +1543,7 @@ const EnhancedAppointmentsTable = ({
                     {/* Чекбокс */}
                     {showCheckboxes &&
                   <td
-                    style={{ padding: '12px 8px' }}
+                    className="eat-td-base"
                     aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`}>
                         <Checkbox aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(e) => {
                         e.stopPropagation();
@@ -1668,11 +1616,7 @@ const EnhancedAppointmentsTable = ({
                         }
                         </div>
                         {row.patient_birth_year &&
-                      <div style={{
-                        fontSize: 'var(--mac-font-size-xs)',
-                        color: 'var(--mac-text-secondary)',
-                        marginTop: '2px'
-                      }}>
+                      <div className="eat-patient-age">
                             {new Date().getFullYear() - row.patient_birth_year} лет
                           </div>
                       }
@@ -1690,11 +1634,7 @@ const EnhancedAppointmentsTable = ({
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
                   }}>
-                        <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--mac-spacing-2)'
-                    }}>
+                        <div className="eat-phone-cell">
                           <Phone size={18} className="eat-phone-icon" />
                           {formatPhoneNumber(row.patient_phone)}
                         </div>
@@ -1729,24 +1669,14 @@ const EnhancedAppointmentsTable = ({
                   title={row.address}>
 
                         {row.address ?
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--mac-spacing-2)'
-                    }}>
+                    <div className="eat-phone-cell">
                             <Home size={18} style={{
                         color: 'var(--mac-accent-blue)',
                         fontWeight: 'var(--mac-font-weight-bold)',
                         filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
                         flexShrink: 0
                       }} />
-                            <span style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical'
-                      }}>
+                            <span className="eat-address-text">
                               {row.address}
                             </span>
                           </div> :
@@ -1891,37 +1821,19 @@ const EnhancedAppointmentsTable = ({
                         if (timeDisplay.primaryDate || timeDisplay.primaryTime) {
                           return (
                             <div title={`Часовой пояс: ${timeDisplay.timeZone}`}>
-                                <div style={{
-                                fontSize: 'var(--mac-font-size-xs)',
-                                fontWeight: 'var(--mac-font-weight-semibold)',
-                                color: 'var(--mac-text-secondary)',
-                                marginBottom: 'var(--mac-spacing-1)'
-                              }}>
+                                <div className="eat-time-label">
                                   {timeDisplay.primaryLabel}
                                 </div>
                                 <div className="eat-th-content">
                                   <Calendar size={12} className="eat-calendar-icon" />
                                   {timeDisplay.primaryDate}
                                 </div>
-                                <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 'var(--mac-spacing-1)',
-                                justifyContent: 'center',
-                                marginTop: '2px',
-                                fontSize: 'var(--mac-font-size-xs)',
-                                color: 'var(--mac-text-secondary)'
-                              }}>
+                                <div className="eat-time-row">
                                   <Clock size={10} />
                                   {timeDisplay.primaryTime}
                                 </div>
                                 {timeDisplay.showChanged &&
-                              <div style={{
-                                marginTop: 'var(--mac-spacing-1)',
-                                fontSize: 'var(--mac-font-size-xs)',
-                                color: 'var(--mac-text-tertiary)',
-                                lineHeight: 1.35
-                              }}>
+                              <div className="eat-time-changed">
                                     {timeDisplay.changedLabel}: {timeDisplay.changedDate} {timeDisplay.changedTime}
                                   </div>
                               }
@@ -1938,15 +1850,7 @@ const EnhancedAppointmentsTable = ({
                                   {row.appointment_date || '—'}
                                 </div>
                                 {row.appointment_time &&
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 'var(--mac-spacing-1)',
-                                justifyContent: 'center',
-                                marginTop: '2px',
-                                fontSize: 'var(--mac-font-size-xs)',
-                                color: 'var(--mac-text-secondary)'
-                              }}>
+                              <div className="eat-time-row">
                                     <Clock size={10} />
                                     {row.appointment_time}
                                   </div>
@@ -2300,34 +2204,13 @@ const EnhancedAppointmentsTable = ({
 
       {/* Пагинация */}
       {totalPages > 1 &&
-      <div style={{
-        padding: 'var(--mac-spacing-4)',
-        borderTop: '1px solid var(--mac-border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'between',
-        gap: 'var(--mac-spacing-4)',
-        flexWrap: 'wrap'
-      }}>
-          <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-base)'
-        }}>
+      <div className="eat-pagination">
+          <div className="eat-pagination-info">
             <span>{t.page}</span>
             <select
             value={currentPage}
             onChange={(e) => setCurrentPage(parseInt(e.target.value))}
-            style={{
-              padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-sm)',
-              backgroundColor: 'var(--mac-bg-primary)',
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-base)'
-            }}>
+            className="eat-pagination-select">
 
               {Array.from({ length: totalPages }, (_, i) =>
             <option key={i + 1} value={i + 1}>
@@ -2338,13 +2221,7 @@ const EnhancedAppointmentsTable = ({
             <span>{t.of} {totalPages}</span>
           </div>
 
-          <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)',
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-base)'
-        }}>
+          <div className="eat-pagination-info">
             <span>Показано: {paginatedData.length} из {filteredData.length}</span>
           </div>
 
