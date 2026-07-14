@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { CreditCard, Check, Printer } from 'lucide-react';
+import { Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { toast } from 'react-toastify';
 // UX Audit R-4.3 (Phase 2): usePaymentMethods hook (future: backend-driven).
@@ -212,7 +212,11 @@ const PaymentDialog = ({
                 Способ оплаты *
               </label>
               <div className="payment-methods-grid">
-                {paymentMethods.map((method) => (
+                {paymentMethods.map((method) => {
+                  // FIX (paymentMethods-jsx): config теперь хранит компонент
+                  // Icon, а не React-элемент. Рендерим как компонент.
+                  const MethodIcon = method.Icon || method.icon;
+                  return (
                   <button
                     key={method.value}
                     type="button"
@@ -224,10 +228,11 @@ const PaymentDialog = ({
                     }}
                     className={`payment-method-btn ${paymentMethod === method.value ? 'payment-method-btn--selected' : ''}`}
                   >
-                    {method.icon}
+                    {MethodIcon && <MethodIcon size={16} />}
                     {method.label}
                   </button>
-                ))}
+                  );
+                })}
               </div>
               {errors.method && (
                 <p className="payment-field-error">
