@@ -1138,9 +1138,12 @@ const CashierPanel = () => {
           </Card>
 
           {/* ✅ УЛУЧШЕНИЕ: Статистика платежей из API */}
+          {/* UX Audit #3.1 + #3.2: stats-card теперь содержит ТОЛЬКО метрики.
+              Кнопки «Обновить/Экспорт/Аналитика» вынесены в отдельный toolbar над табами —
+              Nielsen #8 (эстетический и минималистичный дизайн) + IA-разделение.
+              Скрытые плитки (visibility:hidden) удалены — визуальный шум устранён. */}
           <Card variant="outline" className="cashier-stats-card">
             <div className="cashier-stats-grid">
-              {/* LOW #20: Stats grid stays stable across tabs — same column count, different content. */}
               {activeTab === 'history' ?
               <>
                   <div className="cashier-text-center">
@@ -1196,48 +1199,40 @@ const CashierPanel = () => {
                     Ожидает оплаты ({stats.pending_count} заявок)
                   </div>
                 </div>
-                <div className="cashier-text-center" aria-hidden="true" style={{ visibility: 'hidden' }}>
-                  <div className="cashier-stat-num cashier-stat-green">0</div>
-                  <div className="cashier-stat-cap">Наличные</div>
-                </div>
-                <div className="cashier-text-center" aria-hidden="true" style={{ visibility: 'hidden' }}>
-                  <div className="cashier-stat-num cashier-stat-blue">0</div>
-                  <div className="cashier-stat-cap">Карта</div>
-                </div>
-                <div className="cashier-text-center" aria-hidden="true" style={{ visibility: 'hidden' }}>
-                  <div className="cashier-stat-num cashier-stat-purple">0</div>
-                  <div className="cashier-stat-cap">Оплачено</div>
-                </div>
               </>
               }
-              <div className="cashier-refresh-row">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleRefresh}
-                  title="Обновить данные">
-
-                  Обновить
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={exportToCSV}
-                  title="Экспорт в CSV">
-
-                  Экспорт
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={loadHourlyStats}
-                  title="Почасовая статистика">
-
-                  Аналитика
-                </Button>
-              </div>
             </div>
           </Card>
+
+          {/* UX Audit #3.1: отдельный toolbar для действий над списком. */}
+          <div className="cashier-toolbar">
+            <div className="cashier-toolbar-actions">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefresh}
+                title="Обновить данные">
+
+                Обновить
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exportToCSV}
+                title="Экспорт в CSV">
+
+                Экспорт
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={loadHourlyStats}
+                title="Почасовая статистика">
+
+                Аналитика
+              </Button>
+            </div>
+          </div>
 
           {/* Объединенная секция с вкладками */}
           <Card
