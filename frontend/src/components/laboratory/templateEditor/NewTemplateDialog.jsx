@@ -1,16 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
+  Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
 } from '../../ui/macos';
 
 /**
- * L-H-6 fix: NewTemplateDialog выделен в отдельный файл (~90 строк).
+ * L-H-6 fix: NewTemplateDialog выделен в отдельный файл (~110 строк).
  *
  * Phase 4+: New Template Dialog (was always-visible form).
  * Form fields: code, name, family (select), description.
+ *
+ * L-L-1 fix: inline-валидация уникальности code перед отправкой.
+ * Раньше проверка происходила только на backend — пользователь получал
+ * generic error. Теперь показываем явный Alert под полем, если code
+ * уже существует в переданном списке templates.
  */
-function NewTemplateDialog({ open, onClose, onCreate, saving }) {
+function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates = [] }) {
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -24,8 +29,20 @@ function NewTemplateDialog({ open, onClose, onCreate, saving }) {
     }
   }, [open]);
 
+  // L-L-1 fix: проверяем уникальность code на клиенте.
+  const codeConflict = useMemo(() => {
+    if (!form.code.trim()) return null;
+    const conflict = existingTemplates.find(
+      (t) => t.code.toLowerCase() === form.code.trim().toLowerCase()
+    );
+    return conflict || null;
+  }, [form.code, existingTemplates]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (codeConflict) {
+      return; // L-L-1 fix: блокируем отправку если code уже существует
+    }
     onCreate(form);
   };
 
@@ -39,12 +56,21 @@ function NewTemplateDialog({ open, onClose, onCreate, saving }) {
             <Input
               id="new-template-code"
               aria-label="Код шаблона"
+              aria-invalid={Boolean(codeConflict)}
               value={form.code}
               onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
               placeholder="Напр. hematology_basic"
               className="ltw-input-full"
               required
             />
+            {/* L-L-1 fix: inline-валидация уникальности code */}
+            {codeConflict && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                Шаблон с кодом «{codeConflict.code}» уже существует
+                {codeConflict.name ? ` (${codeConflict.name})` : ''}.
+                Выберите другой код.
+              </Alert>
+            )}
           </div>
           <div>
             <Label htmlFor="new-template-name" className="ltw-label">Название</Label>
@@ -60,7 +86,6 @@ function NewTemplateDialog({ open, onClose, onCreate, saving }) {
           </div>
           <div>
             <Label htmlFor="new-template-family" className="ltw-label">Семейство</Label>
-            {/* PR-59: replaced free-text Input with <select> to prevent typo-induced fragmentation */}
             <select
               id="new-template-family"
               aria-label="Семейство шаблона"
@@ -94,7 +119,12 @@ function NewTemplateDialog({ open, onClose, onCreate, saving }) {
       </DialogContent>
       <DialogActions>
         <Button variant="outline" onClick={onClose}>Отмена</Button>
-        <Button variant="primary" type="submit" form="new-template-form" disabled={saving}>
+        <Button
+          variant="primary"
+          type="submit"
+          form="new-template-form"
+          disabled={saving || Boolean(codeConflict)}
+        >
           <Icon name="plus" size={16} />
           Создать
         </Button>
@@ -108,6 +138,8 @@ NewTemplateDialog.propTypes = {
   onClose: PropTypes.func.isRequired,
   onCreate: PropTypes.func.isRequired,
   saving: PropTypes.bool,
+  existingTemplates: PropTypes.array,
 };
 
 export default NewTemplateDialog;
+

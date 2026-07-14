@@ -51,9 +51,11 @@ export default function LabReportActionsBar({
       )}
       {showSecondaryGroup && (
         <>
-          <Button variant="outline" onClick={onRevise} disabled={saving || !canRevise}>
+          <Button variant="outline" onClick={onRevise} disabled={saving || !canRevise} title="Создать исправленную версию отчёта">
             <Icon name="arrow.triangle.branch" size={16} />
-            {busyAction === 'revise' ? 'Создаю исправленную версию...' : 'Создать исправленную версию'}
+            {/* L-L-2 fix: сокращён текст кнопки для tablet-friendly layout.
+                Полное название доступно в title-атрибуте. */}
+            {busyAction === 'revise' ? 'Создаю...' : 'Исправленная версия'}
           </Button>
           <Button variant="outline" onClick={onPrint} disabled={saving || !canPrint}>
             <Icon name="printer" size={16} />
