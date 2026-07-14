@@ -215,17 +215,17 @@ const CartStepV2 = ({
                 className={`compact-service-card ${isInCart ? 'selected' : ''}`}>
 
                 <Checkbox aria-label={`Select service ${service.name || service.service_code || service.id}`} checked={isInCart} onChange={() => handleServiceToggle(service)}
-                  style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, margin: 0 }} />
+                  className="cart-step-v2__service-checkbox" />
 
-                <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '0px' }}>
-                  <div className="service-name-text" title={service.name} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div className="cart-step-v2__service-info">
+                  <div className="service-name-text cart-step-v2__service-name-row" title={service.name}>
                     {/* PR-25: show service code badge for unambiguous identification */}
                     {service.service_code && (
                       <span className="cart-step-v2__service-code">
                         {String(service.service_code).toUpperCase()}
                       </span>
                     )}
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{service.name}</span>
+                    <span className="cart-step-v2__service-name">{service.name}</span>
                   </div>
                   <div className="service-price-text">
                     {service.price?.toLocaleString()} сум
@@ -247,33 +247,15 @@ const CartStepV2 = ({
       <div className="cart-step-v2__bottom-panel">
         <div className="cart-step-v2__summary-row">
           <span>Выбрано: {cart?.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0} шт.</span>
-          <span style={{ color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
+          <span className="cart-step-v2__cart-total">
             Итого: {cartTotal.toLocaleString()} сум
           </span>
         </div>
 
         {consultationRows.length > 0 &&
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--mac-spacing-2)',
-          padding: 'var(--mac-spacing-2)',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-sm)',
-          background: 'var(--mac-bg-secondary)'
-        }}>
-            <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)',
-            flexWrap: 'wrap'
-          }}>
-              <span style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)'
-            }}>
+        <div className="cart-step-v2__consultation-section">
+            <div className="cart-step-v2__consultation-row">
+              <span className="cart-step-v2__consultation-title">
                 Повторная скидка для консультаций
               </span>
               <Button
@@ -295,29 +277,12 @@ const CartStepV2 = ({
             const reason = row.eligibility?.reason || 'Проверка недоступна';
             const discount = Number(row.eligibility?.repeat_discount_percent || 0);
             return (
-              <div
-                key={row.itemId}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 'var(--mac-spacing-2)'
-                }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-primary)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }} title={row.serviceName}>
+              <div key={row.itemId} className="cart-step-v2__consultation-row">
+                  <div className="cart-step-v2__consultation-info">
+                    <div className="cart-step-v2__consultation-service-name" title={row.serviceName}>
                       {row.serviceName}
                     </div>
-                    <div style={{
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>
+                    <div className="cart-step-v2__consultation-doctor">
                       {row.doctorName ? `Врач: ${row.doctorName}` : 'Врач не выбран'}
                     </div>
                   </div>
@@ -438,11 +403,11 @@ const CartStepV2 = ({
                   gap: 'var(--mac-spacing-2)',
                   whiteSpace: 'nowrap'
                 }}>
-                    <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
+                    <span className="cart-step-v2__cart-item-name" title={displayName}>
                       {displayName}
                     </span>
                     {/* PR-23 P0 #2: quantity stepper */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <div className="cart-step-v2__qty-controls">
                       <button
                         onClick={() => {
                           const newQty = (item.quantity || 1) - 1;
@@ -453,12 +418,12 @@ const CartStepV2 = ({
                           }
                         }}
                         aria-label={`Decrease quantity for ${displayName}`}
-                        style={{ border: '1px solid var(--mac-border)', background: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)', cursor: 'pointer', borderRadius: '3px', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', lineHeight: 1 }}>−</button>
-                      <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: 600 }}>{item.quantity || 1}</span>
+                        className="cart-step-v2__qty-btn">−</button>
+                      <span className="cart-step-v2__qty-value">{item.quantity || 1}</span>
                       <button
                         onClick={() => onUpdateItem?.(item.id, 'quantity', (item.quantity || 1) + 1)}
                         aria-label={`Increase quantity for ${displayName}`}
-                        style={{ border: '1px solid var(--mac-border)', background: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)', cursor: 'pointer', borderRadius: '3px', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', lineHeight: 1 }}>+</button>
+                        className="cart-step-v2__qty-btn">+</button>
                     </div>
                     <button
                     onClick={() => onRemoveFromCart(item.id)}
@@ -503,7 +468,7 @@ const CartStepV2 = ({
                           </option>)}
                       </select>
                       {filteredDoctors.length === 0 && normalizedDoctorsData.length > 0 && (
-                        <span style={{ fontSize: '10px', color: 'var(--mac-text-tertiary)' }}>
+                        <span className="cart-step-v2__discount-hint">
                           Нет врача для этого отделения — показаны все
                         </span>
                       )}
