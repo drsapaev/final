@@ -222,12 +222,10 @@ const WelcomeView = React.memo(({
 
           {/* Панель управления и фильтров */}
           {/* QW-08 fix: unwrapped nested AnimatedTransition (was delays 800-1500). */}
+            {/* UX Audit R-4.6: убран мета-заголовок «Панель управления».
+                Две группы кнопок ниже сами по себе понятны, лишний
+                заголовок создавал визуальный шум (Nielsen #8). */}
             <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
-                <h2 className="registrar-section-heading">
-                  <Icon name="square.grid.2x2" size="default" className="registrar-text-accent" />
-                  Панель управления
-                </h2>
-
               {/* Быстрые действия */}
                 <div className="registrar-grid-auto" style={{ marginBottom: 'var(--mac-spacing-6)' }}>
                     <Button
