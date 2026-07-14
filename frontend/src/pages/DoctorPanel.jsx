@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useDebouncedValue } from '../hooks/useDebouncedCallback';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -55,6 +54,8 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { getRegistrarTimestampDisplay } from '../utils/dateUtils';
+// UX Audit Doctor H-30: import DoctorQueuePanel instead of inline queue rendering.
+import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 
 const hasBackendQueueAction = (entry, action, flagName) => {
   if (!entry) return false;
@@ -67,8 +68,7 @@ const hasBackendQueueAction = (entry, action, flagName) => {
   return false;
 };
 
-// UX Audit Doctor H-10: added 'visit' tab for EMR-v2 integration.
-const DOCTOR_PANEL_TABS = new Set(['dashboard', 'patients', 'appointments', 'queue', 'visit', 'ai', 'reports']);
+const DOCTOR_PANEL_TABS = new Set(['dashboard', 'patients', 'appointments', 'queue', 'ai', 'reports']);
 
 const DoctorPanel = () => {
   const location = useLocation();
@@ -105,12 +105,7 @@ const DoctorPanel = () => {
   const patientModal = useModal();
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [searchQuery, setSearchQuery] = useState('');
-  // UX Audit Doctor M-12: debounce search to avoid lag on large lists.
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const [filterStatus, setFilterStatus] = useState('all');
-  // UX Audit Doctor M-16: simple pagination for patient table.
-  const [patientPage, setPatientPage] = useState(0);
-  const PATIENTS_PER_PAGE = 25;
 
   // UX Audit Doctor M-46: useMemo for stat calculations (was 3 filter calls per render).
   const appointmentStats = useMemo(() => ({
@@ -471,11 +466,10 @@ const DoctorPanel = () => {
       'recovery': 'warning',
       'critical': 'danger',
       'scheduled': 'primary',
-      // UX Audit Doctor H-31: in_progress unified to 'info' (was 'warning').
-      'in_progress': 'info',
+      'in_progress': 'warning',
       'completed': 'success',
       'cancelled': 'danger',
-      // UX Audit Doctor H-31: unified queue status colors from shared config.
+      // Статусы очереди
       'waiting': 'warning',
       'called': 'primary',
       'in_service': 'info',
@@ -577,8 +571,6 @@ const DoctorPanel = () => {
   };
 
   const filteredPatients = patients.filter((patient) => {
-    // UX Audit Doctor M-12: use debounced search query.
-    const _searchQuery = debouncedSearchQuery;
     const patientName = String(patient.name || '');
     const patientPhone = String(patient.phone || '');
     const matchesSearch = patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -659,18 +651,6 @@ const DoctorPanel = () => {
                 {queueStats.waiting}
               </Badge>
             }
-          </button>
-
-          {/* UX Audit Doctor H-10: visit tab for EMR-v2 integration. */}
-          <button
-            aria-label="Открыть вкладку «Приём»"
-            style={activeTab === 'visit' ? activeTabStyle : tabStyle}
-            onClick={() => setDoctorTab('visit')}
-            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'visit', true)}
-            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'visit', false)}>
-
-            <FileText size={isMobile ? 16 : 20} />
-            {!isMobile && <span>Приём</span>}
           </button>
 
           <button
@@ -888,7 +868,7 @@ const DoctorPanel = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredPatients.slice(patientPage * PATIENTS_PER_PAGE, (patientPage + 1) * PATIENTS_PER_PAGE).map((patient) =>
+                      {filteredPatients.map((patient) =>
                   <tr
                     key={patient.id}
                     className="doctor-table-row-hover"
@@ -1100,290 +1080,20 @@ const DoctorPanel = () => {
           </AnimatedTransition>
         }
 
-        {/* ✅ НОВОЕ: Контент таба очереди */}
+        {/* UX Audit Doctor H-30: inline queue replaced with DoctorQueuePanel component. */}
         {activeTab === 'queue' &&
         <AnimatedTransition type="fade" delay={100}>
-            <Card style={patientsTableStyle}>
-              <CardHeader style={tableHeaderStyle}>
-                <div className="doctor-section-head">
-                  <div>
-                    <h2 className="doctor-section-title">
-                      Очередь пациентов
-                    </h2>
-                    <div className="doctor-section-actions doctor-section-actions-sm">
-                      <Badge variant="warning">Ожидают: {queueStats.waiting}</Badge>
-                      <Badge variant="primary">Вызваны: {queueStats.called}</Badge>
-                      <Badge variant="success">Обслужены: {queueStats.served}</Badge>
-                    </div>
-                  </div>
-                  <div className="doctor-section-actions-sm">
-                    <Button
-                    variant="primary"
-                    aria-label="Call next queue patient"
-                    onClick={async () => {
-                      try {
-                        await callNext();
-                        logger.log('Вызван следующий пациент');
-                      } catch (err) {
-                        logger.error('Ошибка вызова:', err);
-                      }
-                    }}
-                    disabled={!canCallNext}>
-
-                      <Phone size={16} />
-                      {!isMobile && <span className="doctor-ml-4">Вызвать следующего</span>}
-                    </Button>
-                    <Button
-                    variant="ghost"
-                    onClick={loadQueue}
-                    aria-label="Refresh doctor queue">
-
-                      <RotateCcw size={16} />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="doctor-card-pad-0">
-                {queueLoading ?
-              <div className="doctor-empty">
-                    <Skeleton height={40} count={5} />
-                  </div> :
-              queueError ?
-              <div className="doctor-empty" data-tone="error">
-                    <AlertCircle size={32} className="doctor-empty-icon" />
-                    <p>{queueError}</p>
-                    <Button variant="ghost" onClick={loadQueue}>Повторить</Button>
-                  </div> :
-              queueEntries.length === 0 ?
-              <div className="doctor-empty">
-                    <Users size={48} className="doctor-empty-icon" />
-                    <p>Очередь пуста</p>
-                  </div> :
-
-              <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th className="doctor-th">№</th>
-                        <th className="doctor-th">Пациент</th>
-                        <th className="doctor-th">Телефон</th>
-                        <th className="doctor-th">Время</th>
-                        <th className="doctor-th">Услуги</th>
-                        <th className="doctor-th">Статус</th>
-                        <th className="doctor-th">Действия</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {queueEntries.map((entry, index) => {
-                    const currentVisitMeta = getCurrentVisitMeta(entry);
-
-                    return (
-                  <tr
-                    key={entry.id}
-                    className={`doctor-queue-row ${currentVisitMeta ? 'doctor-queue-row-current' : entry.priority > 0 ? 'doctor-queue-row-priority' : ''}`}
-                    aria-label={currentVisitMeta ? `Current patient ${getQueuePatientContext(entry)}` : undefined}>
-
-                          <td className="doctor-td">
-                            <Badge variant={entry.priority > 0 ? 'warning' : 'default'}>
-                              {entry.number || index + 1}
-                            </Badge>
-                          </td>
-                          <td className="doctor-td" aria-label={getQueuePatientContext(entry)}>
-                            <div className="doctor-queue-entry-info">
-                              <strong>{entry.patient_name}</strong>
-                              <div className="doctor-queue-entry-row">
-                                {currentVisitMeta &&
-                                <Badge
-                                  variant={currentVisitMeta.variant}
-                                  role="status"
-                                  aria-label={`Current patient context: ${currentVisitMeta.label} for ${getQueuePatientContext(entry)}`}>
-                                  {currentVisitMeta.label}
-                                </Badge>
-                                }
-                                {entry.priority > 0 &&
-                                <span className="doctor-queue-waiting">
-                                  ⚡ Следующий
-                                </span>
-                                }
-                              </div>
-                            </div>
-                          </td>
-                          <td className="doctor-td">{entry.phone || '—'}</td>
-                          <td className="doctor-td">
-                            {/* PR-12: show queue_time / created_at + "Изменено" */}
-                            {(() => {
-                              const timeDisplay = getRegistrarTimestampDisplay(entry);
-                              if (!timeDisplay.primaryDate && !timeDisplay.primaryTime) {
-                                return '—';
-                              }
-                              return (
-                                <div className="doctor-queue-time">
-                                  <div className="doctor-queue-time-label">
-                                    {timeDisplay.primaryLabel}
-                                  </div>
-                                  <div className="doctor-queue-time-row">
-                                    <Clock size={10} />
-                                    {timeDisplay.primaryTime}
-                                  </div>
-                                  {timeDisplay.showChanged &&
-                                    <div className="doctor-queue-time-changed">
-                                      {timeDisplay.changedLabel}: {timeDisplay.changedTime}
-                                    </div>
-                                  }
-                                </div>
-                              );
-                            })()}
-                          </td>
-                          <td className="doctor-td">
-                            {entry.service_details?.length > 0 ?
-                      entry.service_details.slice(0, 2).map((svc, i) =>
-                      <Badge key={i} variant="default" className="doctor-queue-badge-mr">
-                                  {svc.name || svc.code}
-                                </Badge>
-                      ) :
-                      entry.services?.length > 0 ?
-                      <span className="doctor-queue-text-sm">
-                                {entry.services.slice(0, 2).join(', ')}
-                              </span> :
-                      '—'}
-                          </td>
-                          <td className="doctor-td">
-                            <Badge variant={getStatusVariant(entry.status)}>
-                              {getStatusText(entry.status)}
-                            </Badge>
-                            {/* ✅ Таймер для активных статусов */}
-                            {(entry.status === 'called' || entry.status === 'diagnostics') && entry.called_at &&
-                      <span className="doctor-queue-timer">
-                                <Clock size={12} />
-                                {formatElapsedTime(entry.called_at)}
-                              </span>
-                      }
-                          </td>
-                          <td className="doctor-td">
-                            {/* Backend-owned queue action contract */}
-                            {hasBackendQueueAction(entry, 'no_show', 'can_no_show') &&
-                            !hasBackendQueueAction(entry, 'send_to_diagnostics', 'can_send_to_diagnostics') &&
-                      <>
-                                <button
-                          {...getQueueActionA11yProps('Mark no-show', entry)}
-                          aria-label={`Mark no-show for ${getQueuePatientContext(entry)}`}
-                          className="doctor-action-btn doctor-action-btn-danger"
-                          onClick={() => markNoShow(entry.id)}
-                          title="Отметить неявку">
-
-                                  <XCircle size={16} />
-                                </button>
-                              </>
-                      }
-                            {hasBackendQueueAction(entry, 'send_to_diagnostics', 'can_send_to_diagnostics') &&
-                      <>
-                                <button
-                          {...getQueueActionA11yProps('Send to diagnostics', entry)}
-                          aria-label={`Send to diagnostics for ${getQueuePatientContext(entry)}`}
-                          className="doctor-action-btn doctor-action-btn-info"
-                          onClick={() => sendToDiagnostics(entry.id)}
-                          title="На обследование">
-
-                                  <Stethoscope size={16} />
-                                </button>
-                                <button
-                          {...getQueueActionA11yProps('Complete visit', entry)}
-                          aria-label={`Complete visit for ${getQueuePatientContext(entry)}`}
-                          className="doctor-action-btn doctor-action-btn-success"
-                          onClick={() => completeVisit(entry.id)}
-                          title="Завершить приём">
-
-                                  <CheckCircle size={16} />
-                                </button>
-                                <button
-                          {...getQueueActionA11yProps('Mark no-show', entry)}
-                          aria-label={`Mark no-show for ${getQueuePatientContext(entry)}`}
-                          className="doctor-action-btn doctor-action-btn-danger"
-                          onClick={() => markNoShow(entry.id)}
-                          title="Не явился">
-
-                                  <XCircle size={16} />
-                                </button>
-                              </>
-                      }
-                            {hasBackendQueueAction(entry, 'notify_diagnostics_return', 'can_notify_diagnostics_return') &&
-                      <>
-                                <button
-                          {...getQueueActionA11yProps('Call back from diagnostics', entry)}
-                          aria-label={`Call back from diagnostics for ${getQueuePatientContext(entry)}`}
-                          className="doctor-action-btn doctor-action-btn-primary"
-                          onClick={() => callFromDiagnostics(entry.id)}
-                          title="Вернуть с диагностики (Push)">
-
-                                  <Bell size={16} />
-                                </button>
-                                <button
-                          {...getQueueActionA11yProps('Complete visit', entry)}
-                          aria-label={`Complete visit for ${getQueuePatientContext(entry)}`}
-                          className="doctor-action-btn doctor-action-btn-success"
-                          onClick={() => completeVisit(entry.id)}
-                          title="Завершить приём">
-
-                                  <CheckCircle size={16} />
-                                </button>
-                                <button
-                          {...getQueueActionA11yProps('Mark visit incomplete', entry)}
-                          aria-label={`Mark visit incomplete for ${getQueuePatientContext(entry)}`}
-                          className="doctor-action-btn doctor-action-btn-warning"
-                          onClick={() => markIncomplete(entry.id, 'Не вернулся с обследования')}
-                          title="Не вернулся">
-
-                                  <AlertCircle size={16} />
-                                </button>
-                              </>
-                      }
-                            {hasBackendQueueAction(entry, 'restore_next', 'can_restore_next') &&
-                      <button
-                        {...getQueueActionA11yProps('Restore as next patient', entry)}
-                        aria-label={`Restore as next patient for ${getQueuePatientContext(entry)}`}
-                        className="doctor-action-btn doctor-action-btn-warning"
-                        onClick={() => restoreToNext(entry.id)}
-                        title="Восстановить следующим">
-
-                                <RotateCcw size={16} />
-                              </button>
-                      }
-                          </td>
-                        </tr>
-                    );
-                  })}
-                    </tbody>
-                  </table>
-              }
-              </CardContent>
-            </Card>
-          </AnimatedTransition>
-        }
-
-        {activeTab === 'visit' &&
-        <AnimatedTransition type="fade">
-          <Card className="doctor-card-mb-xl">
-            <CardHeader>
-              <h2 className="doctor-section-title">
-                Электронная медицинская карта
-              </h2>
-            </CardHeader>
-            <CardContent>
-              {/* UX Audit Doctor H-10: EMR-v2 integration for general doctor. */}
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mac-text-secondary)' }}>
-                <FileText size={48} style={{ marginBottom: '12px', opacity: 0.5 }} />
-                <p style={{ fontSize: '15px', marginBottom: '8px' }}>
-                  Выберите пациента из очереди, чтобы открыть электронную медицинскую карту.
-                </p>
-                <Button variant="primary" onClick={() => setDoctorTab('queue')}>
-                  Открыть очередь
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <DoctorQueuePanel
+            specialty={doctorSpecialty}
+            onPatientSelect={(entry) => {
+              // Open patient modal when selecting from queue
+              handlePatientClick(entry);
+            }}
+          />
         </AnimatedTransition>
         }
 
-        {activeTab === 'ai' &&
+{activeTab === 'ai' &&
         <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
