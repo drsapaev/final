@@ -1331,7 +1331,31 @@ const CashierPanel = () => {
             {activeTab === 'pending' &&
             <div className="cashier-section-gap">
                 {pendingLoading ?
-              <Skeleton className="cashier-skeleton-h" /> :
+              (/* UX Audit #4.4: skeleton rows внутри tbody сохраняют заголовки таблицы. */
+              <div className="cashier-table-scroll">
+                <table className="cashier-table">
+                  <thead>
+                    <tr className="cashier-table-row">
+                      <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
+                      <th className="cashier-text-sm cashier-text-primary">Пациент</th>
+                      <th className="cashier-text-sm cashier-text-primary">Услуги</th>
+                      <th className="cashier-text-sm cashier-text-primary">Сумма</th>
+                      <th className="cashier-text-sm cashier-text-primary">Статус</th>
+                      <th className="cashier-text-sm cashier-text-primary">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={`skeleton-pending-${i}`} className="cashier-table-row">
+                        {Array.from({ length: 6 }).map((_, j) => (
+                          <td key={j} className="cashier-cell-padded"><Skeleton height={20} /></td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              ) :
               appointments.length > 0 ?
               <div className="cashier-table-scroll">
                     <table className="cashier-table">
@@ -1472,7 +1496,32 @@ const CashierPanel = () => {
             {activeTab === 'history' &&
             <div className="cashier-section-gap">
                 {historyLoading ?
-              <Skeleton className="cashier-skeleton-h" /> :
+              (/* UX Audit #4.4: skeleton rows для history-tab — сохраняют заголовки таблицы. */
+              <div className="cashier-table-scroll">
+                <table className="cashier-table">
+                  <thead>
+                    <tr className="cashier-table-row">
+                      <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
+                      <th className="cashier-text-sm cashier-text-primary">Пациент</th>
+                      <th className="cashier-text-sm cashier-text-primary">Услуга</th>
+                      <th className="cashier-text-sm cashier-text-primary">Способ</th>
+                      <th className="cashier-text-sm cashier-text-primary">Сумма</th>
+                      <th className="cashier-text-sm cashier-text-primary">Статус</th>
+                      <th className="cashier-text-sm cashier-text-primary">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={`skeleton-history-${i}`} className="cashier-table-row">
+                        {Array.from({ length: 7 }).map((_, j) => (
+                          <td key={j} className="cashier-cell-padded"><Skeleton height={20} /></td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              ) :
 
               <div className="cashier-table-scroll">
                     <table className="cashier-table">
