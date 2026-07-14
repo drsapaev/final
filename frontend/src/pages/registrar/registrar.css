@@ -10,9 +10,26 @@
  * the canonical token reference.
  *
  * All classes use macOS design system tokens (var(--mac-*)).
+ *
+ * UX Audit R-4.5: DEPRECATION NOTICE for utility classes below.
+ * ─────────────────────────────────────────────────────────────────
+ * The following utility classes (.registrar-flex, .registrar-text-*,
+ * .registrar-grid-*, .registrar-icon-mr, .registrar-overflow-hidden)
+ * duplicate Tailwind / macOS design system patterns. They add a third
+ * layer of abstraction on top of CSS tokens and Tailwind.
+ *
+ * DEPRECATION PLAN:
+ * - Phase 1 (this PR): mark as @deprecated in comments below.
+ * - Phase 2 (future PR): replace usages in JSX with direct var(--mac-*)
+ *   tokens in component-scoped CSS modules.
+ * - Phase 3 (future PR): delete deprecated classes from this file.
+ *
+ * New code should NOT use these utility classes — use var(--mac-*)
+ * tokens directly in component CSS.
+ * ─────────────────────────────────────────────────────────────────
  */
 
-/* ─── Flexbox utilities ─── */
+/* ─── Flexbox utilities (DEPRECATED — see R-4.5 notice above) ─── */
 
 .registrar-flex {
   display: flex;
@@ -42,7 +59,7 @@
   flex-wrap: wrap;
 }
 
-/* ─── Grid utilities ─── */
+/* ─── Grid utilities (DEPRECATED — see R-4.5 notice above) ─── */
 
 .registrar-grid-auto {
   display: grid;
@@ -69,7 +86,7 @@
   -webkit-backdrop-filter: var(--mac-blur-light);
 }
 
-/* ─── Text utilities ─── */
+/* ─── Text utilities (DEPRECATED — see R-4.5 notice above) ─── */
 
 .registrar-text-primary {
   color: var(--mac-text-primary);
