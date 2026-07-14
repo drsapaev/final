@@ -723,42 +723,15 @@ const RegistrarPanel = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard]);  
+  }, [showWizard]);
 
-  // ✅ Проверка localStorage для обновления после присоединения к очереди (fallback механизм)
-  useEffect(() => {
-    const checkLastQueueJoin = () => {
-      try {
-        const lastJoinStr = localStorage.getItem('lastQueueJoin');
-        if (!lastJoinStr) return;
-
-        const lastJoin = JSON.parse(lastJoinStr);
-        const joinTime = new Date(lastJoin.timestamp);
-        const now = new Date();
-        const diffMs = now - joinTime;
-
-        // Проверяем только если прошло меньше 10 секунд с момента присоединения
-        if (diffMs < 10000 && diffMs > 0) {
-          logger.info('[RegistrarPanel] Обнаружено недавнее присоединение к очереди, обновляем данные');
-          logger.info('[RegistrarPanel] Данные присоединения:', lastJoin);
-          // Удаляем флаг после использования
-          localStorage.removeItem('lastQueueJoin');
-          // Обновляем данные
-          setTimeout(() => {
-            loadAppointments({ source: 'queueJoin_fallback', silent: false });
-          }, 500);
-        }
-      } catch (err) {
-        logger.error('[RegistrarPanel] Ошибка проверки lastQueueJoin:', err);
-      }
-    };
-
-    // Проверяем при монтировании и каждые 2 секунды
-    checkLastQueueJoin();
-    const interval = setInterval(checkLastQueueJoin, 2000);
-
-    return () => clearInterval(interval);
-  }, [loadAppointments]);
+  // UX Audit R-1.7: lastQueueJoin polling (2s) удалён.
+  // Раньше: setInterval(checkLastQueueJoin, 2000) проверял localStorage
+  // каждые 2 секунды — 60 проверок в минуту, даже когда очередь не используется.
+  // Теперь: обновление приходит через `queueUpdated` window-event listener
+  // (строки ниже), который запускается WebSocket'ом ModernQueueManager.
+  // Для fallback между вкладками можно использовать BroadcastChannel,
+  // но polling localStorage — это неэффективный паттерн.
 
   // Автообновление очереди с возможностью паузы (в тихом режиме)
   useEffect(() => {
