@@ -558,6 +558,32 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
 
                 {/* Sections */}
                 <div className="emr-v2-sections">
+                    {/* UX Audit Doctor M-48: progress indicator for EMR sections. */}
+                    {(() => {
+                        const sections = [
+                            { name: 'Жалобы', filled: !!(data?.complaints?.text || data?.complaints) },
+                            { name: 'Анамнез', filled: !!(data?.anamnesis_morbi?.text || data?.anamnesis_morbi) },
+                            { name: 'Осмотр', filled: !!(data?.examination?.text || data?.examination) },
+                            { name: 'Диагноз', filled: !!(data?.diagnosis?.text || data?.diagnosis) },
+                            { name: 'Лечение', filled: !!(data?.treatment?.text || data?.treatment) },
+                            { name: 'Рекомендации', filled: !!(data?.recommendations?.text || data?.recommendations) },
+                            { name: 'Заметки', filled: !!(data?.notes?.text || data?.notes) },
+                        ];
+                        const filledCount = sections.filter(s => s.filled).length;
+                        return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                                <span>Заполнено: {filledCount} из {sections.length}</span>
+                                <div style={{ flex: 1, maxWidth: '200px', height: '6px', borderRadius: '3px', background: 'var(--mac-bg-tertiary)' }}>
+                                    <div style={{ width: `${(filledCount / sections.length) * 100}%`, height: '100%', borderRadius: '3px', background: 'var(--mac-success)', transition: 'width 0.3s ease' }} />
+                                </div>
+                                {sections.filter(s => !s.filled).length > 0 && (
+                                    <span style={{ fontSize: '12px' }}>
+                                        Осталось: {sections.filter(s => !s.filled).map(s => s.name).join(', ')}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })()}
                     {/* Phase 4+ cognitive load reduction: sections are collapsible.
                         Default-open: Complaints + Examination + Diagnosis (the 3
                         sections a doctor fills on every visit).
@@ -755,14 +781,20 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                                 <><Save size={14} aria-hidden="true" /> Сохранить</>
                             )}
                         </button>
+                            {/* UX Audit Doctor M-13: комбинированная кнопка «Сохранить и подписать». */}
                             <button
                                 className="emr-v2-btn emr-v2-btn--success"
-                                onClick={handleSign}
-                                disabled={isSaving || isDirty || accessDenied}
-                                title={accessDenied ? 'Нет прав на изменение EMR' : (isDirty ? 'Сначала сохраните' : 'Подписать')}
-                                aria-label="Подписать EMR"
+                                onClick={async () => {
+                                    if (isDirty) {
+                                        await saveEMR({ isDraft: false });
+                                    }
+                                    handleSign();
+                                }}
+                                disabled={isSaving || accessDenied}
+                                title={accessDenied ? 'Нет прав на изменение EMR' : 'Сохранить и подписать в один шаг'}
+                                aria-label="Сохранить и подписать EMR"
                             >
-                                <CheckCircle2 size={14} aria-hidden="true" /> Подписать
+                                <CheckCircle2 size={14} aria-hidden="true" /> Сохранить и подписать
                             </button>
                         </>
                     ) : (
