@@ -481,21 +481,9 @@ const DoctorPanel = () => {
     borderCollapse: 'collapse'
   };
 
-  const thStyle = {
-    padding: getSpacing('md'),
-    textAlign: 'left',
-    fontWeight: 'var(--mac-font-weight-semibold)',
-    color: getColor('secondary', 700),
-    fontSize: getFontSize('sm'),
-    borderBottom: `1px solid ${getColor('secondary', 200)}`
-  };
-
-  const tdStyle = {
-    padding: getSpacing('md'),
-    borderBottom: '1px solid color-mix(in srgb, var(--mac-separator), transparent 30%)',
-    fontSize: getFontSize('sm'),
-    color: 'var(--mac-text-secondary)'
-  };
+  // Phase 3: thStyle/tdStyle constants removed — replaced by .doctor-th / .doctor-td CSS classes.
+  // The CSS classes use var(--mac-*) tokens directly, eliminating the need for JS-side
+  // getSpacing/getColor/getFontSize calls that produced the same values.
 
 
   // Функции
@@ -929,12 +917,12 @@ const DoctorPanel = () => {
 <table style={tableStyle}>
                     <thead>
                       <tr>
-                        <th style={thStyle}>Пациент</th>
-                        <th style={thStyle}>Возраст</th>
-                        <th style={thStyle}>Телефон</th>
-                        <th style={thStyle}>Диагноз</th>
-                        <th style={thStyle}>Статус</th>
-                        <th style={thStyle}>Действия</th>
+                        <th className="doctor-th">Пациент</th>
+                        <th className="doctor-th">Возраст</th>
+                        <th className="doctor-th">Телефон</th>
+                        <th className="doctor-th">Диагноз</th>
+                        <th className="doctor-th">Статус</th>
+                        <th className="doctor-th">Действия</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -945,7 +933,7 @@ const DoctorPanel = () => {
                     aria-label={`Open ${getPatientA11yContext(patient)}`}
                     onClick={() => handlePatientClick(patient)}>
 
-                          <td style={tdStyle} aria-label={getPatientA11yContext(patient)}>
+                          <td className="doctor-td" aria-label={getPatientA11yContext(patient)}>
                             <div className="doctor-patient-cell">
                               <div className="doctor-avatar-sm" style={{ '--doctor-gradient-from': primaryColor, '--doctor-gradient-to': getColor('primary', 600) }}>
                                 {String(patient.name || 'Пациент').split(' ').map((n) => n[0]).join('')}
@@ -960,15 +948,15 @@ const DoctorPanel = () => {
                               </div>
                             </div>
                           </td>
-                          <td style={tdStyle}>{patient.age ? `${patient.age} лет` : '—'}</td>
-                          <td style={tdStyle}>{patient.phone || '—'}</td>
-                          <td style={tdStyle}>{patient.diagnosis || '—'}</td>
-                          <td style={tdStyle} aria-label={`${getPatientA11yContext(patient)} status`}>
+                          <td className="doctor-td">{patient.age ? `${patient.age} лет` : '—'}</td>
+                          <td className="doctor-td">{patient.phone || '—'}</td>
+                          <td className="doctor-td">{patient.diagnosis || '—'}</td>
+                          <td className="doctor-td" aria-label={`${getPatientA11yContext(patient)} status`}>
                             <Badge variant={getStatusVariant(patient.status)} size="md">
                               {getStatusText(patient.status)}
                             </Badge>
                           </td>
-                          <td style={tdStyle} aria-label={`${getPatientA11yContext(patient)} actions`}>
+                          <td className="doctor-td" aria-label={`${getPatientA11yContext(patient)} actions`}>
                             <button
                         aria-label={`Edit ${getPatientA11yContext(patient)}`}
                         className="doctor-action-btn doctor-action-btn-primary"
@@ -1078,12 +1066,12 @@ const DoctorPanel = () => {
               <table style={tableStyle}>
                     <thead>
                       <tr>
-                        <th style={thStyle}>Время</th>
-                        <th style={thStyle}>Пациент</th>
-                        <th style={thStyle}>Тип</th>
-                        <th style={thStyle}>Статус</th>
-                        <th style={thStyle}>Примечания</th>
-                        <th style={thStyle}>Действия</th>
+                        <th className="doctor-th">Время</th>
+                        <th className="doctor-th">Пациент</th>
+                        <th className="doctor-th">Тип</th>
+                        <th className="doctor-th">Статус</th>
+                        <th className="doctor-th">Примечания</th>
+                        <th className="doctor-th">Действия</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1092,21 +1080,21 @@ const DoctorPanel = () => {
                     key={appointment.id}
                     className="doctor-table-row-hover">
 
-                          <td style={tdStyle}>
+                          <td className="doctor-td">
                             <div className="doctor-patient-cell">
                               <Clock size={16} className="doctor-patient-meta" />
                               {appointment.time}
                             </div>
                           </td>
-                          <td style={tdStyle}>{appointment.patientName || 'Пациент'}</td>
-                          <td style={tdStyle}>{appointment.type || '—'}</td>
-                          <td style={tdStyle}>
+                          <td className="doctor-td">{appointment.patientName || 'Пациент'}</td>
+                          <td className="doctor-td">{appointment.type || '—'}</td>
+                          <td className="doctor-td">
                             <Badge variant={getStatusVariant(appointment.status)} size="md">
                               {getStatusText(appointment.status)}
                             </Badge>
                           </td>
-                          <td style={tdStyle}>{appointment.notes || '—'}</td>
-                          <td style={tdStyle}>
+                          <td className="doctor-td">{appointment.notes || '—'}</td>
+                          <td className="doctor-td">
                             <button
                         aria-label={`Edit ${getAppointmentA11yContext(appointment)}`}
                         className="doctor-action-btn doctor-action-btn-primary"
@@ -1211,13 +1199,13 @@ const DoctorPanel = () => {
               <table style={tableStyle}>
                     <thead>
                       <tr>
-                        <th style={thStyle}>№</th>
-                        <th style={thStyle}>Пациент</th>
-                        <th style={thStyle}>Телефон</th>
-                        <th style={thStyle}>Время</th>
-                        <th style={thStyle}>Услуги</th>
-                        <th style={thStyle}>Статус</th>
-                        <th style={thStyle}>Действия</th>
+                        <th className="doctor-th">№</th>
+                        <th className="doctor-th">Пациент</th>
+                        <th className="doctor-th">Телефон</th>
+                        <th className="doctor-th">Время</th>
+                        <th className="doctor-th">Услуги</th>
+                        <th className="doctor-th">Статус</th>
+                        <th className="doctor-th">Действия</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1230,12 +1218,12 @@ const DoctorPanel = () => {
                     className={`doctor-queue-row ${currentVisitMeta ? 'doctor-queue-row-current' : entry.priority > 0 ? 'doctor-queue-row-priority' : ''}`}
                     aria-label={currentVisitMeta ? `Current patient ${getQueuePatientContext(entry)}` : undefined}>
 
-                          <td style={tdStyle}>
+                          <td className="doctor-td">
                             <Badge variant={entry.priority > 0 ? 'warning' : 'default'}>
                               {entry.number || index + 1}
                             </Badge>
                           </td>
-                          <td style={tdStyle} aria-label={getQueuePatientContext(entry)}>
+                          <td className="doctor-td" aria-label={getQueuePatientContext(entry)}>
                             <div className="doctor-queue-entry-info">
                               <strong>{entry.patient_name}</strong>
                               <div className="doctor-queue-entry-row">
@@ -1255,8 +1243,8 @@ const DoctorPanel = () => {
                               </div>
                             </div>
                           </td>
-                          <td style={tdStyle}>{entry.phone || '—'}</td>
-                          <td style={tdStyle}>
+                          <td className="doctor-td">{entry.phone || '—'}</td>
+                          <td className="doctor-td">
                             {/* PR-12: show queue_time / created_at + "Изменено" */}
                             {(() => {
                               const timeDisplay = getRegistrarTimestampDisplay(entry);
@@ -1264,16 +1252,16 @@ const DoctorPanel = () => {
                                 return '—';
                               }
                               return (
-                                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
-                                  <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: '2px' }}>
+                                <div className="doctor-queue-time">
+                                  <div className="doctor-queue-time-label">
                                     {timeDisplay.primaryLabel}
                                   </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <div className="doctor-queue-time-row">
                                     <Clock size={10} />
                                     {timeDisplay.primaryTime}
                                   </div>
                                   {timeDisplay.showChanged &&
-                                    <div style={{ marginTop: '2px', color: 'var(--mac-text-tertiary)' }}>
+                                    <div className="doctor-queue-time-changed">
                                       {timeDisplay.changedLabel}: {timeDisplay.changedTime}
                                     </div>
                                   }
@@ -1281,7 +1269,7 @@ const DoctorPanel = () => {
                               );
                             })()}
                           </td>
-                          <td style={tdStyle}>
+                          <td className="doctor-td">
                             {entry.service_details?.length > 0 ?
                       entry.service_details.slice(0, 2).map((svc, i) =>
                       <Badge key={i} variant="default" className="doctor-queue-badge-mr">
@@ -1294,7 +1282,7 @@ const DoctorPanel = () => {
                               </span> :
                       '—'}
                           </td>
-                          <td style={tdStyle}>
+                          <td className="doctor-td">
                             <Badge variant={getStatusVariant(entry.status)}>
                               {getStatusText(entry.status)}
                             </Badge>
@@ -1306,7 +1294,7 @@ const DoctorPanel = () => {
                               </span>
                       }
                           </td>
-                          <td style={tdStyle}>
+                          <td className="doctor-td">
                             {/* Backend-owned queue action contract */}
                             {hasBackendQueueAction(entry, 'no_show', 'can_no_show') &&
                             !hasBackendQueueAction(entry, 'send_to_diagnostics', 'can_send_to_diagnostics') &&
