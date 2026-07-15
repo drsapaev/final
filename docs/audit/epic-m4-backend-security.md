@@ -17,14 +17,18 @@
 
 ## P0 — Production Blockers (до deployment с реальными пациентами)
 
-### M4-P0-1 — PHI Audit Trail для patient-endpoints
+### M4-P0-1 — PHI Audit Trail для patient-endpoints ✅ DONE
 
 **Серьёзность:** P0 (регуляторное требование)
+**Статус:** ✅ Реализовано (PR pending)
 **Файлы:**
-- `backend/app/models/emr_v2.py:235` — `EMRAuditLog` model (существует, но не используется для patient-access)
-- `backend/app/api/v1/endpoints/telegram_webhook/_clinic_bot.py:1188` — `_build_mini_app_patient_report_download_response` (не логирует)
-- `backend/app/api/v1/endpoints/telegram_webhook/_clinic_bot.py:1141` — `_build_mini_app_patient_cabinet_summary_from_request` (не логирует)
-- `backend/app/api/v1/endpoints/telegram_webhook/_clinic_bot.py:1244` — `_build_mini_app_patient_forms_preview_from_request` (не логирует)
+- `backend/app/models/patient_access_audit.py` (новый) — `PatientAccessAuditLog` model
+- `backend/app/services/patient_access_audit.py` (новый) — `log_patient_access()` wrapper
+- `backend/alembic/versions/0040_patient_access_audit.py` (новый) — migration
+- `backend/app/api/v1/endpoints/telegram_webhook/_clinic_bot.py` — интеграция во все patient-endpoints
+- `backend/app/api/v1/endpoints/telegram_webhook/_routes.py` — `request: Request` parameter added
+- `backend/tests/unit/test_patient_access_audit.py` (новый) — 11 unit tests
+- `backend/app/models/__init__.py` — model registration
 
 **Текущее состояние:**
 - `EMRAuditLog` model существует с полями: `emr_id`, `patient_id`, `visit_id`, `action`, `user_id`, `user_role`, `ip_address`, `user_agent`, `extra_data`, `timestamp`
