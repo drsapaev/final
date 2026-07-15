@@ -257,7 +257,7 @@ describe('RegistrarPanel command contract', () => {
     expect(resolverBlock).not.toContain('appointment_id');
     expect(resolverBlock).not.toContain('appointment_ids');
     expect(resolverBlock).not.toContain('appointmentRow?.id');
-    expect(source).toContain('Не удалось определить визит для переноса');
+    expect(source).toContain("tI18n('registrar.no_visit_for_postpone')");
   });
 });
 
