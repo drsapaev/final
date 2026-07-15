@@ -98,6 +98,7 @@ from .emr_version import EMRVersion
 from .family_relation import FamilyRelation, RelationType
 from .feature_flags import FeatureFlag, FeatureFlagHistory
 from .patient_access_audit import PatientAccessAuditLog  # M4-P0-1: PHI audit trail
+from .patient_relationship import PatientRelationship, RelationshipType  # M4-P1-3: context roles
 from .file_system import (
     File,
     FileAccessLog,
@@ -197,6 +198,7 @@ __all__ = [
     "User",
     "Patient",
     "PatientAccessAuditLog",  # M4-P0-1: PHI access audit trail
+    "PatientRelationship",  # M4-P1-3: context roles (guardian/heir/caregiver)
     "Visit",
     "VisitService",
     "Service",

@@ -203,9 +203,10 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ---
 
-### M4-P1-3 — Context Roles (guardian / heir / caregiver)
+### M4-P1-3 — Context Roles (guardian / heir / caregiver) ✅ DONE
 
 **Серьёзность:** P1 (feature)
+**Статус:** ✅ Реализовано (PR pending)
 **Файлы:**
 - `backend/app/services/telegram_mini_app_init_data.py:515-530` — `_patient_scope` всегда возвращает `scope.patient_id = telegram_user.patient_id` (только self)
 - `backend/app/models/telegram_config.py:150-154` — `TelegramUser.patient_id` (один patient_id, нет guardian/heir relations)
