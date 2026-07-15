@@ -397,6 +397,16 @@ const TRANSLATIONS = {
     section_fallback: 'Секция',
     field_fallback: 'Поле',
   },
+
+  // ─── Session (STRAT#26 — for future migration when guardrail allows) ─────
+  session: {
+    expired: 'Сессия истекла. Пожалуйста, войдите снова.',
+    extending: 'Продлеваем сессию...',
+    warning_title: 'Сессия скоро истечёт',
+    warning_body: 'Ваша сессия истекает. Продлите, чтобы не потерять несохранённые данные.',
+    btn_later: 'Позже',
+    btn_extend: 'Продлить сессию',
+  },
 };
 
 /**
