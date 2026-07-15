@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useRef } from 'react';
 import {
   CreditCard,
@@ -165,7 +166,7 @@ const PaymentProviderDialog = ({
         clearPolling();
         setPaymentState('failed');
         setError('Время ожидания оплаты истекло. Проверьте статус платежа вручную.');
-        notify.error('Время ожидания истекло');
+        notify.error(t('payment.timeout'));
       }
     }, pollingIntervalMs);
   };
@@ -184,7 +185,7 @@ const PaymentProviderDialog = ({
         const tickets = Array.isArray(data.print_tickets) ? data.print_tickets : [];
         setPrintTickets(tickets);
 
-        notify.success('Платёж успешно завершён!');
+        notify.success(t('payment.payment_success'));
 
         // Показываем принтер талонов если есть талоны для печати
         setShowTicketPrinter(tickets.length > 0);
@@ -551,7 +552,7 @@ const PaymentProviderDialog = ({
           onClose={() => setShowTicketPrinter(false)}
           onAllPrinted={() => {
             setShowTicketPrinter(false);
-            notify.success('Все талоны напечатаны!');
+            notify.success(t('payment.all_receipts_printed'));
           }} />
 
       </ModernDialog>

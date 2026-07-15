@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * RefundRequestsTable - Table for managing refund requests
  *
@@ -137,7 +138,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Process error:', err);
-      notify.error('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
+      notify.error(t('payment.refund_error') + (err.message || t('payment.unknown_error')));
     } finally {
       setProcessingId(null);
     }
@@ -264,7 +265,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     },
     {
       key: 'patient_name',
-      title: 'Пациент',
+      title: t('payment.col_patient'),
       render: (_value, request) => (
         <span className="refund-inline-cluster">
           <User size={16} color="var(--mac-text-secondary)" aria-hidden="true" />
@@ -274,17 +275,17 @@ const RefundRequestsTable = ({ onRefresh }) => {
     },
     {
       key: 'amount',
-      title: 'Сумма',
+      title: t('payment.col_amount'),
       render: (amount) => <span className="refund-cell-amount">{formatAmount(amount)}</span>
     },
     {
       key: 'refund_type',
-      title: 'Тип',
+      title: t('payment.col_type'),
       render: (type) => getRefundTypeBadge(type)
     },
     {
       key: 'reason',
-      title: 'Причина',
+      title: t('payment.col_reason'),
       render: (reason) => (
         <span className="refund-cell-reason" title={reason}>
           {reason || '—'}
@@ -293,17 +294,17 @@ const RefundRequestsTable = ({ onRefresh }) => {
     },
     {
       key: 'status',
-      title: 'Статус',
+      title: t('payment.col_status'),
       render: (status) => getStatusBadge(status)
     },
     {
       key: 'created_at',
-      title: 'Дата',
+      title: t('payment.col_date'),
       render: (createdAt) => <span className="refund-cell-muted">{formatDate(createdAt)}</span>
     },
     {
       key: 'actions',
-      title: 'Действия',
+      title: t('payment.col_actions'),
       render: (_value, request) => renderActions(request)
     }
   ];

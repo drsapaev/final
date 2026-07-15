@@ -674,6 +674,24 @@ const TRANSLATIONS = {
     treatment_plan_save_failed: 'Не удалось сохранить план лечения. Проверьте соединение и попробуйте снова.',
     visit_protocol_save_failed: 'Не удалось сохранить протокол визита. Проверьте соединение и попробуйте снова.',
   },
+  // ─── Payment (STRAT#39) ──────────────────────────────────────────────────
+  payment: {
+    timeout: 'Время ожидания истекло',
+    payment_success: 'Платёж успешно завершён!',
+    all_receipts_printed: 'Все талоны напечатаны!',
+    invalid_amount: 'Введите корректную сумму',
+    insufficient_amount: 'Полученная сумма меньше суммы к оплате',
+    refund_error: 'Ошибка: ',
+    unknown_error: 'Неизвестная ошибка',
+    // RefundRequestsTable headers
+    col_patient: 'Пациент',
+    col_amount: 'Сумма',
+    col_type: 'Тип',
+    col_reason: 'Причина',
+    col_status: 'Статус',
+    col_date: 'Дата',
+    col_actions: 'Действия',
+  },
 };
 
 /**
