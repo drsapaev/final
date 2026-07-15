@@ -21,7 +21,7 @@ import { formatRegistrarTime } from '../utils/dateUtils';
 import {
   Input,
   Checkbox } from '../components/ui/macos';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const formatSpecialistLabel = (specialist) => {
   const doctorName =
