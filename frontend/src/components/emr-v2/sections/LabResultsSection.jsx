@@ -29,6 +29,8 @@ import { useConfirm } from '../../common/ConfirmDialog';
 // CANCELLED) забыли бы обновить LabResultsSection — пациенту показалось бы
 // 'Unknown'. Теперь используется единый источник истины.
 import { formatLabStatus, getLabStatusVariant } from '../../laboratory/labUiLabels';
+// STRAT#12: t() и tInterpolate() для i18n — order confirm dialog мигрирован.
+import { t, tInterpolate } from '../../laboratory/utils/labTranslations';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
 
@@ -124,14 +126,13 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
 
   const handleOrder = async (templateId, templateName) => {
     // UX-AUDIT-FIX9: подтверждение перед созданием заказа.
+    // STRAT#12: строки мигрированы на t() / tInterpolate() из labTranslations.
     const ok = await confirm({
-      title: 'Заказать анализы?',
-      message: `Будет создан заказ «${templateName}» для этого пациента.`,
-      description:
-        'Лаборатория увидит заказ в очереди и приступит к выполнению. ' +
-        'Если заказ ошибочный — его придётся отменять через лабораторию.',
-      confirmLabel: 'Заказать',
-      cancelLabel: 'Отмена',
+      title: t('confirm.order_title'),
+      message: tInterpolate('confirm.order_message', { name: templateName }),
+      description: t('confirm.order_description'),
+      confirmLabel: t('confirm.order_confirm'),
+      cancelLabel: t('confirm.cancel'),
       intent: 'primary',
     });
     if (!ok) return;
