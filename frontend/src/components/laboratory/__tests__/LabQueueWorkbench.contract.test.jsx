@@ -49,24 +49,12 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(cssSource).toContain('UX-AUDIT-FIX11');
   });
 
-  it('UX-AUDIT-FIX13: paginates queue rendering with PAGE_SIZE + load-more button', () => {
-    // FIX13: рендерим только visibleCount записей через .slice(0, visibleCount)
-    // вместо всего sortedAppointments. Кнопка «Показать ещё» увеличивает count.
-    expect(source).toContain('PAGE_SIZE = 20');
-    expect(source).toContain('visibleCount');
-    expect(source).toContain('setVisibleCount');
-    // .slice для ограничения рендера
-    expect(source).toContain('sortedAppointments.slice(0, visibleCount)');
-    // useEffect для сброса пагинации при смене фильтров
-    expect(source).toContain('useEffect(() => {');
-    expect(source).toContain('setVisibleCount(PAGE_SIZE)');
-    expect(source).toContain('[searchQuery, statusFilter, sortBy]');
-    // Кнопка «Показать ещё» в UI
-    expect(source).toContain('Показать ещё');
-    expect(source).toContain('lqw-load-more');
-    // CSS-класс для контейнера кнопки
-    expect(cssSource).toContain('.lqw-load-more');
-    expect(cssSource).toContain('UX-AUDIT-FIX13');
+  it('UX-AUDIT-FIX13 / STRAT#27: uses VirtualizedQueueList for rendering (replaces .slice().map())', () => {
+    // STRAT#27: .slice(0, visibleCount).map() replaced with <VirtualizedQueueList>
+    expect(source).toContain('VirtualizedQueueList');
+    expect(source).toContain('appointments={sortedAppointments}');
+    // No more client-side slicing — virtualizer handles what to render
+    expect(source).not.toContain('sortedAppointments.slice(0, visibleCount)');
   });
 
   it('STRAT#8: accepts server-side pagination props (onLoadMore, hasMore, loadingMore, queueTotal)', () => {
@@ -82,19 +70,21 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(source).toContain('queueTotal: PropTypes.number');
   });
 
-  it('STRAT#8: uses server-side onLoadMore when hasMore=true, falls back to client-side otherwise', () => {
-    // Server-side path: приоритетный
-    expect(source).toContain('if (hasMore && onLoadMore)');
-    expect(source).toContain('onClick={onLoadMore}');
-    expect(source).toContain('disabled={loadingMore}');
-    // Loading indicator
-    expect(source).toContain("loadingMore ? 'arrow.clockwise' : 'arrow.down'");
-    // STRAT#18: 'Загрузка…' migrated to t('queue.loading')
-    expect(source).toContain("t('queue.loading')");
-    // Counter показывает server-side total
-    expect(source).toContain('queueTotal - appointments.length');
-    // Client-side fallback остаётся
-    expect(source).toContain('if (sortedAppointments.length > visibleCount)');
+  it('STRAT#8 / STRAT#27: passes server-side pagination props to VirtualizedQueueList', () => {
+    // STRAT#27: load-more logic moved to VirtualizedQueueList component.
+    // LabQueueWorkbench passes props through.
+    expect(source).toContain('onLoadMore={onLoadMore}');
+    expect(source).toContain('hasMore={hasMore}');
+    expect(source).toContain('loadingMore={loadingMore}');
+    expect(source).toContain('queueTotal={queueTotal}');
+    // VirtualizedQueueList handles the actual load-more rendering
+    const virtualListSource = fs.readFileSync(
+      path.join(ROOT, 'components/laboratory/VirtualizedQueueList.jsx'),
+      'utf8'
+    );
+    expect(virtualListSource).toContain('hasMore && onLoadMore');
+    expect(virtualListSource).toContain('onClick={onLoadMore}');
+    expect(virtualListSource).toContain('disabled={loadingMore}');
   });
 
   it('STRAT#14: queue filter/sort/title labels use t() from labTranslations', () => {
