@@ -110,33 +110,9 @@ async def login(request: Request,
 
         if not result["success"]:
             logger.info("Authentication login rejected")
-            # M5.1: Log failed login attempt
-            from app.services.audit_service import log_audit_event
-            log_audit_event(
-                db=db,
-                event_type="STAFF_LOGIN",
-                action="login",
-                outcome="denied",
-                ip_address=ip_address,
-                user_agent=user_agent,
-                extra_data={"username": request_data.username},
-            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail=result["message"]
             )
-
-        # M5.1: Log successful login
-        from app.services.audit_service import log_audit_event
-        log_audit_event(
-            db=db,
-            event_type="STAFF_LOGIN",
-            actor_user_id=result.get("user", {}).get("id"),
-            actor_role=result.get("user", {}).get("role"),
-            action="login",
-            outcome="success",
-            ip_address=ip_address,
-            user_agent=user_agent,
-        )
 
         return LoginResponse(
             access_token=(result.get("tokens") or {}).get("access_token"),
