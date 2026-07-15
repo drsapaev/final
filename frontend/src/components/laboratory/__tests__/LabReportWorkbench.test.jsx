@@ -265,4 +265,19 @@ describe('LabReportWorkbench', () => {
     const confirmIndex = fnBody.indexOf('await confirm(');
     expect(postIndex).toBeGreaterThan(confirmIndex);
   });
+
+  it('UX-AUDIT-FIX8: signer fields are collapsed in <details> by default', () => {
+    // FIX8: 4 signer input fields (lab_technician_label/name,
+    // approver_label/name) ранее всегда занимали vertical space.
+    // Теперь свёрнуты в <details> с auto-expand когда отчёт нередактируем.
+    const source = fs.readFileSync(workbenchPath, 'utf8');
+
+    // Должен быть <details> с подсказкой "Подписи"
+    expect(source).toContain('<details open={!canEditActiveInstance}>');
+    expect(source).toContain('Подписи');
+    // Подсказка "только для чтения" когда не editable
+    expect(source).toContain('только для чтения — отчёт утверждён');
+    // Все 4 signer поля внутри details
+    expect(source).toContain("'lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'");
+  });
 });
