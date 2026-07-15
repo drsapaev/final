@@ -89,7 +89,7 @@ const ReportsManager = () => {
       setFiles(response.data?.files || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов отчетов:', error);
-      setError('Не удалось загрузить файлы'); // Set error state
+      setError(t('admin2.rm_load_files_error')); // Set error state
       setFiles([]);
     }
   };
@@ -104,7 +104,7 @@ const ReportsManager = () => {
       setQuickReports((prev) => ({ ...prev, daily: response.data }));
     } catch (error) {
       logger.error('Ошибка загрузки быстрых отчетов:', error);
-      setError('Не удалось загрузить статистику');
+      setError(t('admin2.rm_load_stats_error'));
       setQuickReports({ daily: null });
     }
   };
@@ -119,7 +119,7 @@ const ReportsManager = () => {
   const generateReport = async () => {
     const endpoint = getReportEndpoint(reportForm.type);
     if (!reportForm.type || !endpoint) {
-      toast.error('Выберите доступный тип отчёта');
+      toast.error(t('admin2.rm_select_report_type'));
       return;
     }
 
@@ -134,7 +134,7 @@ const ReportsManager = () => {
 
       const data = response.data;
       if (data.success) {
-        toast.success('Отчет успешно сгенерирован!');
+        toast.success(t('admin2.rm_report_generated_success'));
         if (data.filename) {
           // Если есть файл, обновляем список файлов
           loadReportFiles();
@@ -142,11 +142,11 @@ const ReportsManager = () => {
         // Показываем результат
         setReports((prev) => [data, ...prev]);
       } else {
-        toast.error(data.error || 'Ошибка генерации отчета');
+        toast.error(data.error || t('admin2.rm_report_generation_error'));
       }
     } catch (error) {
       logger.error('Ошибка генерации отчета:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка генерации отчета');
+      toast.error(error.response?.data?.detail || t('admin2.rm_report_generation_error'));
     } finally {
       setLoading(false);
     }
@@ -187,10 +187,10 @@ const ReportsManager = () => {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      toast.success('Файл загружен!');
+      toast.success(t('admin2.rm_file_downloaded_success'));
     } catch (error) {
       logger.error('Ошибка загрузки файла:', error);
-      toast.error('Ошибка загрузки файла');
+      toast.error(t('admin2.rm_file_download_error'));
     }
   };
 
@@ -198,8 +198,8 @@ const ReportsManager = () => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.clean_reports_title'),
-      message: 'Удалить старые файлы отчётов (старше 30 дней)?',
-      description: 'Это действие необратимо. Файлы будут удалены навсегда.',
+      message: t('admin2.rm_clean_reports_message'),
+      description: t('admin2.rm_clean_reports_description'),
       confirmLabel: t('admin2.delete_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'danger',
@@ -210,11 +210,11 @@ const ReportsManager = () => {
 
     try {
       const response = await api.post('/reports/cleanup');
-      toast.success(response.data?.message || 'Файлы очищены');
+      toast.success(response.data?.message || t('admin2.rm_files_cleaned_success'));
       loadReportFiles();
     } catch (error) {
       logger.error('Ошибка очистки файлов:', error);
-      toast.error('Ошибка очистки файлов');
+      toast.error(t('admin2.rm_files_clean_error'));
     }
   };
 
@@ -224,12 +224,12 @@ const ReportsManager = () => {
       <MacOSCard className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">
           <BarChart3 className="admin-icon-20-mr-10-blue" />
-          Генерация отчета
+          {t('admin2.rm_generation_title')}
         </h3>
 
         <div className="admin-grid-2col-20-mb-24">
           <div>
-            <label className="admin-label-block-13-500-secondary-mb-8">Тип отчета</label>
+            <label className="admin-label-block-13-500-secondary-mb-8">{t('admin2.rm_label_type')}</label>
             <Select
             value={reportForm.type}
             onChange={(value) => setReportForm((prev) => ({ ...prev, type: value }))}
@@ -238,12 +238,12 @@ const ReportsManager = () => {
               label: report.name
             }))}
             size="large"
-            placeholder="Выберите тип отчета" />
+            placeholder={t('admin2.rm_select_type_ph')} />
 
           </div>
 
           <div>
-            <label className="admin-label-block-13-500-secondary-mb-8">Формат</label>
+            <label className="admin-label-block-13-500-secondary-mb-8">{t('admin2.rm_label_format')}</label>
             <Select
             value={reportForm.format}
             onChange={(value) => setReportForm((prev) => ({ ...prev, format: value }))}
@@ -258,7 +258,7 @@ const ReportsManager = () => {
           </div>
 
           <div>
-            <label className="admin-label-block-13-500-secondary-mb-8">Дата начала</label>
+            <label className="admin-label-block-13-500-secondary-mb-8">{t('admin2.rm_label_start_date')}</label>
             <Input
             type="date"
             value={reportForm.start_date}
@@ -267,7 +267,7 @@ const ReportsManager = () => {
           </div>
 
           <div>
-            <label className="admin-label-block-13-500-secondary-mb-8">Дата окончания</label>
+            <label className="admin-label-block-13-500-secondary-mb-8">{t('admin2.rm_label_end_date')}</label>
             <Input
             type="date"
             value={reportForm.end_date}
@@ -279,8 +279,8 @@ const ReportsManager = () => {
         <div className="admin-flex-justify-end">
           <Button
           type="button"
-          title={loading ? 'Генерация отчёта' : 'Сгенерировать отчёт'}
-          aria-label={loading ? 'Генерация отчёта' : 'Сгенерировать отчёт'}
+          title={loading ? t('admin2.rm_generating_aria') : t('admin2.rm_generate_btn_aria')}
+          aria-label={loading ? t('admin2.rm_generating_aria') : t('admin2.rm_generate_btn_aria')}
           onClick={generateReport}
           disabled={loading || !reportForm.type}
           className="admin-btn-blue-w-full-h-44-flex-center admin-opacity-dynamic"
@@ -289,12 +289,12 @@ const ReportsManager = () => {
             {loading ?
           <>
                 <Loader2 aria-hidden="true" className="admin-icon-18-spin animate-spin" />
-                <span>Генерация...</span>
+                <span>{t('admin2.rm_generating')}</span>
               </> :
 
           <>
                 <FileText aria-hidden="true" className="w-4.5 h-4.5" />
-                <span>Сгенерировать отчет</span>
+                <span>{t('admin2.rm_generate_btn')}</span>
               </>
           }
           </Button>
@@ -305,14 +305,14 @@ const ReportsManager = () => {
       <MacOSCard className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">
           <Clock className="admin-icon-20-mr-10-blue" />
-          Быстрые отчеты (сегодня)
+          {t('admin2.rm_quick_reports_title')}
         </h3>
 
         <div className="admin-grid-auto-240-16">
           <MacOSStatCard
-          title="Сегодня"
+          title={t('admin2.rm_today_stat_title')}
           value={quickReports.daily?.summary?.total_patients_served || 0}
-          subtitle={`${quickReports.daily?.summary?.total_revenue || 0} сум`}
+          subtitle={`${quickReports.daily?.summary?.total_revenue || 0} ${t('admin2.rm_currency')}`}
           icon={Clock}
           color="blue"
           trend={quickReports.daily ? `+${quickReports.daily.summary?.new_patients || 0}` : undefined}
@@ -325,12 +325,12 @@ const ReportsManager = () => {
       {/* Последние отчеты */}
       {reports.length > 0 &&
     <MacOSCard className="p-6">
-          <h3 className="admin-h4-lg-semi-primary-mb-16">Последние отчеты</h3>
+          <h3 className="admin-h4-lg-semi-primary-mb-16">{t('admin2.rm_recent_reports_title')}</h3>
           <Table
         columns={[
         {
           key: 'type',
-          header: 'Тип отчета',
+          header: t('admin2.rm_col_type'),
           render: (value) =>
           <span className="admin-text-med-primary">
                     {availableReports.find((r) => r.type === value)?.name || value}
@@ -339,7 +339,7 @@ const ReportsManager = () => {
         },
         {
           key: 'generated_at',
-          header: 'Дата генерации',
+          header: t('admin2.rm_col_generated_at'),
           render: (value) =>
           <span className="admin-span-13-secondary">
                     {new Date(value).toLocaleString()}
@@ -348,15 +348,15 @@ const ReportsManager = () => {
         },
         {
           key: 'actions',
-          header: 'Действия',
+          header: t('admin2.rm_col_actions'),
           align: 'right',
           render: (row) =>
           <Button
             type="button"
             size="sm"
             variant="outline"
-            title={`Скачать отчёт ${row.filename}`}
-            aria-label={`Скачать отчёт ${row.filename}`}
+            title={t('admin2.rm_download_report_aria', { filename: row.filename })}
+            aria-label={t('admin2.rm_download_report_aria', { filename: row.filename })}
             onClick={() => downloadFile(row.filename)}>
                     <Download aria-hidden="true" className="w-4 h-4" />
                   </Button>
@@ -378,7 +378,7 @@ const ReportsManager = () => {
         <div className="admin-flex-between-mb-24">
           <h3 className="admin-h3-18-600-primary-m0-flex">
             <FileSpreadsheet className="admin-icon-22-mr-10-blue" />
-            Файлы отчетов
+            {t('admin2.rm_files_title')}
           </h3>
           <div className="admin-flex-gap-12">
             <Button
@@ -388,7 +388,7 @@ const ReportsManager = () => {
             className="admin-btn-min-w-100-h-36">
 
               <RefreshCw className="w-4 h-4 mr-2" />
-              Обновить
+              {t('admin2.rm_refresh_btn')}
             </Button>
             <Button
             onClick={cleanupOldReports}
@@ -397,7 +397,7 @@ const ReportsManager = () => {
             className="admin-btn-error-min-w-140-h-36">
 
               <Trash2 className="w-4 h-4 mr-2" />
-              Очистить старые
+              {t('admin2.rm_clean_old_btn')}
             </Button>
           </div>
         </div>
@@ -406,8 +406,8 @@ const ReportsManager = () => {
       <div className="admin-flex-center-justify-h-300">
             <MacOSEmptyState
           icon={FileX}
-          title="Файлы отчетов ещё не сформированы"
-          description="Готовые файлы будут отображаться здесь после формирования отчета." />
+          title={t('admin2.rm_empty_files_title')}
+          description={t('admin2.rm_empty_files_desc')} />
 
           </div> :
 
@@ -415,7 +415,7 @@ const ReportsManager = () => {
         columns={[
         {
           key: 'filename',
-          header: 'Файл',
+          header: t('admin2.rm_col_file'),
           render: (value) =>
           <div className="admin-flex-center-gap-10">
                     <FileText className="admin-icon-18-tertiary" />
@@ -427,7 +427,7 @@ const ReportsManager = () => {
         },
         {
           key: 'size',
-          header: 'Размер',
+          header: t('admin2.rm_col_size'),
           render: (value) =>
           <span className="admin-span-13-secondary">
                     {formatFileSize(value)}
@@ -436,7 +436,7 @@ const ReportsManager = () => {
         },
         {
           key: 'created_at',
-          header: 'Создан',
+          header: t('admin2.rm_col_created'),
           render: (value) =>
           <span className="admin-span-13-secondary">
                     {new Date(value).toLocaleString()}
@@ -445,15 +445,15 @@ const ReportsManager = () => {
         },
         {
           key: 'actions',
-          header: 'Действия',
+          header: t('admin2.rm_col_actions'),
           align: 'right',
           render: (row) =>
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            title={`Скачать файл отчёта ${row.filename}`}
-            aria-label={`Скачать файл отчёта ${row.filename}`}
+            title={t('admin2.rm_download_file_aria', { filename: row.filename })}
+            aria-label={t('admin2.rm_download_file_aria', { filename: row.filename })}
             onClick={() => downloadFile(row.filename)}>
 
                     <Download aria-hidden="true" className="admin-icon-18-secondary" />
@@ -480,30 +480,30 @@ const ReportsManager = () => {
           </div>
           <div className="admin-flex-1-pt-4">
             <h3 className="admin-h3-18-600-primary-mb-4">
-              Автоматические отчеты
+              {t('admin2.rm_auto_reports_title')}
             </h3>
             <p className="admin-p-14-secondary-m0-lh-15">
-              Настройте автоматическую генерацию и отправку отчетов по расписанию
+              {t('admin2.rm_auto_reports_desc')}
             </p>
           </div>
         </div>
 
         <div className="admin-grid-2col-min-16">
           <Button
-          onClick={() => toast.info('Функция настройки расписания в разработке')}
+          onClick={() => toast.info(t('admin2.rm_schedule_in_dev'))}
           className="admin-btn-blue-h-44-flex-center">
 
             <Calendar className="w-4.5 h-4.5" />
-            Настроить расписание
+            {t('admin2.rm_schedule_btn')}
           </Button>
 
           <Button
           variant="outline"
-          onClick={() => toast.info('Настройки уведомлений в разработке')}
+          onClick={() => toast.info(t('admin2.rm_notifications_in_dev'))}
           className="admin-btn-outline-h-44-flex-center">
 
             <Activity className="w-4.5 h-4.5" />
-            Настроить уведомления
+            {t('admin2.rm_notifications_btn')}
           </Button>
         </div>
       </MacOSCard>
@@ -516,10 +516,10 @@ const ReportsManager = () => {
           </div>
           <div className="admin-flex-1-pt-4">
             <h3 className="admin-h3-18-600-primary-mb-4">
-              Хранение файлов
+              {t('admin2.rm_storage_title')}
             </h3>
             <p className="admin-p-14-secondary-m0-lh-15">
-              Управление старыми отчетами и настройка их автоматического удаления
+              {t('admin2.rm_storage_desc')}
             </p>
           </div>
         </div>
@@ -530,28 +530,28 @@ const ReportsManager = () => {
           className="admin-btn-orange-h-44-flex-center">
 
             <Trash2 className="w-4.5 h-4.5" />
-            Очистить старые файлы
+            {t('admin2.rm_clean_old_files_btn')}
           </Button>
 
           <Button
           variant="outline"
-          onClick={() => toast.info('Функция экспорта в разработке')}
+          onClick={() => toast.info(t('admin2.rm_export_in_dev'))}
           className="admin-btn-outline-h-44-flex-center">
 
             <Download className="w-4.5 h-4.5" />
-            Экспорт в облако
+            {t('admin2.rm_export_btn')}
           </Button>
         </div>
       </MacOSCard>
 
       {/* Статистика хранения */}
       <MacOSCard className="admin-card-p-24-bg-card-12">
-        <h3 className="admin-h3-18-600-primary-mb-20">Статистика хранения</h3>
+        <h3 className="admin-h3-18-600-primary-mb-20">{t('admin2.rm_storage_stats_title')}</h3>
 
         <div className="admin-grid-3col-24">
           <div>
             <div className="admin-stat-label-13-secondary-mb-4">
-              Всего файлов
+              {t('admin2.rm_stat_total_files')}
             </div>
             <div className="admin-stat-num-24-600-primary">
               {files.length}
@@ -560,7 +560,7 @@ const ReportsManager = () => {
 
           <div>
             <div className="admin-stat-label-13-secondary-mb-4">
-              Общий размер
+              {t('admin2.rm_stat_total_size')}
             </div>
             <div className="admin-stat-num-24-600-primary">
               {formatFileSize(files.reduce((sum, f) => sum + (f.size || 0), 0))}
@@ -569,7 +569,7 @@ const ReportsManager = () => {
 
           <div>
             <div className="admin-stat-label-13-secondary-mb-4">
-              Хранение (дней)
+              {t('admin2.rm_stat_retention_days')}
             </div>
             <div className="admin-stat-num-24-600-primary">
               30
@@ -586,21 +586,21 @@ const ReportsManager = () => {
       <MacOSCard className="admin-card-p-48-flex-justify-center">
           <MacOSEmptyState
           icon={AlertCircle}
-          title="Ошибка загрузки данных"
-          description="Не удалось загрузить отчеты. Пожалуйста, попробуйте еще раз.">
+          title={t('admin2.rm_error_title')}
+          description={t('admin2.rm_error_desc')}>
 
             <Button onClick={handleRetry} className="mt-4">
               <RefreshCw className="w-4 h-4 mr-2" />
-              Повторить попытку
+              {t('admin2.rm_retry_btn')}
             </Button>
           </MacOSEmptyState>
         </MacOSCard> :
 
       <>
           <div className="flex items-center justify-between">
-            <h2 className="admin-h2-2xl-bold-primary-m0">Система отчетов</h2>
+            <h2 className="admin-h2-2xl-bold-primary-m0">{t('admin2.rm_system_title')}</h2>
             <Badge variant="info">
-              {files.length} файлов
+              {t('admin2.rm_files_count', { count: files.length })}
             </Badge>
           </div>
 
@@ -608,9 +608,9 @@ const ReportsManager = () => {
           <SegmentedControl
           aria-label="Reports sections"
           options={[
-          { value: 'generate', label: 'Генерация', icon: BarChart3 },
-          { value: 'files', label: 'Файлы', icon: FileSpreadsheet },
-          { value: 'settings', label: 'Настройки', icon: Settings }]
+          { value: 'generate', label: t('admin2.rm_tab_generate'), icon: BarChart3 },
+          { value: 'files', label: t('admin2.rm_tab_files'), icon: FileSpreadsheet },
+          { value: 'settings', label: t('admin2.rm_tab_settings'), icon: Settings }]
           }
           value={activeTab}
           onChange={setActiveTab}
