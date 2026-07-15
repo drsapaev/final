@@ -819,22 +819,51 @@ export default function LabReportWorkbench({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--mac-spacing-3)' }}>
-                {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
-                  <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
-                    <span>{signerFieldLabels[key] || key}</span>
-                    <Input
-                      className="macos-input"
-                      aria-label={signerFieldLabels[key] || key}
-                      value={signerSnapshot?.[key] || ''}
-                      onChange={(event) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
-                      // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
-                      // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
-                      disabled={!canEditActiveInstance}
-                    />
-                  </label>
-                ))}
-              </div>
+              {/* UX-AUDIT-FIX8: signer fields свёрнуты в <details>.
+                  Ранее 4 поля (lab_technician_label/name, approver_label/name)
+                  всегда занимали vertical space, даже в DRAFT, когда подпись
+                  ещё не нужна. Это нарушает Nielsen Heuristic #8 (Aesthetic
+                  and Minimalist Design). Теперь по умолчанию свернуты;
+                  раскрываются одним кликом когда нужны.
+
+                  Auto-expand когда отчёт нередактируем (FINALIZED/PRINTED) —
+                  для семантической согласованности (Nielsen Heuristic #2).
+                  Используем canEditActiveInstance (backend-owned action)
+                  вместо прямой проверки status — соответствует SSOT-контракту. */}
+              <details open={!canEditActiveInstance}>
+                <summary
+                  style={{
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    color: 'var(--mac-text-secondary)',
+                    padding: 'var(--mac-spacing-2) 0',
+                    listStyle: 'none',
+                  }}
+                >
+                  Подписи
+                  {!canEditActiveInstance && (
+                    <span style={{ marginLeft: 'var(--mac-spacing-2)', fontWeight: 400, fontSize: '0.85em', opacity: 0.7 }}>
+                      (только для чтения — отчёт утверждён)
+                    </span>
+                  )}
+                </summary>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--mac-spacing-3)', paddingTop: 'var(--mac-spacing-2)' }}>
+                  {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
+                    <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+                      <span>{signerFieldLabels[key] || key}</span>
+                      <Input
+                        className="macos-input"
+                        aria-label={signerFieldLabels[key] || key}
+                        value={signerSnapshot?.[key] || ''}
+                        onChange={(event) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
+                        // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
+                        // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
+                        disabled={!canEditActiveInstance}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </details>
 
               {printFeedback && (
                 <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
