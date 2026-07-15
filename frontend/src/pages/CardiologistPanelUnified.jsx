@@ -9,15 +9,13 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 // so they can save their work instead of losing it to a silent 401.
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useCardiologistHotkeys } from '../hooks/useCardiologistHotkeys';
-import {
-  Save,
-  Settings,
-} from 'lucide-react';
+// S-M-2 fix: replace lucide-direct with macos <Icon>
 import {
   MacOSCard,
   Button,
   Checkbox,
-  Input } from '../components/ui/macos';
+  Input,
+  Icon } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './cardiology.css';
@@ -1953,7 +1951,7 @@ const MacOSCardiologistPanelUnified = () => {
           className="cardio-settings-fab"
           aria-label="Открыть настройки">
 
-          <Settings size={18} />
+          <Icon name="gear" size={18} />
         </button>
         {(activeTab === 'visit' || activeTab === 'blood') && settingsOpen &&
         <MacOSCard className="cardio-settings-card">
@@ -1986,7 +1984,7 @@ const MacOSCardiologistPanelUnified = () => {
                 // the values are stored.
                 notify.success(tI18n('cardio.settings_saved'));
                 setSettingsOpen(false);
-              }}><Save size={16} className="cardio-icon-mr" />Сохранить</Button>
+              }}><Icon name="square.and.arrow.down" size={16} className="cardio-icon-mr" />Сохранить</Button>
             </div>
           </MacOSCard>
         }

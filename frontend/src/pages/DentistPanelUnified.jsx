@@ -2085,22 +2085,22 @@ const DentistPanelUnified = () => {
               <form onSubmit={handleExaminationSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Дата осмотра *</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Дата осмотра *</label>
                     <Input
                     type="date"
                     aria-label="Дата осмотра"
                     value={examinationForm.examination_date}
                     onChange={(e) => setExaminationForm({ ...examinationForm, examination_date: e.target.value })}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Гигиена полости рта</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Гигиена полости рта</label>
                     <select
                     value={examinationForm.oral_hygiene}
                     onChange={(e) => setExaminationForm({ ...examinationForm, oral_hygiene: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">Выберите</option>
                       <option value="excellent">Отличная</option>
@@ -2113,11 +2113,11 @@ const DentistPanelUnified = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Статус кариеса</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Статус кариеса</label>
                     <select
                     value={examinationForm.caries_status}
                     onChange={(e) => setExaminationForm({ ...examinationForm, caries_status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">Выберите</option>
                       <option value="none">Нет кариеса</option>
@@ -2128,11 +2128,11 @@ const DentistPanelUnified = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Статус пародонта</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Статус пародонта</label>
                     <select
                     value={examinationForm.periodontal_status}
                     onChange={(e) => setExaminationForm({ ...examinationForm, periodontal_status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">Выберите</option>
                       <option value="healthy">Здоровый</option>
@@ -2145,11 +2145,11 @@ const DentistPanelUnified = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Прикус</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Прикус</label>
                     <select
                     value={examinationForm.occlusion}
                     onChange={(e) => setExaminationForm({ ...examinationForm, occlusion: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">Выберите</option>
                       <option value="normal">Нормальный</option>
@@ -2160,25 +2160,25 @@ const DentistPanelUnified = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Отсутствующие зубы</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Отсутствующие зубы</label>
                     <Input
                     type="text"
                     aria-label="Отсутствующие зубы"
                     value={examinationForm.missing_teeth}
                     onChange={(e) => setExaminationForm({ ...examinationForm, missing_teeth: e.target.value })}
                     placeholder="Номера отсутствующих зубов"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Зубной налет</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Зубной налет</label>
                     <select
                     value={examinationForm.dental_plaque}
                     onChange={(e) => setExaminationForm({ ...examinationForm, dental_plaque: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">Выберите</option>
                       <option value="none">Нет</option>
@@ -2188,11 +2188,11 @@ const DentistPanelUnified = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Кровоточивость десен</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Кровоточивость десен</label>
                     <select
                     value={examinationForm.gingival_bleeding}
                     onChange={(e) => setExaminationForm({ ...examinationForm, gingival_bleeding: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">Выберите</option>
                       <option value="none">Нет</option>
@@ -2204,26 +2204,26 @@ const DentistPanelUnified = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Диагноз</label>
+                  <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Диагноз</label>
                   <textarea
                   aria-label="Диагноз осмотра"
                   value={examinationForm.diagnosis}
                   onChange={(e) => setExaminationForm({ ...examinationForm, diagnosis: e.target.value })}
                   placeholder="Стоматологический диагноз"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Рекомендации</label>
+                  <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Рекомендации</label>
                   <textarea
                   aria-label="Рекомендации по осмотру"
                   value={examinationForm.recommendations}
                   onChange={(e) => setExaminationForm({ ...examinationForm, recommendations: e.target.value })}
                   placeholder="Рекомендации по лечению и уходу"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
                 </div>
 
