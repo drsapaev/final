@@ -4,6 +4,7 @@ import {
   LAB_REPORT_STATUS_CONFIG,
   getLabReportStepIndex,
 } from './utils/labStatusConfig';
+import { t } from './utils/labTranslations';
 
 /**
  * P-04 fix: LabStatusStepper выделен в отдельный файл.
@@ -27,6 +28,10 @@ import {
  * индекс вычисляется по полной конфигурации, поэтому READY всё равно
  * корректно отрисуется как current step. Скрытие влияет только на
  * будущее/прошлое отображение шага, когда текущий статус — другой.
+ *
+ * STRAT#6: все русские строки мигрированы на t() из labTranslations.
+ * step.label всё ещё берётся из labStatusConfig (SSOT для статус-маппинга),
+ * но вспомогательные тексты (aria-label, title-атрибуты) теперь через t().
  */
 const HIDDEN_STEPPER_STATUSES = new Set(['READY']);
 
@@ -53,7 +58,7 @@ export default function LabStatusStepper({ status }) {
   return (
     <div
       role="navigation"
-      aria-label="Прогресс бланка"
+      aria-label={t('workbench.progress_aria_label')}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -68,6 +73,13 @@ export default function LabStatusStepper({ status }) {
         const isFuture = index > currentIndex;
         const isLast = index === VISIBLE_STEPPER_STEPS.length - 1;
 
+        // STRAT#6: title-атрибуты через t() для i18n
+        const titleSuffix = isCompleted
+          ? t('workbench.step_completed')
+          : isCurrent
+            ? t('workbench.step_current')
+            : t('workbench.step_upcoming');
+
         return (
           <div
             key={step.key}
@@ -76,13 +88,7 @@ export default function LabStatusStepper({ status }) {
             <div
               className={`lab-status-step ${isCurrent ? 'lab-status-step-current' : ''} ${isCompleted ? 'lab-status-step-completed' : ''} ${isFuture ? 'lab-status-step-future' : ''}`}
               aria-current={isCurrent ? 'step' : undefined}
-              title={
-                isCompleted
-                  ? `${step.label} — пройден`
-                  : isCurrent
-                    ? `${step.label} — текущий шаг`
-                    : `${step.label} — предстоит`
-              }
+              title={`${step.label} — ${titleSuffix}`}
             >
               {isCompleted && (
                 <Icon name="checkmark.circle.fill" size={12} />
