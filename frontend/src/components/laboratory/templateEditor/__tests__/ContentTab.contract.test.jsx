@@ -102,20 +102,21 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     expect(source).toContain('unitCatalogId: PropTypes.string');
   });
 
-  it('STRAT#11: both delete dialogs use t() and tInterpolate() from labTranslations', () => {
+  it('STRAT#11: both delete dialogs use t() from unified i18n', () => {
     // STRAT#11: delete section и delete field dialogs мигрированы на t()
-    expect(source).toContain("from '../utils/labTranslations'");
-    expect(source).toContain('import { t, tInterpolate }');
+    // i18n-unification: tInterpolate() replaced with t(key, params) — react-i18next handles interpolation
+    expect(source).toContain("from '../../../i18n/useTranslation'");
+    expect(source).toContain('useTranslation');
 
     // Delete section dialog
     expect(source).toContain("t('confirm.delete_section_title')");
-    expect(source).toContain("tInterpolate('confirm.delete_section_message',");
+    expect(source).toContain("t('confirm.delete_section_message', { name: sectionName })");
     expect(source).toContain("t('confirm.delete_section_description')");
     expect(source).toContain("t('confirm.delete_section_confirm')");
 
     // Delete field dialog
     expect(source).toContain("t('confirm.delete_field_title')");
-    expect(source).toContain("tInterpolate('confirm.delete_field_message',");
+    expect(source).toContain("t('confirm.delete_field_message', { name: fieldName })");
     expect(source).toContain("t('confirm.delete_field_description')");
     expect(source).toContain("t('confirm.delete_field_confirm')");
 

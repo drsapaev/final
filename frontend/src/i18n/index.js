@@ -64,6 +64,10 @@ i18n.use(initReactI18next).init({
   defaultNS: 'translation',
   interpolation: {
     escapeValue: false, // React already escapes by default
+    // Use single-brace {param} interpolation (NOT the react-i18next default {{param}})
+    // to match the existing locale files migrated from labTranslations.tInterpolate.
+    prefix: '{',
+    suffix: '}',
   },
   react: {
     useSuspense: false,

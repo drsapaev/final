@@ -19,9 +19,10 @@ const translationsSource = fs.readFileSync(
 );
 
 describe('LabReportActionsBar STRAT#5 — i18n migration', () => {
-  it('imports t from labTranslations', () => {
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+  it('imports useTranslation from unified i18n', () => {
+    // i18n-unification: now uses unified useTranslation hook from i18n/useTranslation
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('useTranslation');
   });
 
   it('uses t() for all button labels (no hardcoded Russian strings)', () => {

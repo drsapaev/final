@@ -7,9 +7,8 @@ import {
   formatSpecialtyLabel,
   getLabStatusVariant,
 } from './labUiLabels';
-import { t } from './utils/labTranslations';
-import { useTranslation } from '../../i18n/adapter';
 
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * STRAT#28: QueueCard — extracted from LabQueueWorkbench, wrapped in React.memo.
  *

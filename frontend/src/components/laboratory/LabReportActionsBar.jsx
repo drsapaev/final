@@ -1,7 +1,6 @@
 import PropTypes from 'prop-types';
 import { Button, Icon } from '../ui/macos';
-import { t } from './utils/labTranslations';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * P-04 fix: LabReportActionsBar выделен из LabReportWorkbench.
@@ -17,9 +16,8 @@ import { useTranslation } from '../../i18n/adapter';
  * «Создать ревизию» → «Создать исправленную версию».
  *
  * STRAT#5: все русские строки мигрированы на t() из labTranslations.
- * Первый компонент в lab-модуле, полностью использующий i18n-инфраструктуру.
- * Когда будет подключён react-i18next, t() будет заменён на useTranslation().t
- * без изменения call sites.
+ * i18n-unification: t() теперь берётся из useTranslation() (react-i18next),
+ * что обеспечивает реактивность при смене языка.
  */
 export default function LabReportActionsBar({
   saving = false,
@@ -35,6 +33,7 @@ export default function LabReportActionsBar({
   onPrint,
   onNotify,
 }) {
+  const { t } = useTranslation();
   const showPrimaryGroup = canSaveDraft || canFinalize;
   const showSecondaryGroup = canRevise || canPrint || canNotify;
 

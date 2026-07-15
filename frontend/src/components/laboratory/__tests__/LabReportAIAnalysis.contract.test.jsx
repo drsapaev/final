@@ -14,9 +14,9 @@ const source = fs.readFileSync(
 );
 
 describe('LabReportAIAnalysis STRAT#22 — i18n migration', () => {
-  it('imports t from labTranslations', () => {
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+  it('imports t from unified i18n', () => {
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
   });
 
   it('uses t() for AI button labels and tooltips', () => {

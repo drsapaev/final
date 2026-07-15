@@ -24,11 +24,10 @@ import {
 import NewTemplateDialog from './templateEditor/NewTemplateDialog';
 import ContentTab from './templateEditor/ContentTab';
 // STRAT#10: t() для i18n — confirm dialogs мигрированы на translation keys.
-import { t } from './utils/labTranslations';
 import DesignTab from './templateEditor/DesignTab';
 import SignersTab from './templateEditor/SignersTab';
 import PreviewTab from './templateEditor/PreviewTab';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default function LabTemplateWorkbench({
   templates,
@@ -37,6 +36,7 @@ export default function LabTemplateWorkbench({
   onTemplatesChanged,
   notify
 }) {
+  const { t } = useTranslation();
   // L-H-1 fix: useConfirm() для всех destructive actions (вместо native confirm()).
   // Согласованность с LabReportWorkbench — единый стилизованный portal-dialog
   // с focus-trap, Esc-to-cancel, явным описанием последствий.

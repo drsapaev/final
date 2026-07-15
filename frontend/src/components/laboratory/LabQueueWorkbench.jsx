@@ -11,12 +11,11 @@ import {
   getLabStatusVariant
 } from './labUiLabels';
 // STRAT#14: t() для i18n — filter/sort/title/badge labels мигрированы.
-import { t } from './utils/labTranslations';
 // STRAT#28: QueueCard extracted and wrapped in React.memo for performance.
 import QueueCard from './QueueCard';
 // STRAT#27: VirtualizedQueueList for 1000+ entries via @tanstack/react-virtual.
 import VirtualizedQueueList from './VirtualizedQueueList';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.
 // Лабораторное помещение — публичное пространство, экран видят другие
@@ -136,6 +135,7 @@ export default function LabQueueWorkbench({
   loadingMore = false,
   queueTotal = 0,
 }) {
+  const { t } = useTranslation();
   // QW-8 fix: локальный state поиска и фильтра статусов.
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');

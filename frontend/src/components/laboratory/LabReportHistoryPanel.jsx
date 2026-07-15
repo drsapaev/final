@@ -10,8 +10,7 @@ import {
 } from './labUiLabels';
 import { historySeverityState, matchesHistoryFilter } from './utils/labReportNormalize';
 // STRAT#21: t() для i18n — history panel strings мигрированы.
-import { t } from './utils/labTranslations';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * P-04 fix: LabReportHistoryPanel выделен из LabReportWorkbench.
@@ -51,6 +50,7 @@ export default function LabReportHistoryPanel({
   activeInstanceId = null,
   onOpenInstance,
 }) {
+  const { t } = useTranslation();
   const sourceItems = showRecentReportsBrowser ? recentReports : reportHistory;
   const filteredItems = sortHistoryItems(
     sourceItems.filter((item) => matchesHistoryFilter(item, historySeverityFilter))

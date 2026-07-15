@@ -4,9 +4,8 @@ import {
   LAB_REPORT_STATUS_CONFIG,
   getLabReportStepIndex,
 } from './utils/labStatusConfig';
-import { t } from './utils/labTranslations';
-import { useTranslation } from '../../i18n/adapter';
 
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * P-04 fix: LabStatusStepper выделен в отдельный файл.
  *

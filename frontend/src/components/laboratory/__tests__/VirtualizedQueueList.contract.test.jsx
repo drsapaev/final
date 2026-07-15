@@ -24,9 +24,9 @@ describe('VirtualizedQueueList STRAT#27 — @tanstack/react-virtual', () => {
     expect(source).toContain('QueueCard');
   });
 
-  it('imports t from labTranslations for load-more labels', () => {
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+  it('imports t from unified i18n for load-more labels', () => {
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
   });
 
   it('configures virtualizer with count, estimateSize, overscan', () => {

@@ -39,8 +39,8 @@ describe('LabStatusStepper UX-AUDIT-QW3 — hide unreachable READY step', () => 
 
   it('STRAT#6: uses t() for aria-label and title attributes', () => {
     // Все вспомогательные строки мигрированы на t() из labTranslations
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
     // aria-label через t()
     expect(source).toContain("aria-label={t('workbench.progress_aria_label')}");
     // title-атрибуты через t()

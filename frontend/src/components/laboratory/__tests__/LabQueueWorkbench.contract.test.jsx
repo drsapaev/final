@@ -87,10 +87,10 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(virtualListSource).toContain('disabled={loadingMore}');
   });
 
-  it('STRAT#14: queue filter/sort/title labels use t() from labTranslations', () => {
+  it('STRAT#14: queue filter/sort/title labels use t() from unified i18n', () => {
     // STRAT#14: filter/sort/title/badge labels мигрированы на t()
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
 
     // Title + badges
     expect(source).toContain("t('queue.title')");

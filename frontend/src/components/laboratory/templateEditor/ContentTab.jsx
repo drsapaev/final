@@ -3,10 +3,9 @@ import { useState } from 'react';
 import { Badge, Button, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
 // STRAT#11: t() и tInterpolate() для i18n — delete dialogs мигрированы.
-import { t, tInterpolate } from '../utils/labTranslations';
 import { fieldTypeOptions, referenceModeOptions } from './config';
 import ReferenceRuleEditor from './ReferenceRuleEditor';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * L-H-6 fix: ContentTab выделен в отдельный файл (~250 строк).
@@ -53,6 +52,7 @@ function ContentTab({
   analyteCatalogId = 'lab-analyte-catalog',
   unitCatalogId = 'lab-unit-catalog',
 }) {
+  const { t } = useTranslation();
   // UX-AUDIT-FIX4: useConfirm для деструктивных действий (удаление секции/поля).
   const [confirm] = useConfirm();
 
@@ -65,7 +65,7 @@ function ContentTab({
     const sectionName = section?.title || section?.key || `${t('content.section_fallback')} #${sectionIndex + 1}`;
     const ok = await confirm({
       title: t('confirm.delete_section_title'),
-      message: tInterpolate('confirm.delete_section_message', { name: sectionName }),
+      message: t('confirm.delete_section_message', { name: sectionName }),
       description: t('confirm.delete_section_description'),
       confirmLabel: t('confirm.delete_section_confirm'),
       cancelLabel: t('confirm.cancel'),
@@ -79,7 +79,7 @@ function ContentTab({
     const fieldName = field?.label || field?.field_key || `${t('content.field_fallback')} #${fieldIndex + 1}`;
     const ok = await confirm({
       title: t('confirm.delete_field_title'),
-      message: tInterpolate('confirm.delete_field_message', { name: fieldName }),
+      message: t('confirm.delete_field_message', { name: fieldName }),
       description: t('confirm.delete_field_description'),
       confirmLabel: t('confirm.delete_field_confirm'),
       cancelLabel: t('confirm.cancel'),
