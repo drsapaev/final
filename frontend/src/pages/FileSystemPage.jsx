@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import FileManager from '../components/files/FileManager';
 import {
-import { useTranslation } from '../i18n/adapter';
-
   Upload,
   Download,
   Settings,

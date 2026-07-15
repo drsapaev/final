@@ -9,7 +9,7 @@ import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from '../i18n/adapter';
 
-export default function Activation() {void
+export default function Activation() {
   const { t } = useTranslation();
   useTheme();
   const [loading, setLoading] = useState(true);

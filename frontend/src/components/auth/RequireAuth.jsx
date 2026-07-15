@@ -10,7 +10,6 @@ import { useTranslation } from '../../i18n/adapter';
  * Компонент для проверки аутентификации и ролевого доступа
  */
 export function RequireAuth({ 
-  const { t } = useTranslation();
   children, 
   roles = [], 
   permissions = [],
