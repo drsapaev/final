@@ -458,14 +458,50 @@
 
 /* MaskedPhone button (L-H-4 + L-M-5 fix) */
 .lqw-masked-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
   background: none;
   border: none;
-  padding: 0;
+  padding: 2px 4px;
   cursor: pointer;
-  color: inherit;
+  color: var(--mac-text-secondary);
   font: inherit;
   text-decoration: underline dotted;
   text-underline-offset: 2px;
+  border-radius: 4px;
+  transition: color var(--mac-duration-fast) var(--mac-ease),
+              background-color var(--mac-duration-fast) var(--mac-ease);
+}
+
+/* UX-AUDIT-FIX11: усиленная аффорданса — hover/focus визуальный cue */
+.lqw-masked-phone:hover {
+  color: var(--mac-accent);
+  background-color: var(--mac-bg-accent);
+  text-decoration: underline;
+}
+
+.lqw-masked-phone:focus-visible {
+  outline: 2px solid var(--mac-accent);
+  outline-offset: 1px;
+}
+
+.lqw-masked-phone-revealed {
+  color: var(--mac-text-primary);
+  font-weight: 500;
+}
+
+.lqw-masked-phone-text {
+  white-space: nowrap;
+}
+
+/* Read-only mode (canReveal=false) */
+.lqw-masked-phone-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1);
+  color: var(--mac-text-tertiary);
+  opacity: 0.7;
 }
 
 .lqw-masked-phone-empty {
