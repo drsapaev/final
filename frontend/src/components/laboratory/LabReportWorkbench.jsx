@@ -558,8 +558,25 @@ export default function LabReportWorkbench({
 
   // P1 fix: Notify patient via Telegram — sends lab results PDF to patient's
   // Telegram chat via POST /telegram/send-lab-results backend endpoint.
+  //
+  // UX-AUDIT-QW1: Добавлен ConfirmDialog. Отправка в Telegram необратима
+  // (нельзя отозвать сообщение). Соответствие Nielsen Heuristic #5
+  // (Error Prevention) и консистентность с handleFinalize/handleRevise,
+  // которые уже используют useConfirm() для необратимых действий.
   async function handleNotifyPatient() {
     if (!activeInstance) return;
+    const ok = await confirm({
+      title: 'Отправка результатов пациенту',
+      message: 'Результаты будут отправлены в Telegram.',
+      description:
+        'Сообщение нельзя отозвать. Пациент получит PDF с результатами ' +
+        'лабораторных анализов. Перед отправкой убедитесь, что отчёт ' +
+        'утверждён и не содержит ошибок.',
+      confirmLabel: 'Отправить',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) return;
     setSaving(true);
     setBusyAction('notify');
     try {
