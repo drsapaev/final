@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import {
@@ -175,7 +176,7 @@ const PhotoArchive = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      notify.error('Не удалось загрузить фото. Проверьте соединение и попробуйте снова.');
+      notify.error(t('dental2.photo_load_failed'));
     } finally {
       setLoading(false);
     }

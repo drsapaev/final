@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign,
@@ -74,13 +75,13 @@ const DentalPriceManager = ({
     e.preventDefault();
 
     if (!finalPrice || !reason) {
-      notify.error('Заполните цену и причину');
+      notify.error(t('dental2.price_fields_required'));
       return;
     }
 
     const priceNum = Number(finalPrice.replace(/[^0-9.-]/g, ''));
     if (isNaN(priceNum) || priceNum <= 0) {
-      notify.error('Введите корректную цену');
+      notify.error(t('dental2.invalid_price'));
       return;
     }
 
@@ -97,7 +98,7 @@ const DentalPriceManager = ({
 
       if (response.status >= 200 && response.status < 300) {
         const result = response.data;
-        notify.success('Цена отправлена в регистратуру для подтверждения');
+        notify.success(t('dental2.price_sent'));
 
         // Обновляем список изменений
         loadPriceOverrides();

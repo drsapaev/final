@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * Treatment Planner Component  
  * План лечения с этапами
@@ -220,7 +221,7 @@ const priorityBadgeVariant = {
 };
 
 const COPY = {
-  title: 'План лечения',
+  title: t('dental2.treatment_plan_title'),
   addStageAction: 'Добавить этап',
   printAction: 'Печать',
   planNameLabel: 'Название плана',
@@ -319,7 +320,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
       onUpdate && onUpdate(treatmentPlan);
     } catch (error) {
       logger.error('Ошибка сохранения плана:', error);
-      notify.error('Не удалось сохранить план лечения. Проверьте соединение и попробуйте снова.');
+      notify.error(t('dental2.treatment_plan_save_failed'));
     }
   };
 

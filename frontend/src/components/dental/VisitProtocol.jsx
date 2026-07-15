@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
@@ -151,7 +152,7 @@ const VisitProtocol = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      notify.error('Не удалось сохранить протокол визита. Проверьте соединение и попробуйте снова.');
+      notify.error(t('dental2.visit_protocol_save_failed'));
     } finally {
       setLoading(false);
     }

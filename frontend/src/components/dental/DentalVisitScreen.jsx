@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * DentalVisitScreen — Phase 4+ minimalist visit screen for dentistry.
  *
@@ -539,7 +540,7 @@ const DentalVisitScreen = ({
       }
     } catch (error) {
       logger.error('[DentalVisitScreen] loadEMR failed', { error: error?.message });
-      notify.error('Не удалось загрузить карту приёма. Проверьте соединение.');
+      notify.error(t('dental2.visit_map_load_failed'));
     } finally {
       setLoading(false);
     }
