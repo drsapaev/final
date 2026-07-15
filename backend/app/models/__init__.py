@@ -101,7 +101,6 @@ from .patient_access_audit import PatientAccessAuditLog  # M4-P0-1: PHI audit tr
 from .patient_relationship import PatientRelationship, RelationshipType  # M4-P1-3: context roles
 from .passkey_credential import PasskeyCredential  # M4-P1-4: WebAuthn passkeys
 from .emergency_access_token import EmergencyAccessToken  # M4-P2-1: emergency recovery
-from .audit_log import AuditLog  # M5.1: unified audit log
 from .file_system import (
     File,
     FileAccessLog,
@@ -204,7 +203,6 @@ __all__ = [
     "PatientRelationship",  # M4-P1-3: context roles (guardian/heir/caregiver)
     "PasskeyCredential",  # M4-P1-4: WebAuthn passkeys
     "EmergencyAccessToken",  # M4-P2-1: emergency recovery
-    "AuditLog",  # M5.1: unified audit log
     "Visit",
     "VisitService",
     "Service",
