@@ -1,0 +1,63 @@
+import fs from 'fs';
+import path from 'path';
+
+import { describe, expect, it } from 'vitest';
+
+import { fileURLToPath } from 'node:url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '../../../..');
+
+const source = fs.readFileSync(
+  path.join(ROOT, 'components/laboratory/templateEditor/ContentTab.jsx'),
+  'utf8'
+);
+
+describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', () => {
+  it('imports useConfirm from common/ConfirmDialog', () => {
+    expect(source).toContain("from '../../common/ConfirmDialog'");
+    expect(source).toContain('useConfirm');
+  });
+
+  it('wraps section removal in confirm dialog', () => {
+    expect(source).toContain('async function handleRemoveSection(');
+    const handlerStart = source.indexOf('async function handleRemoveSection(');
+    const handlerEnd = source.indexOf('\n  }', handlerStart);
+    const handlerBody = source.slice(handlerStart, handlerEnd);
+
+    expect(handlerBody).toContain('await confirm(');
+    expect(handlerBody).toContain("'Удалить секцию?'");
+    expect(handlerBody).toContain("intent: 'danger'");
+    expect(handlerBody).toContain('if (ok) onRemoveSection(sectionIndex)');
+  });
+
+  it('wraps field removal in confirm dialog', () => {
+    expect(source).toContain('async function handleRemoveField(');
+    const handlerStart = source.indexOf('async function handleRemoveField(');
+    const handlerEnd = source.indexOf('\n  }', handlerStart);
+    const handlerBody = source.slice(handlerStart, handlerEnd);
+
+    expect(handlerBody).toContain('await confirm(');
+    expect(handlerBody).toContain("'Удалить показатель?'");
+    expect(handlerBody).toContain("intent: 'danger'");
+    expect(handlerBody).toContain('if (ok) onRemoveField(sectionIndex, fieldIndex)');
+  });
+
+  it('wires the new handlers into trash buttons', () => {
+    const trashSectionIdx = source.indexOf('aria-label="Удалить секцию"');
+    expect(trashSectionIdx).toBeGreaterThan(-1);
+    const sectionButtonLine = source.lastIndexOf('onClick=', trashSectionIdx);
+    const sectionButtonEnd = source.indexOf('aria-label="Удалить секцию"', sectionButtonLine);
+    const sectionOnClickBody = source.slice(sectionButtonLine, sectionButtonEnd);
+    expect(sectionOnClickBody).toContain('handleRemoveSection');
+    expect(sectionOnClickBody).not.toContain('onRemoveSection(sectionIndex);');
+
+    const trashFieldIdx = source.indexOf('aria-label="Удалить поле"');
+    expect(trashFieldIdx).toBeGreaterThan(-1);
+    const fieldButtonLine = source.lastIndexOf('onClick=', trashFieldIdx);
+    const fieldButtonEnd = source.indexOf('aria-label="Удалить поле"', fieldButtonLine);
+    const fieldOnClickBody = source.slice(fieldButtonLine, fieldButtonEnd);
+    expect(fieldOnClickBody).toContain('handleRemoveField');
+    expect(fieldOnClickBody).not.toContain('onRemoveField(sectionIndex, fieldIndex);');
+  });
+});

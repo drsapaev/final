@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { Badge, Button, Icon } from '../../ui/macos';
+import { useConfirm } from '../../common/ConfirmDialog';
 import { fieldTypeOptions, referenceModeOptions } from './config';
 import ReferenceRuleEditor from './ReferenceRuleEditor';
 
@@ -12,6 +13,11 @@ import ReferenceRuleEditor from './ReferenceRuleEditor';
  *   - duplicate field
  *   - structured ReferenceRuleEditor (вместо raw JSON)
  *   - расширенные правила (видимость/подсветка) — raw JSON, collapsed
+ *
+ * UX-AUDIT-FIX4: удаление секции и поля теперь требует подтверждения.
+ * Ранее single-click на trash удалял элемент со всеми правилами референсов
+ * без возможности отмены. Потеря сложного поля — 5–10 минут работы.
+ * Соответствует Nielsen Heuristic #5 (Error Prevention).
  */
 function ContentTab({
   draftVersion,
@@ -31,6 +37,37 @@ function ContentTab({
   onUpdateFieldCatalog,
   onLoadCatalogReferenceRange,
 }) {
+  // UX-AUDIT-FIX4: useConfirm для деструктивных действий (удаление секции/поля).
+  const [confirm] = useConfirm();
+
+  async function handleRemoveSection(sectionIndex, section) {
+    const ok = await confirm({
+      title: 'Удалить секцию?',
+      message: `«${section?.title || section?.key || `Секция #${sectionIndex + 1}`}» будет удалена со всеми полями и правилами нормы.`,
+      description:
+        'Действие нельзя отменить после сохранения черновика. ' +
+        'Если нужно сохранить структуру — нажмите «Отмена» и сохраните текущий черновик перед удалением.',
+      confirmLabel: 'Удалить секцию',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (ok) onRemoveSection(sectionIndex);
+  }
+
+  async function handleRemoveField(sectionIndex, fieldIndex, field) {
+    const ok = await confirm({
+      title: 'Удалить показатель?',
+      message: `«${field?.label || field?.field_key || `Поле #${fieldIndex + 1}`}» будет удалён со всеми правилами нормы.`,
+      description:
+        'Действие нельзя отменить после сохранения черновика. ' +
+        'Если нужно сохранить поле — нажмите «Отмена».',
+      confirmLabel: 'Удалить поле',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (ok) onRemoveField(sectionIndex, fieldIndex);
+  }
+
   return (
     <div className="ltw-grid">
       <div className="ltw-flex-between">
@@ -66,7 +103,7 @@ function ContentTab({
                 <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'down'); }} disabled={sectionIndex === draftVersion.sections.length - 1} aria-label="Переместить секцию вниз">
                   <Icon name="arrow.down" size={14} />
                 </Button>
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onRemoveSection(sectionIndex); }} aria-label="Удалить секцию">
+                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveSection(sectionIndex, section); }} aria-label="Удалить секцию">
                   <Icon name="trash" size={14} />
                 </Button>
               </span>
@@ -114,7 +151,7 @@ function ContentTab({
                             <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onDuplicateField(sectionIndex, fieldIndex); }} aria-label="Дублировать поле">
                               <Icon name="doc.on.doc" size={12} />
                             </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onRemoveField(sectionIndex, fieldIndex); }} aria-label="Удалить поле">
+                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field); }} aria-label="Удалить поле">
                               <Icon name="trash" size={12} />
                             </Button>
                           </span>
