@@ -37,8 +37,10 @@ import {
   ADULT_TEETH as TEETH_NUMBERS,
   DECIDUOUS_TEETH,
 } from './dentalConstants';
+import { useTranslation } from '../../i18n/adapter';
 
 const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
+  const { t } = useTranslation();
   const [teethData, setTeethData] = useState(initialData);
   const [selectedTooth, setSelectedTooth] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(TOOTH_STATUS.CARIES);

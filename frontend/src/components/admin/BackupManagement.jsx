@@ -26,6 +26,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const emptyBackupStats = {
   total_backups: 0,

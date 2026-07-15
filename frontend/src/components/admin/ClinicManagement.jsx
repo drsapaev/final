@@ -35,7 +35,9 @@ import DepartmentManagement from './DepartmentManagement';
 import ClinicSettings from './ClinicSettings';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 const ClinicManagement = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [systemHealth, setSystemHealth] = useState(null);
   const [stats, setStats] = useState(null);

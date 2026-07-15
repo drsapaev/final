@@ -35,6 +35,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { sanitizePrintableHtml } from '../../utils/printWindow';  // PR-35 / P0-7
+import { useTranslation } from '../../i18n/adapter';
 
 const INVOICE_TYPE_OPTIONS = [
   { value: 'standard', label: 'Обычный' },

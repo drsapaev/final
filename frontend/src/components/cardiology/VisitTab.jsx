@@ -14,6 +14,7 @@ import { User, FileText, RefreshCw, Save, Calendar, Phone } from 'lucide-react';
 import { Button, MacOSCard, MacOSEmptyState } from '../ui/macos';
 import { EMRContainerV2 } from '../emr-v2/EMRContainerV2';
 import { formatRegistrarDate, formatRegistrarDateTime } from '../../utils/dateUtils';
+import { useTranslation } from '../../i18n/adapter';
 
 export function VisitTab({
   selectedPatient,
@@ -25,6 +26,7 @@ export function VisitTab({
   getColor,
   getFontSize,
 }) {
+  const { t } = useTranslation();
   // Empty state: no patient selected
   if (!selectedPatient) {
     return (
@@ -60,7 +62,7 @@ export function VisitTab({
 
           {selectedPatient.phone && (
             <div>
-              <label className="cardio-form-label-block">Телефон</label>
+              <label className="cardio-form-label-block">{t('common.phone')}</label>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <Phone size={16} style={{ marginRight: '6px', color: 'var(--mac-text-secondary)' }} />
                 <span className="cardio-patient-name cardio-patient-name-primary">{selectedPatient.phone}</span>

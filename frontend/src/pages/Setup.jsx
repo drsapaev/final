@@ -9,6 +9,7 @@ import { initializeSetup } from '../api/setup';
 import { getCanonicalRouteById } from '../routing/routeSelectors';
 import logger from '../utils/logger';
 import './Setup.css';
+import { useTranslation } from '../i18n/adapter';
 
 // ============================================================================
 // UX Audit Stage 2 — Setup.jsx full rewrite

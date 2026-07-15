@@ -8,8 +8,10 @@
  */
 
 import DoctorServiceSelector from '../doctor/DoctorServiceSelector';
+import { useTranslation } from '../../i18n/adapter';
 
 export function ServicesTab() {
+  const { t } = useTranslation();
   return (
     <div className="cardio-w-full-visible">
       <DoctorServiceSelector

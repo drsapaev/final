@@ -31,6 +31,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const emptyEquipmentStats = {
   total_equipment: 0,

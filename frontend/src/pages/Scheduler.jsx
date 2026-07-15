@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 import { Input } from '../components/ui/macos';
+import { useTranslation } from '../i18n/adapter';
 
 function todayStr() {
   const d = new Date();
@@ -16,6 +17,7 @@ function todayStr() {
  * Совместимо с GET /schedule?date=YYYY-MM-DD&limit=...
  */
 export default function Scheduler() {
+  const { t } = useTranslation();
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
@@ -74,10 +76,10 @@ export default function Scheduler() {
 <table className="clinic-ops-table">
               <thead>
                 <tr>
-                  <th>Врач</th>
-                  <th>Кабинет</th>
-                  <th>Время</th>
-                  <th>Статус</th>
+                  <th>{t('common.doctor')}</th>
+                  <th>{t('common.cabinet')}</th>
+                  <th>{t('common.time')}</th>
+                  <th>{t('common.status')}</th>
                 </tr>
               </thead>
               <tbody>

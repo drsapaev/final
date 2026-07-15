@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * macOS-style Icon Component

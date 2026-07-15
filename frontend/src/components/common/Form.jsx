@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Контекст для форм
@@ -13,6 +14,7 @@ const FormContext = React.createContext();
  * Провайдер контекста форм
  */
 export function FormProvider({ children }) {
+  const { t } = useTranslation();
   const [forms, setForms] = useState({});
 
   const registerForm = useCallback((formId, initialValues = {}) => {

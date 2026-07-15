@@ -1,11 +1,13 @@
 import PropTypes from 'prop-types';
 import { signerFieldLabels } from './config';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * L-H-6 fix: SignersTab выделен в отдельный файл (~25 строк).
  * Вкладка «Подписи» — подписи по умолчанию (lab_technician + approver).
  */
 function SignersTab({ draftVersion, onUpdateSigner }) {
+  const { t } = useTranslation();
   return (
     <div>
       <div className="ltw-branding-title">Подписи по умолчанию</div>

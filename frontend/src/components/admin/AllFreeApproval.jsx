@@ -23,6 +23,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const ALL_FREE_ACTION_CAN_FIELD = {
   approve: 'can_approve',

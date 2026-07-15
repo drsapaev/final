@@ -5,6 +5,7 @@
  * Shows 2 states: online source (QR badge), desk source (Desk badge).
  */
 import EditModeBanner from './EditModeBanner';
+import { useTranslation } from '../../i18n/adapter';
 
 export default {
   title: 'Wizard/EditModeBanner',

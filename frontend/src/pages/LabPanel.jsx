@@ -15,6 +15,7 @@ import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useLabHotkeys } from '../hooks/useLabHotkeys';
 import notifyService from '../services/notify';
 import './lab.css';
+import { useTranslation } from '../i18n/adapter';
 
 // P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
 // использует labReportingApi.listQueueToday() с собственным auth-токеном.

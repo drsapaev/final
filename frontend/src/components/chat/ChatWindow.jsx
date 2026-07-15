@@ -8,7 +8,6 @@ import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';
 import { X, Send, MessageCircle, ChevronLeft, ChevronDown, Plus, Search, Check, CheckCheck, Mic, Filter, Smile, Paperclip, Zap, AlertCircle, VolumeX, Volume2 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
-import { useTranslation } from '../../hooks/useTranslation';  // PR-72
 import auth from '../../stores/auth';
 import VoiceRecorder from './VoiceRecorder';
 import VoiceMessage from './VoiceMessage';
@@ -25,6 +24,7 @@ import { useToast } from '../../components/common/Toast';
 import logger from '../../utils/logger';
 import './Chat.css';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 const groupReactions = (reactions) => {
   if (!reactions) return {};
@@ -787,7 +787,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                 <Input
                 type="text"
                 className="user-search-input"
-                placeholder="Поиск..."
+                placeholder={t('common.search')}
                 aria-label="Поиск пользователя для нового чата"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -841,7 +841,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
               <div className="empty-state">
                                         <Search size={48} className="empty-state-icon" />
-                                        <h4>Поиск</h4>
+                                        <h4>{t('common.search')}</h4>
                                         <p>Введите имя сотрудника</p>
                                     </div>
               }
@@ -858,7 +858,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                     <Input
                   value={convSearchQuery}
                   onChange={(e) => setConvSearchQuery(e.target.value)}
-                  placeholder="Поиск..."
+                  placeholder={t('common.search')}
                   aria-label="Поиск чатов"
                   style={{
                     width: '100%',

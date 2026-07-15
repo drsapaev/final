@@ -5,6 +5,7 @@
  * with required reason (min 10 chars) and payment context.
  */
 import CancelDialog from './CancelDialog';
+import { useTranslation } from '../../i18n/adapter';
 
 export default {
   title: 'Dialogs/CancelDialog',

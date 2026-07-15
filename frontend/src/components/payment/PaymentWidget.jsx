@@ -33,6 +33,7 @@ import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import './PaymentWidget.css';
+import { useTranslation } from '../../i18n/adapter';
 
 // UX Audit #4 regression fix: dividerStyle, providerOptionStyle, providerNameStyle
 // вынесены в CSS-классы .pw-divider, .pw-provider-option, .pw-provider-name.

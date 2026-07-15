@@ -27,6 +27,7 @@ import {
   ArrowUpRight,
   Clock3 } from
 'lucide-react';
+import { useTranslation } from '../i18n/adapter';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

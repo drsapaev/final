@@ -4,6 +4,7 @@ import {
   Box, Card, CardContent, Typography, Button, Alert,
 } from '../components/ui/macos';
 import { XCircle as CancelIcon, Home as HomeIcon, Headset as SupportIcon } from 'lucide-react';
+import { useTranslation } from '../i18n/adapter';
 
 const SUPPORT_TELEGRAM_HANDLE = '@clinic_support';
 const SUPPORT_TELEGRAM_URL = 'https://t.me/clinic_support';
@@ -52,6 +53,7 @@ const actionGridStyle = {
 };
 
 const PaymentCancel = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 

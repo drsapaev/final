@@ -1,7 +1,9 @@
 import PropTypes from 'prop-types';
 import { Bell } from 'lucide-react';
+import { useTranslation } from '../../i18n/adapter';
 
 export default function NotificationBell({ unreadCount = 0, onClick }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"

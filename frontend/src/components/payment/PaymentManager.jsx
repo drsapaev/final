@@ -14,6 +14,7 @@ import logger from '../../utils/logger';
 import './PaymentManager.css';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 // UX Audit Stage 3 (Payment issue 8.1):
 // Удалён `const API_BASE = '/api/v1'` и `import { tokenManager }` —

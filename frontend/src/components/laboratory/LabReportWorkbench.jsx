@@ -47,6 +47,7 @@ import { useLabReportState } from './hooks/useLabReportState';
 import { useLabToast } from './hooks/useLabToast';
 // STRAT#9: t() для i18n — confirm dialogs мигрированы на translation keys.
 import { t } from './utils/labTranslations';
+import { useTranslation } from '../../i18n/adapter';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,

@@ -28,10 +28,12 @@ import { toast } from 'react-toastify';
 import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettings';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 /**
  * Компонент для управления настройками льгот в админке
  */
 const BenefitSettings = () => {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState({
     repeat_visit_days: 21,
     repeat_visit_discount: 0,

@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import './VitalsWidget.css';
 import { Input } from '../../ui/macos';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * VitalsWidget (Кардиология)
@@ -10,6 +11,7 @@ import { Input } from '../../ui/macos';
  * - BP Warning/Critical thresholds
  */
 const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
+  const { t } = useTranslation();
     const handleChange = (field, value) => {
         onChange?.({ ...vitals, [field]: value });
         onFieldTouch?.(`vitals.${field}`);

@@ -17,6 +17,7 @@ import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './PatientStepV2.css';
+import { useTranslation } from '../../i18n/adapter';
 
 const PatientStepV2 = ({
   data = {}, // ✅ Default empty object to prevent crash

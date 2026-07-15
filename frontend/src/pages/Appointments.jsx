@@ -8,6 +8,7 @@ import {
 import { api } from '../api/client.js';
 
 import logger from '../utils/logger';
+import { useTranslation } from '../i18n/adapter';
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();
@@ -22,6 +23,7 @@ function todayStr() {
  * Для минимальных перезаписей реализуем только чтение и поиск.
  */
 export default function Appointments() {
+  const { t } = useTranslation();
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
@@ -149,10 +151,10 @@ export default function Appointments() {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Пациент</th>
-                  <th>Врач</th>
-                  <th>Время</th>
-                  <th>Статус</th>
+                  <th>{t('common.patient')}</th>
+                  <th>{t('common.doctor')}</th>
+                  <th>{t('common.time')}</th>
+                  <th>{t('common.status')}</th>
                 </tr>
               </thead>
               <tbody>

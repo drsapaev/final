@@ -3,8 +3,10 @@ import { useState, useEffect } from 'react';
 import './LinkPreview.css';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const LinkPreview = ({ url }) => {
+  const { t } = useTranslation();
     const [preview, setPreview] = useState(null);
     const [loading, setLoading] = useState(true);
 

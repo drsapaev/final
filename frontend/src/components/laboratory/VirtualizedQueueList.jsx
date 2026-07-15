@@ -6,6 +6,7 @@ import QueueCard from './QueueCard';
 // STRAT#27: t() for load-more button labels.
 import { t } from './utils/labTranslations';
 import { Button, Icon } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * STRAT#27: VirtualizedQueueList — virtualized rendering for 1000+ queue entries.

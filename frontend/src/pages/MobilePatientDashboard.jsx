@@ -24,11 +24,13 @@ import QueuePositionCard from '../components/mobile/QueuePositionCard';
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { useTranslation } from '../i18n/adapter';
 
 /**
  * Мобильная панель пациента для PWA
  */
 const MobilePatientDashboard = () => {
+  const { t } = useTranslation();
   const [patientData, setPatientData] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -331,7 +333,7 @@ const MobilePatientDashboard = () => {
                   <Phone className="w-4 h-4 text-gray-400" />
                   <div>
                     <p className="text-sm font-medium">{patientData?.phone || 'Не указано'}</p>
-                    <p className="text-xs text-gray-600">Телефон</p>
+                    <p className="text-xs text-gray-600">{t('common.phone')}</p>
                   </div>
                 </div>
               </div>

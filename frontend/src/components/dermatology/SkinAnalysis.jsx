@@ -34,7 +34,9 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
+  const { t } = useTranslation();
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   useState(null);

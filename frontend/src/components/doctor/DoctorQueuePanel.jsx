@@ -29,6 +29,7 @@ import {
   formatRegistrarTime,
   getRegistrarTimestampDisplay,
 } from '../../utils/dateUtils';
+import { useTranslation } from '../../i18n/adapter';
 
 const QUEUE_ACTION_ALIASES = {
   call: ['call'],

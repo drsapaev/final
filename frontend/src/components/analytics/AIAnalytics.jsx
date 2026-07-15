@@ -35,7 +35,9 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import './AIAnalytics.css';
+import { useTranslation } from '../../i18n/adapter';
 const AIAnalytics = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState({

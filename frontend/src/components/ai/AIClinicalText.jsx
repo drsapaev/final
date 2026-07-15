@@ -15,12 +15,14 @@ import {
   CheckCircle } from
 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Компонент для красивого отображения клинических рекомендаций AI
  * Парсит форматированный текст и отображает его с правильной структурой
  */
 const AIClinicalText = ({ content, variant = 'info' }) => {
+  const { t } = useTranslation();
   if (!content) return null;
 
   // Разбираем контент на секции

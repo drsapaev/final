@@ -7,6 +7,7 @@
  */
 import PropTypes from 'prop-types';
 import './AISuggestionCard.css';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * Format confidence as percentage

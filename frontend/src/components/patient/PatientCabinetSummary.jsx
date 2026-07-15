@@ -9,6 +9,7 @@ import {
   describePatientError,
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * L-H-4 fix: PatientCabinetSummary выделен в отдельный файл (~200 строк).
@@ -25,6 +26,7 @@ import PanelEmptyState from './PanelEmptyState';
  *   - mode='reports': только отчёты с PDF-download
  */
 function PatientCabinetSummary({ mode = 'cabinet' }) {
+  const { t } = useTranslation();
   const [cabinetStatus, setCabinetStatus] = useState('idle');
   const [cabinetSummary, setCabinetSummary] = useState(null);
   const [cabinetError, setCabinetError] = useState('');

@@ -5,16 +5,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
-import { useTranslation } from '../../hooks/useTranslation';  // PR-72
 import ChatWindow from './ChatWindow';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Кнопка открытия чата с бейджем непрочитанных сообщений
  */
 const ChatButton = () => {
+  const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const { unreadCount, isConnected, loadMessages } = useChat();
-    const { t } = useTranslation();  // PR-72
     // PR-68 / P0-1: listen for 'openChat' CustomEvent from desktop notifications
     const pendingUserIdRef = useRef(null);
 

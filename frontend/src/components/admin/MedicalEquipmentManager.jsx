@@ -31,8 +31,10 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const MedicalEquipmentManager = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('devices');
   const [devices, setDevices] = useState([]);
   const [measurements, setMeasurements] = useState([]);
@@ -410,7 +412,7 @@ const MedicalEquipmentManager = () => {
           
           </div>
           <div>
-            <label htmlFor="status-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Статус</label>
+            <label htmlFor="status-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('common.status')}</label>
             <Select
             id="status-filter"
             value={filters.status}

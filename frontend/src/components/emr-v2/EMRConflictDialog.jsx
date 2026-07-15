@@ -18,6 +18,7 @@
 import PropTypes from 'prop-types';
 import { useState } from 'react';
 import './EMRConflictDialog.css';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * EMRConflictDialog Component

@@ -4,6 +4,7 @@ import {
 } from '../ui/macos';
 import { Brain, Sparkles, Bot } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const AIButton = ({
   onClick,

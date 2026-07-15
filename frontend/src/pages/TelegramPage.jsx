@@ -21,6 +21,7 @@ import {
  * Централизованное управление ботом и уведомлениями
  */
 const TelegramPage = () => {void
+  const { t } = useTranslation();
   useTheme();
   const [activeTab, setActiveTab] = useState('overview');
 

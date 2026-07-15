@@ -12,6 +12,7 @@ import PaymentWidget from '../components/payment/PaymentWidget';
 import { getApiOrigin, setToken, getToken } from '../api/client';
 
 import logger from '../utils/logger';
+import { useTranslation } from '../i18n/adapter';
 
 const pageStyle = {
   maxWidth: 1180,
@@ -105,6 +106,7 @@ const fullWidthButtonStyle = {
 };
 
 const PaymentTest = () => {
+  const { t } = useTranslation();
   const [showWidget, setShowWidget] = useState(false);
   const [testData, setTestData] = useState({
     visitId: 1,

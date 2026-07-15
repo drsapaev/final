@@ -7,8 +7,10 @@ import { Play, Pause } from 'lucide-react';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const VoiceMessage = ({ message, fileUrl }) => {
+  const { t } = useTranslation();
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(message.voice_duration || 0);

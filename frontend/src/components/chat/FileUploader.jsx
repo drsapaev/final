@@ -5,8 +5,10 @@ import './FileUploader.css';
 import PropTypes from 'prop-types';
 import { validateFile } from '../../utils/fileValidator';  // PR-36 / P0-4
 import { toast } from 'react-toastify';
+import { useTranslation } from '../../i18n/adapter';
 
 const FileUploader = ({ onUpload, disabled }) => {
+  const { t } = useTranslation();
   const fileInputRef = useRef(null);
   const [isValidating, setIsValidating] = useState(false);
 

@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { Alert, Card } from '../../ui/macos';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * L-H-6 fix: PreviewTab выделен в отдельный файл (~70 строк).
@@ -7,6 +8,7 @@ import { Alert, Card } from '../../ui/macos';
  * Shows branding + sections + fields as they'll appear in the PDF.
  */
 function PreviewTab({ draftVersion }) {
+  const { t } = useTranslation();
   const branding = draftVersion.branding_overrides || {};
   const signers = draftVersion.signer_defaults || {};
 

@@ -7,6 +7,7 @@ import {
   AppEmpty, AppError, Button,
   Input } from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors.js';
+import { useTranslation } from '../i18n/adapter';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 

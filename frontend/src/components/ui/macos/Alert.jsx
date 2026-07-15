@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../../i18n/adapter';
 
 // SW-01 fix: merged MacOSAlert API into Alert.
 // Supports both old Alert API (children + severity) and MacOSAlert API

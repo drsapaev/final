@@ -5,6 +5,7 @@
 import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { BarChart3 } from 'lucide-react';
+import { useTranslation } from '../../i18n/adapter';
 
 const ReportsAndAnalytics = ({ patients, diagnoses, prosthetics }) => (
   <Card padding="lg">

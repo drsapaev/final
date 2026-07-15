@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth.js';
 import { getVisibleRoutesForShell, isInternalDemoEnabled } from '../../routing/routeSelectors.js';
+import { useTranslation } from '../../i18n/adapter';
 
 export default function Nav() {
+  const { t } = useTranslation();
   const [state, setState] = useState(auth.getState());
   const navigate = useNavigate();
   const { pathname } = useLocation();

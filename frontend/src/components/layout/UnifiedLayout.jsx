@@ -4,12 +4,14 @@ import UnifiedSidebar from './UnifiedSidebar';
 import { useTheme } from '../../contexts/ThemeContext';
 import '../../styles/unified-sidebar.css';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Унифицированный макет с сайдбаром
  * Используется во всех панелях для единообразия
  */
 const UnifiedLayout = ({ children, showSidebar = true }) => {
+  const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);void
   useLocation();

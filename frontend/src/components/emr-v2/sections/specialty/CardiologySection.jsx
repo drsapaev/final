@@ -22,6 +22,7 @@ import EMRSection from '../EMRSection';
 import EMRTextField from '../EMRTextField';
 import './CardiologySection.css';
 import { Heart, FileText } from 'lucide-react';
+import { useTranslation } from '../../../../i18n/adapter';
 
 /**
  * CardiologySection Component

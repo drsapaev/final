@@ -3,8 +3,10 @@ import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { Smile } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const EmojiPicker = ({ onEmojiSelect, disabled = false }) => {
+  const { t } = useTranslation();
     const [showPicker, setShowPicker] = useState(false);
     const pickerRef = useRef(null);
     const buttonRef = useRef(null);

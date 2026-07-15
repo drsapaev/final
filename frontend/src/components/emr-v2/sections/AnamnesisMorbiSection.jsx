@@ -13,6 +13,7 @@ import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * AnamnesisMorbiSection Component

@@ -11,6 +11,7 @@ import {
 import { historySeverityState, matchesHistoryFilter } from './utils/labReportNormalize';
 // STRAT#21: t() для i18n — history panel strings мигрированы.
 import { t } from './utils/labTranslations';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * P-04 fix: LabReportHistoryPanel выделен из LabReportWorkbench.

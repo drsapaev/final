@@ -49,6 +49,7 @@ import PropTypes from 'prop-types';
 import AppointmentPagination from './AppointmentPagination';  // PR-75
 // UX Audit R-3.1: единая CSV-функция с PHI masking.
 import { generateCSV, downloadCSV } from '../../pages/registrar/registrarCsv';
+import { useTranslation } from '../../i18n/adapter';
 
 const SESSION_COLORS = [
   'var(--mac-accent-blue)', // blue

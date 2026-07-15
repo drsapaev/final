@@ -18,6 +18,7 @@ import PropTypes from 'prop-types';
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import './AISuggestionPopover.css';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * Format confidence as percentage with color

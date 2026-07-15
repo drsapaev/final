@@ -9,6 +9,7 @@
  * Раньше: только 4-пиксельные полоски без текста — Nielsen #1 (visibility).
  */
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const STEP_LABELS = {
   ru: ['Пациент', 'Услуги'],
@@ -17,6 +18,7 @@ const STEP_LABELS = {
 };
 
 const StepProgressIndicator = ({ currentStep, totalSteps, language = 'ru' }) => {
+  const { t } = useTranslation();
   const labels = (STEP_LABELS[language] || STEP_LABELS.ru).slice(0, totalSteps);
   return (
     <ol className="wizard-progress" aria-label="Шаги мастера записи">

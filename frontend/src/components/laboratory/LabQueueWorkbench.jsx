@@ -16,6 +16,7 @@ import { t } from './utils/labTranslations';
 import QueueCard from './QueueCard';
 // STRAT#27: VirtualizedQueueList for 1000+ entries via @tanstack/react-virtual.
 import VirtualizedQueueList from './VirtualizedQueueList';
+import { useTranslation } from '../../i18n/adapter';
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.
 // Лабораторное помещение — публичное пространство, экран видят другие

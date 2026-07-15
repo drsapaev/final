@@ -1,6 +1,7 @@
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 import './ModernFlex.css';
+import { useTranslation } from '../../i18n/adapter';
 
 const ModernFlex = ({
   children,

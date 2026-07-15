@@ -6,6 +6,7 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import { t, tInterpolate } from '../utils/labTranslations';
 import { fieldTypeOptions, referenceModeOptions } from './config';
 import ReferenceRuleEditor from './ReferenceRuleEditor';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * L-H-6 fix: ContentTab выделен в отдельный файл (~250 строк).

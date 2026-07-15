@@ -1,5 +1,6 @@
 import './Avatar.css';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const roleGradients = {
     admin: 'linear-gradient(135deg, var(--mac-accent-purple), var(--mac-accent-purple))',
@@ -11,6 +12,7 @@ const roleGradients = {
 };
 
 const Avatar = ({ user, size = 40, showStatus = false, isOnline = false, className = '' }) => {
+  const { t } = useTranslation();
     const roleKey = user?.role?.toLowerCase() || 'default';
     const background = roleGradients[roleKey] || roleGradients.default;
     const name = user?.name || user?.full_name || user?.user_name || '?';

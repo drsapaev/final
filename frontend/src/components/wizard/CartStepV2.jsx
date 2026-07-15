@@ -18,6 +18,7 @@ import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
+import { useTranslation } from '../../i18n/adapter';
 
 const CartStepV2 = ({
   cart,

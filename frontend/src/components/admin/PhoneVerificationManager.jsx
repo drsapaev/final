@@ -25,7 +25,9 @@ import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 const PhoneVerificationManager = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');

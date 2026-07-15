@@ -9,6 +9,7 @@
 
 import PropTypes from 'prop-types';
 import AIAssistant from '../ai/AIAssistant';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * @param {Object} props
@@ -16,6 +17,7 @@ import AIAssistant from '../ai/AIAssistant';
  *   an ICD-10 code or diagnosis text
  */
 export function AiTab({ onSuggestionSelect }) {
+  const { t } = useTranslation();
   return (
     <div className="cardio-w-full-visible">
       <AIAssistant

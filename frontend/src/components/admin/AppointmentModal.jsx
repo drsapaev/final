@@ -11,6 +11,7 @@ import {
   Alert,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const AppointmentModal = ({
   isOpen,

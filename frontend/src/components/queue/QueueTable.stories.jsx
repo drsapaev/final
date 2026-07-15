@@ -5,6 +5,7 @@
  * Shows states: empty queue, with entries (QR + Desk sources).
  */
 import QueueTable from './QueueTable';
+import { useTranslation } from '../../i18n/adapter';
 
 export default {
   title: 'Queue/QueueTable',

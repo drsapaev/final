@@ -18,6 +18,7 @@ import { FileText, Pencil, CheckCircle2, FilePenLine, RefreshCw, GitBranch } fro
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
 import './EMRHistoryPanel.css';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Format date for display

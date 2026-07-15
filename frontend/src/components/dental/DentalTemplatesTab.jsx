@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { FileText } from 'lucide-react';
 import ProtocolTemplates from './ProtocolTemplates';
+import { useTranslation } from '../../i18n/adapter';
 
 export function DentalTemplatesTab({
   onManageTemplates,

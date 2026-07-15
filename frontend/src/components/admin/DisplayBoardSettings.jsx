@@ -30,7 +30,9 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 const DisplayBoardSettings = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [boards, setBoards] = useState([]); // P2 fix: restored value (was const [, setX]; used in loadDisplayData L75)

@@ -12,6 +12,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernSelect.css';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 const ModernSelect = ({
   label,
@@ -399,7 +400,7 @@ const ModernSelect = ({
             type="text"
             className="search-input"
             aria-label={`Поиск: ${accessibleLabel}`}
-            placeholder="Поиск..."
+            placeholder={t('common.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{

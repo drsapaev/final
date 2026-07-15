@@ -6,6 +6,7 @@ import { flagVariant } from './utils/labReportActions';
 import { t } from './utils/labTranslations';
 // STRAT#2: labToast для interactive numeric validation toasts.
 import { useLabToast } from './hooks/useLabToast';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * STRAT#24: ReportEditor — extracted from LabReportWorkbench.

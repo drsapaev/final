@@ -4,6 +4,7 @@
  * UX Audit R-4.3: visual testing for payment dialog with backend-driven methods.
  */
 import PaymentDialog from './PaymentDialog';
+import { useTranslation } from '../../i18n/adapter';
 
 export default {
   title: 'Dialogs/PaymentDialog',

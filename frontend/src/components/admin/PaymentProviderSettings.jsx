@@ -24,8 +24,10 @@ import {
   savePaymentProviderSettings,
   testPaymentProviderConfig,
 } from '../../api/adminSettings';
+import { useTranslation } from '../../i18n/adapter';
 
 const PaymentProviderSettings = () => {
+  const { t } = useTranslation();
   const { executeAction, loading } = useAsyncAction();
 
   const [settings, setSettings] = useState({

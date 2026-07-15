@@ -4,6 +4,7 @@ import React from 'react';
 import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 /**
  * Error Boundary компонент для перехвата и обработки ошибок React
  */
@@ -66,6 +67,7 @@ ErrorBoundary.propTypes = {
  * Fallback UI компонент
  */
 function ErrorFallback({ error, errorInfo, onRetry, theme }) {
+  const { t } = useTranslation();
   // Проверяем, что theme существует и имеет необходимые методы
   const getColor = theme?.getColor || ((color) => color);
   const getSpacing = theme?.getSpacing || ((size) => size);

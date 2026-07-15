@@ -6,6 +6,7 @@
  */
 import PropTypes from 'prop-types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from '../../i18n/adapter';
 
 const AppointmentPagination = ({
   currentPage,

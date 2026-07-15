@@ -22,6 +22,7 @@ import PrescriptionEditor from './PrescriptionEditor';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { useDoctorTreatmentTemplates } from '../../../hooks/useDoctorTreatmentTemplates';
 import logger from '../../../utils/logger';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * TreatmentSection Component

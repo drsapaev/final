@@ -18,6 +18,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Компонент для экспорта аналитических данных

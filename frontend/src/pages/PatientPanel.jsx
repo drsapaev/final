@@ -20,6 +20,7 @@ import PatientBookingPanel from '../components/patient/PatientBookingPanel';
 import PatientCabinetSummary from '../components/patient/PatientCabinetSummary';
 import PatientFormsPreview from '../components/patient/PatientFormsPreview';
 import './patient.css';
+import { useTranslation } from '../i18n/adapter';
 
 /**
  * PatientPanel — корневой контейнер для patient-facing веб-панели.
@@ -38,6 +39,7 @@ import './patient.css';
  * Защищённые данные требуют Telegram Mini App identity (initData).
  */
 const PatientPanel = () => {
+  const { t } = useTranslation();
   useBreakpoint();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();

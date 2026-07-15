@@ -33,6 +33,7 @@ import { formatLabStatus, getLabStatusVariant } from '../../laboratory/labUiLabe
 import { t, tInterpolate } from '../../laboratory/utils/labTranslations';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
+import { useTranslation } from '../../../i18n/adapter';
 
 // UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
@@ -285,7 +286,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
             </div>
           </DialogContent>
           <DialogActions>
-            <Button variant="outline" onClick={() => setShowOrderModal(false)}>Закрыть</Button>
+            <Button variant="outline" onClick={() => setShowOrderModal(false)}>{t('common.close')}</Button>
           </DialogActions>
         </Dialog>
       )}

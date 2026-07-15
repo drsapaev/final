@@ -12,6 +12,7 @@ import {
   Input } from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: '\u0412\u0441\u0435' },

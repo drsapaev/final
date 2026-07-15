@@ -27,6 +27,7 @@ import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 const formatFcmTokenStatus = (user) => {
   const fallbackLength = typeof user.fcm_token === 'string' ? user.fcm_token.length : 0;
   const tokenLength = Number.isFinite(user.fcm_token_length) ? user.fcm_token_length : fallbackLength;

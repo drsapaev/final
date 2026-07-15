@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../../i18n/adapter';
 const MacOSTab = ({
   tabs,
   activeTab,

@@ -13,6 +13,7 @@ import { Calendar } from 'lucide-react';
 import { MacOSCard, Skeleton, MacOSEmptyState } from '../ui/macos';
 import AppointmentSummaryBar from '../doctor/AppointmentSummaryBar';
 import EnhancedAppointmentsTable from '../tables/EnhancedAppointmentsTable';
+import { useTranslation } from '../../i18n/adapter';
 
 export function AppointmentsTab({
   appointments = [],

@@ -6,6 +6,7 @@
  */
 import PropTypes from 'prop-types';
 import { MacOSCard, Button, Input, Select, Textarea, Badge } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 export function DermaExamsTab({
   activeTab,
@@ -85,7 +86,7 @@ export function DermaExamsTab({
                 <Textarea aria-label="План лечения" value={skinExamination.treatment_plan || ''} onChange={(e) => setSkinExamination({ ...skinExamination, treatment_plan: e.target.value })} rows={3} />
               </div>
               <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--mac-spacing-4)' }}>
-                <Button type="button" variant="outline" onClick={onCancelSkinForm}>Отмена</Button>
+                <Button type="button" variant="outline" onClick={onCancelSkinForm}>{t('common.cancel')}</Button>
                 <Button type="submit">Сохранить осмотр</Button>
               </div>
             </form>
@@ -155,7 +156,7 @@ export function DermaExamsTab({
                 <Textarea aria-label="Результаты" value={cosmeticProcedure.results || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, results: e.target.value })} rows={2} />
               </div>
               <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--mac-spacing-4)' }}>
-                <Button type="button" variant="outline" onClick={onCancelCosmeticForm}>Отмена</Button>
+                <Button type="button" variant="outline" onClick={onCancelCosmeticForm}>{t('common.cancel')}</Button>
                 <Button type="submit">Сохранить процедуру</Button>
               </div>
             </form>

@@ -3,8 +3,10 @@ import {
 } from '../ui/macos';
 import { Clock, User } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const QueuePositionCard = ({ queueEntry }) => {
+  const { t } = useTranslation();
   if (!queueEntry) return null;
 
   const {

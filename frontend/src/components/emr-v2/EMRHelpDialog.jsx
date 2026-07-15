@@ -2,8 +2,10 @@
  * EMRHelpDialog - Справка и безопасность
  */
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const EMRHelpDialog = ({ isOpen, onClose }) => {
+  const { t } = useTranslation();
     if (!isOpen) return null;
     const handleActivationKeyDown = (event, action) => {
         if (event.key === 'Enter' || event.key === ' ') {
