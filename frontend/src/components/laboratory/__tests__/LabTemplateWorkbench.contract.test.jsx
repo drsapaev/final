@@ -100,4 +100,29 @@ describe('LabTemplateWorkbench template version command contract', () => {
     expect(source).not.toContain("confirmLabel: 'Сбросить'");
     expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
+
+  it('STRAT#15: tab labels and action buttons use t() from labTranslations', () => {
+    // STRAT#15: tab labels + action buttons мигрированы на t()
+    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('import { t }');
+
+    // Title
+    expect(source).toContain("t('template.title')");
+    // Action buttons
+    expect(source).toContain("t('template.new_template')");
+    expect(source).toContain("t('template.clone')");
+    expect(source).toContain("t('common.save_draft')");
+    expect(source).toContain("t('template.publish')");
+    expect(source).toContain("t('template.archive')");
+    // Tab labels — uses dynamic key pattern t(`template.${tab.id}_tab`)
+    expect(source).toContain('t(`template.${tab.id}_tab`)');
+
+    // Больше нет хардкоженных русских строк для tabs/buttons
+    expect(source).not.toContain('>Шаблоны<');
+    expect(source).not.toContain('>Новый<');
+    expect(source).not.toContain('>Клонировать<');
+    expect(source).not.toContain('>Опубликовать<');
+    expect(source).not.toContain('>Архивировать<');
+    expect(source).not.toContain('{tab.label}');
+  });
 });
