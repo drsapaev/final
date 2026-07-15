@@ -70,44 +70,42 @@ def _ensure_appointment_record_access(
     appointment: Any,
     current_user: User,
 ) -> None:
-    role = getattr(current_user, "role", None)
-    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
-        current_user, "is_superuser", False
-    ):
-        return
+    """M5.2: Centralized authorization via StaffAuthorizationService."""
+    from app.services.authorization.staff import staff_authorization_service
 
-    if role in APPOINTMENT_DOCTOR_ROLES:
+    # Admin/Registrar/Cashier: broad access
+    if staff_authorization_service.has_permission(current_user, "appointment:read"):
+        role = staff_authorization_service._get_permissions(current_user)
+        # Broad access roles skip ownership check
+        from app.services.authorization.staff import normalize_role
+        nr = normalize_role(getattr(current_user, "role", None))
+        if nr in ("admin", "registrar", "cashier") or getattr(current_user, "is_superuser", False):
+            return
+
+    # Doctor: check ownership
+    if staff_authorization_service.has_permission(current_user, "appointment:read"):
         doctor = (
             db.query(Doctor)
             .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
             .first()
         )
-        if not doctor:
-            raise HTTPException(status_code=403, detail="Access denied")
-        if appointment.doctor_id == doctor.id:
-            return
+        if doctor:
+            if appointment.doctor_id == doctor.id:
+                return
+            assigned_doctor = (
+                db.query(Doctor).filter(Doctor.id == appointment.doctor_id).first()
+            )
+            if not assigned_doctor and appointment.doctor_id == current_user.id:
+                return
+            if assigned_doctor and assigned_doctor.user_id == current_user.id:
+                return
 
-        assigned_doctor = (
-            db.query(Doctor).filter(Doctor.id == appointment.doctor_id).first()
-        )
-        # Some legacy appointment writers stored User.id in doctor_id. Allow it
-        # only when that value does not resolve to another real Doctor row.
-        if not assigned_doctor and appointment.doctor_id == current_user.id:
-            return
-        if assigned_doctor and assigned_doctor.user_id == current_user.id:
-            return
-
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    if role in APPOINTMENT_PATIENT_ROLES:
-        patient_id = getattr(appointment, "patient_id", None)
-        if patient_id is None:
-            raise HTTPException(status_code=403, detail="Access denied")
-
+    # Patient: check self-ownership
+    patient_id = getattr(appointment, "patient_id", None)
+    if patient_id is not None:
         current_patient = getattr(current_user, "patient", None)
-        if getattr(current_patient, "id", None) == patient_id:
+        if current_patient and getattr(current_patient, "id", None) == patient_id:
             return
-
         patient = (
             db.query(Patient)
             .filter(Patient.id == patient_id, Patient.user_id == current_user.id)
@@ -116,6 +114,20 @@ def _ensure_appointment_record_access(
         if patient:
             return
 
+    # M5.1: Log denied access
+    from app.services.audit_service import log_audit_event
+    log_audit_event(
+        db=db,
+        event_type="APPOINTMENT_ACCESS_DENIED",
+        actor_user_id=getattr(current_user, "id", None),
+        actor_role=getattr(current_user, "role", None),
+        subject_patient_id=getattr(appointment, "patient_id", None),
+        resource_type="appointment",
+        resource_id=str(getattr(appointment, "id", "?")),
+        action="view",
+        outcome="denied",
+        extra_data={"reason": "access_denied"},
+    )
     raise HTTPException(status_code=403, detail="Access denied")
 
 

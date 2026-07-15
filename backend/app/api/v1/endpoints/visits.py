@@ -118,7 +118,7 @@ def _update_queue_entries_for_visit_owner(
 
 
 def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user) -> None:
-    if getattr(current_user, "role", None) == "Admin" or getattr(
+    if staff_authorization_service.has_permission(current_user, "emr:read") or getattr(
         current_user, "is_superuser", False
     ):
         return
@@ -169,7 +169,7 @@ def _ensure_doctor_can_create_visit_for_payload(
     payload: VisitCreate,
     current_user,
 ) -> None:
-    if getattr(current_user, "role", None) == "Admin" or getattr(
+    if staff_authorization_service.has_permission(current_user, "emr:read") or getattr(
         current_user, "is_superuser", False
     ):
         return
