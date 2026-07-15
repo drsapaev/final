@@ -22,6 +22,7 @@ import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import { labReportingApi } from '../../../api/labReporting';
 import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions, Icon } from '../../ui/macos';
+import { useConfirm } from '../../common/ConfirmDialog';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
 
@@ -62,6 +63,14 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
   const [templates, setTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [ordering, setOrdering] = useState(false);
+
+  // UX-AUDIT-FIX9: useConfirm для подтверждения создания заказа на анализы.
+  // Ранее один клик в модалке «Заказать анализы» мгновенно создавал заказ
+  // через labReportingApi.createOrder — без подтверждения и без возможности
+  // отмены. Лаборатория сразу видела новый заказ в очереди. Если врач
+  // промахивался мимо нужного шаблона — приходилось идти в лабораторию
+  // и просить отменить. Соответствует Nielsen Heuristic #5 (Error Prevention).
+  const [confirm] = useConfirm();
 
   const loadInstances = useCallback(async () => {
     if (!patientId && !visitId) {
@@ -121,6 +130,18 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
   };
 
   const handleOrder = async (templateId, templateName) => {
+    // UX-AUDIT-FIX9: подтверждение перед созданием заказа.
+    const ok = await confirm({
+      title: 'Заказать анализы?',
+      message: `Будет создан заказ «${templateName}» для этого пациента.`,
+      description:
+        'Лаборатория увидит заказ в очереди и приступит к выполнению. ' +
+        'Если заказ ошибочный — его придётся отменять через лабораторию.',
+      confirmLabel: 'Заказать',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
+    if (!ok) return;
     setOrdering(true);
     try {
       await labReportingApi.createOrder({
