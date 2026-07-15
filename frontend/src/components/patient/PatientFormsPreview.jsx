@@ -53,7 +53,7 @@ const buildInitialFormState = (form) => ({
   updatedAt: form?.submission?.updated_at || '',
 });
 
-function PatientFormsPreview({ status, preview, error, initData }) {
+function PatientFormsPreview({ status, preview = null, error = '', initData = '' }) {
   const [formState, setFormState] = useState({});
   const [autoSaveTimestamps, setAutoSaveTimestamps] = useState({});
   const [autoSavingForms, setAutoSavingForms] = useState({});
@@ -404,10 +404,5 @@ PatientFormsPreview.propTypes = {
   initData: PropTypes.string,
 };
 
-PatientFormsPreview.defaultProps = {
-  preview: null,
-  error: '',
-  initData: '',
-};
 
 export default PatientFormsPreview;
