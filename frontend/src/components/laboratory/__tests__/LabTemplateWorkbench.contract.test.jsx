@@ -50,4 +50,25 @@ describe('LabTemplateWorkbench template version command contract', () => {
     expect(ensureDraftBlock).toContain('labReportingApi.createTemplateVersion');
     expect(ensureDraftBlock).not.toContain('activeVersion?.status === \'DRAFT\'');
   });
+
+  it('UX-AUDIT-QW2: Reset button requires confirm dialog before discarding draft', () => {
+    // QW2 fix: кнопка «Отменить» (Reset) ранее мгновенно сбрасывала черновик
+    // через notify('info', ...). Должна вызывать useConfirm() — как Archive и Publish.
+    const resetBlock = source.indexOf('Отменить');
+    expect(resetBlock).toBeGreaterThan(-1);
+    // Находим блок onClick рядом с кнопкой «Отменить»
+    const onClickStart = source.lastIndexOf('onClick={async () => {', resetBlock);
+    expect(onClickStart).toBeGreaterThan(-1);
+    const onClickEnd = source.indexOf('}}', onClickStart);
+    const onClickBody = source.slice(onClickStart, onClickEnd);
+
+    expect(onClickBody).toContain('await confirm(');
+    expect(onClickBody).toContain("'Сброс черновика'");
+    expect(onClickBody).toContain("intent: 'warning'");
+    expect(onClickBody).toContain('if (!ok) return;');
+    // Не должно быть мгновенного setDraftVersion без confirm
+    const setDraftIdx = onClickBody.indexOf('setDraftVersion(hydrateVersion(');
+    const confirmIdx = onClickBody.indexOf('await confirm(');
+    expect(setDraftIdx).toBeGreaterThan(confirmIdx);
+  });
 });
