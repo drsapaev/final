@@ -23,10 +23,10 @@ import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
-// QW-06 fix: translations extracted to separate file (was 50+ inline keys).
-import { getRegistrarTranslator } from './registrarTranslations';
-// STRAT#30: useTranslation adapter for confirm/notify i18n (react-i18next compatible).
-import { useTranslation } from '../i18n/adapter';
+// Unified i18n: single useTranslation hook for all UI strings (registrarPanel.*)
+// and confirm/notify strings (registrar.*). Replaces the legacy split between
+// getRegistrarTranslator (flat keys) and adapter (namespaced keys).
+import { useTranslation } from '../i18n/useTranslation';
 // Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
@@ -260,20 +260,25 @@ const RegistrarPanel = () => {
     resolveRescheduleVisitId,
     removeRescheduledAppointmentFromView,
   } = useRegistrarReschedule({ setAppointments });
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('language') || localStorage.getItem('app_language') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
-  // QW-06 fix: translations moved to ./registrarTranslations.js (was 50+ inline keys).
-  // EN translations added (previously missing — EN users saw RU fallback).
-  // Full migration to locales/{ru,uz,en}.js deferred until useTranslation.jsx
-  // is refactored to use centralized locale files (see audit §8, Direction 3).
-  const t = useMemo(() => getRegistrarTranslator(language), [language]);
-  // STRAT#30: useTranslation adapter for confirm/notify i18n.
-  // 't' from getRegistrarTranslator handles UI labels (tabs, statuses).
-  // 'tI18n' from useTranslation handles confirm dialogs and notify messages
-  // via the centralized labTranslations dictionary's registrar.* namespace.
-  // When react-i18next is adopted, both will merge into a single t().
-  const { t: tI18n } = useTranslation();
-  const currentWorklistLabel = t(REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments');
-  const statusFilterLabel = statusFilter ? t(REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter) : null;
+  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
+  // Unified i18n hook: single source of truth for all translations.
+  // - registrarPanel.* — flat UI keys (tabs, statuses, headings, buttons)
+  // - registrar.*      — confirm dialog titles/messages + notify messages
+  // Language is read from react-i18next state (not localStorage directly).
+  // Reading `language` from the i18n instance is safe: useTranslation()
+  // subscribes to languageChanged events and triggers a re-render, so
+  // i18n.language is always current when this component renders.
+  const { t: tI18n, language } = useTranslation();
+  // Backward-compat wrapper: WelcomeView and QueueView receive `t` as a prop
+  // and call t('key') for registrarPanel.* flat keys. Wrap tI18n to accept
+  // flat keys and route them to the registrarPanel namespace.
+  // Also handles 'misc.*' and 'registrar.*' namespaced keys passed through.
+  const t = (key) => {
+    if (key.includes('.')) return tI18n(key);
+    return tI18n('registrarPanel.' + key);
+  };
+  const currentWorklistLabel = tI18n('registrarPanel.' + (REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments'));
+  const statusFilterLabel = statusFilter ? tI18n('registrarPanel.' + (REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter)) : null;
   const { theme, getSpacing, getFontSize, getColor } = useTheme();
   // Адаптивные цвета из централизованной системы темизации
   // DS-2 fix: replaced --color-* variables with --mac-* canonical tokens
@@ -1555,8 +1560,8 @@ const RegistrarPanel = () => {
                     {showCalendar ?
                     // PR-13: use formatRegistrarDate to avoid browser-local timezone issues
                     // historyDate is YYYY-MM-DD (Tashkent), parse as Tashkent midnight
-                    formatRegistrarDate(`${historyDate}T00:00:00+05:00`, language === 'ru' ? 'ru-RU' : 'uz-UZ') :
-                    t('today')} · {filteredAppointments.length} {t('tabs_appointments')}
+                    formatRegistrarDate(`${historyDate}T00:00:00+05:00`, language?.startsWith('ru') ? 'ru-RU' : 'uz-UZ') :
+                    tI18n('registrarPanel.today')} · {filteredAppointments.length} {tI18n('registrarPanel.tabs_appointments')}
                   </p>
                 </div>
 
@@ -1568,7 +1573,7 @@ const RegistrarPanel = () => {
                     </Badge>
                   }
                   <Badge variant={appointmentsLoading ? 'info' : 'secondary'}>
-                    {appointmentsLoading ? t('loading') : `${filteredAppointments.length} ${t('tabs_appointments')}`}
+                    {appointmentsLoading ? tI18n('registrarPanel.loading') : `${filteredAppointments.length} ${tI18n('registrarPanel.tabs_appointments')}`}
                   </Badge>
                   <Button
                   variant="primary"
@@ -1581,7 +1586,7 @@ const RegistrarPanel = () => {
                   aria-label="Создать новую запись из рабочего списка регистратора"
                   className="registrar-inline-flex registrar-inline-flex-shrink">
                     <Icon name="plus" size="small" style={{ color: 'white' }} />
-                    {t('new_appointment')}
+                    {tI18n('registrarPanel.new_appointment')}
                   </Button>
                 </div>
               </div>
@@ -1620,7 +1625,7 @@ const RegistrarPanel = () => {
                     <Icon name="magnifyingglass" size="large" />
                   </div>
                   <h3 className="registrar-empty-heading registrar-empty-heading-text">
-                    {t('empty_table')}
+                    {tI18n('registrarPanel.empty_table')}
                   </h3>
                   <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
                     Попробуйте изменить фильтры или выбрать другую дату.
@@ -1989,14 +1994,14 @@ const RegistrarPanel = () => {
       <ModernDialog
         isOpen={showSlotsModal}
         onClose={() => setShowSlotsModal(false)}
-        title={`📅 ${t('available_slots')}`}
+        title={`📅 ${tI18n('registrarPanel.available_slots')}`}
         maxWidth="32rem"
         dialogStyle={{
           backgroundColor: 'var(--mac-bg-primary)'
         }}
         actions={[
           {
-            label: '🌅 ' + t('tomorrow'),
+            label: '🌅 ' + tI18n('registrarPanel.tomorrow'),
             variant: 'primary',
             onClick: async () => {
               if (!rescheduleData) return;
@@ -2035,7 +2040,7 @@ const RegistrarPanel = () => {
             }
           },
           {
-            label: t('select_date'),
+            label: tI18n('registrarPanel.select_date'),
             variant: 'secondary',
             // QW-02 fix: previously called window.prompt('Введите дату переноса (YYYY-MM-DD):', currentVal)
             // — a jarring native browser dialog that blocks the tab, has no date picker,
@@ -2151,7 +2156,7 @@ const RegistrarPanel = () => {
               className="registrar-reschedule-input registrar-reschedule-input-themed"
             />
             <div className="registrar-reschedule-hint registrar-reschedule-hint-text">
-              Выберите дату и нажмите «{t('select_date')}». Время необязательно — если не указано, сохранится текущее.
+              Выберите дату и нажмите «{tI18n('registrarPanel.select_date')}». Время необязательно — если не указано, сохранится текущее.
             </div>
           </div>
         </div>

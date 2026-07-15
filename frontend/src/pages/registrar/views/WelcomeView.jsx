@@ -1,4 +1,6 @@
-import { t } from '../../../i18n/adapter';
+// i18n-unification: `t` is now passed as a prop from RegistrarPanel (wrapper
+// around tI18n that routes flat keys to registrarPanel.* namespace).
+// No direct import needed.
 /**
  * Registrar Panel — Welcome View.
  *

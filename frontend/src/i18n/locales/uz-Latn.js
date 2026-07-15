@@ -1099,7 +1099,9 @@ const uzLatn = {
     print_ticket: 'Talon chop etish',
     auto_refresh: 'Avtomatik yangilash',
     data_source_demo: 'Demo ma\'lumotlar ko\'rsatilgan',
-    data_source_api: 'Ma\'lumotlar serverdan yuklandi'
+    data_source_api: 'Ma\'lumotlar serverdan yuklandi',
+    ds_error_message: 'Yozuvlarni yuklab bo\'lmadi. Serverga ulanishni tekshiring.',
+    ds_retry: 'Qayta urinish'
   }
 };
 

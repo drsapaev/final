@@ -1106,7 +1106,9 @@ const uzCyrl = {
     print_ticket: 'Печать талона',
     auto_refresh: 'Автообновление',
     data_source_demo: 'Показаны демо-данные',
-    data_source_api: 'Данные загружены с сервера'
+    data_source_api: 'Данные загружены с сервера',
+    ds_error_message: 'Не удалось загрузить записи. Проверьте подключение к серверу.',
+    ds_retry: 'Повторить'
   }
 };
 
