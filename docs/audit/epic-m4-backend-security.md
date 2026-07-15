@@ -229,9 +229,10 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ---
 
-### M4-P1-4 — WebAuthn / Passkeys (альтернативный вход)
+### M4-P1-4 — WebAuthn / Passkeys (альтернативный вход) ✅ DONE
 
 **Серьёзность:** P1 (resilience)
+**Статус:** ✅ Реализовано (PR pending)
 **Файлы:** новый functionality
 
 **Текущее состояние:**
