@@ -1,3 +1,4 @@
+import { t } from '../i18n/adapter';
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import RoleGate from '../components/RoleGate.jsx';
@@ -137,8 +138,8 @@ export default function Settings() {void
       title: 'Удаление провайдера',
       message: 'Удалить этого провайдера?',
       description: 'Это действие необратимо.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('misc.delete'),
+      cancelLabel: t('misc.cancel'),
       intent: 'danger',
     });
     if (!ok) {
@@ -508,7 +509,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
     try {
       await onSave(formData);
     } catch (error) {
-      notify.error('Ошибка сохранения: ' + (error.message || 'Неизвестная ошибка'));
+      notify.error(t('misc.operation_error') + ' сохранения: ' + (error.message || 'Неизвестная ошибка'));
     }
   };
 

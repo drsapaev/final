@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * DoctorTemplatesPanel - Universal "Мой опыт" panel for all EMR sections
  * 
@@ -92,8 +93,8 @@ export function DoctorTemplatesPanel({
             title: 'Удаление шаблона',
             message: 'Удалить этот шаблон?',
             description: 'Это действие необратимо.',
-            confirmLabel: 'Удалить',
-            cancelLabel: 'Отмена',
+            confirmLabel: t('misc.delete'),
+            cancelLabel: t('misc.cancel'),
             intent: 'danger',
         });
         if (ok) {

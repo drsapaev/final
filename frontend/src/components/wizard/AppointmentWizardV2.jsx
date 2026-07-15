@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -1381,7 +1382,7 @@ const AppointmentWizardV2 = ({
       message: editMode ? 'Обновить запись с указанными данными?' : 'Создать запись с указанными данными?',
       description: summaryLines.join('\n'),
       confirmLabel: editMode ? 'Обновить' : 'Создать',
-      cancelLabel: 'Отмена',
+      cancelLabel: t('misc.cancel'),
       intent: 'primary',
     });
     if (!confirmed) {

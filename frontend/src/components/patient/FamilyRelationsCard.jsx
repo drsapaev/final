@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * FamilyRelationsCard - component for patient family relationship display.
  */
@@ -289,8 +290,8 @@ export default function FamilyRelationsCard({
       title: 'Удаление семейной связи',
       message: 'Удалить эту семейную связь?',
       description: 'Это действие необратимо.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('misc.delete'),
+      cancelLabel: t('misc.cancel'),
       intent: 'danger',
     });
     if (!ok) return;

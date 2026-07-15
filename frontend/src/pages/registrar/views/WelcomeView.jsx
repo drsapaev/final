@@ -1,3 +1,4 @@
+import { t } from '../../../i18n/adapter';
 /**
  * Registrar Panel — Welcome View.
  *
@@ -341,7 +342,7 @@ const WelcomeView = React.memo(({
                         <button
                           type="button"
                           className="registrar-overflow-item"
-                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
+                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success(t('misc.data_updated'));}}
                           role="menuitem">
                           <Icon name="arrow.clockwise" size="small" aria-hidden="true" />
                           Обновить данные
