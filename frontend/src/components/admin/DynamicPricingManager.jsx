@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -72,6 +72,7 @@ const getSelectedServiceIds = (value) =>
     : [];
 
 const toggleServiceId = (selectedIds, serviceId) => {
+  const { t } = useTranslation();
   const normalizedId = normalizeServiceId(serviceId);
   if (Number.isNaN(normalizedId)) {
     return getSelectedServiceIds(selectedIds);

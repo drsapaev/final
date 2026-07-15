@@ -27,7 +27,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const emptyBranchStats = {
   total_branches: 0,

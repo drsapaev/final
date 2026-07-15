@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -30,6 +30,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { notify } from '../../services/notify.js';
 const AISettings = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState([]);
   const [systemSettings, setSystemSettings] = useState({});

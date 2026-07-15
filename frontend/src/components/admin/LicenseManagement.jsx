@@ -33,7 +33,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const emptyLicenseStats = {
   total_licenses: 0,

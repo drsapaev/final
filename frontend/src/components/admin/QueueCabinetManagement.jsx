@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Building2,
@@ -31,6 +31,7 @@ const INITIAL_FILTERS = {
 };
 
 const formatDate = (value) => {
+  const { t } = useTranslation();
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;

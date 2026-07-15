@@ -8,7 +8,7 @@ import {
 } from '../ui/macos';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const TRANSACTION_TYPE_OPTIONS = [
   { value: 'income', label: '\u0414\u043e\u0445\u043e\u0434' },

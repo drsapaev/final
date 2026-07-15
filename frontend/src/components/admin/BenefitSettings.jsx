@@ -28,7 +28,7 @@ import { toast } from 'react-toastify';
 import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettings';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Компонент для управления настройками льгот в админке
  */

@@ -10,7 +10,7 @@ import UserExportManager from './UserExportManager';
 import GroupPermissionsManager from './GroupPermissionsManager';
 // P-025 fix: wrap child panels in ErrorBoundary to catch unexpected render errors.
 import ErrorBoundary from '../common/ErrorBoundary';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const TAB_ICONS = {
   Users,

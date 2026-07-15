@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * DepartmentManagement Component
  * Управление отделениями, вкладками и интеграциями очередей/услуг
@@ -124,6 +124,7 @@ const PAGE_SIZE_OPTIONS = [
 { value: 50, label: '50' }];
 
 const DepartmentManagement = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
   const [confirm, confirmDialog] = useConfirm();
   const [departments, setDepartments] = useState([]);

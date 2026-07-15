@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
@@ -101,6 +101,7 @@ const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey
 const ServiceCatalog = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces native confirm()).
   const [confirm, confirmDialog] = useConfirm();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);

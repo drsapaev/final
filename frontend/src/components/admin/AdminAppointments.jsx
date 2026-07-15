@@ -7,7 +7,7 @@ import useDoctors from '../../hooks/useDoctors';
 import usePatients from '../../hooks/usePatients';
 import useModal from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import {
   Badge,
   Button,
@@ -49,6 +49,7 @@ const textCellStyle = {
 };
 
 const getAppointmentPatientDisplayName = (appointment) => {
+  const { t } = useTranslation();
   const rawName =
     appointment?.patientName ||
     appointment?.patient_name ||

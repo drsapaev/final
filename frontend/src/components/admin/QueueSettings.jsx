@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -53,6 +53,7 @@ const TIMEZONE_OPTIONS = [
 ];
 
 const normalizeNumber = (value, fallback) => {
+  const { t } = useTranslation();
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };

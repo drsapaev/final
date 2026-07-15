@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * QueueProfilesManager - Admin component for managing queue tabs
  * 
@@ -79,6 +79,7 @@ const PRESET_COLORS = [
 ];
 
 const QueueProfilesManager = ({ theme = 'light' }) => {
+    const { t } = useTranslation();
     // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
     const [confirm, confirmDialog] = useConfirm();
     const [profiles, setProfiles] = useState([]);

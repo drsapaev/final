@@ -31,7 +31,7 @@ import {
   Textarea,
   Checkbox,
 } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ClinicSettings = () => {
   const { t } = useTranslation();

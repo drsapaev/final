@@ -15,7 +15,7 @@ import { toast } from 'react-toastify';
 import { fetchWizardSettings, saveWizardSettings } from '../../api/adminSettings';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const WizardSettings = () => {
   const { t } = useTranslation();
   const [settings, setSettings] = useState({

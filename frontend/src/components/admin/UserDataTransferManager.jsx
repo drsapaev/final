@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import {
   MacOSCard, Button, Input, Checkbox, SegmentedControl,
@@ -10,6 +10,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 
 const toArray = (value, fallbackKeys = []) => {
+  const { t } = useTranslation();
   if (Array.isArray(value)) return value;
 
   for (const key of fallbackKeys) {

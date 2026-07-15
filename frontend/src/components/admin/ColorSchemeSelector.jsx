@@ -7,7 +7,7 @@ import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
 import {
   MacOSCard, Select,
 } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ICONS = {
   light: Sun,

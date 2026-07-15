@@ -15,7 +15,7 @@ import ColorSchemeSelector from './ColorSchemeSelector.jsx';
 import { AccentPicker } from '../ui/macos';
 // P-025 fix: shared loading/error/empty wrapper for Unified* panels.
 import StateWrapper from '../common/StateWrapper.jsx';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const stripPasswordFields = (formData) => {
   const persistedSettings = { ...(formData || {}) };

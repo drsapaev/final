@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import {
   Calendar,
   CreditCard,
@@ -94,6 +94,7 @@ function truncateDescription(description = '') {
 }
 
 const AdminFinanceOverview = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const {

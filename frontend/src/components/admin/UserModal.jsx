@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/macos';
@@ -23,6 +23,7 @@ const UserModal = ({
   onSave,
   loading = false
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     username: '',
     email: '',

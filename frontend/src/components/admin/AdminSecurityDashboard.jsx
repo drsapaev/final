@@ -4,7 +4,7 @@ import {
   Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
 } from '../ui/macos';
 import { api } from '../../api/client';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Admin Security Dashboard — M5.6 frontend integration.

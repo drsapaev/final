@@ -4,7 +4,7 @@ import FCMManager from './FCMManager';
 import RegistrarNotificationManager from './RegistrarNotificationManager';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { MacOSTab } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 
 const UnifiedNotifications = () => {

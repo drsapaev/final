@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import PropTypes from 'prop-types';
 import { AlertCircle, ArrowRight, Check, X } from 'lucide-react';
 import {
@@ -6,6 +6,7 @@ import {
 } from '../ui/macos';
 
 const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) => {
+  const { t } = useTranslation();
   const formatFieldName = (field) => {
     const fieldNames = {
       name: 'Название',
