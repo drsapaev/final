@@ -11,7 +11,7 @@ import {
   describePatientError,
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * L-H-4 fix: PatientBookingPanel выделен в отдельный файл (~120 строк).

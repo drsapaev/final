@@ -1,4 +1,4 @@
-import { t } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -723,6 +723,7 @@ function getMiniAppReportFileName(report) {
 }
 
 function TelegramMiniAppPatientShell() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const selectedSection = getTelegramMiniAppSelectedSection(location.search);

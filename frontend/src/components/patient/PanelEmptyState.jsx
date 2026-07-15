@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { Icon } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * L-H-4 fix: PanelEmptyState выделен в отдельный файл.

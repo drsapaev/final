@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -54,6 +54,7 @@ const buildInitialFormState = (form) => ({
 });
 
 function PatientFormsPreview({ status, preview, error, initData }) {
+  const { t } = useTranslation();
   const [formState, setFormState] = useState({});
   const [autoSaveTimestamps, setAutoSaveTimestamps] = useState({});
   const [autoSavingForms, setAutoSavingForms] = useState({});
