@@ -183,11 +183,11 @@ export default function LabReportWorkbench({
   const handleCreateInstance = useCallback(async (templateIdOverride = null, options = {}) => {
     const templateId = templateIdOverride || selectedTemplateId;
     if (!selectedAppointment?.patient_id || !templateId) {
-      notify('error', 'Выберите запись и шаблон.');
+      notify('error', t('errors.select_patient_template'));
       return;
     }
     if (resolutionHasBlockingGap) {
-      notify('error', 'Для выбранных услуг нет настроенного лабораторного отчёта. Добавьте mapping service_code -> template.');
+      notify('error', t('errors.no_template_for_services'));
       return;
     }
     setSaving(true);
@@ -211,7 +211,7 @@ export default function LabReportWorkbench({
       await onRefreshHistory(selectedAppointment.patient_id);
       await onRefreshRecentReports?.();
       await onQueueChanged?.();
-      notify('success', options.successMessage || 'Новый лабораторный отчёт создан.');
+      notify('success', options.successMessage || t('success.report_created'));
     } catch (error) {
       notify('error', error.message);
     } finally {
@@ -284,7 +284,7 @@ export default function LabReportWorkbench({
 
   async function handleSaveDraft() {
     if (!activeInstance) {
-      notify('error', 'Сначала создайте или откройте отчёт.');
+      notify('error', t('errors.open_or_create_first'));
       return;
     }
     // WF-07 fix: запоминаем статус до save, чтобы обнаружить auto-transition.
@@ -301,9 +301,9 @@ export default function LabReportWorkbench({
       };
       const newStatus = latest?.status || previousStatus;
       if (previousStatus === 'DRAFT' && newStatus === 'IN_PROGRESS') {
-        notify('info', 'Черновик сохранён. Статус изменён на «Заполняется» — отчёт теперь в работе.');
+        notify('info', t('success.draft_saved_in_progress'));
       } else {
-        notify('success', 'Черновик сохранён.');
+        notify('success', t('success.draft_saved'));
       }
     } catch (error) {
       notify('error', error.message);
@@ -347,7 +347,7 @@ export default function LabReportWorkbench({
       await onRefreshHistory(finalized.patient_id);
       await onRefreshRecentReports?.();
       await onQueueChanged?.();
-      notify('success', 'Отчёт утверждён.');
+      notify('success', t('success.finalized'));
     } catch (error) {
       notify('error', error.message);
     } finally {
@@ -378,7 +378,7 @@ export default function LabReportWorkbench({
       onInstanceChange(revised);
       await onRefreshHistory(revised.patient_id);
       await onRefreshRecentReports?.();
-      notify('success', 'Создана исправленная версия отчёта.');
+      notify('success', t('success.revised'));
     } catch (error) {
       notify('error', error.message);
     } finally {
@@ -435,7 +435,7 @@ export default function LabReportWorkbench({
           severity: 'error',
           text: 'Не удалось сформировать PDF. Проверьте соединение и попробуйте снова.'
         });
-        notify('error', downloadError.message || 'Не удалось сформировать PDF.');
+        notify('error', downloadError.message || t('errors.print_failed'));
         return;
       }
       if (!blob || !(blob instanceof Blob)) {
@@ -507,10 +507,10 @@ export default function LabReportWorkbench({
         patient_id: patientId,
         instance_id: activeInstance.id,
       });
-      notify('success', 'Результаты отправлены пациенту через Telegram.');
+      notify('success', t('success.notified'));
     } catch (error) {
       const msg = error?.response?.data?.detail || error?.message || 'Не удалось отправить результаты пациенту.';
-      notify('error', typeof msg === 'string' ? msg : 'Не удалось отправить результаты пациенту.');
+      notify('error', typeof msg === 'string' ? msg : t('errors.notify_failed'));
     } finally {
       setSaving(false);
       setBusyAction('');

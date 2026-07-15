@@ -337,4 +337,30 @@ describe('LabReportWorkbench', () => {
     expect(source).not.toContain("confirmLabel: 'Отправить'");
     expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
+
+  it('STRAT#13: notify() calls use t() for all hardcoded Russian messages', () => {
+    // STRAT#13: все notify() с hardcoded русскими строками мигрированы на t()
+    const source = fs.readFileSync(workbenchPath, 'utf8');
+
+    // Success messages
+    expect(source).toContain("t('success.report_created')");
+    expect(source).toContain("t('success.draft_saved')");
+    expect(source).toContain("t('success.draft_saved_in_progress')");
+    expect(source).toContain("t('success.finalized')");
+    expect(source).toContain("t('success.revised')");
+    expect(source).toContain("t('success.notified')");
+
+    // Error messages
+    expect(source).toContain("t('errors.select_patient_template')");
+    expect(source).toContain("t('errors.no_template_for_services')");
+    expect(source).toContain("t('errors.open_or_create_first')");
+    expect(source).toContain("t('errors.print_failed')");
+    expect(source).toContain("t('errors.notify_failed')");
+
+    // Больше нет хардкоженных русских строк в notify() calls
+    expect(source).not.toContain("notify('error', 'Выберите запись и шаблон.')");
+    expect(source).not.toContain("notify('success', 'Черновик сохранён.')");
+    expect(source).not.toContain("notify('success', 'Отчёт утверждён.')");
+    expect(source).not.toContain("notify('success', 'Результаты отправлены пациенту через Telegram.')");
+  });
 });
