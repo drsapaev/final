@@ -91,4 +91,22 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     // Иконка square.and.arrow.down.on.square
     expect(source).toContain('square.and.arrow.down.on.square');
   });
+
+  it('UX-AUDIT-FIX14: uses parent-provided datalist IDs instead of hardcoded', () => {
+    // FIX14: ID для <datalist> ранее были захардкожены как
+    // 'lab-analyte-catalog' / 'lab-unit-catalog'. Теперь принимаются
+    // через props analyteCatalogId / unitCatalogId (значения по умолчанию
+    // сохранены для backward compat).
+    expect(source).toContain('analyteCatalogId');
+    expect(source).toContain('unitCatalogId');
+    // Используются в input list=...
+    expect(source).toContain('list={analyteCatalogId}');
+    expect(source).toContain('list={unitCatalogId}');
+    // Больше нет хардкоженных строковых ID в list=
+    expect(source).not.toContain('list="lab-analyte-catalog"');
+    expect(source).not.toContain('list="lab-unit-catalog"');
+    // PropTypes добавлены
+    expect(source).toContain('analyteCatalogId: PropTypes.string');
+    expect(source).toContain('unitCatalogId: PropTypes.string');
+  });
 });

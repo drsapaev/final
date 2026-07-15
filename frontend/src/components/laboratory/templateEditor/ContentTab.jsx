@@ -45,6 +45,10 @@ function ContentTab({
   onUpdateField,
   onUpdateFieldCatalog,
   onLoadCatalogReferenceRange,
+  // UX-AUDIT-FIX14: уникальные ID для <datalist> от parent (useId()).
+  // Ранее были захардкожены как 'lab-analyte-catalog' / 'lab-unit-catalog'.
+  analyteCatalogId = 'lab-analyte-catalog',
+  unitCatalogId = 'lab-unit-catalog',
 }) {
   // UX-AUDIT-FIX4: useConfirm для деструктивных действий (удаление секции/поля).
   const [confirm] = useConfirm();
@@ -264,7 +268,7 @@ function ContentTab({
                                 <input
                                   className="macos-input"
                                   aria-label="Код анализируемого показателя"
-                                  list="lab-analyte-catalog"
+                                  list={analyteCatalogId}
                                   value={field.analyte_code || ''}
                                   onChange={(event) => onUpdateFieldCatalog(sectionIndex, fieldIndex, 'analyte_code', event.target.value)}
                                 />
@@ -274,7 +278,7 @@ function ContentTab({
                                 <input
                                   className="macos-input"
                                   aria-label="Код единицы измерения"
-                                  list="lab-unit-catalog"
+                                  list={unitCatalogId}
                                   value={field.unit_code || ''}
                                   onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'unit_code', event.target.value)}
                                 />
@@ -374,6 +378,9 @@ ContentTab.propTypes = {
   onUpdateField: PropTypes.func.isRequired,
   onUpdateFieldCatalog: PropTypes.func.isRequired,
   onLoadCatalogReferenceRange: PropTypes.func.isRequired,
+  // UX-AUDIT-FIX14: уникальные ID для <datalist> от parent (useId).
+  analyteCatalogId: PropTypes.string,
+  unitCatalogId: PropTypes.string,
 };
 
 export default ContentTab;

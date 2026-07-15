@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useId } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
@@ -38,6 +38,14 @@ export default function LabTemplateWorkbench({
   // Согласованность с LabReportWorkbench — единый стилизованный portal-dialog
   // с focus-trap, Esc-to-cancel, явным описанием последствий.
   const [confirm, confirmDialog] = useConfirm();
+
+  // UX-AUDIT-FIX14: useId() для уникальных ID <datalist>. Ранее ID были
+  // захардкожены как 'lab-analyte-catalog' / 'lab-unit-catalog' —
+  // глобальные, что вызывало бы коллизию при множественном монтировании
+  // LabTemplateWorkbench (например, в тестах или будущих admin-панелях).
+  // Теперь React генерирует уникальные ID на каждый instance компонента.
+  const analyteCatalogId = useId();
+  const unitCatalogId = useId();
 
   // Phase 4+: New Template dialog state (was always-visible form).
   const [showNewTemplateDialog, setShowNewTemplateDialog] = useState(false);
@@ -667,6 +675,9 @@ export default function LabTemplateWorkbench({
                   onUpdateField={updateField}
                   onUpdateFieldCatalog={updateFieldCatalog}
                   onLoadCatalogReferenceRange={loadCatalogReferenceRange}
+                  // UX-AUDIT-FIX14: передаём уникальные ID для <datalist>
+                  analyteCatalogId={analyteCatalogId}
+                  unitCatalogId={unitCatalogId}
                 />
               )}
               {editorTab === 'design' && (
@@ -700,14 +711,15 @@ export default function LabTemplateWorkbench({
         existingTemplates={templates}
       />
 
-      <datalist id="lab-analyte-catalog">
+      {/* UX-AUDIT-FIX14: ID datalist теперь уникальны per-instance (useId) */}
+      <datalist id={analyteCatalogId}>
         {catalogAnalytes.map((analyte) => (
           <option key={analyte.code} value={analyte.code}>
             {analyte.name}
           </option>
         ))}
       </datalist>
-      <datalist id="lab-unit-catalog">
+      <datalist id={unitCatalogId}>
         {catalogUnits.map((unit) => (
           <option key={unit.code} value={unit.code}>
             {unit.symbol}
