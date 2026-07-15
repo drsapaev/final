@@ -60,6 +60,7 @@ const QUEUE_JOIN_MESSAGES = {
 };
 
 const QueueJoin = () => {
+  const { t } = useTranslation();
   const { token: paramToken } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
