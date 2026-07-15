@@ -108,7 +108,6 @@ const ServiceCatalog = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces native confirm()).
   const { t } = useTranslation();
   const [confirm, confirmDialog] = useConfirm();
-  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);

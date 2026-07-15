@@ -48,8 +48,7 @@ const textCellStyle = {
   color: 'var(--mac-text-secondary)',
 };
 
-const getAppointmentPatientDisplayName = (appointment) => {
-  const { t } = useTranslation();const getAppointmentPatientDisplayName = (appointment, t) => {
+const getAppointmentPatientDisplayName = (appointment, t) => {
   const rawName =
     appointment?.patientName ||
     appointment?.patient_name ||
