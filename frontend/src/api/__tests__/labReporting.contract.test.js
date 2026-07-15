@@ -34,7 +34,7 @@ describe('labReportingApi UX-AUDIT-FIX12 — AbortController support', () => {
 
   it('uses spread operator to pass signal conditionally', () => {
     // signal должен быть опциональным — если не передан, fetch работает без него.
-    expect(source).toContain("...(options.signal ? { signal: options.signal } : {})");
+    expect(source).toContain('...(options.signal ? { signal: options.signal } : {})');
   });
 
   it('STRAT#4: listQueueToday accepts server-side pagination params', () => {
@@ -43,9 +43,9 @@ describe('labReportingApi UX-AUDIT-FIX12 — AbortController support', () => {
     expect(source).toContain('STRAT#4');
     expect(source).toContain('listQueueToday(targetDate = null, params = {})');
     // limit и offset пробрасываются в query string
-    expect(source).toContain("params.limit !== undefined");
-    expect(source).toContain("search.set('limit', String(params.limit))");
-    expect(source).toContain("params.offset !== undefined");
-    expect(source).toContain("search.set('offset', String(params.offset))");
+    expect(source).toContain('params.limit !== undefined');
+    expect(source).toContain('search.set(\'limit\', String(params.limit))');
+    expect(source).toContain('params.offset !== undefined');
+    expect(source).toContain('search.set(\'offset\', String(params.offset))');
   });
 });

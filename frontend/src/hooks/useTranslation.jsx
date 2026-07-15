@@ -240,7 +240,7 @@ export const TranslationProvider = ({ children }) => {
       labInProgress: 'Ishda',
       labCompleted: 'Tugatilgan',
       labDraft: 'Qoralama',
-      labFilling: "To'ldirilmoqda",
+      labFilling: 'To\'ldirilmoqda',
       labReady: 'Tekshiruvga tayyor',
       labFinalized: 'Tasdiqlangan',
       labPrinted: 'Chop etilgan',

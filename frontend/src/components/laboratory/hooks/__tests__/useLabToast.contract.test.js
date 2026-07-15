@@ -30,15 +30,15 @@ describe('useLabToast hook (STRAT#2)', () => {
   });
 
   it('imports toast from react-toastify for interactive toasts', () => {
-    expect(source).toContain("from 'react-toastify'");
+    expect(source).toContain('from \'react-toastify\'');
     expect(source).toContain('toast');
   });
 
   it('exposes simple delegates that call notify callback', () => {
-    expect(source).toContain("success: (message) => notify('success', message)");
-    expect(source).toContain("error: (message) => notify('error', message)");
-    expect(source).toContain("info: (message) => notify('info', message)");
-    expect(source).toContain("warning: (message) => notify('warning', message)");
+    expect(source).toContain('success: (message) => notify(\'success\', message)');
+    expect(source).toContain('error: (message) => notify(\'error\', message)');
+    expect(source).toContain('info: (message) => notify(\'info\', message)');
+    expect(source).toContain('warning: (message) => notify(\'warning\', message)');
   });
 
   it('exposes interactive methods that call toast directly', () => {
@@ -56,7 +56,7 @@ describe('useLabToast hook (STRAT#2)', () => {
 
 describe('LabReportWorkbench uses useLabToast (STRAT#2)', () => {
   it('imports useLabToast hook', () => {
-    expect(workbenchSource).toContain("from './hooks/useLabToast'");
+    expect(workbenchSource).toContain('from \'./hooks/useLabToast\'');
     expect(workbenchSource).toContain('useLabToast');
   });
 
@@ -78,7 +78,7 @@ describe('LabReportWorkbench uses useLabToast (STRAT#2)', () => {
     const toastCallPattern = /toast\.(error|warning|info)\(/;
     // Находим все matches и проверяем, что их нет в numeric validation block
     // (между t('errors.invalid_numeric') и "return;")
-    const numericBlockStart = reportEditorSource.indexOf("t('errors.invalid_numeric')");
+    const numericBlockStart = reportEditorSource.indexOf('t(\'errors.invalid_numeric\')');
     expect(numericBlockStart).toBeGreaterThan(-1);
     const numericBlockEnd = reportEditorSource.indexOf('return;', numericBlockStart);
     const numericBlock = reportEditorSource.slice(numericBlockStart, numericBlockEnd);

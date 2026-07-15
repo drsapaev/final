@@ -64,8 +64,8 @@ describe('LabTemplateWorkbench template version command contract', () => {
 
     expect(onClickBody).toContain('await confirm(');
     // STRAT#10: строка мигрирована на t('confirm.reset_draft_title')
-    expect(onClickBody).toContain("t('confirm.reset_draft_title')");
-    expect(onClickBody).toContain("intent: 'warning'");
+    expect(onClickBody).toContain('t(\'confirm.reset_draft_title\')');
+    expect(onClickBody).toContain('intent: \'warning\'');
     expect(onClickBody).toContain('if (!ok) return;');
     // Не должно быть мгновенного setDraftVersion без confirm
     const setDraftIdx = onClickBody.indexOf('setDraftVersion(hydrateVersion(');
@@ -75,45 +75,45 @@ describe('LabTemplateWorkbench template version command contract', () => {
 
   it('STRAT#10: both confirm dialogs (archive + reset) use t() from labTranslations', () => {
     // STRAT#10: archive и reset dialogs мигрированы на t()
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
 
     // Archive dialog
-    expect(source).toContain("t('confirm.archive_title')");
-    expect(source).toContain("t('confirm.archive_message')");
-    expect(source).toContain("t('confirm.archive_description')");
-    expect(source).toContain("t('confirm.archive_confirm')");
+    expect(source).toContain('t(\'confirm.archive_title\')');
+    expect(source).toContain('t(\'confirm.archive_message\')');
+    expect(source).toContain('t(\'confirm.archive_description\')');
+    expect(source).toContain('t(\'confirm.archive_confirm\')');
 
     // Reset dialog
-    expect(source).toContain("t('confirm.reset_draft_title')");
-    expect(source).toContain("t('confirm.reset_draft_message')");
-    expect(source).toContain("t('confirm.reset_draft_description')");
-    expect(source).toContain("t('confirm.reset_confirm')");
+    expect(source).toContain('t(\'confirm.reset_draft_title\')');
+    expect(source).toContain('t(\'confirm.reset_draft_message\')');
+    expect(source).toContain('t(\'confirm.reset_draft_description\')');
+    expect(source).toContain('t(\'confirm.reset_confirm\')');
 
     // Общий cancel label
-    expect(source).toContain("t('confirm.cancel')");
+    expect(source).toContain('t(\'confirm.cancel\')');
 
     // Больше нет хардкоженных русских строк в confirm() calls
-    expect(source).not.toContain("title: 'Архивирование версии шаблона'");
-    expect(source).not.toContain("title: 'Сброс черновика'");
-    expect(source).not.toContain("confirmLabel: 'Архивировать'");
-    expect(source).not.toContain("confirmLabel: 'Сбросить'");
-    expect(source).not.toContain("cancelLabel: 'Отмена'");
+    expect(source).not.toContain('title: \'Архивирование версии шаблона\'');
+    expect(source).not.toContain('title: \'Сброс черновика\'');
+    expect(source).not.toContain('confirmLabel: \'Архивировать\'');
+    expect(source).not.toContain('confirmLabel: \'Сбросить\'');
+    expect(source).not.toContain('cancelLabel: \'Отмена\'');
   });
 
   it('STRAT#15: tab labels and action buttons use t() from labTranslations', () => {
     // STRAT#15: tab labels + action buttons мигрированы на t()
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
 
     // Title
-    expect(source).toContain("t('template.title')");
+    expect(source).toContain('t(\'template.title\')');
     // Action buttons
-    expect(source).toContain("t('template.new_template')");
-    expect(source).toContain("t('template.clone')");
-    expect(source).toContain("t('common.save_draft')");
-    expect(source).toContain("t('template.publish')");
-    expect(source).toContain("t('template.archive')");
+    expect(source).toContain('t(\'template.new_template\')');
+    expect(source).toContain('t(\'template.clone\')');
+    expect(source).toContain('t(\'common.save_draft\')');
+    expect(source).toContain('t(\'template.publish\')');
+    expect(source).toContain('t(\'template.archive\')');
     // Tab labels — uses dynamic key pattern t(`template.${tab.id}_tab`)
     expect(source).toContain('t(`template.${tab.id}_tab`)');
 
@@ -128,35 +128,35 @@ describe('LabTemplateWorkbench template version command contract', () => {
 
   it('STRAT#17: notify() calls use t() for all hardcoded Russian messages', () => {
     // STRAT#17: все notify() с hardcoded русскими строками мигрированы на t()
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
 
     // Success messages
-    expect(source).toContain("t('success.template_created')");
-    expect(source).toContain("t('success.template_draft_saved')");
-    expect(source).toContain("t('success.template_published')");
-    expect(source).toContain("t('success.template_archived')");
-    expect(source).toContain("t('success.template_cloned')");
-    expect(source).toContain("t('success.norm_loaded_from_catalog')");
+    expect(source).toContain('t(\'success.template_created\')');
+    expect(source).toContain('t(\'success.template_draft_saved\')');
+    expect(source).toContain('t(\'success.template_published\')');
+    expect(source).toContain('t(\'success.template_archived\')');
+    expect(source).toContain('t(\'success.template_cloned\')');
+    expect(source).toContain('t(\'success.norm_loaded_from_catalog\')');
 
     // Error messages
-    expect(source).toContain("t('errors.catalog_load_failed')");
-    expect(source).toContain("t('errors.template_code_name_required')");
-    expect(source).toContain("t('errors.select_template_first')");
-    expect(source).toContain("t('errors.select_template')");
-    expect(source).toContain("t('errors.select_version_for_archive')");
-    expect(source).toContain("t('errors.select_template_for_copy')");
-    expect(source).toContain("t('errors.validation_errors')");
-    expect(source).toContain("t('errors.no_norm_in_catalog')");
-    expect(source).toContain("t('errors.catalog_load_error')");
+    expect(source).toContain('t(\'errors.catalog_load_failed\')');
+    expect(source).toContain('t(\'errors.template_code_name_required\')');
+    expect(source).toContain('t(\'errors.select_template_first\')');
+    expect(source).toContain('t(\'errors.select_template\')');
+    expect(source).toContain('t(\'errors.select_version_for_archive\')');
+    expect(source).toContain('t(\'errors.select_template_for_copy\')');
+    expect(source).toContain('t(\'errors.validation_errors\')');
+    expect(source).toContain('t(\'errors.no_norm_in_catalog\')');
+    expect(source).toContain('t(\'errors.catalog_load_error\')');
 
     // Больше нет хардкоженных русских строк в notify() calls
-    expect(source).not.toContain("'Не удалось загрузить лабораторный каталог.'");
-    expect(source).not.toContain("'Укажите код и название шаблона.'");
-    expect(source).not.toContain("'Шаблон создан.'");
-    expect(source).not.toContain("'Черновик шаблона сохранён.'");
-    expect(source).not.toContain("'Версия шаблона опубликована.'");
-    expect(source).not.toContain("'Версия шаблона архивирована.'");
-    expect(source).not.toContain("'Копия шаблона создана.'");
+    expect(source).not.toContain('\'Не удалось загрузить лабораторный каталог.\'');
+    expect(source).not.toContain('\'Укажите код и название шаблона.\'');
+    expect(source).not.toContain('\'Шаблон создан.\'');
+    expect(source).not.toContain('\'Черновик шаблона сохранён.\'');
+    expect(source).not.toContain('\'Версия шаблона опубликована.\'');
+    expect(source).not.toContain('\'Версия шаблона архивирована.\'');
+    expect(source).not.toContain('\'Копия шаблона создана.\'');
   });
 });

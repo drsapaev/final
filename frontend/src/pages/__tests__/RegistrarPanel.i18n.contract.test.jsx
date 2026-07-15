@@ -20,57 +20,57 @@ const translationsSource = fs.readFileSync(
 
 describe('RegistrarPanel STRAT#30 — i18n migration', () => {
   it('imports useTranslation from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/adapter'");
+    expect(source).toContain('from \'../i18n/adapter\'');
     expect(source).toContain('useTranslation');
   });
 
   it('instantiates tI18n via useTranslation()', () => {
-    expect(source).toContain("const { t: tI18n } = useTranslation()");
+    expect(source).toContain('const { t: tI18n } = useTranslation()');
   });
 
   it('uses tI18n() for all confirm dialog titles', () => {
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_title')");
-    expect(source).toContain("tI18n('registrar.complete_visit_title')");
-    expect(source).toContain("tI18n('registrar.postpone_tomorrow_title')");
-    expect(source).toContain("tI18n('registrar.postpone_date_title')");
+    expect(source).toContain('tI18n(\'registrar.send_to_cabinet_title\')');
+    expect(source).toContain('tI18n(\'registrar.complete_visit_title\')');
+    expect(source).toContain('tI18n(\'registrar.postpone_tomorrow_title\')');
+    expect(source).toContain('tI18n(\'registrar.postpone_date_title\')');
   });
 
   it('uses tI18n() for confirm dialog confirmLabel and cancelLabel', () => {
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_confirm')");
-    expect(source).toContain("tI18n('registrar.complete_visit_confirm')");
-    expect(source).toContain("tI18n('registrar.postpone_tomorrow_confirm')");
-    expect(source).toContain("tI18n('registrar.postpone_date_confirm')");
-    expect(source).toContain("tI18n('registrar.cancel')");
+    expect(source).toContain('tI18n(\'registrar.send_to_cabinet_confirm\')');
+    expect(source).toContain('tI18n(\'registrar.complete_visit_confirm\')');
+    expect(source).toContain('tI18n(\'registrar.postpone_tomorrow_confirm\')');
+    expect(source).toContain('tI18n(\'registrar.postpone_date_confirm\')');
+    expect(source).toContain('tI18n(\'registrar.cancel\')');
   });
 
   it('uses tI18n() with params for confirm dialog messages', () => {
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_message', { name: inCabinetName })");
-    expect(source).toContain("tI18n('registrar.complete_visit_message', { name: completeName })");
-    expect(source).toContain("tI18n('registrar.postpone_tomorrow_message')");
+    expect(source).toContain('tI18n(\'registrar.send_to_cabinet_message\', { name: inCabinetName })');
+    expect(source).toContain('tI18n(\'registrar.complete_visit_message\', { name: completeName })');
+    expect(source).toContain('tI18n(\'registrar.postpone_tomorrow_message\')');
   });
 
   it('uses tI18n() for all notify messages', () => {
-    expect(source).toContain("tI18n('registrar.sent_to_cabinet')");
-    expect(source).toContain("tI18n('registrar.visit_completed')");
-    expect(source).toContain("tI18n('registrar.appointment_created')");
-    expect(source).toContain("tI18n('registrar.visit_postponed')");
-    expect(source).toContain("tI18n('registrar.no_visit_for_postpone')");
-    expect(source).toContain("tI18n('registrar.select_postpone_date')");
-    expect(source).toContain("tI18n('registrar.invalid_date_format')");
-    expect(source).toContain("tI18n('registrar.invalid_time_format')");
-    expect(source).toContain("tI18n('registrar.cannot_postpone_past')");
-    expect(source).toContain("tI18n('registrar.backend_unavailable')");
+    expect(source).toContain('tI18n(\'registrar.sent_to_cabinet\')');
+    expect(source).toContain('tI18n(\'registrar.visit_completed\')');
+    expect(source).toContain('tI18n(\'registrar.appointment_created\')');
+    expect(source).toContain('tI18n(\'registrar.visit_postponed\')');
+    expect(source).toContain('tI18n(\'registrar.no_visit_for_postpone\')');
+    expect(source).toContain('tI18n(\'registrar.select_postpone_date\')');
+    expect(source).toContain('tI18n(\'registrar.invalid_date_format\')');
+    expect(source).toContain('tI18n(\'registrar.invalid_time_format\')');
+    expect(source).toContain('tI18n(\'registrar.cannot_postpone_past\')');
+    expect(source).toContain('tI18n(\'registrar.backend_unavailable\')');
   });
 
   it('does not contain hardcoded Russian strings in confirm() calls anymore', () => {
-    expect(source).not.toContain("title: 'Отправить в кабинет'");
-    expect(source).not.toContain("title: 'Завершение приёма'");
-    expect(source).not.toContain("title: 'Перенос на завтра'");
-    expect(source).not.toContain("title: 'Перенос на другую дату'");
-    expect(source).not.toContain("confirmLabel: 'Отправить'");
-    expect(source).not.toContain("confirmLabel: 'Завершить'");
-    expect(source).not.toContain("confirmLabel: 'Перенести'");
-    expect(source).not.toContain("cancelLabel: 'Отмена'");
+    expect(source).not.toContain('title: \'Отправить в кабинет\'');
+    expect(source).not.toContain('title: \'Завершение приёма\'');
+    expect(source).not.toContain('title: \'Перенос на завтра\'');
+    expect(source).not.toContain('title: \'Перенос на другую дату\'');
+    expect(source).not.toContain('confirmLabel: \'Отправить\'');
+    expect(source).not.toContain('confirmLabel: \'Завершить\'');
+    expect(source).not.toContain('confirmLabel: \'Перенести\'');
+    expect(source).not.toContain('cancelLabel: \'Отмена\'');
   });
 
   it('labTranslations has registrar.* namespace with all keys', () => {

@@ -24,8 +24,8 @@ describe('ReportSidebar STRAT#25 — extracted sub-component', () => {
   });
 
   it('imports LabReportHistoryPanel and LabReportAIAnalysis', () => {
-    expect(source).toContain("from './LabReportHistoryPanel'");
-    expect(source).toContain("from './LabReportAIAnalysis'");
+    expect(source).toContain('from \'./LabReportHistoryPanel\'');
+    expect(source).toContain('from \'./LabReportAIAnalysis\'');
   });
 
   it('accepts all expected props', () => {
@@ -66,7 +66,7 @@ describe('ReportSidebar STRAT#25 — extracted sub-component', () => {
   });
 
   it('LabReportWorkbench imports and uses ReportSidebar', () => {
-    expect(workbenchSource).toContain("import ReportSidebar from './ReportSidebar'");
+    expect(workbenchSource).toContain('import ReportSidebar from \'./ReportSidebar\'');
     expect(workbenchSource).toContain('<ReportSidebar');
     expect(workbenchSource).toContain('activeInstance={activeInstance}');
     expect(workbenchSource).toContain('showRecentReportsBrowser={showRecentReportsBrowser}');
@@ -75,7 +75,7 @@ describe('ReportSidebar STRAT#25 — extracted sub-component', () => {
 
   it('LabReportWorkbench no longer directly imports LabReportAIAnalysis or LabReportHistoryPanel', () => {
     // STRAT#25: these are now imported by ReportSidebar, not by LabReportWorkbench
-    expect(workbenchSource).not.toContain("import LabReportAIAnalysis from './LabReportAIAnalysis'");
-    expect(workbenchSource).not.toContain("import LabReportHistoryPanel from './LabReportHistoryPanel'");
+    expect(workbenchSource).not.toContain('import LabReportAIAnalysis from \'./LabReportAIAnalysis\'');
+    expect(workbenchSource).not.toContain('import LabReportHistoryPanel from \'./LabReportHistoryPanel\'');
   });
 });

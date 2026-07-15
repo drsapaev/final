@@ -31,10 +31,10 @@ describe('LabTemplateWorkbench Phase 4+ structure contract', () => {
   it('renders 4 editor tabs: Content / Design / Signers / Preview', () => {
     // EDITOR_TABS теперь в templateEditor/config.js — но LabTemplateWorkbench
     // импортирует и использует их.
-    expect(configSource).toContain("id: 'content'");
-    expect(configSource).toContain("id: 'design'");
-    expect(configSource).toContain("id: 'signers'");
-    expect(configSource).toContain("id: 'preview'");
+    expect(configSource).toContain('id: \'content\'');
+    expect(configSource).toContain('id: \'design\'');
+    expect(configSource).toContain('id: \'signers\'');
+    expect(configSource).toContain('id: \'preview\'');
     expect(source).toContain('EDITOR_TABS');
   });
 
@@ -122,7 +122,7 @@ describe('LabTemplateWorkbench Phase 4+ structure contract', () => {
       path.join(ROOT, 'components/laboratory/templateEditor/ContentTab.jsx'),
       'utf8'
     ).replace(/\r\n/g, '\n');
-    expect(contentTabSource).toContain("'up'");
-    expect(contentTabSource).toContain("'down'");
+    expect(contentTabSource).toContain('\'up\'');
+    expect(contentTabSource).toContain('\'down\'');
   });
 });

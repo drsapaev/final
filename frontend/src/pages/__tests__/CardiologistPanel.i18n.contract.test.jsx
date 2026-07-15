@@ -20,37 +20,37 @@ const translationsSource = fs.readFileSync(
 
 describe('CardiologistPanel STRAT#32 — i18n migration', () => {
   it('imports useTranslation from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/adapter'");
+    expect(source).toContain('from \'../i18n/adapter\'');
     expect(source).toContain('useTranslation');
   });
 
   it('instantiates tI18n via useTranslation()', () => {
-    expect(source).toContain("const { t: tI18n } = useTranslation()");
+    expect(source).toContain('const { t: tI18n } = useTranslation()');
   });
 
   it('uses tI18n() for confirm dialog', () => {
-    expect(source).toContain("tI18n('cardio.cancel_appointment_title')");
-    expect(source).toContain("tI18n('cardio.cancel_appointment_message'");
-    expect(source).toContain("tI18n('cardio.cancel_appointment_confirm')");
-    expect(source).toContain("tI18n('cardio.cancel_appointment_cancel')");
+    expect(source).toContain('tI18n(\'cardio.cancel_appointment_title\')');
+    expect(source).toContain('tI18n(\'cardio.cancel_appointment_message\'');
+    expect(source).toContain('tI18n(\'cardio.cancel_appointment_confirm\')');
+    expect(source).toContain('tI18n(\'cardio.cancel_appointment_cancel\')');
   });
 
   it('uses tI18n() for all notify messages', () => {
-    expect(source).toContain("tI18n('cardio.session_expired')");
-    expect(source).toContain("tI18n('cardio.select_patient_first')");
-    expect(source).toContain("tI18n('cardio.appointment_cancelled')");
-    expect(source).toContain("tI18n('cardio.visit_completed')");
-    expect(source).toContain("tI18n('cardio.blood_test_saved')");
-    expect(source).toContain("tI18n('cardio.ecg_added')");
-    expect(source).toContain("tI18n('cardio.settings_saved')");
+    expect(source).toContain('tI18n(\'cardio.session_expired\')');
+    expect(source).toContain('tI18n(\'cardio.select_patient_first\')');
+    expect(source).toContain('tI18n(\'cardio.appointment_cancelled\')');
+    expect(source).toContain('tI18n(\'cardio.visit_completed\')');
+    expect(source).toContain('tI18n(\'cardio.blood_test_saved\')');
+    expect(source).toContain('tI18n(\'cardio.ecg_added\')');
+    expect(source).toContain('tI18n(\'cardio.settings_saved\')');
   });
 
   it('does not contain hardcoded Russian strings in notify() calls', () => {
-    expect(source).not.toContain("notify.error('Сессия истекла");
-    expect(source).not.toContain("notify.success('Запись отменена')");
-    expect(source).not.toContain("notify.success('Прием завершен успешно')");
-    expect(source).not.toContain("notify.success('Анализ крови сохранен успешно')");
-    expect(source).not.toContain("notify.success('Настройки сохранены')");
+    expect(source).not.toContain('notify.error(\'Сессия истекла');
+    expect(source).not.toContain('notify.success(\'Запись отменена\')');
+    expect(source).not.toContain('notify.success(\'Прием завершен успешно\')');
+    expect(source).not.toContain('notify.success(\'Анализ крови сохранен успешно\')');
+    expect(source).not.toContain('notify.success(\'Настройки сохранены\')');
   });
 
   it('labTranslations has cardio.* namespace with all keys', () => {

@@ -40,23 +40,23 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
   });
 
   it('imports formatFlagLabel, formatThreshold from labReportNormalize', () => {
-    expect(source).toContain("from './utils/labReportNormalize'");
+    expect(source).toContain('from \'./utils/labReportNormalize\'');
     expect(source).toContain('formatFlagLabel');
     expect(source).toContain('formatThreshold');
   });
 
   it('imports flagVariant from labReportActions', () => {
-    expect(source).toContain("from './utils/labReportActions'");
+    expect(source).toContain('from \'./utils/labReportActions\'');
     expect(source).toContain('flagVariant');
   });
 
   it('imports t from labTranslations for i18n', () => {
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
   });
 
   it('imports useLabToast for interactive numeric validation', () => {
-    expect(source).toContain("from './hooks/useLabToast'");
+    expect(source).toContain('from \'./hooks/useLabToast\'');
     expect(source).toContain('useLabToast');
   });
 
@@ -71,7 +71,7 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
     expect(source).toContain('labToast.interactiveError');
     expect(source).toContain('labToast.interactiveWarning');
     expect(source).toContain('labToast.interactiveInfo');
-    expect(source).toContain("field.value_type === 'numeric'");
+    expect(source).toContain('field.value_type === \'numeric\'');
   });
 
   it('has STRAT#24 marker in JSDoc', () => {
@@ -79,7 +79,7 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
   });
 
   it('LabReportWorkbench imports and uses ReportEditor', () => {
-    expect(workbenchSource).toContain("import ReportEditor from './ReportEditor'");
+    expect(workbenchSource).toContain('import ReportEditor from \'./ReportEditor\'');
     expect(workbenchSource).toContain('<ReportEditor');
     expect(workbenchSource).toContain('activeInstance={activeInstance}');
     expect(workbenchSource).toContain('draftValues={draftValues}');

@@ -25,7 +25,7 @@ describe('Admin remaining STRAT#37 — i18n migration', () => {
     );
     
     it(`${name} imports t from i18n adapter`, () => {
-      expect(source).toContain("from '../../i18n/adapter'");
+      expect(source).toContain('from \'../../i18n/adapter\'');
     });
     
     it(`${name} has no hardcoded Russian confirm/notify strings`, () => {
