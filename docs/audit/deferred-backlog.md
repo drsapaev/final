@@ -6,7 +6,12 @@
 > отдельного scope за пределами точечного UI-fix.
 
 **Обновлено:** 2026-07-15
-**Активных задач:** 6 (DEFER-001 закрыт в PR #2299; DEFER-007 добавлен)
+**Активных задач:** 5 (DEFER-001 закрыт в PR #2299; DEFER-007 перенесён в Epic M4)
+
+> **Важно:** Backend security & compliance задачи вынесены в отдельный эпик:
+> **[docs/audit/epic-m4-backend-security.md](./epic-m4-backend-security.md)**
+> (M4-P0-1 PHI Audit Trail, M4-P0-2 JWT transition, M4-P0-3 Session fixation и др.)
+> Этот файл содержит только frontend-deferred items.
 
 ---
 
@@ -93,21 +98,6 @@
 
 ---
 
-### DEFER-007 — Optimistic locking для PatientFormsPreview (P-H-7)
-
-- **Источник:** Patient Panel audit (P-H-7)
-- **Симптом:** `PatientFormsPreview.handleSave` отправляет answers без `expected_updated_at` — если backend обновил form schema параллельно, произойдёт silent overwrite. В Lab мы добавили `expected_updated_at` (WF-06) для `labReportingApi.updateInstance`.
-- **Почему отложено:** Нужно backend-изменение — endpoint `/telegram/mini-app/forms/submissions` должен принимать `expected_updated_at` и возвращать 409 Conflict при stale-data. Сейчас этого нет в контракте.
-- **Что нужно:**
-  1. Backend: добавить `expected_updated_at` param в POST `/telegram/mini-app/forms/submissions`
-  2. Backend: возвращать 409 + `{ detail: { reason: 'form_schema_changed' } }` при конфликте
-  3. Frontend: передавать `form.updated_at` в payload
-  4. Frontend: обрабатывать 409 — показывать "Форма изменилась, перезагрузите"
-- **Сложность:** Medium (backend + frontend, 4-6 часов).
-- **Блокирует:** Data-integrity при параллельном редактировании формы.
-
----
-
 ## Выполнено
 
 ### DEFER-001 — DoctorPanels.contract.test.jsx failure (РЕШЕНО в PR #2299)
@@ -115,6 +105,12 @@
 - **Источник:** Doctor Panel audit (Batch H-30, PR #2292)
 - **Решение:** PR #2299 обновил тест — marкеры ищут контракт в `components/doctor/DoctorQueuePanel.jsx` вместо `DoctorPanel.jsx`.
 - **Статус:** ✅ Закрыто (2026-07-15)
+
+### DEFER-007 — Optimistic locking для PatientFormsPreview (ПЕРЕНЕСЕНО в Epic M4)
+
+- **Источник:** Patient Panel audit (P-H-7)
+- **Решение:** Перенесено в **[Epic M4 — Backend Security & Compliance](./epic-m4-backend-security.md)** как часть комплексного backend-security epic. Optimistic locking зависит от backend-endpoint changes, логично делать вместе с audit trail и JWT transition.
+- **Статус:** ✅ Перенесено в Epic M4 (2026-07-15)
 
 ---
 
