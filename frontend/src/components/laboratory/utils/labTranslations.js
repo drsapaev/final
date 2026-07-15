@@ -439,6 +439,25 @@ const TRANSLATIONS = {
     unknown_patient: 'Неизвестный пациент',
     incorrect_server_data: 'Некорректные данные от сервера',
   },
+
+  // ─── Cashier (STRAT#31) ──────────────────────────────────────────────────
+  cashier: {
+    // Confirm dialog
+    confirm_payment_title: 'Подтверждение платежа',
+    confirm_payment_message: 'Подтвердить этот платеж вручную?',
+    confirm_payment_description: 'Платеж будет отмечен как полученный. Действие можно отменить только через процедуру возврата.',
+    confirm_payment_confirm: 'Принять',
+    cancel: 'Отмена',
+    // Notify messages
+    session_expired: 'Сессия истекла. Пожалуйста, войдите снова.',
+    cancel_reason_required: 'Укажите причину отмены (минимум 10 символов)',
+    payment_cancelled: 'Платёж отменён',
+    refund_fields_required: 'Укажите сумму возврата и причину (минимум 3 символа)',
+    no_payment_for_receipt: 'Не удалось определить платеж для печати чека.',
+    print_dialog_opened: 'Открыт диалог печати этого компьютера.',
+    print_dialog_failed: 'Диалог печати не открылся, поэтому был загружен PDF-чек.',
+    session_extending: 'Продлеваем сессию...',
+  },
 };
 
 /**

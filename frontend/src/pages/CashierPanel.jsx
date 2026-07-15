@@ -27,6 +27,8 @@ import tokenManager from '../utils/tokenManager';
 import { getErrorMessage } from '../utils/errorHandler';
 import { formatRegistrarDate, formatRegistrarTime, parseRegistrarTimestamp } from '../utils/dateUtils';
 import notify from '../services/notify';
+// STRAT#31: useTranslation adapter for confirm/notify i18n.
+import { useTranslation } from '../i18n/adapter';
 import { formatUZS } from '../utils/formatCurrency';
 import {
   Dialog,
@@ -342,6 +344,8 @@ const CashierPanel = () => {
   // The hook returns [confirm, dialogNode]; dialogNode must be rendered once
   // in the component tree (we render it at the end of the JSX below).
   const [confirm, confirmDialog] = useConfirm();
+  // STRAT#31: useTranslation adapter for confirm/notify i18n.
+  const { t: tI18n } = useTranslation();
   const location = useLocation();
   const { getStats, getPendingPayments, getPayments, ...paymentsHook } = usePayments();
   // ✅ v2.1: isLoading теперь вычисляется из отдельных loading состояний (см. ниже)
@@ -631,7 +635,7 @@ const CashierPanel = () => {
     onExpired: () => {
       setSessionWarning(null);
       setSessionSecondsLeft(null);
-      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      notify.error(tI18n('cashier.session_expired'));
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -731,11 +735,11 @@ const CashierPanel = () => {
     // The new dialog names the specific action and uses primary intent
     // (Confirm is a constructive action, not destructive).
     const ok = await confirm({
-      title: 'Подтверждение платежа',
-      message: 'Подтвердить этот платеж вручную?',
-      description: 'Платеж будет отмечен как полученный. Действие можно отменить только через процедуру возврата.',
-      confirmLabel: 'Принять',
-      cancelLabel: 'Отмена',
+      title: tI18n('cashier.confirm_payment_title'),
+      message: tI18n('cashier.confirm_payment_message'),
+      description: tI18n('cashier.confirm_payment_description'),
+      confirmLabel: tI18n('cashier.confirm_payment_confirm'),
+      cancelLabel: tI18n('cashier.cancel'),
       intent: 'primary',
     });
     if (!ok) {
@@ -777,7 +781,7 @@ const CashierPanel = () => {
     // UX Audit #2.1: обязательная причина отмены (минимум 10 символов).
     // Раньше textarea была помечена «необязательно» — аудит-лог пустовал.
     if (!cancelReason || cancelReason.trim().length < 10) {
-      notify.warning('Укажите причину отмены (минимум 10 символов)');
+      notify.warning(tI18n('cashier.cancel_reason_required'));
       return;
     }
 
@@ -789,7 +793,7 @@ const CashierPanel = () => {
         setCancelDialogOpen(false);
         setCancelPaymentContext(null);
         setCancelReason('');
-        notify.info('Платёж отменён');
+        notify.info(tI18n('cashier.payment_cancelled'));
         triggerDataReload();
       } else {
         notify.error(getErrorMessage(result.error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
@@ -847,7 +851,7 @@ const CashierPanel = () => {
   // ✅ v2.0: Обработчик возврата
   const handleRefund = async () => {
     if (!refundAmount || !refundReason || refundReason.length < 3) {
-      notify.warning('Укажите сумму возврата и причину (минимум 3 символа)');
+      notify.warning(tI18n('cashier.refund_fields_required'));
       return;
     }
     try {
@@ -879,7 +883,7 @@ const CashierPanel = () => {
     const paymentId = resolvePaymentId(paymentRowOrId);
 
     if (!paymentId) {
-      notify.error('Не удалось определить платеж для печати чека.');
+      notify.error(tI18n('cashier.no_payment_for_receipt'));
       return;
     }
 
@@ -890,7 +894,7 @@ const CashierPanel = () => {
         try {
           const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId));
           if (opened) {
-            notify.success('Открыт диалог печати этого компьютера.');
+            notify.success(tI18n('cashier.print_dialog_opened'));
             return;
           }
 
@@ -908,7 +912,7 @@ const CashierPanel = () => {
         return;
       }
 
-      notify.warning('Диалог печати не открылся, поэтому был загружен PDF-чек.');
+      notify.warning(tI18n('cashier.print_dialog_failed'));
     } finally {
       setProcessingAction(null);
     }
@@ -2001,7 +2005,7 @@ const CashierPanel = () => {
               </button>
               <button
                 type="button"
-                onClick={() => { setSessionWarning(null); notify.info('Продлеваем сессию...'); }}
+                onClick={() => { setSessionWarning(null); notify.info(tI18n('cashier.session_extending')); }}
                 className="cashier-session-warning-btn cashier-session-warning-btn--primary">
                 Продлить сессию
               </button>
