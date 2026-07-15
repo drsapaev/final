@@ -36,11 +36,14 @@ describe('LabPanel queue/report status contract', () => {
     const loadBlock = extractBlock(
       source,
       'const loadLabAppointments = useCallback(async () => {',
-      'const loadTemplates = useCallback(async (preferredTemplateId = null) => {',
+      'const loadMoreAppointments = useCallback(async () => {',
     );
 
     // P-03 fix: должен использовать façade метод.
-    expect(loadBlock).toContain('labReportingApi.listQueueToday()');
+    // STRAT#7: listQueueToday теперь вызывается с pagination params.
+    expect(loadBlock).toContain('labReportingApi.listQueueToday(');
+    expect(loadBlock).toContain('limit: LAB_QUEUE_PAGE_SIZE');
+    expect(loadBlock).toContain('offset: 0');
     // Не должен делать прямой fetch к registrar endpoint.
     expect(loadBlock).not.toContain('/registrar/queues/today');
     expect(loadBlock).not.toContain('new URLSearchParams({ department: \'lab\' })');
@@ -48,6 +51,32 @@ describe('LabPanel queue/report status contract', () => {
     // (теперь backend возвращает плоский entries[] напрямую).
     expect(loadBlock).not.toContain('payload?.queues || []');
     expect(loadBlock).not.toContain('.flatMap((queue) =>');
+  });
+
+  it('STRAT#7: loadMoreAppointments fetches next page with server-side offset', () => {
+    const source = readLabPanelSource();
+    const loadMoreBlock = extractBlock(
+      source,
+      'const loadMoreAppointments = useCallback(async () => {',
+      '// H-2 fix: keyboard shortcuts',
+    );
+
+    expect(loadMoreBlock).toContain('labReportingApi.listQueueToday(null, {');
+    expect(loadMoreBlock).toContain('limit: LAB_QUEUE_PAGE_SIZE');
+    expect(loadMoreBlock).toContain('offset: queueOffset');
+    // Аппендит к существующему списку, не заменяет
+    expect(loadMoreBlock).toContain('setAppointments((current) => [...current, ...newEntries])');
+    // Обновляет offset и hasMore
+    expect(loadMoreBlock).toContain('setQueueOffset((current) => current + newEntries.length)');
+    expect(loadMoreBlock).toContain('setHasMoreQueue(');
+  });
+
+  it('STRAT#7: passes server-side pagination props to LabQueueWorkbench', () => {
+    const source = readLabPanelSource();
+    expect(source).toContain('onLoadMore={loadMoreAppointments}');
+    expect(source).toContain('hasMore={hasMoreQueue}');
+    expect(source).toContain('loadingMore={loadingMore}');
+    expect(source).toContain('queueTotal={queueTotal}');
   });
 
   it('relies on backend-provided lab report summary fields without re-inventing status', () => {
