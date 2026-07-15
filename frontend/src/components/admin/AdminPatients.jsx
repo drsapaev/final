@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { Edit, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react';
 import PropTypes from 'prop-types';
 
@@ -124,11 +125,11 @@ const AdminPatients = () => {
     const patientName = getPatientName(patient);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление пациента',
+      title: t('admin.delete_patient_title'),
       message: `Удалить пациента «${patientName}»?`,
       description: 'Это действие необратимо. Все связанные записи будут помечены как удалённые.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin.delete_confirm'),
+      cancelLabel: t('admin.cancel'),
       intent: 'danger',
     });
 
@@ -140,7 +141,7 @@ const AdminPatients = () => {
       await deletePatient(patient.id);
     } catch (deleteError) {
       logger.error('Ошибка удаления пациента:', deleteError);
-      notify.error('Ошибка при удалении пациента');
+      notify.error(t('admin.patient_delete_error'));
     }
   };
 

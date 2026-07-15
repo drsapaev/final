@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { Edit, Plus, RefreshCw, Search, Stethoscope, Trash2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
@@ -110,11 +111,11 @@ const AdminDoctors = () => {
     const doctorName = getDoctorName(doctor);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const confirmed = await confirm({
-      title: 'Деактивация врача',
+      title: t('admin.deactivate_doctor_title'),
       message: `Деактивировать врача «${doctorName}»?`,
       description: 'Врач будет отмечен как неактивный, но останется в базе данных. Записи к этому врачу будут скрыты из расписания.',
-      confirmLabel: 'Деактивировать',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin.deactivate_confirm'),
+      cancelLabel: t('admin.cancel'),
       intent: 'warning',
     });
 

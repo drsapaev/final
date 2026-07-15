@@ -7,6 +7,7 @@ import useDoctors from '../../hooks/useDoctors';
 import usePatients from '../../hooks/usePatients';
 import useModal from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
+import { t } from '../../i18n/adapter';
 import {
   Badge,
   Button,
@@ -205,11 +206,11 @@ const AdminAppointments = () => {
     const doctorName = getAppointmentDoctorDisplayName(appointment);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление записи',
+      title: t('admin.delete_appointment_title'),
       message: `Удалить запись «${patientName} — ${doctorName}»?`,
       description: 'Это действие необратимо. Запись будет удалена из журнала.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin.delete_confirm'),
+      cancelLabel: t('admin.cancel'),
       intent: 'danger',
     });
 
@@ -221,7 +222,7 @@ const AdminAppointments = () => {
       await deleteAppointment(appointment.id);
     } catch (deleteError) {
       logger.error('Ошибка удаления записи:', deleteError);
-      notify.error('Ошибка при удалении записи');
+      notify.error(t('admin.appointment_delete_error'));
     }
   };
 
