@@ -94,4 +94,37 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     // Client-side fallback остаётся
     expect(source).toContain('if (sortedAppointments.length > visibleCount)');
   });
+
+  it('STRAT#14: queue filter/sort/title labels use t() from labTranslations', () => {
+    // STRAT#14: filter/sort/title/badge labels мигрированы на t()
+    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('import { t }');
+
+    // Title + badges
+    expect(source).toContain("t('queue.title')");
+    expect(source).toContain("t('queue.total')");
+    expect(source).toContain("t('queue.in_progress')");
+    expect(source).toContain("t('common.refresh')");
+
+    // Search
+    expect(source).toContain("t('queue.search_placeholder')");
+    expect(source).toContain("t('queue.search_aria')");
+    expect(source).toContain("t('queue.search_clear')");
+
+    // Filter buttons
+    expect(source).toContain("t('queue.filter_all')");
+    expect(source).toContain("t('queue.filter_active')");
+    expect(source).toContain("t('queue.filter_completed')");
+    expect(source).toContain("t('queue.filter_group_aria')");
+
+    // Sort
+    expect(source).toContain("t('queue.sort_label')");
+    expect(source).toContain("t('queue.sort_aria')");
+    expect(source).toContain("t('queue.sort_default')");
+    expect(source).toContain("t('queue.sort_name')");
+    expect(source).toContain("t('queue.sort_time')");
+
+    // Filter count
+    expect(source).toContain("t('queue.filter_count')");
+  });
 });
