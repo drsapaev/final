@@ -52,10 +52,11 @@ describe('CashierPanel payment action contract', () => {
 
   it('does not invent a paid status in receipt print payloads', () => {
     const source = readCashierPanelSource();
+    // i18n-unification: buildReceiptPrintPayload now takes (paymentRow, labels, defaultPatientLabel)
     const receiptBlock = extractSourceBlock(
       source,
-      'const buildReceiptPrintPayload = (paymentRow) => {',
-      'const getPaymentStatusMeta = (status) => {',
+      'const buildReceiptPrintPayload = (paymentRow, labels, defaultPatientLabel) => {',
+      'const getPaymentStatusMeta = (status, t) => {',
     );
 
     expect(receiptBlock).toContain('status: paymentRow?.status ?? null');
@@ -89,11 +90,11 @@ describe('CashierPanel payment action contract', () => {
   it('does not route grouped cashier rows through the single-visit online widget', () => {
     const source = readCashierPanelSource();
     // P-018 fix: aria-labels were localized to Russian (PHI removed).
-    // The block now ends at the Cash-button aria-label instead of the English one.
+    // i18n-unification: aria-labels now use tI18n('cashier.cash_payment_aria')
     const onlineActionBlock = extractSourceBlock(
       source,
       'onClick={() => openPaymentWidget(appointment)}',
-      'aria-label="Принять оплату через кассу"',
+      "aria-label={tI18n('cashier.cash_payment_aria')}",
     );
     const paymentWidgetBlock = extractSourceBlock(
       source,
