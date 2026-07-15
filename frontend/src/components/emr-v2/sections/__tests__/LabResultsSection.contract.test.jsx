@@ -61,7 +61,8 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     const fnBody = source.slice(fnStart, fnEnd);
 
     expect(fnBody).toContain('await confirm(');
-    expect(fnBody).toContain("'Заказать анализы?'");
+    // STRAT#12: строка мигрирована на t('confirm.order_title')
+    expect(fnBody).toContain("t('confirm.order_title')");
     expect(fnBody).toContain('if (!ok) return;');
     // createOrder должен вызываться ПОСЛЕ confirm
     const confirmIdx = fnBody.indexOf('await confirm(');
@@ -84,5 +85,23 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     // Использование в render: formatLabStatus(instance.status)
     expect(source).toContain('formatLabStatus(instance.status)');
     expect(source).toContain('getLabStatusVariant(instance.status)');
+  });
+
+  it('STRAT#12: order confirm dialog uses t() and tInterpolate() from labTranslations', () => {
+    // STRAT#12: order confirm dialog мигрирован на t()
+    expect(source).toContain("from '../../laboratory/utils/labTranslations'");
+    expect(source).toContain('import { t, tInterpolate }');
+
+    // Order dialog
+    expect(source).toContain("t('confirm.order_title')");
+    expect(source).toContain("tInterpolate('confirm.order_message', { name: templateName })");
+    expect(source).toContain("t('confirm.order_description')");
+    expect(source).toContain("t('confirm.order_confirm')");
+    expect(source).toContain("t('confirm.cancel')");
+
+    // Больше нет хардкоженных русских строк в confirm() calls
+    expect(source).not.toContain("title: 'Заказать анализы?'");
+    expect(source).not.toContain("confirmLabel: 'Заказать'");
+    expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
 });
