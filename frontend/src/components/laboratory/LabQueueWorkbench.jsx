@@ -32,11 +32,26 @@ function maskPhone(phone) {
 // P-05 fix: компонент-обёртка для переключения маска/открыто.
 // L-H-4 fix: миграция inline-стилей в CSS (.lqw-masked-phone*).
 // Раскрытие может быть ограничено ролью через prop canReveal.
+//
+// UX-AUDIT-FIX11: усилена аффорданса кликабельности. Ранее пользователь
+// не понимал, что маску можно раскрыть кликом — title появлялся только
+// при hover, на тач-устройствах не показывался вовсе. Теперь:
+//   1) Добавлена иконка eye/eye.slash перед номером — визуальный cue
+//      «здесь есть действие».
+//   2) CSS-класс .lqw-masked-phone с hover-эффектом (color shift).
+//   3) :focus-visible для keyboard-навигации.
+//   4) title показывает действие («Показать» / «Скрыть»).
+// Соответствует Nielsen Heuristic #6 (Recognition rather than Recall).
 function MaskedPhone({ phone, canReveal = true }) {
   const [revealed, setRevealed] = useState(false);
   if (!phone) return <span className="lqw-masked-phone-empty">не указан</span>;
   if (!canReveal) {
-    return <span>{maskPhone(phone)}</span>;
+    return (
+      <span className="lqw-masked-phone-readonly" title="Доступ к номеру ограничен ролью">
+        <Icon name="eye.slash" size={12} aria-hidden="true" />
+        <span className="lqw-masked-phone-text">{maskPhone(phone)}</span>
+      </span>
+    );
   }
   return (
     <button
@@ -47,9 +62,11 @@ function MaskedPhone({ phone, canReveal = true }) {
       }}
       title={revealed ? 'Скрыть номер' : 'Показать номер (доступ ограничен)'}
       aria-label={revealed ? 'Скрыть номер телефона' : 'Показать номер телефона'}
-      className="lqw-masked-phone"
+      aria-pressed={revealed}
+      className={`lqw-masked-phone ${revealed ? 'lqw-masked-phone-revealed' : ''}`}
     >
-      {revealed ? phone : maskPhone(phone)}
+      <Icon name={revealed ? 'eye.slash' : 'eye'} size={12} aria-hidden="true" />
+      <span className="lqw-masked-phone-text">{revealed ? phone : maskPhone(phone)}</span>
     </button>
   );
 }
