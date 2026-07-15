@@ -60,4 +60,20 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     expect(fieldOnClickBody).toContain('handleRemoveField');
     expect(fieldOnClickBody).not.toContain('onRemoveField(sectionIndex, fieldIndex);');
   });
+
+  it('UX-AUDIT-FIX5: hides raw JSON textareas behind Developer mode toggle', () => {
+    // FIX5: raw JSON (visibility_rule_text / highlight_rule_text) рендерится
+    // только когда developerMode === true. По умолчанию выключен.
+    expect(source).toContain("useState(false)");
+    expect(source).toContain('developerMode');
+    // Тоггл в шапке ContentTab
+    expect(source).toContain('Режим разработчика');
+    expect(source).toContain('setDeveloperMode');
+    // Raw JSON details обёрнут в условие
+    expect(source).toContain('{developerMode && (');
+    expect(source).toContain('<details className="ltw-details">');
+    // Raw JSON textareas всё ещё доступны (не удалены, а скрыты)
+    expect(source).toContain('visibility_rule_text');
+    expect(source).toContain('highlight_rule_text');
+  });
 });
