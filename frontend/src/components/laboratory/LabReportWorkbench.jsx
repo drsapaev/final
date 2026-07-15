@@ -46,8 +46,7 @@ import { useLabReportState } from './hooks/useLabReportState';
 // через toast.* напрямую. Соответствует Nielsen Heuristic #4.
 import { useLabToast } from './hooks/useLabToast';
 // STRAT#9: t() для i18n — confirm dialogs мигрированы на translation keys.
-import { t } from './utils/labTranslations';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,
@@ -64,6 +63,7 @@ export default function LabReportWorkbench({
   onQueueChanged = undefined,
   notify
 }) {
+  const { t } = useTranslation();
   // WF-08 fix: confirmation dialog для irreversible actions.
   // Finalize делает бланк immutable (можно только revise). Revise создаёт
   // новый instance. Оба действия необратимы без объяснения последствий.

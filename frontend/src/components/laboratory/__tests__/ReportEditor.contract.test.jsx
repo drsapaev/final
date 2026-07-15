@@ -50,9 +50,9 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
     expect(source).toContain('flagVariant');
   });
 
-  it('imports t from labTranslations for i18n', () => {
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+  it('imports t from unified i18n for i18n', () => {
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
   });
 
   it('imports useLabToast for interactive numeric validation', () => {

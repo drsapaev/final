@@ -30,10 +30,9 @@ import { useConfirm } from '../../common/ConfirmDialog';
 // 'Unknown'. Теперь используется единый источник истины.
 import { formatLabStatus, getLabStatusVariant } from '../../laboratory/labUiLabels';
 // STRAT#12: t() и tInterpolate() для i18n — order confirm dialog мигрирован.
-import { t, tInterpolate } from '../../laboratory/utils/labTranslations';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 // UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
@@ -52,6 +51,7 @@ function formatDate(dateStr) {
 }
 
 export function LabResultsSection({ patientId, visitId, disabled = false }) {
+  const { t } = useTranslation();
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -130,7 +130,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
     // STRAT#12: строки мигрированы на t() / tInterpolate() из labTranslations.
     const ok = await confirm({
       title: t('confirm.order_title'),
-      message: tInterpolate('confirm.order_message', { name: templateName }),
+      message: t('confirm.order_message', { name: templateName }),
       description: t('confirm.order_description'),
       confirmLabel: t('confirm.order_confirm'),
       cancelLabel: t('confirm.cancel'),

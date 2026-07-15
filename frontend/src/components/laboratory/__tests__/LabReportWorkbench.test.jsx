@@ -301,13 +301,14 @@ describe('LabReportWorkbench', () => {
     expect(source).toContain("'lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'");
   });
 
-  it('STRAT#9: all 3 confirm dialogs use t() from labTranslations', () => {
+  it('STRAT#9: all 3 confirm dialogs use t() from unified i18n', () => {
     // STRAT#9: finalize, revise, notify dialogs мигрированы на t()
+    // i18n-unification: now uses unified useTranslation hook
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
     // Import
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('useTranslation');
 
     // Finalize dialog
     expect(source).toContain("t('confirm.finalize_title')");

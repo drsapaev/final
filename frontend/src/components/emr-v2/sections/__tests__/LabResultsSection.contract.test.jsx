@@ -87,14 +87,14 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     expect(source).toContain('getLabStatusVariant(instance.status)');
   });
 
-  it('STRAT#12: order confirm dialog uses t() and tInterpolate() from labTranslations', () => {
+  it('STRAT#12: order confirm dialog uses t() and tInterpolate() from unified i18n', () => {
     // STRAT#12: order confirm dialog мигрирован на t()
-    expect(source).toContain("from '../../laboratory/utils/labTranslations'");
-    expect(source).toContain('import { t, tInterpolate }');
+    expect(source).toContain("from '../../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
 
     // Order dialog
     expect(source).toContain("t('confirm.order_title')");
-    expect(source).toContain("tInterpolate('confirm.order_message', { name: templateName })");
+    expect(source).toContain("t('confirm.order_message', { name: templateName })");
     expect(source).toContain("t('confirm.order_description')");
     expect(source).toContain("t('confirm.order_confirm')");
     expect(source).toContain("t('confirm.cancel')");
@@ -105,7 +105,7 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
 
-  it('STRAT#20: empty-state strings use t() from labTranslations', () => {
+  it('STRAT#20: empty-state strings use t() from unified i18n', () => {
     // STRAT#20: empty-state strings мигрированы на t('empty.*')
     expect(source).toContain("t('empty.loading_results')");
     expect(source).toContain("t('empty.no_lab_results')");

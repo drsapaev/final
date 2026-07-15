@@ -3,10 +3,9 @@ import { Badge, Icon, Input } from '../ui/macos';
 import { formatFlagLabel, formatThreshold } from './utils/labReportNormalize';
 import { flagVariant } from './utils/labReportActions';
 // STRAT#24: t() для i18n — field-level strings.
-import { t } from './utils/labTranslations';
 // STRAT#2: labToast для interactive numeric validation toasts.
 import { useLabToast } from './hooks/useLabToast';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * STRAT#24: ReportEditor — extracted from LabReportWorkbench.
@@ -36,6 +35,7 @@ export default function ReportEditor({
   reportHistory,
   notify,
 }) {
+  const { t } = useTranslation();
   // STRAT#2: labToast for interactive numeric validation toasts.
   const labToast = useLabToast(notify);
 

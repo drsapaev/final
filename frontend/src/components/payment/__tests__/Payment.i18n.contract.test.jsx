@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
-const translationsSource = fs.readFileSync(path.join(ROOT, 'components/laboratory/utils/labTranslations.js'), 'utf8');
+const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.js'), 'utf8');
 
 describe('Payment components STRAT#39 — i18n migration', () => {
   it('PaymentProviderDialog has no hardcoded Russian notify', () => {

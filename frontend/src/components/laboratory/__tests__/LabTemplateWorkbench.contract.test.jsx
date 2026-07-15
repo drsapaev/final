@@ -73,10 +73,10 @@ describe('LabTemplateWorkbench template version command contract', () => {
     expect(setDraftIdx).toBeGreaterThan(confirmIdx);
   });
 
-  it('STRAT#10: both confirm dialogs (archive + reset) use t() from labTranslations', () => {
+  it('STRAT#10: both confirm dialogs (archive + reset) use t() from unified i18n', () => {
     // STRAT#10: archive и reset dialogs мигрированы на t()
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
 
     // Archive dialog
     expect(source).toContain("t('confirm.archive_title')");
@@ -101,10 +101,10 @@ describe('LabTemplateWorkbench template version command contract', () => {
     expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
 
-  it('STRAT#15: tab labels and action buttons use t() from labTranslations', () => {
+  it('STRAT#15: tab labels and action buttons use t() from unified i18n', () => {
     // STRAT#15: tab labels + action buttons мигрированы на t()
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
 
     // Title
     expect(source).toContain("t('template.title')");
@@ -128,8 +128,8 @@ describe('LabTemplateWorkbench template version command contract', () => {
 
   it('STRAT#17: notify() calls use t() for all hardcoded Russian messages', () => {
     // STRAT#17: все notify() с hardcoded русскими строками мигрированы на t()
-    expect(source).toContain("from './utils/labTranslations'");
-    expect(source).toContain('import { t }');
+    expect(source).toContain("from '../../i18n/useTranslation'");
+    expect(source).toContain('import { useTranslation }');
 
     // Success messages
     expect(source).toContain("t('success.template_created')");

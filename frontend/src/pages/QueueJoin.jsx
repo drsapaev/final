@@ -21,7 +21,7 @@ import { formatRegistrarTime } from '../utils/dateUtils';
 import {
   Input,
   Checkbox } from '../components/ui/macos';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const formatSpecialistLabel = (specialist) => {
   const doctorName =
@@ -64,6 +64,7 @@ const QueueJoin = () => {
   const { token: paramToken } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // Получаем токен из URL параметров или query параметров (для PWA пути)
   const token = paramToken || searchParams.get('token');

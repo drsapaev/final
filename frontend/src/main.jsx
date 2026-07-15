@@ -1,8 +1,9 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-// STRAT#49: Initialize react-i18next with labTranslations dictionary.
-import './i18n/config';
+// Unified i18n: initializes react-i18next with ru/uz-Latn/uz-Cyrl/en/kk locales.
+// See frontend/src/i18n/index.js for supported languages and configuration.
+import './i18n';
 import App from './App.jsx';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';

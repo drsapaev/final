@@ -6,8 +6,7 @@ import {
 } from '../ui/macos';
 import { AIButton, AIAssistant } from '../ai';
 // STRAT#22: t() для i18n — AI analysis strings мигрированы.
-import { t } from './utils/labTranslations';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * P-01 fix: AI-анализ лабораторного бланка перенесён из LabResultsManager
@@ -50,6 +49,7 @@ function hasAnyFilledResult(results) {
 }
 
 export default function LabReportAIAnalysis({ activeInstance, notify }) {
+  const { t } = useTranslation();
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
 
   // Извлекаем возраст и пол из patient_snapshot (backend уже вычислил age_years).

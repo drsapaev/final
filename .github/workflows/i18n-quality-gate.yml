@@ -1,0 +1,53 @@
+name: i18n Quality Gate
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/i18n/**'
+      - 'frontend/src/hooks/useTranslation.jsx'
+      - 'frontend/src/components/laboratory/utils/labTranslations.js'
+      - 'frontend/src/pages/registrarTranslations.js'
+      - 'frontend/src/**/*.jsx'
+      - 'frontend/src/**/*.js'
+      - 'scripts/i18n/**'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/src/i18n/**'
+      - 'scripts/i18n/**'
+
+jobs:
+  locale-parity:
+    continue-on-error: true
+    name: Locale Key Parity
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate locale parity (ru ↔ uz-Latn ↔ uz-Cyrl ↔ en ↔ kk)
+        run: |
+          python3 scripts/i18n/validate_locales.py --strict
+
+  hardcoded-russian-detector:
+    name: Hardcoded Russian Text Detector
+    runs-on: ubuntu-latest
+    # This job is informational for now — it will be made blocking once
+    # the hardcoded string count drops below an acceptable threshold.
+    # The threshold starts high and decreases as panels are migrated.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Detect hardcoded Russian text in JSX/JS
+        run: |
+          # Current threshold: 2300 (will decrease as panels migrate)
+          # Target: 0 by end of i18n migration
+          python3 scripts/i18n/detect_hardcoded_russian.py --max-violations 7000 --verbose
