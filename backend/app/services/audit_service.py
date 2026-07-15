@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from app.models.audit_log import AuditLog
+from app.models.audit import AuditLog
 
 if TYPE_CHECKING:
     from fastapi import Request

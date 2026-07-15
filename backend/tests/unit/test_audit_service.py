@@ -118,7 +118,7 @@ class TestUserAgentExtraction:
 
 class TestAuditLogModel:
     def test_model_has_expected_fields(self):
-        from app.models.audit_log import AuditLog
+        from app.models.audit import AuditLog
         assert AuditLog.__tablename__ == "audit_logs"
         mapper = AuditLog.__mapper__
         cols = set(mapper.columns.keys())
@@ -127,6 +127,6 @@ class TestAuditLogModel:
             "actor_role", "actor_type", "subject_patient_id",
             "resource_type", "resource_id", "action", "outcome",
             "reason_code", "ip_address", "user_agent", "session_id",
-            "extra_data", "timestamp",
+            "payload", "created_at",
         }
         assert expected.issubset(cols), f"Missing: {expected - cols}"
