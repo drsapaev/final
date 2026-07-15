@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { CheckCircle, XCircle, Info } from 'lucide-react';
@@ -79,11 +80,11 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!paymentData.amount || Number(paymentData.amount) <= 0) {
-            notify.warning('Введите корректную сумму');
+            notify.warning(t('payment.invalid_amount'));
             return;
         }
         if (insufficientCash) {
-            notify.warning('Полученная сумма меньше суммы к оплате');
+            notify.warning(t('payment.insufficient_amount'));
             return;
         }
         // Pass change due up to parent for receipt printing (HIGH #9 fix).
