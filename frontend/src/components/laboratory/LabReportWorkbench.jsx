@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { toast } from 'react-toastify';  // PR-55: numeric validation toast
+import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compat;
+// новые callers должны использовать useLabToast.interactive* вместо прямого toast.
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
   Input } from '../ui/macos';
@@ -39,6 +40,10 @@ import LabReportAIAnalysis from './LabReportAIAnalysis';
 // Компонент теперь содержит только handlers + JSX. Это уменьшает
 // god-компонент на ~200 строк и изолирует state для тестирования.
 import { useLabReportState } from './hooks/useLabReportState';
+// STRAT#2: единый хук для нотификаций. Простые messages идут через notify
+// callback (parent inline Alert), interactive toasts (с onClick undo) —
+// через toast.* напрямую. Соответствует Nielsen Heuristic #4.
+import { useLabToast } from './hooks/useLabToast';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,
@@ -59,6 +64,9 @@ export default function LabReportWorkbench({
   // Finalize делает бланк immutable (можно только revise). Revise создаёт
   // новый instance. Оба действия необратимы без объяснения последствий.
   const [confirm, confirmDialog] = useConfirm();
+
+  // STRAT#2: единый канал нотификаций.
+  const labToast = useLabToast(notify);
 
   // STRAT#1: state declarations + derived memos + init effects
   // теперь в useLabReportState hook (hooks/useLabReportState.js).
@@ -944,7 +952,9 @@ export default function LabReportWorkbench({
                                     // Теперь показываем toast с кнопкой undo, которая
                                     // восстанавливает предыдущее валидное значение.
                                     const previousValue = draftValues[field.field_key] || '';
-                                    toast.error(
+                                    // STRAT#2: используем labToast.interactiveError вместо
+                                    // прямого toast.error — единая точка для future migration.
+                                    labToast.interactiveError(
                                       `Некорректное числовое значение: "${val}". Поле возвращено к предыдущему значению.`,
                                       {
                                         autoClose: 6000,
@@ -969,7 +979,8 @@ export default function LabReportWorkbench({
                                       else if (op === 'lt' && parsed < thresholdVal) isCritical = true;
                                       else if (op === 'lte' && parsed <= thresholdVal) isCritical = true;
                                       if (isCritical) {
-                                        toast.warning(
+                                        // STRAT#2: labToast.interactiveWarning для critical value
+                                        labToast.interactiveWarning(
                                           `⚠ Критическое значение: ${field.label} = ${parsed} ${field.unit || ''} ` +
                                           `(порог: ${op} ${thresholdVal}). Проверьте правильность ввода.`,
                                           { autoClose: 8000 }
@@ -984,7 +995,8 @@ export default function LabReportWorkbench({
                                     const low = parseFloat(rangeMatch[1]);
                                     const high = parseFloat(rangeMatch[2]);
                                     if (!isNaN(low) && !isNaN(high) && (parsed < low || parsed > high)) {
-                                      toast.info(
+                                      // STRAT#2: labToast.interactiveInfo для out-of-range
+                                      labToast.interactiveInfo(
                                         `Значение ${parsed} вне референсного диапазона (${low}–${high}) для «${field.label}».`,
                                         { autoClose: 5000 }
                                       );
