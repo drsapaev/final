@@ -46,6 +46,8 @@ import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import notify from '../services/notify';
+// STRAT#33: useTranslation adapter for confirm/notify i18n.
+import { useTranslation } from '../i18n/adapter';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDermaHotkeys } from '../hooks/useDermaHotkeys';
@@ -179,6 +181,8 @@ const DermatologistPanelUnified = () => {
   const { isDark, getColor, getSpacing, getFontSize } = useTheme();
   // QW-5 (UX audit): confirm hook for visit completion
   const [confirm, confirmDialog] = useConfirm();
+  // STRAT#33: useTranslation adapter for confirm/notify i18n.
+  const { t: tI18n } = useTranslation();
   // QW-6 (UX audit): session timeout warning
   const [sessionWarning, setSessionWarning] = useState(null);
 
@@ -186,7 +190,7 @@ const DermatologistPanelUnified = () => {
     onWarning: () => setSessionWarning({ active: true }),
     onExpired: () => {
       setSessionWarning(null);
-      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      notify.error(tI18n('derma.session_expired'));
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -622,7 +626,7 @@ const DermatologistPanelUnified = () => {
           const queueEntryId = resolveDoctorQueueEntryId(row);
           if (queueEntryId === null) {
             logger.warn('[Dermatology] Cannot start visit without OnlineQueueEntry id', row);
-            notify.error('Невозможно начать приём без ID записи в очереди');
+            notify.error(tI18n('derma.no_queue_id_for_visit'));
             break;
           }
           const token = tokenManager.getAccessToken();
@@ -1007,7 +1011,7 @@ const DermatologistPanelUnified = () => {
         }
       } catch (error) {
         logger.error('[Dermatology] Не удалось загрузить пациента из URL:', error);
-        notify.error('Не удалось загрузить пациента');
+        notify.error(tI18n('derma.patient_load_failed'));
       }
     };
 
@@ -1070,7 +1074,7 @@ const DermatologistPanelUnified = () => {
     try {
       const appointmentId = currentAppointment?.appointment_id || null;
       if (!appointmentId) {
-        notify.error('Не удалось определить запись для сохранения рецепта');
+        notify.error(tI18n('derma.no_entry_for_prescription'));
         return;
       }
       const response = await api.post(`/appointments/${appointmentId}/prescription`, prescriptionData);
@@ -1078,14 +1082,14 @@ const DermatologistPanelUnified = () => {
       if (response.status < 400) {
         const savedPrescription = response.data;
         setPrescription(savedPrescription);
-        notify.success('Рецепт сохранен успешно!');
+        notify.success(tI18n('derma.prescription_saved'));
       } else {
         const error = response.data;
         notify.error(error.detail || 'Ошибка при сохранении рецепта');
       }
     } catch (error) {
       logger.error('DermatologistPanel: Save prescription error:', error);
-      notify.error('Ошибка при сохранении рецепта');
+      notify.error(tI18n('derma.prescription_save_failed'));
     }
   };
 
@@ -1139,10 +1143,10 @@ const DermatologistPanelUnified = () => {
   const handleAISuggestion = (type, suggestion) => {
     if (type === 'icd10') {
       setVisitData({ ...visitData, icd10: suggestion });
-        notify.success('Код МКБ-10 добавлен из AI предложения');
+        notify.success(tI18n('derma.icd_added_from_ai'));
     } else if (type === 'diagnosis') {
       setVisitData({ ...visitData, diagnosis: suggestion });
-        notify.success('Диагноз добавлен из AI предложения');
+        notify.success(tI18n('derma.diagnosis_added_from_ai'));
     }
   };
 
@@ -1150,11 +1154,11 @@ const DermatologistPanelUnified = () => {
   const handleSaveVisit = async () => {
     // QW-5 (UX audit): confirm before completing the visit
     const ok = await confirm({
-      title: 'Завершить приём?',
-      message: 'Приём будет сохранён. Убедитесь, что диагноз и план лечения заполнены.',
+      title: tI18n('derma.complete_visit_title'),
+      message: tI18n('derma.complete_visit_message'),
       description: 'После завершения изменения возможны только через поправку EMR.',
-      confirmLabel: 'Завершить приём',
-      cancelLabel: 'Отмена',
+      confirmLabel: tI18n('derma.complete_visit_confirm'),
+      cancelLabel: tI18n('derma.cancel'),
       intent: 'primary',
     });
     if (!ok) {
@@ -1165,7 +1169,7 @@ const DermatologistPanelUnified = () => {
     const entryId = resolveDoctorQueueEntryId(selectedPatient) ?? resolveDoctorQueueEntryId(currentAppointment);
     if (!entryId) {
       logger.error('[Dermатology] handleSaveVisit: нет entryId');
-      notify.error('Не выбран пациент для завершения приема');
+      notify.error(tI18n('derma.no_patient_for_complete'));
       return;
     }
 
@@ -1211,7 +1215,7 @@ const DermatologistPanelUnified = () => {
       await queueService.completeVisit(entryId, visitPayload);
       logger.info('[Dermatology] handleSaveVisit: completeVisit OK');
 
-      notify.success('Прием завершен успешно');
+      notify.success(tI18n('derma.visit_completed'));
 
       // D-004 fix: offer to schedule next visit (was dead code — setScheduleNextModal was never called)
       if (selectedPatient) {
@@ -1276,15 +1280,15 @@ const DermatologistPanelUnified = () => {
           treatment_plan: ''
         });
         loadPatientData();
-        notify.success('Осмотр кожи сохранен успешно');
+        notify.success(tI18n('derma.skin_exam_saved'));
       } else {
         const detail = await response.text();
         logger.error('[Dermatology] Ошибка ответа при сохранении осмотра', { status: response.status, detail });
-        notify.error('Ошибка сохранения осмотра кожи');
+        notify.error(tI18n('derma.skin_exam_save_failed'));
       }
     } catch (error) {
       logger.error('Ошибка сохранения осмотра:', error);
-      notify.error('Ошибка сохранения осмотра кожи');
+      notify.error(tI18n('derma.skin_exam_save_failed'));
     }
   };
 
@@ -1314,15 +1318,15 @@ const DermatologistPanelUnified = () => {
           follow_up: ''
         });
         loadPatientData();
-        notify.success('Косметическая процедура сохранена успешно');
+        notify.success(tI18n('derma.procedure_saved'));
       } else {
         const detail = await response.text();
         logger.error('[Dermatology] Ошибка ответа при сохранении процедуры', { status: response.status, detail });
-        notify.error('Ошибка сохранения косметической процедуры');
+        notify.error(tI18n('derma.procedure_save_failed'));
       }
     } catch (error) {
       logger.error('Ошибка сохранения процедуры:', error);
-      notify.error('Ошибка сохранения косметической процедуры');
+      notify.error(tI18n('derma.procedure_save_failed'));
     }
   };
 
@@ -1696,7 +1700,7 @@ const DermatologistPanelUnified = () => {
                         onClick={() => {
                           // PR-47: PriceOverrideManager was dead code (imported but never rendered).
                           // Button now shows a toast instead of calling removed state setters.
-                          notify.info('Изменение цены недоступно — используйте каталог услуг');
+                          notify.info(tI18n('derma.price_change_unavailable'));
                         }}
                         variant="primary"
                         aria-label="Изменить цену процедуры"
@@ -1787,7 +1791,7 @@ const DermatologistPanelUnified = () => {
         <SessionWarningModal
           visible={!!sessionWarning}
           onDismiss={() => setSessionWarning(null)}
-          onExtend={() => notify.info('Продлеваем сессию...')}
+          onExtend={() => notify.info(tI18n('derma.session_extending'))}
         />
       )}
 
