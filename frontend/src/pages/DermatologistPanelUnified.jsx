@@ -2,23 +2,11 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
-import {
-  Activity,
-  FileText,
-  User,
-  RefreshCw,
-  CheckCircle,
-  Stethoscope,
-  Calendar,
-  Phone,
-  TestTube,
-  Scissors,
-  Sparkles,
-  DollarSign } from
-'lucide-react';
+// S-M-2 fix: lucide-direct replaced with macos <Icon>
 import {
   Button, MacOSCard, Badge, Input, MacOSEmptyState,
-} from '../components/ui/macos';
+  Icon } from '../components/ui/macos';
+
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './dermatology.css';
@@ -1377,7 +1365,7 @@ const DermatologistPanelUnified = () => {
               <MacOSCard className="derma-card-w-full">
                 <div style={dermatologyAppointmentsHeaderStyle}>
                   <h3 style={dermatologyAppointmentsTitleStyle}>
-                    <Calendar size={20} className="derma-icon-mr-green" />
+                    <Icon name="calendar" size={20} className="derma-icon-mr-green" />
                     Записи к дерматологу
                   </h3>
                   <AppointmentSummaryBar
@@ -1412,7 +1400,7 @@ const DermatologistPanelUnified = () => {
               <MacOSCard className="derma-p-8">
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
-                    <User size={20} className="derma-icon-mr-green" />
+                    <Icon name="person" size={20} className="derma-icon-mr-green" />
                     Дерматологические пациенты
                   </h3>
                   <Badge variant="info">Всего: {patients.length} пациентов</Badge>
@@ -1420,7 +1408,7 @@ const DermatologistPanelUnified = () => {
 
                 {loading ?
               <div className="derma-loading-state">
-                    <RefreshCw size={32} className="derma-loading-icon" />
+                    <Icon name="arrow.clockwise" size={32} className="derma-loading-icon" />
                     <p className="derma-p-14-secondary">Загрузка пациентов...</p>
                   </div> :
 
@@ -1437,15 +1425,15 @@ const DermatologistPanelUnified = () => {
                             </div>
                             <div className="derma-patient-info-list">
                               <div className="derma-flex-center">
-                                <Phone size={18} className="derma-icon-mr derma-text-accent" />
+                                <Icon name="phone" size={18} className="derma-icon-mr derma-text-accent" />
                                 {patient.phone}
                               </div>
                               <div className="derma-flex-center">
-                                <Calendar size={14} className="derma-icon-mr" />
+                                <Icon name="calendar" size={14} className="derma-icon-mr" />
                                 {patient.birth_date}
                               </div>
                               <div className="derma-flex-center">
-                                <User size={14} className="derma-icon-mr" />
+                                <Icon name="person" size={14} className="derma-icon-mr" />
                                 ID: {patient.id}
                               </div>
                             </div>
@@ -1464,7 +1452,7 @@ const DermatologistPanelUnified = () => {
                         }}
                         className="derma-flex-center">
 
-                              <Activity size={16} />
+                              <Icon name="waveform.path.ecg" size={16} />
                               Осмотр
                             </Button>
                             <Button
@@ -1480,7 +1468,7 @@ const DermatologistPanelUnified = () => {
                         }}
                         className="derma-flex-center">
 
-                              <Sparkles size={16} />
+                              <Icon name="sparkles" size={16} />
                               Процедура
                             </Button>
                             <Button
@@ -1488,7 +1476,7 @@ const DermatologistPanelUnified = () => {
                         onClick={() => setSelectedPatient(patient)}
                         className="derma-flex-center">
 
-                              <User size={16} />
+                              <Icon name="person" size={16} />
                               Просмотр
                             </Button>
                           </div>
@@ -1511,7 +1499,7 @@ const DermatologistPanelUnified = () => {
               <MacOSCard className="derma-p-8">
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
-                    <Stethoscope size={20} className="derma-icon-mr-orange" />
+                    <Icon name="stethoscope" size={20} className="derma-icon-mr-orange" />
                     Прием пациента: {currentAppointment.patient_name || 'Не указано'}
                   </h3>
                   <Badge variant="info">
@@ -1529,7 +1517,7 @@ const DermatologistPanelUnified = () => {
                 {/* EMR система */}
                 <div className="derma-mt-24">
                   <h4 className="derma-flex-center">
-                    <FileText size={20} className="derma-icon-mr-blue" />
+                    <Icon name="doc.text" size={20} className="derma-icon-mr-blue" />
                     Электронная медицинская карта
                   </h4>
                   <EMRContainerV2
@@ -1543,7 +1531,7 @@ const DermatologistPanelUnified = () => {
                 {emr && !emr.is_draft &&
               <div className="derma-mt-24">
                     <h4 className="derma-flex-center">
-                      <TestTube size={20} className="derma-icon-mr-green" />
+                      <Icon name="doc.text" size={20} className="derma-icon-mr-green" />
                       Рецепт
                     </h4>
                     <PrescriptionSystem
@@ -1566,9 +1554,9 @@ const DermatologistPanelUnified = () => {
                   className="derma-flex-center">
 
                       {loading ?
-                  <RefreshCw size={20} className="animate-spin" /> :
+                  <Icon name="arrow.clockwise" size={20} className="animate-spin" /> :
 
-                  <CheckCircle size={20} />
+                  <Icon name="checkmark.circle" size={20} />
                   }
                       {loading ? 'Завершение...' : 'Завершить прием'}
                     </Button>
@@ -1586,7 +1574,7 @@ const DermatologistPanelUnified = () => {
           {activeTab === 'visit' && !currentAppointment && !selectedPatient &&
           <MacOSCard className="derma-p-48">
               <MacOSEmptyState
-              icon={Calendar}
+              icon="calendar"
               title="Выберите визит"
               description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
               action={
@@ -1645,7 +1633,7 @@ const DermatologistPanelUnified = () => {
           <div className="derma-flex-col-24">
               <MacOSCard className="derma-p-8">
                 <h3 className="derma-flex-center">
-                  <Scissors size={20} className="derma-icon-mr-orange" />
+                  <Icon name="scissors" size={20} className="derma-icon-mr-orange" />
                   Услуги дерматологии и косметологии
                 </h3>
 
@@ -1686,7 +1674,7 @@ const DermatologistPanelUnified = () => {
                       </label>
                       <div className="derma-flex-gap-8">
                         <div className="derma-pos-rel-flex-1">
-                          <DollarSign size={16} className="derma-dollar-icon-abs" />
+                          <Icon name="dollarsign.circle" size={16} className="derma-dollar-icon-abs" />
                           <Input
                           type="text"
                           value={doctorPrice}
@@ -1706,7 +1694,7 @@ const DermatologistPanelUnified = () => {
                         aria-label="Изменить цену процедуры"
                         title="Изменить цену процедуры">
 
-                          <DollarSign size={16} />
+                          <Icon name="dollarsign.circle" size={16} />
                         </Button>
                       </div>
                     </div>
