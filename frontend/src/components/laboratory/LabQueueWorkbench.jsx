@@ -14,6 +14,8 @@ import {
 import { t } from './utils/labTranslations';
 // STRAT#28: QueueCard extracted and wrapped in React.memo for performance.
 import QueueCard from './QueueCard';
+// STRAT#27: VirtualizedQueueList for 1000+ entries via @tanstack/react-virtual.
+import VirtualizedQueueList from './VirtualizedQueueList';
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.
 // Лабораторное помещение — публичное пространство, экран видят другие
@@ -308,60 +310,18 @@ export default function LabQueueWorkbench({
                 : t('queue.no_matches')}
             </Alert>
           ) : (
-            <div className="lqw-card-grid">
-              {/* UX-AUDIT-FIX13: рендерим только visibleCount записей
-                  вместо всего sortedAppointments. Кнопка «Показать ещё»
-                  внизу увеличивает visibleCount на PAGE_SIZE. */}
-              {sortedAppointments.slice(0, visibleCount).map((appointment) => (
-                <QueueCard
-                  key={appointment.id}
-                  appointment={appointment}
-                  isSelected={selectedAppointment?.id === appointment.id}
-                  onOpenAppointment={onOpenAppointment}
-                />
-              ))}
-              {/* UX-AUDIT-FIX13 / STRAT#8: кнопка «Показать ещё».
-                  STRAT#8: когда hasMore=true (server-side pagination активна),
-                  вызываем onLoadMore для догрузки следующей страницы с сервера.
-                  Когда hasMore=false — fallback на client-side visibleCount
-                  (FIX#13 pattern, для случаев когда server-side не настроен). */}
-              {(() => {
-                // Server-side load-more: приоритетный путь
-                if (hasMore && onLoadMore) {
-                  return (
-                    <div className="lqw-load-more">
-                      <Button
-                        variant="outline"
-                        onClick={onLoadMore}
-                        disabled={loadingMore}
-                        aria-label={t('queue.load_more_aria')}
-                      >
-                        <Icon name={loadingMore ? 'arrow.clockwise' : 'arrow.down'} size={14} />
-                        {loadingMore
-                          ? t('queue.loading')
-                          : `${t('queue.show_more')} (${queueTotal - appointments.length} ${t('queue.remaining')})`}
-                      </Button>
-                    </div>
-                  );
-                }
-                // Client-side load-more: fallback (FIX#13)
-                if (sortedAppointments.length > visibleCount) {
-                  return (
-                    <div className="lqw-load-more">
-                      <Button
-                        variant="outline"
-                        onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                        aria-label={`Показать ещё ${Math.min(PAGE_SIZE, sortedAppointments.length - visibleCount)} записей`}
-                      >
-                        <Icon name="arrow.down" size={14} />
-                        Показать ещё ({sortedAppointments.length - visibleCount} осталось)
-                      </Button>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
+            /* STRAT#27: virtualized rendering replaces .slice().map() + load-more IIFE.
+               VirtualizedQueueList handles both performance (only visible cards render)
+               and server-side pagination (infinite scroll + manual load-more button). */
+            <VirtualizedQueueList
+              appointments={sortedAppointments}
+              selectedAppointment={selectedAppointment}
+              onOpenAppointment={onOpenAppointment}
+              onLoadMore={onLoadMore}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              queueTotal={queueTotal}
+            />
           )}
         </CardContent>
       </Card>
