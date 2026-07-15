@@ -31,12 +31,12 @@ def get_backup_status(db: Session) -> dict[str, Any]:
         .filter(
             AuditLog.event_type.in_(["BACKUP_VERIFIED", "BACKUP_FAILED"]),
         )
-        .order_by(AuditLog.timestamp.desc())
+        .order_by(AuditLog.created_at.desc())
         .first()
     )
 
-    if last_backup and last_backup.timestamp:
-        last_at = last_backup.timestamp
+    if last_backup and last_backup.created_at:
+        last_at = last_backup.created_at
         hours_since = int((now - last_at).total_seconds() / 3600)
         overdue = hours_since > BACKUP_INTERVAL_HOURS
         last_status = "verified" if last_backup.event_type == "BACKUP_VERIFIED" else "failed"

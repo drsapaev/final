@@ -44,12 +44,12 @@ def get_secrets_rotation_status(db: Session) -> dict[str, Any]:
                 if hasattr(AuditLog.payload, "op")
                 else True,
             )
-            .order_by(AuditLog.timestamp.desc())
+            .order_by(AuditLog.created_at.desc())
             .first()
         )
 
-        if last_rotation and last_rotation.timestamp:
-            last_rotated = last_rotation.timestamp
+        if last_rotation and last_rotation.created_at:
+            last_rotated = last_rotation.created_at
             days_since = (now - last_rotated).days
             overdue = days_since > ROTATION_INTERVAL_DAYS
         else:

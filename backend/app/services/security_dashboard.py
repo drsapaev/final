@@ -39,9 +39,9 @@ def get_security_dashboard(db: Session, *, hours: int = 24) -> dict[str, Any]:
         db.query(AuditLog)
         .filter(
             AuditLog.event_type.in_(["STAFF_LOGIN", "PATIENT_LOGIN"]),
-            AuditLog.timestamp >= since,
+            AuditLog.created_at >= since,
         )
-        .order_by(AuditLog.timestamp.desc())
+        .order_by(AuditLog.created_at.desc())
         .limit(20)
         .all()
     )
@@ -51,9 +51,9 @@ def get_security_dashboard(db: Session, *, hours: int = 24) -> dict[str, Any]:
         db.query(AuditLog)
         .filter(
             AuditLog.action == "download",
-            AuditLog.timestamp >= since,
+            AuditLog.created_at >= since,
         )
-        .order_by(AuditLog.timestamp.desc())
+        .order_by(AuditLog.created_at.desc())
         .limit(20)
         .all()
     )
@@ -63,9 +63,9 @@ def get_security_dashboard(db: Session, *, hours: int = 24) -> dict[str, Any]:
         db.query(AuditLog)
         .filter(
             AuditLog.action == "export",
-            AuditLog.timestamp >= since,
+            AuditLog.created_at >= since,
         )
-        .order_by(AuditLog.timestamp.desc())
+        .order_by(AuditLog.created_at.desc())
         .limit(20)
         .all()
     )
@@ -76,9 +76,9 @@ def get_security_dashboard(db: Session, *, hours: int = 24) -> dict[str, Any]:
         .filter(
             AuditLog.event_type.in_(["STAFF_LOGIN", "PATIENT_LOGIN"]),
             AuditLog.outcome == "denied",
-            AuditLog.timestamp >= since,
+            AuditLog.created_at >= since,
         )
-        .order_by(AuditLog.timestamp.desc())
+        .order_by(AuditLog.created_at.desc())
         .limit(20)
         .all()
     )
@@ -91,7 +91,7 @@ def get_security_dashboard(db: Session, *, hours: int = 24) -> dict[str, Any]:
         )
         .filter(
             AuditLog.outcome == "denied",
-            AuditLog.timestamp >= since,
+            AuditLog.created_at >= since,
             AuditLog.ip_address.isnot(None),
         )
         .group_by(AuditLog.ip_address)
@@ -106,9 +106,9 @@ def get_security_dashboard(db: Session, *, hours: int = 24) -> dict[str, Any]:
         db.query(AuditLog)
         .filter(
             AuditLog.action == "bulk",
-            AuditLog.timestamp >= since,
+            AuditLog.created_at >= since,
         )
-        .order_by(AuditLog.timestamp.desc())
+        .order_by(AuditLog.created_at.desc())
         .limit(10)
         .all()
     )
@@ -116,13 +116,13 @@ def get_security_dashboard(db: Session, *, hours: int = 24) -> dict[str, Any]:
     # Summary counts
     total_events = (
         db.query(func.count(AuditLog.id))
-        .filter(AuditLog.timestamp >= since)
+        .filter(AuditLog.created_at >= since)
         .scalar() or 0
     )
     total_denied = (
         db.query(func.count(AuditLog.id))
         .filter(
-            AuditLog.timestamp >= since,
+            AuditLog.created_at >= since,
             AuditLog.outcome == "denied",
         )
         .scalar() or 0
@@ -140,7 +140,7 @@ def get_security_dashboard(db: Session, *, hours: int = 24) -> dict[str, Any]:
             "subject_patient_id": entry.subject_patient_id,
             "resource_type": entry.resource_type,
             "ip_address": entry.ip_address,
-            "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+            "timestamp": entry.created_at.isoformat() if entry.created_at else None,
         }
 
     return {
