@@ -76,4 +76,19 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     expect(source).toContain('visibility_rule_text');
     expect(source).toContain('highlight_rule_text');
   });
+
+  it('UX-AUDIT-FIX7: bulk-loads all reference ranges from catalog in one click', () => {
+    // FIX7: bulk-кнопка «Загрузить все нормы» в шапке ContentTab.
+    // Должна итерировать по всем секциям/полям и вызывать
+    // onLoadCatalogReferenceRange для полей с reference_mode='catalog'.
+    expect(source).toContain('handleBulkLoadCatalogReferenceRanges');
+    expect(source).toContain("reference_mode === 'catalog'");
+    expect(source).toContain('onLoadCatalogReferenceRange(sectionIndex, fieldIndex, field.analyte_code)');
+    // Кнопка в UI
+    expect(source).toContain('Загрузить все нормы');
+    // Disabled когда нет валидных полей
+    expect(source).toContain("disabled={!draftVersion?.sections?.some");
+    // Иконка square.and.arrow.down.on.square
+    expect(source).toContain('square.and.arrow.down.on.square');
+  });
 });
