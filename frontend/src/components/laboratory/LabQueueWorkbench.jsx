@@ -12,6 +12,8 @@ import {
 } from './labUiLabels';
 // STRAT#14: t() для i18n — filter/sort/title/badge labels мигрированы.
 import { t } from './utils/labTranslations';
+// STRAT#28: QueueCard extracted and wrapped in React.memo for performance.
+import QueueCard from './QueueCard';
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.
 // Лабораторное помещение — публичное пространство, экран видят другие
@@ -310,81 +312,14 @@ export default function LabQueueWorkbench({
               {/* UX-AUDIT-FIX13: рендерим только visibleCount записей
                   вместо всего sortedAppointments. Кнопка «Показать ещё»
                   внизу увеличивает visibleCount на PAGE_SIZE. */}
-              {sortedAppointments.slice(0, visibleCount).map((appointment) => {
-                const isSelected = selectedAppointment?.id === appointment.id;
-                return (
-                  <div
-                    key={appointment.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onOpenAppointment(appointment)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onOpenAppointment(appointment);
-                      }
-                    }}
-                    className={`lqw-queue-card ${isSelected ? 'lqw-queue-card-selected' : ''}`}
-                  >
-                    <div className="lqw-card-top">
-                      <div className="lqw-card-info">
-                        <div className="lqw-card-name">
-                          {appointment.patient_fio || t('queue.patient_no_name')}
-                        </div>
-                        <div className="lqw-card-meta">
-                          {t('queue.visit')}: {appointment.visit_id || t('queue.visit_not_linked')} | {t('queue.phone')}:{' '}
-                          {/* P-05 fix: маскирование номера телефона в публичном
-                              пространстве лаборатории. Раскрытие — по клику. */}
-                          <MaskedPhone phone={appointment.patient_phone} />
-                        </div>
-                      </div>
-                      <Badge variant={getLabStatusVariant(appointment.status)}>
-                        {formatLabStatus(appointment.status)}
-                      </Badge>
-                    </div>
-
-                    <div className="lqw-card-services">
-                      <strong>{t('queue.services')}:</strong> {formatServices(appointment)}
-                    </div>
-
-                    <div className="lqw-meta-row">
-                      <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty)}</Badge>
-                      {appointment.payment_status && <Badge variant="info">{t('queue.payment')}: {formatPaymentStatus(appointment.payment_status)}</Badge>}
-                      {/* PR-60 / Medium-13: was variant="success" (green implies positive status, but time is not a status) */}
-                      {appointment.appointment_time && <Badge variant="default">{appointment.appointment_time}</Badge>}
-                      {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name}</Badge>}
-                    </div>
-
-                    <div className="lqw-card-bottom">
-                      <div className="lqw-card-id">
-                        {/* P-05 fix: patient_id — внутренний идентификатор, не нужен
-                            лаборанту для работы. Скрываем по умолчанию, раскрытие —
-                            по клику. Снижает риск утечки PII через скриншоты.
-                            L-M-5 fix: используем CSS-класс .lqw-pii-* вместо inline
-                            style-hack с ::-webkit-details-marker. */}
-                        <details className="lqw-pii-details">
-                          <summary
-                            className="lqw-pii-summary"
-                            aria-label={t('queue.patient_id_aria')}
-                          >
-                            {t('queue.patient_id_label')} ▸
-                          </summary>
-                          <span className="lqw-pii-value">
-                            {appointment.patient_id}
-                          </span>
-                        </details>
-                      </div>
-                      {/* L-M-3 fix: убрана вложенная Button внутри role="button".
-                          Карточка целиком кликабельна, отдельная кнопка избыточна
-                          и создавала a11y anti-pattern (click bubbles to parent). */}
-                      <Badge variant={appointment.report_instance_id ? 'success' : 'info'}>
-                        <Icon name="doc.text" size={12} />
-                        {appointment.report_instance_id ? t('queue.report_exists') : t('queue.report_new')}
-                      </Badge>
-                    </div>
-                  </div>
-                );
-              })}
+              {sortedAppointments.slice(0, visibleCount).map((appointment) => (
+                <QueueCard
+                  key={appointment.id}
+                  appointment={appointment}
+                  isSelected={selectedAppointment?.id === appointment.id}
+                  onOpenAppointment={onOpenAppointment}
+                />
+              ))}
               {/* UX-AUDIT-FIX13 / STRAT#8: кнопка «Показать ещё».
                   STRAT#8: когда hasMore=true (server-side pagination активна),
                   вызываем onLoadMore для догрузки следующей страницы с сервера.

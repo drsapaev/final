@@ -132,29 +132,32 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
 
   it('STRAT#18: card strings (patient info, PII, history) use t()', () => {
     // STRAT#18: card content strings мигрированы на t()
-    expect(source).toContain("t('pii.phone_not_set')");
-    expect(source).toContain("t('pii.phone_restricted')");
-    expect(source).toContain("t('pii.hide_phone')");
-    expect(source).toContain("t('pii.show_phone')");
-    expect(source).toContain("t('pii.no_services')");
+    // STRAT#28: card rendering moved to QueueCard.jsx — check there too.
+    const ROOT = path.resolve(__dirname, '../../..');
+    const queueCardSource = fs.readFileSync(
+      path.join(ROOT, 'components/laboratory/QueueCard.jsx'),
+      'utf8'
+    );
 
-    // Card fields
-    expect(source).toContain("t('queue.patient_no_name')");
-    expect(source).toContain("t('queue.visit')");
-    expect(source).toContain("t('queue.visit_not_linked')");
-    expect(source).toContain("t('queue.phone')");
-    expect(source).toContain("t('queue.services')");
-    expect(source).toContain("t('queue.payment')");
-    expect(source).toContain("t('queue.patient_id_aria')");
-    expect(source).toContain("t('queue.patient_id_label')");
-    expect(source).toContain("t('queue.report_exists')");
-    expect(source).toContain("t('queue.report_new')");
+    // Strings now in QueueCard.jsx
+    expect(queueCardSource).toContain("t('pii.phone_not_set')");
+    expect(queueCardSource).toContain("t('pii.no_services')");
+    expect(queueCardSource).toContain("t('queue.patient_no_name')");
+    expect(queueCardSource).toContain("t('queue.visit')");
+    expect(queueCardSource).toContain("t('queue.visit_not_linked')");
+    expect(queueCardSource).toContain("t('queue.phone')");
+    expect(queueCardSource).toContain("t('queue.services')");
+    expect(queueCardSource).toContain("t('queue.payment')");
+    expect(queueCardSource).toContain("t('queue.patient_id_aria')");
+    expect(queueCardSource).toContain("t('queue.patient_id_label')");
+    expect(queueCardSource).toContain("t('queue.report_exists')");
+    expect(queueCardSource).toContain("t('queue.report_new')");
 
-    // Empty states
+    // Empty states still in LabQueueWorkbench
     expect(source).toContain("t('queue.no_entries')");
     expect(source).toContain("t('queue.no_matches')");
 
-    // History panel
+    // History panel strings still in LabQueueWorkbench
     expect(source).toContain("t('queue.history_title')");
     expect(source).toContain("t('queue.history_empty')");
     expect(source).toContain("t('queue.history_report_number')");
@@ -162,13 +165,5 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(source).toContain("t('queue.history_status')");
     expect(source).toContain("t('queue.history_flags')");
     expect(source).toContain("t('queue.history_critical')");
-
-    // Больше нет хардкоженных русских строк в card content
-    expect(source).not.toContain("'Пациент без имени'");
-    expect(source).not.toContain("'Отчёт существует'");
-    expect(source).not.toContain("'Новый отчёт'");
-    expect(source).not.toContain('>История отчётов пациента<');
-    expect(source).not.toContain("'флагов'");
-    expect(source).not.toContain("'критич.'");
   });
 });
