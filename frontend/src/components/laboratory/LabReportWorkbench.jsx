@@ -44,6 +44,8 @@ import { useLabReportState } from './hooks/useLabReportState';
 // callback (parent inline Alert), interactive toasts (с onClick undo) —
 // через toast.* напрямую. Соответствует Nielsen Heuristic #4.
 import { useLabToast } from './hooks/useLabToast';
+// STRAT#9: t() для i18n — confirm dialogs мигрированы на translation keys.
+import { t } from './utils/labTranslations';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,
@@ -326,14 +328,13 @@ export default function LabReportWorkbench({
     // WF-08 fix: Finalize — необратимое действие. Бланк становится immutable,
     // единственный путь правки — revise (создание нового instance).
     // Показываем confirmation dialog с объяснением последствий.
+    // STRAT#9: строки мигрированы на t() из labTranslations.
     const ok = await confirm({
-      title: 'Утверждение отчёта',
-      message: 'После утверждения отчёт становится неизменяемым.',
-      description: 'Редактирование полей и подписей будет заблокировано. ' +
-        'Для исправления потребуется создать исправленную версию. ' +
-        'Действие нельзя отменить.',
-      confirmLabel: 'Утвердить',
-      cancelLabel: 'Отмена',
+      title: t('confirm.finalize_title'),
+      message: t('confirm.finalize_message'),
+      description: t('confirm.finalize_description'),
+      confirmLabel: t('confirm.finalize_confirm'),
+      cancelLabel: t('confirm.cancel'),
       intent: 'primary',
     });
     if (!ok) return;
@@ -360,14 +361,13 @@ export default function LabReportWorkbench({
     // M-1 fix: Revise creates a new instance (old one preserved as FINALIZED),
     // but it changes which instance is "active" and creates audit-trail entries.
     // The comment at L52-55 promised a guard — now delivered.
+    // STRAT#9: строки мигрированы на t() из labTranslations.
     const ok = await confirm({
-      title: 'Создание исправленной версии',
-      message: 'Будет создана новая версия отчёта на основе утверждённой.',
-      description: 'Старая версия останется в истории как утверждённая. ' +
-        'Новая версия станет активной и доступной для редактирования. ' +
-        'Это действие создаёт запись в аудите.',
-      confirmLabel: 'Создать версию',
-      cancelLabel: 'Отмена',
+      title: t('confirm.revise_title'),
+      message: t('confirm.revise_message'),
+      description: t('confirm.revise_description'),
+      confirmLabel: t('confirm.revise_confirm'),
+      cancelLabel: t('confirm.cancel'),
       intent: 'warning',
     });
     if (!ok) return;
@@ -489,15 +489,13 @@ export default function LabReportWorkbench({
   // которые уже используют useConfirm() для необратимых действий.
   async function handleNotifyPatient() {
     if (!activeInstance) return;
+    // STRAT#9: строки мигрированы на t() из labTranslations.
     const ok = await confirm({
-      title: 'Отправка результатов пациенту',
-      message: 'Результаты будут отправлены в Telegram.',
-      description:
-        'Сообщение нельзя отозвать. Пациент получит PDF с результатами ' +
-        'лабораторных анализов. Перед отправкой убедитесь, что отчёт ' +
-        'утверждён и не содержит ошибок.',
-      confirmLabel: 'Отправить',
-      cancelLabel: 'Отмена',
+      title: t('confirm.notify_title'),
+      message: t('confirm.notify_message'),
+      description: t('confirm.notify_description'),
+      confirmLabel: t('confirm.notify_confirm'),
+      cancelLabel: t('confirm.cancel'),
       intent: 'warning',
     });
     if (!ok) return;
