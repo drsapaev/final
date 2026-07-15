@@ -61,7 +61,9 @@ describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
     // Must NOT contain the old English aria-label
     expect(source).not.toContain('Lab result for');
 
-    // Must contain the localized Russian aria-label
-    expect(source).toContain('Результат: ${field.label}');
+    // STRAT#24: field rendering moved to ReportEditor component.
+    // Check there for the localized aria-label pattern.
+    const reportEditorSource = readSource('components/laboratory/ReportEditor.jsx');
+    expect(reportEditorSource).toContain("t('workbench.result_label')");
   });
 });

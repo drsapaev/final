@@ -18,6 +18,12 @@ const workbenchSource = fs.readFileSync(
   'utf8'
 );
 
+// STRAT#24: numeric validation moved to ReportEditor component
+const reportEditorSource = fs.readFileSync(
+  path.join(ROOT, 'components/laboratory/ReportEditor.jsx'),
+  'utf8'
+);
+
 describe('useLabToast hook (STRAT#2)', () => {
   it('exports useLabToast function', () => {
     expect(source).toContain('export function useLabToast(');
@@ -60,21 +66,22 @@ describe('LabReportWorkbench uses useLabToast (STRAT#2)', () => {
 
   it('uses labToast.interactive* for numeric validation instead of direct toast', () => {
     // STRAT#2: 3 toast calls заменены на labToast.interactive*
-    expect(workbenchSource).toContain('labToast.interactiveError(');
-    expect(workbenchSource).toContain('labToast.interactiveWarning(');
-    expect(workbenchSource).toContain('labToast.interactiveInfo(');
+    // STRAT#24: numeric validation moved to ReportEditor component
+    expect(reportEditorSource).toContain('labToast.interactiveError(');
+    expect(reportEditorSource).toContain('labToast.interactiveWarning(');
+    expect(reportEditorSource).toContain('labToast.interactiveInfo(');
   });
 
   it('no longer calls toast.error/warning/info directly in numeric validation', () => {
-    // Прямые toast.* calls должны быть убраны из numeric validation block.
-    // toast import сохранён для backward compat, но calls идут через labToast.
+    // STRAT#24: numeric validation block moved to ReportEditor component.
+    // Check there for direct toast.* calls.
     const toastCallPattern = /toast\.(error|warning|info)\(/;
     // Находим все matches и проверяем, что их нет в numeric validation block
-    // (между "Некорректное числовое значение" и "return;")
-    const numericBlockStart = workbenchSource.indexOf('Некорректное числовое значение');
+    // (между t('errors.invalid_numeric') и "return;")
+    const numericBlockStart = reportEditorSource.indexOf("t('errors.invalid_numeric')");
     expect(numericBlockStart).toBeGreaterThan(-1);
-    const numericBlockEnd = workbenchSource.indexOf('return;', numericBlockStart);
-    const numericBlock = workbenchSource.slice(numericBlockStart, numericBlockEnd);
+    const numericBlockEnd = reportEditorSource.indexOf('return;', numericBlockStart);
+    const numericBlock = reportEditorSource.slice(numericBlockStart, numericBlockEnd);
     expect(toastCallPattern.test(numericBlock)).toBe(false);
   });
 });
