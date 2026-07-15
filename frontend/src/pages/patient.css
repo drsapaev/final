@@ -151,3 +151,483 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+ * L-H-2 fix: PatientPanel — миграция Tailwind utility-classes в CSS.
+ * Заменяет 74 hardcoded Tailwind-colors + 33 utility-класса на
+ * mac-token-based классы .pp-*
+ * ────────────────────────────────────────────────────────────────────── */
+
+/* ─── Card (shared) ─── */
+.pp-card {
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  overflow: hidden;
+  background: var(--mac-bg-primary);
+}
+
+.pp-card-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--mac-border);
+  background: var(--mac-bg-tertiary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .pp-card-header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+}
+
+.pp-card-title {
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+}
+
+.pp-card-subtitle {
+  margin-top: 4px;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+.pp-card-body {
+  padding: 16px;
+}
+
+/* ─── Grid helpers ─── */
+.pp-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .pp-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pp-grid-span-2 {
+  grid-column: 1 / -1;
+}
+
+/* ─── Booking ─── */
+.pp-booking-root {
+  display: grid;
+  gap: 16px;
+}
+
+.pp-booking-summary {
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-tertiary);
+  padding: 12px;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+.pp-summary-title {
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+}
+
+.pp-summary-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .pp-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pp-summary-services {
+  margin-top: 8px;
+}
+
+/* ─── Messages (success / error) ─── */
+.pp-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--mac-font-size-sm);
+  padding: 8px 12px;
+  border-radius: var(--mac-radius-md);
+}
+
+.pp-message--success {
+  color: var(--mac-success, #15803d);
+  background: color-mix(in oklab, var(--mac-success, #15803d) 10%, transparent);
+}
+
+.pp-message--error {
+  color: var(--mac-danger, #b91c1c);
+  background: color-mix(in oklab, var(--mac-danger, #b91c1c) 10%, transparent);
+}
+
+/* ─── Actions row ─── */
+.pp-actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--mac-border);
+  padding-top: 16px;
+}
+
+@media (min-width: 640px) {
+  .pp-actions-row {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+/* ─── Empty state (PanelEmptyState) ─── */
+.pp-empty-state {
+  padding: 24px;
+  border: 1px dashed var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  text-align: center;
+  background: color-mix(in oklab, var(--mac-bg-primary) 60%, transparent);
+}
+
+.pp-empty-state-icon {
+  margin: 0 auto 12px;
+  color: var(--mac-text-muted);
+}
+
+.pp-empty-state-title {
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+}
+
+.pp-empty-state-description {
+  margin-top: 4px;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* L-H-5 fix: skeleton-lines внутри empty-state при loading-variant */
+.pp-empty-state-skeleton {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.pp-skeleton-line {
+  height: 14px;
+  border-radius: var(--mac-radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--mac-border) 25%,
+    var(--mac-bg-secondary) 50%,
+    var(--mac-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: pp-skeleton-shimmer 1.5s infinite;
+  margin: 0 auto;
+}
+
+.pp-skeleton-line--w40 { width: 40%; }
+.pp-skeleton-line--w60 { width: 60%; }
+.pp-skeleton-line--w80 { width: 80%; }
+
+@keyframes pp-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-skeleton-line {
+    animation: none;
+    background: var(--mac-bg-tertiary);
+  }
+}
+
+/* ─── Cabinet ─── */
+.pp-cabinet-root {
+  display: grid;
+  gap: 16px;
+}
+
+.pp-payments-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (min-width: 1024px) {
+  .pp-payments-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.pp-payment-card {
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-tertiary);
+  padding: 12px;
+}
+
+.pp-payment-label {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary);
+}
+
+.pp-payment-value {
+  margin-top: 4px;
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+}
+
+.pp-info-box {
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  padding: 12px;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+.pp-info-title {
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+}
+
+.pp-info-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .pp-info-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pp-info-hint {
+  margin-top: 8px;
+  color: var(--mac-text-muted);
+}
+
+/* ─── Reports section ─── */
+.pp-reports-section {
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  padding: 12px;
+}
+
+.pp-section-title {
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+}
+
+.pp-reports-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.pp-report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+  padding: 12px;
+}
+
+@media (min-width: 640px) {
+  .pp-report-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.pp-report-info {
+  display: grid;
+  gap: 4px;
+}
+
+.pp-report-name {
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+}
+
+.pp-report-date {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Cabinet grid (4 subsections) ─── */
+.pp-cabinet-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .pp-cabinet-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pp-subsection {
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  padding: 12px;
+}
+
+.pp-subsection-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.pp-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--mac-font-size-sm);
+}
+
+.pp-list-item-primary {
+  color: var(--mac-text-primary);
+}
+
+.pp-list-item-secondary {
+  color: var(--mac-text-secondary);
+}
+
+.pp-empty-hint {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+/* ─── Forms ─── */
+.pp-forms-root {
+  display: grid;
+  gap: 16px;
+}
+
+.pp-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.pp-form-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--mac-border);
+  padding-top: 16px;
+}
+
+.pp-form-timestamp {
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-muted);
+}
+
+/* ─── Section tabs (L-H-6 fix: tablist-pattern) ─── */
+.pp-tablist {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 4px;
+  background: var(--mac-bg-tertiary);
+  border-radius: var(--mac-radius-lg);
+  border: 1px solid var(--mac-border);
+}
+
+.pp-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--mac-radius-md);
+  background: transparent;
+  color: var(--mac-text-secondary);
+  cursor: pointer;
+  font-size: var(--mac-font-size-sm);
+  font-weight: 400;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.pp-tab:hover {
+  color: var(--mac-text-primary);
+  background: var(--mac-bg-secondary);
+}
+
+.pp-tab-active {
+  background: var(--mac-bg-primary);
+  color: var(--mac-accent);
+  font-weight: 600;
+  border-color: var(--mac-border);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+.pp-tab:focus-visible {
+  outline: 2px solid var(--mac-accent);
+  outline-offset: 2px;
+}
+
+/* ─── Home view (Upcoming Visits + Lab Results) ─── */
+.pp-home-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .pp-home-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pp-home-card-header {
+  padding: 12px 16px;
+  background: var(--mac-bg-tertiary);
+  border-bottom: 1px solid var(--mac-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pp-home-card-title {
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+}
+
+.pp-home-list {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.pp-home-list-item {
+  padding: 16px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
