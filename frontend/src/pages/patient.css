@@ -525,6 +525,23 @@
   gap: 16px;
 }
 
+/* L-L-7 fix: forms progress indicator */
+.pp-forms-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+  padding: 8px 12px;
+  background: var(--mac-bg-tertiary);
+  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border);
+}
+
+.pp-forms-progress-separator {
+  color: var(--mac-text-muted);
+}
+
 .pp-badges-row {
   display: flex;
   flex-wrap: wrap;

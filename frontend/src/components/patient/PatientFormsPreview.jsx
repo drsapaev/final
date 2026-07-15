@@ -246,6 +246,21 @@ function PatientFormsPreview({ status, preview, error, initData }) {
 
   return (
     <div className="pp-forms-root">
+      {/* L-L-7 fix: progress-indicator для multi-form.
+          Показывает «Анкета N из M» если форм больше одной. */}
+      {forms.length > 1 && (
+        <div className="pp-forms-progress" aria-label="Прогресс заполнения анкет">
+          <Icon name="doc.text" size={14} />
+          <span>Анкет доступно: {forms.length}</span>
+          <span className="pp-forms-progress-separator">·</span>
+          <span>
+            Заполнено: {forms.filter((f) => {
+              const s = formState[f.id]?.savedStatus;
+              return s === 'submitted' || s === 'draft';
+            }).length}
+          </span>
+        </div>
+      )}
       {forms.map((form) => {
         const currentFormState = formState[form.id] || buildInitialFormState(form);
         const isFormBusy = currentFormState.status === 'saving-draft' || currentFormState.status === 'submitting';

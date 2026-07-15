@@ -39,13 +39,39 @@ export const getDefaultAppointmentDate = () => {
 export const getTodayDateInputValue = () => toLocalDateInputValue(new Date());
 
 // ─── Services helper ───────────────────────────────────────────────────────
+//
+// L-L-8 fix: простой split по comma ломается на скобках:
+//   "Анализ крови, УЗИ (грудной клетки)" → ["Анализ крови", "УЗИ (грудной клетки)"]
+// Теперь split respects parenthesized content — comma inside () не разделяет.
+// Это best-effort для user-typed input. Backend должен валидировать отдельно.
 
-export const splitBookingServices = (value) => (
-  String(value || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-);
+export const splitBookingServices = (value) => {
+  const text = String(value || '').trim();
+  if (!text) return [];
+
+  const result = [];
+  let current = '';
+  let parenDepth = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '(') parenDepth++;
+    else if (char === ')') parenDepth = Math.max(0, parenDepth - 1);
+
+    if (char === ',' && parenDepth === 0) {
+      const trimmed = current.trim();
+      if (trimmed) result.push(trimmed);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  const lastTrimmed = current.trim();
+  if (lastTrimmed) result.push(lastTrimmed);
+
+  return result;
+};
 
 // ─── Error messages (L-M-4 fix: unified dictionary) ────────────────────────
 //
