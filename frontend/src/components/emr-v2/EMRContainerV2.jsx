@@ -89,7 +89,7 @@ import {
  * @param {string} props.patientName - Patient name (for sticky header)
  * @param {React.ComponentType} props.ICD10Component - Optional ICD10 autocomplete
  */
-export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }) {
+export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
     const canonicalSpecialty = normalizeSpecialty(specialty);
@@ -914,9 +914,5 @@ EMRContainerV2.propTypes = {
     ICD10Component: PropTypes.elementType,
 };
 
-EMRContainerV2.defaultProps = {
-    patientId: null,
-    ICD10Component: null,
-};
 
 export default EMRContainerV2;

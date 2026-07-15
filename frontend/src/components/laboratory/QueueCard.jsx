@@ -21,7 +21,7 @@ import { useTranslation } from '../../i18n/adapter';
  * Performance impact: при 50+ записях в очереди, typing в search box
  * вызывает re-render только отфильтрованных карточек, а не всех.
  */
-function QueueCard({ appointment, isSelected, onOpenAppointment }) {
+function QueueCard({ appointment, isSelected = false, onOpenAppointment }) {
   const { t } = useTranslation();
   return (
     <div
@@ -126,10 +126,6 @@ QueueCard.propTypes = {
   appointment: PropTypes.object.isRequired,
   isSelected: PropTypes.bool,
   onOpenAppointment: PropTypes.func.isRequired,
-};
-
-QueueCard.defaultProps = {
-  isSelected: false,
 };
 
 // React.memo with default shallow comparison — prevents re-render when
