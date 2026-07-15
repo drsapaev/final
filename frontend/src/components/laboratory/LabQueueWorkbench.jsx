@@ -230,7 +230,7 @@ export default function LabQueueWorkbench({
             </div>
             <div
               role="group"
-              aria-label={t('queue.filter_group_aria')}"
+              aria-label={t('queue.filter_group_aria')}
               className="lqw-status-filter-group"
             >
               {[
