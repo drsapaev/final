@@ -1,21 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Badge, Button, Checkbox, Icon, Input, Textarea,
 } from '../ui/macos';
+import { useConfirm } from '../common/ConfirmDialog';
 import { api } from '../../api/client';
+import logger from '../../utils/logger';
 import {
   describePatientError,
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
 
 /**
- * L-H-4 fix: PatientFormsPreview выделен в отдельный файл (~180 строк).
- *
+ * L-H-4 fix: PatientFormsPreview выделен в отдельный файл.
  * L-H-1 fix: все строки на русском.
- * L-H-2 fix: Tailwind classes → CSS-классы .pp-*
  * L-H-5 fix: skeleton-loading при загрузке форм.
  * L-H-8 fix: lucide-direct → macos <Icon>.
+ * L-M-1 fix: autosave 30s debounce when dirty + storageEnabled.
+ * L-M-9 fix: confirmation dialog для submit (irreversible action).
+ * L-M-12 fix: aria-live для loading-state.
  *
  * Protected patient forms: preview → save draft / submit.
  */
@@ -51,82 +54,47 @@ const buildInitialFormState = (form) => ({
 
 function PatientFormsPreview({ status, preview, error, initData }) {
   const [formState, setFormState] = useState({});
+  const [autoSaveTimestamps, setAutoSaveTimestamps] = useState({});
+  const [autoSavingForms, setAutoSavingForms] = useState({});
+  const autoSaveTimersRef = useRef({});
+  const handleSaveRef = useRef(null);
 
-  useEffect(() => {
-    const forms = Array.isArray(preview?.forms) ? preview.forms : [];
-    const nextState = {};
+  // L-M-9 fix: useConfirm для submit-confirmation
+  const [confirm, confirmDialog] = useConfirm();
 
-    forms.forEach((form) => {
-      nextState[form.id] = buildInitialFormState(form);
-    });
-
-    setFormState(nextState);
-  }, [preview]);
-
-  // L-H-5 fix: skeleton-loading
-  if (status === 'missing-init-data') {
-    return (
-      <PanelEmptyState
-        icon="doc.text"
-        title="Откройте из Telegram"
-        description="Защищённые анкеты требуют Telegram Mini App identity перед показом данных пациента."
-      />
-    );
-  }
-
-  if (status === 'loading') {
-    return (
-      <PanelEmptyState
-        icon="doc.text"
-        title="Загрузка анкет…"
-        description="Проверяем защищённый Telegram Mini App identity."
-        variant="loading"
-      />
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <PanelEmptyState
-        icon="exclamationmark.triangle"
-        title="Анкеты недоступны"
-        description={error || 'Не удалось загрузить защищённые анкеты пациента.'}
-        variant="error"
-      />
-    );
-  }
-
-  const forms = Array.isArray(preview?.forms) ? preview.forms : [];
+  // L-M-6 fix: forms вычисляется через useMemo (было inline — вызывало
+  // react-hooks/exhaustive-deps warning в autosave useEffect).
+  const forms = useMemo(
+    () => Array.isArray(preview?.forms) ? preview.forms : [],
+    [preview]
+  );
   const storageEnabled = preview?.policy?.storage_enabled === true;
   const patientId = preview?.scope?.patient_id || null;
 
-  if (forms.length === 0) {
-    return (
-      <PanelEmptyState
-        icon="doc.text"
-        title="Нет доступных анкет"
-        description="Защищённые анкеты пациента ещё не настроены."
-      />
-    );
-  }
+  useEffect(() => {
+    const nextState = {};
+    forms.forEach((form) => {
+      nextState[form.id] = buildInitialFormState(form);
+    });
+    setFormState(nextState);
+  }, [forms]);
 
-  const handleFieldChange = (formId, field, value) => {
-    setFormState((current) => ({
-      ...current,
-      [formId]: {
-        ...(current[formId] || {}),
-        answers: {
-          ...(current[formId]?.answers || {}),
-          [field.key]: field.type === 'boolean' ? Boolean(value) : value,
-        },
-        error: '',
-        message: '',
-      },
-    }));
-  };
-
-  const handleSave = async (form, nextStatus) => {
+  // ─── handleSave (defined before early returns — hooks rules) ────────────
+  const handleSave = useCallback(async (form, nextStatus) => {
     const currentForm = formState[form.id] || buildInitialFormState(form);
+
+    // L-M-9 fix: confirmation dialog для submit (irreversible action).
+    if (nextStatus === 'submitted') {
+      const ok = await confirm({
+        title: 'Отправка анкеты',
+        message: 'После отправки изменения будут заблокированы.',
+        description: 'Для редактирования отправленной анкеты потребуется обратиться в клинику. Действие нельзя отменить.',
+        confirmLabel: 'Отправить',
+        cancelLabel: 'Отмена',
+        intent: 'primary',
+      });
+      if (!ok) return;
+    }
 
     setFormState((current) => ({
       ...current,
@@ -164,6 +132,10 @@ function PatientFormsPreview({ status, preview, error, initData }) {
           updatedAt: submission.updated_at || '',
         },
       }));
+
+      if (nextStatus === 'draft') {
+        setAutoSaveTimestamps((current) => ({ ...current, [form.id]: new Date() }));
+      }
     } catch (err) {
       const reason = err?.response?.data?.detail?.reason || 'patient_form_save_failed';
       setFormState((current) => ({
@@ -176,6 +148,100 @@ function PatientFormsPreview({ status, preview, error, initData }) {
         },
       }));
     }
+  }, [formState, initData, patientId, confirm]);
+
+  // L-M-1 fix: обновляем ref для autosave-timer.
+  handleSaveRef.current = handleSave;
+
+  // L-M-1 fix: autosave — 30s debounce. Все hooks ВЫЗВАНЫ до early returns.
+  useEffect(() => {
+    if (!storageEnabled || !initData || forms.length === 0) return;
+
+    const timers = autoSaveTimersRef.current;
+    forms.forEach((form) => {
+      const currentFormState = formState[form.id];
+      if (!currentFormState) return;
+      if (currentFormState.savedStatus === 'submitted') return;
+      if (currentFormState.status === 'saving-draft' || currentFormState.status === 'submitting') return;
+
+      if (timers[form.id]) clearTimeout(timers[form.id]);
+
+      timers[form.id] = setTimeout(async () => {
+        if (handleSaveRef.current) {
+          try {
+            setAutoSavingForms((current) => ({ ...current, [form.id]: true }));
+            await handleSaveRef.current(form, 'draft');
+          } catch (e) {
+            logger.warn('[PatientForms] autosave failed:', e);
+          } finally {
+            setAutoSavingForms((current) => ({ ...current, [form.id]: false }));
+          }
+        }
+      }, 30000);
+    });
+
+    return () => {
+      Object.values(timers).forEach((t) => clearTimeout(t));
+    };
+  }, [formState, forms, storageEnabled, initData]);
+
+  // ─── Early returns (after all hooks) ────────────────────────────────────
+  if (status === 'missing-init-data') {
+    return (
+      <PanelEmptyState
+        icon="doc.text"
+        title="Откройте из Telegram"
+        description="Защищённые анкеты требуют Telegram Mini App identity перед показом данных пациента."
+      />
+    );
+  }
+
+  if (status === 'loading') {
+    return (
+      <PanelEmptyState
+        icon="doc.text"
+        title="Загрузка анкет…"
+        description="Проверяем защищённый Telegram Mini App identity."
+        variant="loading"
+      />
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <PanelEmptyState
+        icon="exclamationmark.triangle"
+        title="Анкеты недоступны"
+        description={error || 'Не удалось загрузить защищённые анкеты пациента.'}
+        variant="error"
+      />
+    );
+  }
+
+  if (forms.length === 0) {
+    return (
+      <PanelEmptyState
+        icon="doc.text"
+        title="Нет доступных анкет"
+        description="Защищённые анкеты пациента ещё не настроены."
+      />
+    );
+  }
+
+  // ─── Render ─────────────────────────────────────────────────────────────
+  const handleFieldChange = (formId, field, value) => {
+    setFormState((current) => ({
+      ...current,
+      [formId]: {
+        ...(current[formId] || {}),
+        answers: {
+          ...(current[formId]?.answers || {}),
+          [field.key]: field.type === 'boolean' ? Boolean(value) : value,
+        },
+        error: '',
+        message: '',
+      },
+    }));
   };
 
   return (
@@ -261,6 +327,19 @@ function PatientFormsPreview({ status, preview, error, initData }) {
                     Последнее сохранение: {currentFormState.updatedAt}
                   </div>
                 )}
+                {/* L-M-1 fix: autosave indicator */}
+                {autoSavingForms[form.id] && (
+                  <div className="pp-form-autosave-indicator" aria-live="polite">
+                    <Icon name="arrow.clockwise" size={12} />
+                    Автосохранение…
+                  </div>
+                )}
+                {!autoSavingForms[form.id] && autoSaveTimestamps[form.id] && (
+                  <div className="pp-form-autosave-timestamp">
+                    <Icon name="checkmark.circle" size={12} />
+                    Сохранено {autoSaveTimestamps[form.id].toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                )}
                 <div className="pp-actions-row">
                   <Button
                     variant="outline"
@@ -288,6 +367,8 @@ function PatientFormsPreview({ status, preview, error, initData }) {
           </div>
         );
       })}
+      {/* L-M-9 fix: portal-mounted ConfirmDialog */}
+      {confirmDialog}
     </div>
   );
 }

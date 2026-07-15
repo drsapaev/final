@@ -6,7 +6,7 @@
 > отдельного scope за пределами точечного UI-fix.
 
 **Обновлено:** 2026-07-15
-**Активных задач:** 6
+**Активных задач:** 6 (DEFER-001 закрыт в PR #2299; DEFER-007 добавлен)
 
 ---
 
@@ -19,19 +19,6 @@
 ---
 
 ## Активные задачи
-
-### DEFER-001 — DoctorPanels.contract.test.jsx failure (DoctorPanel.jsx structure drift)
-
-- **Источник:** Doctor Panel audit (Batch H-30, PR #2292)
-- **Симптом:** Тест `keeps the active doctor queue page action visibility backend-owned` падает с `expected -1 to be greater than or equal to 0` — `extractBlock` не находит маркер `Backend-owned queue action contract` в `DoctorPanel.jsx`.
-- **Почему отложено:** Тест привязан к конкретной строке-маркеру, который был удалён в H-30 refactor (inline-очередь заменена на `<DoctorQueuePanel>`). Нужно либо:
-  1. Восстановить маркер в DoctorPanel.jsx, ИЛИ
-  2. Обновить тест, чтобы он искал контракт в `components/doctor/DoctorQueuePanel.jsx` (где сейчас живёт код).
-- **Что нужно:** Прочитать DoctorQueuePanel.jsx, понять где именно living `hasBackendQueueAction(entry, 'no_show', 'can_no_show')` и др., обновить extractBlock-маркеры в тесте.
-- **Сложность:** Low (1-2 часа).
-- **Блокирует:** Чистый CI на main (сейчас 1 test failure visible).
-
----
 
 ### DEFER-002 — MediLabDemo.jsx dead demo page (L-L-3)
 
@@ -106,9 +93,28 @@
 
 ---
 
+### DEFER-007 — Optimistic locking для PatientFormsPreview (P-H-7)
+
+- **Источник:** Patient Panel audit (P-H-7)
+- **Симптом:** `PatientFormsPreview.handleSave` отправляет answers без `expected_updated_at` — если backend обновил form schema параллельно, произойдёт silent overwrite. В Lab мы добавили `expected_updated_at` (WF-06) для `labReportingApi.updateInstance`.
+- **Почему отложено:** Нужно backend-изменение — endpoint `/telegram/mini-app/forms/submissions` должен принимать `expected_updated_at` и возвращать 409 Conflict при stale-data. Сейчас этого нет в контракте.
+- **Что нужно:**
+  1. Backend: добавить `expected_updated_at` param в POST `/telegram/mini-app/forms/submissions`
+  2. Backend: возвращать 409 + `{ detail: { reason: 'form_schema_changed' } }` при конфликте
+  3. Frontend: передавать `form.updated_at` в payload
+  4. Frontend: обрабатывать 409 — показывать "Форма изменилась, перезагрузите"
+- **Сложность:** Medium (backend + frontend, 4-6 часов).
+- **Блокирует:** Data-integrity при параллельном редактировании формы.
+
+---
+
 ## Выполнено
 
-*(пусто — задачи переносятся сюда после завершения)*
+### DEFER-001 — DoctorPanels.contract.test.jsx failure (РЕШЕНО в PR #2299)
+
+- **Источник:** Doctor Panel audit (Batch H-30, PR #2292)
+- **Решение:** PR #2299 обновил тест — marкеры ищут контракт в `components/doctor/DoctorQueuePanel.jsx` вместо `DoctorPanel.jsx`.
+- **Статус:** ✅ Закрыто (2026-07-15)
 
 ---
 

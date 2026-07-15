@@ -546,6 +546,71 @@
   color: var(--mac-text-muted);
 }
 
+/* L-M-1 fix: autosave indicators */
+.pp-form-autosave-indicator,
+.pp-form-autosave-timestamp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-muted);
+}
+
+.pp-form-autosave-indicator {
+  color: var(--mac-accent);
+}
+
+.pp-form-autosave-indicator svg {
+  animation: pp-autosave-spin 1s linear infinite;
+}
+
+.pp-form-autosave-timestamp svg {
+  color: var(--mac-success, #15803d);
+}
+
+@keyframes pp-autosave-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-form-autosave-indicator svg {
+    animation: none;
+  }
+}
+
+/* ─── Breadcrumb (L-M-7 fix) ─── */
+.pp-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+  flex-wrap: wrap;
+}
+
+.pp-breadcrumb-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mac-accent);
+  font: inherit;
+  padding: 0;
+}
+
+.pp-breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.pp-breadcrumb-separator {
+  color: var(--mac-text-muted);
+}
+
+.pp-breadcrumb-current {
+  color: var(--mac-text-primary);
+  font-weight: 500;
+}
+
 /* ─── Section tabs (L-H-6 fix: tablist-pattern) ─── */
 .pp-tablist {
   display: flex;

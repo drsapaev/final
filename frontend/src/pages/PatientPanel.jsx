@@ -59,27 +59,45 @@ const PatientPanel = () => {
   const [formsInitData, setFormsInitData] = useState('');
 
   // P1 fix: backend endpoints /patients/appointments and /patients/results
+  // L-M-6 fix: добавлены loading + error states для graceful degradation.
+  // Раньше sync exception (token expired) мог упасть вне try/catch.
+  // Теперь loadPatientData оборачивает каждый API-вызов индивидуально.
   const [appointments, setAppointments] = useState([]);
   const [results, setResults] = useState([]);
+  const [patientDataLoading, setPatientDataLoading] = useState(true);
+  const [patientDataError, setPatientDataError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadPatientData() {
-      try {
-        const [apptRes, resultsRes] = await Promise.allSettled([
-          api.get('/patients/appointments'),
-          api.get('/patients/results'),
-        ]);
-        if (cancelled) return;
-        if (apptRes.status === 'fulfilled') {
-          setAppointments(Array.isArray(apptRes.value.data) ? apptRes.value.data : []);
+      setPatientDataLoading(true);
+      setPatientDataError('');
+
+      // L-M-6 fix: каждый API-вызов в своём try/catch — sync exceptions
+      // (token expired, network error) не валит весь loader.
+      const safeFetch = async (url, setter, label) => {
+        try {
+          const response = await api.get(url);
+          if (!cancelled) {
+            setter(Array.isArray(response.data) ? response.data : []);
+          }
+        } catch (error) {
+          logger.error(`[PatientPanel] Failed to load ${label}:`, error);
+          // Не показываем error если это просто 401 (пользователь не авторизован)
+          if (error?.response?.status !== 401) {
+            setPatientDataError(`Не удалось загрузить ${label}. Обновите страницу.`);
+          }
         }
-        if (resultsRes.status === 'fulfilled') {
-          setResults(Array.isArray(resultsRes.value.data) ? resultsRes.value.data : []);
-        }
-      } catch (error) {
-        logger.error('Error loading patient data:', error);
+      };
+
+      await Promise.allSettled([
+        safeFetch('/patients/appointments', setAppointments, 'записи'),
+        safeFetch('/patients/results', setResults, 'результаты'),
+      ]);
+
+      if (!cancelled) {
+        setPatientDataLoading(false);
       }
     }
 
@@ -87,7 +105,6 @@ const PatientPanel = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const hasPatientData = appointments.length > 0 || results.length > 0;
   const sectionConfig = PATIENT_SECTIONS[activeSection];
   const isSectionMode = Boolean(sectionConfig);
   const sectionTitle = sectionConfig?.title || 'Главная пациента';
@@ -214,6 +231,23 @@ const PatientPanel = () => {
             Раньше state `query` обновлялся, но не использовался для фильтрации.
             Search будет добавлен когда появится реальный search-target. */}
 
+        {/* L-M-7 fix: breadcrumb для wayfinding. Показывает путь:
+            Главная › {Название секции}. Помогает пациенту понять,
+            где он находится и как вернуться назад. */}
+        {isSectionMode && (
+          <nav className="pp-breadcrumb" aria-label="Навигация">
+            <button
+              type="button"
+              onClick={() => switchSection('home')}
+              className="pp-breadcrumb-link"
+            >
+              Главная
+            </button>
+            <span className="pp-breadcrumb-separator" aria-hidden="true">›</span>
+            <span className="pp-breadcrumb-current">{sectionTitle}</span>
+          </nav>
+        )}
+
         <div id="pp-tabpanel" role="tabpanel" tabIndex={0}>
           {isSectionMode ? (
             <Card className="pp-card" data-testid={`patient-section-${activeSection}`}>
@@ -308,16 +342,29 @@ const PatientPanel = () => {
           )}
         </div>
 
-        {/* L-H-3 fix: подсказка для Quick Action вместо мёртвого disabled-button.
-            Показываем контекстную подсказку вместо disabled-кнопки без объяснения. */}
-        {!hasPatientData && (
+        {/* L-M-6 fix: loading + error states для patient data.
+            Заменяет старую подсказку "Данные загружаются" (которая показывалась
+            всегда когда нет данных, даже после ошибки). */}
+        {patientDataLoading && !isSectionMode && (
+          <Card className="pp-card">
+            <div className="pp-card-body">
+              <PanelEmptyState
+                icon="arrow.clockwise"
+                title="Данные пациента загружаются"
+                description="Записи и результаты появятся после загрузки. Используйте вкладки выше для доступа к защищённым разделам."
+                variant="loading"
+              />
+            </div>
+          </Card>
+        )}
+        {patientDataError && !patientDataLoading && (
           <Card className="pp-card">
             <div className="pp-card-body">
               <PanelEmptyState
                 icon="exclamationmark.triangle"
-                title="Данные пациента загружаются"
-                description="Записи и результаты появятся после загрузки. Используйте вкладки выше для доступа к защищённым разделам."
-                variant="loading"
+                title="Ошибка загрузки"
+                description={patientDataError}
+                variant="error"
               />
             </div>
           </Card>
