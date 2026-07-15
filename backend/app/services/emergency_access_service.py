@@ -76,10 +76,7 @@ def issue_emergency_token(
     db.add(token)
     db.commit()
 
-    logger.info(
-        "Emergency access token issued (patient_id=%s, issued_by=%s, method=%s)",
-        patient_id, issued_by, verification_method,
-    )
+    logger.info("Emergency access token issued")
 
     return {
         "token": plaintext_token,
@@ -124,7 +121,7 @@ def consume_emergency_token(
     # Check expiry
     now = datetime.now(UTC)
     if now > record.expires_at:
-        logger.warning("Emergency token expired (patient_id=%s)", record.patient_id)
+        logger.warning("Emergency token expired")
         # Mark as used to prevent reuse attempts
         record.used = True
         record.used_at = now
@@ -136,7 +133,7 @@ def consume_emergency_token(
     record.used_at = now
     db.commit()
 
-    logger.info("Emergency token consumed (patient_id=%s)", record.patient_id)
+    logger.info("Emergency token consumed")
 
     return {
         "patient_id": record.patient_id,

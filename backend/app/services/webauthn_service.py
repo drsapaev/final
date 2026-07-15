@@ -150,7 +150,7 @@ def finish_passkey_registration(
     # Clean up challenge
     cache_manager.delete(f"webauthn_reg_challenge:{patient_id}")
 
-    logger.info("Passkey registered for patient_id=%s", patient_id)
+    logger.info("Passkey registered")
     return credential
 
 
@@ -299,7 +299,7 @@ def finish_passkey_authentication(
     db.add(session)
     db.commit()
 
-    logger.info("Passkey authentication successful for patient_id=%s", patient_id)
+    logger.info("Passkey authentication successful")
 
     return {
         "access_token": access_token,
