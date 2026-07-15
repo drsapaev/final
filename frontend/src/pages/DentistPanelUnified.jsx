@@ -43,6 +43,8 @@ import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { printPanelTicket } from '../services/panelPrint';
 import notify from '../services/notify';
+// STRAT#34: useTranslation adapter for confirm/notify i18n.
+import { useTranslation } from '../i18n/adapter';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
@@ -405,6 +407,8 @@ const DentistPanelUnified = () => {
 
   // C-1 (UX audit): confirm hook for visit completion
   const [confirm, confirmDialog] = useConfirm();
+  // STRAT#34: useTranslation adapter for confirm/notify i18n.
+  const { t: tI18n } = useTranslation();
   // C-2 (UX audit): session timeout warning
   const [sessionWarning, setSessionWarning] = useState(null);
 
@@ -412,7 +416,7 @@ const DentistPanelUnified = () => {
     onWarning: () => setSessionWarning({ active: true }),
     onExpired: () => {
       setSessionWarning(null);
-      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      notify.error(tI18n('dental.session_expired'));
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -681,7 +685,7 @@ const DentistPanelUnified = () => {
           const queueEntryId = resolveDoctorQueueEntryId(row);
           if (queueEntryId === null) {
             logger.warn('[Dentist] Cannot start visit without OnlineQueueEntry id', row);
-            notify.error('Cannot start visit without a queue entry id');
+            notify.error(tI18n('dental.no_queue_id_for_visit'));
             break;
           }
           const token = tokenManager.getAccessToken();
@@ -976,7 +980,7 @@ const DentistPanelUnified = () => {
       return;
     }
 
-    notify.info('У пациента нет активного визита. Откройте вкладку «Пациенты» для поиска.');
+    notify.info(tI18n('dental.no_active_visit'));
     handleTabChange('patients');
   };
 
@@ -1060,14 +1064,14 @@ const DentistPanelUnified = () => {
 
   const handleCompleteVisit = async () => {
     if (!selectedPatient) {
-      notify.error('Не выбран пациент для завершения приёма');
+      notify.error(tI18n('dental.no_patient_for_complete'));
       return;
     }
 
     const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
     if (queueEntryId === null) {
       logger.error('[Dentistry] handleCompleteVisit: нет queueEntryId', { selectedPatient });
-      notify.error('Невозможно завершить приём без ID записи в очереди');
+      notify.error(tI18n('dental.no_queue_id_for_complete'));
       return;
     }
 
@@ -1139,7 +1143,7 @@ const DentistPanelUnified = () => {
       logger.info('[Dentistry] handleCompleteVisit: payload', visitPayload);
       await queueService.completeVisit(queueEntryId, visitPayload);
       logger.info('[Dentistry] handleCompleteVisit: completeVisit OK');
-      notify.success('Приём завершён успешно');
+      notify.success(tI18n('dental.visit_completed'));
 
       // Сброс состояния
       setSelectedPatient(null);
@@ -1219,7 +1223,7 @@ const DentistPanelUnified = () => {
   const handleVisitProtocol = async (patient) => {
     const visitId = patient?.visit_id || await ensureCanonicalVisitId(patient);
     if (!visitId) {
-      notify.error('Для протокола визита нужен канонический visit_id. Откройте пациента из вкладки "Записи".');
+      notify.error(tI18n('dental.protocol_needs_visit_id'));
       return;
     }
 
@@ -1382,7 +1386,7 @@ const DentistPanelUnified = () => {
     const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id, protocolRecord);
 
     if (!backendProtocol && !protocolRecord?.visitData) {
-      notify.error('Не удалось открыть протокол визита: данные не найдены.');
+      notify.error(tI18n('dental.protocol_not_found'));
       return;
     }
 
@@ -1413,7 +1417,7 @@ const DentistPanelUnified = () => {
   const handleTreatmentPlanner = async (patient) => {
     const visitId = patient?.visit_id || await ensureCanonicalVisitId(patient);
     if (!visitId) {
-      notify.error('План лечения требует канонический visit_id. Откройте пациента из вкладки "Записи".');
+      notify.error(tI18n('dental.treatment_plan_needs_visit_id'));
       return;
     }
 
@@ -1767,7 +1771,7 @@ const DentistPanelUnified = () => {
     <DentalTemplatesTab
       onManageTemplates={handleProtocolTemplates}
       templates={[]}
-      onApplyTemplate={() => notify.info('Шаблоны будут реализованы в следующей версии')}
+      onApplyTemplate={() => notify.info(tI18n('dental.templates_future'))}
     />;
   const renderReports = () =>
     <DentalReportsTab
@@ -1831,7 +1835,7 @@ const DentistPanelUnified = () => {
         onSuggestionSelect={(type, suggestion) => {
           logger.info('[Dentistry] AI suggestion:', { type, suggestion });
           if (type === 'icd10') {
-            notify.success('Код МКБ-10 добавлен из AI предложения');
+            notify.success(tI18n('dental.icd_added_from_ai'));
           }
         }} />
 
@@ -2309,7 +2313,7 @@ const DentistPanelUnified = () => {
         <SessionWarningModal
           visible={!!sessionWarning}
           onDismiss={() => setSessionWarning(null)}
-          onExtend={() => notify.info('Продлеваем сессию...')}
+          onExtend={() => notify.info(tI18n('dental.session_extending'))}
         />
       )}
     </div>);
