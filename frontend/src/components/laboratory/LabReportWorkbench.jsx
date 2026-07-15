@@ -33,11 +33,10 @@ import {
 } from './utils/labReportActions';
 import LabStatusStepper from './LabStatusStepper';
 import LabReportActionsBar from './LabReportActionsBar';
-import LabReportHistoryPanel from './LabReportHistoryPanel';
-// P-01 fix: AI-анализ перенесён из LabResultsManager в LabReportWorkbench.
-import LabReportAIAnalysis from './LabReportAIAnalysis';
 // STRAT#24: sections/fields editor extracted to ReportEditor component.
 import ReportEditor from './ReportEditor';
+// STRAT#25: supplementary content (AI + history) grouped in ReportSidebar.
+import ReportSidebar from './ReportSidebar';
 // STRAT#1: state-логика вынесена в useLabReportState hook.
 // Компонент теперь содержит только handlers + JSX. Это уменьшает
 // god-компонент на ~200 строк и изолирует state для тестирования.
@@ -732,12 +731,7 @@ export default function LabReportWorkbench({
                       Использует patient_snapshot из activeInstance — отдельный
                       запрос GET /patients/{id} не нужен. */}
                   {/* PR-61 / Medium-22: AI button styled as secondary (was visually mixed with operational buttons) */}
-                  <span style={{ opacity: 0.85, borderLeft: '1px solid var(--mac-border)', paddingLeft: 'var(--mac-spacing-2)' }}>
-                  <LabReportAIAnalysis
-                    activeInstance={activeInstance}
-                    notify={notify}
-                  />
-                  </span>
+                  {/* STRAT#25: AI analysis moved to ReportSidebar — rendered after the editor card. */}
                 </div>
               </div>
 
@@ -850,18 +844,17 @@ export default function LabReportWorkbench({
         </CardContent>
       </Card>
 
-      {(showRecentReportsBrowser || reportHistory.length > 0) && (
-        // P-04 fix: панель истории вынесена в LabReportHistoryPanel
-        <LabReportHistoryPanel
-          showRecentReportsBrowser={showRecentReportsBrowser}
-          recentReports={recentReports}
-          reportHistory={reportHistory}
-          historySeverityFilter={historySeverityFilter}
-          onSeverityFilterChange={setHistorySeverityFilter}
-          activeInstanceId={activeInstance?.id}
-          onOpenInstance={onOpenInstance}
-        />
-      )}
+      {/* STRAT#25: supplementary content (AI analysis + history) grouped in ReportSidebar */}
+      <ReportSidebar
+        activeInstance={activeInstance}
+        notify={notify}
+        showRecentReportsBrowser={showRecentReportsBrowser}
+        recentReports={recentReports}
+        reportHistory={reportHistory}
+        historySeverityFilter={historySeverityFilter}
+        onSeverityFilterChange={setHistorySeverityFilter}
+        onOpenInstance={onOpenInstance}
+      />
       {/* WF-08 fix: portal-mounted ConfirmDialog для irreversible actions */}
       {confirmDialog}
     </div>
