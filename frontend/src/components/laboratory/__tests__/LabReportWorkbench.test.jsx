@@ -273,7 +273,8 @@ describe('LabReportWorkbench', () => {
     const fnBody = source.slice(fnStart, fnEnd);
 
     expect(fnBody).toContain('await confirm(');
-    expect(fnBody).toContain("'Отправка результатов пациенту'");
+    // STRAT#9: строка мигрирована на t('confirm.notify_title')
+    expect(fnBody).toContain("t('confirm.notify_title')");
     expect(fnBody).toContain("intent: 'warning'");
     // Действие не должно выполняться без подтверждения
     expect(fnBody).toContain('if (!ok) return;');
@@ -296,5 +297,44 @@ describe('LabReportWorkbench', () => {
     expect(source).toContain('только для чтения — отчёт утверждён');
     // Все 4 signer поля внутри details
     expect(source).toContain("'lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'");
+  });
+
+  it('STRAT#9: all 3 confirm dialogs use t() from labTranslations', () => {
+    // STRAT#9: finalize, revise, notify dialogs мигрированы на t()
+    const source = fs.readFileSync(workbenchPath, 'utf8');
+
+    // Import
+    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('import { t }');
+
+    // Finalize dialog
+    expect(source).toContain("t('confirm.finalize_title')");
+    expect(source).toContain("t('confirm.finalize_message')");
+    expect(source).toContain("t('confirm.finalize_description')");
+    expect(source).toContain("t('confirm.finalize_confirm')");
+
+    // Revise dialog
+    expect(source).toContain("t('confirm.revise_title')");
+    expect(source).toContain("t('confirm.revise_message')");
+    expect(source).toContain("t('confirm.revise_description')");
+    expect(source).toContain("t('confirm.revise_confirm')");
+
+    // Notify dialog
+    expect(source).toContain("t('confirm.notify_title')");
+    expect(source).toContain("t('confirm.notify_message')");
+    expect(source).toContain("t('confirm.notify_description')");
+    expect(source).toContain("t('confirm.notify_confirm')");
+
+    // Все dialogs используют общий cancel label
+    expect(source).toContain("t('confirm.cancel')");
+
+    // Больше нет хардкоженных русских строк в confirm() calls
+    expect(source).not.toContain("title: 'Утверждение отчёта'");
+    expect(source).not.toContain("title: 'Создание исправленной версии'");
+    expect(source).not.toContain("title: 'Отправка результатов пациенту'");
+    expect(source).not.toContain("confirmLabel: 'Утвердить'");
+    expect(source).not.toContain("confirmLabel: 'Создать версию'");
+    expect(source).not.toContain("confirmLabel: 'Отправить'");
+    expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
 });
