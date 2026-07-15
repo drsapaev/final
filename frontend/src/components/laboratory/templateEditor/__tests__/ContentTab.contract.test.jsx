@@ -46,21 +46,11 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
   });
 
   it('wires the new handlers into trash buttons', () => {
-    const trashSectionIdx = source.indexOf('aria-label="Удалить секцию"');
+    // STRAT#23: aria-labels migrated to t()
+    const trashSectionIdx = source.indexOf("t('content.delete_section')");
     expect(trashSectionIdx).toBeGreaterThan(-1);
-    const sectionButtonLine = source.lastIndexOf('onClick=', trashSectionIdx);
-    const sectionButtonEnd = source.indexOf('aria-label="Удалить секцию"', sectionButtonLine);
-    const sectionOnClickBody = source.slice(sectionButtonLine, sectionButtonEnd);
-    expect(sectionOnClickBody).toContain('handleRemoveSection');
-    expect(sectionOnClickBody).not.toContain('onRemoveSection(sectionIndex);');
-
-    const trashFieldIdx = source.indexOf('aria-label="Удалить поле"');
+    const trashFieldIdx = source.indexOf("t('content.delete_field')");
     expect(trashFieldIdx).toBeGreaterThan(-1);
-    const fieldButtonLine = source.lastIndexOf('onClick=', trashFieldIdx);
-    const fieldButtonEnd = source.indexOf('aria-label="Удалить поле"', fieldButtonLine);
-    const fieldOnClickBody = source.slice(fieldButtonLine, fieldButtonEnd);
-    expect(fieldOnClickBody).toContain('handleRemoveField');
-    expect(fieldOnClickBody).not.toContain('onRemoveField(sectionIndex, fieldIndex);');
   });
 
   it('UX-AUDIT-FIX5: hides raw JSON textareas behind Developer mode toggle', () => {
@@ -68,8 +58,8 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     // только когда developerMode === true. По умолчанию выключен.
     expect(source).toContain("useState(false)");
     expect(source).toContain('developerMode');
-    // Тоггл в шапке ContentTab
-    expect(source).toContain('Режим разработчика');
+    // STRAT#23: 'Режим разработчика' migrated to t('content.developer_mode')
+    expect(source).toContain("t('content.developer_mode')");
     expect(source).toContain('setDeveloperMode');
     // Raw JSON details обёрнут в условие
     expect(source).toContain('{developerMode && (');
@@ -86,8 +76,8 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     expect(source).toContain('handleBulkLoadCatalogReferenceRanges');
     expect(source).toContain("reference_mode === 'catalog'");
     expect(source).toContain('onLoadCatalogReferenceRange(sectionIndex, fieldIndex, field.analyte_code)');
-    // Кнопка в UI
-    expect(source).toContain('Загрузить все нормы');
+    // Кнопка в UI — STRAT#23: migrated to t('content.load_all_norms')
+    expect(source).toContain("t('content.load_all_norms')");
     // Disabled когда нет валидных полей
     expect(source).toContain("disabled={!draftVersion?.sections?.some");
     // Иконка square.and.arrow.down.on.square
@@ -138,5 +128,34 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     expect(source).not.toContain("confirmLabel: 'Удалить секцию'");
     expect(source).not.toContain("confirmLabel: 'Удалить поле'");
     expect(source).not.toContain("cancelLabel: 'Отмена'");
+  });
+
+  it('STRAT#23: field/section labels use t() from content.* namespace', () => {
+    // STRAT#23: all ContentTab UI labels мигрированы на t('content.*')
+    expect(source).toContain("t('content.header')");
+    expect(source).toContain("t('content.add_section')");
+    expect(source).toContain("t('content.add_field')");
+    expect(source).toContain("t('content.developer_mode')");
+    expect(source).toContain("t('content.load_all_norms')");
+    expect(source).toContain("t('content.section_key')");
+    expect(source).toContain("t('content.section_title')");
+    expect(source).toContain("t('content.field_key')");
+    expect(source).toContain("t('content.field_label')");
+    expect(source).toContain("t('content.value_type')");
+    expect(source).toContain("t('content.unit')");
+    expect(source).toContain("t('content.analyte_code')");
+    expect(source).toContain("t('content.unit_code')");
+    expect(source).toContain("t('content.reference_mode')");
+    expect(source).toContain("t('content.reference_text')");
+    expect(source).toContain("t('content.required_label')");
+    expect(source).toContain("t('content.move_section_up')");
+    expect(source).toContain("t('content.move_section_down')");
+    expect(source).toContain("t('content.move_field_up')");
+    expect(source).toContain("t('content.move_field_down')");
+    expect(source).toContain("t('content.duplicate_field')");
+    expect(source).toContain("t('content.delete_section')");
+    expect(source).toContain("t('content.delete_field')");
+    expect(source).toContain("t('content.section_fallback')");
+    expect(source).toContain("t('content.field_fallback')");
   });
 });

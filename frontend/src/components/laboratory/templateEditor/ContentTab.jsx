@@ -61,7 +61,7 @@ function ContentTab({
 
   async function handleRemoveSection(sectionIndex, section) {
     // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
-    const sectionName = section?.title || section?.key || `Секция #${sectionIndex + 1}`;
+    const sectionName = section?.title || section?.key || `${t('content.section_fallback')} #${sectionIndex + 1}`;
     const ok = await confirm({
       title: t('confirm.delete_section_title'),
       message: tInterpolate('confirm.delete_section_message', { name: sectionName }),
@@ -75,7 +75,7 @@ function ContentTab({
 
   async function handleRemoveField(sectionIndex, fieldIndex, field) {
     // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
-    const fieldName = field?.label || field?.field_key || `Поле #${fieldIndex + 1}`;
+    const fieldName = field?.label || field?.field_key || `${t('content.field_fallback')} #${fieldIndex + 1}`;
     const ok = await confirm({
       title: t('confirm.delete_field_title'),
       message: tInterpolate('confirm.delete_field_message', { name: fieldName }),
@@ -119,7 +119,7 @@ function ContentTab({
     <div className="ltw-grid">
       <div className="ltw-flex-between">
         <div className="ltw-fw-600">
-          Секции и показатели ({draftVersion?.sections?.reduce((acc, s) => acc + (s.fields?.length || 0), 0) || 0} показателей в {draftVersion?.sections?.length || 0} секц.)
+          {t('content.header')} ({draftVersion?.sections?.reduce((acc, s) => acc + (s.fields?.length || 0), 0) || 0} {t('content.header_fields')} {draftVersion?.sections?.length || 0} {t('content.header_sections')})
         </div>
         <span className="ltw-flex-gap-4" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           {/* UX-AUDIT-FIX5: Developer mode toggle. По умолчанию выключен —
@@ -127,19 +127,19 @@ function ContentTab({
           <label
             className="ltw-checkbox-label"
             style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', fontSize: '0.85em', opacity: 0.85 }}
-            title="Показать raw JSON правил видимости и подсветки для каждого поля. Только для продвинутых пользователей."
+            title={t('content.developer_mode_title')}
           >
             <input
               type="checkbox"
               checked={developerMode}
               onChange={(e) => setDeveloperMode(e.target.checked)}
-              aria-label="Режим разработчика (raw JSON правил)"
+              aria-label={t('content.developer_mode_aria')}
             />
-            Режим разработчика
+            {t('content.developer_mode')}
           </label>
           <Button variant="outline" onClick={onAddSection}>
             <Icon name="plus" size={16} />
-            Добавить секцию
+            {t('content.add_section')}
           </Button>
           {/* UX-AUDIT-FIX7: Bulk-кнопка для загрузки всех референсных
               интервалов из каталога одним кликом. Показывается всегда,
@@ -154,10 +154,10 @@ function ContentTab({
                 f.reference_mode === 'catalog' && f.analyte_code
               )
             )}
-            title="Загрузить референсные интервалы из каталога для всех полей, у которых указан код аналита"
+            title={t('content.load_all_norms_title')}
           >
             <Icon name="square.and.arrow.down.on.square" size={14} />
-            Загрузить все нормы
+            {t('content.load_all_norms')}
           </Button>
         </span>
       </div>
@@ -171,21 +171,21 @@ function ContentTab({
               className={`ltw-section-header ${isSectionExpanded ? 'ltw-section-header-expanded' : ''}`}
               onClick={() => onToggleSection(sectionIndex)}
               aria-expanded={isSectionExpanded}
-              aria-label={`Секция: ${section.title || section.key}`}
+              aria-label={`${t('content.section_aria')}: ${section.title || section.key}`}
             >
               <div className="ltw-flex-center">
                 <Icon name={isSectionExpanded ? 'chevron.down' : 'chevron.right'} size={16} />
                 <span className="ltw-section-title">{section.title || section.key}</span>
-                <Badge variant="default">{section.fields.length} полей</Badge>
+                <Badge variant="default">{section.fields.length} {t('content.section_fields_count')}</Badge>
               </div>
               <span className="ltw-flex-gap-4">
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'up'); }} disabled={sectionIndex === 0} aria-label="Переместить секцию вверх">
+                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'up'); }} disabled={sectionIndex === 0} aria-label={t('content.move_section_up')}>
                   <Icon name="arrow.up" size={14} />
                 </Button>
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'down'); }} disabled={sectionIndex === draftVersion.sections.length - 1} aria-label="Переместить секцию вниз">
+                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'down'); }} disabled={sectionIndex === draftVersion.sections.length - 1} aria-label={t('content.move_section_down')}>
                   <Icon name="arrow.down" size={14} />
                 </Button>
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveSection(sectionIndex, section); }} aria-label="Удалить секцию">
+                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveSection(sectionIndex, section); }} aria-label={t('content.delete_section')}>
                   <Icon name="trash" size={14} />
                 </Button>
               </span>
@@ -195,12 +195,12 @@ function ContentTab({
               <div className="ltw-section-content">
                 <div className="ltw-grid-2">
                   <label className="ltw-grid-6">
-                    <span>Ключ секции</span>
-                    <input className="macos-input" aria-label="Ключ секции" value={section.key} onChange={(event) => onUpdateSection(sectionIndex, 'key', event.target.value)} />
+                    <span>{t('content.section_key')}</span>
+                    <input className="macos-input" aria-label={t('content.section_key')} value={section.key} onChange={(event) => onUpdateSection(sectionIndex, 'key', event.target.value)} />
                   </label>
                   <label className="ltw-grid-6">
-                    <span>Заголовок секции</span>
-                    <input className="macos-input" aria-label="Заголовок секции" value={section.title || ''} onChange={(event) => onUpdateSection(sectionIndex, 'title', event.target.value)} />
+                    <span>{t('content.section_title')}</span>
+                    <input className="macos-input" aria-label={t('content.section_title')} value={section.title || ''} onChange={(event) => onUpdateSection(sectionIndex, 'title', event.target.value)} />
                   </label>
                 </div>
 
@@ -215,25 +215,25 @@ function ContentTab({
                           className={`ltw-field-header ${isFieldExpanded ? 'ltw-field-header-expanded' : ''}`}
                           onClick={() => onToggleField(sectionIndex, fieldIndex)}
                           aria-expanded={isFieldExpanded}
-                          aria-label={`Поле: ${field.label || field.field_key}`}
+                          aria-label={`${t('content.field_aria')}: ${field.label || field.field_key}`}
                         >
                           <div className="ltw-flex-center">
                             <Icon name={isFieldExpanded ? 'chevron.down' : 'chevron.right'} size={14} />
-                            <span className="ltw-field-title">{field.label || field.field_key || '(без названия)'}</span>
+                            <span className="ltw-field-title">{field.label || field.field_key || t('content.field_no_title')}</span>
                             <Badge variant="info">{fieldTypeOptions.find((o) => o.value === field.value_type)?.label || field.value_type}</Badge>
-                            {field.required && <Badge variant="warning">обязательное</Badge>}
+                            {field.required && <Badge variant="warning">{t('content.field_required')}</Badge>}
                           </div>
                           <span className="ltw-flex-gap-4">
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'up'); }} disabled={fieldIndex === 0} aria-label="Переместить поле вверх">
+                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'up'); }} disabled={fieldIndex === 0} aria-label={t('content.move_field_up')}>
                               <Icon name="arrow.up" size={12} />
                             </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'down'); }} disabled={fieldIndex === section.fields.length - 1} aria-label="Переместить поле вниз">
+                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'down'); }} disabled={fieldIndex === section.fields.length - 1} aria-label={t('content.move_field_down')}>
                               <Icon name="arrow.down" size={12} />
                             </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onDuplicateField(sectionIndex, fieldIndex); }} aria-label="Дублировать поле">
+                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onDuplicateField(sectionIndex, fieldIndex); }} aria-label={t('content.duplicate_field')}>
                               <Icon name="doc.on.doc" size={12} />
                             </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field); }} aria-label="Удалить поле">
+                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field); }} aria-label={t('content.delete_field')}>
                               <Icon name="trash" size={12} />
                             </Button>
                           </span>
@@ -243,51 +243,51 @@ function ContentTab({
                           <div className="ltw-field-content">
                             <div className="ltw-grid-4">
                               <label className="ltw-grid-6">
-                                <span>Ключ поля</span>
-                                <input className="macos-input" aria-label="Ключ поля" value={field.field_key} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
+                                <span>{t('content.field_key')}</span>
+                                <input className="macos-input" aria-label={t('content.field_key')} value={field.field_key} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
                               </label>
                               <label className="ltw-grid-6">
-                                <span>Название поля</span>
-                                <input className="macos-input" aria-label="Название поля" value={field.label} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
+                                <span>{t('content.field_label')}</span>
+                                <input className="macos-input" aria-label={t('content.field_label')} value={field.label} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
                               </label>
                               <label className="ltw-grid-6">
-                                <span>Тип значения</span>
-                                <select className="macos-input" aria-label="Тип значения" value={field.value_type} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'value_type', event.target.value)}>
+                                <span>{t('content.value_type')}</span>
+                                <select className="macos-input" aria-label={t('content.value_type')} value={field.value_type} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'value_type', event.target.value)}>
                                   {fieldTypeOptions.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                   ))}
                                 </select>
                               </label>
                               <label className="ltw-grid-6">
-                                <span>Единица измерения</span>
-                                <input className="macos-input" aria-label="Единица измерения" value={field.unit || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
+                                <span>{t('content.unit')}</span>
+                                <input className="macos-input" aria-label={t('content.unit')} value={field.unit || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
                               </label>
                             </div>
 
                             <div className="ltw-grid-5">
                               <label className="ltw-grid-6">
-                                <span>Код анализируемого показателя</span>
+                                <span>{t('content.analyte_code')}</span>
                                 <input
                                   className="macos-input"
-                                  aria-label="Код анализируемого показателя"
+                                  aria-label={t('content.analyte_code')}
                                   list={analyteCatalogId}
                                   value={field.analyte_code || ''}
                                   onChange={(event) => onUpdateFieldCatalog(sectionIndex, fieldIndex, 'analyte_code', event.target.value)}
                                 />
                               </label>
                               <label className="ltw-grid-6">
-                                <span>Код единицы измерения</span>
+                                <span>{t('content.unit_code')}</span>
                                 <input
                                   className="macos-input"
-                                  aria-label="Код единицы измерения"
+                                  aria-label={t('content.unit_code')}
                                   list={unitCatalogId}
                                   value={field.unit_code || ''}
                                   onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'unit_code', event.target.value)}
                                 />
                               </label>
                               <label className="ltw-grid-6">
-                                <span>Источник нормы</span>
-                                <select className="macos-input" aria-label="Источник нормы" value={field.reference_mode} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'reference_mode', event.target.value)}>
+                                <span>{t('content.reference_mode')}</span>
+                                <select className="macos-input" aria-label={t('content.reference_mode')} value={field.reference_mode} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'reference_mode', event.target.value)}>
                                   {referenceModeOptions.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                   ))}
@@ -301,22 +301,22 @@ function ContentTab({
                                     onClick={() => onLoadCatalogReferenceRange(sectionIndex, fieldIndex, field.analyte_code)}
                                   >
                                     <Icon name="square.and.arrow.down.on.square" size={14} />
-                                    Загрузить из каталога
+                                    {t('content.load_from_catalog')}
                                   </Button>
                                 </div>
                               )}
                               {field.reference_mode === 'catalog' && !field.analyte_code && (
                                 <span className="ltw-catalog-hint">
-                                  Укажите код аналита для загрузки нормы из каталога
+                                  {t('content.catalog_hint')}
                                 </span>
                               )}
                               <label className="ltw-grid-6">
-                                <span>Текст нормы</span>
-                                <input className="macos-input" aria-label="Текст нормы" value={field.reference_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
+                                <span>{t('content.reference_text')}</span>
+                                <input className="macos-input" aria-label={t('content.reference_text')} value={field.reference_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
                               </label>
                               <label className="ltw-checkbox-label">
-                                <input type="checkbox" aria-label="Обязательное поле" checked={Boolean(field.required)} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
-                                Обязательное
+                                <input type="checkbox" aria-label={t('content.required_aria')} checked={Boolean(field.required)} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
+                                {t('content.required_label')}
                               </label>
                             </div>
 
@@ -351,7 +351,7 @@ function ContentTab({
                   })}
                   <Button variant="outline" onClick={() => onAddField(sectionIndex)}>
                     <Icon name="plus" size={16} />
-                    Добавить показатель
+                    {t('content.add_field')}
                   </Button>
                 </div>
               </div>
