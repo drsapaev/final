@@ -119,9 +119,10 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ---
 
-### M4-P0-3 — Session fixation protection
+### M4-P0-3 — Session fixation protection ✅ DONE
 
 **Серьёзность:** P0 (security)
+**Статус:** ✅ Реализовано (PR pending)
 **Файлы:**
 - `backend/app/services/auth_svc/_tokens.py:291-314` — обычный login создаёт новую сессию, **не отзывает старые**
 - `backend/app/services/auth_svc/_tokens.py:372-387` — refresh-token reuse detection существует (✅), но только для refresh, не для login

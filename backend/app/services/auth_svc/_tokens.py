@@ -289,6 +289,12 @@ class TokensMixin(AuthenticationServiceMixinBase):
             }
 
         # Иначе — обычная выдача токенов
+        # M4-P0-3: Session fixation protection — revoke all existing sessions
+        # before creating a new one. Prevents stolen sessions from remaining
+        # valid after a fresh login.
+        if getattr(settings, "REVOKE_SESSIONS_ON_NEW_LOGIN", True):
+            self._revoke_all_user_sessions(db, user.id, reason="new_login")
+
         jti = str(uuid.uuid4())
         access_token = self.create_access_token(
             {
@@ -539,5 +545,58 @@ class TokensMixin(AuthenticationServiceMixinBase):
             logger.error(f"Error logging out user: {e}")
             db.rollback()
             return {"success": False, "message": "Ошибка выхода"}
+
+    def _revoke_all_user_sessions(
+        self, db: Session, user_id: int, *, reason: str = "unspecified"
+    ) -> int:
+        """M4-P0-3: Revoke all active sessions + refresh tokens for a user.
+
+        Used for session fixation protection on new login.
+        Returns the number of sessions revoked.
+
+        Args:
+            db: SQLAlchemy session
+            user_id: User whose sessions to revoke
+            reason: Audit reason (e.g. 'new_login', 'security_alert')
+        """
+        try:
+            now = datetime.now(UTC)
+
+            # Revoke all active refresh tokens
+            refresh_count = (
+                db.query(RefreshToken)
+                .filter(
+                    RefreshToken.user_id == user_id,
+                    RefreshToken.revoked == False,
+                )
+                .update({"revoked": True, "revoked_at": now})
+            )
+
+            # Revoke all active user sessions
+            session_count = (
+                db.query(UserSession)
+                .filter(
+                    UserSession.user_id == user_id,
+                    UserSession.revoked == False,
+                )
+                .update({"revoked": True, "revoked_at": now})
+            )
+
+            db.commit()
+
+            if refresh_count > 0 or session_count > 0:
+                logger.info(
+                    "Revoked %d sessions and %d refresh tokens for user_id (reason=%s)",
+                    session_count,
+                    refresh_count,
+                    reason,
+                )
+
+            return session_count
+
+        except Exception as e:
+            logger.error("Error revoking user sessions: %s", e)
+            db.rollback()
+            return 0
 
 

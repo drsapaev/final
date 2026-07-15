@@ -154,7 +154,12 @@ def exchange_init_data_for_jwt(
         algorithm=PATIENT_JWT_ALGORITHM,
     )
 
-    # Step 5: Store UserSession for revocation capability
+    # Step 5: M4-P0-3 — Revoke previous patient sessions for this telegram_user_id
+    # before creating a new one. This prevents session fixation: if a patient
+    # re-authenticates, old sessions are invalidated.
+    _revoke_previous_patient_sessions(db, scope.patient_id)
+
+    # Step 6: Store UserSession for revocation capability
     user_session = UserSession(
         # user_id is required by model — use patient_id as a placeholder.
         # In a future migration, we may add patient_sessions table.
@@ -214,3 +219,50 @@ def verify_patient_jwt(token: str) -> dict[str, Any] | None:
     except jwt.InvalidTokenError:
         logger.warning("Invalid patient JWT")
         return None
+
+
+def _revoke_previous_patient_sessions(db: Session, patient_id: int | None) -> int:
+    """M4-P0-3: Revoke all previous patient sessions before issuing a new JWT.
+
+    Patient sessions are stored in UserSession with negative user_id
+    (e.g. user_id=-42 for patient_id=42). This function revokes all
+    active sessions for that patient before a new JWT exchange.
+
+    Args:
+        db: SQLAlchemy session
+        patient_id: Patient whose sessions to revoke
+
+    Returns:
+        Number of sessions revoked.
+    """
+    if patient_id is None:
+        return 0
+
+    try:
+        from datetime import UTC, datetime
+
+        # Patient sessions use negative user_id (see exchange_init_data_for_jwt)
+        patient_session_user_id = -int(patient_id)
+
+        count = (
+            db.query(UserSession)
+            .filter(
+                UserSession.user_id == patient_session_user_id,
+                UserSession.revoked == False,
+            )
+            .update({"revoked": True, "revoked_at": datetime.now(UTC)})
+        )
+        db.commit()
+
+        if count > 0:
+            logger.info(
+                "Revoked %d previous patient sessions before new JWT exchange",
+                count,
+            )
+
+        return count
+
+    except Exception as e:
+        logger.error("Error revoking previous patient sessions: %s", e)
+        db.rollback()
+        return 0
