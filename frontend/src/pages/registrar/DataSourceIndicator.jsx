@@ -9,20 +9,22 @@
 import { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Icon } from '../../components/ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }) => {
+  const { t: tI18n } = useTranslation();
   // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
   // DS-3: inline styles replaced with .registrar-ds-* CSS classes
+  // i18n-unification: hardcoded Russian strings migrated to registrarPanel.* namespace
   if (dataSource === 'error') {
     return (
       <div className="registrar-ds-indicator registrar-ds-error">
         <Icon name="exclamationmark.triangle" size="small" className="registrar-text-white" />
-        <span>Не удалось загрузить записи. Проверьте подключение к серверу.</span>
+        <span>{tI18n('registrarPanel.ds_error_message')}</span>
         <button
           onClick={() => onRetry?.({ source: 'error_refresh_button', force: true })}
           className="registrar-ds-retry-btn">
-          Повторить
+          {tI18n('registrarPanel.ds_retry')}
         </button>
       </div>
     );
@@ -32,9 +34,9 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
     return (
       <div className="registrar-ds-indicator registrar-ds-success">
         <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
-        <span>Данные загружены с сервера</span>
+        <span>{tI18n('registrarPanel.data_source_api')}</span>
         <span className="registrar-ds-count">
-          {count} из {paginationInfo?.total ?? count} записей
+          {count} / {paginationInfo?.total ?? count}
         </span>
       </div>
     );
@@ -44,7 +46,7 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
     return (
       <div className="registrar-ds-indicator registrar-ds-loading">
         <Icon name="arrow.up.arrow.down" size="small" className="registrar-text-white" />
-        <span>Загрузка данных...</span>
+        <span>{tI18n('registrarPanel.loading')}</span>
       </div>
     );
   }

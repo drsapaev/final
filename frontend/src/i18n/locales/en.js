@@ -950,7 +950,9 @@ const en = {
     print_ticket: 'Print ticket',
     auto_refresh: 'Auto-refresh',
     data_source_demo: 'Showing demo data',
-    data_source_api: 'Data loaded from server'
+    data_source_api: 'Data loaded from server',
+    ds_error_message: 'Failed to load records. Check server connection.',
+    ds_retry: 'Retry'
   }
 };
 
