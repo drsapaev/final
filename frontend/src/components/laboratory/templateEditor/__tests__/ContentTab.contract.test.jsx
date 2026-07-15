@@ -26,7 +26,8 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     const handlerBody = source.slice(handlerStart, handlerEnd);
 
     expect(handlerBody).toContain('await confirm(');
-    expect(handlerBody).toContain("'Удалить секцию?'");
+    // STRAT#11: строка мигрирована на t('confirm.delete_section_title')
+    expect(handlerBody).toContain("t('confirm.delete_section_title')");
     expect(handlerBody).toContain("intent: 'danger'");
     expect(handlerBody).toContain('if (ok) onRemoveSection(sectionIndex)');
   });
@@ -38,7 +39,8 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     const handlerBody = source.slice(handlerStart, handlerEnd);
 
     expect(handlerBody).toContain('await confirm(');
-    expect(handlerBody).toContain("'Удалить показатель?'");
+    // STRAT#11: строка мигрирована на t('confirm.delete_field_title')
+    expect(handlerBody).toContain("t('confirm.delete_field_title')");
     expect(handlerBody).toContain("intent: 'danger'");
     expect(handlerBody).toContain('if (ok) onRemoveField(sectionIndex, fieldIndex)');
   });
@@ -108,5 +110,33 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     // PropTypes добавлены
     expect(source).toContain('analyteCatalogId: PropTypes.string');
     expect(source).toContain('unitCatalogId: PropTypes.string');
+  });
+
+  it('STRAT#11: both delete dialogs use t() and tInterpolate() from labTranslations', () => {
+    // STRAT#11: delete section и delete field dialogs мигрированы на t()
+    expect(source).toContain("from '../utils/labTranslations'");
+    expect(source).toContain('import { t, tInterpolate }');
+
+    // Delete section dialog
+    expect(source).toContain("t('confirm.delete_section_title')");
+    expect(source).toContain("tInterpolate('confirm.delete_section_message',");
+    expect(source).toContain("t('confirm.delete_section_description')");
+    expect(source).toContain("t('confirm.delete_section_confirm')");
+
+    // Delete field dialog
+    expect(source).toContain("t('confirm.delete_field_title')");
+    expect(source).toContain("tInterpolate('confirm.delete_field_message',");
+    expect(source).toContain("t('confirm.delete_field_description')");
+    expect(source).toContain("t('confirm.delete_field_confirm')");
+
+    // Общий cancel label
+    expect(source).toContain("t('confirm.cancel')");
+
+    // Больше нет хардкоженных русских строк в confirm() calls
+    expect(source).not.toContain("title: 'Удалить секцию?'");
+    expect(source).not.toContain("title: 'Удалить показатель?'");
+    expect(source).not.toContain("confirmLabel: 'Удалить секцию'");
+    expect(source).not.toContain("confirmLabel: 'Удалить поле'");
+    expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
 });

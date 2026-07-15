@@ -2,6 +2,8 @@ import PropTypes from 'prop-types';
 import { useState } from 'react';
 import { Badge, Button, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
+// STRAT#11: t() и tInterpolate() для i18n — delete dialogs мигрированы.
+import { t, tInterpolate } from '../utils/labTranslations';
 import { fieldTypeOptions, referenceModeOptions } from './config';
 import ReferenceRuleEditor from './ReferenceRuleEditor';
 
@@ -58,28 +60,28 @@ function ContentTab({
   const [developerMode, setDeveloperMode] = useState(false);
 
   async function handleRemoveSection(sectionIndex, section) {
+    // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
+    const sectionName = section?.title || section?.key || `Секция #${sectionIndex + 1}`;
     const ok = await confirm({
-      title: 'Удалить секцию?',
-      message: `«${section?.title || section?.key || `Секция #${sectionIndex + 1}`}» будет удалена со всеми полями и правилами нормы.`,
-      description:
-        'Действие нельзя отменить после сохранения черновика. ' +
-        'Если нужно сохранить структуру — нажмите «Отмена» и сохраните текущий черновик перед удалением.',
-      confirmLabel: 'Удалить секцию',
-      cancelLabel: 'Отмена',
+      title: t('confirm.delete_section_title'),
+      message: tInterpolate('confirm.delete_section_message', { name: sectionName }),
+      description: t('confirm.delete_section_description'),
+      confirmLabel: t('confirm.delete_section_confirm'),
+      cancelLabel: t('confirm.cancel'),
       intent: 'danger',
     });
     if (ok) onRemoveSection(sectionIndex);
   }
 
   async function handleRemoveField(sectionIndex, fieldIndex, field) {
+    // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
+    const fieldName = field?.label || field?.field_key || `Поле #${fieldIndex + 1}`;
     const ok = await confirm({
-      title: 'Удалить показатель?',
-      message: `«${field?.label || field?.field_key || `Поле #${fieldIndex + 1}`}» будет удалён со всеми правилами нормы.`,
-      description:
-        'Действие нельзя отменить после сохранения черновика. ' +
-        'Если нужно сохранить поле — нажмите «Отмена».',
-      confirmLabel: 'Удалить поле',
-      cancelLabel: 'Отмена',
+      title: t('confirm.delete_field_title'),
+      message: tInterpolate('confirm.delete_field_message', { name: fieldName }),
+      description: t('confirm.delete_field_description'),
+      confirmLabel: t('confirm.delete_field_confirm'),
+      cancelLabel: t('confirm.cancel'),
       intent: 'danger',
     });
     if (ok) onRemoveField(sectionIndex, fieldIndex);
