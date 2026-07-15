@@ -569,15 +569,6 @@ const TRANSLATIONS = {
     age_not_set: 'Не указан',
     status_active_label: 'Активный',
     status_waiting_label: 'Ожидает',
-    appointments_not_found: 'Записи не найдены',
-    no_appointments_filtered: 'По текущему поиску или фильтру нет записей.',
-    no_appointments_empty: 'Нет реальных записей для отображения. Создайте визит через регистратуру, очередь или кнопку назначения следующего визита.',
-    patient_initial: 'П',
-    unknown: 'Неизвестно',
-    phone_not_set: 'Телефон не указан',
-    age_not_set: 'Не указан',
-    status_active_label: 'Активный',
-    status_waiting_label: 'Ожидает',
   },
   // ─── Admin (STRAT#36) ────────────────────────────────────────────────────
   admin: {
