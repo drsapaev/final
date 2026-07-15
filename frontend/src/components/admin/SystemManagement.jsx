@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import {
   Server,
@@ -42,6 +42,7 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 const SystemManagement = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('monitoring');

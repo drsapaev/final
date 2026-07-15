@@ -24,7 +24,7 @@ import {
   savePaymentProviderSettings,
   testPaymentProviderConfig,
 } from '../../api/adminSettings';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const PaymentProviderSettings = () => {
   const { t } = useTranslation();

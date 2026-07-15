@@ -27,7 +27,7 @@ import {
   MacOSCard,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const SecuritySettings = ({
   settings = {},

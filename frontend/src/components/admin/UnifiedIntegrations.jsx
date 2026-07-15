@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import React from 'react';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { MacOSTab } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // Lazy-load child panels for bundle optimization
 const LazyWebhookManager = React.lazy(() => import('./WebhookManager'));

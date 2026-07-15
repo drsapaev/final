@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
 import {
   Activity,
@@ -134,6 +134,7 @@ function exportActivityToCsv(chartData) {
 }
 
 const AdminDashboard = () => {
+  const { t } = useTranslation();
   const {
     data: statsData,
     loading: statsLoading,

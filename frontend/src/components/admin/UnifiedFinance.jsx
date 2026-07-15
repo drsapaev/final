@@ -7,7 +7,7 @@ import DiscountBenefitsManager from './DiscountBenefitsManager';
 import AdminFinanceOverview from './AdminFinanceOverview';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { MacOSTab } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 
 const UnifiedFinance = ({ renderFinance }) => {

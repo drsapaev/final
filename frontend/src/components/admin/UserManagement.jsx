@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -32,6 +32,7 @@ import { useRoles } from '../../hooks/useRoles';
 import { getProfile } from '../../stores/auth';
 
 const UserManagement = () => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

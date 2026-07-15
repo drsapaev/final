@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { Edit, Plus, RefreshCw, Search, Stethoscope, Trash2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
@@ -44,6 +44,7 @@ const getDoctorInitials = (doctor) =>
 
 // PR-19: dynamic department label lookup (was hardcoded)
 const getDepartmentLabel = (department, deptList = []) => {
+  const { t } = useTranslation();
   if (!department) return 'Не указано';
   const found = deptList.find((d) => d.key === department);
   return found ? found.name_ru : department;

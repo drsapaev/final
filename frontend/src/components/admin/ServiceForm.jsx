@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * ServiceForm — extracted from ServiceCatalog.jsx (UX Audit Admin #4.1).
  *
@@ -43,6 +43,7 @@ const SERVICE_GROUP_LABELS = {
 };
 
 const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => {
+  const { t } = useTranslation();
   for (const rawValue of [queueTag, departmentKey, categorySpecialty]) {
     if (!rawValue) continue;
     const normalized = String(rawValue).trim().toLowerCase();

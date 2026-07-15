@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeftRight, LayoutDashboard, LineChart } from 'lucide-react';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
@@ -110,6 +110,7 @@ const getRouteIconStyle = (isActive) => ({
 });
 
 export default function AdminRouteSwitcher() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 

@@ -24,7 +24,7 @@ import {
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const DEFAULT_LANGUAGE_OPTIONS = [
   { value: 'ru', label: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439' },

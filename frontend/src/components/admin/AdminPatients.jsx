@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { Edit, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react';
 import PropTypes from 'prop-types';
 
@@ -59,6 +59,7 @@ const getPatientInitials = (patient) =>
     .slice(0, 2) || 'П';
 
 const getGenderLabel = (gender) => {
+  const { t } = useTranslation();
   const genderMap = {
     male: 'Мужской',
     female: 'Женский',

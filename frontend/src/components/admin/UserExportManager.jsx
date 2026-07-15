@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import {
   Users,
@@ -27,6 +27,7 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 const UserExportManager = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   // Состояние

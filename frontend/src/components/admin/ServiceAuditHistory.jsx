@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { servicesService } from '../../api/services';
@@ -27,6 +27,7 @@ import {
 } from '../ui/macos';
 
 const ServiceAuditHistory = ({ serviceId, serviceName }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');

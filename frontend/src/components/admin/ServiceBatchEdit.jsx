@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
@@ -23,6 +23,7 @@ import {
 import { notify } from '../../services/notify.js';
 
 const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }) => {
+  const { t } = useTranslation();
   const [updates, setUpdates] = useState({});
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);

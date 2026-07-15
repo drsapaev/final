@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -41,6 +41,7 @@ const buildStats = (items = []) => ({
 });
 
 const parseMeta = (meta) => {
+  const { t } = useTranslation();
   if (!meta) return {};
   if (typeof meta === 'object') return meta;
   try {

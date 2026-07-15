@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FolderTree, Package } from 'lucide-react';
@@ -17,6 +17,7 @@ const SERVICE_TABS = [
 ];
 
 const getInitialServicesTab = (search) => {
+  const { t } = useTranslation();
   const params = new URLSearchParams(search);
   return params.get('servicesTab') || localStorage.getItem('servicesTab') || 'catalog';
 };
