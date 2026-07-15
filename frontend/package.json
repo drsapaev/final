@@ -44,6 +44,7 @@
     "dompurify": "^3.4.11",
     "emoji-mart": "^5.6.0",
     "heic2any": "^0.0.4",
+    "i18next": "^26.3.6",
     "isomorphic-dompurify": "^2.33.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
@@ -56,6 +57,7 @@
     "react-datepicker": "8.10.0",
     "react-dom": "18.3.1",
     "react-dropzone": "^14.3.8",
+    "react-i18next": "^17.0.9",
     "react-input-mask": "^2.0.4",
     "react-markdown": "^9.1.0",
     "react-router-dom": "^6.30.4",
@@ -89,9 +91,9 @@
     "rollup": "^3.30.0",
     "rollup-plugin-visualizer": "^7.0.1",
     "terser": "^5.48.0",
+    "typescript": "^6.0.3",
     "vite": "^6.4.3",
-    "vitest": "^3.2.6",
-    "typescript": "^6.0.3"
+    "vitest": "^3.2.6"
   },
   "overrides": {
     "uuid": "11.1.1",

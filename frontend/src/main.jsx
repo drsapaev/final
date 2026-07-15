@@ -1,6 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+// STRAT#49: Initialize react-i18next with labTranslations dictionary.
+import './i18n/config';
 import App from './App.jsx';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
