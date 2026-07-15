@@ -36,4 +36,25 @@ describe('LabStatusStepper UX-AUDIT-QW3 — hide unreachable READY step', () => 
     expect(source).toContain('LAB_REPORT_STATUS_CONFIG');
     expect(source).toContain('getLabReportStepIndex');
   });
+
+  it('STRAT#6: uses t() for aria-label and title attributes', () => {
+    // Все вспомогательные строки мигрированы на t() из labTranslations
+    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('import { t }');
+    // aria-label через t()
+    expect(source).toContain("aria-label={t('workbench.progress_aria_label')}");
+    // title-атрибуты через t()
+    expect(source).toContain("t('workbench.step_completed')");
+    expect(source).toContain("t('workbench.step_current')");
+    expect(source).toContain("t('workbench.step_upcoming')");
+    // Больше нет хардкоженных русских строк
+    expect(source).not.toContain('aria-label="Прогресс бланка"');
+    expect(source).not.toContain('— пройден');
+    expect(source).not.toContain('— текущий шаг');
+    expect(source).not.toContain('— предстоит');
+  });
+
+  it('has STRAT#6 marker in JSDoc', () => {
+    expect(source).toContain('STRAT#6');
+  });
 });

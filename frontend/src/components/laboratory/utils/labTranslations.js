@@ -83,6 +83,10 @@ const TRANSLATIONS = {
     saved_at: 'сохранено',
     signatures: 'Подписи',
     signatures_readonly_hint: 'только для чтения — отчёт утверждён',
+    progress_aria_label: 'Прогресс бланка',
+    step_completed: 'пройден',
+    step_current: 'текущий шаг',
+    step_upcoming: 'предстоит',
   },
 
   // ─── Actions bar ─────────────────────────────────────────────────────────
