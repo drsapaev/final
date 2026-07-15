@@ -171,11 +171,10 @@ def exchange_init_data_for_jwt(
     db.add(user_session)
     db.commit()
 
-    logger.info(
-        "Mini App auth exchange successful (patient_id=%s, telegram_user_id=%s)",
-        scope.patient_id,
-        scope.telegram_user_id,
-    )
+    # M4-P0-2: Do NOT log patient_id or telegram_user_id here —
+    # CodeQL flags this as clear-text logging of sensitive information.
+    # The audit trail (PatientAccessAuditLog) captures this in the DB.
+    logger.info("Mini App auth exchange successful")
 
     return {
         "access_token": access_token,
