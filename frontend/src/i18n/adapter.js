@@ -34,7 +34,10 @@ const i18n = {
     // STRAT#31: when locale switcher is added, this will dispatch
     // a language change event that updates the TRANSLATIONS dictionary.
     // For now, it's a no-op — only Russian is supported.
-    console.warn('[i18n] changeLanguage is a no-op — only "ru" is supported');
+    if (typeof window !== 'undefined' && window.console) {
+      // eslint-disable-next-line no-console
+      console.warn('[i18n] changeLanguage is a no-op — only "ru" is supported');
+    }
     return lang;
   },
   exists: (key) => {
