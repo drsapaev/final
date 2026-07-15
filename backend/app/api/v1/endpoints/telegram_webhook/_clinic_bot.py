@@ -720,6 +720,12 @@ def _resolve_mini_app_patient_scope_from_init_data(
     init_data = validate_telegram_mini_app_init_data(
         init_data_payload,
         bot_token=bot_token,
+        # M4-P0-2: Legacy mode for per-request initData callers.
+        # max_age=24h (backward compat), replay_check=False (same initData
+        # is sent with every request). New /auth/exchange endpoint uses
+        # the secure defaults: max_age=5min, replay_check=True.
+        max_age_seconds=LEGACY_MAX_AUTH_AGE_SECONDS,
+        replay_check=False,
     )
     return resolve_telegram_mini_app_session_scope(
         db,
@@ -801,6 +807,9 @@ def _telegram_user_from_mini_app_init_data(
     init_data = validate_telegram_mini_app_init_data(
         init_data_payload,
         bot_token=bot_token,
+        # M4-P0-2: Legacy mode (see comment above).
+        max_age_seconds=LEGACY_MAX_AUTH_AGE_SECONDS,
+        replay_check=False,
     )
     user = init_data.user if isinstance(init_data.user, dict) else {}
     try:

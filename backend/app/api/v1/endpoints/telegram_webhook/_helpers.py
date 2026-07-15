@@ -103,6 +103,7 @@ from app.services.telegram_bot import (  # noqa: F401
     telegram_text_corruption_reason,
 )
 from app.services.telegram_mini_app_init_data import (  # noqa: F401
+    LEGACY_MAX_AUTH_AGE_SECONDS,  # M4-P0-2: backward-compat max_age for per-request initData
     TelegramMiniAppInitDataError,
     TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,

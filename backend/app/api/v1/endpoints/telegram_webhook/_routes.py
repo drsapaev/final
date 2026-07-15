@@ -282,6 +282,71 @@ def reject_patient_onboarding_request(
     )
 
 
+# M4-P0-2: Telegram Mini App JWT Exchange endpoint.
+# Replaces per-request initData-replay with short-lived JWT.
+@router.post(
+    "/mini-app/auth/exchange",
+    operation_id="telegram_mini_app_auth_exchange",
+    response_model=dict[str, Any],
+)
+def exchange_mini_app_auth(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Exchange Telegram Mini App initData for short-lived JWT.
+
+    M4-P0-2: Secure alternative to per-request initData replay.
+    - initData validated ONCE (max_age=5min, replay protection)
+    - Returns JWT access_token (15 min) + refresh_token (7 days)
+    - Subsequent requests should use Authorization: Bearer <access_token>
+
+    Request body: { "init_data": "<Telegram.WebApp.initData>" }
+    """
+    from app.api.v1.endpoints.admin_telegram import _get_configured_bot_token
+    from app.services.telegram_mini_app_jwt import (
+        TelegramMiniAppAuthExchangeError,
+        exchange_init_data_for_jwt,
+    )
+
+    try:
+        body = request.json()
+    except Exception:
+        body = {}
+
+    init_data_payload = body.get("init_data") if isinstance(body, dict) else None
+    if not init_data_payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "init_data_required"},
+        )
+
+    bot_token = _get_configured_bot_token(db)
+    if not bot_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"reason": "bot_token_required"},
+        )
+
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    try:
+        result = exchange_init_data_for_jwt(
+            db,
+            init_data_payload,
+            bot_token=bot_token,
+            request_ip=client_ip,
+            request_user_agent=user_agent,
+        )
+    except TelegramMiniAppAuthExchangeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+    return result
+
+
 @router.post(
     "/mini-app/appointments/preview",
     operation_id="telegram_mini_app_preview_appointment_booking",

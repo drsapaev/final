@@ -59,9 +59,10 @@
 
 ---
 
-### M4-P0-2 — Переход на JWT после initData verification
+### M4-P0-2 — Переход на JWT после initData verification ✅ DONE
 
 **Серьёзность:** P0 (security)
+**Статус:** ✅ Реализовано (PR pending)
 **Файлы:**
 - `backend/app/services/telegram_mini_app_init_data.py:556` — `validate_telegram_mini_app_init_data` (HMAC ✅, auth_date ✅, replay ❌, JWT issuance ❌)
 - `backend/app/services/telegram_mini_app_init_data.py:20` — `DEFAULT_MAX_AUTH_AGE_SECONDS = 24 * 60 * 60` (24 часа — недопустимо)

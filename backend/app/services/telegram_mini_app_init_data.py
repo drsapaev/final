@@ -17,7 +17,8 @@ from app.models.patient import Patient
 from app.models.telegram_config import TelegramPatientFormSubmission, TelegramUser
 from app.models.user import User
 
-DEFAULT_MAX_AUTH_AGE_SECONDS = 24 * 60 * 60
+DEFAULT_MAX_AUTH_AGE_SECONDS = 5 * 60  # M4-P0-2: reduced from 24h to 5min (for /auth/exchange)
+LEGACY_MAX_AUTH_AGE_SECONDS = 24 * 60 * 60  # M4-P0-2: backward-compat for existing per-request initData callers
 DEFAULT_MAX_FUTURE_SKEW_SECONDS = 60
 _HASH_FIELD = "hash"
 _AUTH_DATE_FIELD = "auth_date"
@@ -560,8 +561,16 @@ def validate_telegram_mini_app_init_data(
     max_age_seconds: int = DEFAULT_MAX_AUTH_AGE_SECONDS,
     max_future_skew_seconds: int = DEFAULT_MAX_FUTURE_SKEW_SECONDS,
     now: datetime | None = None,
+    replay_check: bool = True,
 ) -> TelegramMiniAppInitData:
-    """Validate Telegram Mini App initData before trusting Mini App identity."""
+    """Validate Telegram Mini App initData before trusting Mini App identity.
+
+    M4-P0-2: Added replay_check parameter (default True).
+    When enabled, the initData hash is stored in cache for max_age_seconds.
+    If the same initData is presented again within that window, it is rejected
+    with "init_data_replayed" error. This prevents XSS-leaked initData from
+    being replayed multiple times.
+    """
 
     token = str(bot_token or "").strip()
     if not token:
@@ -592,6 +601,11 @@ def validate_telegram_mini_app_init_data(
     if age_seconds < -int(max_future_skew_seconds):
         raise TelegramMiniAppInitDataError("auth_date_in_future")
 
+    # M4-P0-2: Replay protection — store initData hash in cache.
+    # If same hash is seen again within max_age_seconds, reject.
+    if replay_check:
+        _check_and_mark_replay(received_hash, max_age_seconds)
+
     trusted_fields = {key: value for key, value in fields.items() if key != _HASH_FIELD}
     return TelegramMiniAppInitData(
         fields=trusted_fields,
@@ -599,6 +613,23 @@ def validate_telegram_mini_app_init_data(
         age_seconds=age_seconds,
         user=_parse_user(trusted_fields.get("user")),
     )
+
+
+def _check_and_mark_replay(init_data_hash: str, ttl_seconds: int) -> None:
+    """M4-P0-2: Check if initData hash was already used; mark it as used.
+
+    Uses cache_manager (Redis when available, in-memory fallback).
+    If the hash is already in cache, raises TelegramMiniAppInitDataError.
+    Otherwise, stores the hash with TTL=ttl_seconds.
+    """
+    from app.core.cache import cache_manager
+
+    cache_key = f"telegram_init_data_used:{init_data_hash}"
+    existing = cache_manager.get(cache_key)
+    if existing is not None:
+        raise TelegramMiniAppInitDataError("init_data_replayed")
+
+    cache_manager.set(cache_key, True, ttl=ttl_seconds)
 
 
 def resolve_telegram_mini_app_session_scope(
