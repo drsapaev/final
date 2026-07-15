@@ -483,11 +483,11 @@ export default function LabTemplateWorkbench({
           <CardTitle className="ltw-card-title">
             <span className="ltw-flex-center">
               <Icon name="rectangle.stack.badge.plus" size={20} />
-              Шаблоны
+              {t('template.title')}
             </span>
             <Button variant="primary" size="small" onClick={() => setShowNewTemplateDialog(true)} disabled={saving}>
               <Icon name="plus" size={14} />
-              Новый
+              {t('template.new_template')}
             </Button>
           </CardTitle>
         </CardHeader>
@@ -551,7 +551,7 @@ export default function LabTemplateWorkbench({
               <div className="ltw-flex-gap-8">
                 <Button variant="outline" onClick={handleCloneTemplate} disabled={saving}>
                   <Icon name="doc.on.doc" size={16} />
-                  Клонировать
+                  {t('template.clone')}
                 </Button>
                 <Button
                   variant="outline"
@@ -583,15 +583,15 @@ export default function LabTemplateWorkbench({
                 </Button>
                 <Button variant="outline" onClick={handleSaveTemplate} disabled={saving}>
                   <Icon name="square.and.arrow.down" size={16} />
-                  Сохранить черновик
+                  {t('common.save_draft')}
                 </Button>
                 <Button variant="primary" onClick={handlePublishVersion} disabled={saving}>
                   <Icon name="checkmark.seal" size={16} />
-                  Опубликовать
+                  {t('template.publish')}
                 </Button>
-                <Button variant="outline" onClick={handleArchiveTemplate} disabled={saving || !activeVersion} title="Архивировать версию">
+                <Button variant="outline" onClick={handleArchiveTemplate} disabled={saving || !activeVersion} title={t('template.archive')}>
                   <Icon name="archivebox" size={16} />
-                  Архивировать
+                  {t('template.archive')}
                 </Button>
               </div>
             )}
@@ -641,7 +641,7 @@ export default function LabTemplateWorkbench({
                       }}
                       className={`ltw-tablist-tab ${isActive ? 'ltw-tablist-tab-active' : ''}`}
                     >
-                      {tab.label}
+                      {t(`template.${tab.id}_tab`)}
                     </button>
                   );
                 })}

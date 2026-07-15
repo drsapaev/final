@@ -151,6 +151,7 @@ const TRANSLATIONS = {
 
   // ─── Template editor ─────────────────────────────────────────────────────
   template: {
+    title: 'Шаблоны',
     content_tab: 'Содержимое',
     design_tab: 'Оформление',
     signers_tab: 'Подписи',
