@@ -64,6 +64,7 @@ const LicenseManagement = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [stats, setStats] = useState(null);
   const [showKeys, setShowKeys] = useState({});
+  const { t } = useTranslation();
 
   // Форма лицензии
   const [formData, setFormData] = useState({
@@ -80,19 +81,19 @@ const LicenseManagement = () => {
   });
 
   const statusOptions = [
-  { value: 'active', label: 'Активная', color: 'success' },
-  { value: 'expired', label: 'Истекла', color: 'error' },
-  { value: 'expiring', label: 'Истекает', color: 'warning' },
-  { value: 'suspended', label: 'Приостановлена', color: 'gray' }];
+  { value: 'active', label: t('admin2.lm_status_active'), color: 'success' },
+  { value: 'expired', label: t('admin2.lm_status_expired'), color: 'error' },
+  { value: 'expiring', label: t('admin2.lm_status_expiring'), color: 'warning' },
+  { value: 'suspended', label: t('admin2.lm_status_suspended'), color: 'gray' }];
 
 
   const typeOptions = [
-  { value: 'software', label: 'Программное обеспечение' },
-  { value: 'subscription', label: 'Подписка' },
-  { value: 'perpetual', label: 'Бессрочная' },
-  { value: 'trial', label: 'Пробная' },
-  { value: 'academic', label: 'Академическая' },
-  { value: 'enterprise', label: 'Корпоративная' }];
+  { value: 'software', label: t('admin2.lm_type_software') },
+  { value: 'subscription', label: t('admin2.lm_type_subscription') },
+  { value: 'perpetual', label: t('admin2.lm_type_perpetual') },
+  { value: 'trial', label: t('admin2.lm_type_trial') },
+  { value: 'academic', label: t('admin2.lm_type_academic') },
+  { value: 'enterprise', label: t('admin2.lm_type_enterprise') }];
 
 
   const loadLicenses = useCallback(async () => {
@@ -120,7 +121,7 @@ const LicenseManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.type || !formData.license_key.trim()) {
-      setMessage({ type: 'error', text: 'Заполните обязательные поля' });
+      setMessage({ type: 'error', text: t('admin2.lm_msg_required') });
       return;
     }
 
@@ -129,10 +130,10 @@ const LicenseManagement = () => {
 
       if (editingLicense) {
         await api.put(`/clinic/licenses/${editingLicense.id}`, formData);
-        setMessage({ type: 'success', text: 'Лицензия обновлена' });
+        setMessage({ type: 'success', text: t('admin2.lm_msg_updated') });
       } else {
         await api.post('/clinic/licenses', formData);
-        setMessage({ type: 'success', text: 'Лицензия добавлена' });
+        setMessage({ type: 'success', text: t('admin2.lm_msg_created') });
       }
 
       setShowAddForm(false);
@@ -140,7 +141,7 @@ const LicenseManagement = () => {
       resetForm();
       loadLicenses();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка сохранения лицензии' });
+      setMessage({ type: 'error', text: t('admin2.lm_msg_save_error') });
     } finally {
       setSaving(false);
     }
@@ -155,10 +156,10 @@ const LicenseManagement = () => {
   const handleDelete = async (licenseId) => {
     try {
       await api.delete(`/clinic/licenses/${licenseId}`);
-      setMessage({ type: 'success', text: 'Лицензия удалена' });
+      setMessage({ type: 'success', text: t('admin2.lm_msg_deleted') });
       loadLicenses();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка удаления лицензии' });
+      setMessage({ type: 'error', text: t('admin2.lm_msg_delete_error') });
     }
   };
 
@@ -171,7 +172,7 @@ const LicenseManagement = () => {
 
   const copyKey = (key) => {
     navigator.clipboard.writeText(key);
-    setMessage({ type: 'success', text: 'Ключ скопирован в буфер обмена' });
+    setMessage({ type: 'success', text: t('admin2.lm_msg_copied') });
   };
 
   const resetForm = () => {
@@ -221,10 +222,10 @@ const LicenseManagement = () => {
     return matchesSearch && matchesStatus && matchesType;
   });
   const hasLicenseFilters = searchTerm.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all';
-  const licenseEmptyTitle = hasLicenseFilters ? 'Лицензии по фильтрам не найдены' : 'Лицензии ещё не добавлены';
+  const licenseEmptyTitle = hasLicenseFilters ? t('admin2.lm_empty_title_filtered') : t('admin2.lm_empty_title_initial');
   const licenseEmptyDescription = hasLicenseFilters ?
-  'Измените поиск, статус или тип, чтобы увидеть другие лицензии.' :
-  'Добавьте первую лицензию, чтобы контролировать доступы и сроки действия программ.';
+  t('admin2.lm_empty_desc_filtered') :
+  t('admin2.lm_empty_desc_initial');
 
   return (
     <div className="admin-flex-col-gap-24-overflow-hidden">
@@ -232,10 +233,10 @@ const LicenseManagement = () => {
       <div className="admin-flex-jc-between-ai-center-wrap-gap-16">
         <div>
           <h2 className="admin-2xl-bold-primary-m-008px0">
-            Управление лицензиями
+            {t('admin2.lm_page_title')}
           </h2>
           <p className="admin-secondary-sm-m-0">
-            Учет и управление программными лицензиями
+            {t('admin2.lm_page_subtitle')}
           </p>
         </div>
         {stats &&
@@ -245,7 +246,7 @@ const LicenseManagement = () => {
                 {stats.total_licenses}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Всего лицензий
+                {t('admin2.lm_stat_total')}
               </div>
             </div>
             <div className="text-center">
@@ -253,7 +254,7 @@ const LicenseManagement = () => {
                 {stats.active_licenses}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Активных
+                {t('admin2.lm_stat_active')}
               </div>
             </div>
           </div>
@@ -264,7 +265,7 @@ const LicenseManagement = () => {
       {message.text &&
       <Alert
         type={message.type === 'success' ? 'success' : 'error'}
-        title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
+        title={message.type === 'success' ? t('admin2.lm_alert_success') : t('admin2.lm_alert_error')}
         message={message.text} />
 
       }
@@ -275,8 +276,8 @@ const LicenseManagement = () => {
           <div className="admin-flex-1-pos-relative">
             <Input
               type="text"
-              aria-label="Поиск лицензий по названию, поставщику или ключу"
-              placeholder="Поиск по названию, поставщику или ключу..."
+              aria-label={t('admin2.lm_search_aria')}
+              placeholder={t('admin2.lm_search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="admin-pl-40" />
@@ -285,21 +286,21 @@ const LicenseManagement = () => {
           </div>
           <div className="admin-flex-gap-12-wrap">
             <Select
-              aria-label="Фильтр лицензий по статусу"
+              aria-label={t('admin2.lm_filter_status_aria')}
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
-                { value: 'all', label: 'Все статусы' },
+                { value: 'all', label: t('admin2.lm_filter_all_statuses') },
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
               className="admin-minw-150" />
             <Select
-              aria-label="Фильтр лицензий по типу"
+              aria-label={t('admin2.lm_filter_type_aria')}
               value={typeFilter}
               onChange={setTypeFilter}
               options={[
-                { value: 'all', label: 'Все типы' },
+                { value: 'all', label: t('admin2.lm_filter_all_types') },
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
@@ -309,7 +310,7 @@ const LicenseManagement = () => {
               className="admin-flex-ai-center-gap-8-bg-blue-bd-none-p-8px16">
               
               <Plus aria-hidden="true" className="w-4 h-4" />
-              <span>Добавить лицензию</span>
+              <span>{t('admin2.lm_btn_add')}</span>
             </Button>
           </div>
         </div>
@@ -320,12 +321,12 @@ const LicenseManagement = () => {
       <MacOSCard className="admin-p-24-overflow-hidden">
           <div className="admin-flex-jc-between-ai-center-mb-16">
             <h3 className="admin-lg-semi-primary-m-0">
-              {editingLicense ? 'Редактировать лицензию' : 'Добавить лицензию'}
+              {editingLicense ? t('admin2.lm_form_edit_title') : t('admin2.lm_form_create_title')}
             </h3>
             <Button
             variant="outline"
             type="button"
-            aria-label={editingLicense ? 'Закрыть форму редактирования лицензии' : 'Закрыть форму добавления лицензии'}
+            aria-label={editingLicense ? t('admin2.lm_form_close_edit_aria') : t('admin2.lm_form_close_create_aria')}
             onClick={() => {
               setShowAddForm(false);
               setEditingLicense(null);
@@ -341,59 +342,59 @@ const LicenseManagement = () => {
             <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Название *
+                  {t('admin2.lm_field_name')}
                 </label>
                 <Input
                 type="text"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Введите название лицензии" />
+                placeholder={t('admin2.lm_field_name_placeholder')} />
               
               </div>
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Тип *
+                  {t('admin2.lm_field_type')}
                 </label>
                 <Select
-                aria-label="Тип лицензии"
+                aria-label={t('admin2.lm_field_type_aria')}
                 value={formData.type}
                 onChange={(value) => setFormData({ ...formData, type: value })}
                 options={[
-                  { value: '', label: 'Выберите тип' },
+                  { value: '', label: t('admin2.lm_field_type_select_option') },
                   ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
                 ]}
                 size="large" />
               </div>
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Лицензионный ключ *
+                  {t('admin2.lm_field_license_key')}
                 </label>
                 <Input
                 type="text"
                 required
                 value={formData.license_key}
                 onChange={(e) => setFormData({ ...formData, license_key: e.target.value })}
-                placeholder="Введите лицензионный ключ" />
+                placeholder={t('admin2.lm_field_license_key_placeholder')} />
               
               </div>
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Поставщик
+                  {t('admin2.lm_field_vendor')}
                 </label>
                 <Input
                 type="text"
                 value={formData.vendor}
                 onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                placeholder="Введите название поставщика" />
+                placeholder={t('admin2.lm_field_vendor_placeholder')} />
               
               </div>
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Статус
+                  {t('admin2.lm_field_status')}
                 </label>
                 <Select
-                aria-label="Статус лицензии"
+                aria-label={t('admin2.lm_field_status_aria')}
                 value={formData.status}
                 onChange={(value) => setFormData({ ...formData, status: value })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
@@ -401,7 +402,7 @@ const LicenseManagement = () => {
               </div>
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Дата покупки
+                  {t('admin2.lm_field_purchase_date')}
                 </label>
                 <Input
                 type="date"
@@ -411,7 +412,7 @@ const LicenseManagement = () => {
               </div>
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Дата истечения
+                  {t('admin2.lm_field_expiry_date')}
                 </label>
                 <Input
                 type="date"
@@ -421,37 +422,37 @@ const LicenseManagement = () => {
               </div>
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Стоимость (сум)
+                  {t('admin2.lm_field_cost')}
                 </label>
                 <Input
                 type="number"
                 value={formData.cost}
                 onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
-                placeholder="Введите стоимость" />
+                placeholder={t('admin2.lm_field_cost_placeholder')} />
               
               </div>
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Количество мест
+                  {t('admin2.lm_field_seats')}
                 </label>
                 <Input
                 type="number"
                 min="1"
                 value={formData.seats}
                 onChange={(e) => setFormData({ ...formData, seats: parseInt(e.target.value) })}
-                placeholder="Введите количество мест" />
+                placeholder={t('admin2.lm_field_seats_placeholder')} />
               
               </div>
             </div>
 
             <div>
               <label className="admin-block-sm-med-primary-mb-4">
-                Описание
+                {t('admin2.lm_field_description')}
               </label>
               <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Введите описание лицензии"
+              placeholder={t('admin2.lm_field_description_placeholder')}
               rows={3} />
             
             </div>
@@ -467,7 +468,7 @@ const LicenseManagement = () => {
               }}
               disabled={saving}>
               
-                Отмена
+                {t('admin2.cancel')}
               </Button>
               <Button
               type="submit"
@@ -478,12 +479,12 @@ const LicenseManagement = () => {
                 {saving ?
               <>
                     <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin1slinearinfinite" />
-                    Сохранение...
+                    {t('admin2.lm_btn_saving')}
                   </> :
 
               <>
                     <Save aria-hidden="true" className="w-4 h-4" />
-                    {editingLicense ? 'Обновить' : 'Добавить'}
+                    {editingLicense ? t('admin2.lm_btn_update') : t('admin2.lm_btn_add_submit')}
                   </>
               }
               </Button>
@@ -509,7 +510,7 @@ const LicenseManagement = () => {
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
               <Plus aria-hidden="true" focusable="false" className="w-4 h-4 mr-2" />
-              Добавить лицензию
+              {t('admin2.lm_btn_add')}
             </Button>
         } /> :
 
@@ -541,7 +542,7 @@ const LicenseManagement = () => {
                   <Button
                 type="button"
                 variant="outline"
-                aria-label={showKeys[license.id] ? `Скрыть ключ лицензии ${license.name}` : `Показать ключ лицензии ${license.name}`}
+                aria-label={showKeys[license.id] ? t('admin2.lm_key_hide_aria', { name: license.name }) : t('admin2.lm_key_show_aria', { name: license.name })}
                 onClick={() => toggleKeyVisibility(license.id)}
                 className="admin-p-2px6-minw-auto">
                 
@@ -554,7 +555,7 @@ const LicenseManagement = () => {
                   <Button
                 type="button"
                 variant="outline"
-                aria-label={`Скопировать ключ лицензии ${license.name}`}
+                aria-label={t('admin2.lm_key_copy_aria', { name: license.name })}
                 onClick={() => copyKey(license.license_key)}
                 className="admin-p-2px6-minw-auto">
                 
@@ -564,17 +565,17 @@ const LicenseManagement = () => {
                 {license.cost > 0 &&
             <div className="admin-flex-ai-center-gap-8-sm-secondary">
                     <DollarSign aria-hidden="true" className="w-4 h-4" />
-                    <span>{license.cost.toLocaleString()} сум</span>
+                    <span>{t('admin2.lm_cost_display', { cost: license.cost.toLocaleString() })}</span>
                   </div>
             }
                 <div className="admin-flex-ai-center-gap-8-sm-secondary">
                   <Shield aria-hidden="true" className="w-4 h-4" />
-                  <span>{license.seats} мест</span>
+                  <span>{t('admin2.lm_seats_count', { count: license.seats })}</span>
                 </div>
                 {license.expiry_date &&
             <div className="admin-flex-ai-center-gap-8-sm" style={{ '--admin-color': isExpiringSoon(license.expiry_date) ? 'var(--mac-warning)' : 'var(--mac-text-secondary)' }}>
                     <Calendar aria-hidden="true" className="w-4 h-4" />
-                    <span>Истекает: {new Date(license.expiry_date).toLocaleDateString()}</span>
+                    <span>{t('admin2.lm_expiry_label', { date: new Date(license.expiry_date).toLocaleDateString() })}</span>
                     {isExpiringSoon(license.expiry_date) &&
               <AlertTriangle aria-hidden="true" className="w-3.5 h-3.5" />
               }
@@ -594,7 +595,7 @@ const LicenseManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={`Редактировать лицензию ${license.name}`}
+              aria-label={t('admin2.lm_row_edit_aria', { name: license.name })}
               onClick={() => handleEdit(license)}
               className="admin-p-6px12">
               
@@ -603,7 +604,7 @@ const LicenseManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={`Удалить лицензию ${license.name}`}
+              aria-label={t('admin2.lm_row_delete_aria', { name: license.name })}
               onClick={() => handleDelete(license.id)}
               className="admin-p-6px12-error-bd-error">
               

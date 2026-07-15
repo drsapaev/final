@@ -60,24 +60,24 @@ const UserManagement = () => {
 
   // Fallback roles if API fails
   const roles = apiRoleOptions.filter((r) => r.value !== '') || [
-  { value: 'Admin', label: 'Администратор' },
-  { value: 'Doctor', label: 'Врач' },
-  { value: 'Nurse', label: 'Медсестра' },
-  { value: 'Receptionist', label: 'Регистратор' },
-  { value: 'Cashier', label: 'Кассир' },
-  { value: 'Lab', label: 'Лаборант' },
-  { value: 'Patient', label: 'Пациент' }];
+  { value: 'Admin', label: t('admin2.um_role_admin') },
+  { value: 'Doctor', label: t('admin2.um_role_doctor') },
+  { value: 'Nurse', label: t('admin2.um_role_nurse') },
+  { value: 'Receptionist', label: t('admin2.um_role_receptionist') },
+  { value: 'Cashier', label: t('admin2.um_role_cashier') },
+  { value: 'Lab', label: t('admin2.um_role_lab') },
+  { value: 'Patient', label: t('admin2.um_role_patient') }];
 
 
   const roleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
-  { value: '', label: 'Все роли' },
+  { value: '', label: t('admin2.um_filter_all_roles') },
   ...roles];
 
 
   const statusOptions = [
-  { value: '', label: 'Все статусы' },
-  { value: 'active', label: 'Активные' },
-  { value: 'inactive', label: 'Неактивные' }];
+  { value: '', label: t('admin2.um_filter_all_statuses') },
+  { value: 'active', label: t('admin2.um_status_active_plural') },
+  { value: 'inactive', label: t('admin2.um_status_inactive_plural') }];
 
 
   useEffect(() => {
@@ -168,7 +168,7 @@ const UserManagement = () => {
       setTotalUsers(response.data.total || 0);
       setError('');
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка подключения к серверу';
+      const errorMessage = err.response?.data?.detail || err.message || t('admin2.um_error_connection');
       setError(errorMessage);
       logger.error('Ошибка загрузки пользователей:', err);
     } finally {
@@ -180,17 +180,17 @@ const UserManagement = () => {
     try {
       if (selectedUser) {
         await api.put(`/users/users/${selectedUser.id}`, userData);
-        setSuccess('Пользователь успешно обновлен');
+        setSuccess(t('admin2.um_msg_updated'));
       } else {
         await api.post('/users/users', userData);
-        setSuccess('Пользователь успешно создан');
+        setSuccess(t('admin2.um_msg_created'));
       }
       setError('');
       loadUsers(currentPage);
       setShowUserModal(false);
       setSelectedUser(null);
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка сохранения пользователя';
+      const errorMessage = err.response?.data?.detail || err.message || t('admin2.um_error_save');
       setError(errorMessage);
       logger.error('Ошибка сохранения пользователя:', err);
       throw err; // UserModal catch block will handle specific errors if needed
@@ -205,20 +205,20 @@ const UserManagement = () => {
     if (currentProfile?.id && Number(selectedUser.id) === Number(currentProfile.id)) {
       setDeleteDialogMode('blocked-self');
       setDeleteDialogMessage(
-        'Нельзя удалить текущую учётную запись, под которой вы сейчас вошли. Войдите под другим администратором и удалите или деактивируйте этот аккаунт оттуда.'
+        t('admin2.um_msg_blocked_delete')
       );
       return;
     }
 
     try {
       await api.delete(`/users/users/${selectedUser.id}`);
-      setSuccess('Пользователь успешно удален');
+      setSuccess(t('admin2.um_msg_deleted'));
       setError('');
       loadUsers(currentPage);
       setShowDeleteDialog(false);
       setSelectedUser(null);
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка удаления пользователя';
+      const errorMessage = err.response?.data?.detail || err.message || t('admin2.um_error_delete');
 
       if (errorMessage.includes('связанные данные') || errorMessage.includes('деактивировать')) {
         setDeleteDialogMode('deactivate');
@@ -240,14 +240,14 @@ const UserManagement = () => {
     if (currentProfile?.id && Number(selectedUser.id) === Number(currentProfile.id)) {
       setDeleteDialogMode('blocked-self');
       setDeleteDialogMessage(
-        'Нельзя деактивировать текущую учётную запись из активной сессии. Войдите под другим администратором и выполните это действие оттуда.'
+        t('admin2.um_msg_blocked_deactivate')
       );
       return;
     }
 
     try {
       await api.put(`/users/users/${selectedUser.id}`, { is_active: false });
-      setSuccess('Пользователь деактивирован');
+      setSuccess(t('admin2.um_msg_deactivated'));
       setError('');
       loadUsers(currentPage);
       setShowDeleteDialog(false);
@@ -255,8 +255,8 @@ const UserManagement = () => {
       setDeleteDialogMode('confirm');
       setDeleteDialogMessage('');
     } catch (deactivateErr) {
-      const deactivateMessage = deactivateErr.response?.data?.detail || deactivateErr.message || 'Ошибка деактивации пользователя';
-      setError(`Ошибка деактивации пользователя: ${deactivateMessage}`);
+      const deactivateMessage = deactivateErr.response?.data?.detail || deactivateErr.message || t('admin2.um_error_deactivate');
+      setError(t('admin2.um_error_deactivate_detailed', { message: deactivateMessage }));
       logger.error('Ошибка деактивации пользователя:', deactivateErr);
     }
   };
@@ -278,11 +278,11 @@ const UserManagement = () => {
   const handleToggleUserStatus = async (userId, isActive) => {
     try {
       await api.put(`/users/users/${userId}`, { is_active: !isActive });
-      setSuccess(`Пользователь ${!isActive ? 'активирован' : 'деактивирован'}`);
+      setSuccess(!isActive ? t('admin2.um_msg_activated') : t('admin2.um_msg_deactivated'));
       setError('');
       loadUsers(currentPage);
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка изменения статуса пользователя';
+      const errorMessage = err.response?.data?.detail || err.message || t('admin2.um_error_status_change');
       setError(errorMessage);
       logger.error('Ошибка изменения статуса пользователя:', err);
     }
@@ -432,7 +432,7 @@ const UserManagement = () => {
     title: t('admin2.col_active'),
     render: (_, user) =>
     <Badge variant={user.is_active ? 'success' : 'default'} outline>
-          {user.is_active ? 'Активен' : 'Неактивен'}
+          {user.is_active ? t('admin2.um_status_active_singular') : t('admin2.um_status_inactive_singular')}
         </Badge>
 
   },
@@ -452,10 +452,10 @@ const UserManagement = () => {
     <div className="admin-d-flex-jc-end">
           <Button
         data-user-actions-trigger="true"
-        aria-label={`Действия: ${user.full_name || user.username}`}
+        aria-label={t('admin2.um_actions_aria', { name: user.full_name || user.username })}
         aria-haspopup="menu"
         aria-expanded={actionsMenuUser?.id === user.id}
-        title="Действия"
+        title={t('admin2.um_actions_button_title')}
         onClick={(e) => {
           openActionsMenu(e, user);
         }}
@@ -475,25 +475,25 @@ const UserManagement = () => {
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" className="admin-mb-24">
         <Typography variant="h1" className="admin-fs-24-fw-600">
-          Управление пользователями
+          {t('admin2.um_page_title')}
         </Typography>
         <Button
           variant="primary"
           onClick={() => openUserDialog()}
           startIcon={<Plus size={16} />}>
           
-          Добавить пользователя
+          {t('admin2.um_btn_add')}
         </Button>
       </Box>
 
       {/* Alerts */}
       {error &&
-      <Alert variant="error" title="Ошибка" onClose={() => setError('')} className="admin-mb-16">
+      <Alert variant="error" title={t('admin2.um_alert_error')} onClose={() => setError('')} className="admin-mb-16">
           {error}
         </Alert>
       }
       {success &&
-      <Alert variant="success" title="Успешно" onClose={() => setSuccess('')} className="admin-mb-16">
+      <Alert variant="success" title={t('admin2.um_alert_success')} onClose={() => setSuccess('')} className="admin-mb-16">
           {success}
         </Alert>
       }
@@ -504,11 +504,11 @@ const UserManagement = () => {
 
           {/* Search */}
           <div className="admin-flex-1">
-            <label className="admin-d-block-mb-6-fs-13-fw-500">Поиск</label>
+            <label className="admin-d-block-mb-6-fs-13-fw-500">{t('admin2.um_search_label')}</label>
             <div className="admin-pos-relative">
               <Search size={16} className="admin-pos-absolute-left-10-top-50pct-tf-translateY-50-888" />
               <Input
-                placeholder="Поиск пользователей..."
+                placeholder={t('admin2.um_search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="admin-pl-32-w-100pct" />
@@ -519,11 +519,11 @@ const UserManagement = () => {
           {/* Role Filter */}
           <div>
             <Select
-              label="Роль"
+              label={t('admin2.um_filter_role_label')}
               value={roleFilter}
               onChange={setRoleFilter}
               options={roleOptions}
-              placeholder="Все роли"
+              placeholder={t('admin2.um_filter_all_roles')}
               size="large"
               className="admin-w-full" />
 
@@ -532,11 +532,11 @@ const UserManagement = () => {
           {/* Status Filter */}
           <div>
             <Select
-              label="Статус"
+              label={t('admin2.um_filter_status_label')}
               value={statusFilter}
               onChange={setStatusFilter}
               options={statusOptions}
-              placeholder="Все статусы"
+              placeholder={t('admin2.um_filter_all_statuses')}
               size="large"
               className="admin-w-full" />
 
@@ -544,14 +544,14 @@ const UserManagement = () => {
 
           {/* Refresh Button */}
           <div>
-            <label className="admin-d-block-mb-6-fs-13-fw-500-vis-hidden">Действие</label>
+            <label className="admin-d-block-mb-6-fs-13-fw-500-vis-hidden">{t('admin2.um_action_filter_label')}</label>
             <Button
               variant="secondary"
               onClick={() => loadUsers(currentPage)}
               startIcon={<RefreshCw size={16} />}
               className="admin-w-100pct-jc-center"
               disabled={loading}>
-              Обновить
+              {t('admin2.um_btn_refresh')}
             </Button>
           </div>
         </div>
@@ -569,7 +569,7 @@ const UserManagement = () => {
         {totalPages > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid var(--mac-border)' }}>
             <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
-              Всего: {totalUsers} · Страница {currentPage} из {totalPages}
+              {t('admin2.um_pagination_info', { total: totalUsers, current: currentPage, totalPages })}
             </span>
             <div style={{ display: 'flex', gap: '8px' }}>
               <Button
@@ -577,14 +577,14 @@ const UserManagement = () => {
                 size="sm"
                 disabled={currentPage <= 1 || loading}
                 onClick={() => { setCurrentPage(p => p - 1); loadUsers(currentPage - 1); }}>
-                ← Назад
+                {t('admin2.um_btn_prev')}
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
                 disabled={currentPage >= totalPages || loading}
                 onClick={() => { setCurrentPage(p => p + 1); loadUsers(currentPage + 1); }}>
-                Вперёд →
+                {t('admin2.um_btn_next')}
               </Button>
             </div>
           </div>
@@ -597,7 +597,7 @@ const UserManagement = () => {
       <div
         ref={actionsMenuRef}
         role="menu"
-        aria-label="Действия пользователя"
+        aria-label={t('admin2.um_actions_menu_aria')}
         className="admin-pos-fixed-z-2000-w-208-p-6-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo-bg-bg-primary-bsh-var-mac-shadow-lg-d-grid-gap-2-top-dyn-left-dyn" style={{ '--admin-top0': actionsMenuPosition.top, '--admin-left1': actionsMenuPosition.left }}>
 
         <Button
@@ -608,7 +608,7 @@ const UserManagement = () => {
           style={actionMenuItemStyle}
           startIcon={<Edit size={16} />}
           onClick={handleEditFromActionsMenu}>
-          Редактировать
+          {t('admin2.um_btn_edit')}
         </Button>
         <Button
           type="button"
@@ -618,7 +618,7 @@ const UserManagement = () => {
           style={actionMenuItemStyle}
           startIcon={actionsMenuUser.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
           onClick={handleToggleStatusFromActionsMenu}>
-          {actionsMenuUser.is_active ? 'Деактивировать' : 'Активировать'}
+          {actionsMenuUser.is_active ? t('admin2.um_btn_deactivate') : t('admin2.um_btn_activate')}
         </Button>
         <div role="separator" className="admin-h-1-bg-var-mac-border-m-4px-0" />
         <Button
@@ -629,7 +629,7 @@ const UserManagement = () => {
           startIcon={<Trash2 size={16} />}
           className="admin-w-100pct-d-flex-ai-center-gap-10-p-9px-10px-bd-none-radius-var-mac-radius-sm-bg-transparent-primary-font-inherit-fs-13-ta-left-cur-pointer-error"
           onClick={handleDeleteFromActionsMenu}>
-          Удалить
+          {t('admin2.um_btn_delete')}
         </Button>
       </div>
       }
@@ -649,19 +649,19 @@ const UserManagement = () => {
         onClose={closeDeleteDialog}
         title={
           deleteDialogMode === 'deactivate'
-            ? 'Удаление недоступно'
+            ? t('admin2.um_modal_title_delete_unavailable')
             : deleteDialogMode === 'blocked-self'
-              ? 'Действие недоступно'
-              : 'Подтверждение удаления'
+              ? t('admin2.um_modal_title_action_unavailable')
+              : t('admin2.um_modal_title_delete_confirm')
         }
         size="sm">
         
         <div className="admin-p-0-0-24px-0">
           {deleteDialogMode === 'confirm' ? (
             <Typography>
-              Вы уверены, что хотите удалить пользователя <b>{selectedUser?.username}</b>?
+              {t('admin2.um_delete_confirm_question', { name: selectedUser?.username })}
               <br />
-              Это действие нельзя отменить.
+              {t('admin2.um_delete_confirm_warning')}
             </Typography>
           ) : (
             <Typography>
@@ -676,24 +676,24 @@ const UserManagement = () => {
           {deleteDialogMode === 'confirm' ? (
             <>
               <Button variant="secondary" onClick={closeDeleteDialog}>
-                Отмена
+                {t('admin2.cancel')}
               </Button>
               <Button variant="danger" onClick={handleDeleteUser}>
-                Удалить
+                {t('admin2.um_btn_delete')}
               </Button>
             </>
           ) : deleteDialogMode === 'deactivate' ? (
             <>
               <Button variant="secondary" onClick={closeDeleteDialog}>
-                Отмена
+                {t('admin2.cancel')}
               </Button>
               <Button variant="primary" onClick={handleDeactivateInstead}>
-                Деактивировать
+                {t('admin2.um_btn_deactivate')}
               </Button>
             </>
           ) : (
             <Button variant="primary" onClick={closeDeleteDialog}>
-              Понятно
+              {t('admin2.um_btn_understood')}
             </Button>
           )}
         </div>
