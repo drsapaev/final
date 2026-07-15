@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { useState } from 'react';
 import { Badge, Button, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
 import { fieldTypeOptions, referenceModeOptions } from './config';
@@ -18,6 +19,14 @@ import ReferenceRuleEditor from './ReferenceRuleEditor';
  * Ранее single-click на trash удалял элемент со всеми правилами референсов
  * без возможности отмены. Потеря сложного поля — 5–10 минут работы.
  * Соответствует Nielsen Heuristic #5 (Error Prevention).
+ *
+ * UX-AUDIT-FIX5: raw JSON textareas (visibility_rule_text /
+ * highlight_rule_text) скрыты за глобальным «Developer mode» тогглом.
+ * Ранее каждый `<details>` с raw JSON рендерился в каждой field card —
+ * 90% лаборантов никогда не редактируют эти правила, но визуальный шум
+ * от них отъедал vertical space и повышал когнитивную нагрузку
+ * (Nielsen Heuristic #8 — Aesthetic and Minimalist Design).
+ * Теперь по умолчанию raw JSON не виден; power users включают тоггл.
  */
 function ContentTab({
   draftVersion,
@@ -39,6 +48,10 @@ function ContentTab({
 }) {
   // UX-AUDIT-FIX4: useConfirm для деструктивных действий (удаление секции/поля).
   const [confirm] = useConfirm();
+
+  // UX-AUDIT-FIX5: глобальный тоггл для raw JSON правил.
+  // По умолчанию выключен — raw JSON скрыт из основного UI.
+  const [developerMode, setDeveloperMode] = useState(false);
 
   async function handleRemoveSection(sectionIndex, section) {
     const ok = await confirm({
@@ -74,10 +87,27 @@ function ContentTab({
         <div className="ltw-fw-600">
           Секции и показатели ({draftVersion?.sections?.reduce((acc, s) => acc + (s.fields?.length || 0), 0) || 0} показателей в {draftVersion?.sections?.length || 0} секц.)
         </div>
-        <Button variant="outline" onClick={onAddSection}>
-          <Icon name="plus" size={16} />
-          Добавить секцию
-        </Button>
+        <span className="ltw-flex-gap-4" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+          {/* UX-AUDIT-FIX5: Developer mode toggle. По умолчанию выключен —
+              raw JSON (visibility_rule_text / highlight_rule_text) скрыт. */}
+          <label
+            className="ltw-checkbox-label"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)', fontSize: '0.85em', opacity: 0.85 }}
+            title="Показать raw JSON правил видимости и подсветки для каждого поля. Только для продвинутых пользователей."
+          >
+            <input
+              type="checkbox"
+              checked={developerMode}
+              onChange={(e) => setDeveloperMode(e.target.checked)}
+              aria-label="Режим разработчика (raw JSON правил)"
+            />
+            Режим разработчика
+          </label>
+          <Button variant="outline" onClick={onAddSection}>
+            <Icon name="plus" size={16} />
+            Добавить секцию
+          </Button>
+        </span>
       </div>
 
       {draftVersion.sections.map((section, sectionIndex) => {
@@ -245,21 +275,23 @@ function ContentTab({
                               updateField={onUpdateField}
                             />
 
-                            <details className="ltw-details">
-                              <summary className="ltw-summary">
-                                Расширенные правила (видимость / подсветка) — raw JSON
-                              </summary>
-                              <div className="ltw-raw-json-grid">
-                                <label className="ltw-grid-6">
-                                  <span>JSON правил видимости</span>
-                                  <textarea className="macos-input" aria-label="JSON правил видимости" rows={3} value={field.visibility_rule_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'visibility_rule_text', event.target.value)} />
-                                </label>
-                                <label className="ltw-grid-6">
-                                  <span>JSON правил подсветки</span>
-                                  <textarea className="macos-input" aria-label="JSON правил подсветки" rows={3} value={field.highlight_rule_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'highlight_rule_text', event.target.value)} />
-                                </label>
-                              </div>
-                            </details>
+                            {developerMode && (
+                              <details className="ltw-details">
+                                <summary className="ltw-summary">
+                                  Расширенные правила (видимость / подсветка) — raw JSON
+                                </summary>
+                                <div className="ltw-raw-json-grid">
+                                  <label className="ltw-grid-6">
+                                    <span>JSON правил видимости</span>
+                                    <textarea className="macos-input" aria-label="JSON правил видимости" rows={3} value={field.visibility_rule_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'visibility_rule_text', event.target.value)} />
+                                  </label>
+                                  <label className="ltw-grid-6">
+                                    <span>JSON правил подсветки</span>
+                                    <textarea className="macos-input" aria-label="JSON правил подсветки" rows={3} value={field.highlight_rule_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'highlight_rule_text', event.target.value)} />
+                                  </label>
+                                </div>
+                              </details>
+                            )}
                           </div>
                         )}
                       </div>
