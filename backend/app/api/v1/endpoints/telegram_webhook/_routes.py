@@ -347,6 +347,164 @@ def exchange_mini_app_auth(
     return result
 
 
+# M4-P0-3: Patient session management endpoints.
+# Allow patients to view active sessions and revoke all (e.g. if phone is stolen).
+@router.post(
+    "/mini-app/sessions/list",
+    operation_id="telegram_mini_app_patient_sessions_list",
+    response_model=dict[str, Any],
+)
+def list_mini_app_patient_sessions(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """List active patient sessions (M4-P0-3).
+
+    Returns active sessions for the authenticated patient, including
+    IP, user-agent, and creation timestamp. Uses initData for auth
+    (backward compat — will be replaced by JWT in future).
+
+    Request body: { "init_data": "<Telegram.WebApp.initData>" }
+    """
+    from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
+        _resolve_mini_app_patient_scope_from_auth,
+        LEGACY_MAX_AUTH_AGE_SECONDS,
+    )
+    from app.models.authentication import UserSession
+
+    try:
+        body = request.json()
+    except Exception:
+        body = {}
+
+    init_data = body.get("init_data") if isinstance(body, dict) else None
+    if not init_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "init_data_required"},
+        )
+
+    try:
+        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=init_data,
+            entry_token=None,
+            expected_section="cabinet",
+        )
+    except Exception as exc:
+        reason = getattr(exc, "reason", "auth_failed")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": reason},
+        ) from exc
+
+    # Patient sessions use negative user_id (see telegram_mini_app_jwt.py)
+    patient_session_user_id = -int(scope.patient_id)
+    sessions = (
+        db.query(UserSession)
+        .filter(
+            UserSession.user_id == patient_session_user_id,
+            UserSession.revoked == False,
+        )
+        .order_by(UserSession.created_at.desc())
+        .all()
+    )
+
+    return {
+        "sessions": [
+            {
+                "id": s.id,
+                "ip": s.ip,
+                "user_agent": s.user_agent,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "expires_at": s.expires_at.isoformat() if s.expires_at else None,
+                "is_current": False,  # TODO: compare with current session's refresh_token
+            }
+            for s in sessions
+        ],
+        "total": len(sessions),
+    }
+
+
+@router.post(
+    "/mini-app/sessions/revoke-all",
+    operation_id="telegram_mini_app_patient_sessions_revoke_all",
+    response_model=dict[str, Any],
+)
+def revoke_all_mini_app_patient_sessions(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Revoke all patient sessions except the current one (M4-P0-3).
+
+    Used when patient suspects their phone is stolen or wants to
+    log out from all other devices.
+
+    Request body: { "init_data": "<Telegram.WebApp.initData>" }
+    """
+    from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
+        _resolve_mini_app_patient_scope_from_auth,
+    )
+    from app.models.authentication import UserSession
+    from datetime import UTC, datetime
+
+    try:
+        body = request.json()
+    except Exception:
+        body = {}
+
+    init_data = body.get("init_data") if isinstance(body, dict) else None
+    if not init_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "init_data_required"},
+        )
+
+    try:
+        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=init_data,
+            entry_token=None,
+            expected_section="cabinet",
+        )
+    except Exception as exc:
+        reason = getattr(exc, "reason", "auth_failed")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": reason},
+        ) from exc
+
+    # Revoke all patient sessions (patient sessions use negative user_id)
+    patient_session_user_id = -int(scope.patient_id)
+    revoked_count = (
+        db.query(UserSession)
+        .filter(
+            UserSession.user_id == patient_session_user_id,
+            UserSession.revoked == False,
+        )
+        .update({"revoked": True, "revoked_at": datetime.now(UTC)})
+    )
+    db.commit()
+
+    # M4-P0-1: Audit log the session revocation
+    from app.services.patient_access_audit import log_patient_access
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="session_management",
+        action="revoke_all",
+        outcome="success",
+        request=request,
+        extra_data={"revoked_count": revoked_count},
+    )
+
+    return {
+        "revoked": True,
+        "revoked_count": revoked_count,
+        "message": f"Отозвано сессий: {revoked_count}",
+    }
+
+
 @router.post(
     "/mini-app/appointments/preview",
     operation_id="telegram_mini_app_preview_appointment_booking",

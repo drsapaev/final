@@ -77,6 +77,14 @@ class Settings(BaseSettings):
         default=False,
         description="Enable /payments/test-init endpoint (bypasses audit logging). Keep false in production.",
     )
+    # M4-P0-3: Session fixation protection — revoke all existing sessions on new login.
+    # When True, a new login invalidates all previous sessions for that user.
+    # This prevents session fixation attacks where an attacker steals a session
+    # before the user logs in. Set to False for backward compatibility.
+    REVOKE_SESSIONS_ON_NEW_LOGIN: bool = Field(
+        default=True,
+        description="Revoke all existing user sessions when a new login succeeds (session fixation protection).",
+    )
 
     # --- CORS (при необходимости) ---
     BACKEND_CORS_ORIGINS: list[str] = Field(
