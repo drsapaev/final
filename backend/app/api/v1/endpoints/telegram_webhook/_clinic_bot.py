@@ -1224,6 +1224,8 @@ def _build_mini_app_patient_cabinet_summary_from_request(
     request: "Request | None" = None,  # M4-P0-1: for audit logging
 ) -> dict[str, Any]:
     from app.services.patient_access_audit import log_patient_access
+    # M4-P1-1: Centralized ABAC authorization
+    from app.services.authorization import AuthorizationError, can_access_phi
 
     try:
         scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
@@ -1232,20 +1234,26 @@ def _build_mini_app_patient_cabinet_summary_from_request(
             entry_token=request_body.entry_token,
             expected_section=request_body.section or "cabinet",
         )
-        if request_body.patient_id is not None:
-            if int(scope.patient_id) != int(request_body.patient_id):
-                # M4-P0-1: Log denied access attempt
-                log_patient_access(
-                    db=db,
-                    scope=scope,
-                    subject_patient_id=request_body.patient_id,
-                    resource_type="cabinet_summary",
-                    action="view",
-                    outcome="denied",
-                    request=request,
-                    extra_data={"reason": "patient_scope_mismatch"},
-                )
-                raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
+        # M4-P1-1: Use centralized authorization instead of inline patient_id check
+        subject_patient_id = request_body.patient_id if request_body.patient_id is not None else scope.patient_id
+        if not can_access_phi(
+            scope,
+            subject_patient_id=subject_patient_id,
+            resource_type="cabinet_summary",
+            action="view",
+        ):
+            # M4-P0-1: Log denied access attempt
+            log_patient_access(
+                db=db,
+                scope=scope,
+                subject_patient_id=subject_patient_id,
+                resource_type="cabinet_summary",
+                action="view",
+                outcome="denied",
+                request=request,
+                extra_data={"reason": "authorization_denied"},
+            )
+            raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
     except TelegramMiniAppInitDataError as exc:
         # M4-P0-1: Log auth failure (cannot identify subject, but log attempt)
         log_patient_access(
@@ -1316,6 +1324,8 @@ def _build_mini_app_patient_report_download_response(
     request: "Request | None" = None,  # M4-P0-1: for audit logging
 ) -> Response:
     from app.services.patient_access_audit import log_patient_access
+    # M4-P1-1: Centralized ABAC authorization
+    from app.services.authorization import can_access_phi
 
     try:
         scope = _resolve_mini_app_patient_scope_for_optional_patient(
@@ -1325,6 +1335,30 @@ def _build_mini_app_patient_report_download_response(
             request_body.patient_id,
             expected_section=request_body.section or "results",
         )
+        # M4-P1-1: Use centralized authorization
+        subject_patient_id = request_body.patient_id if request_body.patient_id is not None else scope.patient_id
+        if not can_access_phi(
+            scope,
+            subject_patient_id=subject_patient_id,
+            resource_type="lab_report",
+            action="download",
+            resource_id=str(request_body.report_id),
+        ):
+            log_patient_access(
+                db=db,
+                scope=scope,
+                subject_patient_id=subject_patient_id,
+                resource_type="lab_report",
+                resource_id=str(request_body.report_id),
+                action="download",
+                outcome="denied",
+                request=request,
+                extra_data={"reason": "authorization_denied"},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"reason": "authorization_denied"},
+            )
     except TelegramMiniAppInitDataError as exc:
         # M4-P0-1: Log auth failure
         log_patient_access(
