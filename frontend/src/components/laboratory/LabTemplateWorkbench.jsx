@@ -121,7 +121,7 @@ export default function LabTemplateWorkbench({
         setCatalogAnalytes(analytes);
       } catch (error) {
         if (!cancelled) {
-          notify('error', error.message || 'Не удалось загрузить лабораторный каталог.');
+          notify('error', error.message || t('errors.catalog_load_failed'));
         }
       }
     }
@@ -134,7 +134,7 @@ export default function LabTemplateWorkbench({
 
   async function handleCreateTemplate(formData) {
     if (!formData.code || !formData.name) {
-      notify('error', 'Укажите код и название шаблона.');
+      notify('error', t('errors.template_code_name_required'));
       return;
     }
     setSaving(true);
@@ -143,7 +143,7 @@ export default function LabTemplateWorkbench({
         ...formData,
         initial_version: blankVersion
       });
-      notify('success', 'Шаблон создан.');
+      notify('success', t('success.template_created'));
       setShowNewTemplateDialog(false);
       await onTemplatesChanged();
     } catch (error) {
@@ -214,14 +214,14 @@ export default function LabTemplateWorkbench({
 
   async function handleSaveTemplate() {
     if (!selectedTemplate) {
-      notify('error', 'Выберите шаблон для редактирования.');
+      notify('error', t('errors.select_template_first'));
       return;
     }
     const rangeErrors = validateReferenceRanges();
     const keyErrors = validateFieldKeyUniqueness();
     if (rangeErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...keyErrors];
-      notify('error', `Ошибки валидации (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
+      notify('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
       return;
     }
     setSaving(true);
@@ -229,7 +229,7 @@ export default function LabTemplateWorkbench({
       const versionId = await ensureDraftVersion();
       const payload = buildVersionPayload(draftVersion);
       await labReportingApi.updateTemplateVersion(versionId, payload);
-      notify('success', 'Черновик шаблона сохранён.');
+      notify('success', t('success.template_draft_saved'));
       await onTemplatesChanged(selectedTemplate.id);
     } catch (error) {
       notify('error', error.message);
@@ -240,14 +240,14 @@ export default function LabTemplateWorkbench({
 
   async function handlePublishVersion() {
     if (!selectedTemplate) {
-      notify('error', 'Выберите шаблон.');
+      notify('error', t('errors.select_template'));
       return;
     }
     const rangeErrors = validateReferenceRanges();
     const keyErrors = validateFieldKeyUniqueness();
     if (rangeErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...keyErrors];
-      notify('error', `Ошибки валидации (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
+      notify('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
       return;
     }
     setSaving(true);
@@ -255,7 +255,7 @@ export default function LabTemplateWorkbench({
       const versionId = await ensureDraftVersion();
       await labReportingApi.updateTemplateVersion(versionId, buildVersionPayload(draftVersion));
       await labReportingApi.publishTemplateVersion(versionId);
-      notify('success', 'Версия шаблона опубликована.');
+      notify('success', t('success.template_published'));
       await onTemplatesChanged(selectedTemplate.id);
     } catch (error) {
       notify('error', error.message);
@@ -269,7 +269,7 @@ export default function LabTemplateWorkbench({
   // portal-dialog с focus-trap, Esc-to-cancel, явным описанием последствий.
   async function handleArchiveTemplate() {
     if (!selectedTemplate || !activeVersion) {
-      notify('error', 'Выберите версию для архивирования.');
+      notify('error', t('errors.select_version_for_archive'));
       return;
     }
     const ok = await confirm({
@@ -284,7 +284,7 @@ export default function LabTemplateWorkbench({
     setSaving(true);
     try {
       await labReportingApi.archiveTemplateVersion(activeVersion.id);
-      notify('success', 'Версия шаблона архивирована.');
+      notify('success', t('success.template_archived'));
       await onTemplatesChanged(selectedTemplate.id);
     } catch (error) {
       notify('error', error.message);
@@ -295,13 +295,13 @@ export default function LabTemplateWorkbench({
 
   async function handleCloneTemplate() {
     if (!selectedTemplate) {
-      notify('error', 'Выберите шаблон для копирования.');
+      notify('error', t('errors.select_template_for_copy'));
       return;
     }
     setSaving(true);
     try {
       const cloned = await labReportingApi.cloneTemplate(selectedTemplate.id);
-      notify('success', 'Копия шаблона создана.');
+      notify('success', t('success.template_cloned'));
       await onTemplatesChanged(cloned.id);
     } catch (error) {
       notify('error', error.message);
@@ -384,12 +384,12 @@ export default function LabTemplateWorkbench({
           range.text || `${range.low || ''}–${range.high || ''}`);
         if (range.low != null) updateField(sectionIndex, fieldIndex, 'reference_low', range.low);
         if (range.high != null) updateField(sectionIndex, fieldIndex, 'reference_high', range.high);
-        notify('success', `Норма загружена из каталога: ${range.text || ''}`);
+        notify('success', `${t('success.norm_loaded_from_catalog')}: ${range.text || ''}`);
       } else {
-        notify('info', 'В каталоге нет норм для этого аналита.');
+        notify('info', t('errors.no_norm_in_catalog'));
       }
     } catch (e) {
-      notify('error', `Ошибка загрузки из каталога: ${e.message}`);
+      notify('error', `${t('errors.catalog_load_error')}: ${e.message}`);
     }
   }
 

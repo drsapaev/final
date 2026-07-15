@@ -206,6 +206,16 @@ const TRANSLATIONS = {
     order_failed: 'Не удалось создать заказ.',
     invalid_numeric: 'Некорректное числовое значение',
     field_restored: 'Поле возвращено к предыдущему значению.',
+    // Template-specific (STRAT#17)
+    catalog_load_failed: 'Не удалось загрузить лабораторный каталог.',
+    template_code_name_required: 'Укажите код и название шаблона.',
+    select_template_first: 'Выберите шаблон для редактирования.',
+    select_template: 'Выберите шаблон.',
+    select_version_for_archive: 'Выберите версию для архивирования.',
+    select_template_for_copy: 'Выберите шаблон для копирования.',
+    validation_errors: 'Ошибки валидации',
+    no_norm_in_catalog: 'В каталоге нет норм для этого аналита.',
+    catalog_load_error: 'Ошибка загрузки из каталога',
   },
 
   // ─── Success messages ────────────────────────────────────────────────────
@@ -216,9 +226,15 @@ const TRANSLATIONS = {
     revised: 'Создана исправленная версия отчёта.',
     notified: 'Результаты отправлены пациенту через Telegram.',
     order_created: 'Заказ создан. Лаборатория увидит его в очереди.',
-    template_created: 'Новый шаблон создан.',
+    template_created: 'Шаблон создан.',
     draft_restored: 'Черновик восстановлен из серверной версии.',
     report_created: 'Новый лабораторный отчёт создан.',
+    // Template-specific (STRAT#17)
+    template_draft_saved: 'Черновик шаблона сохранён.',
+    template_published: 'Версия шаблона опубликована.',
+    template_archived: 'Версия шаблона архивирована.',
+    template_cloned: 'Копия шаблона создана.',
+    norm_loaded_from_catalog: 'Норма загружена из каталога',
   },
 
   // ─── Empty states ────────────────────────────────────────────────────────
