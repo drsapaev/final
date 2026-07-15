@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
@@ -55,12 +55,18 @@ const SERVICE_GROUP_PREFIXES = {
 };
 
 const SERVICE_GROUP_LABELS = {
-  cardiology: 'Кардиология',
-  ecg: 'ЭКГ',
-  dermatology: 'Дерматология',
-  dental: 'Стоматология',
-  laboratory: 'Лаборатория',
-  procedures: 'Процедуры'
+  cardiology: 'sc_group_cardiology',
+  ecg: 'sc_group_ecg',
+  dermatology: 'sc_group_dermatology',
+  dental: 'sc_group_dental',
+  laboratory: 'sc_group_laboratory',
+  procedures: 'sc_group_procedures'
+};
+
+const getServiceGroupLabel = (groupKey, t) => {
+  if (!groupKey) return '';
+  const labelKey = SERVICE_GROUP_LABELS[groupKey];
+  return labelKey ? t(`admin2.${labelKey}`) : groupKey;
 };
 
 const SERVICE_GROUP_ALIASES = {
@@ -100,6 +106,7 @@ const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey
 
 const ServiceCatalog = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces native confirm()).
+  const { t } = useTranslation();
   const [confirm, confirmDialog] = useConfirm();
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState([]);
@@ -191,7 +198,7 @@ const ServiceCatalog = () => {
 
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
-      setMessage({ type: 'error', text: 'Ошибка загрузки данных' });
+      setMessage({ type: 'error', text: t('admin2.sc_load_error') });
     } finally {
       setLoading(false);
     }
@@ -244,7 +251,7 @@ const ServiceCatalog = () => {
 
       setMessage({
         type: 'success',
-        text: editingService ? 'Услуга обновлена' : 'Услуга создана'
+        text: editingService ? t('admin2.sc_service_updated') : t('admin2.sc_service_created')
       });
       setEditingService(null);
       setShowAddForm(false);
@@ -252,7 +259,7 @@ const ServiceCatalog = () => {
       logger.error('Ошибка сохранения:', error);
 
       // ✅ ПАРСИНГ ДЕТАЛЬНЫХ ОШИБОК ОТ BACKEND
-      let errorMessage = 'Ошибка сохранения услуги';
+      let errorMessage = t('admin2.sc_save_error_default');
       const errorData = error.response?.data || {};
 
       if (errorData.detail) {
@@ -264,14 +271,14 @@ const ServiceCatalog = () => {
             const field = err.loc ? err.loc.join('.') : 'unknown';
             return `${field}: ${err.msg}`;
           }).join('; ');
-          errorMessage = `Ошибка валидации: ${errors}`;
+          errorMessage = t('admin2.sc_validation_error', { errors });
         } else if (errorData.detail.message) {
           errorMessage = errorData.detail.message;
         }
       } else if (error.response?.status === 409) {
-        errorMessage = 'Услуга с таким кодом уже существует';
+        errorMessage = t('admin2.sc_code_conflict');
       } else if (error.response?.status === 422) {
-        errorMessage = 'Неверный формат данных. Проверьте коды услуг';
+        errorMessage = t('admin2.sc_invalid_format');
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -284,8 +291,8 @@ const ServiceCatalog = () => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_service_title'),
-      message: 'Удалить услугу?',
-      description: 'Услуга будет деактивирована. При необходимости её можно восстановить через администратора.',
+      message: t('admin2.sc_delete_message'),
+      description: t('admin2.sc_delete_description'),
       confirmLabel: t('admin2.delete_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'danger',
@@ -311,19 +318,19 @@ const ServiceCatalog = () => {
         );
       }
 
-      setMessage({ type: 'success', text: response.data.message || 'Услуга удалена' });
+      setMessage({ type: 'success', text: response.data.message || t('admin2.sc_service_deleted') });
     } catch (error) {
       // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
       setServices(oldServices);
 
       logger.error('Ошибка удаления:', error);
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Ошибка удаления услуги' });
+      setMessage({ type: 'error', text: error.response?.data?.detail || t('admin2.sc_delete_error_default') });
     }
   };
 
   const getCategoryName = (categoryId) => {
     const category = categories.find((cat) => cat.id === categoryId);
-    return category?.name_ru || 'Без категории';
+    return category?.name_ru || t('admin2.sc_no_category');
   };
 
   const getCategorySpecialty = (categoryId) => {
@@ -368,7 +375,7 @@ const ServiceCatalog = () => {
 
         <div className="admin-flex-center-justify">
           <RefreshCw className="admin-spinner-20-mr-8" size={20} />
-          <span className="admin-load-text-primary">Загрузка справочника услуг...</span>
+          <span className="admin-load-text-primary">{t('admin2.sc_loading_catalog')}</span>
         </div>
       </MacOSCard>);
 
@@ -380,10 +387,10 @@ const ServiceCatalog = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="admin-page-h2-xl-semi-primary-m0">
-            Справочник услуг
+            {t('admin2.sc_page_title')}
           </h2>
           <p className="admin-header-p-mt-4-sm-secondary">
-            Управление услугами и ценами по специальностям
+            {t('admin2.sc_page_subtitle')}
           </p>
         </div>
 
@@ -395,16 +402,16 @@ const ServiceCatalog = () => {
               className="admin-btn-filter-active-catalog"
             >
               <CheckSquare size={16} className="mr-2" />
-              Редактировать ({selectedServiceIds.size})
+              {t('admin2.sc_edit_count_btn', { count: selectedServiceIds.size })}
             </Button>
           )}
           <Button variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw size={16} className="mr-2" />
-            Обновить
+            {t('admin2.sc_refresh_btn')}
           </Button>
           <Button onClick={() => setShowAddForm(true)}>
             <Plus size={16} className="mr-2" />
-            Добавить услугу
+            {t('admin2.sc_add_btn')}
           </Button>
         </div>
       </div>
@@ -426,43 +433,43 @@ const ServiceCatalog = () => {
         <div className="admin-grid-auto-250-12">
           <div>
             <label className="admin-label-block-sm-med-primary-mb-8">
-              Поиск по названию
+              {t('admin2.sc_filter_search_label')}
             </label>
             <Input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Введите название услуги..."
+              placeholder={t('admin2.sc_filter_search_ph')}
               icon={Search}
               iconPosition="left" />
           </div>
 
           <div>
             <label className="admin-label-block-sm-med-primary-mb-8">
-              Специальность
+              {t('admin2.sc_filter_specialty_label')}
             </label>
             <Select
               value={selectedSpecialty}
               onChange={(value) => setSelectedSpecialty(value)}
               options={[
-              { value: 'all', label: 'Все специальности' },
-              { value: 'cardiology', label: 'Кардиология' },
-              { value: 'dermatology', label: 'Дерматология' },
-              { value: 'stomatology', label: 'Стоматология' },
-              { value: 'laboratory', label: 'Лаборатория' },
-              { value: 'physiotherapy', label: 'Физиотерапия' }]
+              { value: 'all', label: t('admin2.sc_filter_specialty_all') },
+              { value: 'cardiology', label: t('admin2.sc_filter_specialty_cardiology') },
+              { value: 'dermatology', label: t('admin2.sc_filter_specialty_dermatology') },
+              { value: 'stomatology', label: t('admin2.sc_filter_specialty_stomatology') },
+              { value: 'laboratory', label: t('admin2.sc_filter_specialty_laboratory') },
+              { value: 'physiotherapy', label: t('admin2.sc_filter_specialty_physiotherapy') }]
               } />
           </div>
 
           <div>
             <label className="admin-label-14-500-primary-mb-8">
-              Категория
+              {t('admin2.sc_filter_category_label')}
             </label>
             <Select
               value={selectedCategory}
               onChange={(value) => setSelectedCategory(value)}
               options={[
-              { value: 'all', label: 'Все категории' },
+              { value: 'all', label: t('admin2.sc_filter_category_all') },
               ...categories.map((category) => ({
                 value: category.id,
                 label: category.name_ru
@@ -472,13 +479,13 @@ const ServiceCatalog = () => {
 
           <div>
             <label className="admin-label-14-500-primary-mb-8">
-              Отделение
+              {t('admin2.sc_filter_department_label')}
             </label>
             <Select
               value={selectedDepartment}
               onChange={(value) => setSelectedDepartment(value)}
               options={[
-              { value: 'all', label: 'Все отделения' },
+              { value: 'all', label: t('admin2.sc_filter_department_all') },
               ...departments.map((dept) => ({
                 value: dept.key,
                 label: dept.name_ru
@@ -499,7 +506,7 @@ const ServiceCatalog = () => {
               {services.length}
             </div>
             <div className="admin-stat-label-sm-secondary-mt-4">
-              Всего услуг
+              {t('admin2.sc_stat_total')}
             </div>
           </div>
         </MacOSCard>
@@ -512,7 +519,7 @@ const ServiceCatalog = () => {
               {services.filter((s) => s.active).length}
             </div>
             <div className="admin-stat-label-sm-secondary-mt-4">
-              Активных
+              {t('admin2.sc_stat_active')}
             </div>
           </div>
         </MacOSCard>
@@ -525,7 +532,7 @@ const ServiceCatalog = () => {
               {categories.length}
             </div>
             <div className="admin-stat-label-sm-secondary-mt-4">
-              Категорий
+              {t('admin2.sc_stat_categories')}
             </div>
           </div>
         </MacOSCard>
@@ -538,7 +545,7 @@ const ServiceCatalog = () => {
               {filteredServices.length}
             </div>
             <div className="admin-stat-label-sm-secondary-mt-4">
-              Найдено
+              {t('admin2.sc_stat_filtered')}
             </div>
           </div>
         </MacOSCard>
@@ -598,7 +605,7 @@ const ServiceCatalog = () => {
                     </div>
                     {canonicalCode &&
                   <div className="admin-service-code">
-                        Код: {canonicalCode}
+                        {t('admin2.sc_cell_code', { code: canonicalCode })}
                       </div>
                     }
                     {hasLegacyCodeMismatch &&
@@ -616,22 +623,22 @@ const ServiceCatalog = () => {
 
               price:
               <div className="admin-service-price">
-                  {service.price ? `${service.price.toLocaleString()} ${service.currency || 'UZS'}` : 'Не указана'}
+                  {service.price ? `${service.price.toLocaleString()} ${service.currency || 'UZS'}` : t('admin2.sc_cell_price_not_set')}
                 </div>,
 
               duration:
               <div className="admin-service-duration">
-                  {service.duration_minutes ? `${service.duration_minutes} мин` : '—'}
+                  {service.duration_minutes ? t('admin2.sc_cell_duration', { minutes: service.duration_minutes }) : '—'}
                 </div>,
 
               doctor:
               <div className="admin-service-doctor">
-                  {doctor ? doctor.user?.full_name || `Врач #${doctor.id}` : '—'}
+                  {doctor ? doctor.user?.full_name || t('admin2.sc_cell_doctor_default', { id: doctor.id }) : '—'}
                 </div>,
 
               status:
               <Badge variant={service.active ? 'success' : 'error'}>
-                  {service.active ? 'Активна' : 'Неактивна'}
+                  {service.active ? t('admin2.sc_status_active') : t('admin2.sc_status_inactive')}
                 </Badge>,
 
               actions:
@@ -643,7 +650,7 @@ const ServiceCatalog = () => {
                   aria-label={`View change history for ${service.name}`}
                   onClick={() => setShowHistory({ serviceId: service.id, serviceName: service.name })}
                   className="admin-icon-square-btn"
-                  title="История изменений">
+                  title={t('admin2.sc_action_history_title')}>
                     <History aria-hidden="true" size={14} />
                   </Button>
                   <Button
@@ -653,7 +660,7 @@ const ServiceCatalog = () => {
                   aria-label={`Edit service ${service.name}`}
                   onClick={() => setEditingService(service)}
                   className="admin-icon-square-btn"
-                  title="Редактировать">
+                  title={t('admin2.sc_action_edit_title')}>
                     <Edit aria-hidden="true" size={14} />
                   </Button>
                   <Button
@@ -663,7 +670,7 @@ const ServiceCatalog = () => {
                   aria-label={`Delete service ${service.name}`}
                   onClick={() => handleDeleteService(service.id)}
                   className="admin-icon-square-btn-error"
-                  title="Удалить">
+                  title={t('admin2.sc_action_delete_title')}>
                     <Trash2 aria-hidden="true" size={14} />
                   </Button>
                 </div>
@@ -673,14 +680,14 @@ const ServiceCatalog = () => {
           emptyState={
           <MacOSEmptyState
                 icon={Package}
-                title="Услуги не найдены"
+                title={t('admin2.sc_empty_title')}
                 description={searchTerm || selectedCategory !== 'all' || selectedSpecialty !== 'all' || selectedDepartment !== 'all' ?
-                'Попробуйте изменить критерии поиска' :
-                'Добавьте первую услугу в справочник'}
+                t('admin2.sc_empty_desc_filtered') :
+                t('admin2.sc_empty_desc_initial')}
                 action={
                 <Button onClick={() => setShowAddForm(true)}>
                       <Plus className="w-4 h-4 mr-2" />
-                      Добавить услугу
+                      {t('admin2.sc_add_btn')}
                     </Button>
                 } />
           } />
@@ -752,6 +759,7 @@ const ServiceCatalog = () => {
 // Компонент формы услуги с вкладками
 // ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
 const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
   const [formData, setFormData] = useState({
@@ -796,7 +804,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
           (s) => (s.code === normalizedCode || s.service_code === normalizedCode) && s.id !== service?.id
         );
         if (duplicate) {
-          setCodeWarning(`⚠️ Код "${normalizedCode}" уже используется: ${duplicate.name}`);
+          setCodeWarning(t('admin2.sc_code_duplicate_warning', { code: normalizedCode, name: duplicate.name }));
         } else {
           setCodeWarning('');
         }
@@ -808,7 +816,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [formData.code, service?.id]);
+  }, [formData.code, service?.id, t]);
 
   const selectedFormCategory = categories.find(
     (category) => category.id === parseInt(formData.category_id, 10)
@@ -831,7 +839,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     );
   const expectedPrefixLabel = allowedPrefixes.length ? allowedPrefixes.join(' / ') : '';
   const selectedGroupLabel = selectedServiceGroup
-    ? SERVICE_GROUP_LABELS[selectedServiceGroup] || selectedServiceGroup
+    ? getServiceGroupLabel(selectedServiceGroup, t)
     : '';
 
   // Auto-extract category_code from code prefix (guarded by prefix alignment checks)
@@ -847,8 +855,8 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
     if (codePrefixMismatch) {
       const errorText = selectedGroupLabel
-        ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}". Допустимые префиксы: ${expectedPrefixLabel}`
-        : `Код ${normalizedCode} не подходит для выбранной категории услуги. Допустимые префиксы: ${expectedPrefixLabel}`;
+        ? t('admin2.sc_code_mismatch_error_with_group', { code: normalizedCode, group: selectedGroupLabel, prefixes: expectedPrefixLabel })
+        : t('admin2.sc_code_mismatch_error_no_group', { code: normalizedCode, prefixes: expectedPrefixLabel });
       logger.warn('[FIX:ADM-06] Blocking mismatched service code before save:', {
         normalizedCode,
         selectedServiceGroup,
@@ -919,15 +927,15 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   };
 
   const tabs = [
-  { key: 'basic', label: 'Основное', icon: Package },
-  { key: 'queue', label: 'Очередь', icon: Users },
-  { key: 'options', label: 'Опции', icon: Filter }];
+  { key: 'basic', label: t('admin2.sc_tab_basic'), icon: Package },
+  { key: 'queue', label: t('admin2.sc_tab_queue'), icon: Users },
+  { key: 'options', label: t('admin2.sc_tab_options'), icon: Filter }];
 
 
   return (
     <MacOSCard variant="default" className="p-6">
       <h3 className="admin-h3-18-600-primary-mb-20">
-        {service ? 'Редактирование услуги' : 'Добавление услуги'}
+        {service ? t('admin2.sc_form_title_edit') : t('admin2.sc_form_title_add')}
       </h3>
 
       {/* Tab Navigation */}
@@ -961,7 +969,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         <div className="admin-grid-auto-250-12">
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Название услуги *
+                {t('admin2.sc_form_name_label')}
               </label>
               <Input
               type="text"
@@ -972,7 +980,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Код услуги (K01, D02...)
+                {t('admin2.sc_form_code_label')}
               </label>
               <Input
               type="text"
@@ -985,18 +993,18 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               {(() => {
                 const codeHint = codePrefixMismatch
                   ? { type: 'error', text: selectedGroupLabel
-                      ? `Код ${normalizedCode} не подходит для группы «${selectedGroupLabel}». Допустимо: ${expectedPrefixLabel}`
-                      : `Код ${normalizedCode} не подходит для выбранной группы.` }
+                      ? t('admin2.sc_code_mismatch_inline_with_group', { code: normalizedCode, group: selectedGroupLabel, prefixes: expectedPrefixLabel })
+                      : t('admin2.sc_code_mismatch_inline_no_group', { code: normalizedCode }) }
                   : codeWarning
                   ? { type: 'error', text: codeWarning }
                   : checkingDuplicates
-                  ? { type: 'info', text: 'Проверка...' }
+                  ? { type: 'info', text: t('admin2.sc_code_checking') }
                   : (formData.code && !isValidServiceCode(formData.code))
-                  ? { type: 'warning', text: 'Формат: 1 буква + 2 цифры' }
+                  ? { type: 'warning', text: t('admin2.sc_code_format_hint') }
                   : (derivedCategoryCode && selectedGroupLabel)
-                  ? { type: 'info', text: `Префикс: ${derivedCategoryCode} (ожидается ${expectedPrefixLabel} для «${selectedGroupLabel}»)` }
+                  ? { type: 'info', text: t('admin2.sc_code_prefix_hint_with_group', { prefix: derivedCategoryCode, expected: expectedPrefixLabel, group: selectedGroupLabel }) }
                   : derivedCategoryCode
-                  ? { type: 'info', text: `Префикс кода: ${derivedCategoryCode}` }
+                  ? { type: 'info', text: t('admin2.sc_code_prefix_hint_no_group', { prefix: derivedCategoryCode }) }
                   : null;
 
                 if (!codeHint) return null;
@@ -1018,13 +1026,13 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Категория *
+                {t('admin2.sc_form_category_label')}
               </label>
               <Select
               value={formData.category_id}
               onChange={(value) => handleChange('category_id', value)}
               options={[
-              { value: '', label: 'Выберите категорию' },
+              { value: '', label: t('admin2.sc_form_category_ph') },
               ...categories.map((category) => ({
                 value: category.id,
                 label: `${category.name_ru} (${category.specialty})`
@@ -1034,7 +1042,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Цена
+                {t('admin2.sc_form_price_label')}
               </label>
               <div className="admin-form-row-gap-8">
                 <Input
@@ -1058,7 +1066,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Длительность (мин)
+                {t('admin2.sc_form_duration_label')}
               </label>
               <Input
               type="number"
@@ -1070,16 +1078,16 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Врач (опционально)
+                {t('admin2.sc_form_doctor_label')}
               </label>
               <Select
               value={formData.doctor_id}
               onChange={(value) => handleChange('doctor_id', value)}
               options={[
-              { value: '', label: 'Все врачи' },
+              { value: '', label: t('admin2.sc_form_doctor_all') },
               ...doctors.map((doctor) => ({
                 value: doctor.id,
-                label: `${doctor.user?.full_name || `Врач #${doctor.id}`} (${doctor.specialty})`
+                label: `${doctor.user?.full_name || t('admin2.sc_cell_doctor_default', { id: doctor.id })} (${doctor.specialty})`
               }))]
               } />
             </div>
@@ -1091,20 +1099,19 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         <div className="flex flex-col gap-4">
             <div className="admin-info-banner-catalog">
               <p className="admin-p-14-secondary-m0">
-                Выберите вкладку регистратуры, на которой будет отображаться эта услуга.
-                Это определяет, в какую очередь попадёт пациент.
+                {t('admin2.sc_form_queue_banner_desc')}
               </p>
             </div>
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Вкладка регистратуры
+                {t('admin2.sc_form_queue_tag_label')}
               </label>
               <Select
               value={formData.queue_tag}
               onChange={(value) => handleChange('queue_tag', value)}
               options={[
-              { value: '', label: 'Без очереди (услуга не появится в регистратуре)' },
+              { value: '', label: t('admin2.sc_form_queue_no_queue') },
               ...queueProfiles.
               filter((profile) => profile.is_active !== false).
               map((profile) => ({
@@ -1117,7 +1124,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             {formData.queue_tag &&
           <div className="admin-success-banner-catalog">
                 <p className="admin-p-14-success-m0">
-                  ✓ Услуга будет отображаться на вкладке с тегом: <strong>{formData.queue_tag}</strong>
+                  {t('admin2.sc_form_queue_active_hint_prefix')} <strong>{formData.queue_tag}</strong>
                 </p>
               </div>
           }
@@ -1132,36 +1139,36 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               id="active"
               checked={formData.active}
               onChange={(checked) => handleChange('active', checked)}
-              label="Услуга активна" />
+              label={t('admin2.sc_form_active_label')} />
 
               <Checkbox
               id="requires_doctor"
               checked={formData.requires_doctor}
               onChange={(checked) => handleChange('requires_doctor', checked)}
-              label="Требует врача" />
+              label={t('admin2.sc_form_requires_doctor_label')} />
 
               <Checkbox
               id="is_consultation"
               checked={formData.is_consultation}
               onChange={(checked) => handleChange('is_consultation', checked)}
-              label="Это консультация" />
+              label={t('admin2.sc_form_is_consultation_label')} />
 
               <Checkbox
               id="allow_doctor_price_override"
               checked={formData.allow_doctor_price_override}
               onChange={(checked) => handleChange('allow_doctor_price_override', checked)}
-              label="Врач может изменить цену" />
+              label={t('admin2.sc_form_allow_override_label')} />
 
             </div>
 
             <div className="admin-bg-secondary-box-catalog">
               <h5 className="admin-h5-14-600-primary-mb-8">
-                Подсказки:
+                {t('admin2.sc_form_hints_heading')}
               </h5>
               <ul className="admin-ul-13-secondary-pl-20">
-                <li><strong>Требует врача</strong> — для ЭхоКГ, сложных процедур</li>
-                <li><strong>Консультация</strong> — участвует в расчёте льгот и повторных визитов</li>
-                <li><strong>Врач может изменить цену</strong> — для индивидуальных случаев</li>
+                <li><strong>{t('admin2.sc_form_requires_doctor_label')}</strong>{t('admin2.sc_form_hint_requires_doctor')}</li>
+                <li><strong>{t('admin2.sc_form_hint_consultation_term')}</strong>{t('admin2.sc_form_hint_consultation')}</li>
+                <li><strong>{t('admin2.sc_form_allow_override_label')}</strong>{t('admin2.sc_form_hint_allow_override')}</li>
               </ul>
             </div>
           </div>
@@ -1175,11 +1182,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
           <div className="admin-form-row-gap-12">
             <Button type="button" variant="outline" onClick={onCancel}>
               <X size={16} className="mr-2" />
-              Отменить
+              {t('admin2.sc_form_cancel_btn')}
             </Button>
             <Button type="submit">
               <Save size={16} className="mr-2" />
-              Сохранить
+              {t('admin2.sc_form_save_btn')}
             </Button>
           </div>
         </div>
