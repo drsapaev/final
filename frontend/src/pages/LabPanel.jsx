@@ -96,6 +96,11 @@ export default function LabPanel() {
   const [queueOffset, setQueueOffset] = useState(0);
   const [hasMoreQueue, setHasMoreQueue] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // STRAT#16: ref для AbortController очереди — отменяет предыдущий
+  // запрос при быстром повторном вызове loadLabAppointments.
+  const queueAbortControllerRef = useRef(null);
+  // STRAT#16: отдельный ref для load-more запросов.
+  const loadMoreAbortControllerRef = useRef(null);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -222,6 +227,15 @@ export default function LabPanel() {
   }, [switchTab]);
 
   const loadLabAppointments = useCallback(async () => {
+    // STRAT#16: AbortController для отмены предыдущего запроса при
+    // быстром повторном вызове (refresh, tab switch). Предотвращает
+    // setState-after-unmount и race conditions.
+    if (queueAbortControllerRef.current) {
+      queueAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    queueAbortControllerRef.current = controller;
+
     setAppointmentsLoading(true);
     try {
       // P-03 fix: используем lab-specific façade endpoint вместо прямого
@@ -234,9 +248,12 @@ export default function LabPanel() {
       // (STRAT#4), но frontend ранее грузил все записи сразу. Теперь
       // initial load получает первые LAB_QUEUE_PAGE_SIZE=50 записей;
       // loadMoreAppointments() догружает следующие.
+      //
+      // STRAT#16: передаём signal для отмены запроса при быстром повторе.
       const payload = await labReportingApi.listQueueToday(null, {
         limit: LAB_QUEUE_PAGE_SIZE,
         offset: 0,
+        signal: controller.signal,
       });
       const queueEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments(queueEntries);
@@ -257,6 +274,8 @@ export default function LabPanel() {
       });
       logger.info('[LabPanel] loaded lab queue entries', queueEntries.length);
     } catch (error) {
+      // STRAT#16: не показываем error notification для отменённых запросов.
+      if (isAbortLikeError(error)) return;
       logger.error('[LabPanel] loadLabAppointments failed', error);
       notify(
         'error',
@@ -275,11 +294,19 @@ export default function LabPanel() {
   // LabQueueWorkbench (заменит client-side load-more из FIX#13).
   const loadMoreAppointments = useCallback(async () => {
     if (loadingMore || !hasMoreQueue) return;
+    // STRAT#16: AbortController для load-more (аналогично loadLabAppointments).
+    if (loadMoreAbortControllerRef.current) {
+      loadMoreAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    loadMoreAbortControllerRef.current = controller;
+
     setLoadingMore(true);
     try {
       const payload = await labReportingApi.listQueueToday(null, {
         limit: LAB_QUEUE_PAGE_SIZE,
         offset: queueOffset,
+        signal: controller.signal,
       });
       const newEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments((current) => [...current, ...newEntries]);
@@ -287,6 +314,8 @@ export default function LabPanel() {
       setHasMoreQueue((payload?.total ?? 0) > queueOffset + newEntries.length);
       logger.info('[LabPanel] loaded more lab queue entries', newEntries.length);
     } catch (error) {
+      // STRAT#16: не показываем error notification для отменённых запросов.
+      if (isAbortLikeError(error)) return;
       logger.error('[LabPanel] loadMoreAppointments failed', error);
       notify('error', getErrorMessage(error, 'Не удалось загрузить дополнительные записи очереди.'));
     } finally {
@@ -462,6 +491,19 @@ export default function LabPanel() {
       }
     }
   }, [loadLabAppointments, loadRecentReports, loadTemplates, searchParams, loadInstance]);
+
+  // STRAT#16: cleanup — отменяем все pending запросы при unmount компонента.
+  // Предотвращает setState-after-unmark warnings и network waste.
+  useEffect(() => {
+    return () => {
+      if (queueAbortControllerRef.current) {
+        queueAbortControllerRef.current.abort();
+      }
+      if (loadMoreAbortControllerRef.current) {
+        loadMoreAbortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (selectedAppointment?.patient_id) {

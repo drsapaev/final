@@ -77,7 +77,10 @@ export const labReportingApi = {
       search.set('offset', String(params.offset));
     }
     const suffix = search.size ? `?${search.toString()}` : '';
-    return request(`/lab/queue/today${suffix}`);
+    // STRAT#16: пробрасываем signal в request() для AbortController support.
+    return request(`/lab/queue/today${suffix}`, {
+      ...(params.signal ? { signal: params.signal } : {}),
+    });
   },
 
   listOrders(params = {}) {
