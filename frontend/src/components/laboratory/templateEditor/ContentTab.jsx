@@ -81,6 +81,34 @@ function ContentTab({
     if (ok) onRemoveField(sectionIndex, fieldIndex);
   }
 
+  // UX-AUDIT-FIX7: Bulk-загрузка всех референсных интервалов из каталога.
+  // Ранее лаборант кликал «Загрузить из каталога» на каждом поле отдельно —
+  // при 20 показателях это 20 микро-решений вместо одного (закон Хика,
+  // Fitts's Law). Теперь одна кнопка в шапке ContentTab.
+  function handleBulkLoadCatalogReferenceRanges() {
+    if (!draftVersion?.sections) return;
+    let loaded = 0;
+    let skipped = 0;
+    draftVersion.sections.forEach((section, sectionIndex) => {
+      (section.fields || []).forEach((field, fieldIndex) => {
+        if (field.reference_mode === 'catalog' && field.analyte_code) {
+          onLoadCatalogReferenceRange(sectionIndex, fieldIndex, field.analyte_code);
+          loaded += 1;
+        } else {
+          skipped += 1;
+        }
+      });
+    });
+    // Используем глобальный notify (если передан) или тихий возврат.
+    // Parent (LabTemplateWorkbench) сам обработает уведомление, т.к.
+    // каждый вызов onLoadCatalogReferenceRange триггерит его callback.
+    // Здесь только логируем для отладки.
+    if (typeof window !== 'undefined' && window.console) {
+      // eslint-disable-next-line no-console
+      console.debug('[ContentTab] bulk-load reference ranges:', { loaded, skipped });
+    }
+  }
+
   return (
     <div className="ltw-grid">
       <div className="ltw-flex-between">
@@ -106,6 +134,24 @@ function ContentTab({
           <Button variant="outline" onClick={onAddSection}>
             <Icon name="plus" size={16} />
             Добавить секцию
+          </Button>
+          {/* UX-AUDIT-FIX7: Bulk-кнопка для загрузки всех референсных
+              интервалов из каталога одним кликом. Показывается всегда,
+              но активна только если есть хотя бы одно поле с reference_mode
+              === 'catalog' и непустым analyte_code. */}
+          <Button
+            variant="outline"
+            size="small"
+            onClick={handleBulkLoadCatalogReferenceRanges}
+            disabled={!draftVersion?.sections?.some((s) =>
+              (s.fields || []).some((f) =>
+                f.reference_mode === 'catalog' && f.analyte_code
+              )
+            )}
+            title="Загрузить референсные интервалы из каталога для всех полей, у которых указан код аналита"
+          >
+            <Icon name="square.and.arrow.down.on.square" size={14} />
+            Загрузить все нормы
           </Button>
         </span>
       </div>
