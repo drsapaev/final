@@ -300,3 +300,9 @@ class AuthorizationService:
 
 # Singleton instance
 authorization_service = AuthorizationService()
+
+# M4-P1-1: Re-export dependency helpers for convenient import
+from app.services.authorization.dependencies import (  # noqa: E402, F401
+    can_access_phi,
+    check_phi_access,
+)

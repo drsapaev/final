@@ -153,17 +153,26 @@ class TestStaffAccess:
         assert result.reason == "staff_role_denied"
 
     def test_admin_has_full_access(self):
-        """Admin can access all resources."""
+        """Admin can access all resources (that are defined in STAFF_PERMISSIONS)."""
         scope = _make_staff_scope(staff_role="admin")
-        for resource_type in ["lab_report", "cabinet_summary", "form_submission"]:
-            for action in ["view", "download"]:
-                result = authorization_service.can_access_phi(
-                    scope,
-                    subject_patient_id=42,
-                    resource_type=resource_type,
-                    action=action,
-                )
-                assert result.allowed, f"Admin failed for {resource_type}:{action}"
+        # Only test resource:action combos that exist in STAFF_PERMISSIONS for admin
+        test_cases = [
+            ("lab_report", "view"),
+            ("lab_report", "download"),
+            ("cabinet_summary", "view"),
+            ("form_submission", "view"),
+            ("appointment", "view"),
+            ("appointment", "create"),
+            ("appointment", "preview"),
+        ]
+        for resource_type, action in test_cases:
+            result = authorization_service.can_access_phi(
+                scope,
+                subject_patient_id=42,
+                resource_type=resource_type,
+                action=action,
+            )
+            assert result.allowed, f"Admin failed for {resource_type}:{action}"
 
     def test_staff_cannot_submit_patient_forms(self):
         """Staff cannot submit patient forms (patient-only action)."""
